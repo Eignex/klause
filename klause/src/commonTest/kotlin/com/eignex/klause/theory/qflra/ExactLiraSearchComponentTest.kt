@@ -53,6 +53,75 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `arithmetic assertions retract across decisions without arithmetic effects`() {
+        val model = Problem(
+            numBoolVars = 4,
+            intBounds = openBounds(),
+            factors = arrayOf(ReifiedLinear(3, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (variable in 0..2) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+            }
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(3, true))))
+            val first = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+            assertEquals(
+                bigIntOf(7), assertNotNull(first.model.valueOf<ExactLiraAssignment>(component)).ints.single(),
+            )
+            session.popTo(1)
+            for (variable in 1..3) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, false))))
+            }
+            val direction = assertNotNull(component.nextBranch(session)).first()
+            assertIs<ComponentResult.Consistent>(session.push(direction))
+
+            val sibling = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+
+            assertTrue(
+                assertNotNull(sibling.model.valueOf<ExactLiraAssignment>(component)).ints.single() != bigIntOf(7),
+            )
+        }
+    }
+
+    @Test
+    fun `disequality directions retain inherited bounds and restore their sibling`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.NE, 0.0),
+                ReifiedRealLinear(
+                    0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0,
+                ),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val sides = assertNotNull(SourceBoundAtom.rationalSplit(
+                session, listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO,
+            ))
+            for (upper in listOf(true, false)) {
+                val side = if (upper) sides.positive else sides.negative
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side)))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, upper))))
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                assertEquals(upper, assignment.bools[0])
+                assertEquals(!upper, assignment.reals.single() > BigFraction.ZERO)
+                session.popTo(0)
+            }
+        }
+    }
+
+    @Test
     fun `compound disjunct conflicts retain their Boolean names`() {
         for ((relation, values, fixed) in listOf(
             Triple(LinearOp.EQ, longArrayOf(0L, 1L), 2),

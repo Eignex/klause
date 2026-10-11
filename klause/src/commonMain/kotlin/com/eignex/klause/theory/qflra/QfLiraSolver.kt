@@ -101,6 +101,7 @@ class ExactLiraSearchComponent(
     private val disjunctOwner = Any()
     private var disjunctionRegistrationDeclined = false
     private val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    private val assertedRows = exactForms.map { BooleanArray(it.size) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -133,6 +134,7 @@ class ExactLiraSearchComponent(
     private val lpDelegate: Lazy<LpPropagator> = lazy {
         LpPropagator(
             object : LpSearchPolicy {
+                override val eagerAssertionScopes: Boolean = false
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                     accept(decision, context)
                 override fun propagate(context: SearchContext): ComponentResult = relax(context)
@@ -386,11 +388,7 @@ class ExactLiraSearchComponent(
                 val variable = decision.literal ushr 1
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
-                node = node.copy(
-                    retainedReduction = null,
-                    disequalityDirections = emptyMap(),
-                    directionPremises = emptyMap(),
-                )
+                node = node.copy(retainedReduction = null)
                 if (variable !in arithmeticVariables && bools.any { it == UNASSIGNED }) {
                     nodesByLevel.put(context.decisionLevel, node)
                     dirty = wasDirty
@@ -436,6 +434,7 @@ class ExactLiraSearchComponent(
                         } == true
                     }
                     node = node.copy(sourceBranches = node.sourceBranches + atom, retainedReduction = retained)
+                    if (!lp.atLevel(context.decisionLevel, operationStop)) return ComponentResult.Indeterminate
                     if (!system.assertAtom(atom, SearchAtomPremise.Asserted(decision))) {
                         return ComponentResult.Indeterminate
                     }
@@ -453,8 +452,10 @@ class ExactLiraSearchComponent(
 
     private fun assertSource(context: SearchContext): Boolean {
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
+        val published = ArrayList<RowAddress>()
         for ((factorIndex, factor) in model.factors.withIndex()) {
             for ((index, row) in factor.linearRows.withIndex()) {
+                if (assertedRows[factorIndex][index]) continue
                 val address = RowAddress(factorIndex, index)
                 val asserted = node.rowAssertions[address]
                 if (factor.linearForm is LinearForm.Disjunction && asserted == null) continue
@@ -469,6 +470,8 @@ class ExactLiraSearchComponent(
                     disequalities += Triple(address, comparison, premise)
                 } else if (!system.assertComparison(comparison, null, premise)) {
                     return false
+                } else {
+                    published += address
                 }
             }
         }
@@ -524,11 +527,13 @@ class ExactLiraSearchComponent(
             ) {
                 return false
             }
+            published += address
         }
         directions?.let { next ->
             node = node.copy(disequalityDirections = next, directionPremises = checkNotNull(directionPremises))
         }
         nodesByLevel.put(context.decisionLevel, node)
+        for (address in published) assertedRows[address.factor][address.row] = true
         return true
     }
 
@@ -571,6 +576,7 @@ class ExactLiraSearchComponent(
         ) {
             return ComponentResult.Consistent
         }
+        if (!lp.atLevel(context.decisionLevel, operationStop)) return ComponentResult.Indeterminate
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
@@ -748,6 +754,7 @@ class ExactLiraSearchComponent(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        assertedRows.forEach { it.fill(false) }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
                 bools[variable] = UNASSIGNED

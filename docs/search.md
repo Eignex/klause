@@ -136,6 +136,11 @@ row, fixing and cutoff premises. See
 [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
 The complete integer theory batches newly selected disequality directions and
 their immutable reasons into one node snapshot per source assertion pass.
+Directions retain their premises along the branch, and retraction restores the
+parent snapshot before a sibling adds assertions. Completed source comparisons
+are installed once along a branch; retraction clears publication markers before
+restored assertions and sibling substitutions are installed against the LP trail.
+Incomplete passes publish no markers.
 
 The complete integer theory checks source equality paths before invoking the LP.
 Equalities with one coefficient or two coefficients of equal magnitude form a
