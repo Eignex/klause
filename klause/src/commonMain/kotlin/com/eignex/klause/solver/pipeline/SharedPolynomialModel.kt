@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
@@ -61,6 +62,11 @@ internal class SharedPolynomialModel private constructor(
                 val explicit = formulaForFactor(factor)
                 if (explicit != null) {
                     formulas += explicit
+                } else if (factor is ContinuousProduct) {
+                    formulas += PolynomialRealFormula.Atom(
+                        PolynomialExpression.Product(listOf(real(factor.a), real(factor.b))),
+                        PolynomialRelation.EQ, real(factor.result),
+                    )
                 } else if (factor is RealProduct) {
                     formulas += PolynomialRealFormula.Atom(
                         PolynomialExpression.Product(listOf(integer(factor.intOperand), real(factor.realOperand))),
@@ -89,6 +95,10 @@ internal class SharedPolynomialModel private constructor(
                 if (upper.isFinite()) formulas += bound(real(id), PolynomialRelation.LE, upper)
             }
             val formula = lowering.formula(formulas)
+            val fixedReals = (0 until source.numRealVars).mapNotNull { id ->
+                source.realLower[id].takeIf { it.isFinite() && it == source.realUpper[id] }
+                    ?.let { id to requireNotNull(BigFraction.ofDouble(it)) }
+            }.toMap()
             return SharedPolynomialModel(
                 source,
                 Problem(
@@ -97,7 +107,7 @@ internal class SharedPolynomialModel private constructor(
                     source.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },
                     source.hasSymmetryBreaking, settings = source.settings,
                 ),
-                PolynomialTheoryService(formula, source.numBoolVars, lowering.realCount),
+                PolynomialTheoryService(formula, source.numBoolVars, lowering.realCount, fixedReals),
                 integerIds.toMap(),
             )
         }

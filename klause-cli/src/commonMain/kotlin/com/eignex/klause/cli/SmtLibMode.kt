@@ -97,6 +97,9 @@ internal object SmtLibMode : CliMode {
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
             common.logRoute(route, routingElapsedMs)
             return when (route) {
+                is SourceProblemRoute.PolynomialTheory -> polynomialSolvable(
+                    route, { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) }, routingElapsedMs,
+                )
                 is SourceProblemRoute.Finite -> linearSolvable(
                     route.problem,
                     minimizedObjective,

@@ -112,6 +112,10 @@ internal object MiniZincMode : CliMode {
                     routeLinearToTheory = integralObjective,
                 )
                 return when (route) {
+                    is SourceProblemRoute.PolynomialTheory -> polynomialSolvable(route, { assignment ->
+                        applier?.render(program, assignment)
+                            ?: writeFlatZincSolution(program, assignment, outputObjective)
+                    })
                     is SourceProblemRoute.Finite -> linearSolvable(
                         route.problem, minimized, maximize, render,
                         searchHints = program.searchHints?.toSearchHints(),
