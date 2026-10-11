@@ -2,6 +2,8 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.bound.CumulativeFlowBound
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
+import com.eignex.klause.util.constructionLongArray
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesLowerBound
@@ -32,13 +34,21 @@ internal class SchedulingView(
 /** Every [Cumulative] of [problem], normalized; factors the relaxations cannot soundly
  *  encode (variable durations, optional tasks, non-positive capacity, empty) are omitted. */
 internal fun schedulingViews(problem: Problem): List<SchedulingView> {
+    var result: List<SchedulingView> = emptyList()
+    sequence<Unit> { result = prepareSchedulingViews(problem) }.forEach { }
+    return result
+}
+
+internal suspend fun SequenceScope<Unit>.prepareSchedulingViews(problem: Problem): List<SchedulingView> {
+    var visits = 0
     val out = ArrayList<SchedulingView>()
     for (f in problem.factors) {
+        if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
         when (f) {
             is Cumulative -> {
                 if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty() || f.starts.isEmpty()) continue
                 val cap = declaredCapacityOf(problem, f) ?: continue
-                val res = minimumResourcesOf(problem, f) ?: continue
+                val res = prepareMinimumResources(problem, f) ?: continue
                 out.add(SchedulingView(f.starts, f.durations, res, cap))
             }
 
@@ -67,4 +77,13 @@ internal fun minimumResourcesOf(problem: Problem, f: Cumulative): LongArray? {
     if (f.resourceVars.isEmpty()) return LongArray(f.starts.size) { i -> f.resources[i] }
     if (f.resourceVars.any { !problem.statesLowerBound(it) }) return null
     return LongArray(f.starts.size) { i -> problem.rootDomainOf(f.resourceVars[i]).min }
+}
+
+internal suspend fun SequenceScope<Unit>.prepareMinimumResources(problem: Problem, f: Cumulative): LongArray? {
+    if (f.resourceVars.isEmpty()) return constructionLongArray(f.starts.size) { f.resources[it] }
+    for (i in f.resourceVars.indices) {
+        if (!problem.statesLowerBound(f.resourceVars[i])) return null
+        if ((i + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+    }
+    return constructionLongArray(f.starts.size) { problem.rootDomainOf(f.resourceVars[it]).min }
 }

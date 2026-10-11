@@ -17,6 +17,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.Contribution
@@ -599,17 +600,37 @@ internal class CpToLpRelaxation(
      *  strength, so they contribute only their CORE rows (if any). */
     private val suppressedHullFactors: Set<Int> = emptySet(),
     internal val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
+    deferred: Boolean = false,
 ) {
     private val linearProjection = LinearLpProjection()
 
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
-    private val cumulativeRelaxation: CumulativeRelaxation? =
+    private var cumulativeRelaxation: CumulativeRelaxation? = null
+
+    private var structurallyPersistent: Boolean = false
+
+    init {
+        if (!deferred) preparation().forEach { }
+    }
+
+    fun preparation(): Iterator<Unit> = sequence {
         if (cumulative || diffn) {
-            CumulativeRelaxation(problem, includeCumulative = cumulative, includeDiffn = diffn)
-                .takeIf { it.applicable }
-        } else {
-            null
+            val owner = CumulativeRelaxation(problem, includeCumulative = cumulative, includeDiffn = diffn, deferred = true)
+            owner.preparation().forEach { yield(Unit) }
+            cumulativeRelaxation = owner.takeIf { it.applicable }
         }
+        structurallyPersistent = !objectiveCone && !cumulative && !diffn
+        if (structurallyPersistent) for (fid in problem.factors.indices) {
+            val factor = problem.factors[fid]
+            if (factor is ReifiedLinear || factor is ReifiedPseudoBoolean || factor is ReifiedCardinality ||
+                factor is ReifiedRealLinear
+            ) {
+                structurallyPersistent = false
+                break
+            }
+            if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        }
+    }.iterator()
 
     /**
      * Whether this relaxer emits no row whose coefficients depend on the live domains, the
@@ -621,12 +642,6 @@ internal class CpToLpRelaxation(
      * a not-yet-wired hull off the persistent path (checked at build). When this holds and every
      * column is re-derivable, live column bounds suffice to reuse the fixed relaxation layout.
      */
-    private val structurallyPersistent: Boolean =
-        !objectiveCone && !cumulative && !diffn &&
-            problem.factors.none {
-                it is ReifiedLinear || it is ReifiedPseudoBoolean || it is ReifiedCardinality ||
-                    it is ReifiedRealLinear
-            }
 
     /**
      * Objective-cone membership, structural (depends only on `Problem.factors` and the
