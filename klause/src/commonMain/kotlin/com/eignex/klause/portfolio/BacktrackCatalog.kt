@@ -29,7 +29,8 @@ import com.eignex.klause.util.ArmCatalog
  * **Per-kind ranking** ([ranked]): SAT-optimized first (the pigeonhole guard), the conflict-driven
  * workhorse, the LP-intensity spread, LinUCB routing, the free engine, the restart-level selector portfolio,
  * and the dom-wdeg / first-fail / activity heuristic arms. A CSP ranks fewer LP arms and no LinUCB (it has no
- * bound to exploit). A pool built for a model keeps only the arms whose needs the model offers.
+ * bound to exploit). Clausal satisfaction leads with its clause-only proof recipe. A pool built for a
+ * model keeps only the arms whose needs the model offers.
  */
 object BacktrackCatalog {
 
@@ -157,7 +158,6 @@ object BacktrackCatalog {
      *  Keeps [BacktrackArm.label] and the produced recipe's [BacktrackRecipe.label] in lockstep. */
     private fun make(arm: BacktrackArm): BacktrackRecipe = when (arm) {
         BacktrackArm.SatOptimized -> satOptimized()
-        BacktrackArm.ClausalFocused -> clausal(arm, 0.8)
         BacktrackArm.ClausalBalanced -> clausal(arm, 0.975)
         BacktrackArm.ClausalStable -> clausal(arm, 0.99)
         BacktrackArm.ConflictDriven -> conflictDriven()
@@ -188,7 +188,6 @@ object BacktrackCatalog {
         BacktrackArm.FirstFail,
         BacktrackArm.Activity,
         BacktrackArm.ObjectiveGuided,
-        BacktrackArm.ClausalFocused,
         BacktrackArm.ClausalBalanced,
         BacktrackArm.ClausalStable,
     )
@@ -205,7 +204,6 @@ object BacktrackCatalog {
         BacktrackArm.DomWdeg,
         BacktrackArm.FirstFail,
         BacktrackArm.Activity,
-        BacktrackArm.ClausalFocused,
         BacktrackArm.ClausalBalanced,
         BacktrackArm.ClausalStable,
     )
@@ -250,7 +248,9 @@ object BacktrackCatalog {
         val order = rankedArms(kind, facts.profile.realColumns)
         // A small finite optimization pool needs a relaxation beside its SAT guard: the LP arm finds
         // witnesses that the two LP-free cores miss, without probing an entire intensity palette.
-        val ranked = if (kind == Kind.COP && facts.profile.problemClass == ProblemClass.FiniteCp &&
+        val ranked = if (kind == Kind.CSP && facts.profile.problemClass == ProblemClass.Sat) {
+            listOf(BacktrackArm.ClausalBalanced) + order.filter { it != BacktrackArm.ClausalBalanced }
+        } else if (kind == Kind.COP && facts.profile.problemClass == ProblemClass.FiniteCp &&
             !facts.binaryIntegers
         ) {
             val rest = order.filter { it != BacktrackArm.LpDefault }
@@ -274,7 +274,6 @@ object BacktrackCatalog {
  */
 internal enum class BacktrackArm(val label: String, val needs: Set<ArmNeed> = emptySet()) {
     SatOptimized("satOptimized"),
-    ClausalFocused("clausal-focused", setOf(ArmNeed.Clausal)),
     ClausalBalanced("clausal-balanced", setOf(ArmNeed.Clausal)),
     ClausalStable("clausal-stable", setOf(ArmNeed.Clausal)),
     ConflictDriven("conflictDriven"),

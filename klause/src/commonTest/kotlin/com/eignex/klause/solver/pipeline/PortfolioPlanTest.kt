@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
@@ -20,6 +21,37 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PortfolioPlanTest {
+
+    @Test
+    fun `curated sequential clausal satisfaction reserves complete proof time`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP)
+        val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
+
+        val shares = clausalProofShares(scenario, profile, listOf("ls/probsat/plain", "bt/clausal-balanced"))
+
+        assertEquals(listOf(0.0, 0.85), shares.toList())
+    }
+
+    @Test
+    fun `explicit or non clausal search keeps unreserved scheduling`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP)
+        val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
+        val labels = listOf("ls/probsat/plain", "bt/clausal-balanced")
+        val controls = listOf(
+            scenario.copy(cores = 2),
+            scenario.copy(kind = Kind.COP),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("clausal-balanced") }),
+            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("probsat/plain") }),
+            scenario.copy(btEdit = { it }),
+            scenario.copy(annotationArm = BacktrackParams()),
+        )
+
+        for (control in controls) assertTrue(clausalProofShares(control, profile, labels).isEmpty())
+        assertTrue(clausalProofShares(scenario,
+            profile.copy(problemClass = ProblemClass.PseudoBoolean), labels).isEmpty())
+        assertTrue(clausalProofShares(scenario, profile, listOf("bt/satOptimized")).isEmpty())
+    }
 
     @Test
     fun `portfolio resolves distinct slice schedules`() {
