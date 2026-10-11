@@ -225,7 +225,8 @@ internal object MiniZincSourceValidation {
 internal fun SolveRecord.sourceChecked(validation: SourceValidation, approximation: Boolean): SolveRecord {
     val reject = validation.status == "invalid" ||
         (approximation && (feasible == false || (feasible == true && validation.status != "valid")))
-    val verifiedStats = stats + listOfNotNull(validation.checker?.let { "sourceValidationChecker" to it }).toMap() + mapOf(
+    val checkerStats = listOfNotNull(validation.checker?.let { "sourceValidationChecker" to it }).toMap()
+    val verifiedStats = stats + checkerStats + mapOf(
         "sourceValidation" to validation.status,
         "sourceValidationReason" to validation.reason,
         "sourceValidationScope" to validation.scope,

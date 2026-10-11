@@ -31,22 +31,22 @@ internal object Xcsp3SourceChecker {
     )
 
     fun inspect(source: File, witness: String, objective: String?): SourceValidation {
-        val document = try {
+        val document = runCatching {
             source.inputStream().use { builder().parse(it) }
-        } catch (failure: Exception) {
+        }.getOrElse { failure ->
             return result("unknown", "source XML cannot be read: ${failure.message.orEmpty().take(300)}")
         }
-        val parser = try {
+        val parser = runCatching {
             XParser(document)
-        } catch (failure: Exception) {
+        }.getOrElse { failure ->
             return result("unknown", "source syntax is unsupported: ${failure.message.orEmpty().take(300)}")
         }
         if (unsupported(document) || parser.oEntries.size > 1) {
             return result("unknown", "reified, soft or multiple-objective source checking is unsupported")
         }
-        val solution = try {
+        val solution = runCatching {
             builder().parse(InputSource(StringReader(witness)))
-        } catch (failure: Exception) {
+        }.getOrElse { failure ->
             return result("invalid", "malformed instantiation XML: ${failure.message.orEmpty().take(300)}")
         }
         val root = solution.documentElement
@@ -55,16 +55,17 @@ internal object Xcsp3SourceChecker {
         val pinned = StringWriter().also {
             TransformerFactory.newInstance().newTransformer().transform(DOMSource(root), StreamResult(it))
         }.toString().substringAfter("?>").trim()
-        return try {
+        return runCatching {
             val checker = SolutionChecker(false, source.absolutePath, pinned.byteInputStream())
             when {
                 checker.violatedCtrs.isNotEmpty() -> result("invalid", "source constraints reject candidate")
 
-                checker.invalidObjs.isNotEmpty() -> result("invalid", "reported objective differs from source objective")
+                checker.invalidObjs.isNotEmpty() ->
+                    result("invalid", "reported objective differs from source objective")
 
                 else -> result("valid", "source constraints and objective accept candidate", "v $pinned")
             }
-        } catch (failure: Exception) {
+        }.getOrElse { failure ->
             result("unknown", "source checking cannot complete: ${failure.message.orEmpty().take(300)}")
         }
     }
@@ -97,7 +98,9 @@ internal object Xcsp3SourceChecker {
             val variable = parser.mapForVars.getValue(name) as? XVarInteger
                 ?: return result("unknown", "only integer source variables are supported")
             val value = text.toLongOrNull() ?: return result("invalid", "noninteger assignment for $name")
-            if (!(variable.dom as Dom).contains(value)) return result("invalid", "value outside source domain for $name")
+            if (!(variable.dom as Dom).contains(value)) {
+                return result("invalid", "value outside source domain for $name")
+            }
             if (value.toInt().toLong() != value) return result("unknown", "assignment exceeds checker integer range")
         }
         return null
