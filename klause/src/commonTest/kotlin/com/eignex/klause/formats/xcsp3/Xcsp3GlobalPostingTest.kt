@@ -45,6 +45,195 @@ class Xcsp3GlobalPostingTest {
     private val threeVars = """<var id="x">1..3</var><var id="y">1..3</var><var id="z">1..3</var>"""
 
     @Test
+    fun `matrix results follow coordinate and selected cell moves`() {
+        val parsed = parse(
+            "<element><matrix>(a,b)(b,a)</matrix><index>i j</index><value>v</value></element>",
+            """
+            <var id="a">0..1</var><var id="b">0..1</var>
+            <var id="i">0..1</var><var id="j">0..1</var><var id="v">0..1</var>
+            """.trimIndent(),
+        )
+        val problem = parsed.problem
+        val names = parsed.intVarNames
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+        state.assignment.setInt(names.getValue("a"), 0)
+        state.assignment.setInt(names.getValue("b"), 1)
+        state.assignment.setInt(names.getValue("i"), 0)
+        state.assignment.setInt(names.getValue("j"), 0)
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+        state.recompute()
+
+        for ((move, selected) in listOf(
+            Move.IntSet(names.getValue("i"), 1) to 1L,
+            Move.IntSet(names.getValue("b"), 0) to 0L,
+        )) {
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(selected, state.assignment.intValue(names.getValue("v")))
+            assertEquals(0L, predicted)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `matrix result repairs select fixed cells through source coordinates`() {
+        for ((rowOffset, colOffset) in listOf(0L to 0L, -2L to 5L)) {
+            val parsed = parse(
+                """
+                <element startRowIndex="$rowOffset" startColIndex="$colOffset">
+                  <matrix>(a,a)(a,b)</matrix><index>i j</index><value>v</value>
+                </element>
+                <intension>eq(v,1)</intension>
+                """.trimIndent(),
+                """
+                <var id="a">0</var><var id="b">1</var>
+                <var id="i">$rowOffset..${rowOffset + 1}</var>
+                <var id="j">$colOffset..${colOffset + 1}</var><var id="v">0..1</var>
+                """.trimIndent(),
+            )
+            val problem = parsed.problem
+            val names = parsed.intVarNames
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+            state.assignment.setInt(names.getValue("a"), 0)
+            state.assignment.setInt(names.getValue("b"), 1)
+            state.assignment.setInt(names.getValue("i"), rowOffset)
+            state.assignment.setInt(names.getValue("j"), colOffset)
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+            state.recompute()
+            state.moveSink.addChannelingIntSet(state, names.getValue("v"), 1)
+            val move = state.moveSink.list.single()
+            val before = state.cost
+            val predicted = state.netDelta(move)
+
+            state.apply(move)
+
+            assertEquals(rowOffset + 1, state.assignment.intValue(names.getValue("i")))
+            assertEquals(colOffset + 1, state.assignment.intValue(names.getValue("j")))
+            assertEquals(1L, state.assignment.intValue(names.getValue("v")))
+            assertEquals(before + predicted, state.cost)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `matrix result repairs change an admissible selected cell`() {
+        val parsed = parse(
+            """
+            <element><matrix>(a,b)(b,b)</matrix><index>i j</index><value>v</value></element>
+            <intension>eq(v,1)</intension>
+            """.trimIndent(),
+            """
+            <var id="a">0..1</var><var id="b">0</var>
+            <var id="i">0</var><var id="j">0</var><var id="v">0..1</var>
+            """.trimIndent(),
+        )
+        val problem = parsed.problem
+        val a = parsed.intVarNames.getValue("a")
+        val v = parsed.intVarNames.getValue("v")
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+        state.assignment.setInt(a, 0)
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+        state.recompute()
+        state.moveSink.addChannelingIntSet(state, v, 1)
+        val move = state.moveSink.list.single()
+        val before = state.cost
+        val predicted = state.netDelta(move)
+
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(a))
+        assertEquals(1L, state.assignment.intValue(v))
+        assertEquals(before + predicted, state.cost)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `matrix result repairs protect selected cells`() {
+        for (protection in listOf("pin", "owner")) {
+            val parsed = parse(
+                "<element><matrix>(a,b)(b,b)</matrix><index>i j</index><value>v</value></element>",
+                """
+                <var id="a">0..1</var><var id="b">0</var>
+                <var id="i">0</var><var id="j">0</var><var id="v">0..1</var>
+                """.trimIndent(),
+            )
+            val problem = parsed.problem
+            val a = parsed.intVarNames.getValue("a")
+            val assumptions = if (protection == "pin") Assumptions.None.withInt(a, 0) else Assumptions.None
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(5), assumptions)
+            state.assignment.setInt(a, 0)
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            if (protection == "owner") {
+                state.moveSink.setOwners(IntArray(problem.numIntVars) { if (it == a) 7 else -1 })
+            }
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, parsed.intVarNames.getValue("v"), 1)
+
+            assertTrue(state.moveSink.list.isEmpty(), protection)
+        }
+    }
+
+    @Test
+    fun `matrix result repairs respect source and output protections`() {
+        for (protection in listOf(
+            "row pin", "column pin", "output pin", "row owner", "index owner", "output owner",
+        )) {
+            val parsed = parse(
+                "<element><matrix>(a,a)(a,b)</matrix><index>i j</index><value>v</value></element>",
+                """
+                <var id="a">0</var><var id="b">1</var>
+                <var id="i">0..1</var><var id="j">0..1</var><var id="v">0..1</var>
+                """.trimIndent(),
+            )
+            val problem = parsed.problem
+            val names = parsed.intVarNames
+            val protected = when (protection) {
+                "row pin", "row owner" -> names.getValue("i")
+                "column pin" -> names.getValue("j")
+                "index owner" -> problem.factors.filterIsInstance<Element>().single().idx
+                else -> names.getValue("v")
+            }
+            val assumptions = if (protection.endsWith("pin")) {
+                Assumptions.None.withInt(protected, 0)
+            } else {
+                Assumptions.None
+            }
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(5), assumptions)
+            state.assignment.setInt(names.getValue("a"), 0)
+            state.assignment.setInt(names.getValue("b"), 1)
+            state.assignment.setInt(names.getValue("i"), 0)
+            state.assignment.setInt(names.getValue("j"), 0)
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            if (protection.endsWith("owner")) {
+                state.moveSink.setOwners(IntArray(problem.numIntVars) { if (it == protected) 7 else -1 })
+            }
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, names.getValue("v"), 1)
+
+            assertTrue(state.moveSink.list.isEmpty(), protection)
+        }
+    }
+
+    @Test
     fun `bin packing channels follow item moves in every capacity form`() {
         for ((capacity, expectedCost) in listOf(
             "<limits>3 3</limits>" to 2L,

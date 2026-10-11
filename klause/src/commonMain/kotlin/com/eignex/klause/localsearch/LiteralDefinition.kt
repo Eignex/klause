@@ -36,11 +36,14 @@ internal class EqualityPredicateDefinition(
 internal fun literalDefinitions(problem: Problem, hints: IntArray, nodes: List<SweepNode>): List<SweepNode> {
     val hinted = BooleanArray(problem.numIntVars)
     for (v in hints) if (v in hinted.indices) hinted[v] = true
+    val elementResults = BooleanArray(problem.numIntVars)
+    for (node in nodes) if (node is ElementResultDefinition) elementResults[node.out] = true
     val channelRows = BooleanArray(problem.numFactors)
     val channels = ArrayList<LiteralIntDefinition>()
     for (i in problem.factors.indices) {
         val row = problem.factors[i] as? ReifiedLinear ?: continue
         if (row.op != LinearOp.EQ || row.vars.size != 1 || !hinted[row.vars[0]]) continue
+        if (elementResults[row.vars[0]]) continue
         val constants = row.integerConstants ?: continue
         if (constants.coeff(0) != 1L || constants.bound !in 0L..1L) continue
         val variable = row.vars[0]
@@ -52,7 +55,7 @@ internal fun literalDefinitions(problem: Problem, hints: IntArray, nodes: List<S
         channels.add(LiteralIntDefinition(row.vars[0], literal))
         channelRows[i] = true
     }
-    if (channels.isEmpty()) return nodes
+    if (channels.isEmpty()) return orderedDefinitions(problem, nodes)
     val counts = IntArray(problem.numBoolVars)
     val sources = arrayOfNulls<ReifiedLinear>(problem.numBoolVars)
     for (i in problem.factors.indices) {

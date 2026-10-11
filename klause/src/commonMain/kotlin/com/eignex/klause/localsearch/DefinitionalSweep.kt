@@ -58,6 +58,7 @@ class DefinitionalSweep internal constructor(
     companion object {
         /** Infer definitions using the source domains to recognize hinted binary literal channels.
          * Unique unary equality predicates used only by those channels are maintained with them.
+         * Hinted native [com.eignex.klause.factor.table.Element] results follow their indexes and selected cells.
          * Competing definitions and cyclic cones remain searched. */
         fun infer(
             problem: Problem,
@@ -65,7 +66,8 @@ class DefinitionalSweep internal constructor(
             boolFolds: List<BoolFoldDefinition> = emptyList(),
         ): DefinitionalSweep? {
             val base = infer(problem.factors, problem.numIntVars, definedHints, boolFolds)
-            val ordered = literalDefinitions(problem, definedHints, base?.nodes.orEmpty())
+            val nodes = base?.nodes.orEmpty() + elementResultDefinitions(problem, definedHints)
+            val ordered = literalDefinitions(problem, definedHints, nodes)
             return if (ordered.isEmpty()) null else DefinitionalSweep(ordered)
         }
 
@@ -527,6 +529,7 @@ class InvariantNetwork internal constructor(
     private val intDefinitions = MutableIntObjectMap<FunctionalObjective.Node>()
     private val literalChannels = MutableIntObjectMap<LiteralIntDefinition>()
     private val equalityPredicates = MutableIntObjectMap<EqualityPredicateDefinition>()
+    private val elementResults = MutableIntObjectMap<ElementResultDefinition>()
     private val extremumRepairs = BooleanArray(numIntVars)
 
     /** Node indexes reading each int var. */
@@ -546,6 +549,7 @@ class InvariantNetwork internal constructor(
             }
             if (n is LiteralIntDefinition) literalChannels.put(n.out, n)
             if (n is EqualityPredicateDefinition) equalityPredicates.put(n.out, n)
+            if (n is ElementResultDefinition) elementResults.put(n.out, n)
         }
         intReaders = readers(numIntVars) { it.intInputs }
         boolReaders = readers(numBoolVars) { it.boolInputs }
@@ -574,6 +578,8 @@ class InvariantNetwork internal constructor(
     internal fun literalChannel(v: Int): LiteralIntDefinition? = literalChannels[v]
 
     internal fun equalityPredicate(v: Int): EqualityPredicateDefinition? = equalityPredicates[v]
+
+    internal fun elementResultDefinition(v: Int): ElementResultDefinition? = elementResults[v]
 
     internal fun hasExtremumRepair(v: Int): Boolean = extremumRepairs[v]
 

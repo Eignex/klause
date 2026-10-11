@@ -329,6 +329,14 @@ Element matching-cell indexes and range endpoints use Long arithmetic, including
 whose valid array indexes cross the Int boundary. Matching-cell scans skip unreachable
 inverse targets until an admissible index repair is found.
 
+Hinted native Element results are maintained from their indexes and selected cells.
+Competing definitions and cyclic selections remain searched. Value-directed result
+repairs change an admissible selected cell or backsolve a matching index through its
+source coordinates. Each repair scans at most 32 array positions and offers at most
+four alternatives, following at most 16 nested selections. Output and input domains,
+pins and implicit owners remain enforced; an out-of-range index or a domain-clamped
+result leaves the defining constraint subject to ordinary violation scoring.
+
 The one-way definition network contains immutable reader indexes; matching mixed-pool
 arms share its lazy construction while each state applies definitions to its own assignment.
 Element index repairs backsolve affine definitions with one or two distinct integer

@@ -154,9 +154,11 @@ product and soft-constraint encodings. XCSP3 supplies finite-domain variables,
 supported globals and optional objectives. Each frontend retains its source
 objective orientation and output names. XCSP3 variable-matrix selection uses a
 row-major index equality and a native `Element` factor. The compiler marks the
-flattened index and affine expression outputs as functionally defined. Local search
+flattened index, selected result and affine expression outputs as functionally defined. Local search
 maintains index-only affine chains from their source inputs; independently constrained
-outputs remain searched. Bounds on each source index enforce the matrix range when
+affine outputs remain searched. Eligible unique Element results follow indexes and selected
+cells, with inverse repairs into their source coordinates or admissible cells. Competing
+and cyclic definitions remain searched. Bounds on each source index enforce the matrix range when
 its declared domain extends beyond it, including nonzero axis offsets; repeated
 cells and aliases retain their source variable identities. Unsupported constructs
 decline through the common solve surface. Boolean-valued XCSP arithmetic terms

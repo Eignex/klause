@@ -80,6 +80,7 @@ internal fun Compiler.Builder.element(e: XmlElement) {
             hi = domainMin(v) + domainSpan(v) - 1
         }
         val selected = newAuxVar(lo, hi)
+        definedVars.add(selected)
         factors.add(
             Element(idx = idx, result = selected, arr = arr, arrIsVars = arrIsVars, indexOffset = offset),
         )
@@ -88,8 +89,10 @@ internal fun Compiler.Builder.element(e: XmlElement) {
     }
     val value = e.child("value")?.textContent?.trim()
         ?: throw UnsupportedXcsp3Exception("element: missing <value> or <condition>")
+    val result = singleTermVar(value)
+    definedVars.add(result)
     factors.add(
-        Element(idx = idx, result = singleTermVar(value), arr = arr, arrIsVars = arrIsVars, indexOffset = offset),
+        Element(idx = idx, result = result, arr = arr, arrIsVars = arrIsVars, indexOffset = offset),
     )
 }
 
@@ -164,6 +167,7 @@ internal fun Compiler.Builder.elementVarMatrix(
     }
     val index = newAuxVar(0L, cells - 1L)
     definedVars.add(index)
+    definedVars.add(v)
     factors.add(
         Linear(
             longArrayOf(nCols.toLong(), 1L, -1L), intArrayOf(i, j, index),
