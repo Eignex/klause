@@ -3,6 +3,7 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.report.Reports
 import java.io.File
 import java.io.StringReader
+import java.lang.reflect.Array as ReflectArray
 import java.math.BigInteger
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlinx.serialization.encodeToString
@@ -257,7 +258,7 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
         loads.forEach { integer(it, "bin-packing load") }
         if (c.childs[2].type.name != "condition") {
             val capacities = c.childs[2].value
-            val count = java.lang.reflect.Array.getLength(capacities)
+            val count = ReflectArray.getLength(capacities)
             // The upstream vector callbacks inspect only bins covered by the capacity vector.
             if (bins.any { it < BigInteger.ZERO || it >= BigInteger.valueOf(count.toLong()) }) {
                 decline("bin outside capacity vector")
@@ -285,8 +286,8 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
         is XVarInteger -> listOf(BigInteger.valueOf(assignment.getValue(value.id).toLong()))
         is Number -> listOf(BigInteger.valueOf(value.toLong()))
         else -> if (value.javaClass.isArray) {
-            (0 until java.lang.reflect.Array.getLength(value)).flatMap {
-                integers(java.lang.reflect.Array.get(value, it))
+            (0 until ReflectArray.getLength(value)).flatMap {
+                integers(ReflectArray.get(value, it))
             }
         } else {
             decline("integer list ${value.javaClass.simpleName}")

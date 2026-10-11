@@ -353,7 +353,7 @@ class Xcsp3SourceCheckerTest {
         "<ordered><list>x y</list><lengths>1500000000</lengths><operator>le</operator></ordered>" +
             "|1500000000 1500000000|ordered offset",
         "<knapsack><list>x y</list><weights>2 2</weights><condition>(le,0)</condition>" +
-            "<profits>0 0</profits><condition>(eq,0)</condition></knapsack>|1500000000 1500000000|weighted term",
+            "<profits>0 0</profits><condition>(eq,0)</condition></knapsack>|1500000000 0|weighted term",
     ])
     fun `unchecked non sum overflow cannot earn source witness credit`(
         constraint: String,
@@ -399,6 +399,15 @@ class Xcsp3SourceCheckerTest {
         "<binPacking><list>x y</list><sizes>1500000000 1500000000</sizes>" +
             "<condition>(le,1500000000)</condition></binPacking>|0 1|valid",
         "<binPacking><list>x y</list><sizes>1 1</sizes><condition>(le,1)</condition></binPacking>|0 0|invalid",
+        "<binPacking><list>x y</list><sizes>1500000000 1500000000</sizes>" +
+            "<limits>1500000000 1500000000</limits></binPacking>|0 1|valid",
+        "<binPacking><list>x y</list><sizes>1500000000 1500000000</sizes>" +
+            "<loads>1500000000 1500000000</loads></binPacking>|0 1|valid",
+        "<binPacking><list>x y</list><sizes>1 1</sizes><limits>1</limits></binPacking>|0 0|invalid",
+        "<group><noOverlap><origins>%0 %1</origins><lengths>1500000000 1500000000</lengths>" +
+            "</noOverlap><args>x y</args></group>|1500000000 1500000000|unknown",
+        "<noOverlap><origins>(x,y)(x,y)</origins><lengths>(1500000000,1)(1500000000,1)</lengths>" +
+            "</noOverlap>|1500000000 0|unknown",
         "<knapsack><list>x y</list><weights>1 -1</weights><condition>(eq,0)</condition>" +
             "<profits>0 0</profits><condition>(eq,0)</condition></knapsack>|1500000000 1500000000|valid",
         "<ordered><list>x y</list><lengths>1</lengths><operator>le</operator></ordered>|2147483636 2147483637|valid",
@@ -411,6 +420,7 @@ class Xcsp3SourceCheckerTest {
         "<intension>eq(abs(x),1500000000)</intension>|-1500000000 0|valid",
         "<intension>if(eq(x,y),eq(sqr(x),2250000000000000000),eq(x,0))</intension>|1500000000 1500000000|valid",
         "<intension>lt(mul(x,x),0)</intension>|1500000000 0|invalid",
+        "<intension>eq(x,add(9223372036854775807,9223372036854775807,2))</intension>|0 0|unknown",
         "<allDifferent>mul(x,x) mul(y,y)</allDifferent>|1500000000 1499999999|valid",
     ])
     fun `safe non sum boundaries cancellation and violations remain checkable`(
@@ -503,6 +513,113 @@ class Xcsp3SourceCheckerTest {
             assertEquals("unknown", checked.status)
             assertTrue(checked.reason.contains("outside checker arithmetic auditing"), checked.reason)
             assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "<cumulative><origins>x y</origins><lengths>l l</lengths><heights>h h</heights>" +
+            "<condition>(le,1)</condition></cumulative>|0 0 1 1500000000 1|unknown",
+        "<cumulative><origins>x y</origins><lengths>l l</lengths><heights>h h</heights>" +
+            "<condition>(le,2)</condition></cumulative>|0 0 1 1 1|valid",
+        "<cumulative><origins>x y</origins><lengths>l l</lengths><ends>e e</ends><heights>h h</heights>" +
+            "<condition>(le,2)</condition></cumulative>|0 0 1 1 2|invalid",
+        "<cumulative><origins>x y</origins><lengths>l l</lengths><ends>e e</ends><heights>h h</heights>" +
+            "<condition>(le,2)</condition></cumulative>|0 0 1 1 1|valid",
+        "<noOverlap><origins>x y</origins><lengths>l l</lengths></noOverlap>" +
+            "|1500000000 1500000000 1500000000 1 1|unknown",
+        "<noOverlap><origins>x y</origins><lengths>l l</lengths></noOverlap>|0 1 1 1 1|valid",
+    ])
+    fun `variable scheduling arithmetic includes endpoints loads and explicit ends`(
+        constraint: String,
+        values: String,
+        status: String,
+    ) {
+        val model = File.createTempFile("xcsp-variable-scheduling-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables>
+                    <var id="x">0..2000000000</var><var id="y">0..2000000000</var>
+                    <var id="l">0..2000000000</var><var id="h">0..2000000000</var><var id="e">0..2000000000</var>
+                  </variables>
+                  <constraints>$constraint</constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>x y l h e</list><values>$values</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals(status, checked.status, checked.reason)
+            if (status == "valid") assertNotNull(checked.checkedWitness) else assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @Test
+    fun `the pinned checker accepts the wrapped expression objective`() {
+        val model = File.createTempFile("xcsp-wrapped-objective-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="COP">
+                  <variables><var id="x">0..1500000000</var></variables>
+                  <objectives><minimize>mul(x,x,x)</minimize></objectives>
+                </instance>
+                """.trimIndent(),
+            )
+            val objective = "-7250882478129283072"
+            val witness = "<instantiation cost='$objective'><list>x</list><values>1500000000</values></instantiation>"
+
+            val checker = SolutionChecker(false, model.absolutePath, witness.byteInputStream())
+            val checked = Xcsp3SourceChecker.inspect(model, witness, objective)
+
+            assertTrue(checker.invalidObjs.isEmpty())
+            assertEquals("unknown", checked.status)
+            assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "sum|5 -5|0|valid",
+        "sum|5 -5|1|invalid",
+        "product|1 1|5062500000000000000000000000000000000|valid",
+        "minimum|5 -5|-11250000000000000000|valid",
+        "maximum|5 -5|11250000000000000000|valid",
+        "nValues|5 -5|2|valid",
+    ])
+    fun `expression list objectives retain exact aggregate arithmetic`(
+        type: String,
+        coefficients: String,
+        objective: String,
+        status: String,
+    ) {
+        val model = File.createTempFile("xcsp-expression-aggregate-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="COP">
+                  <variables><var id="x">0..1500000000</var></variables>
+                  <objectives><minimize type="$type">
+                    <list>mul(x,x) mul(x,x)</list><coeffs>$coefficients</coeffs>
+                  </minimize></objectives>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>x</list><values>1500000000</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, objective)
+
+            assertEquals(status, checked.status, checked.reason)
+            if (status == "valid") assertNotNull(checked.checkedWitness) else assertNull(checked.checkedWitness)
         } finally {
             model.delete()
         }
