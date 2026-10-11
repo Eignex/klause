@@ -47,7 +47,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 1_048_576)
     private val equalities = HashMap<Key, Int>()
     private val pendingEqualities = LinkedHashMap<ComparisonKey, PendingEquality>()
     private val pairEqualities = HashMap<PairKey, Int>()
-    private val orderedImages = HashMap<Int, LongArray>()
+    private val orderedImages = HashMap<Int, List<Long>>()
     private var work = 0
     private var diagnosticPending = emptyMap<String, Int>()
     private val diagnosticCompleted = HashMap<String, Int>()
@@ -462,7 +462,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 1_048_576)
     private fun comparisonKey(variable: Int, value: Long, operator: LinearOp): Key {
         if (operator != LinearOp.LE && operator != LinearOp.GE) return Key(variable, value, operator)
         val image = definitions[variable]?.image ?: return Key(variable, value, operator)
-        val ordered = orderedImages.getOrPut(variable) { image.sorted().toLongArray() }
+        val ordered = orderedImages.getOrPut(variable) { image.sorted() }
         val found = ordered.binarySearch(value)
         val index = if (found >= 0) found else when (operator) {
             LinearOp.LE -> -found - 2
