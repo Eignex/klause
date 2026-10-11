@@ -2,11 +2,21 @@ package com.eignex.klause.ir
 
 import com.eignex.klause.util.EmptyIntArray
 
-/** A renumbering of a problem's variables: `newId = map[oldId]`, one map per namespace. */
-class VarRemap(bools: IntArray, ints: IntArray, reals: IntArray = EmptyIntArray) {
-    private val bools = bools.copyOf()
-    private val ints = ints.copyOf()
-    private val reals = reals.copyOf()
+/** Owned renumbering of source variables: `newId = map(oldId)`, one captured table per namespace. */
+class VarRemap private constructor(bools: IntArray, ints: IntArray, reals: IntArray, borrowed: Boolean) {
+    /** Capture the caller's source renumbering tables. */
+    constructor(bools: IntArray, ints: IntArray, reals: IntArray = EmptyIntArray) :
+        this(bools, ints, reals, borrowed = false)
+
+    private val bools = if (borrowed) bools else bools.copyOf()
+    private val ints = if (borrowed) ints else ints.copyOf()
+    private val reals = if (borrowed) reals else reals.copyOf()
+
+    internal companion object {
+        // Refinement reads a mutable owner's tables only within one synchronous workspace operation.
+        internal fun borrowed(bools: IntArray, ints: IntArray): VarRemap =
+            VarRemap(bools, ints, EmptyIntArray, borrowed = true)
+    }
 
     /** Renumber a source Boolean, or null when the variable is absent from the target. */
     fun bool(id: SourceBoolId): SourceBoolId? = bool(id.index).takeIf { it >= 0 }?.let(::SourceBoolId)

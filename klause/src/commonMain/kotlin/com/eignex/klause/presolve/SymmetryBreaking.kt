@@ -174,7 +174,7 @@ internal object SymmetryBreaking {
         }
         val intMap = IntArray(nInt) { it }
         val boolMap = IntArray(nBool) { it }
-        val mapping = VarRemap(boolMap, intMap)
+        val mapping = VarRemap.borrowed(boolMap, intMap)
         val extra = ArrayList<Factor>()
         for (cell in colourCells(intColour, heldInts)) {
             for (group in verifiedGroups(problem, cell, intInc, intMap, mapping, cancellation)) {
@@ -662,7 +662,7 @@ internal object SymmetryBreaking {
         val intMap = IntArray(nInt)
         val boolMap = IntArray(nBool)
         // The remap reads these arrays, so loading a round's colours into them re-aims it in place.
-        val mapping = VarRemap(boolMap, intMap)
+        val mapping = VarRemap.borrowed(boolMap, intMap)
         repeat(nInt + nBool + 1) {
             // Bail before a fresh round once the search's work budget is spent — returning the current
             // (possibly not-yet-stable) partition. Callers treat a spent budget as "stop", so a partial
