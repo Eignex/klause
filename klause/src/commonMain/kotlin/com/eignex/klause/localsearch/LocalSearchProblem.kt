@@ -31,13 +31,20 @@ class LocalSearchProblem private constructor(
     internal companion object {
         fun preparation(problem: Problem, domains: Array<IntDomain>?): Iterator<LocalSearchProblem?> =
             sequence<LocalSearchProblem?> {
-                val invariants = Array<Invariant>(problem.numFactors) { NoInvariant }
+                val invariants = arrayOfNulls<Invariant>(problem.numFactors)
+                yield(null)
                 val boolCounts = IntArray(problem.numBoolVars)
+                yield(null)
                 val intCounts = IntArray(problem.numIntVars)
+                yield(null)
                 val realCounts = IntArray(problem.numRealVars)
+                yield(null)
                 val boolSeen = IntArray(problem.numBoolVars)
+                yield(null)
                 val intSeen = IntArray(problem.numIntVars)
+                yield(null)
                 val realSeen = IntArray(problem.numRealVars)
+                yield(null)
                 for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
                     for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
                         val factor = problem.factors[fid]
@@ -52,12 +59,12 @@ class LocalSearchProblem private constructor(
                 val boolOccurrences = allocateOccurrences(boolCounts)
                 val intOccurrences = allocateOccurrences(intCounts)
                 val realOccurrences = allocateOccurrences(realCounts)
-                boolCounts.fill(0)
-                intCounts.fill(0)
-                realCounts.fill(0)
-                boolSeen.fill(0)
-                intSeen.fill(0)
-                realSeen.fill(0)
+                for (counts in listOf(boolCounts, intCounts, realCounts, boolSeen, intSeen, realSeen)) {
+                    for (from in counts.indices step PROJECTION_BATCH) {
+                        counts.fill(0, from, minOf(from + PROJECTION_BATCH, counts.size))
+                        yield(null)
+                    }
+                }
                 for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
                     for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
                         if (invariants[fid] === NoInvariant) continue
@@ -72,7 +79,10 @@ class LocalSearchProblem private constructor(
                     }
                     yield(null)
                 }
-                yield(LocalSearchProblem(problem, invariants, boolOccurrences, intOccurrences, realOccurrences))
+                @Suppress("UNCHECKED_CAST")
+                yield(LocalSearchProblem(
+                    problem, invariants as Array<Invariant>, boolOccurrences, intOccurrences, realOccurrences,
+                ))
             }.iterator()
 
         private inline fun IntArray.forEachVariableOnce(seen: IntArray, factorId: Int, action: (Int) -> Unit) {
@@ -86,14 +96,16 @@ class LocalSearchProblem private constructor(
         }
 
         private suspend fun SequenceScope<LocalSearchProblem?>.allocateOccurrences(counts: IntArray): Array<IntArray> {
-            val out = Array(counts.size) { EmptyIntArray }
+            val out = arrayOfNulls<IntArray>(counts.size)
+            yield(null)
             for (from in counts.indices step PROJECTION_BATCH) {
                 for (v in from until minOf(from + PROJECTION_BATCH, counts.size)) {
-                    if (counts[v] != 0) out[v] = IntArray(counts[v])
+                    out[v] = if (counts[v] == 0) EmptyIntArray else IntArray(counts[v])
                 }
                 yield(null)
             }
-            return out
+            @Suppress("UNCHECKED_CAST")
+            return out as Array<IntArray>
         }
     }
 }

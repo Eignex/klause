@@ -47,8 +47,8 @@ residuals and warm captures remain private until all initial factors are scored 
 initial greedy pass completes. Preparation consumes time but no search instructions or
 solve-wide move allowance.
 
-Projection preparation retains private invariant and occurrence-index progress in
-batches. Matching arms also share retained definition-reader preparation. A mutex
+Projection preparation retains each buffer allocation, occurrence-array installation
+and count/stamp reset as well as factor visits in private batches. Matching arms also share retained definition-reader preparation. A mutex
 protects each shared step and publishes only complete indexes; a suspended arm holds no
 lock. Closing a handle releases its private cursor and exclusive solver ownership.
 Completed shared preparation remains reusable. Invocation cancellation pauses a cursor;
@@ -63,7 +63,7 @@ buffer, tabu/activity, Boolean scores, configuration/probe flags, definition mas
 and reader arrays, implicit owners, seed sort scratch, warm weights and greedy order.
 Array copies and growable-list/map resizing also remain atomic. They can trigger runtime
 allocation or collection delays; polling occurs between these primitives, before the
-whole state exists. One definition evaluation, reification row, factor initialization,
+whole state exists. One factor projection/occurrence visit, definition evaluation, reification row, factor initialization,
 implicit global seed or bounded coordinate repair can also overrun a segment. Root
 support/pin checks, definition inference performed by the caller, custom restart policy
 mutations, later restart reconciliation, lazy first-use scoring indexes and activity
