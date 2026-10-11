@@ -14,8 +14,8 @@ import com.eignex.klause.lp.engine.LpSolution
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.solveLp
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.CpIntId
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
