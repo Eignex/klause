@@ -1,0 +1,30 @@
+# nonlinear-real: problems with the nonlinear-real theme, drawn 2026-10-12 by klause-lab deploy/make-sets.py
+# tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
+# easy: 10
+smtlib-qfnra/20161105-Sturm-MBO/mbo_E15E26
+smtlib-qfnra/20161105-Sturm-MGC/mgc_08
+smtlib-qfnra/20170501-Heizmann-UltimateInvariantSynthesis/sorting_bubblesort_ground.i_4_3_3.bpl_5
+smtlib-qfnra/20180501-Economics-Mulligan/MulliganEconomicsModel0015e
+smtlib-qfnra/2019-ezsmt/generator/inst-ijcai-lin7.ez
+smtlib-qfnra/20240407-pPDA-Chiari-Pontiggia-Winkler/certificate_no_hints/mod5_POMC_no_hints
+smtlib-qfnra/LassoRanker/CooperatingT2/bubbleSort.t2.c_Iteration6_Loop_4-pieceTemplate
+smtlib-qfnra/UltimateAutomizer/InVarSynth_ShortCircuit-SideEffect-SwitchStatement-Unsafe.c_Iteration1_0
+smtlib-qfnra/hong/hong_13
+smtlib-qfnra/hycomp/ball_count_2d_hill_simple.05.qfree_global_4
+# medium: 14
+smtlib-qfnra/20161105-Sturm-MBO/mbo_E12E19
+smtlib-qfnra/20161105-Sturm-MBO/mbo_E2E11
+smtlib-qfnra/20170501-Heizmann-UltimateInvariantSynthesis/linear_search.i_6_24_3.bpl_3
+smtlib-qfnra/2019-ezsmt/reverseFolding/29-reverse_folding-0-0
+smtlib-qfnra/2019-ezsmt/reverseFolding/40-reverse_folding-0-0
+smtlib-qfnra/20200911-Pine/1599121901979464000
+smtlib-qfnra/20200911-Pine/1599121902699953000
+smtlib-qfnra/LassoRanker/CooperatingT2/collatz.t2.c_Iteration3_Lasso_7-phaseTemplate
+smtlib-qfnra/LassoRanker/Ultimate/Collatz.bpl_Iteration1_Lasso_3-lexTemplate
+smtlib-qfnra/UltimateAutomizer/InVarSynth_BoolVsInt.c_Iteration3_0
+smtlib-qfnra/hycomp/ball_count_1d_plain.04.seq_lazy_global_10
+smtlib-qfnra/kissing/kissing_4_8
+smtlib-qfnra/zankl/matrix-4-all-4
+smtlib-qfnra/zankl/matrix-4-all-7
+# hard: 1
+smtlib-qfnra/LassoRanker/Ultimate/piecewise.bpl_Iteration1_Loop_4-pieceTemplate
