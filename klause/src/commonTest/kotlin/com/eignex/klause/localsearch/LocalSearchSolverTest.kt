@@ -98,7 +98,7 @@ class LocalSearchSolverTest {
             assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
             val before = handle.stats.ls.moves.sum
             var polls = 0
-            val paused = handle.runSlice(Cancellation { ++polls >= 3 }, Long.MAX_VALUE, -1L)
+            val paused = handle.runSlice(Cancellation { ++polls >= 2 }, Long.MAX_VALUE, -1L)
             assertNull(paused)
             assertTrue(handle.stats.ls.moves.sum > before)
             assertTrue(handle.stats.ls.moves.sum < params.maxFlips)
