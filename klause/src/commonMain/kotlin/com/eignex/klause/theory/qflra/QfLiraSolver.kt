@@ -564,9 +564,11 @@ class ExactLiraSearchComponent(
         ) {
             return ComponentResult.Consistent
         }
+        var checked = false
         // A pinned root can certify its source witness without preparing a numerical basis.
         if (!sourceInstalled && context.decisionLevel == 0 && bools.none { it == UNASSIGNED }) {
             if (!context.consumeCheck()) return ComponentResult.Indeterminate
+            checked = true
             when (val result = realDifference?.check(bools, operationStop)) {
                 RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
                 is RealDifferenceSystem.Result.Feasible -> {
@@ -585,10 +587,9 @@ class ExactLiraSearchComponent(
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
-        var checked = false
         // Graph evidence has no LP certifier identity to offer an overridden acceptance policy.
         val completeBooleans = bools.none { it == UNASSIGNED }
-        if ((context.decisionLevel > 0 || completeBooleans) && node.sourceBranches.isEmpty() &&
+        if (!checked && (context.decisionLevel > 0 || completeBooleans) && node.sourceBranches.isEmpty() &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy
         ) {
             realDifference?.let { graph ->
