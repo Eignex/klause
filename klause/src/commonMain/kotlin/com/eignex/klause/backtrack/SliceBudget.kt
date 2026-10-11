@@ -45,6 +45,12 @@ internal class SliceBudget(
     // cannot stop inside it, so the excess is repaid from the slices that follow.
     private var nodeDebt: Long = preparation?.nodeDebt ?: 0L
 
+    fun inheritPreparation(preparation: SliceBudget) {
+        lpWorkMark = preparation.lpWorkMark
+        propagationWorkMark = preparation.propagationWorkMark
+        nodeDebt = preparation.nodeDebt
+    }
+
     /**
      * Arm the next slice: [sliceNodes] work units when non-negative, and at most [sliceMillis] of wall time. False
      * when debt from earlier slices consumes the whole allowance, so the caller pauses without searching.

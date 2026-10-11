@@ -21,7 +21,10 @@ internal class IntEventMachinery private constructor(
     preparedDirtyVars: ArrayList<IntArrayList?>?,
     preparedDirtyMark: ArrayList<IntHashSet?>?,
 ) {
-    constructor(projection: PropagationProblem, incremental: Boolean) : this(projection, incremental, null, null, null, null)
+    constructor(
+        projection: PropagationProblem,
+        incremental: Boolean,
+    ) : this(projection, incremental, null, null, null, null)
     private val problem: Problem = projection.problem
 
     /** Whether the typed int-event machinery ([dirtyKinds] / [baseFlat]) is live. */

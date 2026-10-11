@@ -37,6 +37,7 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.objective.SingleIntObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
@@ -48,6 +49,7 @@ import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchLearnedConflict
@@ -121,9 +123,10 @@ internal class ResumableMinimize(
     preparedSession: PropagationSession? = null,
     preparationBudget: SliceBudget? = null,
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
+    private val deferredInstallation: Boolean = false,
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
-    override val canReseed: Boolean get() = clausePrimal?.isDone != false
+    override val canReseed: Boolean get() = !preparationPending && clausePrimal?.isDone != false
     override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
     private var replaced = false
@@ -136,25 +139,11 @@ internal class ResumableMinimize(
     // cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed in runSlice.
     // One-shot calls retain their invocation token. Resumed calls replace it while keeping a bound lifetime scope.
     private val baseCancellation: Cancellation = params0.cancellation
-    private val params: BacktrackParams = params0
-        .copy(
-            cancellation = cancelledWhen(::runDeadline) { sliceCancelled() },
-            minHammingDistance = 0,
-            recentWindow = 0,
-        )
-        .let { p ->
-            // Objective-guided value selection: dive toward the cost-minimising polarity first. Applied on
-            // the minimisation path when the objective is non-trivial, kept incumbent-guided on top; a no-op
-            // for a pure-satisfaction objective (all coefficients zero → IndomainBest is IndomainMin).
-            if (p.objectiveGuidedValues && objectiveHasWeight()) {
-                p.copy(valueSelector = SolutionGuided(IndomainBest(objective)))
-            } else {
-                p
-            }
-        }
-
-    private fun objectiveHasWeight(): Boolean =
-        objective.boolWeightValues.any { it != 0L } || objective.intCoefficientValues.any { it != 0L }
+    private var params: BacktrackParams = params0.copy(
+        cancellation = cancelledWhen(::runDeadline) { sliceCancelled() },
+        minHammingDistance = 0,
+        recentWindow = 0,
+    )
 
     // Slice control without a coroutine: a re-armable deadline plus the current global token.
     private var globalToken: Cancellation = params0.cancellation
@@ -170,8 +159,8 @@ internal class ResumableMinimize(
     private var clausePrimalCandidate: Sample? = null
     private val slice = SliceBudget(
         { sink.search.searchWork + (clausePrimal?.work ?: 0L) },
-        { lpEngine.totalSolveWork() + sink.lp.standaloneWork },
-        { session.work },
+        { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork },
+        { if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L },
         preparationBudget,
         ownsWorkDebt = ownsWorkDebt,
     )
@@ -210,8 +199,8 @@ internal class ResumableMinimize(
     // Replaced wholesale by [rebind], whose fragment incumbent starts empty again.
     private var incumbents = minimizingSampleExchange(problem, params.toleranceCheck)
     private val bestObj: Double get() = incumbents.current()?.objective?.pruningBound ?: Double.POSITIVE_INFINITY
-    private val singleObj = objective.singleIntObjective()
-    private val discreteObjective = objective.realCoefficientValues.all { it == 0.0 }
+    private var singleObj: SingleIntObjective? = null
+    private var discreteObjective = true
     private var objVarBest: Long? = null
     private val externalShared = params.objectiveBoundSupplier != null
     private var lastExternalCutoff = Double.POSITIVE_INFINITY
@@ -239,7 +228,7 @@ internal class ResumableMinimize(
     // Built once; persists across slices, so warm starts roll forward. Always constructed so the
     // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
     // is off.
-    private val lpEngine = LpEngine(problem, objective, params.lpParams(), sink, solver.lpSolveContext)
+    private lateinit var lpEngine: LpEngine
     private var leafSolver: LeafRealSolver? = null
     private val rootLpDutyCycle = RootLpDutyCycle()
 
@@ -256,49 +245,13 @@ internal class ResumableMinimize(
     private val lpHints: LpHints? =
         if (params.lpPlan.branching) LpHints(problem.numIntVars, problem.numBoolVars) else null
 
-    init {
-        lpEngine.lpHints = lpHints
-    }
-
-    private val cp = CpSearchComponent(
-        preparedSession ?: PropagationSession(
-            solver.propagationProjection(params.nativeSat ?: true, problem),
-            cancelledWhen(::runDeadline) { solveCancelled() },
-            params.propagationCancelFloor,
-            nativeSat = params.nativeSat ?: true,
-            pbLearning = params.pbLearning ?: true,
-        ),
-        branching = CpBranching.None,
-    ).also {
-        it.conflictStats = sink.ca
-        sink.search.propagationWork = { it.session.work }
-        sink.search.rootPropagationWork = { it.session.rootWork }
-        sink.search.propagationNanos = { it.session.propagationNanos }
-        sink.search.rootPropagationNanos = { it.session.rootPropagationNanos }
-    }
+    private lateinit var cp: CpSearchComponent
     private val session: PropagationSession get() = cp.session
     private val restart = RestartSchedule.from(params)
     private var decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
-    private val brancher = BacktrackBrancher(
-        session, params, sink, restart, LpGuidedBranching(), nativeConflict = { cp.lastConflict },
-    ).also {
-        cp.propagationObserver = it::onPropagation
-        cp.cascadeConflictObserver = it::onCascadeConflict
-    }
-    private val searchSession = SearchComponentSet(
-        buildList {
-            add(cp)
-            if (lpEngine.lpRelaxer != null) {
-                lpEngine.cpAdapter.attach(session, feasibility = false)
-                add(lpEngine.propagator)
-            }
-        },
-        branchers = listOf(brancher),
-    ).session(
-        cancellation = params.cancellation,
-        learnedDb = params.sharedLearnedDb(),
-    )
-    private val run: SearchRun
+    private lateinit var brancher: BacktrackBrancher
+    private lateinit var searchSession: SearchSession
+    private lateinit var run: SearchRun
     private var rootExhausted: UnsatCore? = null
     private var rootIsExhausted = false
     private var firstRun = true
@@ -325,37 +278,147 @@ internal class ResumableMinimize(
 
     override val work: Long get() = slice.spent()
 
-    override val initialWork: Long
+    override var initialWork: Long = 0L
+        private set
 
-    init {
-        try {
-            checkInitialization()
-            val seeded = session.seed(params.assumptions)
-            checkInitialization()
-            cp.rebase()
-            if (seeded is PropagationResult.Unsat || session.isUnsatAtRoot ||
-                problem.baked is PropagationResult.Unsat
-            ) {
-                rootExhausted = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
-                rootIsExhausted = true
-            } else {
-                when (searchSession.initialize()) {
-                    ComponentResult.Consistent -> params.clauseExchange?.onSearchStart(session)
-                    is ComponentResult.Conflict -> rootExhausted = null
-                    ComponentResult.Indeterminate -> Unit
+    private var installation: Iterator<Unit>? = sequence {
+        var boolWeighted = false
+        var intWeighted = false
+        var single = -1
+        var multiple = false
+        for (v in objective.boolWeightValues.indices) {
+            boolWeighted = boolWeighted || objective.boolWeightValues[v] != 0L
+            if ((v + 1) % 256 == 0) yield(Unit)
+        }
+        for (v in objective.intCoefficientValues.indices) {
+            if (objective.intCoefficientValues[v] != 0L) {
+                intWeighted = true
+                if (single >= 0) multiple = true else single = v
+            }
+            if ((v + 1) % 256 == 0) yield(Unit)
+        }
+        for (v in objective.realCoefficientValues.indices) {
+            discreteObjective = discreteObjective && objective.realCoefficientValues[v] == 0.0
+            if ((v + 1) % 256 == 0) yield(Unit)
+        }
+        if (!boolWeighted && discreteObjective && single >= 0 && !multiple) {
+            singleObj = SingleIntObjective(single, objective.intCoefficientValues[single] > 0L)
+        }
+        if (params.objectiveGuidedValues && (boolWeighted || intWeighted)) {
+            params = params.copy(valueSelector = SolutionGuided(IndomainBest(objective)))
+        }
+        cp = CpSearchComponent(
+            preparedSession ?: PropagationSession(
+                solver.propagationProjection(params.nativeSat ?: true, problem),
+                cancelledWhen(::runDeadline) { solveCancelled() },
+                params.propagationCancelFloor,
+                nativeSat = params.nativeSat ?: true,
+                pbLearning = params.pbLearning ?: true,
+            ),
+            branching = CpBranching.None,
+        ).also {
+            it.conflictStats = sink.ca
+            sink.search.propagationWork = { it.session.work }
+            sink.search.rootPropagationWork = { it.session.rootWork }
+            sink.search.propagationNanos = { it.session.propagationNanos }
+            sink.search.rootPropagationNanos = { it.session.rootPropagationNanos }
+        }
+        yield(Unit)
+        lpEngine = LpEngine(problem, objective, params.lpParams(), sink, solver.lpSolveContext)
+        lpEngine.lpHints = lpHints
+        yield(Unit)
+        brancher = BacktrackBrancher(
+            session, params, sink, restart, LpGuidedBranching(), nativeConflict = { cp.lastConflict },
+        ).also {
+            cp.propagationObserver = it::onPropagation
+            cp.cascadeConflictObserver = it::onCascadeConflict
+        }
+        yield(Unit)
+        searchSession = SearchComponentSet(
+            buildList {
+                add(cp)
+                if (lpEngine.lpRelaxer != null) {
+                    lpEngine.cpAdapter.attach(session, feasibility = false)
+                    add(lpEngine.propagator)
+                }
+            },
+            branchers = listOf(brancher),
+        ).session(
+            cancellation = params.cancellation,
+            learnedDb = params.sharedLearnedDb(),
+        )
+        yield(Unit)
+        val seeded = if (deferredInstallation) {
+            var result: PropagationResult? = null
+            val seed = session.prepareSeed(params.assumptions)
+            while (result == null) {
+                result = seed.next()
+                if (result == null) yield(Unit)
+            }
+            result
+        } else {
+            session.seed(params.assumptions)
+        }
+        cp.rebase()
+        if (seeded is PropagationResult.Unsat || session.isUnsatAtRoot || problem.baked is PropagationResult.Unsat) {
+            rootExhausted = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
+            rootIsExhausted = true
+        } else {
+            var initialized: ComponentResult? = null
+            val initializer = searchSession.prepareInitialization { component, context ->
+                if (deferredInstallation && component === cp) {
+                    cp.prepareInitialization(context)
+                } else {
+                    sequenceOf(component.initialize(context)).iterator()
                 }
             }
-            checkInitialization()
-            run = searchSession.openRun(problem.numBoolVars, traversal)
-            initialWork = slice.spent()
-        } catch (primary: Throwable) {
-            closeAfter(primary)
-            throw primary
+            while (initialized == null) {
+                initialized = initializer.next()
+                if (initialized == null) yield(Unit)
+            }
+            when (initialized) {
+                ComponentResult.Consistent -> params.clauseExchange?.onSearchStart(session)
+                is ComponentResult.Conflict -> rootExhausted = null
+                ComponentResult.Indeterminate -> Unit
+            }
+        }
+        if (!deferredInstallation) checkInitialization()
+        run = searchSession.openRun(problem.numBoolVars, traversal)
+        initialWork = slice.spent()
+    }.iterator()
+
+    internal fun inheritPreparationBudget(preparation: SliceBudget) {
+        check(installation == null)
+        slice.inheritPreparation(preparation)
+    }
+
+    override val preparationPending: Boolean get() = installation != null && !closed
+
+    internal fun advanceInstallation(): Boolean {
+        check(!closed) { "search is closed" }
+        val pending = installation ?: return true
+        try {
+            if (pending.hasNext()) pending.next() else installation = null
+            return installation == null
+        } catch (failure: Throwable) {
+            closeAfter(failure)
+            throw failure
+        }
+    }
+
+    init {
+        if (!deferredInstallation) {
+            try {
+                while (!advanceInstallation()) checkInitialization()
+            } catch (failure: Throwable) {
+                closeAfter(failure)
+                throw failure
+            }
         }
     }
 
     private fun checkInitialization() {
-        if (pausable && (session.fixpointCancelled || solveCancelled())) {
+        if (pausable && ((::cp.isInitialized && session.fixpointCancelled) || solveCancelled())) {
             throw SearchInitializationCancelled(stats, work)
         }
     }
@@ -427,6 +490,7 @@ internal class ResumableMinimize(
     override fun close() {
         if (closed) return
         closed = true
+        installation = null
         var failure: Throwable? = null
         try {
             clausePrimal?.close()
@@ -434,7 +498,7 @@ internal class ResumableMinimize(
             failure = closeFailure
         }
         try {
-            lpEngine.close()
+            if (::lpEngine.isInitialized) lpEngine.close()
         } catch (closeFailure: Throwable) {
             failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
         }

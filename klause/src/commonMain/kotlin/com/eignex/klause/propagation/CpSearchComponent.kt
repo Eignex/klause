@@ -99,6 +99,38 @@ class CpSearchComponent(
         return result
     }
 
+    internal fun prepareInitialization(
+        context: com.eignex.klause.solver.search.SearchContext,
+    ): Iterator<ComponentResult?> = sequence {
+        sharedContext = context
+        if (session.isUnsatAtRoot) {
+            yield(ComponentResult.Conflict())
+            return@sequence
+        }
+        var result: ComponentResult = ComponentResult.Consistent
+        for (variable in 0 until session.problem.numBoolVars) {
+            if ((variable + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+            val value = session.boolValue(variable) ?: continue
+            val publication = context.publish(Lit.make(variable, value))
+            if (publication !is ComponentResult.Consistent) result = publication
+        }
+        for (variable in 0 until session.problem.numIntVars) {
+            if ((variable + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+            val domain = session.intDomain(variable)
+            val lower = context.publish(
+                SearchDecision.IntAtLeast(sourceIntId(variable), domain.min),
+                session.sharedBoundPremise(variable, false, context, ::sourceIntId, sharedRootLevel),
+            )
+            if (lower !is ComponentResult.Consistent) result = lower
+            val upper = context.publish(
+                SearchDecision.IntAtMost(sourceIntId(variable), domain.max),
+                session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel),
+            )
+            if (upper !is ComponentResult.Consistent) result = upper
+        }
+        yield(result)
+    }.iterator()
+
     override fun assert(
         decision: SearchDecision,
         context: com.eignex.klause.solver.search.SearchContext,

@@ -228,23 +228,55 @@ class PropagationSession private constructor(
         }
         check(trail.size == 0 && levelTop == 1)
         for (i in assumptions.boolKeys.indices) {
-            val result = pushBool(assumptions.boolKeys[i], assumptions.boolValues[i], reportImplied = false)
-            if (result is PropagationResult.Unsat) {
-                yield(result)
-                return@sequence
+            for (result in preparePin(true, assumptions.boolKeys[i], if (assumptions.boolValues[i]) 1L else 0L)) {
+                if (result is PropagationResult.Unsat) {
+                    yield(result)
+                    return@sequence
+                }
+                yield(null)
             }
-            yield(null)
         }
         for (i in assumptions.intKeys.indices) {
-            val result = pushInt(assumptions.intKeys[i], assumptions.intValues[i], reportImplied = false)
-            if (result is PropagationResult.Unsat) {
-                yield(result)
-                return@sequence
+            for (result in preparePin(false, assumptions.intKeys[i], assumptions.intValues[i])) {
+                if (result is PropagationResult.Unsat) {
+                    yield(result)
+                    return@sequence
+                }
+                yield(null)
             }
-            yield(null)
         }
         yield(PropagationResult.Implied.EMPTY)
     }.iterator()
+
+    private fun preparePin(boolean: Boolean, v: Int, value: Long): Sequence<PropagationResult?> = sequence {
+        val pinned = if (boolean) state.pinBoolAsDecision(v, value != 0L) else state.setIntAsDecision(v, value)
+        if (!pinned) {
+            yield(revertAndUnsat(state.conflictLevels ?: EmptyIntArray))
+            return@sequence
+        }
+        val queue = state.beginSeedFixpoint()
+        while (queue.hasNext()) {
+            queue.next()
+            yield(null)
+        }
+        do {
+            val conflict = state.advanceRootFixpoint(cancellation)
+            if (conflict != null) {
+                yield(revertAndUnsat(conflict))
+                return@sequence
+            }
+            if (state.rootFixpointPending) yield(null)
+        } while (state.rootFixpointPending)
+        if (boolean) {
+            boolPinned[v] = if (value != 0L) 1 else 0
+            trail.add(encBool(v))
+        } else {
+            intPinnedSet[v] = true
+            intPinnedVal[v] = value
+            trail.add(encInt(v))
+        }
+        levelPush(state.mark())
+    }
 
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
     val decisionLevel: Int get() = trail.size
