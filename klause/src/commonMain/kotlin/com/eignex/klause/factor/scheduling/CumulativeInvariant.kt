@@ -357,7 +357,8 @@ internal class CumulativeInvariant(
                 val di = simulateCumulativeStartDelta(ls, iCur, jCur, curDur(state, i), curRes(state, i))
                 val dj = simulateCumulativeStartDelta(ls, jCur, iCur, dj0, rj0)
                 if (di + dj >= 0) continue
-                sink.addCompound(
+                sink.addChannelingCompound(
+                    state,
                     listOf(
                         IntSet(iV, jCur),
                         IntSet(jV, iCur),
@@ -413,7 +414,7 @@ internal class CumulativeInvariant(
             coordinated.carryBinaryChannels(state, sink)
             val move = coordinated.toMove() as Move.Compound
             val before = sink.size
-            sink.addCompound(move.parts)
+            sink.addChannelingCompound(state, move.parts)
             if (sink.size > before) added++
         }
     }
@@ -466,7 +467,7 @@ internal class CumulativeInvariant(
             val sj = state.assignment.intValue(starts[j])
             if (si == sj) continue
             if (sj !in state.rootDomains[starts[i]] || si !in state.rootDomains[starts[j]]) continue
-            sink.addCompound(listOf(IntSet(starts[i], sj), IntSet(starts[j], si)))
+            sink.addChannelingCompound(state, listOf(IntSet(starts[i], sj), IntSet(starts[j], si)))
             emitted++
         }
     }

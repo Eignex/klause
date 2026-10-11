@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -12,6 +13,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -24,6 +26,201 @@ import kotlin.test.assertTrue
  * [strategy.CblsStallSwapTest] fixture (GE/LE only) deliberately avoids.
  */
 class LocalSearchStateTest {
+    @Test
+    fun `root repairs preserve multiple selected Element requirements`() {
+        for (definedResults in listOf(false, true)) {
+            val problem = Problem(
+                0, 9, arrayOf(
+                    IntDomain(0, 1), IntDomain(2, 3), IntDomain(1, 1), IntDomain(1, 1),
+                    IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0),
+                ), arrayOf<Factor>(
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, -2),
+                    Element(0, 2, longArrayOf(4, 5), true, 0),
+                    Element(1, 3, longArrayOf(6, 7), true, 2),
+                    Cumulative(intArrayOf(0, 8), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            val hints = if (definedResults) intArrayOf(1, 2, 3) else intArrayOf(1)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, hints)).network(9, 0)
+            for ((variable, value) in longArrayOf(0, 2, 1, 1, 1, 0, 1, 0, 0).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+            val before = state.assignment.snapshot()
+            val degrees = state.factorDegree.copyOf()
+            val payloads = state.intPayload.copyOf()
+            val step = state.step
+
+            state.moveSink.addChannelingIntSet(state, 0, 1)
+            val coordinated = state.moveSink.list.filterIsInstance<Move.Compound>().single()
+            val predicted = state.netDelta(coordinated)
+
+            assertEquals(before, state.assignment.snapshot())
+            assertEquals(1L, state.cost)
+            assertEquals(step, state.step)
+            assertContentEquals(degrees, state.factorDegree)
+            assertContentEquals(payloads, state.intPayload)
+            assertEquals(1L, state.netDelta(Move.IntSet(0, 1)))
+            assertEquals(-1L, predicted)
+            state.apply(coordinated)
+            assertEquals(1L, state.assignment.intValue(0))
+            assertEquals(1L, state.assignment.intValue(5))
+            assertEquals(1L, state.assignment.intValue(7))
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `joint root repairs select cells from the complete propagated move`() {
+        val problem = Problem(
+            0, 11, arrayOf(
+                IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2), IntDomain(1, 1), IntDomain(1, 1),
+                IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0),
+            ), arrayOf<Factor>(
+                Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                Element(0, 3, longArrayOf(5, 6), true, 0),
+                Element(2, 4, longArrayOf(7, 8, 9), true, 0),
+                Cumulative(intArrayOf(0, 10), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4))).network(11, 0)
+        for ((variable, value) in longArrayOf(0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0).withIndex()) {
+            state.assignment.setInt(variable, value)
+        }
+        state.recompute()
+        val before = state.assignment.snapshot()
+
+        state.moveSink.addChannelingCompound(state, listOf(Move.IntSet(0, 1), Move.IntSet(1, 1)))
+        val coordinated = state.moveSink.list.filterIsInstance<Move.Compound>().maxBy { it.parts.size }
+
+        assertEquals(before, state.assignment.snapshot())
+        assertEquals(-1L, state.netDelta(coordinated))
+        state.apply(coordinated)
+        assertEquals(2L, state.assignment.intValue(2))
+        assertEquals(1L, state.assignment.intValue(6))
+        assertEquals(0L, state.assignment.intValue(8))
+        assertEquals(1L, state.assignment.intValue(9))
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `Element-preserving proposals respect protected roots and cells`() {
+        for (protection in listOf("cell-pin", "cell-owner", "cell-domain", "cell-definition", "root-pin")) {
+            val factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, -2),
+                Element(0, 2, longArrayOf(4, 5), true, 0),
+                Element(1, 3, longArrayOf(6, 7), true, 2),
+                Cumulative(intArrayOf(0, 8), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+            ) + if (protection == "cell-definition") arrayOf<Factor>(Product(7, 7, 5)) else emptyArray()
+            val problem = Problem(
+                0, 9, arrayOf(
+                    IntDomain(0, 1), IntDomain(2, 3), IntDomain(1, 1), IntDomain(1, 1),
+                    IntDomain(0, 1), IntDomain(0, if (protection == "cell-domain") 0 else 1),
+                    IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0),
+                ), factors,
+            )
+            val pins = when (protection) {
+                "cell-pin" -> Assumptions.None.withInt(5, 0)
+                "root-pin" -> Assumptions.None.withInt(0, 0)
+                else -> Assumptions.None
+            }
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), pins)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1, 2, 3))).network(9, 0)
+            for ((variable, value) in longArrayOf(0, 2, 1, 1, 1, 0, 1, 0, 0).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            if (protection == "cell-owner") state.moveSink.setOwners(IntArray(9) { if (it == 5) 1 else -1 })
+            state.recompute()
+            val before = state.assignment.snapshot()
+
+            state.moveSink.addChannelingIntSet(state, 0, 1)
+
+            assertTrue(state.moveSink.list.none { it is Move.Compound }, protection)
+            assertEquals(before, state.assignment.snapshot(), protection)
+            assertEquals(1L, state.cost, protection)
+        }
+    }
+
+    @Test
+    fun `Element-preserving proposals reject conflicting shared-cell targets`() {
+        val problem = Problem(
+            0, 8, arrayOf(
+                IntDomain(0, 1), IntDomain(1, 2), IntDomain(1, 1), IntDomain(0, 0),
+                IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0),
+            ), arrayOf<Factor>(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, -1),
+                Element(0, 2, longArrayOf(4, 5), true, 0),
+                Element(1, 3, longArrayOf(6, 5), true, 1),
+                Cumulative(intArrayOf(0, 7), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1, 2, 3))).network(8, 0)
+        for ((variable, value) in longArrayOf(0, 1, 1, 0, 1, 0, 0, 0).withIndex()) {
+            state.assignment.setInt(variable, value)
+        }
+        state.recompute()
+        val before = state.assignment.snapshot()
+
+        state.moveSink.addChannelingIntSet(state, 0, 1)
+
+        assertTrue(state.moveSink.list.none { it is Move.Compound })
+        assertEquals(before, state.assignment.snapshot())
+        assertEquals(1L, state.cost)
+    }
+
+    @Test
+    fun `Element-preserving proposals bound the number of selected factors`() {
+        for (selections in listOf(32, 33)) {
+            val problem = Problem(
+                0, 5, arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 0)),
+                Array<Factor>(selections + 1) {
+                    if (it == selections) Cumulative(intArrayOf(0, 4), longArrayOf(1, 1), longArrayOf(1, 1), 1)
+                    else Element(0, 1, longArrayOf(2, 3), true, 0)
+                },
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(1, 1)
+            state.assignment.setInt(2, 1)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 0, 1)
+
+            assertEquals(if (selections == 32) 1 else 0, state.moveSink.list.count { it is Move.Compound })
+            assertEquals(1L, state.cost)
+        }
+    }
+
+    @Test
+    fun `Element-preserving probe allowance resets with the candidate collection`() {
+        val problem = Problem(
+            0, 5, arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 0)),
+            arrayOf<Factor>(
+                Element(0, 1, longArrayOf(2, 3), true, 0),
+                Cumulative(intArrayOf(0, 4), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 1)
+        state.recompute()
+
+        repeat(2) {
+            state.moveSink.clear()
+            repeat(5) { state.moveSink.addChannelingIntSet(state, 0, 1) }
+
+            assertEquals(4, state.moveSink.list.count { it is Move.Compound })
+            assertEquals(5, state.moveSink.list.count { it is Move.IntSet })
+            assertEquals(1L, state.cost)
+        }
+    }
+
     @Test
     fun `cumulative repair scores distinguish overload reductions within a degree bucket`() {
         for (coordinate in listOf("start", "duration", "resource", "capacity")) {

@@ -410,6 +410,11 @@ saturated payload as committed Cumulative grades.
 Weight and plateau-stall schedules recognize a lower unweighted fraction sum when
 integer costs tie. Integer-cost drops take precedence, and restarts re-anchor both
 components. Recipes using break scoring retain integer-only stall feedback.
+During infeasibility, root repairs can also preserve satisfied variable-array Element
+results by coordinating admissible destination cells. Each candidate collection probes
+at most four variants over at most 32 selected factors. Conflicts, pins, ownership and
+defined cells reject a variant; original candidates remain available, and complete
+compound scoring checks every affected constraint.
 Opt-in Cumulative residual snapshots prioritize the start, duration and demand coordinates
 of tasks participating in the maximum overload, retaining coordinate bounds and omission counts.
 Domain-aware definition inference derives hinted unit equality channels only when
