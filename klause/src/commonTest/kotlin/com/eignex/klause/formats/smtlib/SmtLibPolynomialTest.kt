@@ -251,6 +251,15 @@ class SmtLibPolynomialTest {
     }
 
     @Test
+    fun `quoted numeric symbols cannot change numeral meaning`() {
+        val parsed = SmtLibPolynomial.parse("(declare-const |2| Real) (assert (= |2| 2))")
+
+        val atom = assertIs<PolynomialRealFormula.Atom>(parsed.formula)
+        assertEquals(PolynomialExpression.Variable(SourceRealId(0)), atom.left)
+        assertEquals(PolynomialExpression.Constant.of(bigIntOf(2)), atom.right)
+    }
+
+    @Test
     fun `linear real formulas remain distinguishable from nonlinear sources`() {
         val parsed = SmtLibPolynomial.parse("(declare-const x Real) (assert (<= (* (/ 1 3) x) 2))")
 
@@ -292,6 +301,7 @@ class SmtLibPolynomialTest {
     fun `ill sorted and undeclared polynomial terms are rejected`() {
         val cases = listOf(
             "(assert (= x 1))", "(assert (= x 1)) (declare-const x Real)",
+            "(declare-const 2 Real)", "(declare-const \"x\" Real)",
             "(declare-const b Bool) (assert (= (* b b) 1))",
             "(declare-const b Bool) (assert (> b false))",
             "(declare-const b Bool) (assert (= b 1))",
