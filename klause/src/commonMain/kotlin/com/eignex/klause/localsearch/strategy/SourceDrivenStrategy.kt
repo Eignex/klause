@@ -128,7 +128,6 @@ class SourceDrivenStrategy(
 
     private val noiseSink = MoveSink()
     private val scoreSink = MoveSink()
-    private val alternativeSink = MoveSink()
 
     /** Pick the next move to apply, or `null` when no candidate is available (the engine restarts). */
     fun pickMove(state: LocalSearchState): Move? {
@@ -155,20 +154,12 @@ class SourceDrivenStrategy(
 
         noiseSink.clear()
         scoreSink.clear()
-        alternativeSink.clear()
         noiseSink.setAssumptions(state.assumptions)
         scoreSink.setAssumptions(state.assumptions)
         noiseSink.setInvariants(state.invariants)
         scoreSink.setInvariants(state.invariants)
         noiseSink.setOwners(state.seeding.ownerInt)
         scoreSink.setOwners(state.seeding.ownerInt)
-        alternativeSink.setAssumptions(state.assumptions)
-        alternativeSink.setInvariants(state.invariants)
-        alternativeSink.setOwners(state.seeding.ownerInt)
-        if (!stalled) {
-            noiseSink.alternativeRepairs = alternativeSink
-            scoreSink.alternativeRepairs = alternativeSink
-        }
         for (cs in sources) {
             if (!cs.enabled) continue
             if (cs.stallGated && !stalled) continue
@@ -183,19 +174,7 @@ class SourceDrivenStrategy(
         // While stalled, never let tabu starve the noise pool into a null pick (a restart that discards
         // plateau progress): fall back to the unfiltered candidates so the search keeps walking the plateau.
         val noiseMoves = if (noiseFiltered.isEmpty() && stalled) ccNoise else noiseFiltered
-        val primaryScoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
-        val alternatives = tabu.filter(state, ccFilter(state, alternativeSink.list))
-        val scoreMoves = if (alternatives.isEmpty() || stall != null) {
-            primaryScoreMoves
-        } else {
-            val bestPrimary = minOf(
-                noiseMoves.minOfOrNull { score(state, it) } ?: Double.POSITIVE_INFINITY,
-                primaryScoreMoves.minOfOrNull { score(state, it) } ?: Double.POSITIVE_INFINITY,
-            )
-            if (bestPrimary < 0.0) primaryScoreMoves else {
-                primaryScoreMoves + alternatives.filter { score(state, it) < bestPrimary }
-            }
-        }
+        val scoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
         // A NoiseSchedule retunes its level and steers the acceptance rule (WalkSAT noise / probSAT cb);
         // noise-free rules ignore the level.
         val noiseSchedule = schedule.noise as? NoiseSchedule
@@ -215,7 +194,23 @@ class SourceDrivenStrategy(
         // once per pick that sampled the noise pool, so acceptance stays pure. A Metropolis rule with
         // no temperature schedule falls back to a fixed conservative temperature rather than degenerating.
         val temperature = schedule.temperature?.temperature ?: DEFAULT_METROPOLIS_TEMPERATURE
-        val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { score(state, it) }
+        val hasAlternatives = noiseSink.hasAlternativeRepairs || scoreSink.hasAlternativeRepairs
+        val bestPrimary = if (hasAlternatives) {
+            minOf(
+                noiseMoves.filterNot(noiseSink::isAlternativeRepair).minOfOrNull { score(state, it) }
+                    ?: Double.POSITIVE_INFINITY,
+                scoreMoves.filterNot(scoreSink::isAlternativeRepair).minOfOrNull { score(state, it) }
+                    ?: Double.POSITIVE_INFINITY,
+            )
+        } else {
+            Double.POSITIVE_INFINITY
+        }
+        val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) {
+            val value = score(state, it)
+            if (hasAlternatives && (noiseSink.isAlternativeRepair(it) || scoreSink.isAlternativeRepair(it)) &&
+                value >= bestPrimary
+            ) Double.POSITIVE_INFINITY else value
+        }
         if (effectiveAcceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
         return move
     }
