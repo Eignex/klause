@@ -3,11 +3,11 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 internal class MonotoneClausePrimal private constructor(
     private val solver: BacktrackSolver,
@@ -21,44 +21,57 @@ internal class MonotoneClausePrimal private constructor(
 ) : AutoCloseable {
     private var accepted = variables.fold(params.assumptions) { pins, variable -> pins.withBool(variable, true) }
     private var index = 0
-    private var repair: RepairSearch? = null
+    private var repair: ResumableMinimize? = null
+    private var trial: Assumptions? = null
+    private var pure: List<Int> = emptyList()
+    private var trialSample: Sample? = null
     private var bestValue = Double.POSITIVE_INFINITY
     private var closed = false
 
     val work: Long get() = (repair?.work ?: 0L) + literalWork / PROPAGATION_WORK_PER_NODE
     val isDone: Boolean get() = closed || index == variables.size || lifetime() || work >= 100_000L
 
-    fun advance(): Sample? {
+    fun advance(sliceMillis: Long = 2_500L, sliceNodes: Long = -1L): Sample? {
         if (isDone || params.cancellation()) return null
-        val search = repair ?: solver.openRepair(
-            LinearObjective(),
-            BacktrackPresets.conflictDriven(params.randomSeed, cancellation = params.cancellation or lifetime).copy(
-                assumptions = params.assumptions,
-                nativeSat = params.nativeSat,
-                phaseSaving = false,
-            ),
-        ).also { repair = it }
+        val startWork = work
+        val start = TimeSource.Monotonic.markNow()
+        val search = repair ?: try {
+            ResumableMinimize(
+                solver, LinearObjective(),
+                BacktrackPresets.conflictDriven(params.randomSeed, cancellation = lifetime).copy(
+                    assumptions = params.assumptions, nativeSat = params.nativeSat, phaseSaving = false,
+                ),
+                rebindable = true,
+            ).also { repair = it }
+        } catch (cancelled: SearchInitializationCancelled) {
+            literalWork += cancelled.work * PROPAGATION_WORK_PER_NODE
+            close()
+            return null
+        }
         while (!isDone && !params.cancellation()) {
-            val variable = variables[index]
-            val trial = accepted.withBool(variable, false)
-            val pure = purePins(trial)
-            val candidate = search.repair(
-                pure.first,
-                20_000L,
-                Double.POSITIVE_INFINITY,
-                lifetime or Cancellation.after(250.milliseconds),
-            )
-            // A slice ending says nothing about this trial; retry it when the caller re-arms the slice.
-            if (candidate == null && params.cancellation() && !lifetime()) return null
+            if (trial == null) {
+                val next = accepted.withBool(variables[index], false)
+                val simplified = purePins(next)
+                trial = next
+                pure = simplified.second
+                search.rebind(simplified.first, 20_000L)
+            }
+            val nodes = if (sliceNodes < 0L) -1L else (sliceNodes - (work - startWork)).coerceAtLeast(0L)
+            val millis = (sliceMillis - start.elapsedNow().inWholeMilliseconds).coerceAtLeast(0L)
+            val terminal = search.runSlice(lifetime, millis, nodes) { trialSample = it.sample }
+            if (terminal == null && trialSample == null) return null
             index++
-            if (candidate != null) {
-                accepted = trial
-                val polished = polish(candidate, pure.second)
-                val value = objective.evaluate(polished)
-                if (value < bestValue) {
-                    bestValue = value
-                    return polished
-                }
+            val completedTrial = checkNotNull(trial)
+            trial = null
+            val sample = trialSample
+            trialSample = null
+            if (sample == null) continue
+            accepted = completedTrial
+            val polished = polish(sample, pure)
+            val value = objective.evaluate(polished)
+            if (value < bestValue) {
+                bestValue = value
+                return polished
             }
         }
         return null

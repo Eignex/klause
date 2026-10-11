@@ -79,6 +79,22 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
+    fun `a feasibility trial resumes across small work slices`() {
+        val solver = BacktrackSolver(Problem(
+            12, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+        ).bake())
+        val objective = LinearObjective(boolWeights = longArrayOf(1L))
+        val primal = assertNotNull(MonotoneClausePrimal.create(
+            solver, objective, BacktrackParams(), Cancellation.Never,
+        ))
+        primal.use {
+            var sample = it.advance(sliceNodes = 1L)
+            repeat(30) { if (sample == null && !it.isDone) sample = it.advance(sliceNodes = 1L) }
+            assertEquals(0L, objective.evaluateLong(assertNotNull(sample)))
+        }
+    }
+
+    @Test
     fun `negative occurrence of a costly variable disables the probe`() {
         val solver = BacktrackSolver(Problem(
             1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false)))),

@@ -57,6 +57,11 @@ internal class SliceBudget(
         return false
     }
 
+    fun remainingNodes(): Long {
+        charge()
+        return if (workBounded) (nodeEnd - nodeCount()).coerceAtLeast(0L) else -1L
+    }
+
     /** Work spent so far: nodes plus LP and propagation work, charged or not. */
     fun spent(): Long = nodeCount() + lpWork() / LP_WORK_PER_NODE + propagationWork() / PROPAGATION_WORK_PER_NODE
 

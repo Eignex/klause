@@ -514,7 +514,12 @@ internal class ResumableMinimize(
                 }
             }
             clausePrimal?.let { primal ->
-                if (clausePrimalCandidate == null) clausePrimalCandidate = primal.advance()
+                if (clausePrimalCandidate == null) {
+                    val millis = slice.deadline?.let {
+                        (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
+                    } ?: 2_500L
+                    clausePrimalCandidate = primal.advance(millis, if (pausable) slice.remainingNodes() else -1L)
+                }
                 clausePrimalCandidate?.let { sample ->
                     if (pausable && sliceCancelled()) return StepEvent.Paused
                     val published = publishLpProposal(sample)
