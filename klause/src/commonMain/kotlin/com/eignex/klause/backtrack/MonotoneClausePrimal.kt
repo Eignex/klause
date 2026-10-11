@@ -113,7 +113,7 @@ internal class MonotoneClausePrimal private constructor(
         val pure = mutableListOf<Int>()
         while (!params.cancellation() && !phaseToken()) {
             val polarity = residualPolarity(pins) ?: break
-            val next = polarity.indices.filter { polarity[it] == 1 || polarity[it] == 2 }
+            val next = polarity.indices.filter { it !in pins && polarity[it] != 3 }
             if (next.isEmpty()) break
             for (variable in next) pins[variable] = polarity[variable] == 1
             pure.addAll(next)

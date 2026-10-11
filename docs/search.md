@@ -354,7 +354,8 @@ Pure Boolean clausal optimization with at most 64 positive-cost variables can
 seed incumbents through greedy feasibility repairs when those variables occur
 only positively in hard clauses. A private satisfaction repair keeps unaccepted
 cost variables true and tries their cheap values in descending weight order.
-A bounded pure-literal fixpoint fixes free residual variables to satisfying values. Only
+A bounded pure-literal fixpoint fixes free residual variables to satisfying values and
+fills variables absent from the remaining clauses. Only
 feasible trials are retained. Clause-local polishing releases these pins and removes unnecessary
 costly values; polishing resumes across slices before the composed verifier checks the full
 proposal for publication.
