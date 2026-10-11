@@ -178,6 +178,10 @@ class SourceDrivenStrategy(
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
             cs.source.generate(state, sink)
         }
+        return selectMove(state, stall, stalled)
+    }
+
+    private fun selectMove(state: LocalSearchState, stall: StallSchedule?, stalled: Boolean): Move? {
         // The noise/score pool split is preserved across the CC + tabu filters. CC precedes tabu: the
         // configuration filter is the primary focus, tabu the cycle-breaker layered on what survives it.
         val ccNoise = ccFilter(state, noiseSink.list)
