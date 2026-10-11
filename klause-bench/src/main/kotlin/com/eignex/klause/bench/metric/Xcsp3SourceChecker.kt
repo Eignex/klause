@@ -27,6 +27,12 @@ internal object Xcsp3SourceChecker {
     )
 
     fun inspect(source: File, witness: String, objective: String?): SourceValidation {
+        val solution = runCatching {
+            builder().parse(InputSource(StringReader(witness)))
+        }.getOrElse { failure ->
+            return result("invalid", "malformed instantiation XML: ${failure.message.orEmpty().take(300)}")
+        }
+        val root = solution.documentElement
         val document = runCatching {
             source.inputStream().use { builder().parse(it) }
         }.getOrElse { failure ->
@@ -40,12 +46,6 @@ internal object Xcsp3SourceChecker {
         if (unsupported(document) || parser.oEntries.size > 1) {
             return result("unknown", "reified, soft or multiple-objective source checking is unsupported")
         }
-        val solution = runCatching {
-            builder().parse(InputSource(StringReader(witness)))
-        }.getOrElse { failure ->
-            return result("invalid", "malformed instantiation XML: ${failure.message.orEmpty().take(300)}")
-        }
-        val root = solution.documentElement
         checkAssignment(parser, root)?.let { return it }
         pinObjective(parser, root, objective)?.let { return it }
         val cost = objective?.let { " cost=\"$it\"" }.orEmpty()
