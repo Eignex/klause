@@ -42,6 +42,7 @@ User-facing documentation is maintained separately at
 | [Fixture provenance](testing/fixtures.md) | Committed input identities, hashes, licenses and capture exclusions |
 | [Portfolio slice evidence](evidence/slice-policy.md) | Bounded selection and validation supporting the common slice defaults |
 | [Numerical kernel evidence](evidence/numerical-kernels.md) | Bounded evidence for current dense-basis, rational and polling decisions |
+| [State ownership evidence](evidence/coordinator-ownership.md) | Bounded source, work and allocation validation for concrete lifecycle owners |
 
 Keep one authoritative page for each contract; link to it from related workflows.
 Update the affected contract in the same change as ownership, dependency,

@@ -96,8 +96,10 @@ redistribution terms, hashes and exclusions.
 consumer trace. It compiles against `:klause`'s internal JVM test API through its init script;
 ordinary bench runs and tests do not load it. The source is the two-integer problem
 `x,y ∈ [-3,7]`, `x+y >= 1`, minimizing `2x+y+5`. One root and four
-push/push/pop/push/pop cycles must reproduce the frozen 21-state capture SHA-256
-`deb7c8bb9b3c744e71b31893b7abd1c1f1b8511d8edeecda8f965566e6d4c648`.
+push/push/pop/push/pop cycles must reproduce the frozen 21-state trace SHA-256
+`a2913b8157272acf0f0244dc8cc2ba81d4b4802e3a99a63eec09425d76f6d4e4`.
+The trace hashes each observed source-bound tuple and its effective exact LP model,
+independent of retained trail revision history.
 
 ```
 ./gradlew -I klause-bench/scripts/lp-lifecycle/lp-lifecycle.init.gradle :klause:lpLifecycleComparison --max-workers=2 > /tmp/lp-lifecycle.log
