@@ -122,6 +122,8 @@ From the separate `klause-lab` checkout, using its configured client:
 ./deploy/lab show 123
 ./deploy/lab cases 123
 ./deploy/lab csv 123
+./deploy/lab files 123
+./deploy/lab cat 123 job.log 8000
 ./deploy/lab fetch 123 /absolute/path/to/klause-evidence/campaigns/lp-ceiling/raw
 ```
 
@@ -131,6 +133,11 @@ the HTTP `GET /experiments/<id>/cases` endpoint supplies the JSON array consumed
 outputs, including `cases/<index>/record.json` for the offline source verifier.
 `lab compare` links experiments; `lab schedule`, `reschedule`, `schedules` and
 `check` manage regression runs under the lab's operations guide.
+
+`lab files` lists a job's files and `lab cat <id> <path> [tail-bytes]` prints one, such as
+`job.log`, `setup.log` or `cases/<index>/record.json`, over HTTP: reading a job needs no SSH.
+`lab ssh <id> [instance] [command]` reaches a running AWS job's instance. Measure as a lab
+experiment rather than directly on the lab Mac, where a run competes with the lab's cases.
 
 Cases disable result caching, alternate configurations across seeds/repetitions,
 and retain installed-build provenance when supported by the selected revision.
