@@ -180,7 +180,7 @@ The route does not support enumeration or optimization. Its parameters are
 `nra-matrix-cells=auto|unlimited|N`: defaults are unlimited work, 65,536 coefficients
 and 262,144 matrix cells. Work/matrix zero exhausts the allowance; a dense cap must
 be positive. These native units are separate from `node-limit` and linear open work.
-`-s` reports backend `exact-nra`, `nraWork`, `nraProjectedPolynomials`,
+The library result retains backend `exact-nra`. `-s` reports `nraWork`, `nraProjectedPolynomials`,
 `nraLiftedCells` and, on a resource stop, `nraResource`. Legacy open counters remain
 zero. The whole-run deadline includes source admission. `open-bound-proof=false`
 does not disable admission or polynomial solving because this route has no finite
