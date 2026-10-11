@@ -114,7 +114,11 @@ internal class ExactLiraEqualities(
         for (row in rows) {
             if (progressStop()) return ComponentResult.Indeterminate
             val value = forest.difference(row.target, row.source, row.sourceSign)
-            val nonintegral = (row.op == LinearOp.EQ || row.op == LinearOp.NE) && row.bound.den != BIG_ONE
+            val integralComparison = row.op == LinearOp.EQ || row.op == LinearOp.NE
+            val intrinsicNonintegral = integralComparison && row.bound.den != BIG_ONE
+            val derivedNonintegral = integralComparison && !intrinsicNonintegral && value == null &&
+                forest.nonintegralOffset(row.target, row.source, row.sourceSign, row.bound)
+            val nonintegral = intrinsicNonintegral || derivedNonintegral
             val exclusion = if (value == null && excluded.isNotEmpty()) {
                 row.offsetKey(forest)?.let { excluded[it] }
             } else null
@@ -130,7 +134,9 @@ internal class ExactLiraEqualities(
                 val paths = forest.offsetPremises(row.target, row.source, progressStop)
                     ?: return ComponentResult.Indeterminate
                 paths + exclusion
-            } else if (nonintegral) emptyList() else {
+            } else if (intrinsicNonintegral) emptyList() else if (derivedNonintegral) {
+                forest.premises(row.target, row.source, progressStop) ?: return ComponentResult.Indeterminate
+            } else {
                 forest.comparisonPremises(row.target, row.source, row.sourceSign, progressStop)
                     ?: return ComponentResult.Indeterminate
             }
@@ -382,6 +388,16 @@ internal class ExactLiraEqualities(
             val relativeSign = sign * first.sign * second.sign
             return if (first.vertex < second.vertex) OffsetKey(first.vertex, second.vertex, relativeSign, normalized)
             else OffsetKey(second.vertex, first.vertex, relativeSign, -relativeSign * normalized)
+        }
+
+        fun nonintegralOffset(target: Int, source: Int, sign: Int, bound: BigFraction): Boolean {
+            val first = find(target)
+            val second = find(source)
+            if (first.vertex != second.vertex) return false
+            val coefficient = first.sign - sign * second.sign
+            if (coefficient == 0) return false
+            val residual = bound - BigFraction.ofLong(first.offset - sign * second.offset)
+            return (residual * BigFraction.ofLong(coefficient.toLong()).reciprocal()).den != BIG_ONE
         }
 
         fun offsetPremises(target: Int, source: Int, stop: Cancellation): List<SearchAtomPremise>? {

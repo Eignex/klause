@@ -24,6 +24,60 @@ import kotlin.test.assertNull
 
 class ExactLiraEqualitiesTest {
     @Test
+    fun `a signed equality path rejects an incompatible parity with its guard and retracts`() {
+        for ((operator, truth) in listOf(LinearOp.EQ to false, LinearOp.NE to true)) {
+            for (bound in listOf(0L, Long.MIN_VALUE)) {
+                val open = Bits(2).also { it.set(0); it.set(1) }
+                val source = Problem(
+                    2,
+                    intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+                    factors = arrayOf(
+                        ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 3),
+                        ReifiedLinear(1, longArrayOf(-1, 1), intArrayOf(0, 1), operator, bound),
+                    ),
+                )
+                val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+                    factor.linearRows.map { it.exactForm(0) }
+                }) { _, _ -> ComponentResult.Consistent }
+                val session = SearchSession(emptyList())
+                session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+                assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+                assertEquals(truth, session.boolValue(1))
+                assertEquals(
+                    setOf(Lit.make(0, false), Lit.make(1, truth)), session.reasonFor(1)?.literals?.toSet(),
+                )
+                session.popTo(0)
+                assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+                assertNull(session.boolValue(1))
+            }
+        }
+    }
+
+    @Test
+    fun `a signed equality path leaves a comparison with compatible parity undecided`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val source = Problem(
+            2,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 4),
+                ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+        assertNull(session.boolValue(1))
+    }
+
+    @Test
     fun `a signed comparison depending on a fixed component cites the fixing guard and retracts`() {
         val open = Bits(2).also { it.set(0); it.set(1) }
         val source = Problem(
