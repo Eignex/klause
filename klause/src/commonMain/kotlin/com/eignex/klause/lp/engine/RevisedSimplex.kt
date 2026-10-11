@@ -122,7 +122,8 @@ internal class RevisedSimplex(
     internal val lastTheoryPricingDeclines: Int get() = observations.lastTheoryPricingDeclines
     internal val lastTheoryPricingResourceStops: Int get() = observations.lastTheoryPricingResourceStops
     internal val lastTheoryPricingWorkOps: Long get() = observations.lastTheoryPricingWorkOps
-    internal val lastTheoryPricingEstimatedFtranWorkOps: Long get() = observations.lastTheoryPricingEstimatedFtranWorkOps
+    internal val lastTheoryPricingEstimatedFtranWorkOps: Long
+        get() = observations.lastTheoryPricingEstimatedFtranWorkOps
     internal val lastTheoryPricingSelections: Int get() = observations.lastTheoryPricingSelections
     internal val lastTheorySelectedColumn: Int get() = observations.lastTheorySelectedColumn
     private val observations = SimplexObservations()
@@ -2408,7 +2409,8 @@ internal class RevisedSimplex(
         }
         observations.sourceBasicDualResidual = dualResidual
         if (numerical.applied &&
-            (!observations.sourcePrimalResidual.isFinite() || !observations.sourceBoundViolation.isFinite() || !dualResidual.isFinite())
+            (!observations.sourcePrimalResidual.isFinite() ||
+                !observations.sourceBoundViolation.isFinite() || !dualResidual.isFinite())
         ) {
             throw LpScalingArithmeticException()
         }
