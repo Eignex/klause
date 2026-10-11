@@ -83,7 +83,8 @@ coefficient operations and elimination steps. Interruption throws
 polynomials and completed intervals outlive the context and never retain mutable
 producer buffers. Dense coefficient expansion defaults to at most 65,536 entries
 and elimination matrices to at most 262,144 cells per allocation. Callers can
-configure these invocation limits. A checked `PolynomialResourceLimit` identifies
+configure these invocation limits; null disables either cap within the checked
+integer representation. A checked `PolynomialResourceLimit` identifies
 dense expansion, matrix allocation or degree overflow before allocating or
 truncating data; this is a resource decline, never a mathematical verdict.
 
