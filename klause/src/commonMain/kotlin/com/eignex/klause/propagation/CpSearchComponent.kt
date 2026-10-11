@@ -370,6 +370,7 @@ class CpSearchComponent(
                     learned.lbd,
                 )
             }
+            lastResult = result
             return when (result) {
                 is PropagationResult.Implied -> {
                     // The clause stays in this component's own database. Copying it into the shared one
@@ -389,7 +390,6 @@ class CpSearchComponent(
                 }
 
                 is PropagationResult.Unsat -> {
-                    lastResult = result
                     cascadeConflictObserver?.invoke(result)
                     val next = result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
                     when {
