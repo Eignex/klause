@@ -555,7 +555,8 @@ class ExactLiraSearchComponent(
         }
         var checked = false
         // Graph evidence has no LP certifier identity to offer an overridden acceptance policy.
-        if (context.decisionLevel > 0 && node.sourceBranches.isEmpty() &&
+        val completeBooleans = bools.none { it == UNASSIGNED }
+        if ((context.decisionLevel > 0 || completeBooleans) && node.sourceBranches.isEmpty() &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy
         ) {
             realDifference?.let { graph ->
@@ -566,17 +567,18 @@ class ExactLiraSearchComponent(
                     // Shared LP explanations keep conflict learning on the same source proof surface.
                     RealDifferenceSystem.Result.Infeasible -> Unit
                     is RealDifferenceSystem.Result.Feasible -> {
-                        val floating = lp.solveFloat()
-                        if (operationStop()) return ComponentResult.Indeterminate
-                        if (floating?.second != null) {
-                            if (bools.any { it == UNASSIGNED }) {
-                                dirty = false
-                                return ComponentResult.Consistent
-                            }
+                        if (completeBooleans) {
                             candidate = result.point
                             acceptWitness(result.point)?.let {
                                 assignment = it
                                 outcome = ComponentCheck.Feasible
+                                dirty = false
+                                return ComponentResult.Consistent
+                            }
+                        } else {
+                            val floating = lp.solveFloat()
+                            if (operationStop()) return ComponentResult.Indeterminate
+                            if (floating?.second != null) {
                                 dirty = false
                                 return ComponentResult.Consistent
                             }

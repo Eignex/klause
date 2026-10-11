@@ -93,9 +93,11 @@ witnesses still pass the complete source-row check. Infeasible graphs retain the
 shared LP route for conflict explanations and learning. Active source rows remain
 asserted in the shared LP scope. Floating LP solves maintain the basis on graph-feasible
 states; their numerical output supplies no verdict. Graph feasibility replaces
-exact LP point certification below the root. Bounded potentials from an earlier
+exact LP point certification below the root and for complete Boolean assignments
+at the root. A complete graph witness passes source validation before numerical
+LP work, so pinned local-search completions need no floating guide. Bounded potentials from an earlier
 feasible graph seed relaxation, which must still settle every active edge. The
-root relaxation and inconclusive floating updates retain the full shared LP solve. Graph admission
+partial root relaxation and inconclusive floating updates retain the full shared LP solve. Graph admission
 is capped at 10,000 real variables and 100,000 edges. Larger models,
 fractional normalized bounds, unsafe Long magnitudes, disequalities,
 private disjunctions, Boolean arithmetic beyond shared clauses/cardinalities,
