@@ -915,9 +915,7 @@ internal fun Compiler.Builder.cardinality(e: XmlElement) {
 internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
     val eq = newBool()
     factors.add(ReifiedLinear(eq, longArrayOf(1), intArrayOf(x), LinearOp.EQ, value))
-    val ch = newAuxVar(0L, 1L)
-    factors.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
-    return ch
+    return litTo01(Lit.make(eq, true))
 }
 
 /** `binPacking`: item `i` goes to bin `list[i]`; each bin's total item size meets the condition. */

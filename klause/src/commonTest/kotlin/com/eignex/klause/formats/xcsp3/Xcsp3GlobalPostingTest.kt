@@ -9,6 +9,7 @@ import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
@@ -40,6 +41,73 @@ class Xcsp3GlobalPostingTest {
         .toSet()
 
     private val threeVars = """<var id="x">1..3</var><var id="y">1..3</var><var id="z">1..3</var>"""
+
+    @Test
+    fun `bin packing channels follow item moves in every capacity form`() {
+        for ((capacity, expectedCost) in listOf(
+            "<limits>3 3</limits>" to 2L,
+            "<condition>(le,3)</condition>" to 2L,
+            "<loads>l0 l1</loads>" to 4L,
+        )) {
+            val parsed = parse(
+                "<binPacking><list>x y</list><sizes>2 3</sizes>$capacity</binPacking>",
+                """
+                <var id="x">0..1</var><var id="y">0..1</var>
+                <var id="l0">0..5</var><var id="l1">0..5</var>
+                """.trimIndent(),
+            )
+            val problem = parsed.problem
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+            val x = parsed.intVarNames.getValue("x")
+            state.assignment.setInt(x, 0)
+            state.assignment.setInt(parsed.intVarNames.getValue("y"), 1)
+            state.assignment.setInt(parsed.intVarNames.getValue("l0"), 2)
+            state.assignment.setInt(parsed.intVarNames.getValue("l1"), 3)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+                .network(problem.numIntVars, problem.numBoolVars)
+            state.recompute()
+            assertEquals(0L, state.cost)
+
+            val move = Move.IntSet(x, 1)
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(expectedCost, state.cost)
+            assertEquals(expectedCost, predicted)
+            state.recompute()
+            assertEquals(expectedCost, state.cost)
+        }
+    }
+
+    @Test
+    fun `an affine packing index follows a joint coordinate move`() {
+        val parsed = parse(
+            """
+            <intension>eq(index,add(mul(2,day),theater))</intension>
+            <binPacking><list>index</list><sizes>2</sizes><limits>3 3 3 3</limits></binPacking>
+            """.trimIndent(),
+            """<var id="day">0..1</var><var id="theater">0..1</var><var id="index">0..3</var>""",
+        )
+        val problem = parsed.problem
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+        val day = parsed.intVarNames.getValue("day")
+        val theater = parsed.intVarNames.getValue("theater")
+        state.assignment.setInt(day, 0)
+        state.assignment.setInt(theater, 0)
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+            .network(problem.numIntVars, problem.numBoolVars)
+        state.recompute()
+        val move = Move.Compound(listOf(Move.IntSet(day, 1), Move.IntSet(theater, 1)))
+        val predicted = state.netDelta(move)
+
+        state.apply(move)
+
+        assertEquals(3L, state.assignment.intValue(parsed.intVarNames.getValue("index")))
+        assertEquals(0L, predicted)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
 
     @Test
     fun `an ascending ordered chain posts one Increasing over the sequence`() {

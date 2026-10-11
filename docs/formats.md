@@ -161,7 +161,7 @@ its declared domain extends beyond it, including nonzero axis offsets; repeated
 cells and aliases retain their source variable identities. Unsupported constructs
 decline through the common solve surface. Boolean-valued XCSP arithmetic terms
 use fresh 0/1 integers tied directly to their source literal by a reified equality,
-including negated literals; products and sum terms share this encoding.
+including negated literals; products, sum terms and bin-packing indicators share this encoding.
 Products of a Boolean expression and a declared integer use their declared equality
 output directly, so local search maintains the source product output during moves.
 The compiler marks the fresh binary channels as deterministic outputs. Domain-aware
