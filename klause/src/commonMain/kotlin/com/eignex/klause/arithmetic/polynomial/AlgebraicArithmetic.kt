@@ -71,8 +71,8 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         if (lower == null) return checkNotNull(upper).lowerBound - BigFraction.ONE
         if (upper == null) return lower.upperBound + BigFraction.ONE
         require(compare(lower, upper) < 0) { "sector boundaries must be strictly ordered" }
-        var a = lower
-        var b = upper
+        var a: AlgebraicReal = lower
+        var b: AlgebraicReal = upper
         while (a.upperBound >= b.lowerBound) {
             a = refine(a)
             b = refine(b)
