@@ -110,7 +110,9 @@ internal fun PolynomialRealFormula.requireVariableCounts(
         if (!seenFormulas.add(node)) continue
         when (node) {
             is PolynomialRealFormula.Constant -> Unit
-            is PolynomialRealFormula.BooleanVariable -> require(node.id.index < boolCount) { "polynomial Boolean id out of range" }
+            is PolynomialRealFormula.BooleanVariable -> require(node.id.index < boolCount) {
+                "polynomial Boolean id out of range"
+            }
             is PolynomialRealFormula.Atom -> {
                 expressions.addLast(node.left)
                 expressions.addLast(node.right)
@@ -142,11 +144,16 @@ private fun polynomialFormulasEqual(left: PolynomialRealFormula, right: Polynomi
         val (first, second) = work.removeLast()
         if (first === second || !seen.add(PolynomialNodePair(first, second))) continue
         when (first) {
-            is PolynomialRealFormula.Constant -> if (second !is PolynomialRealFormula.Constant || first.value != second.value) return false
-            is PolynomialRealFormula.BooleanVariable -> if (second !is PolynomialRealFormula.BooleanVariable || first.id != second.id) return false
+            is PolynomialRealFormula.Constant -> {
+                if (second !is PolynomialRealFormula.Constant || first.value != second.value) return false
+            }
+            is PolynomialRealFormula.BooleanVariable -> {
+                if (second !is PolynomialRealFormula.BooleanVariable || first.id != second.id) return false
+            }
             is PolynomialRealFormula.Atom -> {
                 if (second !is PolynomialRealFormula.Atom || first.relation != second.relation ||
-                    !polynomialExpressionsEqual(first.left, second.left) || !polynomialExpressionsEqual(first.right, second.right)
+                    !polynomialExpressionsEqual(first.left, second.left) ||
+                    !polynomialExpressionsEqual(first.right, second.right)
                 ) return false
             }
             is PolynomialRealFormula.Not -> {

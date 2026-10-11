@@ -33,21 +33,38 @@ internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
         fun rational(value: PolynomialExpression): BigFraction? =
             (value as? PolynomialExpression.Constant)?.let { BigFraction.of(it.numerator, it.denominator) }
 
-        fun sum(operands: List<PolynomialExpression>, cancellation: Cancellation = Cancellation.Never): PolynomialExpression {
+        fun sum(
+            operands: List<PolynomialExpression>,
+            cancellation: Cancellation = Cancellation.Never,
+        ): PolynomialExpression {
             if (operands.all { it is PolynomialExpression.Constant }) {
-                return constant(operands.fold(BigFraction.ZERO) { value, operand -> foldCoefficient(value, rational(operand)!!, cancellation, multiply = false) })
+                return constant(
+                    operands.fold(BigFraction.ZERO) { value, operand ->
+                        foldCoefficient(value, rational(operand)!!, cancellation, multiply = false)
+                    },
+                )
             }
             return if (operands.size == 1) operands.single() else PolynomialExpression.Sum(operands)
         }
 
-        fun product(operands: List<PolynomialExpression>, cancellation: Cancellation = Cancellation.Never): PolynomialExpression {
+        fun product(
+            operands: List<PolynomialExpression>,
+            cancellation: Cancellation = Cancellation.Never,
+        ): PolynomialExpression {
             if (operands.all { it is PolynomialExpression.Constant }) {
-                return constant(operands.fold(BigFraction.ONE) { value, operand -> foldCoefficient(value, rational(operand)!!, cancellation, multiply = true) })
+                return constant(
+                    operands.fold(BigFraction.ONE) { value, operand ->
+                        foldCoefficient(value, rational(operand)!!, cancellation, multiply = true)
+                    },
+                )
             }
             return if (operands.size == 1) operands.single() else PolynomialExpression.Product(operands)
         }
 
-        fun negate(operand: PolynomialExpression, cancellation: Cancellation = Cancellation.Never): PolynomialExpression =
+        fun negate(
+            operand: PolynomialExpression,
+            cancellation: Cancellation = Cancellation.Never,
+        ): PolynomialExpression =
             product(listOf(constant(BigFraction.MINUS_ONE), operand), cancellation)
 
         fun power(
@@ -99,7 +116,9 @@ internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
         }
 
         fun and(operands: List<PolynomialRealFormula>): PolynomialRealFormula {
-            if (operands.any { it == PolynomialRealFormula.Constant(false) }) return PolynomialRealFormula.Constant(false)
+            if (operands.any { it == PolynomialRealFormula.Constant(false) }) {
+                return PolynomialRealFormula.Constant(false)
+            }
             val values = operands.filter { it != PolynomialRealFormula.Constant(true) }
             return when (values.size) {
                 0 -> PolynomialRealFormula.Constant(true)

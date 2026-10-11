@@ -62,7 +62,11 @@ internal data class PolynomialMacro(
 private sealed interface PolynomialFrame {
     data class Evaluate(val expression: SExpr, val environment: PolynomialEnvironment) : PolynomialFrame
     data class Combine(val expression: SExpr.SList, val count: Int) : PolynomialFrame
-    data class Let(val bindings: List<String>, val body: SExpr, val environment: PolynomialEnvironment) : PolynomialFrame
+    data class Let(
+        val bindings: List<String>,
+        val body: SExpr,
+        val environment: PolynomialEnvironment,
+    ) : PolynomialFrame
     data class Call(val macro: PolynomialMacro) : PolynomialFrame
     data class CheckSort(val boolean: Boolean) : PolynomialFrame
 }
@@ -139,7 +143,9 @@ internal class SmtLibPolynomialEvaluator(
                 when {
                     head == "let" -> scheduleLet(node, frame.environment, work)
                     macro != null -> {
-                        if (node.items.size != macro.parameters.size + 1) smtUnsupported("polynomial macro '$head' arity")
+                        if (node.items.size != macro.parameters.size + 1) {
+                            smtUnsupported("polynomial macro '$head' arity")
+                        }
                         work.addLast(PolynomialFrame.Call(macro))
                         for (argument in node.items.drop(1).asReversed()) {
                             work.addLast(PolynomialFrame.Evaluate(argument, frame.environment))
@@ -149,7 +155,9 @@ internal class SmtLibPolynomialEvaluator(
                         validateOperator(node)
                         val args = node.items.drop(1)
                         work.addLast(PolynomialFrame.Combine(node, args.size))
-                        for (argument in args.asReversed()) work.addLast(PolynomialFrame.Evaluate(argument, frame.environment))
+                        for (argument in args.asReversed()) {
+                            work.addLast(PolynomialFrame.Evaluate(argument, frame.environment))
+                        }
                     }
                 }
             }
@@ -182,7 +190,9 @@ internal class SmtLibPolynomialEvaluator(
             "+" -> PolynomialValue.Real(sum(args.map { it.real() }, cancellation))
             "-" -> PolynomialValue.Real(
                 if (args.size == 1) negate(args.single().real(), cancellation)
-                else sum(listOf(args.first().real()) + args.drop(1).map { negate(it.real(), cancellation) }, cancellation),
+                else sum(
+                    listOf(args.first().real()) + args.drop(1).map { negate(it.real(), cancellation) }, cancellation,
+                ),
             )
             "*" -> {
                 val terms = args.map { it.real() }
@@ -219,14 +229,18 @@ internal class SmtLibPolynomialEvaluator(
             "and" -> PolynomialValue.Boolean(and(args.map { it.boolean() }))
             "or" -> PolynomialValue.Boolean(or(args.map { it.boolean() }))
             "not" -> PolynomialValue.Boolean(not(args.single().boolean()))
-            "xor" -> PolynomialValue.Boolean(args.map { it.boolean() }.reduce { left, right -> not(equivalent(left, right)) })
+            "xor" -> PolynomialValue.Boolean(
+                args.map { it.boolean() }.reduce { left, right -> not(equivalent(left, right)) },
+            )
             "=>" -> PolynomialValue.Boolean(
                 args.map { it.boolean() }.reduceRight { left, right -> or(listOf(not(left), right)) },
             )
             "ite" -> {
                 val condition = args[0].boolean()
                 if (args[1] is PolynomialValue.Boolean) {
-                    PolynomialValue.Boolean(PolynomialRealLowering.conditional(condition, args[1].boolean(), args[2].boolean()))
+                    PolynomialValue.Boolean(
+                        PolynomialRealLowering.conditional(condition, args[1].boolean(), args[2].boolean()),
+                    )
                 } else {
                     PolynomialValue.Real(lowering.conditional(condition, args[1].real(), args[2].real()))
                 }
