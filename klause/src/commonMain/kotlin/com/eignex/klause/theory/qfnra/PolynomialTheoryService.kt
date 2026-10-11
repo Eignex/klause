@@ -49,12 +49,22 @@ internal class PolynomialCondition(
 }
 
 internal class PolynomialTheoryService(
-    val formula: PolynomialRealFormula,
+    formula: PolynomialRealFormula,
     val boolCount: Int,
     val realCount: Int,
+    fixedReals: Map<Int, BigFraction> = emptyMap(),
 ) {
+    private val fixedReals = fixedReals.toMap()
+    val formula: PolynomialRealFormula = if (fixedReals.isEmpty()) formula else PolynomialRealFormula.And(
+        listOf(formula) + fixedReals.map { (id, value) ->
+            PolynomialRealFormula.Atom(
+                PolynomialExpression.Variable(SourceRealId(id)), PolynomialRelation.EQ,
+                PolynomialExpression.Constant.of(value.num, value.den),
+            )
+        },
+    )
     fun invocation(params: QfNraParams = QfNraParams()): PolynomialTheoryInvocation =
-        PolynomialTheoryInvocation(formula, boolCount, realCount, params)
+        PolynomialTheoryInvocation(formula, boolCount, realCount, params, fixedReals)
 }
 
 internal class PolynomialTheoryInvocation(
@@ -62,6 +72,7 @@ internal class PolynomialTheoryInvocation(
     private val boolCount: Int,
     private val realCount: Int,
     private val params: QfNraParams,
+    private val fixedReals: Map<Int, BigFraction>,
 ) : AutoCloseable {
     private var closed = false
     private var active = false
@@ -85,7 +96,7 @@ internal class PolynomialTheoryInvocation(
             val result = solveQfNra(
                 formula, boolCount, realCount,
                 params.copy(cancellation = params.cancellation or cancellation, maximumWork = remaining),
-                condition,
+                PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper),
             )
             lastUnknown = result as? QfNraResult.Unknown
             stats = QfNraStats(

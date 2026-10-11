@@ -102,8 +102,9 @@ internal class Solvable(
 
     /** Finite CP problem. */
     val problem: Problem? get() = finite?.problem
-    val optimize: Boolean get() = finite?.optimize ?: (openRequest?.objective != null)
-    val maximize: Boolean get() = finite?.maximize ?: (openRequest?.maximize ?: false)
+    val optimize: Boolean get() = finite?.optimize ?: (openRequest?.objective != null || polynomial?.objective != null)
+    val maximize: Boolean get() = finite?.maximize ?: (openRequest?.maximize ?: polynomial?.maximize ?: false)
+    private val polynomial: SolvablePipeline.PolynomialTheory? get() = pipeline as? SolvablePipeline.PolynomialTheory
     private val openRequest: OpenTheoryRequest? get() = (pipeline as? SolvablePipeline.OpenTheory)?.request
     val lsObjective: IncrementalObjective? get() = finite?.localSearchObjective
     val linearObjective: LinearObjective? get() = finite?.linearObjective
@@ -139,6 +140,7 @@ private fun Problem.finiteSolveShape(
 }
 
 private fun sourceRouteName(route: SourceProblemRoute): String = when (route) {
+    is SourceProblemRoute.PolynomialTheory -> "a polynomial model"
     is SourceProblemRoute.Finite -> "a finite model"
     is SourceProblemRoute.OpenTheory -> "an open theory model"
     is SourceProblemRoute.UnsupportedOpen -> "an unsupported open model"
@@ -160,6 +162,8 @@ internal sealed interface SolvablePipeline {
     data class PolynomialTheory(
         val request: PolynomialTheoryRequest,
         val render: (OpenTheoryAssignment) -> String,
+        val objective: LinearObjective? = null,
+        val maximize: Boolean = false,
     ) : SolvablePipeline
 
     data class Interrupted(val reason: TerminationReason) : SolvablePipeline

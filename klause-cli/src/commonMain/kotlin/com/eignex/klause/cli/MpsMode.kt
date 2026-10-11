@@ -103,6 +103,7 @@ internal object MpsMode : CliMode {
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
             common.logRoute(route, routingElapsedMs)
             return when (route) {
+                is SourceProblemRoute.PolynomialTheory -> polynomialSolvable(route, renderOpen, routingElapsedMs)
                 // Finite solving minimizes; the open route negates a maximized objective itself.
                 is SourceProblemRoute.Finite -> mpsLinearSolvable(
                     compiled,
