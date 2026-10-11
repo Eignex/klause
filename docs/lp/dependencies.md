@@ -5,11 +5,6 @@ lifetime. Koblas supplies validated CSC containers, indexed/vector Level 1 kerne
 primitives. There is one floating simplex with exact certification; vendor selection does not change
 numerical authority or create another solver.
 
-`klause-numerics` owns exact integer/rational primitives and the Native bignum
-binding. `klause-lattice` consumes that substrate without a solver dependency.
-Koblas/Kumulant integration and basis workspaces remain in `klause`.
-See [module interfaces](../architecture.md#numerical-module-interfaces).
-
 ## Dependency provenance
 
 ### Koblas

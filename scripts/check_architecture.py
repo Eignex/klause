@@ -25,14 +25,6 @@ FORBIDDEN = {
     "solver.pipeline": ("formats",),
     "theory": ("propagation", "backtrack", "ir.IntDomain", "ir.intdomain"),
 }
-MODULE_PACKAGES = {
-    "klause-numerics": ("util", "simplex.exact"),
-    "klause-lattice": ("lp.lattice",),
-}
-MODULE_DEPENDENCIES = {
-    "klause-numerics": (),
-    "klause-lattice": ("klause-numerics",),
-}
 NAME = r"[A-Za-z_][A-Za-z_0-9]*"
 QUALIFIED = re.compile(rf"\b{re.escape(ROOT)}\.(?:{NAME}\.)*(?:{NAME}|\*)")
 PACKAGE = re.compile(rf"^\s*package\s+({NAME}(?:\.{NAME})*)", re.MULTILINE)
@@ -149,29 +141,11 @@ def check(root):
     paths = list(sources(root))
     if not paths:
         return ["No production Kotlin sources found"]
-    problems = [
+    return [
         f"{path.relative_to(root)}:{line}: {owner} must not depend on {target}"
         for path in paths
         for line, owner, target in violations(path.read_text())
     ]
-    for path in paths:
-        module = path.relative_to(root).parts[0]
-        if module not in MODULE_PACKAGES:
-            continue
-        match = PACKAGE.search(code_only(path.read_text()))
-        if not match or not any(within(match[1], ROOT + "." + prefix) for prefix in MODULE_PACKAGES[module]):
-            problems.append(f"{path.relative_to(root)}: package does not belong to {module}")
-    for module, allowed in MODULE_DEPENDENCIES.items():
-        build = root / module / "build.gradle.kts"
-        if not build.exists():
-            continue
-        code = code_only(build.read_text())
-        # Project coordinates are literal strings, so inspect their original spelling after locating calls in code.
-        for call in re.finditer(r"\bproject\s*\(", code):
-            coordinate = re.match(r'\s*"(:[\w-]+)"\s*\)', build.read_text()[call.end():])
-            if not coordinate or coordinate[1][1:] not in allowed:
-                problems.append(f"{module}/build.gradle.kts: forbidden numerical module dependency")
-    return problems
 
 
 def main():

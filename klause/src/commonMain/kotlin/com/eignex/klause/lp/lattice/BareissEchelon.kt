@@ -24,11 +24,8 @@ import com.eignex.klause.util.unaryMinus
  * [rows] is the reduced matrix; [pivots] holds, per reduced row, the column its leading entry sits in,
  * ascending. A row that reduced to all zeros is dropped, so [rows] has exactly the system's rank.
  */
-@LatticeApi
-class BareissEchelon internal constructor(
-    /** Reduced independent rows, owned by this result. */
+internal class BareissEchelon(
     val rows: List<SparseIntRow>,
-    /** Leading column per reduced row, in ascending order. */
     val pivots: IntArray,
     /** The right-hand sides carried through the same row operations, when the caller supplied them.
      *  Index-aligned with [rows]; empty when the elimination was run on coefficients alone. */
@@ -64,8 +61,7 @@ class BareissEchelon internal constructor(
  * candidate creates the least of it. Zero rows are dropped rather than kept, so [BareissEchelon.rows] is
  * exactly the rank — a system whose equalities are dependent contributes only its independent ones.
  */
-@LatticeApi
-fun bareissEchelon(
+internal fun bareissEchelon(
     a: List<SparseIntRow>,
     cols: Int,
     rhsIn: Array<BigInt>? = null,

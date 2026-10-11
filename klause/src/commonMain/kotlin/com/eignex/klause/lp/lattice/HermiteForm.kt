@@ -22,13 +22,7 @@ import com.eignex.klause.util.unaryMinus
  * `H = A · V`, where [v] is unimodular (integer, determinant ±1) and therefore a bijection of the
  * integer lattice — so `Ax ⋛ b` and `Hy ⋛ b` have the same integer solutions, related by `x = Vy`.
  */
-@LatticeApi
-class HermiteForm internal constructor(
-    /** Rows after the integer column transformation, owned by this result. */
-    val h: List<SparseIntRow>,
-    /** Read-only unimodular map from transformed columns to source columns. */
-    val v: UnimodularTransform,
-)
+internal class HermiteForm(val h: List<SparseIntRow>, val v: UnimodularTransform)
 
 /**
  * Column Hermite normal form of [a] over [cols] columns, with the unimodular column transform that
@@ -49,8 +43,7 @@ class HermiteForm internal constructor(
  * bound the wrong column. Cancellation therefore reports nothing rather than a prefix.
  */
 @Suppress("NestedBlockDepth", "ReturnCount")
-@LatticeApi
-fun hermiteNormalForm(
+internal fun hermiteNormalForm(
     a: List<SparseIntRow>,
     cols: Int,
     cancellation: Cancellation = Cancellation.Never,
