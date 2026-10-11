@@ -219,6 +219,14 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
             if (invariants?.hasExtremumRepair(varId) != true) {
                 val linear = invariants?.linearDefinition(varId)
                 if (linear != null) {
+                    val scaled = positiveScaledBinaryDefinition(state, varId)
+                    if (scaled != null && invariants?.literalChannel(scaled.first) != null &&
+                        allowsDefinedInt(varId) && newValue in state.rootDomains[varId] &&
+                        (newValue == 0L || newValue == scaled.second)
+                    ) {
+                        LiteralChannelRepair(state, this).propose(scaled.first, if (newValue == 0L) 0L else 1L)
+                        return
+                    }
                     AffineIndexRepair(state, this, linear).propose(newValue)
                     return
                 }

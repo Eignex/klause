@@ -22,6 +22,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.OptionalPresence
+import com.eignex.klause.localsearch.positiveScaledBinaryDefinition
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -550,12 +551,17 @@ internal class CumulativeInvariant(
         val output = durationVars[task]
         if (!sink.allowsDefinedInt(output) || 0L !in state.rootDomains[output]) return null
         val net = state.invariants ?: return null
-        val product = net.intDefinition(output) as? FunctionalObjective.Times ?: return null
-        val a = product.a.varId
-        val b = product.b.varId
-        if (a < 0 || b < 0 || a == b) return null
-        for ((flag, length) in listOf(a to b, b to a)) {
-            val duration = state.assignment.intValue(length)
+        val candidates = when (val definition = net.intDefinition(output)) {
+            is FunctionalObjective.Times -> {
+                val a = definition.a.varId
+                val b = definition.b.varId
+                if (a < 0 || b < 0 || a == b) return null
+                listOf(a to state.assignment.intValue(b), b to state.assignment.intValue(a))
+            }
+            is FunctionalObjective.Lin -> listOf(positiveScaledBinaryDefinition(state, output) ?: return null)
+            else -> return null
+        }
+        for ((flag, duration) in candidates) {
             if (duration <= 0L || duration !in state.rootDomains[output]) continue
             val domain = state.rootDomains[flag]
             if (domain.min < 0L || domain.max > 1L || 0L !in domain || 1L !in domain ||

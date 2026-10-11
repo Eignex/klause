@@ -186,6 +186,13 @@ coordinate rejects the entire tuple move, preserving the chosen row's support;
 maintained columns decline tuple construction. The ordinary scorer grades the complete
 assignment.
 
+A maintained unary affine definition with zero offset, unit output coefficient and
+positive scale can invert exact zero or scale targets through a maintained binary
+literal channel. Domain, pin and owner checks protect both outputs and source choices;
+the existing literal inverse retains its depth and alternative bounds. Other affine
+forms keep their ordinary inverse path. This repair route does not widen definition
+inference admission.
+
 Satisfied linear equalities counter-shift the first admissible partner in coefficient
 magnitude order whose coefficient divides the driving drift. Targets outside root
 domains and protected partners do not prevent later partners from absorbing the drift.
@@ -206,10 +213,11 @@ starts must be in each other's root domains and pass pins, definitions and impli
 ownership checks. The ordinary scorer grades the complete move and maintained outputs
 across every affected factor.
 
-Cumulative overload repair can remove a maintained product duration through a unit
-binary equality channel and a unary equality choice predicate. It checks zero in the
-channel and duration domains, pins and implicit owners before proposing a complete
-choice-and-channel move. Per repair call, at most 16 such moves are drawn from at most
+Cumulative overload repair can remove a maintained product duration or its zero-offset
+positive scaled binary affine form through a unit binary equality channel and a unary
+equality choice predicate. It checks zero in the channel and duration domains, pins and
+implicit owners before proposing a complete choice-and-channel move. Per repair call,
+at most 16 such moves are drawn from at most
 32 present values of each choice domain, with at most four alternatives per predicate.
 The starting peak task advances per worker so early candidates cannot consume every
 call's budget. Retained conditional durations also admit up to four atomic choice swaps
