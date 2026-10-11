@@ -129,6 +129,10 @@ traversal clears visited ids between extractions and reads learned native clause
 variables directly, retaining the same factor-core membership across restarts and
 learned-clause compaction.
 
+Clause minimization reuses its redundancy memo storage within an analyzer. It clears
+the memo before each conflict because levels and antecedents belong to the frozen
+reason graph of that analysis, rather than the variable across search paths.
+
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump. Sound
 resolvents that cannot assert retain chronological fallback. Root refutations, unusable
