@@ -436,20 +436,24 @@ internal class NativeSatState(private val state: PropagationState) {
                 wi++
                 continue
             }
+            val baseClause = h < baseCount
+            val lits = if (baseClause) arena.lits else learnedLits.backingData
+            val start = if (baseClause) arena.start(h) else learnedStarts[h - baseCount]
+            val len = if (baseClause) arena.length(h) else learnedEnd(h - baseCount) - start
             val i0 = watchPosition(h, 0)
             val i1 = watchPosition(h, 1)
-            val slot0IsFalse = litOf(h, i0) == falseLit
+            val slot0IsFalse = lits[start + i0] == falseLit
             val lIdx = if (slot0IsFalse) i0 else i1
             val otherIdx = if (slot0IsFalse) i1 else i0
-            val otherLit = litOf(h, otherIdx)
+            val otherLit = lits[start + otherIdx]
             if (state.litTrue(otherLit)) {
                 entries[wi] = packWatch(h, otherLit) // refresh the blocker to the satisfying literal
                 wi++
                 continue
             }
-            val replacement = findNonFalse(h, lIdx, otherIdx)
+            val replacement = findNonFalse(lits, start, len, lIdx, otherIdx)
             if (replacement >= 0) {
-                val newLit = litOf(h, replacement)
+                val newLit = lits[start + replacement]
                 setWatchPosition(h, if (slot0IsFalse) 0 else 1, replacement)
                 removeWatchAt(falseLit, wi) // swap-pop; re-process wi without advancing
                 addWatch(newLit, h, otherLit)
@@ -466,11 +470,10 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     /** A non-false literal index other than the two watched ([lIdx], [otherIdx]); -1 if none. */
-    private fun findNonFalse(h: Int, lIdx: Int, otherIdx: Int): Int {
-        val len = clauseLen(h)
+    private fun findNonFalse(lits: IntArray, start: Int, len: Int, lIdx: Int, otherIdx: Int): Int {
         for (k in 0 until len) {
             if (k == lIdx || k == otherIdx) continue
-            if (!state.litFalse(litOf(h, k))) return k
+            if (!state.litFalse(lits[start + k])) return k
         }
         return -1
     }
