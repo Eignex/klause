@@ -55,8 +55,8 @@ internal object SmtLibPolynomial {
 }
 
 internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation = Cancellation.Never) {
-    private val declarations = LinkedHashMap<String, PolynomialValue>()
-    private val macros = LinkedHashMap<String, PolynomialMacro>()
+    private val bindings = PolynomialBindings()
+    private var environment = bindings.environment()
     private val realNames = LinkedHashMap<String, Int>()
     private val boolNames = LinkedHashMap<String, Int>()
     private val assertions = ArrayList<Pair<SExpr, PolynomialEnvironment>>()
@@ -87,7 +87,7 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
             "define-fun" -> define(command)
             "assert" -> {
                 command.polynomialSize(2)
-                assertions.add(command.items[1] to environment())
+                assertions.add(command.items[1] to environment)
             }
             "set-logic" -> {
                 command.polynomialSize(2)
@@ -115,10 +115,10 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
                                 ?: smtUnsupported("polynomial assumption must be a Boolean literal")
                         }
                     }
-                    if (declarations[polynomialSymbol(atom.text)] !is PolynomialValue.Boolean) {
+                    if (environment.value(polynomialSymbol(atom.text)) !is PolynomialValue.Boolean) {
                         smtUnsupported("polynomial assumption must name a declared Boolean")
                     }
-                    assertions.add(assumption to environment())
+                    assertions.add(assumption to environment)
                 }
                 querySeen = true
             }
@@ -145,11 +145,13 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
 
     private fun declare(name: String, sort: String) {
         unusedName(name)
-        declarations[name] = when (sort) {
+        val value = when (sort) {
             "Real" -> PolynomialValue.Real.variable(realNames.size).also { realNames[name] = realNames.size }
             "Bool" -> PolynomialValue.Boolean.variable(boolNames.size).also { boolNames[name] = boolNames.size }
             else -> smtUnsupported("unsupported polynomial sort '$sort'")
         }
+        bindings.declare(name, value)
+        environment = bindings.environment()
     }
 
     private fun define(command: SExpr.SList) {
@@ -169,7 +171,7 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
         }
         val macro = PolynomialMacro(
             names, sorts, polynomialBooleanSort(command.polynomialAtom(3)), command.items[4],
-            environment(),
+            environment,
         )
         val parametersForValidation = names.mapIndexed { index, parameter ->
             parameter to if (sorts[index]) PolynomialValue.Boolean.variable(index)
@@ -178,18 +180,17 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
         val value = SmtLibPolynomialEvaluator(
             PolynomialRealLowering(realNames.size + names.size), validateOnly = true, cancellation = cancellation,
         ).evaluate(
-            macro.body, macro.environment.copy(values = macro.environment.values + parametersForValidation),
+            macro.body, macro.environment.withValues(parametersForValidation),
         )
         if (macro.booleanResult) value.boolean() else if (value !is PolynomialValue.Real) {
             smtUnsupported("polynomial macro result must be Real")
         }
-        macros[name] = macro
+        bindings.define(name, macro)
+        environment = bindings.environment()
     }
 
-    private fun environment(): PolynomialEnvironment = PolynomialEnvironment(declarations.toMap(), macros.toMap())
-
     private fun unusedName(name: String) {
-        if (name in declarations || name in macros || name in setOf("true", "false")) {
+        if (bindings.contains(name) || name in setOf("true", "false")) {
             smtUnsupported("duplicate or reserved polynomial declaration '$name'")
         }
     }

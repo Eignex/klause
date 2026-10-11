@@ -8,6 +8,7 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
+import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
@@ -239,6 +240,94 @@ class SmtLibPolynomialTest {
             ),
             atom.left,
         )
+    }
+
+    @Test
+    fun `interleaved declarations and helpers preserve retained assertion identities`() {
+        val source = buildString {
+            repeat(32) { index ->
+                append("(declare-const x$index Real) ")
+                append("(define-fun f$index ((x Real)) Real (* x x$index)) ")
+                repeat(4) { append("(assert (let ((x$index 7)) (= (f$index 2) 14))) ") }
+            }
+        }
+
+        val parsed = SmtLibPolynomial.parse(source)
+
+        val terms = assertIs<PolynomialRealFormula.And>(parsed.formula).operands
+        assertEquals(128, terms.size)
+        for ((index, term) in terms.withIndex()) {
+            val atom = assertIs<PolynomialRealFormula.Atom>(term)
+            assertEquals(
+                PolynomialExpression.Product(
+                    listOf(
+                        PolynomialExpression.Constant.of(bigIntOf(2)),
+                        PolynomialExpression.Variable(SourceRealId(index / 4)),
+                    ),
+                ),
+                atom.left,
+            )
+        }
+    }
+
+    @Test
+    fun `nested local bindings shadow helpers without changing their definition scope`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const x Real) (define-fun f () Real (* x x)) " +
+                "(define-fun g ((x Real)) Real (let ((y x)) (+ y f))) " +
+                "(assert (let ((x 7) (f 9)) (let ((x f)) (= (g x) f))))",
+        )
+
+        val atom = assertIs<PolynomialRealFormula.Atom>(parsed.formula)
+        val variable = PolynomialExpression.Variable(SourceRealId(0))
+        assertEquals(
+            PolynomialExpression.Sum(
+                listOf(
+                    PolynomialExpression.Constant.of(bigIntOf(9)),
+                    PolynomialExpression.Product(listOf(variable, variable)),
+                ),
+            ),
+            atom.left,
+        )
+        assertEquals(PolynomialExpression.Constant.of(bigIntOf(9)), atom.right)
+    }
+
+    @Test
+    fun `retained scopes reject later declarations and helpers`() {
+        val cases = listOf(
+            "(assert (= (* x x) 1)) (declare-const x Real)",
+            "(assert (= f 1)) (define-fun f () Real 1)",
+            "(assert (= (f 1) 1)) (define-fun f ((x Real)) Real x)",
+            "(define-fun f () Real x) (declare-const x Real) (assert (= f 1))",
+            "(define-fun f () Real g) (define-fun g () Real 1) (assert (= f 1))",
+        )
+
+        for (source in cases) {
+            assertFailsWith<UnsupportedSmtException>(source) { SmtLibPolynomial.parse(source) }
+        }
+    }
+
+    @Test
+    fun `retained helper expansion honors cancellation during lowering`() {
+        var charged = 0L
+        var limited = false
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = limited && charged >= 1
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val compiler = SmtLibPolynomialCompiler(cancellation)
+        val reader = SExprReader(
+            StringCharSource(
+                "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
+                    "(assert (let ((x 7)) (= (f (+ 1 1)) 14)))",
+            ),
+        )
+        while (true) compiler.command(reader.readCommandOrNull() ?: break)
+        charged = 0
+        limited = true
+
+        assertFailsWith<PolynomialSourceInterrupted> { compiler.build() }
+        assertEquals(1L, charged)
     }
 
     @Test
