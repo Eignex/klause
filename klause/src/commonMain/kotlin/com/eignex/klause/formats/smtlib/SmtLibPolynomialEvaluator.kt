@@ -163,7 +163,7 @@ internal class SmtLibPolynomialEvaluator(
         for (binding in list.items) {
             val pair = binding as? SExpr.SList ?: smtUnsupported("malformed polynomial let binding")
             if (pair.items.size != 2) smtUnsupported("malformed polynomial let binding")
-            val name = pair.polynomialAtom(0)
+            val name = pair.polynomialName(0)
             if (name in names) smtUnsupported("duplicate polynomial let binding '$name'")
             names.add(name)
             arguments.add(pair.items[1])

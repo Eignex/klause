@@ -59,13 +59,13 @@ internal class SmtLibPolynomialCompiler {
         when (head) {
             "declare-const" -> {
                 command.polynomialSize(3)
-                declare(command.polynomialAtom(1), command.polynomialAtom(2))
+                declare(command.polynomialName(1), command.polynomialAtom(2))
             }
             "declare-fun" -> {
                 command.polynomialSize(4)
                 val parameters = command.items[2] as? SExpr.SList ?: smtUnsupported("malformed declare-fun arguments")
                 if (parameters.items.isNotEmpty()) smtUnsupported("polynomial arithmetic does not support uninterpreted functions")
-                declare(command.polynomialAtom(1), command.polynomialAtom(3))
+                declare(command.polynomialName(1), command.polynomialAtom(3))
             }
             "define-fun" -> define(command)
             "assert" -> {
@@ -132,7 +132,7 @@ internal class SmtLibPolynomialCompiler {
 
     private fun define(command: SExpr.SList) {
         command.polynomialSize(5)
-        val name = command.polynomialAtom(1)
+        val name = command.polynomialName(1)
         unusedName(name)
         val parameters = command.items[2] as? SExpr.SList ?: smtUnsupported("malformed define-fun parameters")
         val names = ArrayList<String>()
@@ -140,7 +140,7 @@ internal class SmtLibPolynomialCompiler {
         for (parameter in parameters.items) {
             val pair = parameter as? SExpr.SList ?: smtUnsupported("malformed polynomial parameter")
             if (pair.items.size != 2) smtUnsupported("malformed polynomial parameter")
-            val parameterName = pair.polynomialAtom(0)
+            val parameterName = pair.polynomialName(0)
             if (parameterName in names) smtUnsupported("duplicate polynomial parameter '$parameterName'")
             names.add(parameterName)
             sorts.add(polynomialBooleanSort(pair.polynomialAtom(1)))
@@ -189,3 +189,14 @@ internal fun SExpr.SList.polynomialSize(expected: Int) {
 
 internal fun polynomialSymbol(text: String): String =
     if (text.startsWith('|') && text.endsWith('|')) text.substring(1, text.length - 1) else text
+
+internal fun SExpr.SList.polynomialName(index: Int): String {
+    val text = (items.getOrNull(index) as? SExpr.Atom)?.text ?: smtUnsupported("malformed polynomial symbol")
+    if (text.startsWith('|') && text.endsWith('|')) return polynomialSymbol(text)
+    val punctuation = "~!@$%^&*_+=<>.?/-"
+    fun initial(character: Char): Boolean = character in 'a'..'z' || character in 'A'..'Z' || character in punctuation
+    if (text.isEmpty() || !initial(text[0]) || !text.all { initial(it) || it in '0'..'9' }) {
+        smtUnsupported("invalid polynomial symbol '$text'")
+    }
+    return text
+}
