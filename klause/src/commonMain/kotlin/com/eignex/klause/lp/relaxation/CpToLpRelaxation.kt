@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
@@ -405,6 +406,9 @@ internal fun LpRelaxation.leafResult(
     sink: LpStatsSink?,
 ): LeafRealResult {
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
+    if (problem.factors.any { it is ContinuousProduct } && certified.verdict != LpVerdict.INFEASIBLE) {
+        return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    }
     certified.floatOptimum?.let { float ->
         return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, floatReals(float.primal, problem))
     }
@@ -439,6 +443,9 @@ internal fun LpRelaxation.exactLeafResult(
     objective: LinearObjective?,
     sample: Sample,
 ): LeafRealResult {
+    if (problem.factors.any { it is ContinuousProduct }) {
+        return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    }
     val unboundedness = certified.unboundedness
     val primal = unboundedness?.witness?.primal ?: certified.exactPrimal
         ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)

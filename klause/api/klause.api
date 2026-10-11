@@ -1087,6 +1087,26 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
+public final class com/eignex/klause/factor/arithmetic/ContinuousProduct : com/eignex/klause/ir/Factor {
+	public fun <init> (III)V
+	public fun canSubstituteAffine (IIII)Z
+	public final fun getA ()I
+	public final fun getB ()I
+	public fun getBoolVars ()[I
+	public fun getIntVars ()[I
+	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
+	public final fun getResult ()I
+	public fun getStructuralKeyWeight ()I
+	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
+	public fun isValueAnonymous ()Z
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
+	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
+}
+
 public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klause/ir/Factor, com/eignex/klause/ir/LinearRow {
 	public fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZ)V
 	public synthetic fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -5539,6 +5559,103 @@ public final class com/eignex/klause/model/CircuitExpr$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class com/eignex/klause/model/ContinuousRealEquality : com/eignex/klause/model/BoolExpr {
+	public static final field Companion Lcom/eignex/klause/model/ContinuousRealEquality$Companion;
+	public fun <init> (Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/model/ContinuousRealExpr;)V
+	public final fun component1 ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public final fun component2 ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public final fun copy (Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/model/ContinuousRealExpr;)Lcom/eignex/klause/model/ContinuousRealEquality;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/ContinuousRealEquality;Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/model/ContinuousRealExpr;ILjava/lang/Object;)Lcom/eignex/klause/model/ContinuousRealEquality;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeft ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public final fun getRight ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public fun hashCode ()I
+	public fun toExpr ()Lcom/eignex/klause/model/BoolExpr;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/ContinuousRealEquality$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/ContinuousRealEquality$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/ContinuousRealEquality;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/ContinuousRealEquality;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ContinuousRealEquality$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/eignex/klause/model/ContinuousRealExpr {
+	public static final field Companion Lcom/eignex/klause/model/ContinuousRealExpr$Companion;
+}
+
+public final class com/eignex/klause/model/ContinuousRealExpr$Affine : com/eignex/klause/model/ContinuousRealExpr {
+	public static final field Companion Lcom/eignex/klause/model/ContinuousRealExpr$Affine$Companion;
+	public fun <init> (Ljava/util/Map;D)V
+	public synthetic fun <init> (Ljava/util/Map;DILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun component2 ()D
+	public final fun copy (Ljava/util/Map;D)Lcom/eignex/klause/model/ContinuousRealExpr$Affine;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/ContinuousRealExpr$Affine;Ljava/util/Map;DILjava/lang/Object;)Lcom/eignex/klause/model/ContinuousRealExpr$Affine;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoefficients ()Ljava/util/Map;
+	public final fun getConstant ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/ContinuousRealExpr$Affine$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/ContinuousRealExpr$Affine$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/ContinuousRealExpr$Affine;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/ContinuousRealExpr$Affine;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ContinuousRealExpr$Affine$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ContinuousRealExpr$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ContinuousRealExpr$Multiply : com/eignex/klause/model/ContinuousRealExpr {
+	public static final field Companion Lcom/eignex/klause/model/ContinuousRealExpr$Multiply$Companion;
+	public fun <init> (Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/model/ContinuousRealExpr;)V
+	public final fun component1 ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public final fun component2 ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public final fun copy (Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/model/ContinuousRealExpr;)Lcom/eignex/klause/model/ContinuousRealExpr$Multiply;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/ContinuousRealExpr$Multiply;Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/model/ContinuousRealExpr;ILjava/lang/Object;)Lcom/eignex/klause/model/ContinuousRealExpr$Multiply;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeft ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public final fun getRight ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/ContinuousRealExpr$Multiply$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/ContinuousRealExpr$Multiply$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/ContinuousRealExpr$Multiply;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/ContinuousRealExpr$Multiply;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ContinuousRealExpr$Multiply$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class com/eignex/klause/model/CostMddExpr : com/eignex/klause/model/BoolExpr {
 	public static final field Companion Lcom/eignex/klause/model/CostMddExpr$Companion;
 	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/util/List;Lcom/eignex/klause/model/IntExpr;)V
@@ -8425,6 +8542,19 @@ public final class com/eignex/klause/schema/BuildersKt {
 	public static synthetic fun symmetricAllDifferent$default (Ljava/util/List;IILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun table (Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun xor ([Lcom/eignex/klause/model/BoolTerm;)Lcom/eignex/klause/model/BoolExpr;
+}
+
+public final class com/eignex/klause/schema/ContinuousProductsKt {
+	public static final fun eq (Lcom/eignex/klause/model/ContinuousRealExpr;D)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun eq (Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/model/ContinuousRealExpr;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun eq (Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun eq (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/model/ContinuousRealExpr;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun times (Lcom/eignex/klause/model/ContinuousRealExpr;D)Lcom/eignex/klause/model/ContinuousRealExpr;
+	public static final fun times (Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/model/ContinuousRealExpr;)Lcom/eignex/klause/model/ContinuousRealExpr;
+	public static final fun times (Lcom/eignex/klause/model/ContinuousRealExpr;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/ContinuousRealExpr;
+	public static final fun times (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/model/ContinuousRealExpr;)Lcom/eignex/klause/model/ContinuousRealExpr;
+	public static final fun times (Lcom/eignex/klause/schema/FloatTerm;Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/ContinuousRealExpr;
+	public static final fun toContinuousRealExpr (Lcom/eignex/klause/schema/FloatTerm;)Lcom/eignex/klause/model/ContinuousRealExpr;
 }
 
 public final class com/eignex/klause/schema/FloatExpr : com/eignex/klause/schema/FloatTerm {

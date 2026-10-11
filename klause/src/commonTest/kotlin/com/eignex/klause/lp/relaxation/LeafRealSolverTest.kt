@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -24,6 +25,23 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
+    @Test
+    fun `linear leaf feasibility cannot certify a continuous square`() {
+        val problem = Problem(
+            0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2, realLower = doubleArrayOf(1.0, 2.0), realUpper = doubleArrayOf(1.0, 2.0),
+        )
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+
+        val fresh = leafRealFeasibility(problem, null, sample)
+        LeafRealSolver(problem, null).use { owner ->
+            val retained = owner.solve(sample, toleranceCheck = { true })
+
+            assertEquals(LpVerdict.INDETERMINATE, fresh.verdict)
+            assertEquals(LpVerdict.INDETERMINATE, retained.verdict)
+        }
+    }
+
     @Test
     fun `a mixed leaf with an unrepresentable integer cost remains indeterminate`() {
         val problem = Problem(

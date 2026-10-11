@@ -171,14 +171,15 @@ nonlinear integer/real arithmetic remain outside the supported theory surface.
 
 Native factor coverage is broader than SMT source admission. `Product` represents
 finite Int × Int multiplication and `RealProduct` represents finite Int × Real
-multiplication, but the linear SMT facade rejects products of multiple nonconstant
-operands. Polynomial fallback accepts pure Real/Bool satisfaction only; it does
-not admit nonlinear integer sources even when their integers have finite bounds.
-Neither native product factor represents Real × Real multiplication. See the
+multiplication. `ContinuousProduct` represents exact Real × Real multiplication
+through the shared model and [schema lowering](#schema-continuous-products), but
+shared solver execution remains unsupported. The linear SMT facade rejects products
+of multiple nonconstant operands. Polynomial fallback accepts pure Real/Bool
+satisfaction only; it does not admit nonlinear integer sources even when their
+integers have finite bounds. See the
 [implemented arithmetic routes](architecture.md#implemented-arithmetic-routes).
-Polynomial composition and continuous products are under active work in
-[#2621](https://github.com/Eignex/klause/issues/2621) and
-[#2622](https://github.com/Eignex/klause/issues/2622); nonlinear integer SMT admission
+Shared polynomial execution is under active work in
+[#2621](https://github.com/Eignex/klause/issues/2621); nonlinear integer SMT admission
 is tracked in [#2625](https://github.com/Eignex/klause/issues/2625). These are
 implementation gaps rather than admission restrictions imposed by the support
 policy. Update this coverage when those routes land.
@@ -426,3 +427,31 @@ XCSP min/max arithmetic expressions mark deterministic auxiliaries and materiali
 operands as definition hints. Top-level equalities retain output aliases; hints alone do
 not orient unrelated sums or unhinted min/max globals. Domains and independently posted
 output constraints remain authoritative during local-search definition maintenance.
+
+## Schema continuous products
+
+`ContinuousRealEquality` lowers continuous affine expressions and multiplication
+chains into real columns, `ContinuousProduct` factors and exact affine equality
+rows. The shared `ProblemBuilder.continuousProduct` entry checks every ID against
+allocated real columns. Named schema variables keep their original IDs; anonymous
+real auxiliaries carry intermediate affine values and product results. Equal source
+subexpressions within an equality reuse their column, including square operands.
+Constant terms use fixed real columns. Coefficients, constants and declared bounds
+retain their exact binary64 rational meaning. Multiplication nodes are never folded
+with floating arithmetic, so a chain preserves its exact polynomial relation.
+
+The DSL exposes `(x * x * y) eq z`, `(x * y) eq 2.0` and affine operands such as
+`((x + 0.5) * y) eq z`. Existing scalar affine arithmetic keeps its established
+coefficient construction semantics. Model AST serialization preserves the product
+tree and named affine operands. Source AST maps are borrowed read-only during
+compilation, like other model payloads.
+
+Products connect all participating float variables before representation selection.
+A product connected to a grid-selected strict, disequal or optional float component
+is rejected rather than approximated. Continuous equalities requiring Boolean
+reification are rejected; top-level constraints and conjunctions are supported.
+Continuous products declare unsupported finite execution capabilities and no LP
+relaxation. LP leaf publication declines feasible or tolerance-accepted completions
+when a continuous product remains; exact linear refutations remain sound. The
+[polynomial theory](solver/qfnra.md) owns nonlinear witness authority, and its
+polynomial-source admission is separate from this schema representation.

@@ -18,6 +18,7 @@ import com.eignex.klause.model.BoolExpr
 import com.eignex.klause.model.BoolRef
 import com.eignex.klause.model.CardinalityExpr
 import com.eignex.klause.model.CircuitExpr
+import com.eignex.klause.model.ContinuousRealEquality
 import com.eignex.klause.model.CostMddExpr
 import com.eignex.klause.model.CostRegularExpr
 import com.eignex.klause.model.CumulativeExpr
@@ -117,6 +118,8 @@ internal fun Lowering.assertExpr(expr: BoolExpr) {
         is IntCompare -> assertIntCompare(expr)
 
         is FloatLinearConstraint -> assertFloatLinear(expr)
+
+        is ContinuousRealEquality -> assertContinuousEquality(expr)
 
         is AllDifferent -> assertAllDifferent(expr.terms)
 

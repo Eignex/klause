@@ -28,6 +28,7 @@ import com.eignex.klause.model.BoolRef
 import com.eignex.klause.model.BoolSpec
 import com.eignex.klause.model.CardinalityExpr
 import com.eignex.klause.model.CircuitExpr
+import com.eignex.klause.model.ContinuousRealEquality
 import com.eignex.klause.model.CostMddExpr
 import com.eignex.klause.model.CostRegularExpr
 import com.eignex.klause.model.CumulativeExpr
@@ -144,7 +145,9 @@ internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings
 
     fun newIntVar(domain: IntDomain): Int = problemBuilder.newInt(domain)
 
-    fun newRealVar(lower: Double, upper: Double, name: String): Int = problemBuilder.newReal(lower, upper, name)
+    fun newRealVar(lower: Double, upper: Double, name: String? = null): Int = problemBuilder.newReal(lower, upper, name)
+
+    fun continuousProduct(a: Int, b: Int, result: Int) = problemBuilder.continuousProduct(a, b, result)
 
     fun buildProblem() = problemBuilder.build()
 
@@ -197,6 +200,8 @@ internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings
         }
 
         is IntCompare -> reifyIntCompare(expr)
+
+        is ContinuousRealEquality -> error("Continuous equality requires a top-level constraint")
 
         is FloatLinearConstraint -> {
             // A float-linear implication cannot be lowered without a reified float-linear factor.
