@@ -79,7 +79,8 @@ A model key's identity belongs to its source scope, rather than a global symbol 
 `SourceBoolId`, `SourceIntId` and `SourceRealId` name separate source namespaces.
 `CompiledSchema.sourceId`/`sourceRealId` expose those locations; a bucketed float has no
 continuous source location. `VarRemap` owns its primitive tables and returns typed source
-locations or null for an absent target.
+locations or null for an absent target. Internal symmetry refinement borrows its owner's
+mutable tables through an explicit workspace view, confined to that synchronous operation.
 
 `CpProblemProjection` maps `SourceIntId` to `CpIntId`, returning null for a theory-owned
 integer, and maps the finite id back to the source. `RelaxationBuilder` maps finite
