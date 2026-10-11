@@ -2,6 +2,7 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.source.CorpusFetcher
 import java.io.File
+import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
@@ -12,8 +13,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Xcsp3SourceCheckerTest {
     private val source = File(CorpusFetcher.workspaceRoot(), "klause-bench/smoke-corpus/xcsp3/sum-opt-tiny.xml")
+
+    init {
+        val witness = "<instantiation><list>a b c</list><values>2 2 0</values></instantiation>"
+        Xcsp3SourceChecker.inspect(source, witness, "10")
+    }
 
     @Test
     fun `a source valid optimization witness retains the checked assignment`() {
