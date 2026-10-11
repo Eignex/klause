@@ -41,6 +41,7 @@ bootstrap slices retain the containing lifetime scope and rearm their invocation
 | Presolve rounds and probe caps | Native schedule rounds or probe calls, local schedule/tier/bake | Emphasis defaults; no unlimited sentinel / skip relevant work | Forgo reductions; aggregate telemetry can exceed one local cap |
 | LP work and iteration limits | Native LP work proxy and pivots, individual solve or split component | Legacy zero delegates to the engine / an exhausted caller token prevents entry | Incomplete solve may retain certified bounds; no optimum proof |
 | Open-theory limits | Open policy work, leaves and decisions, retained complete theory scope | `Long.MAX_VALUE` / exhausted scope | Unknown budget exhaustion; completed proofs only |
+| `QfNraParams.maximumWork` | Native normalization, CAD and Boolean work, one invocation | Null / zero prevents entry | Unknown before verdict publication |
 | Neutral kernel controls | Caller-owned native work, optional maximum and cancellation | Missing maximum / zero maximum is exhausted | Kernel interruption without solver result semantics |
 
 Local-search initial preparation retains its progress between cancelled invocations.
@@ -91,6 +92,11 @@ from the caller's adapter; they contain no portfolio pricing. Composing tokens c
 one available meter, rather than charging all possible ancestors. Presolve's adapter
 explicitly owns native root-work conversion. Numerical kernels consume native controls;
 solver policy owns conversions and result/proof semantics.
+
+The [polynomial real theory](qfnra.md#results-and-invocation-resources) retains one
+counted scope through its final publication poll. Its native work reaches a supplied
+caller meter once and remains separate from legacy open-theory policy counters.
+Kernel representation or allocation declines produce a resource-unknown result.
 
 See [sessions](sessions.md) for handle ownership, [presolve](presolve.md) for phase
 telemetry, [portfolio scheduling](portfolio.md) for coverage and
