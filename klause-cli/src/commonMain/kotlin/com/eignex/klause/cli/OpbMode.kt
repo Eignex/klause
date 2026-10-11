@@ -46,7 +46,7 @@ internal object OpbMode : CliMode {
  *  `-xi` when false. */
 internal fun renderPbModel(numVars: Int, s: Sample): String = buildString {
     append("v")
-    for (v in 0 until numVars) append(if (s.bools[v]) " x${v + 1}" else " -x${v + 1}")
+    for (v in 0 until numVars) append(if (s.boolValue(v)) " x${v + 1}" else " -x${v + 1}")
 }
 
 /** PB-competition output protocol. Incumbent `o` costs stream live; the final `s` status and the

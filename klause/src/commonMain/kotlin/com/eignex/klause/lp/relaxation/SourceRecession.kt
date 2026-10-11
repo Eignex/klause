@@ -100,7 +100,7 @@ private fun rowKeeps(
     var slope = BigFraction.ZERO
     for (i in intVars.indices) {
         val coefficient = BigFraction.ofDouble(intCoefficients.at(i)) ?: return false
-        activity += coefficient * BigFraction.ofLong(point.ints[intVars[i]])
+        activity += coefficient * BigFraction.ofLong(point.intValue(intVars[i]))
     }
     for (j in realVars.indices) {
         val coefficient = BigFraction.ofDouble(realCoefficients.at(j)) ?: return false
