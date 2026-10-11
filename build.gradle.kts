@@ -1,10 +1,31 @@
 plugins {
+    base
     // Pin the Kotlin plugins once in the root classloader so sibling KMP projects share one
     // instance — the Kotlin/Native bundle build service can't span per-project classloaders.
     // Subprojects apply the kotlin plugins without a version.
     kotlin("multiplatform") version "2.4.10" apply false
     kotlin("plugin.serialization") version "2.4.10" apply false
 }
+
+val checkArchitectureTests = tasks.register<Exec>("checkArchitectureTests") {
+    group = "verification"
+    description = "Test the package boundary checker without compiling Kotlin."
+    workingDir(rootDir)
+    commandLine("python3", "scripts/test_check_architecture.py")
+    inputs.files("scripts/check_architecture.py", "scripts/test_check_architecture.py")
+}
+
+val checkArchitecture = tasks.register<Exec>("checkArchitecture") {
+    group = "verification"
+    description = "Check documented outbound Kotlin package dependencies without compiling Kotlin."
+    dependsOn(checkArchitectureTests)
+    workingDir(rootDir)
+    commandLine("python3", "scripts/check_architecture.py")
+    inputs.file("scripts/check_architecture.py")
+    inputs.files(fileTree(rootDir) { include("klause*/src/*Main/kotlin/**/*.kt") })
+}
+
+tasks.named("check") { dependsOn(checkArchitecture) }
 
 val koblasJvmArgs = buildList {
     add("--enable-native-access=ALL-UNNAMED")
@@ -16,6 +37,12 @@ val koblasJvmArgs = buildList {
 // Koblas and Kumulant use timestamped snapshots; this endpoint is outside the conventions'
 // default repository set.
 allprojects {
+    pluginManager.withPlugin("org.jetbrains.kotlin.multiplatform") {
+        tasks.named("check") { dependsOn(checkArchitecture) }
+    }
+    pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+        tasks.named("check") { dependsOn(checkArchitecture) }
+    }
     repositories {
         maven("https://central.sonatype.com/repository/maven-snapshots/") {
             mavenContent { snapshotsOnly() }
