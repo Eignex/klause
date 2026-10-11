@@ -1,13 +1,8 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.solver.result.GLUE_LBD
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableIntObjectMap
-import kotlin.time.TimeSource
 
 /**
  * Shared trailed coordination for finite-domain and theory components.
@@ -21,7 +16,7 @@ class SearchSession(
     private val components: List<SearchComponent>,
     private val maxChecks: Long = Long.MAX_VALUE,
     private val cancellation: Cancellation = Cancellation.Never,
-    private val learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+    learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
     private val branchers: List<SearchBrancher> = emptyList(),
     private val atoms: SearchAtomRegistry? = null,
 ) : SearchContext,
@@ -31,30 +26,11 @@ class SearchSession(
     }
 
     private val singleComponent = components.singleOrNull()
-    private val trail = ArrayList<SearchDecision>()
-    private val boolValues = MutableIntIntMap()
-    private val boolLevels = MutableIntIntMap()
-    private val boolReasons = MutableIntObjectMap<SearchExplanation>()
-
-    /** Component that published a Boolean consequence without a clause, which may still explain it. */
-    private val boolPublisher = MutableIntObjectMap<SearchComponent>()
-    private val valuesAtLevel = ArrayList<IntArrayList>().apply { add(IntArrayList()) }
-    private val intFacts = MutableIntObjectMap<IntFact>()
-    private val priorIntFactsAtLevel = ArrayList<MutableIntObjectMap<IntFact?>>().apply {
-        add(MutableIntObjectMap())
-    }
-    private val pendingAssertions = ArrayDeque<PendingAssertion>()
+    private val trail = SearchTrail()
+    private val learning = SearchLearning(learnedDb)
     private var selfPublicationsPending = false
-    private val learned = WatchedClauseStore()
-    private val boolTrail = IntArrayList()
-    private val trailStartAtLevel = IntArrayList().apply { add(0) }
-    private val pendingAttach = ArrayDeque<Int>()
-    private var propagatedTrail = 0
-    private var unitsPending = false
     private var activeComponent: SearchComponent? = null
     private var conflictResolver: SearchConflictResolver? = null
-
-    /** Component whose deduction produced the current conflict, or null when the shared engine did. */
     private var conflictOwner: SearchComponent? = null
     private var lastPushCreatedLevel = false
     private var unassignListener: SearchUnassignListener? = null
@@ -62,25 +38,11 @@ class SearchSession(
     private var checksExhausted = false
     private var decisionsExhausted = false
     private var openTheoryWork: OpenTheoryWorkSink? = null
-    private var learnedClauses = 0L
-    private var relearnedClauses = 0L
-    private var restarts = 0L
-    private var reductions = 0L
-    private var droppedClauses = 0L
-    private var peakLearnedClauses = 0L
-    private var glueClauses = 0L
-    private var assertingConflicts = 0L
-    private var nonAssertingConflicts = 0L
-    private var reductionNanos = 0L
 
     /** Current shared decision level. */
-    override val decisionLevel: Int get() = trail.size
+    override val decisionLevel: Int get() = trail.decisionLevel
 
-    override fun boolValue(variable: Int): Boolean? = when (val value = boolValues.getOrDefault(variable, UNASSIGNED)) {
-        FALSE -> false
-        TRUE -> true
-        else -> null
-    }
+    override fun boolValue(variable: Int): Boolean? = trail.boolValue(variable)
 
     override fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision): SearchTheoryAtom? =
         if (cancelled()) null else atoms?.register(positive, negative)
@@ -96,18 +58,18 @@ class SearchSession(
     private fun namedExplanation(explanation: SearchExplanation?): SearchExplanation? =
         if (atoms == null) explanation else explanation?.takeIf { it.literals.all(::acceptsLiteral) }
 
-    override fun intLowerBound(variable: Int): Long? = intFacts[variable]?.lower
+    override fun intLowerBound(variable: Int): Long? = trail.lower(variable)
 
-    override fun intUpperBound(variable: Int): Long? = intFacts[variable]?.upper
+    override fun intUpperBound(variable: Int): Long? = trail.upper(variable)
 
     override fun intLowerBoundPremise(variable: Int): SearchAtomPremise =
-        intFacts[variable]?.lowerPremise ?: SearchAtomPremise.Unavailable
+        trail.lowerPremise(variable)
 
     override fun intUpperBoundPremise(variable: Int): SearchAtomPremise =
-        intFacts[variable]?.upperPremise ?: SearchAtomPremise.Unavailable
+        trail.upperPremise(variable)
 
     /** Clause-form reason for the current assignment of [variable], or null when it is a decision. */
-    fun reasonFor(variable: Int): SearchExplanation? = boolReasons[variable]
+    fun reasonFor(variable: Int): SearchExplanation? = trail.reasonFor(variable)
 
     override fun imply(literal: Int, explanation: SearchExplanation): ComponentResult =
         assignImplied(literal, explanation)
@@ -142,7 +104,7 @@ class SearchSession(
                     )
                 }
             } else {
-                pendingAssertions.addLast(PendingAssertion(decision, activeComponent))
+                trail.pendingAssertions.addLast(PendingSearchAssertion(decision, activeComponent))
                 ComponentResult.Consistent
             }
         }
@@ -183,23 +145,23 @@ class SearchSession(
         val reason = namedExplanation(explanation)
         val variable = literal ushr 1
         val value = if (literal and 1 == 0) TRUE else FALSE
-        return when (boolValues.getOrDefault(variable, UNASSIGNED)) {
+        return when (trail.rawBoolValue(variable)) {
             value -> ComponentResult.Consistent
 
             UNASSIGNED -> {
                 assignBool(variable, value, if (publishedTheory) activeComponent else null)
                 if (reason != null) {
-                    boolReasons.put(variable, reason)
+                    trail.retainReason(variable, reason)
                 } else {
-                    activeComponent?.let { boolPublisher.put(variable, it) }
+                    activeComponent?.let { trail.retainPublisher(variable, it) }
                 }
                 if (!publishedTheory && singleComponent != null && singleComponent === activeComponent) {
                     // The sole component already applied its consequence. Keep the fixpoint signal
                     // without buffering a delivery that would only be skipped as a self-publication.
                     selfPublicationsPending = true
                 } else {
-                    pendingAssertions.addLast(
-                        PendingAssertion(SearchDecision.Bool(literal), if (publishedTheory) null else activeComponent),
+                    trail.pendingAssertions.addLast(
+                        PendingSearchAssertion(SearchDecision.Bool(literal), if (publishedTheory) null else activeComponent),
                     )
                 }
                 ComponentResult.Consistent
@@ -287,17 +249,14 @@ class SearchSession(
             if (!acceptsLiteral(decision.literal)) return ComponentResult.Indeterminate
             val variable = decision.literal ushr 1
             val value = if (decision.literal and 1 == 0) TRUE else FALSE
-            when (boolValues.getOrDefault(variable, UNASSIGNED)) {
+            when (trail.rawBoolValue(variable)) {
                 value -> return ComponentResult.Consistent
                 UNASSIGNED -> Unit
                 else -> return ComponentResult.Conflict()
             }
         }
-        trail.add(decision)
+        trail.enter(decision)
         lastPushCreatedLevel = true
-        trailStartAtLevel.add(boolTrail.size)
-        valuesAtLevel.add(IntArrayList())
-        priorIntFactsAtLevel.add(MutableIntObjectMap())
         when (decision) {
             is SearchDecision.Bool -> assignBool(
                 decision.literal ushr 1,
@@ -318,7 +277,7 @@ class SearchSession(
                     for (assertion in assertions) {
                         val variable = assertion.literal ushr 1
                         val value = if (assertion.literal and 1 == 0) TRUE else FALSE
-                        val prior = boolValues.getOrDefault(variable, UNASSIGNED)
+                        val prior = trail.rawBoolValue(variable)
                         if (prior != UNASSIGNED && prior != value) return ComponentResult.Conflict()
                         if (prior == UNASSIGNED) assignBool(variable, value, source)
                     }
@@ -370,31 +329,9 @@ class SearchSession(
     }
 
     private fun retractTo(decisionLevel: Int) {
-        require(decisionLevel in 0..trail.size) { "invalid search decision level $decisionLevel" }
-        if (decisionLevel == trail.size) return
-        for (level in trail.size downTo decisionLevel + 1) {
-            val assignedAtLevel = valuesAtLevel[level]
-            for (position in assignedAtLevel.size - 1 downTo 0) {
-                val variable = assignedAtLevel[position]
-                boolValues.remove(variable)
-                boolLevels.remove(variable)
-                boolReasons.remove(variable)
-                boolPublisher.remove(variable)
-                unassignListener?.onUnassign(variable)
-            }
-            valuesAtLevel.removeAt(level)
-            priorIntFactsAtLevel.removeAt(level).forEach { variable, fact ->
-                if (fact == null) intFacts.remove(variable) else intFacts.put(variable, fact)
-            }
-        }
-        trail.subList(decisionLevel, trail.size).clear()
-        boolTrail.truncateTo(trailStartAtLevel[decisionLevel + 1])
-        trailStartAtLevel.truncateTo(decisionLevel + 1)
-        if (propagatedTrail > boolTrail.size) propagatedTrail = boolTrail.size
-        // A unit clause is woken by no assignment, so retraction is the only signal that its literal
-        // may have become unassigned again.
-        unitsPending = learned.units.size > 0
-        pendingAssertions.clear()
+        if (decisionLevel == this.decisionLevel) return
+        trail.retractTo(decisionLevel, unassignListener)
+        learning.onRetraction(trail.boolTrail.size)
         singleComponent?.retract(decisionLevel) ?: components.forEach { it.retract(decisionLevel) }
     }
 
@@ -402,8 +339,8 @@ class SearchSession(
     fun propagate(): ComponentResult {
         while (true) {
             selfPublicationsPending = false
-            while (pendingAssertions.isNotEmpty()) {
-                val pending = pendingAssertions.removeFirst()
+            while (trail.pendingAssertions.isNotEmpty()) {
+                val pending = trail.pendingAssertions.removeFirst()
                 val registered = (pending.decision as? SearchDecision.Theory)?.decision as? RegisteredTheoryDecision
                 val integer = (registered?.payload as? SearchIntegerBound)?.decision()
                 val asserted = integer ?: pending.decision
@@ -433,7 +370,7 @@ class SearchSession(
             if (result !is ComponentResult.Consistent) return result
             val learned = propagateLearnedClauses()
             if (learned !is ComponentResult.Consistent) return learned
-            if (pendingAssertions.isEmpty() && !selfPublicationsPending) return ComponentResult.Consistent
+            if (trail.pendingAssertions.isEmpty() && !selfPublicationsPending) return ComponentResult.Consistent
         }
     }
 
@@ -478,7 +415,7 @@ class SearchSession(
         var clause = namedExplanation(explanation)?.literals?.toList() ?: return null
         if (clause.isEmpty()) return SearchConflictResolution.Exhausted
         if (!clause.all(::isFalseLiteral)) return null
-        var remainingResolutions = boolValues.size
+        var remainingResolutions = trail.booleanCount
         while (true) {
             val conflictLevel = clause.maxOf { literal -> levelOf(literal) }
             if (conflictLevel == 0) return SearchConflictResolution.Exhausted
@@ -488,7 +425,7 @@ class SearchSession(
                     .sorted()
                     .toIntArray()
                 val backjump = levels.lastOrNull { it < conflictLevel } ?: 0
-                assertingConflicts++
+                learning.onConflict(asserting = true)
                 return SearchConflictResolution.Backjump(
                     ExplainedLearnedConflict(SearchExplanation(clause.toIntArray()), backjump, levels),
                 )
@@ -508,7 +445,7 @@ class SearchSession(
      * non-asserting backjump would.
      */
     private fun retainUnasserting(clause: List<Int>): SearchConflictResolution {
-        nonAssertingConflicts++
+        learning.onConflict(asserting = false)
         learn(SearchExplanation(clause.toIntArray()))
         return SearchConflictResolution.Chronological
     }
@@ -519,10 +456,10 @@ class SearchSession(
     }
 
     private fun latestResolvableLiteral(clause: List<Int>, level: Int): Pair<Int, SearchExplanation>? {
-        val assignedAtLevel = valuesAtLevel[level]
+        val assignedAtLevel = trail.assignedAtLevel(level)
         for (position in assignedAtLevel.size - 1 downTo 0) {
             val variable = assignedAtLevel[position]
-            val assigned = boolValues.getOrDefault(variable, UNASSIGNED).takeIf { it != UNASSIGNED } ?: continue
+            val assigned = trail.rawBoolValue(variable).takeIf { it != UNASSIGNED } ?: continue
             val falsified = (variable shl 1) or assigned
             if (falsified !in clause) continue
             val reason = reasonOf(variable, falsified xor 1) ?: continue
@@ -537,10 +474,10 @@ class SearchSession(
      * does not rebuild it.
      */
     private fun reasonOf(variable: Int, implied: Int): SearchExplanation? {
-        boolReasons[variable]?.let { return it }
-        val published = namedExplanation(boolPublisher[variable]?.reasonFor(implied)) ?: return null
+        trail.reasonFor(variable)?.let { return it }
+        val published = namedExplanation(trail.publisherOf(variable)?.reasonFor(implied)) ?: return null
         if (implied !in published.literals) return null
-        boolReasons.put(variable, published)
+        trail.retainReason(variable, published)
         return published
     }
 
@@ -567,9 +504,7 @@ class SearchSession(
                 values[key] = if (key is TypedSearchValueKey<*>) key.capture(value) else value
             }
         }
-        boolValues.forEach { variable, value ->
-            model.contribute(SearchBoolValue(variable), value == TRUE)
-        }
+        trail.contributeModel(model)
         singleComponent?.contributeModel(model, this) ?: components.forEach { it.contributeModel(model, this) }
         return AssembledSearchModel(values)
     }
@@ -588,8 +523,7 @@ class SearchSession(
     /** Return to root, notify components, and propagate retained learned clauses. */
     fun restart(): ComponentResult {
         popTo(0)
-        reduceLearnedDb()
-        restarts++
+        learning.onRestart()
         singleComponent?.onRestart(this) ?: components.forEach { it.onRestart(this) }
         return propagate()
     }
@@ -604,21 +538,8 @@ class SearchSession(
     fun resetRootFacts() {
         require(atoms == null) { "registered source atoms require a fresh session when rebuilding the root" }
         require(decisionLevel == 0) { "root facts can only be rebuilt at shared level zero" }
-        boolValues.clear()
-        boolLevels.clear()
-        boolReasons.clear()
-        boolPublisher.clear()
-        valuesAtLevel.clear()
-        valuesAtLevel.add(IntArrayList())
-        intFacts.clear()
-        priorIntFactsAtLevel.clear()
-        priorIntFactsAtLevel.add(MutableIntObjectMap())
-        pendingAssertions.clear()
-        boolTrail.clear()
-        trailStartAtLevel.clear()
-        trailStartAtLevel.add(0)
-        propagatedTrail = 0
-        unitsPending = learned.units.size > 0
+        trail.resetRoot()
+        learning.onRootReset()
     }
 
     /**
@@ -743,28 +664,16 @@ class SearchSession(
     }
 
     /** Number of sound clause-form explanations retained by the shared Boolean engine. */
-    val learnedClauseCount: Int get() = learned.size
+    val learnedClauseCount: Int get() = learning.size
 
     /** Distinct learned clauses with a literal block distance of at most two: the short, reusable ones. */
-    internal val glueClauseCount: Long get() = glueClauses
+    internal val glueClauseCount: Long get() = learning.glueClauses
 
     /** Booleans assigned at the root, however deep the search stands: progress no later search undoes. */
-    internal val rootFixedCount: Int get() = valuesAtLevel[0].size
+    internal val rootFixedCount: Int get() = trail.rootFixedCount
 
     /** Snapshot learned-clause telemetry for a completed open-theory solve. */
-    fun learnedClauseStats(): OpenTheoryClauseStats = OpenTheoryClauseStats(
-        learnedClauses,
-        relearnedClauses,
-        restarts,
-        reductions,
-        droppedClauses,
-        learned.size.toLong(),
-        peakLearnedClauses,
-        learned.watchVisits,
-        assertingConflicts,
-        nonAssertingConflicts,
-        reductionNanos,
-    )
+    fun learnedClauseStats(): OpenTheoryClauseStats = learning.snapshot()
 
     /** Retain a sound clause-form explanation for subsequent propagation. */
     fun learn(explanation: SearchExplanation?) {
@@ -773,98 +682,7 @@ class SearchSession(
     }
 
     private fun learn(literals: IntArray) {
-        if (literals.isEmpty()) return
-        val lbd = lbdOf(literals)
-        val index = learned.add(literals.copyOf(), lbd)
-        if (index >= 0) {
-            learnedClauses++
-            if (lbd <= GLUE_LBD) glueClauses++
-            peakLearnedClauses = maxOf(peakLearnedClauses, learned.size.toLong())
-            pendingAttach.addLast(index)
-        } else {
-            relearnedClauses++
-        }
-    }
-
-    private fun lbdOf(literals: IntArray): Int {
-        val levels = HashSet<Int>(literals.size)
-        for (literal in literals) levels.add(levelOf(literal))
-        return levels.size
-    }
-
-    /**
-     * Drop the weakest retained clauses once the database exceeds its cap.
-     *
-     * Every learned clause is implied by the root problem, so forgetting one only weakens propagation.
-     * Clauses that are glue, that have propagated since the last reduction, or that are unit are kept
-     * regardless.
-     */
-    private fun reduceLearnedDb() {
-        val cap = learnedDb.maxClauses ?: return
-        // Reduction renumbers clauses, so it waits until no clause is queued for its first
-        // examination. The next propagation drains that queue, so the following restart reduces.
-        if (learned.size <= cap || pendingAttach.isNotEmpty()) return
-        val started = TimeSource.Monotonic.markNow()
-        try {
-            reduceOverCap(cap)
-        } finally {
-            reductionNanos += started.elapsedNow().inWholeNanoseconds
-        }
-    }
-
-    private fun reduceOverCap(cap: Int) {
-        val droppable = IntArrayList(learned.size)
-        for (index in 0 until learned.size) {
-            val retained = learned.lbdAt(index) <= learnedDb.glueLbd ||
-                learned.usedAt(index) ||
-                learned.literalsAt(index).size == 1
-            if (!retained) droppable.add(index)
-        }
-        val survivors = (cap - (learned.size - droppable.size)).coerceAtLeast(0)
-        if (droppable.size <= survivors) {
-            learned.clearUsed()
-            return
-        }
-        val dropped = selectDroppedClauses(droppable, survivors)
-        learned.retain { index -> !dropped[index] }
-        reductions++
-        droppedClauses += droppable.size - survivors
-        learned.clearUsed()
-        unitsPending = learned.units.size > 0
-    }
-
-    private fun selectDroppedClauses(droppable: IntArrayList, survivors: Int): BooleanArray {
-        val dropped = BooleanArray(learned.size)
-        var maximumLbd = 0
-        for (position in 0 until droppable.size) {
-            maximumLbd = maxOf(maximumLbd, learned.lbdAt(droppable[position]))
-        }
-        // A bounded histogram avoids sorting when LBDs occupy a small integer range.
-        if (maximumLbd <= MAXIMUM_BUCKETED_LBD &&
-            maximumLbd.toLong() <= droppable.size.toLong() * BUCKET_RANGE_FACTOR
-        ) {
-            markBucketedDrops(droppable, survivors, maximumLbd, dropped)
-        } else {
-            droppable.sortByIntKey { learned.lbdAt(it) }
-            for (position in survivors until droppable.size) dropped[droppable[position]] = true
-        }
-        return dropped
-    }
-
-    private fun markBucketedDrops(droppable: IntArrayList, survivors: Int, maximumLbd: Int, dropped: BooleanArray) {
-        val counts = IntArray(maximumLbd + 1)
-        for (position in 0 until droppable.size) counts[learned.lbdAt(droppable[position])]++
-        var remaining = survivors
-        var cutoff = 0
-        while (remaining > counts[cutoff]) {
-            remaining -= counts[cutoff++]
-        }
-        // Scanning original indices keeps the same oldest-first tie order as the packed sort.
-        for (position in 0 until droppable.size) {
-            val index = droppable[position]
-            val lbd = learned.lbdAt(index)
-            dropped[index] = lbd > cutoff || (lbd == cutoff && remaining-- <= 0)
-        }
+        learning.learn(literals, this)
     }
 
     private fun runComponents(call: (SearchComponent) -> ComponentResult): ComponentResult {
@@ -902,42 +720,17 @@ class SearchSession(
      * every other clause is visited only when one of its two watched literals is falsified.
      */
     private fun propagateLearnedClauses(): ComponentResult {
-        // A conflict from this store belongs to the engine, not to whichever component last had one.
         conflictOwner = null
-        while (pendingAttach.isNotEmpty()) {
-            val result = learned.attach(pendingAttach.removeFirst(), this)
-            if (result !is ComponentResult.Consistent) return result
-        }
-        if (unitsPending) {
-            unitsPending = false
-            val result = learned.propagateUnits(this)
-            if (result !is ComponentResult.Consistent) {
-                // The units after this one stay pending: leaving early must not drop them until the
-                // next retraction.
-                unitsPending = true
-                return result
-            }
-        }
-        while (propagatedTrail < boolTrail.size) {
-            val falsified = boolTrail[propagatedTrail++] xor 1
-            val result = learned.propagate(falsified, this)
-            if (result !is ComponentResult.Consistent) {
-                // The watchers of this literal were left partly unvisited, and a backjump does not
-                // always rewind past it, so it stays queued rather than being silently skipped.
-                propagatedTrail--
-                return result
-            }
-        }
-        return ComponentResult.Consistent
+        return learning.propagate(this, trail.boolTrail)
     }
 
     override fun truth(literal: Int): Boolean? = literalTruth(literal)
 
-    override fun levelOf(literal: Int): Int = boolLevels.getOrDefault(literal ushr 1, 0)
+    override fun levelOf(literal: Int): Int = trail.levelOf(literal)
 
-    override fun implied(clause: Int, literal: Int): ComponentResult = imply(literal, learned.explanationOf(clause))
+    override fun implied(clause: Int, literal: Int): ComponentResult = imply(literal, learning.explanationOf(clause))
 
-    override fun conflicted(clause: Int): ComponentResult = ComponentResult.Conflict(learned.explanationOf(clause))
+    override fun conflicted(clause: Int): ComponentResult = ComponentResult.Conflict(learning.explanationOf(clause))
 
     private fun literalTruth(literal: Int): Boolean? {
         val value = boolValue(literal ushr 1) ?: return null
@@ -945,77 +738,18 @@ class SearchSession(
     }
 
     private fun assignBool(variable: Int, value: Int, source: SearchComponent?) {
-        boolValues.put(variable, value)
-        boolLevels.put(variable, decisionLevel)
-        valuesAtLevel[decisionLevel].add(variable)
-        val literal = (variable shl 1) or if (value == TRUE) 0 else 1
-        boolTrail.add(literal)
-        atoms?.assertion(literal)?.let {
-            pendingAssertions.addLast(PendingAssertion(SearchDecision.Theory(it), source))
-        }
+        trail.assignBool(variable, value, source, atoms)
     }
 
     private fun publishIntFact(
         decision: SearchDecision,
         premise: SearchAtomPremise = SearchAtomPremise.Unavailable,
-    ): ComponentResult {
-        val before = intFacts[decision.intVariable()]
-        val result = updateIntFact(decision, premise)
-        if (result !is ComponentResult.Consistent || intFacts[decision.intVariable()] == before) return result
-        pendingAssertions.addLast(PendingAssertion(decision, activeComponent))
-        return ComponentResult.Consistent
-    }
+    ): ComponentResult = trail.publishIntFact(decision, premise, this, activeComponent)
 
     private fun updateIntFact(
         decision: SearchDecision,
         premise: SearchAtomPremise = SearchAtomPremise.Unavailable,
-    ): ComponentResult {
-        val variable = decision.intVariable()
-        val prior = intFacts[variable]
-        val values = when (decision) {
-            is SearchDecision.IntAtMost -> IntFact(prior?.lower, minOf(prior?.upper ?: Long.MAX_VALUE, decision.upper))
-
-            is SearchDecision.IntAtLeast -> IntFact(maxOf(prior?.lower ?: Long.MIN_VALUE, decision.lower), prior?.upper)
-
-            is SearchDecision.IntEqual -> IntFact(
-                maxOf(prior?.lower ?: Long.MIN_VALUE, decision.value),
-                minOf(prior?.upper ?: Long.MAX_VALUE, decision.value),
-            )
-
-            is SearchDecision.Bool, is SearchDecision.Theory -> error("only integer decisions carry integer facts")
-        }
-        val candidate = values.copy(
-            lowerPremise = if (values.lower == prior?.lower) {
-                prior?.lowerPremise ?: SearchAtomPremise.Unavailable
-            } else {
-                premise
-            },
-            upperPremise = if (values.upper == prior?.upper) {
-                prior?.upperPremise ?: SearchAtomPremise.Unavailable
-            } else {
-                premise
-            },
-        )
-        if (candidate.lower != null && candidate.upper != null && candidate.lower > candidate.upper) {
-            return ComponentResult.Conflict(
-                explainAtoms(SearchAtomPremise.All(listOf(candidate.lowerPremise, candidate.upperPremise))),
-            )
-        }
-        if (candidate == prior) return ComponentResult.Consistent
-        val changedAtLevel = priorIntFactsAtLevel[decisionLevel]
-        if (!changedAtLevel.containsKey(variable)) changedAtLevel.put(variable, prior)
-        intFacts.put(variable, candidate)
-        return ComponentResult.Consistent
-    }
-
-    private fun SearchDecision.intVariable(): Int = when (this) {
-        is SearchDecision.IntAtMost -> variable
-        is SearchDecision.IntAtLeast -> variable
-        is SearchDecision.IntEqual -> variable
-        is SearchDecision.Bool, is SearchDecision.Theory -> error("only integer decisions carry an integer variable")
-    }
-
-    private data class PendingAssertion(val decision: SearchDecision, val source: SearchComponent?)
+    ): ComponentResult = trail.updateIntFact(decision, premise, this)
 
     private inner class ExplainedLearnedConflict(
         private val explanation: SearchExplanation,
@@ -1035,664 +769,9 @@ class SearchSession(
         }
     }
 
-    private data class IntFact(
-        val lower: Long?,
-        val upper: Long?,
-        val lowerPremise: SearchAtomPremise = SearchAtomPremise.Unavailable,
-        val upperPremise: SearchAtomPremise = SearchAtomPremise.Unavailable,
-    )
-
     private companion object {
-        const val MAXIMUM_BUCKETED_LBD = 4096
-        const val BUCKET_RANGE_FACTOR = 4
         const val UNASSIGNED = -1
         const val FALSE = 0
         const val TRUE = 1
     }
-}
-
-/**
- * Resumable traversal of a [SearchSession].
- *
- * Frames contain public shared decisions only. Consequently a CP split, an integer-theory split, and a
- * future array/function/quantifier split all follow the identical push, propagation, retraction, restart,
- * and budget path.
- */
-class SearchRun internal constructor(
-    private val session: SearchSession,
-    private val params: SearchSolveParams,
-    private val booleanBranching: BooleanBranching,
-    private val decisionBudget: SearchDecisionBudget,
-    private val observer: SearchRunObserver,
-    private val modelContinuation: SearchModelContinuation,
-    private val modelPolicy: SearchModelPolicy,
-    private val nodePolicy: SearchNodePolicy,
-    private val lifecycle: SearchRunLifecycle,
-) {
-    private val frames = ArrayList<Frame>()
-    private var decisions = 0L
-    private var decisionsSinceRestart = 0L
-    private var sawIndeterminate = false
-
-    // Whether the last [applyLearnedConflict] call reached its backjump, so the conflict that produced it is spent.
-    private var learnedApplied = false
-    private var resumeAfterSolution = false
-    private var lastModel: AssembledSearchModel? = null
-    private var consumedModel = false
-    private var terminal: SearchRunEvent? = null
-    private var started = false
-    private var budgetInterrupted = false
-    private val cancellationPoller = SearchCancellationPoller()
-    internal var pauseBeforeDecision: () -> Boolean = { false }
-    private var pendingAdvance = false
-
-    /**
-     * Poll the cancellation token on a fixed cadence rather than a time-adaptive one.
-     *
-     * A run stops where it polls, so an adaptive cadence makes the stopping point of a *counted* budget
-     * depend on machine speed. A caller pausing this run on a node budget sets this so the pause lands
-     * on the same node every time. See [SearchCancellationPoller.fixedCadence].
-     */
-    var fixedCancellationCadence: Boolean
-        get() = cancellationPoller.fixedCadence
-        set(value) {
-            cancellationPoller.fixedCadence = value
-        }
-
-    init {
-        params.restart.beginRun()
-    }
-
-    /** Advance until the next model or terminal verdict. */
-    fun next(): SearchRunEvent {
-        terminal?.let { return it }
-        if (!started) {
-            started = true
-            lifecycle.onStart(session).toEvent()?.let { return it }
-        }
-        lifecycle.onResume(session).toEvent()?.let { return it }
-        if (pendingAdvance) {
-            pendingAdvance = false
-            if (!backtrack()) return stopAfterBacktrack()
-        }
-        if (resumeAfterSolution) {
-            resumeAfterSolution = false
-            when (modelContinuation) {
-                SearchModelContinuation.Chronological -> if (!backtrack()) return stopAfterBacktrack()
-
-                SearchModelContinuation.BlockAtRoot -> when (session.blockModelAtRoot(checkNotNull(lastModel))) {
-                    ComponentResult.Consistent -> {
-                        frames.clear()
-                        consumedModel = true
-                        lifecycle.onModelBlocked(session).toEvent()?.let { return it }
-                    }
-
-                    is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
-
-                    ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
-                }
-            }
-        }
-        while (true) {
-            if (cancellationPoller.due()) {
-                if (session.cancelled()) {
-                    return lifecycle.onCancellation(session).toEvent()
-                        ?: finish(SearchRunEvent.Indeterminate.Cancelled)
-                }
-                cancellationPoller.rearm()
-            }
-            when (val node = nodePolicy.beforeBranch(session)) {
-                SearchNodeDisposition.Expand -> Unit
-
-                SearchNodeDisposition.Prune -> {
-                    observer.onConflict(null)
-                    if (!backtrack()) return stopAfterBacktrack()
-                    continue
-                }
-
-                is SearchNodeDisposition.Backjump -> {
-                    observer.onConflict(null)
-                    observer.onLearnedNodeBackjump()
-                    when (applyLearnedConflict(node.consequence)) {
-                        SearchLearnedConflictResult.Resume -> continue
-
-                        SearchLearnedConflictResult.Exhausted -> return finish(SearchRunEvent.Exhausted)
-
-                        SearchLearnedConflictResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
-
-                        SearchLearnedConflictResult.Indeterminate -> {
-                            return finish(SearchRunEvent.Indeterminate.Component)
-                        }
-
-                        is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
-                    }
-                    continue
-                }
-
-                SearchNodeDisposition.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
-
-                // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
-                SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
-            }
-            when (val alternatives = alternatives()) {
-                is Alternatives.Leaf -> when (val result = session.check()) {
-                    ComponentCheck.Feasible -> {
-                        params.restart.onSolution()
-                        val model = session.model().also {
-                            lastModel = it
-                            observer.onModel(it)
-                        }
-                        resumeAfterSolution = true
-                        when (modelPolicy.onModel(model, session)) {
-                            SearchModelDisposition.Surface -> return SearchRunEvent.Satisfied(model)
-
-                            SearchModelDisposition.Indeterminate -> {
-                                resumeAfterSolution = false
-                                lastModel = null
-                                return finish(SearchRunEvent.Indeterminate.Component)
-                            }
-
-                            SearchModelDisposition.Skip -> {
-                                resumeAfterSolution = false
-                                lastModel = null
-                                // A model is skipped when its check could not decide it, often because the deadline
-                                // cut that check short. Such a check costs far more than the nodes the polling cadence
-                                // was tuned on, so a skip polls at once rather than after the cadence's next interval.
-                                if (session.cancelled()) {
-                                    val event = lifecycle.onCancellation(session).toEvent()
-                                        ?: finish(SearchRunEvent.Indeterminate.Cancelled)
-                                    if (event == SearchRunEvent.Paused) pendingAdvance = true
-                                    return event
-                                }
-                                if (!backtrack()) return stopAfterBacktrack()
-                            }
-
-                            SearchModelDisposition.Continue -> {
-                                resumeAfterSolution = false
-                                when (modelContinuation) {
-                                    SearchModelContinuation.Chronological -> if (!backtrack()) {
-                                        return stopAfterBacktrack()
-                                    }
-
-                                    SearchModelContinuation.BlockAtRoot -> when (
-                                        session.blockModelAtRoot(checkNotNull(lastModel))
-                                    ) {
-                                        ComponentResult.Consistent -> {
-                                            frames.clear()
-                                            consumedModel = true
-                                            lifecycle.onModelBlocked(session).toEvent()?.let { return it }
-                                        }
-
-                                        is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
-
-                                        ComponentResult.Indeterminate -> return finish(
-                                            SearchRunEvent.Indeterminate.Component,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    is ComponentCheck.Infeasible -> {
-                        observer.onConflict(null)
-                        when (resolveExplainedConflict(result.explanation)) {
-                            LearnedOutcome.RESUMED -> {
-                                if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
-                                    restart()?.let { return it }
-                                }
-                                continue
-                            }
-
-                            LearnedOutcome.ABANDONED -> {
-                                if (!backtrack()) return stopAfterBacktrack()
-                                continue
-                            }
-
-                            LearnedOutcome.UNAPPLIED -> Unit
-                        }
-                        retainExplanation(result.explanation)
-                        if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
-                            restart()?.let { return it }
-                            continue
-                        }
-                        if (!resolveConflict() && !backtrack()) {
-                            return stopAfterBacktrack()
-                        }
-                    }
-
-                    ComponentCheck.Indeterminate -> {
-                        sawIndeterminate = true
-                        if (session.cancelled()) {
-                            return lifecycle.onCancellation(session).toEvent()
-                                ?: finish(SearchRunEvent.Indeterminate.Cancelled)
-                        }
-                        if (!backtrack()) return stopAfterBacktrack(indeterminate = true)
-                    }
-                }
-
-                is Alternatives.Branch -> {
-                    if (session.consumeCancellationPollRequest() && session.cancelled()) {
-                        return lifecycle.onCancellation(session).toEvent()
-                            ?: finish(SearchRunEvent.Indeterminate.Cancelled)
-                    }
-                    if (alternatives.decisions.isEmpty()) {
-                        if (!backtrack()) return stopAfterBacktrack()
-                        continue
-                    }
-                    if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
-                        restart()?.let { return it }
-                        continue
-                    }
-                    frames += Frame(session.decisionLevel, alternatives.decisions)
-                    when (advanceFrame()) {
-                        Advance.Expanded -> Unit
-                        Advance.Paused -> return SearchRunEvent.Paused
-                        Advance.Budget -> return finish(SearchRunEvent.Indeterminate.Budget)
-                        Advance.Exhausted -> if (!backtrack()) return stopAfterBacktrack()
-                        Advance.Restart -> restart()?.let { return it }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun alternatives(): Alternatives {
-        booleanBranching.alternatives(session)?.let { return Alternatives.Branch(it) }
-        val decisions = session.branchAlternatives()
-        return if (decisions == null) Alternatives.Leaf else Alternatives.Branch(decisions)
-    }
-
-    private fun advanceFrame(): Advance {
-        val frame = frames.last()
-        while (frame.next < frame.decisions.size) {
-            if (pauseBeforeDecision()) {
-                pendingAdvance = true
-                return Advance.Paused
-            }
-            if (decisions == params.maxDecisions) {
-                session.markDecisionBudgetExhausted()
-                return Advance.Budget
-            }
-            val level = session.decisionLevel
-            val decision = frame.decisions[frame.next++]
-            if (!decision.tightens(session)) continue
-            if (!session.canCommitOpenTheoryDecision()) return Advance.Budget
-            when (val result = session.push(decision)) {
-                ComponentResult.Consistent -> {
-                    if (!session.lastPushCreatedLevel()) continue
-                    if (!session.recordOpenTheoryDecision(decision)) return Advance.Budget
-                    decisions++
-                    decisionsSinceRestart++
-                    observer.onCommit(decision, session.decisionLevel)
-                    if (!decisionBudget.consume()) return Advance.Budget
-                    return Advance.Expanded
-                }
-
-                ComponentResult.Indeterminate -> {
-                    session.popTo(level)
-                    sawIndeterminate = true
-                }
-
-                is ComponentResult.Conflict -> {
-                    observer.onConflict(decision)
-                    val outcome = if (session.hasNativeConflictResolver) {
-                        LearnedOutcome.UNAPPLIED
-                    } else {
-                        resolveExplainedConflict(result.explanation)
-                    }
-                    if (outcome == LearnedOutcome.RESUMED) return Advance.Expanded
-                    if (session.decisionLevel < level) return Advance.Exhausted
-                    // An abandoned learned conflict has already run its course; only an unapplied one leaves the
-                    // original conflict for the chronological resolvers.
-                    val unapplied = outcome == LearnedOutcome.UNAPPLIED
-                    if (unapplied) retainExplanation(result.explanation)
-                    session.popTo(level)
-                    if (unapplied && resolveConflict()) return Advance.Expanded
-                    if (frames.isEmpty()) return Advance.Exhausted
-                    if (frames.last() !== frame) return Advance.Exhausted
-                }
-            }
-        }
-        frames.removeLast()
-        return Advance.Exhausted
-    }
-
-    private fun SearchDecision.tightens(context: SearchContext): Boolean = when (this) {
-        is SearchDecision.Bool -> context.boolValue(literal ushr 1) == null
-
-        is SearchDecision.IntAtMost -> (context.intUpperBound(variable) ?: Long.MAX_VALUE) > upper
-
-        is SearchDecision.IntAtLeast -> (context.intLowerBound(variable) ?: Long.MIN_VALUE) < lower
-
-        is SearchDecision.IntEqual -> context.intLowerBound(
-            variable,
-        ) != value || context.intUpperBound(variable) != value
-
-        is SearchDecision.Theory -> true
-    }
-
-    private fun backtrack(): Boolean {
-        while (frames.isNotEmpty()) {
-            val frame = frames.last()
-            if (session.decisionLevel > frame.level) session.popTo(frame.level)
-            when (advanceFrame()) {
-                Advance.Expanded -> return true
-
-                Advance.Paused -> return false
-
-                Advance.Budget -> {
-                    budgetInterrupted = true
-                    return false
-                }
-
-                Advance.Exhausted -> Unit
-
-                Advance.Restart -> return restart() == null
-            }
-        }
-        return false
-    }
-
-    /**
-     * Retain a conflict explanation the shared database does not already own elsewhere.
-     *
-     * A component with its own conflict analyzer keeps the clause in its own database and propagates it
-     * there, so copying it here would give one clause two watch indexes and two reduction policies while
-     * deducing nothing new. The shared analyzer still reaches that component's reasoning, through
-     * [SearchComponent.reasonFor].
-     */
-    private fun retainExplanation(explanation: SearchExplanation?) {
-        if (session.explanationIsOwnedElsewhere) return
-        session.learn(explanation)
-    }
-
-    private fun resolveExplainedConflict(explanation: SearchExplanation?): LearnedOutcome {
-        if (session.hasNativeConflictResolver) return LearnedOutcome.UNAPPLIED
-        val resolution = session.explainedConflict(explanation)
-        if (resolution !is SearchConflictResolution.Backjump) return LearnedOutcome.UNAPPLIED
-        val result = applyLearnedConflict(resolution.conflict)
-        return when {
-            resumed(result) -> LearnedOutcome.RESUMED
-            learnedApplied -> LearnedOutcome.ABANDONED
-            else -> LearnedOutcome.UNAPPLIED
-        }
-    }
-
-    private fun resolveConflict(): Boolean {
-        val (resolver, resolution) = session.conflictResolution() ?: return false
-        if (consumedModel && !resolver.resolvesAfterModelBlock) return false
-        when (resolution) {
-            SearchConflictResolution.Chronological -> return false
-
-            SearchConflictResolution.Exhausted -> return false
-
-            is SearchConflictResolution.Backjump -> {
-                return resumed(applyLearnedConflict(resolution.conflict))
-            }
-        }
-    }
-
-    // Whether a learned conflict left the search to resume from its backjump level. By the time it returns, the
-    // backjump has already dropped the frames above that level, so a caller that is not resumed backtracks below it.
-    // That is sound when the asserted consequence was refuted, but an indeterminate propagation refuted nothing: the
-    // region it covered goes unsearched, so the run cannot claim to have exhausted the space.
-    private fun resumed(result: SearchLearnedConflictResult): Boolean = when (result) {
-        SearchLearnedConflictResult.Resume -> true
-
-        SearchLearnedConflictResult.Exhausted,
-        SearchLearnedConflictResult.Chronological,
-        -> false
-
-        SearchLearnedConflictResult.Indeterminate -> {
-            sawIndeterminate = true
-            false
-        }
-
-        is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
-    }
-
-    private fun applyLearnedConflict(initial: SearchLearnedConflict): SearchLearnedConflictResult {
-        var conflict = initial
-        learnedApplied = false
-        repeat(MAX_NODE_BACKJUMPS) {
-            if (conflict.decisionLevel !in 0..session.decisionLevel) {
-                return SearchLearnedConflictResult.Chronological
-            }
-            learnedApplied = true
-            params.restart.recordConflict(conflict.lbd, session.decisionLevel)
-            observer.onLearnedConflict(conflict)
-            session.popTo(conflict.decisionLevel)
-            while (frames.isNotEmpty() && frames.last().level >= conflict.decisionLevel) frames.removeLast()
-            when (val result = conflict.apply(session)) {
-                SearchLearnedConflictResult.Resume,
-                SearchLearnedConflictResult.Exhausted,
-                SearchLearnedConflictResult.Chronological,
-                SearchLearnedConflictResult.Indeterminate,
-                -> return result
-
-                is SearchLearnedConflictResult.Backjump -> conflict = result.conflict
-            }
-        }
-        return SearchLearnedConflictResult.Chronological
-    }
-
-    private fun exhausted(): SearchRunEvent = if (sawIndeterminate) {
-        SearchRunEvent.Indeterminate.Component
-    } else {
-        SearchRunEvent.Exhausted
-    }
-
-    private fun finish(event: SearchRunEvent): SearchRunEvent {
-        terminal = event
-        return event
-    }
-
-    private fun stopAfterBacktrack(indeterminate: Boolean = false): SearchRunEvent {
-        if (pendingAdvance) return SearchRunEvent.Paused
-        // An exhausted frame stack has no pending region for a later slice to resume.
-        if (frames.isEmpty() && !budgetInterrupted) return finish(exhausted())
-        if (session.cancelled()) {
-            return lifecycle.onCancellation(session).toEvent()
-                ?: finish(SearchRunEvent.Indeterminate.Cancelled)
-        }
-        return when {
-            budgetInterrupted -> finish(SearchRunEvent.Indeterminate.Budget)
-            indeterminate -> finish(SearchRunEvent.Indeterminate.Component)
-            else -> finish(exhausted())
-        }
-    }
-
-    /** Return the shared session to its root and run every mode-specific restart action. */
-    private fun restart(): SearchRunEvent? = when (session.restart()) {
-        ComponentResult.Consistent -> {
-            frames.clear()
-            params.restart.onRestart()
-            observer.onRestart(decisionsSinceRestart)
-            decisionsSinceRestart = 0L
-            params.restart.beginRun()
-            lifecycle.onRestart(session).toEvent()
-        }
-
-        is ComponentResult.Conflict -> finish(SearchRunEvent.Exhausted)
-
-        ComponentResult.Indeterminate -> if (session.cancelled()) {
-            lifecycle.onCancellation(session).toEvent() ?: finish(SearchRunEvent.Indeterminate.Cancelled)
-        } else {
-            finish(SearchRunEvent.Indeterminate.Component)
-        }
-    }
-
-    private fun SearchRunDisposition.toEvent(): SearchRunEvent? = when (this) {
-        SearchRunDisposition.Continue -> null
-        SearchRunDisposition.Exhausted -> finish(exhausted())
-        SearchRunDisposition.Pause -> SearchRunEvent.Paused
-        SearchRunDisposition.Indeterminate -> finish(SearchRunEvent.Indeterminate.Component)
-    }
-
-    /** Reset traversal state after its components have been reseeded at root. */
-    fun reset() {
-        check(session.decisionLevel == 0) { "a search run may only reset at its root" }
-        frames.clear()
-        decisions = 0L
-        decisionsSinceRestart = 0L
-        sawIndeterminate = false
-        resumeAfterSolution = false
-        lastModel = null
-        consumedModel = false
-        terminal = null
-        pendingAdvance = false
-        started = false
-        cancellationPoller.reset()
-        params.restart.beginRun()
-    }
-
-    private data class Frame(val level: Int, val decisions: List<SearchDecision>, var next: Int = 0)
-
-    private sealed interface Alternatives {
-        data object Leaf : Alternatives
-        data class Branch(val decisions: List<SearchDecision>) : Alternatives
-    }
-
-    private enum class Advance {
-        Expanded,
-        Paused,
-        Exhausted,
-        Budget,
-        Restart,
-    }
-
-    private companion object {
-        const val MAX_NODE_BACKJUMPS = 64
-    }
-}
-
-/** Charges successful shared decisions to an optional solve-wide allowance. */
-fun interface SearchDecisionBudget {
-    /** Record one decision and return whether traversal may continue. */
-    fun consume(): Boolean
-
-    /** No additional solve-wide decision limit. */
-    data object Unlimited : SearchDecisionBudget {
-        override fun consume(): Boolean = true
-    }
-}
-
-/** Observes shared traversal lifecycle events without owning its trail. */
-interface SearchRunObserver {
-    /** A shared decision was accepted at [decisionLevel]. */
-    fun onCommit(decision: SearchDecision, decisionLevel: Int) {}
-
-    /** A branch assertion or candidate leaf was refuted. */
-    fun onConflict(decision: SearchDecision?) {}
-
-    /** A node policy supplied an asserting learned consequence. */
-    fun onLearnedNodeBackjump() {}
-
-    /**
-     * A component produced a learned consequence before the runner retracts to its asserting level.
-     *
-     * The observer may retain analysis metadata for mode-specific reporting, such as projecting an
-     * assumption core. Restart feedback remains owned by [SearchRun].
-     */
-    fun onLearnedConflict(conflict: SearchLearnedConflict) {}
-
-    /** The runner returned the session to root after [decisions] decisions in the completed run. */
-    fun onRestart(decisions: Long) {}
-
-    /** The session assembled a complete model. */
-    fun onModel(model: AssembledSearchModel) {}
-
-    /** No-op lifecycle observer. */
-    data object None : SearchRunObserver
-}
-
-/** Supplies Boolean alternatives before component-owned residual splits. */
-fun interface BooleanBranching {
-    /** Exhaustive alternatives for one unassigned Boolean, or null when Boolean branching is complete. */
-    fun alternatives(context: SearchContext): List<SearchDecision>?
-
-    /** Source-order Boolean variables with false before true. */
-    class SourceOrder(private val numBoolVars: Int) : BooleanBranching {
-        override fun alternatives(context: SearchContext): List<SearchDecision>? =
-            (0 until numBoolVars).firstOrNull { context.boolValue(it) == null }?.let { variable ->
-                listOf(SearchDecision.Bool((variable shl 1) or 1), SearchDecision.Bool(variable shl 1))
-            }
-    }
-
-    /** Leave Boolean selection to a component-owned [SearchBrancher]. */
-    data object None : BooleanBranching {
-        override fun alternatives(context: SearchContext): List<SearchDecision>? = null
-    }
-}
-
-/** A model or terminal verdict from a resumable [SearchRun]. */
-sealed interface SearchRunEvent {
-    /** A complete model; call [SearchRun.next] again to continue enumeration. */
-    data class Satisfied(
-        /** The complete model assembled by the participating search components. */
-        val model: AssembledSearchModel,
-    ) : SearchRunEvent
-
-    /** Every branch was refuted. */
-    data object Exhausted : SearchRunEvent
-
-    /** The mode yielded cooperatively and may resume by calling [SearchRun.next]. */
-    data object Paused : SearchRunEvent
-
-    /** Cancellation, a limit, or a component prevented an exact verdict. */
-    sealed interface Indeterminate : SearchRunEvent {
-        /** A component could not decide a candidate leaf exactly. */
-        data object Component : Indeterminate
-
-        /** The shared decision allowance was spent. */
-        data object Budget : Indeterminate
-
-        /** The solve cancellation token fired. */
-        data object Cancelled : Indeterminate
-    }
-}
-
-/** Terminal result of [SearchSession.solveBoolean]. */
-sealed interface BooleanSearchResult {
-    /**
-     * Every component accepted the complete shared assignment.
-     *
-     * @property model Values contributed by every active component.
-     */
-    data class Satisfied(val model: AssembledSearchModel) : BooleanSearchResult
-
-    /** Every complete Boolean assignment was refuted. */
-    data object Exhausted : BooleanSearchResult
-
-    /** A component or a solve-wide limit prevented an exact verdict. */
-    data object Indeterminate : BooleanSearchResult
-}
-
-/** Terminal result of [SearchSession.solve]. */
-sealed interface SearchResult {
-    /**
-     * Every component accepted the complete shared assignment.
-     *
-     * @property model Values contributed by every active component.
-     */
-    data class Satisfied(val model: AssembledSearchModel) : SearchResult
-
-    /** Every component-provided branch was refuted. */
-    data object Exhausted : SearchResult
-
-    /** A component or a solve-wide limit prevented an exact verdict. */
-    data object Indeterminate : SearchResult
-}
-
-/** What one learned conflict did to the run. */
-private enum class LearnedOutcome {
-    /** The search resumes from the backjump level. */
-    RESUMED,
-
-    /** The conflict was never applied; the original conflict is still live. */
-    UNAPPLIED,
-
-    /** The backjump ran but did not resume, so the caller backtracks below it. */
-    ABANDONED,
 }
