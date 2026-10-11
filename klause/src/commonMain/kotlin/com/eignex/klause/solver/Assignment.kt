@@ -102,6 +102,23 @@ class Assignment private constructor(
         reals = if (numRealVars == 0) EmptyDoubleArray else reals.copyOf(),
     )
 
+    internal fun copySteps(target: Assignment, batch: Int): Sequence<Unit> = sequence {
+        require(numBoolVars == target.numBoolVars && numIntVars == target.numIntVars &&
+            numRealVars == target.numRealVars)
+        for (from in bits.words.indices step batch) {
+            bits.words.copyInto(target.bits.words, from, from, minOf(from + batch, bits.words.size))
+            yield(Unit)
+        }
+        for (from in ints.indices step batch) {
+            ints.copyInto(target.ints, from, from, minOf(from + batch, ints.size))
+            yield(Unit)
+        }
+        for (from in reals.indices step batch) {
+            reals.copyInto(target.reals, from, from, minOf(from + batch, reals.size))
+            yield(Unit)
+        }
+    }
+
     internal fun copyInto(target: Assignment) {
         require(
             numBoolVars == target.numBoolVars && numIntVars == target.numIntVars && numRealVars == target.numRealVars,

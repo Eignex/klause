@@ -207,6 +207,10 @@ class LubyRestart(val unit: Int = 100) : RestartPolicy {
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         state.restart()
+        advanceCadence()
+    }
+
+    internal fun advanceCadence() {
         luby.advance()
         cadence = unit * luby.value
     }

@@ -17,6 +17,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
+import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -35,6 +36,73 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
+
+    @Test
+    fun `definition suspension preserves completed outputs without publishing costs`() {
+        var expired = false
+        val evaluations = IntArray(513)
+        val nodes = List(evaluations.size) { id ->
+            object : DefinitionalSweep.SweepNode {
+                override val out: Int = id + 1
+                override val outIsBool: Boolean = false
+                override val intInputs: IntArray = intArrayOf(0)
+                override val boolInputs: IntArray = intArrayOf()
+                override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
+                    evaluations[id]++
+                    if (id == 255) expired = true
+                    return assignment.intValue(0)
+                }
+            }
+        }
+        val problem = Problem(
+            1, 514, Array(514) { IntDomain(0, 9) },
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+        )
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+            strategy = SourceDrivenStrategy(sources = emptyList(), perturbation = { Move.BoolFlip(0) }),
+            definitionalSweep = DefinitionalSweep(nodes), perMoveInvariants = true,
+        )
+        val warm = WarmState()
+        val params = LocalSearchParams(maxFlips = 1L, randomSeed = 7L, reportResiduals = true)
+        search.resumable(LinearObjective(), params, warm).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {
+                throw AssertionError("unfinished initialization published an incumbent")
+            })
+            assertEquals(256, evaluations.sum())
+            assertNull(handle.stats.ls.bestResidual)
+            assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+            expired = false
+
+            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+
+            assertTrue(evaluations.all { it == 1 })
+        }
+    }
+
+    @Test
+    fun `lifetime cancellation bounds suspended initial preparation`() {
+        val problem = Problem(1, 513, Array(513) { IntDomain(0, 9) }, emptyArray())
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+        var expired = false
+        val params = LocalSearchParams(randomSeed = 7L).withLifetimeCancellation(Cancellation { expired })
+        val warm = WarmState()
+        search.resumableSolve(params, warm).use { handle ->
+            var polls = 0
+            assertNull(handle.runSlice(Cancellation { ++polls >= 12 }, Long.MAX_VALUE, -1L))
+            expired = true
+
+            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+
+            assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+            assertFalse(handle.isDone)
+        }
+        search.resumableSolve(LocalSearchParams(randomSeed = 7L)).use {
+            assertIs<SolveResult.Sat>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+        }
+    }
 
     @Test
     fun `initial preparation pauses preserve seeded walks and charge only committed instructions`() {
