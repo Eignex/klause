@@ -19,7 +19,13 @@ import com.eignex.klause.util.unaryMinus
  *
  * [index] is strictly ascending and [value] is index-aligned; no stored value is zero.
  */
-internal class SparseIntRow(val index: IntArray, val value: Array<BigInt>) {
+@LatticeApi
+class SparseIntRow(
+    /** Borrowed strictly ascending column indexes; the caller must not mutate them during a reduction. */
+    val index: IntArray,
+    /** Borrowed nonzero coefficients aligned with [index]; the caller must not mutate them during a reduction. */
+    val value: Array<BigInt>,
+) {
 
     /** The lowest column the row mentions, or [Int.MAX_VALUE] when the row is zero. */
     val lead: Int get() = if (index.isEmpty()) Int.MAX_VALUE else index[0]
@@ -27,8 +33,10 @@ internal class SparseIntRow(val index: IntArray, val value: Array<BigInt>) {
     /** The highest column the row mentions — its pivot in a lower-triangular form — or -1 when zero. */
     val trail: Int get() = if (index.isEmpty()) -1 else index[index.size - 1]
 
+    /** Whether this row has no nonzero entries. */
     val isZero: Boolean get() = index.isEmpty()
 
+    /** The coefficient of [column], or zero when absent. */
     operator fun get(column: Int): BigInt {
         var lo = 0
         var hi = index.size - 1
@@ -44,13 +52,15 @@ internal class SparseIntRow(val index: IntArray, val value: Array<BigInt>) {
         return BIG_ZERO
     }
 
+    /** Canonical empty row used by reduction kernels. */
     companion object {
-        val Zero = SparseIntRow(IntArray(0), emptyArray())
+        internal val Zero = SparseIntRow(IntArray(0), emptyArray())
     }
 }
 
 /** The row over [entries] `column -> coefficient`, dropping the zeros and sorting what is left. */
-internal fun sparseIntRow(entries: Map<Int, BigInt>): SparseIntRow {
+@LatticeApi
+fun sparseIntRow(entries: Map<Int, BigInt>): SparseIntRow {
     val kept = entries.entries.filter { !it.value.isZero() }.sortedBy { it.key }
     if (kept.isEmpty()) return SparseIntRow.Zero
     return SparseIntRow(IntArray(kept.size) { kept[it].key }, Array(kept.size) { kept[it].value })
@@ -65,7 +75,11 @@ internal fun sparseIntRow(entries: Map<Int, BigInt>): SparseIntRow {
  * down the whole matrix. An untouched column is left null and materialised on first access, so a
  * transform over a hundred thousand columns of which a few thousand move costs only what moved.
  */
-internal class UnimodularTransform(val size: Int) {
+@LatticeApi
+class UnimodularTransform internal constructor(
+    /** Number of source and transformed integer columns. */
+    val size: Int,
+) {
     private val columns = arrayOfNulls<MutableMap<Int, BigInt>>(size)
     private val operations = ArrayList<UnimodularColumnOperation>()
 
@@ -78,7 +92,7 @@ internal class UnimodularTransform(val size: Int) {
     /** Entry `V(i, j)`. */
     operator fun get(i: Int, j: Int): BigInt = column(j)[i] ?: BIG_ZERO
 
-    fun swap(x: Int, y: Int) {
+    internal fun swap(x: Int, y: Int) {
         if (x == y) return
         val cx = column(x)
         val cy = column(y)
@@ -87,14 +101,14 @@ internal class UnimodularTransform(val size: Int) {
         operations.add(UnimodularColumnOperation.Swap(x, y))
     }
 
-    fun negate(j: Int) {
+    internal fun negate(j: Int) {
         val c = column(j)
         for (row in c.keys.toList()) c[row] = -c.getValue(row)
         operations.add(UnimodularColumnOperation.Negate(j))
     }
 
     /** `column(target) += factor · column(source)`. */
-    fun addMultiple(target: Int, source: Int, factor: BigInt) {
+    internal fun addMultiple(target: Int, source: Int, factor: BigInt) {
         if (target == source || factor.isZero()) return
         val src = column(source)
         val dst = column(target)
@@ -135,7 +149,7 @@ internal class UnimodularTransform(val size: Int) {
     internal fun columnOrNull(j: Int): Map<Int, BigInt>? = columns[j]
 
     /** Stored non-zeros, counting an untouched identity column as the one entry it stands for. */
-    val nonZeroCount: Int get() = (0 until size).sumOf { columns[it]?.size ?: 1 }
+    internal val nonZeroCount: Int get() = (0 until size).sumOf { columns[it]?.size ?: 1 }
 }
 
 private sealed interface UnimodularColumnOperation {

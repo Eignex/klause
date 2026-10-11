@@ -79,7 +79,7 @@ selections, without a complete-solver timing-gain claim.
 
 ## Rational normalization
 
-The [fraction factories](../../klause/src/commonMain/kotlin/com/eignex/klause/simplex/exact/RationalSimplex.kt)
+The [fraction factories](../../klause-numerics/src/commonMain/kotlin/com/eignex/klause/simplex/exact/BigFraction.kt)
 avoid redundant GCD/division when coprimality is established. Exact normalization
 and value preservation are defined in
 [certification](../lp/certification.md#certification-mechanisms).
