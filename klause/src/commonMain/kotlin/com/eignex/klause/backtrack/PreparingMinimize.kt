@@ -1,6 +1,8 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.propagation.PropagationPreparation
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
@@ -8,6 +10,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
 import kotlin.time.TimeSource
@@ -90,7 +93,12 @@ internal class PreparingMinimize(
                 if (preparing.isUnsat) {
                     budget.noteOverspend()
                     sink.stop()
-                    terminal = MinimizeResult.Infeasible(null, sink.snapshot())
+                    terminal = if (params.objectiveBoundSupplier != null) {
+                        MinimizeResult.Unknown(TerminationReason.SearchExhausted, sink.snapshot())
+                    } else {
+                        val core = (solver.problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
+                        MinimizeResult.Infeasible(core, sink.snapshot())
+                    }
                     close()
                     return terminal
                 }
@@ -117,6 +125,11 @@ internal class PreparingMinimize(
     override fun close() {
         if (closed) return
         closed = true
+        val pending = search == null
+        val completedWork = sink.search.propagationWork()
+        val completedRootWork = sink.search.rootPropagationWork()
+        val completedNanos = sink.search.propagationNanos()
+        val completedRootNanos = sink.search.rootPropagationNanos()
         try {
             (search ?: installing)?.close()
         } finally {
@@ -125,6 +138,12 @@ internal class PreparingMinimize(
             retainedPropagationNanos = propagationNanos
             preparation = null
             installing = null
+            if (pending) {
+                sink.search.propagationWork = { completedWork }
+                sink.search.rootPropagationWork = { completedRootWork }
+                sink.search.propagationNanos = { completedNanos }
+                sink.search.rootPropagationNanos = { completedRootNanos }
+            }
         }
     }
 }

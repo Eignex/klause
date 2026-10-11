@@ -49,6 +49,7 @@ fun main(args: Array<String>) {
     println("MODEL input=$input ints=${problem.numIntVars} bools=${problem.numBoolVars} factors=${problem.numFactors}")
     for (round in 0..rounds) {
         val times = mutableListOf<Long>()
+        val batchBytes = mutableListOf<Long>()
         var allocated = 0L
         val preparation = PropagationPreparation(baked, Cancellation.Never, 0, true)
         var ready: PropagationSession? = null
@@ -56,8 +57,11 @@ fun main(args: Array<String>) {
             val before = bytes()
             val started = System.nanoTime()
             ready = preparation.advance()
-            times.add(System.nanoTime() - started)
-            allocated += bytes() - before
+            val nanos = System.nanoTime() - started
+            val allocation = bytes() - before
+            times.add(nanos)
+            batchBytes.add(allocation)
+            allocated += allocation
         }
         val session = checkNotNull(ready)
         val digest = MessageDigest.getInstance("SHA-256")
@@ -68,8 +72,8 @@ fun main(args: Array<String>) {
         for (v in 0 until problem.numIntVars) hash(session.intDomain(v).toString())
         for (v in 0 until problem.numBoolVars) hash(session.boolValue(v).toString())
         val rootHash = digest.digest().joinToString("") { "%02x".format(it) }
-        println("PROPAGATION round=$round batches=${times.size} ns=${times.sum()} maxNs=${times.max()} bytes=$allocated work=${preparation.work} hash=$rootHash")
-        times.forEachIndexed { batch, ns -> println("BATCH round=$round batch=$batch ns=$ns") }
+        println("PROPAGATION round=$round batches=${times.size} ns=${times.sum()} maxNs=${times.max()} bytes=$allocated maxBytes=${batchBytes.max()} work=${preparation.work} hash=$rootHash")
+        times.forEachIndexed { batch, ns -> println("BATCH round=$round batch=$batch ns=$ns bytes=${batchBytes[batch]}") }
         for (lp in listOf(LpConfig.OFF, LpConfig.AGGRESSIVE)) for (slice in listOf(Long.MAX_VALUE, 1L)) {
             val params = BacktrackParams(
                 nativeSat = false, randomSeed = 3L, nodeBudget = NodeBudget(0L), lpConfig = lp, assumptions = assumptions,
@@ -82,14 +86,14 @@ fun main(args: Array<String>) {
             handle.use {
                 while (it.preparationPending) {
                     val segmentStart = System.nanoTime()
-                    it.runSlice(Cancellation.Never, slice, -1L) { error("zero decision allowance published an incumbent") }
+                    it.runSlice(Cancellation { !it.preparationPending }, slice, -1L) { error("zero decision allowance published an incumbent") }
                     segments.add(System.nanoTime() - segmentStart)
                 }
                 val stats = it.stats
                 check(stats.search.nodes.sum == 0.0)
-                println("INSTALLATION round=$round lp=$lp slice=$slice segments=${segments.size} openNs=$openNs ns=${segments.sum()} maxNs=${segments.maxOrNull() ?: 0L} bytes=${bytes() - before} work=${it.work} propagationWork=${stats.search.propagationWork.sum.toLong()} nodes=${stats.search.nodes.sum} rootHash=$rootHash")
+                println("INSTALLATION round=$round lp=${lp.emphasis} slice=$slice segments=${segments.size} openNs=$openNs ns=${segments.sum()} maxNs=${segments.maxOrNull() ?: 0L} bytes=${bytes() - before} work=${it.work} propagationWork=${stats.search.propagationWork.sum.toLong()} nodes=${stats.search.nodes.sum} rootHash=$rootHash lpSolves=${stats.lp.solves.sum.toLong()} lpWork=${stats.lp.workOps.sum.toLong()}")
             }
-            segments.forEachIndexed { segment, ns -> println("SEGMENT round=$round lp=$lp slice=$slice segment=$segment ns=$ns") }
+            segments.forEachIndexed { segment, ns -> println("SEGMENT round=$round lp=${lp.emphasis} slice=$slice segment=$segment ns=$ns") }
         }
     }
 }

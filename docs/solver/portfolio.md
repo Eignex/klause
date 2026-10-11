@@ -86,10 +86,10 @@ forward and overspending is repaid by later slices. The solve-wide decision/move
 
 General CP optimization handles retain one private construction cursor through projection,
 state buffers, occurrence and event indexes, watch registration, root queue seeding and
-propagation, assumptions, LP planning and shared-search installation. Model-wide loops
-checkpoint after at most 256 entries or visits, including visits inside a wide factor's
+propagation, assumptions, LP planning and shared-search installation. Long construction
+scans checkpoint every 256 entries or visits, including scans inside a wide factor's
 index lists. Runtime array allocation, one domain materialization, factor invocation,
-payload snapshot and source hull estimate remain atomic operations; the batch bound is
+and payload snapshot remain atomic operations; the batch bound is
 not a hard elapsed-time guarantee. The packed native-SAT optimization path and public
 satisfaction/repair constructors retain their eager lifecycle.
 
