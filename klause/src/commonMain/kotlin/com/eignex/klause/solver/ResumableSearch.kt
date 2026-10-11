@@ -159,8 +159,6 @@ interface ResumableSolver<P : SolverParams> : Solver<P> {
  * fragments. Single-threaded and stateful; obtain one from a backtrack solver.
  */
 internal interface RepairSearch : AutoCloseable {
-    val work: Long get() = 0L
-
     /**
      * Solve the fragment pinned by [assumptions] under a [decisionBudget] (decisions), pruning against
      * [cutoff] and stopping when [cancellation] fires. The caller MUST keep [cutoff] monotone
