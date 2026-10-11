@@ -18,7 +18,10 @@ internal fun BakedProblem.countingScope(assumptions: Assumptions): BakedProblem 
     val pins = Array(deductions.boolKeys.size) {
         Clause(intArrayOf(Lit.make(deductions.boolKeys[it], deductions.boolValues[it])))
     }
-    return conditioned.withFactors(conditioned.factors + pins).bake()
+    return conditioned.withFactors(
+        newFactors = conditioned.factors + pins,
+        newImpliedFactorMask = conditioned.impliedFactorMask?.let { it + BooleanArray(pins.size) },
+    ).bake()
 }
 
 internal fun BakedProblem.scopedApproximateCount(config: ApproxCountConfig): Count =

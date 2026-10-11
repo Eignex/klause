@@ -10,7 +10,8 @@ package com.eignex.klause.count
  *
  * The projection can include integer variables ([intSamplingSet]): those are channelled to Boolean
  * bits (see [IntBitChannel]) and the hashes range over their bits, so counting is over distinct
- * integer *values* (× the Boolean projection).
+ * integer *values* (× the Boolean projection). Real columns constrain feasibility but are not
+ * counted; every real declaration is retained in the hashed cells.
  */
 data class ApproxCountConfig(
     /** Multiplicative tolerance `ε`. Smaller ε → tighter bound → more enumeration work. */
@@ -136,7 +137,8 @@ enum class SampleQuality {
 
     /**
      * Near-uniform draws via XOR-hashing (UniGen2). An accuracy-validation tool: far more
-     * expensive than [CHEAP], used to check how biased the cheap path is.
+     * expensive than [CHEAP], used to check how biased the cheap path is. Uniformity concerns the
+     * Boolean/integer projection; real completions retain their coordinates and exact rational payloads.
      */
     ACCURATE,
 }

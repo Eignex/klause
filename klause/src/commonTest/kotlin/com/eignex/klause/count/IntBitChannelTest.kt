@@ -2,17 +2,46 @@ package com.eignex.klause.count
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /** The native int↔bits channel that replaces bit-blasting for XOR-hash counting over integers. */
 class IntBitChannelTest {
+
+    @Test
+    fun `integer channels scopes and hashes preserve source metadata`() {
+        val base = Problem(
+            1, 1, arrayOf(IntDomain(0, 1)), arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
+            impliedFactorMask = booleanArrayOf(true), hasSymmetryBreaking = true,
+            numRealVars = 2, realLower = doubleArrayOf(2.0, Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(3.0, Double.POSITIVE_INFINITY), settings = ProblemSettings(largeSpanThreshold = 100),
+        ).bake()
+
+        val channelled = IntBitChannel.channel(base, intArrayOf(0)).problem
+        val hashed = channelled.withHashes(XorHashFamily(intArrayOf(1), 0L).draw(1))
+
+        val conditioned = base.countingScope(Assumptions(ints = mapOf(0 to 1L)))
+
+        for (problem in listOf(channelled, hashed, conditioned)) {
+            assertEquals(2, problem.numRealVars)
+            assertContentEquals(base.realLower, problem.realLower)
+            assertContentEquals(base.realUpper, problem.realUpper)
+            assertEquals(base.settings, problem.settings)
+            assertTrue(problem.hasSymmetryBreaking)
+            assertContentEquals(BooleanArray(problem.numFactors) { it == 0 }, problem.impliedFactorMask)
+        }
+    }
 
     private fun ints(domains: List<IntDomain>) = Problem(
         numBoolVars = 0,

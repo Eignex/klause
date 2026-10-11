@@ -9,6 +9,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -49,15 +50,16 @@ class UniGenTest {
         for (max in listOf(1L, 2L)) {
             val model = Problem(
                 numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
-                factors = emptyArray(), numRealVars = 1,
-                realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(3.0),
+                factors = emptyArray(), numRealVars = 2,
+                realLower = doubleArrayOf(2.0, Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(3.0, Double.POSITIVE_INFINITY),
             )
 
             val sample = BacktrackSolver(model.bake()).samples(
                 SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L), BacktrackParams(),
             ).first()
 
-            assertEquals(1, sample.numRealVars)
+            assertEquals(2, sample.numRealVars)
             assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(model, sample))
         }
     }
@@ -85,6 +87,38 @@ class UniGenTest {
             assertEquals(1L, sample.intValue(0))
             assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), sample.exactReals)
             assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(model, sample))
+        }
+    }
+
+    @Test
+    fun `conditioned accurate real witnesses retain the captured scope`() {
+        val model = Problem(
+            2, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
+                    doubleArrayOf(3.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
+                    doubleArrayOf(3.0), LinearOp.GE, 0.0),
+            ),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.5),
+        ).bake()
+        val config = SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L)
+        val params = BacktrackParams(assumptions = Assumptions(bools = mapOf(1 to false)))
+        BacktrackSolver(model).session().use { session ->
+            session.push(Assumptions(bools = mapOf(1 to true)).withIntHole(0, 0L))
+            val captured = session.samples(config, params)
+            session.push(Assumptions(ints = mapOf(0 to 2L)))
+            assertTrue(session.samples(config, params).none())
+
+            val sample = captured.first()
+
+            assertTrue(sample.boolValue(1))
+            assertEquals(1L, sample.intValue(0))
+            assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), sample.exactReals)
+            assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(model, sample))
+            session.pop()
+            assertEquals(1L, session.samples(config, params).first().intValue(0))
         }
     }
 
