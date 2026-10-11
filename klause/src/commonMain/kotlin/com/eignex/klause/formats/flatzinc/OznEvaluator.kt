@@ -19,7 +19,7 @@ internal class OznEvaluator(items: List<OznItem>) {
         return try {
             renderValues(bindings)
         } catch (e: CheckedLongOverflowException) {
-            throw OznParseException("integer overflow in .ozn output: ${e.message}")
+            throw OznParseException("integer overflow in .ozn output: ${e.message}", e)
         }
     }
 
@@ -392,11 +392,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                 return OznValue.StringV(l.value + r.value)
             }
             if (l is OznValue.ArrayV && r is OznValue.ArrayV) {
-                checkMaterialization(l.elements.size.toLong() + r.elements.size)
-                if (l.axes.size != 1 || r.axes.size != 1) {
-                    throw OznParseException("++: expected one-dimensional arrays")
-                }
-                return OznValue.ArrayV(l.elements + r.elements)
+                return concatenateArrays(l, r)
             }
             return OznValue.StringV(stringifyForShow(l) + stringifyForShow(r))
         }
@@ -439,6 +435,14 @@ internal class OznEvaluator(items: List<OznItem>) {
 
             else -> throw OznParseException("binary `${e.op}`")
         }
+    }
+
+    private fun concatenateArrays(left: OznValue.ArrayV, right: OznValue.ArrayV): OznValue.ArrayV {
+        if (left.axes.size != 1 || right.axes.size != 1) {
+            throw OznParseException("++: expected one-dimensional arrays")
+        }
+        checkMaterialization(left.elements.size.toLong() + right.elements.size)
+        return OznValue.ArrayV(left.elements + right.elements)
     }
 
     private fun intDivMod(a: Long, b: Long, op: String): Long {
