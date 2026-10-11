@@ -287,7 +287,7 @@ object Presolver {
         cancellation: Cancellation,
         abortFraction: Double,
     ): Presolved {
-        val session = PresolveSession(problem, ctx.bakeConfig)
+        val session = PresolveSession(problem, ctx.bakeConfig, cancellation)
         // Persistent subsume indices + the change-mark at subsume's last firing, so each re-run reprocesses
         // only the factors other passes changed in between instead of rescanning the whole live set.
         val subsumeMemo = SubsumeMemo()

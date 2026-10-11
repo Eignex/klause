@@ -79,6 +79,12 @@ Every fresh root, probe and repair reports construction once, flushes native cou
 deltas before cancellation polls, and flushes the remainder on return, including seed
 conflicts and propagation conflicts. Repeated polls do not bill the same delta twice.
 A reseed bills its fresh root; an already-baked input does not bill another construction.
+The incremental presolve state uses the same adapter across delta propagation and resets
+only its native-counter cursor when a reseed creates a fresh state. Added factors report
+one construction entry plus their structural-key weight. Pass views and materialization
+retain the phase token for any root work they perform; completed pass deltas remain
+mandatory even if their application exhausts the allowance. Incremental presolve polls
+from its first factor fire rather than using search's per-node cancellation floor.
 The pipeline has no additional base-bake estimate. CLI effort telemetry retains
 `presolveRootConstructionEntries` and `presolveRootPropagationWork` separately from
 converted `presolveWork` and probe calls, accumulated across the same phase.
