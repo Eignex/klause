@@ -31,7 +31,7 @@ internal class MonotoneClausePrimal private constructor(
     private var bestValue = Double.POSITIVE_INFINITY
     private var activeStart: TimeSource.Monotonic.ValueTimeMark? = null
     private val phaseToken = object : Cancellation {
-        override fun isCancelled(): Boolean = lifetime() || work >= 100_000L ||
+        override fun isCancelled(): Boolean = lifetime() ||
             activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis
         override fun deadline() = lifetime.deadline()
     }
