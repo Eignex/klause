@@ -12437,6 +12437,8 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
         final fun <get-exactReals>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? // com.eignex.klause.solver/Sample.exactReals.<get-exactReals>|<get-exactReals>(){}[0]
     final val ints // com.eignex.klause.solver/Sample.ints|{}ints[0]
         final fun <get-ints>(): kotlin/LongArray // com.eignex.klause.solver/Sample.ints.<get-ints>|<get-ints>(){}[0]
+    final val numBoolVars // com.eignex.klause.solver/Sample.numBoolVars|{}numBoolVars[0]
+        final fun <get-numBoolVars>(): kotlin/Int // com.eignex.klause.solver/Sample.numBoolVars.<get-numBoolVars>|<get-numBoolVars>(){}[0]
     final val numIntVars // com.eignex.klause.solver/Sample.numIntVars|{}numIntVars[0]
         final fun <get-numIntVars>(): kotlin/Int // com.eignex.klause.solver/Sample.numIntVars.<get-numIntVars>|<get-numIntVars>(){}[0]
     final val numRealVars // com.eignex.klause.solver/Sample.numRealVars|{}numRealVars[0]
@@ -12445,10 +12447,13 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
         final fun <get-reals>(): kotlin/DoubleArray // com.eignex.klause.solver/Sample.reals.<get-reals>|<get-reals>(){}[0]
 
     final fun approximateRealValue(kotlin/Int): kotlin/Double // com.eignex.klause.solver/Sample.approximateRealValue|approximateRealValue(kotlin.Int){}[0]
+    final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/Sample.boolValue|boolValue(kotlin.Int){}[0]
     final fun copy(kotlin/BooleanArray = ..., kotlin/LongArray = ..., kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ..., kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? = ...): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Sample.copy|copy(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?;kotlin.collections.List<com.ionspin.kotlin.bignum.integer.BigInteger>?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/Sample.equals|equals(kotlin.Any?){}[0]
+    final fun exactIntValue(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver/Sample.exactIntValue|exactIntValue(kotlin.Int){}[0]
     final fun hammingDistanceTo(com.eignex.klause.solver/Sample): kotlin/Int // com.eignex.klause.solver/Sample.hammingDistanceTo|hammingDistanceTo(com.eignex.klause.solver.Sample){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver/Sample.hashCode|hashCode(){}[0]
+    final fun intValue(kotlin/Int): kotlin/Long // com.eignex.klause.solver/Sample.intValue|intValue(kotlin.Int){}[0]
 }
 
 final class com.eignex.klause.theory.difference/DifferenceSearchComponent : com.eignex.klause.solver.search/TheoryComponent { // com.eignex.klause.theory.difference/DifferenceSearchComponent|null[0]
@@ -12480,12 +12485,14 @@ final class com.eignex.klause.theory.qflra/ExactLiraAssignment { // com.eignex.k
     final val reals // com.eignex.klause.theory.qflra/ExactLiraAssignment.reals|{}reals[0]
         final fun <get-reals>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLiraAssignment.reals.<get-reals>|<get-reals>(){}[0]
 
+    final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLiraAssignment.boolValue|boolValue(kotlin.Int){}[0]
     final fun component1(): kotlin/BooleanArray // com.eignex.klause.theory.qflra/ExactLiraAssignment.component1|component1(){}[0]
     final fun component2(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.theory.qflra/ExactLiraAssignment.component2|component2(){}[0]
     final fun component3(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLiraAssignment.component3|component3(){}[0]
     final fun copy(kotlin/BooleanArray = ..., kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ...): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.theory.qflra/ExactLiraAssignment.copy|copy(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLiraAssignment.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.theory.qflra/ExactLiraAssignment.hashCode|hashCode(){}[0]
+    final fun intValue(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.theory.qflra/ExactLiraAssignment.intValue|intValue(kotlin.Int){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.theory.qflra/ExactLiraAssignment.toString|toString(){}[0]
 }
 
@@ -12511,6 +12518,7 @@ final class com.eignex.klause.theory.qflra/ExactLraAssignment { // com.eignex.kl
     final val reals // com.eignex.klause.theory.qflra/ExactLraAssignment.reals|{}reals[0]
         final fun <get-reals>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLraAssignment.reals.<get-reals>|<get-reals>(){}[0]
 
+    final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLraAssignment.boolValue|boolValue(kotlin.Int){}[0]
     final fun component1(): kotlin/BooleanArray // com.eignex.klause.theory.qflra/ExactLraAssignment.component1|component1(){}[0]
     final fun component2(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLraAssignment.component2|component2(){}[0]
     final fun copy(kotlin/BooleanArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ...): com.eignex.klause.theory.qflra/ExactLraAssignment // com.eignex.klause.theory.qflra/ExactLraAssignment.copy|copy(kotlin.BooleanArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]

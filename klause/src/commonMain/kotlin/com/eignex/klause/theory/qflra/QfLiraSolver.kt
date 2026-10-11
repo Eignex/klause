@@ -38,7 +38,7 @@ import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.lp.sourceDoubleBoundedSplit
 import com.eignex.klause.lp.sourceEqualityRows
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.SnapshotValues
+import com.eignex.klause.solver.snapshotValues
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -97,7 +97,7 @@ class ExactLiraAssignment(
     /** Independent copy of the integer coordinates. */
     val ints: Array<BigInt> get() = integerValues.copyOf()
 
-    private val realValues: List<BigFraction> = SnapshotValues(reals)
+    private val realValues: List<BigFraction> = snapshotValues(reals)
 
     /** Owned read-only rational coordinates. */
     val reals: List<BigFraction> get() = realValues
