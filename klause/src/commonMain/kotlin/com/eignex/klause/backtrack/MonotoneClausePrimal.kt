@@ -105,7 +105,7 @@ internal class MonotoneClausePrimal private constructor(
                 val simplified = purePins(next)
                 trial = next
                 pure = simplified.second
-                search.rebind(simplified.first, Long.MAX_VALUE)
+                search.rebind(simplified.first, maxOf(20_000L, solver.problem.numBoolVars.toLong() * 2L))
             }
             val nodes = if (sliceNodes < 0L) -1L else (sliceNodes - (work - startWork)).coerceAtLeast(0L)
             val millis = (sliceMillis - start.elapsedNow().inWholeMilliseconds).coerceAtLeast(0L)
