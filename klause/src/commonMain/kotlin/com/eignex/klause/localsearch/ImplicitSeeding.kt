@@ -22,7 +22,9 @@ class ImplicitSeeding(
      *  [Invariant.providesImplicitNeighbourhood]). The engine draws their feasibility-preserving moves
      *  even during infeasibility, and seeds them feasible at search start. Built once on first
      *  access. */
-    val electedImplicit: IntArray by lazy { electImplicitFactors() }
+    private var preparedElected: IntArray? = null
+    val electedImplicit: IntArray
+        get() = preparedElected ?: electImplicitFactors().also { preparedElected = it }
 
     /** Scope-disjoint subset of [electedImplicit] for feasible-init seeding: greedily chosen
      *  largest-scope-first so no two seed factors share an int variable. Disjointness guarantees one
@@ -72,7 +74,9 @@ class ImplicitSeeding(
             if (projection.invariants[id].providesImplicitNeighbourhood) elected.add(id)
             if ((id + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
         }
-        var candidates = elected.toIntArray()
+        val electedIds = elected.toIntArray()
+        yield(Unit)
+        var candidates = electedIds.copyOf()
         yield(Unit)
         var sorted = IntArray(candidates.size)
         yield(Unit)
@@ -120,7 +124,9 @@ class ImplicitSeeding(
             }
             seeds.add(id)
         }
-        preparedSeedFactors = seeds.toIntArray()
+        val selected = seeds.toIntArray()
+        preparedElected = electedIds
+        preparedSeedFactors = selected
     }
 
     /** Implicit-solving feasible init; costs are reconciled by the caller. */
