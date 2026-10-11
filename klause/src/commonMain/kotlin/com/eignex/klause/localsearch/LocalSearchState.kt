@@ -779,14 +779,25 @@ class LocalSearchState private constructor(
 
     internal fun elementPreservingMove(move: Move, eligibility: MoveSink): Move? {
         if (cost == 0L || probeActive || !hasVariableElements) return null
-        val repairs = evaluateMove(move, elementEligibility = eligibility).elementRepairs ?: return null
-        if (repairs.isEmpty()) return null
+        val objective = shaping.objective.takeIf { shaping.shapingLambda != 0.0 }
+        val root = evaluateMove(move, objective, elementEligibility = eligibility)
+        val repairs = root.elementRepairs ?: return null
         val parts = if (move is Move.Compound) move.parts else listOf(move)
-        return Move.Compound(parts + repairs)
+        if (repairs.preserved.isNotEmpty()) return Move.Compound(parts + repairs.preserved)
+        val violated = repairs.violated ?: return null
+        if (violated.isEmpty() || !eligibility.reserveElementProbe()) return null
+        val variant = Move.Compound(parts + violated)
+        val extended = evaluateMove(variant, objective)
+        if (extended.netDelta >= root.netDelta || !(extended.weightedNetDelta <= root.weightedNetDelta) ||
+            extended.newlyViolated > root.newlyViolated || !(extended.objectiveDelta <= root.objectiveDelta)
+        ) return null
+        return variant
     }
 
-    private fun elementPreservingRepairs(eligibility: MoveSink): List<Move>? {
-        val targets = LinkedHashMap<Int, Long>()
+    private fun elementPreservingRepairs(eligibility: MoveSink): ElementRepairs? {
+        val preserved = LinkedHashMap<Int, Long>()
+        val violated = LinkedHashMap<Int, Long>()
+        var admissible = true
         val considered = IntHashSet()
         for (i in 0 until probeSlots.size) {
             val slot = probeSlots[i]
@@ -798,18 +809,32 @@ class LocalSearchState private constructor(
                 if (!element.arrIsVars || element.idx != variable || !considered.add(fid)) continue
                 if (considered.size > MAX_PRESERVED_ELEMENT_SELECTIONS) return null
                 val wasViolated = if (probeTouched[fid]) probeWasViolated[fid] else factorDegree[fid] > 0
-                if (wasViolated) continue
-                if (!preserveElementTarget(element, eligibility, targets)) return null
+                if (!wasViolated) {
+                    if (!preserveElementTarget(element, eligibility, preserved)) return null
+                } else if (factorDegree[fid] > 0 && admissible) {
+                    admissible = assignment.intValue(element.result) == savedIntValue(element.result) &&
+                        preserveElementTarget(element, eligibility, violated, requireUnowned = true)
+                }
             }
         }
-        return targets.filter { (variable, value) -> assignment.intValue(variable) != value }
+        val preservedMoves = preserved.filter { (variable, value) -> assignment.intValue(variable) != value }
             .map { (variable, value) -> Move.IntSet(variable, value) }
+        val violatedMoves = if (admissible) {
+            violated.filter { (variable, value) -> assignment.intValue(variable) != value }
+                .map { (variable, value) -> Move.IntSet(variable, value) }
+        } else {
+            null
+        }
+        return ElementRepairs(preservedMoves, violatedMoves)
     }
+
+    private data class ElementRepairs(val preserved: List<Move>, val violated: List<Move>?)
 
     private fun preserveElementTarget(
         element: Element,
         eligibility: MoveSink,
         targets: MutableMap<Int, Long>,
+        requireUnowned: Boolean = false,
     ): Boolean {
         val index = assignment.intValue(element.idx)
         if (index < element.indexOffset || index >= element.indexOffset.toLong() + element.arr.size) return false
@@ -819,6 +844,7 @@ class LocalSearchState private constructor(
         if (previous != null && previous != value) return false
         targets[cell] = value
         if (assignment.intValue(cell) == value) return true
+        if (requireUnowned && !eligibility.allowsElementDestination(cell)) return false
         if (value !in rootDomains[cell] || !eligibility.allowsInt(cell) ||
             problem.numBoolVars + cell in probeSlotSet
         ) return false
@@ -1222,7 +1248,7 @@ class LocalSearchState private constructor(
             val breaks = if (move is Move.Compound) newlyViolated else breakCount
             val cumulativeDelta = if (refineCumulative) cumulativeFractionDelta(weightedResidual) else 0.0
             val elementRepairs = elementEligibility?.let { elementPreservingRepairs(it) }
-            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta, elementRepairs)
+            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta, elementRepairs, newlyViolated)
         } finally {
             breakProbeActive = false
             restoreProbeCoordinates()
@@ -1273,7 +1299,8 @@ class LocalSearchState private constructor(
         val weightedNetDelta: Double,
         val objectiveDelta: Double,
         val cumulativeDelta: Double,
-        val elementRepairs: List<Move>?,
+        val elementRepairs: ElementRepairs?,
+        val newlyViolated: Int,
     )
 
     // Reconcile exact degrees independently of apply status deltas; fused updates avoid a second degree read.

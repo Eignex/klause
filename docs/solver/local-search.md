@@ -281,6 +281,16 @@ at most four variants over at most 32 selected factors. Conflicts, pins, ownersh
 defined cells reject a variant; original candidates remain available, and complete
 compound scoring checks every affected constraint.
 
+Already-violated variable-array selections can add a destination-cell variant when the
+complete root probe leaves them violated and preserves their requested results. The
+extension declines when satisfied-selection preservation needs cell writes. Destination
+requests must agree and pass domain, pin, definition, implicit-owner and protected-root
+filters. A second complete propagated probe must strictly lower raw cost, not increase
+weighted cost or the number of newly violated factors, and not worsen the objective
+when shaping is active. Both admission probes share the four-probe collection allowance;
+the same 32-selection limit applies. Synthesis consumes no random draws. Declined
+extensions retain the original root candidate and restore the complete live state.
+
 Opt-in Cumulative residual snapshots prioritize the start,
 duration and demand coordinates of tasks participating in the maximum overload,
 retaining coordinate bounds and omission counts.

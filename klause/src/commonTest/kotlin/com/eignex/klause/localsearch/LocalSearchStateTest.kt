@@ -14,6 +14,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.FunctionalObjective
 import kotlin.random.Random
 import kotlin.test.Test
@@ -340,6 +341,235 @@ class LocalSearchStateTest {
             assertEquals(4, state.moveSink.list.count { it is Move.Compound })
             assertEquals(5, state.moveSink.list.count { it is Move.IntSet })
             assertEquals(1L, state.cost)
+        }
+    }
+
+    @Test
+    fun `violated Element variants repair complete propagated index selections`() {
+        for (derivedIndex in listOf(false, true)) {
+            val problem = Problem(
+                0, 5, arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    Linear(intArrayOf(1), intArrayOf(if (derivedIndex) 4 else 0), LinearOp.GE, 1),
+                    Element(0, 1, longArrayOf(2, 3), true, 0),
+                ) + if (derivedIndex) {
+                    arrayOf<Factor>(Linear(intArrayOf(1, -1), intArrayOf(4, 0), LinearOp.EQ, 0))
+                } else {
+                    emptyArray()
+                },
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            if (derivedIndex) {
+                state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(0))).network(5, 0)
+            }
+            state.assignment.setInt(1, 1)
+            state.recompute()
+            state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, -1, 0))
+            state.shaping.shapingLambda = 1.0
+            state.weights.factorWeights[0] = 2.0
+            val before = state.assignment.snapshot()
+            val degrees = state.factorDegree.copyOf()
+            val payloads = state.intPayload.copyOf()
+            val longPayloads = state.longPayload.copyOf()
+            val weights = state.weights.factorWeights.copyOf()
+            val touched = state.tabu.lastTouched.copyOf()
+            val activity = state.tabu.touchCount.copyOf()
+            val best = state.bestCostSeen
+            val step = state.step
+            val membership = state.factorDegree.indices.map { it in state.violated }
+
+            state.moveSink.addChannelingIntSet(state, if (derivedIndex) 4 else 0, 1)
+            val variant = state.moveSink.list.filterIsInstance<Move.Compound>().single()
+            val raw = state.netDelta(variant)
+            val weighted = state.weightedNetDelta(variant)
+            val objective = state.objectiveDelta(assertNotNull(state.shaping.objective), variant)
+
+            assertEquals(before, state.assignment.snapshot())
+            assertContentEquals(degrees, state.factorDegree)
+            assertContentEquals(payloads, state.intPayload)
+            assertContentEquals(longPayloads, state.longPayload)
+            assertContentEquals(weights, state.weights.factorWeights)
+            assertContentEquals(touched, state.tabu.lastTouched)
+            assertContentEquals(activity, state.tabu.touchCount)
+            assertEquals(membership, state.factorDegree.indices.map { it in state.violated })
+            assertEquals(best, state.bestCostSeen)
+            assertEquals(step, state.step)
+            assertEquals(2L, state.cost)
+            assertEquals(-2L, raw)
+            assertEquals(-3.0, weighted)
+            assertEquals(-1.0, objective)
+            state.apply(variant)
+            assertEquals(1L, state.assignment.intValue(0))
+            assertEquals(1L, state.assignment.intValue(3))
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `violated Element admission rejects broken factors and worse weighted or objective grades`() {
+        for (grade in listOf("raw", "new-break", "weighted", "objective")) {
+            val extra = when (grade) {
+                "raw" -> arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(3), LinearOp.LE, 0))
+                "new-break" -> arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(3), LinearOp.LE, 2))
+                "weighted" -> arrayOf<Factor>(
+                    Linear(intArrayOf(1), intArrayOf(3), LinearOp.LE, -1),
+                    Linear(intArrayOf(1), intArrayOf(3), LinearOp.GE, 3),
+                )
+                else -> emptyArray()
+            }
+            val problem = Problem(
+                0, 4, arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3), IntDomain(0, 3)),
+                arrayOf<Factor>(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                    Element(0, 1, longArrayOf(2, 3), true, 0),
+                ) + extra,
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(1, 3)
+            state.recompute()
+            if (grade == "weighted") state.weights.factorWeights[2] = 10.0
+            if (grade == "objective") {
+                state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+                state.shaping.shapingLambda = 1.0
+            }
+            val before = state.assignment.snapshot()
+            val degrees = state.factorDegree.copyOf()
+            val payloads = state.longPayload.copyOf()
+            val cost = state.cost
+
+            state.moveSink.addChannelingIntSet(state, 0, 1)
+
+            assertEquals(listOf(Move.IntSet(0, 1)), state.moveSink.list, grade)
+            assertEquals(before, state.assignment.snapshot(), grade)
+            assertContentEquals(degrees, state.factorDegree, grade)
+            assertContentEquals(payloads, state.longPayload, grade)
+            assertEquals(cost, state.cost, grade)
+            state.recompute()
+            assertEquals(cost, state.cost, grade)
+        }
+    }
+
+    @Test
+    fun `violated Element proposals protect destinations and stable requested results`() {
+        val protections = listOf("pin", "owner", "domain", "definition", "root-cell", "result-change", "fixed", "index")
+        for (protection in protections) {
+            val problem = Problem(
+                0, 4, arrayOf(
+                    IntDomain(0, 2), IntDomain(1, 2), IntDomain(0, 1),
+                    IntDomain(0, if (protection == "domain") 0 else 1),
+                ), arrayOf<Factor>(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                    Element(0, 1, longArrayOf(2, 3), true, 0),
+                ) + if (protection == "definition") arrayOf<Factor>(Product(2, 2, 3)) else emptyArray(),
+            )
+            val pins = if (protection == "pin") Assumptions.None.withInt(3, 0) else Assumptions.None
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), pins)
+            if (protection == "definition") {
+                state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(3))).network(4, 0)
+            }
+            state.assignment.setInt(1, 1)
+            if (protection == "fixed") state.assignment.setInt(3, 1)
+            state.recompute()
+            if (protection == "owner") {
+                state.moveSink.setOwners(intArrayOf(-1, -1, -1, 0))
+                state.moveSink.proposer = 0
+            }
+            val before = state.assignment.snapshot()
+            val cost = state.cost
+
+            when (protection) {
+                "root-cell" -> state.moveSink.addChannelingCompound(state, listOf(Move.IntSet(0, 1), Move.IntSet(3, 0)))
+                "result-change" -> state.moveSink.addChannelingCompound(state, listOf(Move.IntSet(0, 1), Move.IntSet(1, 2)))
+                "index" -> state.moveSink.addChannelingIntSet(state, 0, 2)
+                else -> state.moveSink.addChannelingIntSet(state, 0, 1)
+            }
+
+            assertTrue(state.moveSink.list.none { move ->
+                move is Move.Compound && move.parts.any { it == Move.IntSet(3, 1) }
+            }, protection)
+            assertEquals(before, state.assignment.snapshot(), protection)
+            assertEquals(cost, state.cost, protection)
+        }
+    }
+
+    @Test
+    fun `violated Element proposals coalesce compatible cells and reject conflicting requests`() {
+        for (compatible in listOf(false, true)) {
+            val result = if (compatible) 1L else 2L
+            val problem = Problem(
+                0, 5, arrayOf(
+                    IntDomain(0, 1), IntDomain(1, 1), IntDomain(result, result), IntDomain(0, 2), IntDomain(0, 2),
+                ),
+                arrayOf<Factor>(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                    Element(0, 1, longArrayOf(3, 4), true, 0),
+                    Element(0, 2, longArrayOf(3, 4), true, 0),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(1, 1)
+            state.assignment.setInt(2, result)
+            state.recompute()
+            val before = state.assignment.snapshot()
+
+            state.moveSink.addChannelingIntSet(state, 0, 1)
+
+            val variants = state.moveSink.list.filterIsInstance<Move.Compound>()
+            assertEquals(if (compatible) 1 else 0, variants.size)
+            assertEquals(before, state.assignment.snapshot())
+            if (compatible) {
+                assertEquals(listOf(Move.IntSet(0, 1), Move.IntSet(4, 1)), variants.single().parts)
+                state.apply(variants.single())
+                assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
+    fun `violated Element admission probes share the collection allowance and reset together`() {
+        val problem = Problem(
+            0, 4, arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                Element(0, 1, longArrayOf(2, 3), true, 0),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(1, 1)
+        state.recompute()
+        val before = state.assignment.snapshot()
+
+        repeat(2) {
+            state.moveSink.clear()
+            repeat(5) { state.moveSink.addChannelingIntSet(state, 0, 1) }
+
+            assertEquals(2, state.moveSink.list.count { it is Move.Compound })
+            assertEquals(5, state.moveSink.list.count { it is Move.IntSet })
+            assertEquals(before, state.assignment.snapshot())
+            assertEquals(2L, state.cost)
+        }
+    }
+
+    @Test
+    fun `violated Element proposals bound affected selections`() {
+        for (selections in listOf(32, 33)) {
+            val problem = Problem(
+                0, 4, arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 1)),
+                Array<Factor>(selections + 1) {
+                    if (it == selections) Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+                    else Element(0, 1, longArrayOf(2, 3), true, 0)
+                },
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(1, 1)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 0, 1)
+
+            assertEquals(if (selections == 32) 1 else 0, state.moveSink.list.count { it is Move.Compound })
+            assertEquals(selections + 1L, state.cost)
         }
     }
 

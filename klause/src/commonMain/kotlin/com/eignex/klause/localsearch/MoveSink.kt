@@ -93,6 +93,9 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     internal fun allowsInt(varId: Int): Boolean =
         !assumptions.isFrozenInt(varId) && invariants?.isDefinedInt(varId) != true && !ownedByOther(varId)
 
+    internal fun allowsElementDestination(varId: Int): Boolean =
+        allowsInt(varId) && (ownerInt?.get(varId) ?: -1) < 0
+
     internal fun allowsDefinedInt(varId: Int): Boolean =
         !assumptions.isFrozenInt(varId) && !ownedByOther(varId)
 
@@ -263,10 +266,16 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         if (touchesFrozen(parts)) return
         val kept = withoutRedundantParts(parts)
         if (kept.isEmpty()) return
-        elementPreservingProbes++
+        if (!reserveElementProbe()) return
         val base = if (kept.size == 1) kept[0] else Move.Compound(kept)
         val variant = state.elementPreservingMove(base, this) as? Move.Compound ?: return
         addCompound(variant.parts)
+    }
+
+    internal fun reserveElementProbe(): Boolean {
+        if (elementPreservingProbes >= MAX_ELEMENT_PRESERVING_PROBES) return false
+        elementPreservingProbes++
+        return true
     }
 
     internal fun addElementIndexSet(state: LocalSearchState, varId: Int, newValue: Long): Boolean {
