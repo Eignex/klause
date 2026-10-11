@@ -134,9 +134,9 @@ and [FlatZincIntegerFloatImages](../klause/src/commonMain/kotlin/com/eignex/klau
 
 The frontend supports quantifier-free linear integer and real arithmetic, including
 difference fragments, Boolean structure and supported minimize/maximize objectives.
-The theory packages cover difference arithmetic, LIA and LRA/LIRA. Bitvectors,
-arrays, strings, quantifiers and unrestricted non-linear arithmetic are outside
-this frontend's supported theory surface.
+The theory packages cover difference arithmetic, LIA, LRA/LIRA and complete pure
+polynomial real satisfaction. Bitvectors, arrays, strings, quantifiers and mixed
+nonlinear integer/real arithmetic remain outside the supported theory surface.
 
 Asserted and reified equalities between an integer conditional result and a constant
 can lower directly to Boolean tests of its branches. Completed conditional definitions and equality
@@ -199,8 +199,32 @@ not an unlimited completeness guarantee for every integer model.
 
 The internal `SmtLibPolynomial.parse` entry point preserves pure Real/Bool polynomial
 satisfaction sources separately from `SmtLib.parse` and its linear factors. It performs
-no theory selection and publishes no SAT/UNSAT result. The existing SMT facade and
-CLI retain their supported linear routes.
+no theory selection and publishes no SAT/UNSAT result. Public `SmtLibAdmission.parse`
+first attempts the established linear facade. Only an explicit unsupported-syntax
+decline reopens the same source through polynomial lowering. Pure Real/Bool
+satisfaction sources with `define-fun` helpers use lexical polynomial lowering
+before legacy expansion can capture caller-local bindings. Other successful linear
+inputs retain their existing routes, including integer/mixed sources and objectives.
+Helper parameter/return sorts and explicit integer operations preserve integer syntax
+even when there is no declared integer variable.
+Reopenable streamed inputs close each owned closeable source, or drain active
+sources without a close contract before retrying. Cancellation stops that drain,
+prevents reopening, and returns `SmtLibInput.Interrupted` without publishing partial metadata.
+
+The polynomial admission publishes `ir.PolynomialRealProblem`, an opaque neutral
+snapshot of formula, original declaration identities and auxiliary counts. Its
+`pipelineRequest()` selects the complete polynomial theory. The CLI renders the
+common `OpenTheoryResult`; parsing and frontend code do not invoke the engine.
+Numeric conditional auxiliaries stay private and every original declaration receives
+an exact value, including unused declarations. Point-identified rational coordinates
+use exact SMT numerals/division. Other algebraic coordinates use `(root-obj p k)`
+with an exact integer
+defining polynomial and one-based distinct real-root index. Canonical names are
+quoted in the model. A negative SMT numeral is `(- n)`; a bare `-n` is a symbol.
+
+This route supports one satisfaction result and model publication. It declines
+all-solution enumeration and polynomial optimization. Explicit local search returns
+UNKNOWN without proof authority; ALNS has no open-model CLI route.
 
 `ir.PolynomialExpression` retains exact reduced arbitrary-precision rational leaves,
 source real identities, sums, products and nonnegative integer powers. Relations

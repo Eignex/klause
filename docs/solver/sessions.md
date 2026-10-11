@@ -53,3 +53,12 @@ restart state belong to that solver.
 Repair handles are a separate internal contract. Their cutoff must be monotone
 non-increasing because retained objective-bound clauses survive fragment reseeding.
 General session push/pop starts a fresh search and does not reuse repair machinery.
+
+## Polynomial invocations
+
+A polynomial pipeline request retains an immutable source snapshot and can be reused
+for fresh calls. Each execution constructs its own arithmetic context, Boolean
+search and CAD traversal. It exposes no resumable handle, scoped mutation or retained
+refinement state. Complete exact scalar metadata remains readable after subsequent
+executions or cancellation; published witnesses own only original source coordinates.
+See [polynomial theory](qfnra.md) and [resource allowances](resources.md).

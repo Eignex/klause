@@ -147,6 +147,31 @@ class PortfolioPlanTest {
     }
 
     @Test
+    fun `continuous majority general integers leave LP time to family scheduling`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
+        val labels = listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed")
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+
+        val shares = continuousLpShares(scenario, profile, labels, objective, continuousMajority = true)
+
+        assertTrue(shares.isEmpty())
+    }
+
+    @Test
+    fun `continuous majority binary models retain LP descent reservation`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
+        val labels = listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed")
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+
+        val shares = continuousLpShares(scenario, profile, labels, objective,
+            continuousMajority = true, binaryIntegers = true)
+
+        assertEquals(listOf(0.0, 0.5, 0.0), shares.toList())
+    }
+
+    @Test
     fun `explicit and inapplicable scenarios keep their requested scheduling`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)

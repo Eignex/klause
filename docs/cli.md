@@ -173,6 +173,20 @@ Solver-control flags are common to **every** mode:
     them in model order. Both yield the same solutions; the order decides how many variables the pass
     eliminates within its fill-in budget, so `stable_id` is only there as a measurement baseline.
 
+Pure polynomial-real satisfaction uses the complete exact polynomial route for
+complete engines. Explicit `-e ls` returns UNKNOWN and `-e alns` rejects the open route.
+The route does not support enumeration or optimization. Its parameters are
+`nra-work-limit=auto|unlimited|N`, `nra-dense-coefficients=auto|unlimited|N` and
+`nra-matrix-cells=auto|unlimited|N`: defaults are unlimited work, 65,536 coefficients
+and 262,144 matrix cells. Work/matrix zero exhausts the allowance; a dense cap must
+be positive. These native units are separate from `node-limit` and linear open work.
+The library result retains backend `exact-nra`. `-s` reports `nraWork`, `nraProjectedPolynomials`,
+`nraLiftedCells` and, on a resource stop, `nraResource`. Legacy open counters remain
+zero. The whole-run deadline includes source admission. `open-bound-proof=false`
+does not disable admission or polynomial solving because this route has no finite
+bound proof. [Polynomial source semantics](formats.md#polynomial-source-lowering)
+defines exact root rendering and supported syntax.
+
 An open theory is selected by the model route and uses the shared complete theory solver
 independently of `-e`. SMT-LIB and source-exact MPS fragments/objectives that lack a complete
 theory route can use open local search for witnesses; its engine policy is described by

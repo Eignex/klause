@@ -24,6 +24,23 @@ class ArmNeedsTest {
     ).bake()
 
     @Test
+    fun `continuous majority counts real coordinates against all discrete coordinates`() {
+        for ((counts, expected) in listOf(Triple(0, 1, 1) to false, Triple(0, 1, 2) to true,
+            Triple(2, 1, 2) to false)
+        ) {
+            val (bools, ints, reals) = counts
+            val model = Problem(
+                bools, ints, Array(ints) { IntDomain(0, 1) }, emptyArray(),
+                numRealVars = reals, realLower = DoubleArray(reals), realUpper = DoubleArray(reals) { 1.0 },
+            ).bake()
+
+            val majority = model.continuousMajority
+
+            assertEquals(expected, majority)
+        }
+    }
+
+    @Test
     fun `integer domain bounds identify binary pools`() {
         for ((upper, binary) in listOf(1L to true, 5L to false)) {
             val model = linearModel(upper)

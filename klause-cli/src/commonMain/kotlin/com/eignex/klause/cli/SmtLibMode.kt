@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.smtlib.SmtLibAdmission
+import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -10,8 +11,12 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.algebraicRealValue
+import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.plus
@@ -20,7 +25,7 @@ import com.eignex.klause.util.unaryMinus
 import kotlin.time.TimeSource
 
 /**
- * SMT-LIB 2 front-end (`.smt2` / `.smt`; QF_LIA / QF_LRA / QF_LIRA). Emits the SMT-LIB convention: a
+ * SMT-LIB 2 front-end (`.smt2` / `.smt`; linear arithmetic and polynomial reals). Emits the SMT-LIB convention: a
  * `sat` / `unsat` / `unknown` status line, followed (when sat) by a `(get-model)`-style
  * `(define-fun …)` block. `-s` statistics are emitted as `;` comment lines.
  */
@@ -36,12 +41,35 @@ internal object SmtLibMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val config = common.config
-            val parsed = SmtLib.parse(
-                openFileSource(path),
+            latestSourceObjective = null
+            val admissionStart = TimeSource.Monotonic.markNow()
+            val stop = Cancellation { common.deadlineAtMs?.let { nowMillis() >= it } == true }
+            val admitted = SmtLibAdmission.parse(
+                { openFileSource(path) },
                 config.unboundedIntLo,
                 config.unboundedIntHi,
                 settings = config.problemSettings(),
+                cancellation = stop,
             )
+            val parsed = when (admitted) {
+                is SmtLibInput.Linear -> admitted.problem
+                is SmtLibInput.Polynomial -> {
+                    common.takeOpenBoundProof()
+                    val source = admitted.problem
+                    val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
+                    val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
+                    return polynomialSolvable(
+                        source.pipelineRequest(),
+                        { assignment -> renderOpenTheoryModel(emptyMap(), bools, reals, assignment) },
+                        admissionStart.elapsedNow().inWholeMilliseconds,
+                    )
+                }
+
+                SmtLibInput.Interrupted -> return interruptedSolvable(
+                    if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,
+                    admissionStart.elapsedNow().inWholeMilliseconds,
+                )
+            }
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.model.numBoolVars} int=${parsed.model.numIntVars} " +
                     "real=${parsed.model.numRealVars} factors=${parsed.model.factors.size}"
@@ -52,7 +80,6 @@ internal object SmtLibMode : CliMode {
             val minimizedObjective = parsed.objective?.toLinearObjective()
             val maximize = parsed.sense == ObjectiveSense.MAXIMIZE
             val objective = if (maximize) minimizedObjective?.negated() else minimizedObjective
-            latestSourceObjective = null
             val render: (Sample) -> String = { sample ->
                 latestSourceObjective = objective?.evaluateExact(sample)
                 renderModel(ints, bools, reals, sample)
@@ -193,13 +220,16 @@ internal fun renderOpenTheoryModel(
     append("(\n")
     for ((name, id) in ints) append("  (define-fun $name () Int ${smtInteger(assignment.intValue(id))})\n")
     for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.boolValue(id)})\n")
-    for ((name, id) in reals) append("  (define-fun $name () Real ${smtReal(assignment.realValue(id))})\n")
+    for ((name, id) in reals) {
+        val value = assignment.algebraicRealValue(id)?.let(::smtAlgebraicValue) ?: smtReal(assignment.realValue(id))
+        append("  (define-fun $name () Real $value)\n")
+    }
     append(")")
 }
 
-private fun smtInteger(value: String): String = if (value.startsWith('-')) "(- ${value.drop(1)})" else value
+internal fun smtInteger(value: String): String = if (value.startsWith('-')) "(- ${value.drop(1)})" else value
 
-private fun smtReal(value: String): String {
+internal fun smtReal(value: String): String {
     val negative = value.startsWith('-')
     val magnitude = if (negative) value.drop(1) else value
     val parts = magnitude.split('/')

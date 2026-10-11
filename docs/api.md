@@ -53,11 +53,21 @@ does not refine it or require its producing arithmetic context. The common
 `OpenTheoryAssignment.ExactNra` witness preserves this representation.
 `algebraicRealValue(id)` returns its typed scalar through reconstruction wrappers.
 Other routes retain their existing rational text and return null from that accessor.
-For irrational values, `realValue(id)` returns `root(index;[c0,c1,...])`: coefficients
+Point-identified rational values use reduced rational text. Other algebraic values
+use `root(index;[c0,c1,...])` from `realValue(id)`: coefficients
 are exact rationals in ascending exponent order, and the index is one-based among
 the defining polynomial's distinct real roots in increasing order. This text carries
 an exact value; callers rendering another format use the typed metadata.
 Numerical equality requires exact arithmetic comparison rather than object identity.
+
+`SmtLibAdmission.parse` returns a linear model, opaque `PolynomialRealProblem`, or
+interrupted admission. The polynomial snapshot owns its source-name maps and returns
+independent metadata views. Its `pipelineRequest()` and `OpenTheoryPipeline.execute`
+extension provide complete polynomial satisfaction through the existing
+`OpenTheoryResult`. `PolynomialTheoryExecution` retains native counters/resource
+cause beside that common result; it does not reinterpret legacy open-work units.
+`PolynomialTheoryParams` captures one invocation's work, allocation and stop controls.
+The source snapshot can be reused for fresh invocations; no traversal state escapes.
 
 The `lp.lattice` package is an internal implementation mechanism within `klause`.
 Its reductions borrow caller-owned input rows and expose read-only result buffers

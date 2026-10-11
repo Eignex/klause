@@ -97,6 +97,18 @@ The [polynomial real theory](qfnra.md#results-and-invocation-resources) retains 
 counted scope through its final publication poll. Its native work reaches a supplied
 caller meter once and remains separate from legacy open-theory policy counters.
 Kernel representation or allocation declines produce a resource-unknown result.
+Public `PolynomialTheoryParams.maximumWork` is nullable for unlimited native work;
+zero prevents entry. Dense coefficients default to 65,536 and must be positive or
+unlimited. Matrix cells default to 262,144 and accept zero or unlimited. Disabling
+an allocation cap retains checked native dimensions. `PolynomialTheoryExecution`
+reports these counters and the resource cause separately from `SolveStats`.
+Timeout and external cancellation keep separate common termination reasons.
+
+The SMT CLI starts its whole-run deadline before admission and retains that deadline
+through polynomial solving. Source parsing polls separately and charges its own exact
+coefficient-folding units when a caller meter exists. Parsing is excluded from native
+engine counters. `nra-work-limit`, `nra-dense-coefficients` and `nra-matrix-cells` own
+the polynomial limits; `node-limit` and legacy open-work settings do not price them.
 
 See [sessions](sessions.md) for handle ownership, [presolve](presolve.md) for phase
 telemetry, [portfolio scheduling](portfolio.md) for coverage and

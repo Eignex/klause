@@ -127,7 +127,7 @@ internal fun presolveWorkFor(budgetMs: Long): Long = if (budgetMs > Long.MAX_VAL
  * theory. Shrinking `-t` cannot substitute, since it starves the solve along with the proof and the two
  * arms stop being comparable. Read only by the front-ends that route open models — MPS and SMT-LIB.
  */
-private fun CommonOptions.takeOpenBoundProof(): Boolean {
+internal fun CommonOptions.takeOpenBoundProof(): Boolean {
     val entries = engineParams.filter { it.startsWith("$OPEN_BOUND_PROOF_KEY=") }
     if (entries.isEmpty()) return true
     engineParams.removeAll(entries)
