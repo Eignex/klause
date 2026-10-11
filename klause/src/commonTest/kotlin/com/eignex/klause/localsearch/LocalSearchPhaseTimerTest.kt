@@ -26,6 +26,7 @@ class LocalSearchPhaseTimerTest {
         assertEquals(2, source.next())
         clock += 1000L
         assertFalse(source.hasNext())
+        assertFailsWith<NoSuchElementException> { source.next() }
 
         assertEquals(5L, timer.snapshot().getValue("seeding"))
         assertEquals(5L, timer.snapshot().values.sum())
