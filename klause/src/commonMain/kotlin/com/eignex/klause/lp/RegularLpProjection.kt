@@ -104,8 +104,16 @@ internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
 }
 
 internal fun Regular.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
-    if (!boxes.statesBothBounds(seq)) return null
-    val reach = forwardReach(boxes::domain) ?: return null
+    var result: LpSizeEstimate? = null
+    sequence<Unit> { result = prepareLpHull(this@estimateLpHull, boxes) }.forEach { }
+    return result
+}
+
+internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: Regular, boxes: RootBoxes): LpSizeEstimate? {
+    val seq = factor.seq
+
+    if (!prepareStatesBothBounds(boxes, seq)) return null
+    val reach = prepareForwardReach(factor, boxes::domain) ?: return null
     // arc columns + conservation (≤ arcs) + channel (len) + source + acceptance.
     return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 2L)
 }
@@ -114,24 +122,48 @@ private class RegularReach(val states: Array<IntHashSet>, val arcCount: Long)
 
 /** Forward-reachable states per layer over [domainOf]'s domains plus the total candidate-arc count. */
 private fun Regular.forwardReach(domainOf: (Int) -> IntDomain): RegularReach? {
-    val len = seq.size
-    val s = alphabetSize
-    val trans = transitions
-    val reach = Array(len + 1) { IntHashSet() }
-    reach[0].add(q0)
+    var result: RegularReach? = null
+    sequence<Unit> { result = prepareForwardReach(this@forwardReach, domainOf) }.forEach { }
+    return result
+}
+
+private suspend fun SequenceScope<Unit>.prepareForwardReach(
+    factor: Regular,
+    domainOf: (Int) -> IntDomain,
+): RegularReach? {
+    val len = factor.seq.size
+    val s = factor.alphabetSize
+    val trans = factor.transitions
+    val pending = arrayOfNulls<IntHashSet>(len + 1)
+    yield(Unit)
+    for (i in pending.indices) {
+        pending[i] = IntHashSet()
+        if ((i + 1) % 256 == 0) yield(Unit)
+    }
+    @Suppress("UNCHECKED_CAST")
+    val reach = pending as Array<IntHashSet>
+    var visits = 0
+    reach[0].add(factor.q0)
     var arcCount = 0L
     for (t in 0 until len) {
-        val dom = domainOf(seq[t])
-        reach[t].forEach { state ->
+        if (++visits % 256 == 0) yield(Unit)
+        val dom = domainOf(factor.seq[t])
+        val current = reach[t]
+        for (slot in current.usedInternal.indices) {
+            if (++visits % 256 == 0) yield(Unit)
+            if (!current.usedInternal[slot]) continue
+            val state = current.keysInternal[slot]
             // Walk the alphabet (1..s), not the domain: only symbols in range have a transition, and
             // s is the automaton's alphabet size (bounded), never the variable's span — so a wide
             // sequence domain is tested by membership, never enumerated.
             for (sym in 1..s) {
+                if (++visits % 256 == 0) yield(Unit)
                 if (sym.toLong() in dom) {
                     val nxt = trans[(state - 1) * s + (sym - 1)].toInt()
                     if (nxt != 0) {
                         reach[t + 1].add(nxt)
                         arcCount++
+                        if (arcCount > MAX_REGULAR_ARCS) return null
                     }
                 }
             }

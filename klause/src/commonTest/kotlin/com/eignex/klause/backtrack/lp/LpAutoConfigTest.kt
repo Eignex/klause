@@ -177,4 +177,21 @@ class LpAutoConfigTest {
         assertFalse(r.gomory)
         assertTrue(r.energeticReasoning)
     }
+    @Test
+    fun `retained hull planning preserves the eager plan across checkpoints`() {
+        val p = problem(NValue(IntArray(513) { it }, 513), intVars = 514)
+        val expected = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
+        var actual: LpPlan? = null
+        val planning = sequence<Unit> {
+            actual = with(LpAutoConfig) { prepare(p, LpConfig.AGGRESSIVE, LpPlan()) }
+        }.iterator()
+
+        planning.next()
+        assertEquals(null, actual)
+        while (planning.hasNext()) planning.next()
+
+        assertEquals(expected, actual)
+        assertTrue(expected.nValue)
+    }
+
 }

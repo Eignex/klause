@@ -79,7 +79,10 @@ internal fun Problem.statesLowerBoundAtLeast(v: Int, floor: Long): Boolean =
  *
  * The whole-table reading copies, so this is built once for a model and shared across its factors.
  */
-internal class RootBoxes(private val problem: Problem, private val domains: Array<IntDomain> = problem.rootDomainsOf()) {
+internal class RootBoxes(
+    private val problem: Problem,
+    private val domains: Array<IntDomain> = problem.rootDomainsOf(),
+) {
 
     /** Root box of integer column [v]; see [rootDomainOf]. */
     fun domain(v: Int): IntDomain = domains[v]
@@ -100,4 +103,12 @@ internal suspend fun SequenceScope<Unit>.prepareRootBoxes(problem: Problem): Roo
     }
     @Suppress("UNCHECKED_CAST")
     return RootBoxes(problem, domains as Array<IntDomain>)
+}
+
+internal suspend fun SequenceScope<Unit>.prepareStatesBothBounds(boxes: RootBoxes, vars: IntArray): Boolean {
+    for ((position, v) in vars.withIndex()) {
+        if (!boxes.statesBothBounds(v)) return false
+        if ((position + 1) % 256 == 0) yield(Unit)
+    }
+    return true
 }

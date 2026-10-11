@@ -84,19 +84,25 @@ forward and overspending is repaid by later slices. The solve-wide decision/move
 
 ### Private CP preparation
 
-General CP optimization handles open with private preparation. Propagator projection and
-root propagation advance in batches of 256 factors, retaining the queue, watcher changes
-and deductions between turns. A paused root is not a search session and cannot publish a
-sample or refutation. Completion installs its fixpoint or derived conflict once, then
-enables the ordinary trail and branch-and-bound search. Propagator objects remain
-private to the handle. Preparation work, fractional charges and overspend debt carry
-into search without being charged again; the stats sink retains its timing window. A
-cancellation between root fires pauses the private queue without marking the fixpoint
-unusable. Final assumption seeding and search installation can abort initialization, and
-their partial state cannot resume or publish a result. The packed native-SAT
-optimization path and satisfaction/repair construction retain their constructor
-lifecycle. State allocation, occurrence indexes, individual factor calls, assumption
-seeding and LP construction remain atomic work.
+General CP optimization handles retain one private construction cursor through projection,
+state buffers, occurrence and event indexes, watch registration, root queue seeding and
+propagation, assumptions, LP planning and shared-search installation. Model-wide loops
+checkpoint after at most 256 entries or visits, including visits inside a wide factor's
+index lists. Runtime array allocation, one domain materialization, factor invocation,
+payload snapshot and source hull estimate remain atomic operations; the batch bound is
+not a hard elapsed-time guarantee. The packed native-SAT optimization path and public
+satisfaction/repair constructors retain their eager lifecycle.
+
+A paused cursor cannot publish an assignment or an incomplete fixpoint as a refutation.
+A completed root conflict can return its refutation even when its work consumes the
+slice. Successful installation transfers the prepared state and work ledger once;
+assumption pins, watcher entries and LP plans are not restarted on resume. Root and
+assumption propagation retain pending wakes between batches. Fractional work charges
+and overspend debt carry through installation into search. Construction scans spend
+wall time without manufacturing decisions or LP solve work; solve-wide decision/move
+allowances are unchanged. Closing drops the private cursor and closes any installed LP
+owner. Ordinary installation exceptions close the handle before propagating the failure.
+See [search](search.md#finite-propagation) and [resource allowances](resources.md).
 
 ## Preparation revisits
 

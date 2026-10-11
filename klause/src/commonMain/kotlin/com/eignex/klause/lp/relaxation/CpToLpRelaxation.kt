@@ -607,6 +607,17 @@ internal class CpToLpRelaxation(
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private var cumulativeRelaxation: CumulativeRelaxation? = null
 
+    /**
+     * Whether this relaxer emits no row whose coefficients depend on the live domains, the
+     * row-side half of [LpRelaxation.persistentEligible]: the objective cone (different per-cone
+     * structure), the cumulative / diffn energetic rows (live-coefficient rows with no auxiliary
+     * column to gate them), and live-M reified rows are excluded. Auxiliary-column hulls (circuit,
+     * table, …) stay candidates here — their rows are fixed and the live restriction rides on the
+     * column bounds, which the per-column presence rule re-binds; an un-ruled aux column is what keeps
+     * a not-yet-wired hull off the persistent path (checked at build). When this holds and every
+     * column is re-derivable, live column bounds suffice to reuse the fixed relaxation layout.
+     */
+
     private var structurallyPersistent: Boolean = false
 
     init {
@@ -615,7 +626,9 @@ internal class CpToLpRelaxation(
 
     fun preparation(): Iterator<Unit> = sequence {
         if (cumulative || diffn) {
-            val owner = CumulativeRelaxation(problem, includeCumulative = cumulative, includeDiffn = diffn, deferred = true)
+            val owner = CumulativeRelaxation(
+                problem, includeCumulative = cumulative, includeDiffn = diffn, deferred = true,
+            )
             owner.preparation().forEach { yield(Unit) }
             cumulativeRelaxation = owner.takeIf { it.applicable }
         }
@@ -632,16 +645,6 @@ internal class CpToLpRelaxation(
         }
     }.iterator()
 
-    /**
-     * Whether this relaxer emits no row whose coefficients depend on the live domains, the
-     * row-side half of [LpRelaxation.persistentEligible]: the objective cone (different per-cone
-     * structure), the cumulative / diffn energetic rows (live-coefficient rows with no auxiliary
-     * column to gate them), and live-M reified rows are excluded. Auxiliary-column hulls (circuit,
-     * table, …) stay candidates here — their rows are fixed and the live restriction rides on the
-     * column bounds, which the per-column presence rule re-binds; an un-ruled aux column is what keeps
-     * a not-yet-wired hull off the persistent path (checked at build). When this holds and every
-     * column is re-derivable, live column bounds suffice to reuse the fixed relaxation layout.
-     */
 
     /**
      * Objective-cone membership, structural (depends only on `Problem.factors` and the

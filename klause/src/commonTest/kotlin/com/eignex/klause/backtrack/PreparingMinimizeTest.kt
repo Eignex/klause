@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -12,6 +13,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -64,5 +66,24 @@ class PreparingMinimizeTest {
             assertEquals(whole.objective, assertIs<MinimizeResult.Optimal>(terminal).objective)
             assertEquals(whole.stats.search.propagationWork, search.stats.search.propagationWork)
         }
+    }
+
+    @Test
+    fun `an installation failure closes the retained handle`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        val search = PreparingMinimize(
+            BacktrackSolver(fixture.problem), fixture.objective,
+            fixture.params.copy(assumptions = Assumptions.None.withInt(Int.MAX_VALUE, 1)),
+        )
+
+        assertFailsWith<IndexOutOfBoundsException> {
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
+        }
+
+        assertFalse(search.preparationPending)
+        assertFailsWith<IllegalStateException> {
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
+        }
+        search.close()
     }
 }

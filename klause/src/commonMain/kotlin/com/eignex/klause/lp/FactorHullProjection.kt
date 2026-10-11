@@ -38,3 +38,13 @@ internal fun Factor.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? = when (th
     is Table -> estimateLpHull(boxes)
     else -> null
 }
+
+internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: Factor, boxes: RootBoxes): LpSizeEstimate? = when (factor) {
+    is Element -> prepareLpHull(factor, boxes)
+    is GlobalCardinality -> prepareLpHull(factor, boxes)
+    is Mdd -> prepareLpHull(factor, boxes)
+    is NValue -> prepareLpHull(factor, boxes)
+    is Regular -> prepareLpHull(factor, boxes)
+    is Table -> prepareLpHull(factor, boxes)
+    else -> null
+}

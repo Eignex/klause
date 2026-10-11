@@ -914,24 +914,25 @@ internal class LpEngine(
         yield(Unit)
         lpRelaxer?.preparation()?.forEach { yield(Unit) }
         lpSeparators = if (params.lpPlan.cuts || params.lpPlan.circuit) {
-        buildList {
-            if (params.lpPlan.cuts) {
-                add(AllDifferentSeparator())
-                add(GccSeparator())
-                add(KnapsackCoverSeparator())
-                add(CliqueCutSeparator())
-                add(AggregationMirSeparator())
-                if (params.lpPlan.impliedBoundCuts) add(ImpliedBoundSeparator())
-                if (params.lpPlan.flowCoverCuts) add(FlowCoverSeparator())
-                val coef = constructionLongArray(problem.numIntVars) { objective.intCoefficientValues.getOrElse(it) { 0L } }
-                add(AssignmentObjectiveCut(coef))
+            buildList {
+                if (params.lpPlan.cuts) {
+                    add(AllDifferentSeparator())
+                    add(GccSeparator())
+                    add(KnapsackCoverSeparator())
+                    add(CliqueCutSeparator())
+                    add(AggregationMirSeparator())
+                    if (params.lpPlan.impliedBoundCuts) add(ImpliedBoundSeparator())
+                    if (params.lpPlan.flowCoverCuts) add(FlowCoverSeparator())
+                    val coef = constructionLongArray(problem.numIntVars) {
+                        objective.intCoefficientValues.getOrElse(it) { 0L }
+                    }
+                    add(AssignmentObjectiveCut(coef))
+                }
+                if (params.lpPlan.circuit) add(CircuitSeparator())
             }
-            if (params.lpPlan.circuit) add(CircuitSeparator())
+        } else {
+            emptyList()
         }
-    } else {
-        emptyList()
-    }
-
         lpLadder = LpEffortLadder(
             top = LpEffort.ceiling(cutsPermitted = params.lpPlan.cuts),
             reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,

@@ -37,7 +37,8 @@ internal class BoolWatcherIndex(
      * sound because it is still a real literal of the factor — if true the factor really is
      * satisfied; if not the watcher simply fires.
      */
-    val blockersByLit: Array<IntArrayList> = preparedBlockers ?: Array(2 * numBoolVars) { IntArrayList(initialCapacity = 2) }
+    val blockersByLit: Array<IntArrayList> =
+        preparedBlockers ?: Array(2 * numBoolVars) { IntArrayList(initialCapacity = 2) }
 
     /**
      * Back-pointer index for O(1) `moveBoolWatcher` removal: maps `pack(fid, lit)` to

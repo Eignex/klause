@@ -117,29 +117,57 @@ internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
 }
 
 internal fun Mdd.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
-    if (!boxes.statesBothBounds(seq)) return null
-    val reach = forwardReach(boxes::domain) ?: return null
+    var result: LpSizeEstimate? = null
+    sequence<Unit> { result = prepareLpHull(this@estimateLpHull, boxes) }.forEach { }
+    return result
+}
+
+internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: Mdd, boxes: RootBoxes): LpSizeEstimate? {
+    val seq = factor.seq
+
+    if (!prepareStatesBothBounds(boxes, seq)) return null
+    val reach = prepareForwardReach(factor, boxes::domain) ?: return null
     return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 3L)
 }
 
 private class MddReach(val states: Array<IntHashSet>, val arcCount: Long)
 
 private fun Mdd.forwardReach(domainOf: (Int) -> IntDomain): MddReach? {
-    val n = seq.size
-    val stride = recordStride
-    val trans = transitions
-    val starts = layerStarts
-    val reach = Array(n + 1) { IntHashSet() }
-    reach[0].add(initial)
+    var result: MddReach? = null
+    sequence<Unit> { result = prepareForwardReach(this@forwardReach, domainOf) }.forEach { }
+    return result
+}
+
+private suspend fun SequenceScope<Unit>.prepareForwardReach(
+    factor: Mdd,
+    domainOf: (Int) -> IntDomain,
+): MddReach? {
+    val n = factor.seq.size
+    val stride = factor.recordStride
+    val trans = factor.transitions
+    val starts = factor.layerStarts
+    val pending = arrayOfNulls<IntHashSet>(n + 1)
+    yield(Unit)
+    for (i in pending.indices) {
+        pending[i] = IntHashSet()
+        if ((i + 1) % 256 == 0) yield(Unit)
+    }
+    @Suppress("UNCHECKED_CAST")
+    val reach = pending as Array<IntHashSet>
+    var visits = 0
+    reach[0].add(factor.initial)
     var arcCount = 0L
     for (layer in 0 until n) {
-        val dom = domainOf(seq[layer])
+        if (++visits % 256 == 0) yield(Unit)
+        val dom = domainOf(factor.seq[layer])
         var p = starts[layer]
         val end = starts[layer + 1]
         while (p < end) {
+            if (++visits % 256 == 0) yield(Unit)
             if (trans[p].toInt() in reach[layer] && trans[p + 1] in dom) {
                 reach[layer + 1].add(trans[p + 2].toInt())
                 arcCount++
+                if (arcCount > MAX_MDD_ARCS) return null
             }
             p += stride
         }

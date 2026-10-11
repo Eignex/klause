@@ -1,7 +1,9 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
@@ -94,5 +96,75 @@ class PropagationPreparationTest {
         assertEquals(PropagationSession(problem).work, session.work)
         assertEquals(IntDomain(0, 3), session.intDomain(0))
         assertFalse(session.fixpointCancelled)
+    }
+
+    @Test
+    fun `a wide factor occurrence index matches eager wakeups`() {
+        val variables = 513
+        val problem = Problem(
+            1, variables, Array(variables) { IntDomain(0, 1) },
+            arrayOf(
+                Linear(IntArray(variables) { 1 }, IntArray(variables) { it }, LinearOp.GE, 1),
+                Clause(intArrayOf(Lit.make(0, true))),
+            ),
+        )
+        val expected = PropagationSession(problem)
+        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        var session: PropagationSession? = null
+
+        while (session == null) session = preparation.advance()
+        session.pinInt(0, 0)
+        expected.pinInt(0, 0)
+
+        assertEquals(expected.work, session.work)
+        assertEquals(expected.boolValue(0), session.boolValue(0))
+        for (v in 0 until variables) assertEquals(expected.intDomain(v), session.intDomain(v))
+    }
+
+    @Test
+    fun `an assumption fixpoint can pause and resume without restarting its decision`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)),
+            Array(260) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1) },
+        )
+        var cancelled = false
+        val preparation = PropagationPreparation(problem, Cancellation { cancelled }, 0, false)
+        var ready: PropagationSession? = null
+        while (ready == null) ready = preparation.advance()
+        val session = assertNotNull(ready)
+        val assumptions = Assumptions.None.withInt(0, 1)
+        val seed = session.prepareSeed(assumptions)
+        val expected = PropagationSession(problem)
+        expected.seed(assumptions)
+
+        assertNull(seed.next())
+        cancelled = true
+        assertNull(seed.next())
+        cancelled = false
+        while (seed.next() == null) Unit
+
+        assertEquals(1, session.decisionLevel)
+        assertEquals(expected.work, session.work)
+        assertEquals(expected.intDomain(0), session.intDomain(0))
+        session.popLast()
+        assertEquals(IntDomain(0, 1), session.intDomain(0))
+    }
+
+    @Test
+    fun `assumptions without wakes remain pausable between pins`() {
+        val problem = Problem(0, 260, Array(260) { IntDomain(0, 1) }, emptyArray())
+        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        var ready: PropagationSession? = null
+        while (ready == null) ready = preparation.advance()
+        val session = assertNotNull(ready)
+        val ints = Assumptions(intArrayOf(), booleanArrayOf(), IntArray(260) { it }, LongArray(260))
+        val seed = session.prepareSeed(ints)
+
+        assertNull(seed.next())
+        assertEquals(1, session.decisionLevel)
+        while (seed.next() == null) Unit
+
+        assertEquals(260, session.decisionLevel)
+        assertTrue((0 until 260).all { session.intDomain(it) == IntDomain(0, 0) })
     }
 }

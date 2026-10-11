@@ -28,7 +28,7 @@ import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RootBoxes
-import com.eignex.klause.lp.estimateLpHull
+import com.eignex.klause.lp.prepareLpHull
 import com.eignex.klause.lp.lpHullFamily
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
@@ -289,7 +289,9 @@ object LpAutoConfig {
                 // Per-factor hull sizes come from each factor's LP hull estimate (single source with
                 // the build); the driver-emitted circuit arcs and time-indexed model keep their own.
                 if (circuit) admit(circuitEstimate(problem))
-                if (constArrayElement) admit(hullEstimate(problem, rootBoxes(), LpTechnique.ELEMENT, HullFamily.ELEMENT))
+                if (constArrayElement) {
+                    admit(hullEstimate(problem, rootBoxes(), LpTechnique.ELEMENT, HullFamily.ELEMENT))
+                }
                 if (table) admit(hullEstimate(problem, rootBoxes(), LpTechnique.TABLE, HullFamily.TABLE))
                 if (nValue) admit(hullEstimate(problem, rootBoxes(), LpTechnique.NVALUE, HullFamily.NVALUE))
                 if (regular) admit(hullEstimate(problem, rootBoxes(), LpTechnique.REGULAR, HullFamily.REGULAR))
@@ -431,7 +433,7 @@ object LpAutoConfig {
         for (f in problem.factors) {
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             if (f.lpHullFamily() != family) continue
-            val e = f.estimateLpHull(boxes) ?: continue
+            val e = prepareLpHull(f, boxes) ?: continue
             cols += e.cols
             rows += e.rows
             any = true
