@@ -190,7 +190,7 @@ class ResumableMinimizeTest {
         )
 
         val result = BacktrackSolver(problem.bake()).minimize(
-            LinearObjective(boolCoefficients = longArrayOf(-1, 0)),
+            LinearObjective(boolWeights = longArrayOf(-1, 0)),
             BacktrackParams(variableSelector = selector, valueSelector = IndomainMax),
         )
 
