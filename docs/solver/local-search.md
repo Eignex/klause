@@ -142,6 +142,10 @@ coordinate rejects the entire tuple move, preserving the chosen row's support;
 maintained columns decline tuple construction. The ordinary scorer grades the complete
 assignment.
 
+Satisfied linear equalities counter-shift the first admissible partner in coefficient
+magnitude order whose coefficient divides the driving drift. Targets outside root
+domains and protected partners do not prevent later partners from absorbing the drift.
+
 ## Cumulative neighborhoods
 
 Cumulative integer moves update every task reading the coordinate as a start,
