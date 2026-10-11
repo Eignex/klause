@@ -325,7 +325,13 @@ DIMACS CNF supplies Boolean clauses. WCNF supplies weighted partial MaxSAT.
 OPB/WBO supplies pseudo-Boolean constraints and objectives, including supported
 product and soft-constraint encodings. XCSP3 supplies finite-domain variables,
 supported globals and optional objectives. Each frontend retains its source
-objective orientation and output names. XCSP3 variable-matrix selection uses a
+objective orientation and output names. OPB/WBO objective normalization combines repeated
+and complementary literals, negation offsets and soft penalties with exact integers.
+Only the final Boolean coefficients and constant must fit signed 64-bit values;
+an unrepresentable result throws `OpbLoweringException`. Product terms retain their
+shared AND indicators and source conjunction semantics.
+
+XCSP3 variable-matrix selection uses a
 row-major index equality and a native `Element` factor. The compiler marks the
 flattened index, selected result and affine expression outputs as functionally defined. Local search
 maintains index-only affine chains from their source inputs; independently constrained

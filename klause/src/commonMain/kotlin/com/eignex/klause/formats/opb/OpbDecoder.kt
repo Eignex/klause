@@ -16,13 +16,16 @@ import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.plus
 import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 
 /** An OPB source document lowered to a solver problem. */
 data class OpbProblem(
@@ -44,8 +47,8 @@ internal object OpbDecoder {
 
     fun decode(document: OpbDocument, settings: ProblemSettings = ProblemSettings()): OpbProblem {
         val builder = Builder(document.numDeclaredVars, settings)
-        val objectiveWeights = MutableIntLongMap()
-        var objectiveConstant = 0L
+        val objectiveWeights = HashMap<Int, BigInt>()
+        var objectiveConstant = BIG_ZERO
         var hasObjective = false
         var softTop: Long? = null
         val softCosts = LongArrayList()
@@ -58,7 +61,7 @@ internal object OpbDecoder {
                     for (term in statement.terms) {
                         addObjectiveTerm(
                             objectiveWeights,
-                            requireLong(term.coefficient, "objective coefficient"),
+                            term.coefficient,
                             builder.literalFor(term),
                         ) {
                             objectiveConstant += it
@@ -115,8 +118,13 @@ internal object OpbDecoder {
                                 relation.longBound(),
                             )
                             hasObjective = true
-                            objectiveWeights.addTo(sat, -statement.softCost)
-                            objectiveConstant += statement.softCost
+                            addObjectiveTerm(
+                                objectiveWeights,
+                                bigIntOf(statement.softCost),
+                                Lit.make(sat, positive = false),
+                            ) {
+                                objectiveConstant += it
+                            }
                             softCosts.add(statement.softCost)
                             softViolations.add(Lit.make(sat, positive = false))
                         }
@@ -142,10 +150,10 @@ internal object OpbDecoder {
                 boolWeights = LongArray(
                     builder.numBoolVars,
                 ).also { weights ->
-                    objectiveWeights.forEach { v, w -> weights[v] = w }
+                    objectiveWeights.forEach { (v, w) -> weights[v] = requireLong(w, "objective coefficient") }
                 },
                 intCoefficients = EmptyLongArray,
-                constant = objectiveConstant,
+                constant = requireLong(objectiveConstant, "objective constant"),
             )
         } else {
             null
@@ -211,15 +219,17 @@ internal object OpbDecoder {
     }
 
     private inline fun addObjectiveTerm(
-        weights: MutableIntLongMap,
-        weight: Long,
+        weights: MutableMap<Int, BigInt>,
+        weight: BigInt,
         literal: Int,
-        addConstant: (Long) -> Unit,
+        addConstant: (BigInt) -> Unit,
     ) {
+        val variable = Lit.variable(literal)
+        val previous = weights[variable] ?: BIG_ZERO
         if (Lit.isPositive(literal)) {
-            weights.addTo(Lit.variable(literal), weight)
+            weights[variable] = previous + weight
         } else {
-            weights.addTo(Lit.variable(literal), -weight)
+            weights[variable] = previous + -weight
             addConstant(weight)
         }
     }
