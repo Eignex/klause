@@ -115,6 +115,32 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
+    fun `reduced trials restore original coordinates and caller pins`() {
+        val solver = BacktrackSolver(Problem(
+            33, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(28, true), Lit.make(31, true))),
+                Clause(intArrayOf(Lit.make(29, true), Lit.make(31, false))),
+            ),
+        ).bake())
+        val objective = LinearObjective(boolWeights = LongArray(33).apply {
+            this[28] = 1L
+            this[29] = 2L
+        })
+        val primal = assertNotNull(MonotoneClausePrimal.create(
+            solver, objective, BacktrackParams(assumptions = Assumptions(bools = mapOf(32 to true))), Cancellation.Never,
+        ))
+
+        primal.use {
+            val sample = assertNotNull(it.advance())
+
+            assertEquals(33, sample.bools.size)
+            assertEquals(1L, objective.evaluateLong(sample))
+            assertTrue(sample.bools[28])
+            assertTrue(sample.bools[32])
+        }
+    }
+
+    @Test
     fun `negative occurrence of a costly variable disables the probe`() {
         val solver = BacktrackSolver(Problem(
             1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false)))),
