@@ -391,6 +391,7 @@ binary equality channel and a unary equality choice predicate. It checks zero in
 channel and duration domains, pins and implicit owners before proposing a complete
 choice-and-channel move. Per repair call, at most 16 such moves are drawn from at most
 32 present values of each choice domain, with at most four alternatives per predicate.
+The starting peak task advances per worker so early candidates cannot consume every call's budget.
 Start-time repairs skip absent tasks and tasks with zero duration or demand; present
 positive-footprint tasks retain neighboring and sampled targets outside the maximum peak.
 The ordinary scorer grades every affected factor; removing a footprint does not

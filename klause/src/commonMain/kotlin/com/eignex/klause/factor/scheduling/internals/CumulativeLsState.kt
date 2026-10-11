@@ -11,4 +11,6 @@ class CumulativeLsState(
     var overage: Long,
     /** Current capacity ceiling (mirrors the capacity variable's assigned value). */
     var cap: Long,
-)
+) {
+    internal var durationRepairCursor: Int = 0
+}

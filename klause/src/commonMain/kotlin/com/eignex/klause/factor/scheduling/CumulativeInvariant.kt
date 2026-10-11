@@ -264,8 +264,8 @@ internal class CumulativeInvariant(
         val tLow = ls.tLow
         val absT = if (peakT >= 0) peakT + tLow else 0L
         val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else EmptyIntArray
+        emitConditionalDurationRepairs(state, ls, peakTasks, sink)
         val maxTargets = 4
-        var durationRepairs = 0
         for (i in 0 until n) {
             if (!OptionalPresence.isPresentInAssignment(presents, i, state)) continue
             val v = starts[i]
@@ -276,13 +276,6 @@ internal class CumulativeInvariant(
             val dom = state.rootDomains[v]
             val runsAtPeak = (peakT >= 0 && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
-                if (durationVars.isNotEmpty() &&
-                    durationRepairs < CUMULATIVE_MAX_DURATION_REPAIRS
-                ) {
-                    durationRepairs += ConditionalProductRepair(
-                        state, sink, durationVars[i], CUMULATIVE_MAX_DURATION_REPAIRS - durationRepairs,
-                    ).propose()
-                }
                 val afterPeak = absT + 1
                 if (afterPeak in dom && afterPeak != cur) sink.addChannelingIntSet(state, v, afterPeak)
                 val beforePeak = absT - d
@@ -301,6 +294,27 @@ internal class CumulativeInvariant(
             }
         }
         if (peakTasks.isNotEmpty()) emitFeasibleSwaps(state, ls, peakTasks, sink)
+    }
+
+    private fun emitConditionalDurationRepairs(
+        state: LocalSearchState,
+        ls: CumulativeLsState,
+        peakTasks: IntArray,
+        sink: MoveSink,
+    ) {
+        if (durationVars.isEmpty() || peakTasks.isEmpty()) return
+        var first = 0
+        while (first < peakTasks.size && peakTasks[first] < ls.durationRepairCursor) first++
+        if (first == peakTasks.size) first = 0
+        var added = 0
+        for (offset in peakTasks.indices) {
+            if (added >= CUMULATIVE_MAX_DURATION_REPAIRS) break
+            val i = peakTasks[(first + offset) % peakTasks.size]
+            ls.durationRepairCursor = if (i + 1 == n) 0 else i + 1
+            added += ConditionalProductRepair(
+                state, sink, durationVars[i], CUMULATIVE_MAX_DURATION_REPAIRS - added,
+            ).propose()
+        }
     }
 
     private fun collectPeakTasks(state: LocalSearchState, absT: Long): IntArray {

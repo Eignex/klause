@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
@@ -21,6 +22,55 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CumulativeInvariantTest {
+    @Test
+    fun `conditional repairs reach improving tasks beyond earlier candidates`() {
+        val factors = ArrayList<Factor>()
+        repeat(6) { i ->
+            factors.add(ReifiedLinear(i, intArrayOf(1), intArrayOf(i), LinearOp.EQ, 0))
+            factors.add(ReifiedLinear(i, intArrayOf(1), intArrayOf(6 + i), LinearOp.EQ, 1))
+            factors.add(Product(6 + i, 12, 13 + i))
+        }
+        val cumulative = factors.size
+        factors.add(Cumulative(
+            IntArray(6) { 19 + it }, LongArray(6) { 1 }, LongArray(6) { 1 }, 5,
+            durationVars = IntArray(6) { 13 + it },
+        ))
+        repeat(5) { factors.add(Clause(intArrayOf(Lit.make(it, true)))) }
+        val problem = Problem(
+            6, 25, Array(25) {
+                when (it) {
+                    in 0..5 -> IntDomain(0, 4)
+                    in 6..11, in 13..18 -> IntDomain(0, 1)
+                    12 -> IntDomain(1, 1)
+                    else -> IntDomain(0, 0)
+                }
+            }, factors.toTypedArray(),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem, IntArray(6) { 6 + it })).network(25, 6)
+        for (i in 0 until 25) state.assignment.setInt(i, if (i in 6..18) 1L else 0L)
+        for (i in 0 until 6) state.assignment.setBool(i, true)
+        state.recompute()
+        val before = state.cost
+        val moves = ArrayList<Move>()
+
+        repeat(2) {
+            state.moveSink.clear()
+            state.factors[cumulative].proposeRepairMoves(state, cumulative, state.moveSink)
+            assertTrue(state.moveSink.size <= 16)
+            moves.addAll(state.moveSink.list)
+        }
+        val move = assertNotNull(moves.firstOrNull { state.netDelta(it) < 0L })
+        val predicted = state.netDelta(move)
+        state.apply(move)
+
+        assertTrue(state.assignment.intValue(5) > 0L)
+        assertEquals(-before, predicted)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
     @Test
     fun `start repairs skip tasks without a resource footprint`() {
         for (inactive in listOf(
