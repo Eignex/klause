@@ -269,8 +269,11 @@ defining polynomial and one-based distinct real-root index. Canonical names are
 quoted in the model. A negative SMT numeral is `(- n)`; a bare `-n` is a symbol.
 
 This route supports one satisfaction result and model publication. It declines
-all-solution enumeration and polynomial optimization. Explicit local search returns
-UNKNOWN without proof authority; ALNS has no open-model CLI route.
+all-solution enumeration and polynomial optimization. Local search and ALNS generate finite candidates and request exact continuous
+completion. They publish exact witnesses and retain heuristic proof guarantees:
+failed completion never establishes global UNSAT. Mixed solving schedules complete
+backtracking, local search and ALNS over the same polynomial constraints. Native
+polynomial allowances belong to the containing invocation across all workers.
 
 `ir.PolynomialExpression` retains exact reduced arbitrary-precision rational leaves,
 source real identities, sums, products and nonnegative integer powers. Relations

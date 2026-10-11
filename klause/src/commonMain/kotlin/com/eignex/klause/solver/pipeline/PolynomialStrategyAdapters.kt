@@ -28,6 +28,7 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialSearchComponent
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
 import com.eignex.klause.theory.qfnra.QfNraResult
+import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 
 /** Finite strategy controls for composed polynomial satisfaction. */
@@ -80,18 +81,24 @@ internal class PolynomialStrategyAdapters(
         cancellation = params.localSearch.cancellation or cancellation,
     )
 
+    private var refutedCondition: PolynomialCondition? = null
+
     private val completion = CandidateCompletion { candidate, stop ->
         val pins = model.integerColumns.map { (id, column) -> column to BigFraction.ofLong(candidate.intValue(id)) }
             .toMap()
-        val query = invocation.check(
-            PolynomialCondition((0 until model.source.numBoolVars).associateWith(candidate::boolValue), pins, pins),
-            stop,
+        val condition = PolynomialCondition(
+            (0 until model.source.numBoolVars).associateWith(candidate::boolValue), pins, pins,
         )
+        val query = if (!stop() && condition == refutedCondition) QfNraResult.Unsatisfiable(QfNraStats(0, 0, 0))
+        else invocation.check(condition, stop)
         when (query) {
             is QfNraResult.Satisfiable -> Completion.Witness(
                 certified(model.capture(query.assignment, candidate.bools, candidate.ints)), work = 1,
             )
-            is QfNraResult.Unsatisfiable -> Completion.Refuted(work = 1)
+            is QfNraResult.Unsatisfiable -> {
+                refutedCondition = condition
+                Completion.Refuted(work = 1)
+            }
             is QfNraResult.Unknown -> Completion.Undecided(work = 1)
         }
     }

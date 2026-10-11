@@ -14,7 +14,7 @@ import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
 
-/** A complete polynomial-real request selected from lossless neutral source metadata. */
+/** A polynomial request composing exact continuous constraints with finite factors. */
 class PolynomialTheoryRequest internal constructor(
     /** Original source identities and polynomial formula. */
     val problem: PolynomialRealProblem,
@@ -23,6 +23,25 @@ class PolynomialTheoryRequest internal constructor(
 
 /** Select the complete polynomial-real theory without materializing finite domains. */
 fun PolynomialRealProblem.pipelineRequest(): PolynomialTheoryRequest = PolynomialTheoryRequest(this)
+
+/**
+ * Select exact polynomial completion for this shared model.
+ * Integer columns require finite source domains; every continuous factor must have an exact encoding.
+ */
+fun Problem.pipelineRequest(): PolynomialTheoryRequest {
+    val shared = requireNotNull(SharedPolynomialModel.assemble(this)) {
+        "the shared polynomial pipeline requires finite integers and exactly encodable continuous factors"
+    }
+    return shared.request()
+}
+
+internal fun SharedPolynomialModel.request(): PolynomialTheoryRequest = PolynomialTheoryRequest(
+    PolynomialRealProblem(
+        service.formula, service.realCount, source.numBoolVars, source.numRealVars, source.numBoolVars,
+        emptyMap(), emptyMap(),
+    ),
+    this,
+)
 
 /** Controls for one complete polynomial-real invocation, in native arithmetic units. */
 data class PolynomialTheoryParams(
@@ -140,11 +159,13 @@ fun OpenTheoryPipeline.execute(
             }
         }
         is SolveResult.Unsat -> PolynomialTheoryExecution(OpenTheoryResult.Unsat(result.stats), stats)
-        is SolveResult.Unknown -> incomplete(result.reason, stats).copy(resource = when (invocation.lastUnknown?.resource) {
-            PolynomialResource.DENSE_COEFFICIENTS -> PolynomialTheoryResource.DenseCoefficients
-            PolynomialResource.MATRIX_CELLS -> PolynomialTheoryResource.MatrixCells
-            PolynomialResource.DEGREE_OVERFLOW -> PolynomialTheoryResource.DegreeOverflow
-            null -> null
-        })
+        is SolveResult.Unknown -> incomplete(result.reason, stats).copy(
+            resource = when (invocation.lastUnknown?.resource) {
+                PolynomialResource.DENSE_COEFFICIENTS -> PolynomialTheoryResource.DenseCoefficients
+                PolynomialResource.MATRIX_CELLS -> PolynomialTheoryResource.MatrixCells
+                PolynomialResource.DEGREE_OVERFLOW -> PolynomialTheoryResource.DegreeOverflow
+                null -> null
+            },
+        )
     }
 }

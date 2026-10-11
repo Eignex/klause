@@ -81,8 +81,8 @@ internal class PolynomialSearchComponent(
             ),
             Cancellation { context.cancelled() },
         )
-        signature = current
-        outcome = result
+        signature = current.takeUnless { result is QfNraResult.Unknown }
+        outcome = result.takeUnless { it is QfNraResult.Unknown }
         return result
     }
 
