@@ -9947,6 +9947,19 @@ public final class com/eignex/klause/solver/pipeline/PlannedSearchKt {
 	public static synthetic fun search$default (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/ir/Problem;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
 }
 
+public final class com/eignex/klause/solver/pipeline/PolynomialOptimizationExecution {
+	public fun <init> (Lcom/eignex/klause/solver/result/MinimizeResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/MinimizeResult;
+	public final fun component2 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/MinimizeResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;)Lcom/eignex/klause/solver/pipeline/PolynomialOptimizationExecution;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/PolynomialOptimizationExecution;Lcom/eignex/klause/solver/result/MinimizeResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialOptimizationExecution;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getResult ()Lcom/eignex/klause/solver/result/MinimizeResult;
+	public final fun getStats ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/pipeline/PolynomialStrategyParams {
 	public fun <init> ()V
 	public fun <init> (Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/localsearch/LocalSearchParams;Lcom/eignex/klause/propagation/Assumptions;I)V
@@ -10012,6 +10025,8 @@ public final class com/eignex/klause/solver/pipeline/PolynomialTheoryRequest {
 public final class com/eignex/klause/solver/pipeline/PolynomialTheoryRequestKt {
 	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/PolynomialOptimizationExecution;
+	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialOptimizationExecution;
 	public static final fun pipelineRequest (Lcom/eignex/klause/ir/PolynomialRealProblem;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;
 	public static final fun pipelineRequest (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;
 }

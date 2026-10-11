@@ -14,6 +14,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -23,6 +25,37 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PolynomialStrategyAdaptersTest {
+    @Test
+    fun `shared finite objective keeps exact completion across optimization strategies`() {
+        val source = Problem(
+            numBoolVars = 0, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 2)),
+            factors = arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)),
+            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0),
+        )
+        val request = source.pipelineRequest()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(randomSeed = 17),
+            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 30),
+            alnsIterations = 2,
+        ))
+        val engines = listOf(FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS, FiniteEngine.MIXED)
+
+        for (engine in engines) {
+            val result = OpenTheoryPipeline.minimize(request, objective, params, engine).result
+
+            val incumbent = assertIs<MinimizeResult.WithSample>(result)
+            assertEquals(1L, incumbent.sample.intValue(0))
+            assertEquals(1.0, incumbent.objective)
+            assertEquals(1.0, assertNotNull(incumbent.sample.algebraicReals).single().rational?.toDouble())
+            if (engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.MIXED) {
+                assertIs<MinimizeResult.Optimal>(result)
+            } else {
+                assertIs<MinimizeResult.BestFound>(result)
+            }
+        }
+    }
+
     @Test
     fun `finite strategies compose exact irrational constraints with scheduling and all different`() {
         val formula = SmtLibPolynomial.parse("""

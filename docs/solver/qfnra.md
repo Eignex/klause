@@ -114,10 +114,10 @@ contract are defined in the [API contract](../api.md).
 
 ## Pipeline and frontend publication
 
-The pipeline accepts opaque `ir.PolynomialRealProblem` through `pipelineRequest()`.
-`OpenTheoryPipeline.execute` invokes the complete engine once and returns the common
-SAT/UNSAT/UNKNOWN result with `PolynomialTheoryStats` and an optional native resource
-cause. Source declaration prefixes trim numeric conditional auxiliaries at capture.
+The pipeline accepts opaque `ir.PolynomialRealProblem` and shared `ir.Problem`
+models through `pipelineRequest()`. `OpenTheoryPipeline.execute` selects a finite
+strategy with exact polynomial completion and returns the common SAT/UNSAT/UNKNOWN
+result with `PolynomialTheoryStats` and an optional native resource cause. Source declaration prefixes trim numeric conditional auxiliaries at capture.
 Both verdicts receive a final stop check, and SAT capture receives another check
 before publication. Timeout, external cancellation and budget/resource exhaustion
 retain distinct common termination reasons. Exact source scalars survive invocation
@@ -141,3 +141,28 @@ can reject the finite branch, while its witness cannot accept that branch. Compl
 checks require every mapped integer and Boolean to be fixed. Conflicts without a
 clause explanation remain chronological and cannot enter learned-clause exchange.
 Retraction invalidates query results; the containing invocation allowance persists.
+
+## Shared model composition
+
+`SharedPolynomialModel` separates exactly encodable continuous factors from finite
+factors. Integer columns appearing in the continuous equations receive symbolic
+real coordinates for conditioned queries; their source finite domains and global
+constraints remain in CP. Exact linear rows, Boolean reification, real bounds and
+integer/real products become neutral polynomial formulas. AllDifferent, scheduling
+and other finite factors remain intact in the finite projection. Linear relaxation
+rows cannot stand in for a factor's semantics. Binary64 constants denote their exact
+binary rational values.
+
+Backtracking checks interval relaxations and fixed finite branches. Local search
+generates candidates from finite factors, then pins their complete finite values in
+a theory query before publication. ALNS uses that same completion in bootstrap,
+finite CP repair and its inner local search. Pure-real sources use an empty finite
+projection, so the local-search arm still runs and obtains an exact completion.
+Rejected heuristic candidates never establish a global refutation.
+
+`OpenTheoryPipeline.minimize` supports objectives over the finite columns using the
+same projection, theory and objective in every worker. Complete traversal can prove
+an optimum or infeasibility; local search and ALNS retain exact incumbents without
+proof admission. Continuous objectives and all-solution enumeration remain outside
+this interface. [Search](search.md), [local search](local-search.md),
+[portfolio](portfolio.md) and [sessions](sessions.md) own their execution lifecycles.
