@@ -13,6 +13,20 @@ assembly. CP and theory components contribute residual state and reasons through
 same protocol. The session exchanges Boolean literals, semantic integer bounds and
 opaque theory decisions rather than native CP domains.
 
+[SearchSession](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)
+coordinates component callbacks, conflicts and complete checks.
+[SearchTrail](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchTrail.kt)
+owns decisions, Boolean values, reasons and publishers, integer facts, undo levels and
+pending assertion delivery.
+[SearchLearning](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
+owns shared clauses, attachment and propagation cursors, unit reawakening, reduction and
+telemetry. Retraction removes trail facts and restores integer premises before clamping
+the learned propagation cursor and notifying components. Root rebuild clears facts while
+retaining learned clauses and reawakening units. Native CP clause state remains CP-owned.
+[SearchRun](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchRun.kt)
+contains the single traversal loop and owns frames, decisions, restarts, cancellation
+cadence and resumable/terminal state.
+
 Fractional source integers split at exact floor/ceiling thresholds. CP decisions use
 Long values; open theories use arbitrary-precision thresholds. Stable complementary
 atoms must exist before first-UIP learning. Boolean atom names belong to one immutable
