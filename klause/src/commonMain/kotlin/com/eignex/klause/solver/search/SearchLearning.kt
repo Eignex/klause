@@ -78,13 +78,8 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         return levels.size
     }
 
-    /**
-     * Drop the weakest retained clauses once the database exceeds its cap.
-     *
-     * Every learned clause is implied by the root problem, so forgetting one only weakens propagation.
-     * Clauses that are glue, that have propagated since the last reduction, or that are unit are kept
-     * regardless.
-     */
+    // Every learned clause is implied by the root problem, so forgetting one only weakens propagation.
+    // Glue clauses, clauses that propagated since the last reduction, and units are retained.
     private fun reduceLearnedDb() {
         val cap = learnedDb.maxClauses ?: return
         // Reduction renumbers clauses, so it waits until no clause is queued for its first
