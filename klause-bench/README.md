@@ -444,7 +444,9 @@ independent witness checks do not by themselves verify optimality/refutation.
 [scripts/lp-lifecycle](scripts/lp-lifecycle/) measures the complete CP bounding consumer
 across a fixed 21-state push/pop trace, with retained and fresh numerical owners.
 The checker independently validates source bounds, primal values, objectives and lower
-bounds using a vertex oracle, and requires every owner to close. See
+bounds using a vertex oracle, and requires every owner to close. The trace identity
+hashes each observed source bound tuple and its effective exact LP model, so retained
+and fresh owners share an identity independent of trail revision history. See
 [LP capture/replay](../docs/lp/replay.md) for the trace and measurement contract.
 
 `-PlpLifecycleCli=/absolute/path/to/klause-cli-jvm` selects an installed distribution
