@@ -33,7 +33,10 @@ class ProofCheckTest(unittest.TestCase):
         query = solver.check
 
         def check_pinned():
-            pinned = any(row.eq(z3.Real('x') == 1) for row in solver.assertions())
+            solver.push()
+            solver.add(z3.Real('x') != 1)
+            pinned = query() == z3.unsat
+            solver.pop()
             return query() if pinned else z3.unknown
 
         case = self.case(kind='satisfy', objective=None, proven=False,
