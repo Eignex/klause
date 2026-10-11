@@ -55,11 +55,11 @@ deadline. Probe-call caps do not establish a wall-clock bound.
 ## Phase allowance and telemetry
 
 [PresolveBudget](../../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveBudget.kt)
-owns the phase's deterministic work allowance. Its tokens carry the budget as their work
-meter adapter, so explicit `Cancellation.charge` calls reduce the original allowance. Rebuilding
-a problem does not create another allowance or reset consumed work.
+owns the phase's deterministic work allowance. Its tokens carry a native-work adapter,
+so explicit `Cancellation.charge` calls reduce the original allowance. Rebuilding a
+problem does not create another allowance or reset consumed work.
 
-RootBaker records probe calls through the token's `PresolveBudget` meter. Counts include
+RootBaker records probe calls through the token's phase adapter. Counts include
 Boolean probes, integer bound/hole SAC and repair calls, accumulated across tiers and
 reseeds. Integer limits apply per variable and per tier within one bake; an aggregate
 count above one tier's cap is not a cap violation by itself. Round entries include empty
