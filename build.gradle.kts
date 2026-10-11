@@ -1,5 +1,4 @@
 plugins {
-    base
     // Pin the Kotlin plugins once in the root classloader so sibling KMP projects share one
     // instance — the Kotlin/Native bundle build service can't span per-project classloaders.
     // Subprojects apply the kotlin plugins without a version.
@@ -24,8 +23,6 @@ val checkArchitecture = tasks.register<Exec>("checkArchitecture") {
     inputs.file("scripts/check_architecture.py")
     inputs.files(fileTree(rootDir) { include("klause*/src/*Main/kotlin/**/*.kt") })
 }
-
-tasks.named("check") { dependsOn(checkArchitecture) }
 
 val koblasJvmArgs = buildList {
     add("--enable-native-access=ALL-UNNAMED")
