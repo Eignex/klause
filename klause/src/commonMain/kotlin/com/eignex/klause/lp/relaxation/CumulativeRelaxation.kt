@@ -408,26 +408,26 @@ internal class CumulativeRelaxation(
     }
 
     private suspend fun SequenceScope<Unit>.endUpperBoundsOf(links: MakespanLinks, start: Int, dur: Long): IntHashSet {
-            val result = IntHashSet()
-            val queue = IntArrayDeque()
-            // Seed: vars directly proven ≥ start + c with c ≥ dur are ≥ the task end.
-            links.geFrom[start]?.forEach { wc ->
-                if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-                if (wc[1] >= dur) {
-                    val w = wc[0].toInt()
-                    if (result.add(w)) queue.addLast(w)
-                }
+        val result = IntHashSet()
+        val queue = IntArrayDeque()
+        // Seed: vars directly proven ≥ start + c with c ≥ dur are ≥ the task end.
+        links.geFrom[start]?.forEach { wc ->
+            if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            if (wc[1] >= dur) {
+                val w = wc[0].toInt()
+                if (result.add(w)) queue.addLast(w)
             }
-            // Close through max edges: result = max(...) ≥ operand ≥ end ⇒ result ≥ end too.
-            while (queue.isNotEmpty()) {
-                val v = queue.removeFirst()
-                links.maxResultsOf[v]?.forEach { m ->
-                    if (result.add(m)) queue.addLast(m)
-                    if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-                }
-            }
-            return result
         }
+        // Close through max edges: result = max(...) ≥ operand ≥ end ⇒ result ≥ end too.
+        while (queue.isNotEmpty()) {
+            val v = queue.removeFirst()
+            links.maxResultsOf[v]?.forEach { m ->
+                if (result.add(m)) queue.addLast(m)
+                if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+        }
+        return result
+    }
 
     internal companion object {
         /** Per-factor task cap: above it the `O(n log n)` row build is skipped (sound loosening). */

@@ -179,7 +179,10 @@ class LpAutoConfigTest {
     }
     @Test
     fun `retained hull planning preserves the eager plan across checkpoints`() {
-        val p = problem(NValue(IntArray(513) { it }, 513), intVars = 514)
+        val settings = KlauseConfig.DEFAULT.copy(
+            lpCeilingTableauCells = Long.MAX_VALUE, lpMaxTableauCells = Long.MAX_VALUE,
+        ).problemSettings()
+        val p = problem(NValue(513, IntArray(513) { it }), intVars = 514).withSettings(settings)
         val expected = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
         var actual: LpPlan? = null
         val planning = sequence<Unit> {
