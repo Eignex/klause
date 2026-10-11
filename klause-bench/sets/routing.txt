@@ -13,7 +13,7 @@ xcsp3-cop/TSPTW2-n040w020-1_c23
 mzn-bench/2012/tpp/tpp_7_5_30_1
 mzn-bench/2013/mario/mario_t_hard_1
 mzn-bench/2014/mario/mario_t_hard_2
-mzn-bench/2014/stochastic-vrp
+mzn-bench/2014/stochastic-vrp/vrp-s2-v2-c7_vrp-v2-c7_det
 mzn-bench/2017/mario/mario_medium_4
 mzn-bench/2018/vrplc/vrplc9_5_10_s1
 mzn-bench/2020/p1f-pjs/10

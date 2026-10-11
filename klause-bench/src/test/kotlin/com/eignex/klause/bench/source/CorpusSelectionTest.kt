@@ -57,6 +57,27 @@ class CorpusSelectionTest {
     }
 
     @Test
+    fun `data-free challenge keys distinguish the selected model within a family`() {
+        val root = Files.createTempDirectory("mznmodels").toFile()
+        try {
+            File(root, "2011/bacp").mkdirs()
+            File(root, "2011/bacp/bacp-9.mzn").writeText("int: n = 9;")
+            val original = Layout.MznChallengeAllYears.discover(root).single()
+
+            File(root, "2011/bacp/bacp-19.mzn").writeText("int: n = 19;")
+            val selected = Layout.MznChallengeAllYears.discover(root).single()
+
+            assertEquals("2011/bacp/bacp-9", original.name)
+            assertEquals("2011/bacp/bacp-19", selected.name)
+            assertEquals("2011/bacp/bacp-19.mzn", selected.mznRelPath)
+            assertEquals(original.family, selected.family)
+            assertEquals("2011/bacp", selected.family)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `per-family cap then interleave then overall cap`() {
         val all = (1..4).map { Discovered("famA/$it", "famA/m.mzn", "famA/$it.dzn") } +
             (1..4).map { Discovered("famB/$it", "famB/m.mzn", "famB/$it.dzn") }
@@ -125,7 +146,7 @@ class CorpusSelectionTest {
             // is not mistaken for a challenge year.
             File(root, "not-a-year").mkdirs()
             val found = Layout.MznChallengeAllYears.discover(root).sortedBy { it.name }
-            assertEquals(listOf("2013/black-hole", "2025/black-hole"), found.map { it.name })
+            assertEquals(listOf("2013/black-hole/black-hole", "2025/black-hole/black-hole"), found.map { it.name })
             assertEquals(listOf("2013/black-hole", "2025/black-hole"), found.map { it.family })
         } finally {
             root.deleteRecursively()
@@ -144,8 +165,8 @@ class CorpusSelectionTest {
             val found = Layout.MznChallengeAllYears.discover(root)
             val selected = CorpusSelection.applySelection(found, Selection(maxInstances = 1))
 
-            assertEquals(listOf("2020/bnn-planner"), selected.map { it.name })
-            assertEquals(listOf("2020/bnn-planner"), found.map { it.name })
+            assertEquals(listOf("2020/bnn-planner/model"), selected.map { it.name })
+            assertEquals(listOf("2020/bnn-planner/model"), found.map { it.name })
         } finally {
             root.deleteRecursively()
         }
