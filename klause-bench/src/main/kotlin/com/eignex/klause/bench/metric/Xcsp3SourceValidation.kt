@@ -70,7 +70,9 @@ internal object Xcsp3SourceValidation {
 
     fun checkerResult(exitCode: Int, log: String): SourceValidation {
         if (exitCode == 0) {
-            val result = log.lineSequence().lastOrNull { it.startsWith(RESULT_PREFIX) }?.removePrefix(RESULT_PREFIX)
+            val lines = log.lines()
+            val start = lines.indexOfLast { it.startsWith(RESULT_PREFIX) }
+            val result = if (start < 0) null else lines.drop(start).joinToString("\n").removePrefix(RESULT_PREFIX)
             if (result != null) {
                 return runCatching { Reports.json.decodeFromString<SourceValidation>(result) }.getOrElse {
                     Xcsp3SourceChecker.result("unknown", "malformed source checker result")
