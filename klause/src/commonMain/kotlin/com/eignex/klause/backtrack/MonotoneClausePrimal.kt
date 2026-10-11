@@ -27,12 +27,22 @@ internal class MonotoneClausePrimal private constructor(
     private var trialSample: Sample? = null
     private var bestValue = Double.POSITIVE_INFINITY
     private var closed = false
+    private var polishing: Sample? = null
+    private var polishingVariables: List<Int> = emptyList()
+    private var polishingIndex = 0
+    private var polishingPureCount = 0
 
     val work: Long get() = (repair?.work ?: 0L) + literalWork / PROPAGATION_WORK_PER_NODE
-    val isDone: Boolean get() = closed || index == variables.size || lifetime() || work >= 100_000L
+    val isDone: Boolean
+        get() = closed || (polishing == null && (index == variables.size || lifetime() || work >= 100_000L))
 
     fun advance(sliceMillis: Long = 2_500L, sliceNodes: Long = -1L): Sample? {
-        if (isDone || params.cancellation()) return null
+        if (params.cancellation()) return null
+        if (polishing != null) {
+            finishPolishing()?.let { return it }
+            if (polishing != null) return null
+        }
+        if (isDone) return null
         val startWork = work
         val start = TimeSource.Monotonic.markNow()
         val search = repair ?: try {
@@ -67,12 +77,12 @@ internal class MonotoneClausePrimal private constructor(
             trialSample = null
             if (sample == null) continue
             accepted = completedTrial
-            val polished = polish(sample, pure)
-            val value = objective.evaluate(polished)
-            if (value < bestValue) {
-                bestValue = value
-                return polished
-            }
+            polishing = Sample(sample.bools.copyOf(), sample.ints)
+            polishingVariables = pure + variables
+            polishingIndex = 0
+            polishingPureCount = pure.size
+            finishPolishing()?.let { return it }
+            if (polishing != null) return null
         }
         return null
     }
@@ -81,7 +91,7 @@ internal class MonotoneClausePrimal private constructor(
         val pins = trial.bools.toMutableMap()
         val polarity = IntArray(solver.problem.numBoolVars)
         for (clause in clauses) {
-            if (params.cancellation() || lifetime()) break
+            if (params.cancellation() || lifetime()) return trial to emptyList()
             literalWork += clause.literals.size
             if (clause.literals.any { literal ->
                     pins[Lit.variable(literal)]?.let { Lit.evaluate(literal, it) } == true
@@ -98,11 +108,14 @@ internal class MonotoneClausePrimal private constructor(
         return trial.mergedWith(Assumptions(bools = pins)) to pure
     }
 
-    private fun polish(candidate: Sample, pure: List<Int>): Sample {
-        val values = candidate.bools.copyOf()
-        for (variable in pure + variables) {
-            if (params.cancellation() || lifetime()) break
-            if ((variable in pure || values[variable]) && occurrences[variable].all { clause ->
+    private fun finishPolishing(): Sample? {
+        val candidate = checkNotNull(polishing)
+        val values = candidate.bools
+        while (polishingIndex < polishingVariables.size) {
+            if (params.cancellation()) return null
+            val pureVariable = polishingIndex < polishingPureCount
+            val variable = polishingVariables[polishingIndex++]
+            if ((pureVariable || values[variable]) && occurrences[variable].all { clause ->
                     clause.literals.any { literal ->
                         literalWork++
                         Lit.variable(literal) != variable && Lit.evaluate(literal, values[Lit.variable(literal)])
@@ -110,7 +123,14 @@ internal class MonotoneClausePrimal private constructor(
                 }
             ) values[variable] = !values[variable]
         }
-        return Sample(values, candidate.ints)
+        polishing = null
+        val value = objective.evaluate(candidate)
+        return if (value < bestValue) {
+            bestValue = value
+            candidate
+        } else {
+            null
+        }
     }
 
     override fun close() {
