@@ -162,6 +162,14 @@ with capacity. Shared presence flips grade the combined footprint change. Predic
 deltas and committed grades use the final combined load rather than summing independent
 scores against the original timeline.
 
+Overload start swaps filter on the joint raw profile change, including every aliased
+role of either coordinate. The filter applies and restores only affected footprints,
+without copying the timeline; capacity aliases also rescan the retained profile.
+At most four swaps are offered, preserving the peak-task/partner neighborhood. Both
+starts must be in each other's root domains and pass pins, definitions and implicit
+ownership checks. The ordinary scorer grades the complete move and maintained outputs
+across every affected factor.
+
 Cumulative overload repair can remove a maintained product duration through a unit
 binary equality channel and a unary equality choice predicate. It checks zero in the
 channel and duration domains, pins and implicit owners before proposing a complete
