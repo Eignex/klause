@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.propagation.PropagationPreparation
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -15,7 +16,7 @@ internal class PreparingMinimize(
     private val solver: BacktrackSolver,
     private val objective: LinearObjective,
     private val params: BacktrackParams,
-) : ResumableSearch {
+) : ResumableSearch, ReseedGuard {
     private var globalToken = params.cancellation
     private val propagationToken = cancelledWhen({ globalToken.deadline() }) { globalToken() }
     private var preparation: PropagationPreparation? = PropagationPreparation(
@@ -35,6 +36,9 @@ internal class PreparingMinimize(
         it.search.rootPropagationNanos = { propagationNanos }
     }
     private val budget = SliceBudget({ 0L }, { 0L }, { propagationWork })
+
+    override val canReseed: Boolean get() = !preparationPending && search?.canReseed != false
+    override val canContinuePreparation: Boolean get() = search?.canContinuePreparation == true
 
     override val isDone: Boolean get() = search?.isDone == true
     override val preparationPending: Boolean get() = search == null && !closed

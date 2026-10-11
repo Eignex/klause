@@ -26,12 +26,14 @@ class PreparingMinimizeTest {
 
             assertNull(paused)
             assertTrue(search.preparationPending)
+            assertFalse(search.canReseed)
             assertTrue(samples.isEmpty())
             val result = assertIs<MinimizeResult.Optimal>(
                 search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L, samples::add),
             )
             assertEquals(-4.0, result.objective)
             assertFalse(search.preparationPending)
+            assertTrue(search.canReseed)
         }
     }
 
