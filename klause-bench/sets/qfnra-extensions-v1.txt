@@ -1,0 +1,6 @@
+# Frozen version 1 membership. Source hashes: smoke-corpus/qfnra-v1/manifest.json
+smtlib-qfnra-extensions-v1/division/symbolic-divisor
+smtlib-qfnra-extensions-v1/mixed/integer-real
+smtlib-qfnra-extensions-v1/nonpolynomial/negative-power
+smtlib-qfnra-extensions-v1/nonpolynomial/transcendental
+smtlib-qfnra-extensions-v1/session/multiple-queries

@@ -232,8 +232,10 @@ internal object SolveMetric {
         solver: String?,
         solution: File,
     ): Pair<SolveRecord, String?> = runCatching {
+        val hashes = SolveEvidence.sourceHashes(ref)
         val run = ReferenceSolve.run(ref, REFERENCE_MINIZINC_BACKEND, s, budget, solver)
         val r = run.result
+        check(hashes == SolveEvidence.sourceHashes(ref)) { "reference source changed during solve" }
         r.assignment?.let { solution.writeText(it) }
         SolveRecord(
             problem = ref.name,
@@ -258,6 +260,9 @@ internal object SolveMetric {
             command = r.command,
             buildProvenance = r.buildProvenance,
             buildFingerprint = r.buildProvenance?.fingerprint,
+            sourceHashes = hashes,
+            sourceOutputSha256 = sha256(r.rawOutput.toByteArray()),
+            finalWitness = if (r.feasible == true) SolveEvidence.finalWitness(ref.format, r.rawOutput) else null,
         ) to r.rawOutput
     }.getOrElse { failure ->
         println("?? [${ref.name}] reference ERROR: ${failure.message ?: failure::class.simpleName}")

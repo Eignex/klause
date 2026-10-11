@@ -35,7 +35,7 @@ enum class Format {
     /** XCSP3 instance. Net-new ingest (phase 3). */
     XCSP3,
 
-    /** SMT-LIB script (QF_LIA / QF_LRA / QF_LIRA). Net-new ingest (phase 3). */
+    /** SMT-LIB source script; catalog membership is independent of Klause frontend support. */
     SMTLIB,
 
     /** MPS (Mathematical Programming System) MIP instance. In-process via `Mps.parse(…).toProblem(…)`. */
