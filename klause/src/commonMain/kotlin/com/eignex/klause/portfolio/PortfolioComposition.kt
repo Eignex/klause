@@ -357,7 +357,20 @@ internal object PortfolioComposition {
         val alns = scenario.kind == Kind.COP && scenario.cores < count && facts.offersAll(AlnsWorkerConfig.NEEDS)
         val arms = ArrayList<WorkerConfig>(count + 1)
         val local = if (lsCount > 0) {
-            lsArms(scenario.kind, lsCount, scenario.lsPool, scenario.nodeBudget, facts)
+            val selected = lsArms(scenario.kind, lsCount, scenario.lsPool, scenario.nodeBudget, facts)
+            if (scenario.kind == Kind.COP && scenario.cores == 1 && scenario.lsPool == null &&
+                facts.profile.scheduling && selected.getOrNull(1)?.label == "cbls-plateau/ils-basin" &&
+                selected.first().label == "cbls/fixed"
+            ) {
+                val primary = LocalSearchWorkerConfig(
+                    LocalSearchCatalog.byLabel("cbls-primary-plateau/ils-basin"),
+                    scenario.nodeBudget,
+                    seedOffset = 1,
+                )
+                listOf(primary) + selected.drop(1)
+            } else {
+                selected
+            }
         } else {
             emptyList()
         }

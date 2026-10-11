@@ -2,7 +2,6 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 
 /**
@@ -32,41 +31,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private var compounds: ArrayList<Move.Compound>? = null
     private var cachedList: List<Move>? = null
     private var elementPreservingProbes: Int = 0
-    private var collectingAlternativeRepairs: Boolean = false
-    private var alternativePrimitives: IntHashSet? = null
-    private var alternativeCompounds: IntHashSet? = null
-
-    internal val hasAlternativeRepairs: Boolean
-        get() = alternativePrimitives?.isEmpty() == false || alternativeCompounds?.isEmpty() == false
-
-    internal fun collectAlternativeRepairs(generate: () -> Unit) {
-        val previous = collectingAlternativeRepairs
-        collectingAlternativeRepairs = true
-        try {
-            generate()
-        } finally {
-            collectingAlternativeRepairs = previous
-        }
-    }
-
-    internal fun isAlternativeRepair(move: Move): Boolean {
-        if (!hasAlternativeRepairs) return false
-        val moves = list
-        for (i in moves.indices) {
-            if (moves[i] !== move) continue
-            return if (i < lane.size) alternativePrimitives?.contains(i) == true else {
-                alternativeCompounds?.contains(i - lane.size) == true
-            }
-        }
-        return false
-    }
-
-    private fun recordAlternativePrimitive() {
-        if (collectingAlternativeRepairs) {
-            val positions = alternativePrimitives ?: IntHashSet().also { alternativePrimitives = it }
-            positions.add(lane.size)
-        }
-    }
+    internal var alternativeRepairs: MoveSink? = null
 
     /** Materialized [Move] view. Stable across reads until the sink is mutated.
      *  Compound moves follow primitives in the iteration order. */
@@ -134,7 +99,6 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     /** Queue a Boolean-flip move on `boolVar`. */
     fun addBoolFlip(varId: Int) {
         if (!allowsBool(varId)) return
-        recordAlternativePrimitive()
         lane.add(encodeBoolFlip(varId))
         valueLane.add(0L)
         cachedList = null
@@ -152,7 +116,6 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     /** Queue an int-set move on `intVar`. */
     fun addIntSet(varId: Int, newValue: Long) {
         if (!allowsInt(varId)) return
-        recordAlternativePrimitive()
         lane.add(encodeIntSet(varId))
         valueLane.add(newValue)
         cachedList = null
@@ -160,7 +123,6 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
     /** Queue a real-set move on `realVar`. Real columns are never pinned, defined or owned. */
     fun addRealSet(varId: Int, newValue: Double) {
-        recordAlternativePrimitive()
         lane.add(encodeRealSet(varId))
         valueLane.add(newValue.toRawBits())
         cachedList = null
@@ -179,10 +141,6 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
             return
         }
         val side = compounds ?: ArrayList<Move.Compound>(2).also { compounds = it }
-        if (collectingAlternativeRepairs) {
-            val positions = alternativeCompounds ?: IntHashSet().also { alternativeCompounds = it }
-            positions.add(side.size)
-        }
         side.add(Move.Compound(kept))
         cachedList = null
     }
@@ -230,9 +188,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         cachedList = null
         proposer = NO_PROPOSER
         elementPreservingProbes = 0
-        collectingAlternativeRepairs = false
-        alternativePrimitives?.clear()
-        alternativeCompounds?.clear()
+        alternativeRepairs = null
     }
 
     /** Channeling-aware variant of [addIntSet]. Asks [state] to synthesize the coordinated

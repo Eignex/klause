@@ -12,6 +12,39 @@ import kotlin.test.assertTrue
 class PortfolioCompositionTest {
 
     @Test
+    fun `scheduled mixed optimization pairs primary and full plateau neighborhoods`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val ordinary = ProblemFacts.assumed(Kind.COP)
+        val scheduling = ProblemFacts(ordinary.profile.copy(scheduling = true)) { true }
+        val baseline = PortfolioComposition.compose(scenario, ordinary).filterIsInstance<LocalSearchWorkerConfig>()
+
+        val paired = PortfolioComposition.compose(scenario, scheduling).filterIsInstance<LocalSearchWorkerConfig>()
+
+        assertEquals("cbls-primary-plateau/ils-basin", paired.first().label)
+        assertEquals("cbls-plateau/ils-basin", paired[1].label)
+        assertEquals(baseline.drop(1).map { it.label }, paired.drop(1).map { it.label })
+        assertEquals(baseline.size, paired.size)
+    }
+
+    @Test
+    fun `explicit parallel and single engine scheduling pools retain their recipes`() {
+        val scenarios = listOf(
+            PortfolioScenario.sequential(Kind.CSP),
+            PortfolioScenario.parallel(4, Kind.COP),
+            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.LOCAL_SEARCH),
+            PortfolioScenario.sequential(Kind.COP).copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
+        )
+        for (scenario in scenarios) {
+            val ordinary = ProblemFacts.assumed(scenario.kind)
+            val scheduling = ProblemFacts(ordinary.profile.copy(scheduling = true)) { true }
+
+            val selected = PortfolioComposition.compose(scenario, scheduling)
+
+            assertEquals(PortfolioComposition.compose(scenario, ordinary).map { it.label }, selected.map { it.label })
+        }
+    }
+
+    @Test
     fun `curated satisfaction root cuts require an explicit override`() {
         for (requested in listOf(null, false, true)) {
             val edit = requested?.let { enabled ->

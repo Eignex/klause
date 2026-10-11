@@ -95,11 +95,11 @@ including proposals generated during reverted repair chains. Cost recomputation 
 it; grading probes do not advance it.
 Additional targets use ordinary index inverse repairs and complete move grading; nested
 Element and literal-channel index definitions retain the first-candidate neighborhood.
-Source-driven strategies retain supplemental repair candidates in their original order
-and noise pool. During score-based selection, an alternative must strictly improve on
-the best surviving primary candidate. Equal or worse alternatives do not enter greedy
-tie breaking; WalkSAT noise still draws from the full bounded repair neighborhood.
-Proposal cursors and collection-wide Element-preserving probe allowances remain shared.
+The primary-repair plateau recipe collects supplemental repairs separately. Productive
+primary candidates retain priority; when none improves the complete score, strictly
+better supplemental candidates enter its score-only pool. Other recipes and direct
+repair consumers retain the complete bounded neighborhood. Recipe copies preserve the
+primary-repair policy.
 
 ### Element results
 

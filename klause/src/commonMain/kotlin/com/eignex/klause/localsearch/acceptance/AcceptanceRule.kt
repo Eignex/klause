@@ -207,7 +207,6 @@ sealed interface AcceptanceRule {
             for (pool in arrayOf(noisePool, scorePool)) {
                 for (m in pool) {
                     val k = key(m)
-                    if (k == Double.POSITIVE_INFINITY) continue
                     if (k < bestKey) {
                         best = m
                         bestKey = k
