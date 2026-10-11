@@ -230,6 +230,14 @@ moves reconcile cost and violated membership from exact post-move degrees. Facto
 and engine projections are separate: the local-search projection supplies an
 `Invariant`, while mutable payloads belong to each `LocalSearchState`.
 
+ArgminJump constructs coordinated integer targets and maintained-Boolean inverse repairs
+through the generic move sink before comparing their complete weighted deltas. Pins,
+definitions and implicit owners filter candidates before ranking. Each sampled coordinate
+contributes at most one strict weighted improvement over staying put; the selected move
+is emitted without regenerating repair alternatives. Small integer domains are enumerated
+and wider domains retain their sampled-target cap. Inverse repairs and Element destination
+variants retain the move sink's existing bounds.
+
 ### Comparison clauses
 
 Comparison-clause integer scores substitute the target in every matching literal,

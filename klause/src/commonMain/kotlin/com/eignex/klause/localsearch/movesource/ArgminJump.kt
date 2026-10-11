@@ -1,25 +1,22 @@
 package com.eignex.klause.localsearch.movesource
 
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 
 /**
- * Feasibility-Jump / ViolationLS candidate generation. Where the step-based sources
- * ([ViolatedRepairs], [Frontier]) propose ±1 / repair-suggested moves, this source jumps a hot-spot
- * variable directly to the value that minimizes the weighted sum of the constraint violations it
- * participates in.
+ * Feasibility-Jump / ViolationLS candidate generation. Selects hot-spot jumps by the complete
+ * weighted violation change of their coordinated assignments.
  *
  * Per call it samples [candidateVars] variables biased toward currently-violated factors (a random
- * violated factor → a random variable of it) and, for each, emits the single best jump:
- *  - int var: the domain value v* minimizing `Σ weight(f)·Δdegree(f)` over the factors f touching
- *    the variable, computed with [LocalSearchState.forEachIntFactorDelta]. Small domains are swept
- *    exactly; wide domains are sampled up to [maxValueTries]. The current value is always a
- *    candidate (Δ = 0), so the emitted jump never increases weighted violation.
- *  - bool var: the flip, emitted only when its weighted violation delta is strictly negative.
+ * violated factor → a random variable of it) and emits the best admissible coordinated move for each:
+ *  - int var: small domains are swept exactly; wide domains are sampled up to [maxValueTries].
+ *    Each target uses channeling and inverse definition repairs through [MoveSink.addChannelingIntSet].
+ *  - bool var: searched variables offer a flip; maintained predicates offer inverse repairs.
  *
- * The jump is scored against the adaptive per-constraint weights in
- * [com.eignex.klause.localsearch.FactorWeightBook.factorWeights];
- * reading it forces the lazy allocation, which is intended for a weighted-violation method.
+ * [LocalSearchState.weightedNetDelta] scores each complete candidate, including maintained outputs,
+ * against the adaptive per-constraint weights. Staying put has delta zero, so only strict weighted
+ * improvements are emitted. The selected move is retained without regenerating its repair alternatives.
  */
 class ArgminJump(
     /** Hot-spot variables sampled (and jumped) per [generate] call. */
@@ -38,7 +35,10 @@ class ArgminJump(
 
     override fun generate(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
-        val weights = state.weights.factorWeights
+        val candidates = MoveSink(state.assumptions).also {
+            it.setInvariants(state.invariants)
+            it.setOwners(state.seeding.ownerInt)
+        }
         repeat(candidateVars) {
             val fid = state.violated.random(state.rng)
             val scope = state.problem.factors[fid]
@@ -46,56 +46,50 @@ class ArgminJump(
             val nBool = scope.boolVars.size
             if (nInt + nBool == 0) return@repeat
             val pick = state.rng.nextInt(nInt + nBool)
+            candidates.clear()
             if (pick < nInt) {
-                emitBestIntJump(state, weights, scope.intVars[pick], sink)
+                collectIntJumps(state, scope.intVars[pick], candidates)
             } else {
-                val v = scope.boolVars[pick - nInt]
-                if (weightedBoolFlipDelta(state, weights, v) < 0.0) sink.addBoolFlip(v)
+                candidates.addChannelingBoolFlip(state, scope.boolVars[pick - nInt])
             }
+            emitBestJump(state, candidates, sink)
         }
     }
 
-    private fun emitBestIntJump(state: LocalSearchState, weights: DoubleArray, v: Int, sink: MoveSink) {
+    private fun collectIntJumps(state: LocalSearchState, v: Int, candidates: MoveSink) {
         val cur = state.assignment.intValue(v)
         val d = state.rootDomains[v]
-        var bestVal = cur
-        // Staying put is the baseline candidate (Δ = 0); a jump is taken only if it strictly beats it.
-        var bestDelta = 0.0
         val few = d.spanOrNull(maxValueTries.toLong())
         if (few != null) {
             for (idx in 0 until few.size) {
-                val candidate = few.valueAt(idx)
-                if (candidate == cur) continue
-                val delta = weightedIntSetDelta(state, weights, v, candidate)
-                if (delta < bestDelta) {
-                    bestDelta = delta
-                    bestVal = candidate
-                }
+                val target = few.valueAt(idx)
+                if (target != cur) candidates.addChannelingIntSet(state, v, target)
             }
         } else {
             repeat(maxValueTries) {
-                val candidate = state.randomIntValue(v)
-                if (candidate == cur) return@repeat
-                val delta = weightedIntSetDelta(state, weights, v, candidate)
-                if (delta < bestDelta) {
-                    bestDelta = delta
-                    bestVal = candidate
-                }
+                val target = state.randomIntValue(v)
+                if (target != cur) candidates.addChannelingIntSet(state, v, target)
             }
         }
-        if (bestVal != cur) sink.addChannelingIntSet(state, v, bestVal)
     }
 
-    private fun weightedIntSetDelta(state: LocalSearchState, weights: DoubleArray, v: Int, newValue: Long): Double {
-        var wd = 0.0
-        state.forEachIntFactorDelta(v, newValue) { fid, delta -> wd += weights[fid] * delta }
-        return wd
-    }
-
-    private fun weightedBoolFlipDelta(state: LocalSearchState, weights: DoubleArray, v: Int): Double {
-        var wd = 0.0
-        state.forEachBoolFactorDelta(v) { fid, delta -> wd += weights[fid] * delta }
-        return wd
+    private fun emitBestJump(state: LocalSearchState, candidates: MoveSink, sink: MoveSink) {
+        var best: Move? = null
+        var bestDelta = 0.0
+        for (i in 0 until candidates.size) {
+            val candidate = candidates.moveAt(i)
+            val delta = state.weightedNetDelta(candidate)
+            if (delta < bestDelta) {
+                bestDelta = delta
+                best = candidate
+            }
+        }
+        when (val move = best ?: return) {
+            is Move.BoolFlip -> sink.addBoolFlip(move.varId)
+            is Move.IntSet -> sink.addIntSet(move.varId, move.newValue)
+            is Move.RealSet -> sink.addRealSet(move.varId, move.newValue)
+            is Move.Compound -> sink.addCompound(move.parts)
+        }
     }
 
     /** Catalog identity and defaults. */
