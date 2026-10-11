@@ -56,7 +56,7 @@ deadline. Probe-call caps do not establish a wall-clock bound.
 
 [PresolveBudget](../../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveBudget.kt)
 owns the phase's deterministic work allowance. Its tokens carry the budget as their work
-meter, so explicit `Cancellation.charge` calls reduce the original allowance. Rebuilding
+meter adapter, so explicit `Cancellation.charge` calls reduce the original allowance. Rebuilding
 a problem does not create another allowance or reset consumed work.
 
 RootBaker records probe calls through the token's `PresolveBudget` meter. Counts include
@@ -66,15 +66,44 @@ count above one tier's cap is not a cap violation by itself. Round entries inclu
 schedule scans and accumulate across source and finite schedules. Neither aggregate is a
 single-pass count.
 
-Probe telemetry is distinct from charged work. The propagation path counts its own
-factor fires without charging them through this token. Retaining the meter preserves the
-charge destination and probe counters; it does not price every construction or
-propagation operation into the phase allowance. Work and timing measurements must retain
-these scope differences.
+Root propagation reports native work through a narrow propagation-owned meter on the
+existing cancellation surface. Presolve owns its conversion: construction entries and
+native propagation work each cost 53 phase units. Construction entries count Boolean,
+integer and real columns, factors, and each factor's structural-key weight. This is a
+deterministic size proxy, including state and projection preparation; it does not count
+allocated bytes or every instruction. Native propagation work is the existing counter
+of factor fires, literal reads and wakeup entries, including native SAT BCP. Internal
+propagator loops without counter increments are outside that proxy.
 
+Every fresh root, probe and repair reports construction once, flushes native counter
+deltas before cancellation polls, and flushes the remainder on return, including seed
+conflicts and propagation conflicts. Repeated polls do not bill the same delta twice.
+A reseed bills its fresh root; an already-baked input does not bill another construction.
+The pipeline has no additional base-bake estimate. CLI effort telemetry retains
+`presolveRootConstructionEntries` and `presolveRootPropagationWork` separately from
+converted `presolveWork` and probe calls, accumulated across the same phase.
+
+A spent work allowance or fired outer token prevents entry into another probe, opposite
+polarity, repair or tier. A completed failed probe retains its proven forcing, bound
+exclusion or hole even when no allowance remains for repair. Conditional deductions
+from a successful or interrupted hypothetical probe are not published. Completed repair
+deductions remain sound if propagation stops before its fixpoint. Boolean probing keeps
+all incoming integer deductions when it returns a partial result.
+
+Construction is mandatory and charged after completion, even under a zero allowance.
+Propagation polls at its existing boundaries (every 256 CP factor fires or native SAT
+trail entries); a single fire, native BCP trail entry or construction can exceed the
+remaining allowance. Final counter flushing can also exhaust the allowance after a
+short fixpoint completes. These weights and polling intervals are not a hard time bound.
+`PresolveBudget(0)` stops optional probing; a phase without a budget adapter has no native
+charges and retains outer cancellation. The CLI's nonpositive budget selects that
+unlimited-work policy. Counters and converted charges saturate at `Long.MAX_VALUE`.
+
+[RootBakerTest](../../klause/src/commonTest/kotlin/com/eignex/klause/presolve/RootBakerTest.kt)
+covers work exhaustion across probing tiers, retained exclusions, repair/reseed billing,
+zero and unlimited allowances, outer cancellation and root conflicts.
 [PresolveSharedTest](../../klause/src/commonTest/kotlin/com/eignex/klause/presolve/PresolveSharedTest.kt)
-covers expired-deadline SAC, probe telemetry across successive rebakes, and charges
-consuming the originating allowance.
+covers inherited phase accounting across rebuilds.
 
 ## Clausal objectives
 
