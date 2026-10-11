@@ -97,7 +97,10 @@ exact LP point certification below the root and for complete Boolean assignments
 at the root. A complete graph witness passes source validation before numerical
 LP work, so pinned local-search completions need no floating guide. If every
 Boolean is published at the root, initialization waits for those publications
-to reach the theory before checking the pinned arithmetic. Bounded potentials from an earlier
+to reach the theory before checking the pinned arithmetic. Pure-real local-search
+completions keep their source rows and Boolean pins, skipping source presolve
+before the selected exact real theory certifies the leaf. Mixed integer/real
+completions retain source preparation. Bounded potentials from an earlier
 feasible graph seed relaxation, which must still settle every active edge. The
 partial root relaxation and inconclusive floating updates retain the full shared LP solve. Graph admission
 is capped at 10,000 real variables and 100,000 edges. Larger models,
