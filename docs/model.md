@@ -113,6 +113,21 @@ and the appended row's unchanged columns and coefficients. Variables owned by
 an open theory never become finite CP domains. Continuous coordinates remain
 arithmetic-owned and are not integer branch candidates.
 
+`PreparedSourcePlan.capabilities` reduces the execution contracts captured on its
+components. `admission(strategy, operation)` reports participating arms, procedure
+completeness, worker claim authority and explicit unsupported causes. Complete
+integer traversal may remain nonterminating; nonlinear integer candidate traversal
+retains its incomplete guarantee. LS and ALNS offer checked witnesses only.
+A mixed strategy exposes its admitted siblings and their individual declines.
+Resource exhaustion belongs to invocation results, rather than build-time admission.
+
+`withObjective` captures linear or exact quadratic operation data without reselecting
+source ownership. Unsupported objectives do not erase supported satisfaction.
+Finite counting and accurate sampling use complete cells independently of the
+sampling backend. Their real coordinates remain existential. Native polynomial and
+nonlinear requests have no enumeration, count or sampling surface solely because a
+finite projection exists. A relaxation supplies no omitted source check or operation.
+
 Built-in factor execution capabilities are declared by
 `solver/FactorExecutionCapabilities.kt`, outside `ir`. The declarations distinguish
 unsupported routes, deliberate inertness, filtering strength, complete assignment

@@ -2,11 +2,14 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealProduct
-import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.NonlinearIntegerProblem
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.solver.objective.LinearObjective
 
 /** Execution data selected from a source, before any mutable search state is allocated. */
@@ -49,6 +52,8 @@ class ExecutionComponentDescriptor internal constructor(
     integerCoordinates: List<Int>,
     realCoordinates: List<Int>,
     booleanCoordinates: List<Int> = emptyList(),
+    internal val execution: ComponentExecutionContract = unavailableContract(
+        ExecutionDeclineCause.SOURCE_COMPLETION, semantics),
 ) {
     private val factors = factorIndices.toList()
     private val integers = integerCoordinates.toList()
@@ -115,6 +120,11 @@ class PreparedSourcePlan internal constructor(
     val decline: PreparedPlanDecline? = null,
     integerCoordinates: List<Int> = (0 until sourceIntCount).toList(),
     realCoordinates: List<Int> = (0 until sourceRealCount).toList(),
+    private val operations: Set<ExecutionOperation> = sourceOperations,
+    /** Exact quadratic source objective captured for this operation, or null. */
+    val quadraticObjective: QuadraticObjectiveSpec? = null,
+    /** Direction of [quadraticObjective]. */
+    val quadraticSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
 ) {
     private val descriptions = components.toList()
     private val integerMapping = integerCoordinates.toList()
@@ -123,6 +133,54 @@ class PreparedSourcePlan internal constructor(
     init {
         require(integerMapping.size == sourceIntCount && realMapping.size == sourceRealCount)
     }
+
+    /** Operation and strategy admission derived from this plan's installed component contracts. */
+    val capabilities: ExecutionCapabilities = ExecutionCapabilities(descriptions, operations, objectiveSupported())
+
+    private fun objectiveSupported(): Boolean {
+        if (quadraticObjective != null) {
+            return (polynomialModel != null || kind == PreparedExecutionKind.NONLINEAR_INTEGER) &&
+                quadraticObjective.terms.all { term -> listOfNotNull(term.first, term.second).all { variable ->
+                    when (variable) {
+                        is QuadraticVariable.Bool -> variable.id.index in 0 until sourceBoolCount
+                        is QuadraticVariable.Int -> variable.id.index in 0 until sourceIntCount
+                        is QuadraticVariable.Real -> variable.id.index in 0 until sourceRealCount
+                    }
+                } }
+        }
+        val linear = objective ?: return false
+        if (linear.realCoefficientValues.any { !it.isFinite() } ||
+            linear.realCoefficientValues.size > sourceRealCount || linear.intCoefficientValues.size > sourceIntCount ||
+            linear.boolWeightValues.size > sourceBoolCount
+        ) return false
+        if (kind == PreparedExecutionKind.NONLINEAR_INTEGER) return false
+        return polynomialModel == null || linear.realCoefficientValues.none { it != 0.0 }
+    }
+
+    /** Bind an immutable linear objective without reselecting source ownership. */
+    fun withObjective(objective: LinearObjective, maximize: Boolean = false): PreparedSourcePlan = PreparedSourcePlan(
+        originalSource, model, reboundKind(), componentPlan, polynomialModel, descriptions,
+        sourceBoolCount, sourceIntCount, sourceRealCount, objective, maximize, structuralDecline(),
+        integerMapping, realMapping, operations,
+    )
+
+    /** Bind an exact quadratic objective while preserving source coordinate mappings and completion. */
+    fun withObjective(
+        objective: QuadraticObjectiveSpec,
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    ): PreparedSourcePlan = PreparedSourcePlan(
+        originalSource, model, reboundKind(), componentPlan, polynomialModel, descriptions,
+        sourceBoolCount, sourceIntCount, sourceRealCount, decline = structuralDecline(),
+        integerCoordinates = integerMapping, realCoordinates = realMapping, operations = operations,
+        quadraticObjective = objective, quadraticSense = sense,
+    )
+
+    private fun structuralDecline(): PreparedPlanDecline? =
+        decline.takeUnless { it == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE }
+
+    private fun reboundKind(): PreparedExecutionKind = if (
+        decline == PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE && polynomialModel != null
+    ) PreparedExecutionKind.POLYNOMIAL else kind
 
     /** Independent component list whose values own their coordinate and factor lists. */
     val components: List<ExecutionComponentDescriptor> get() = descriptions.toList()
@@ -198,23 +256,40 @@ internal fun Problem.preparedWithComponents(
     maximize: Boolean = false,
 ): PreparedSourcePlan {
     ownership.requireSource(this)
+    val finiteFactors = factors.indices.filter { ownership.factorOwner(it) == FactorOwner.CP }
+    val sharedFactors = factors.indices.filter { ownership.factorOwner(it) == FactorOwner.SHARED }
+    val theoryFactors = factors.indices.filter { ownership.factorOwner(it) == FactorOwner.THEORY }
+    val finiteIntegers = ownership.cpIntVars.toList()
+    val completion = when (ownership.theoryPipeline) {
+        ProblemPipeline.EXACT_LRA -> checkedCompletionContract(ProcedureCompleteness.DECISION)
+        ProblemPipeline.EXACT_LIRA -> checkedCompletionContract(ProcedureCompleteness.EXHAUSTIVE)
+        ProblemPipeline.DIFFERENCE_THEORY -> checkedCompletionContract(ProcedureCompleteness.EXHAUSTIVE)
+        ProblemPipeline.FINITE_CP -> if (finiteRealCompletionSupported()) {
+            checkedCompletionContract(ProcedureCompleteness.DECISION)
+        } else unavailableContract(ExecutionDeclineCause.SOURCE_COMPLETION, "finite-real")
+        ProblemPipeline.UNSUPPORTED_OPEN -> unplacedArithmeticContract()
+    }
+    val completionNeeded = ownership.hasTheoryComponent || numRealVars != 0
+    val completeSource = !completionNeeded || completion.support(ExecutionStrategy.COMPLETE).runnable
+    val finite = finiteComponentContract(finiteFactors, finiteIntegers, ownership, completeSource,
+        ownership.hasTheoryComponent && ownership.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN)
     val descriptors = listOf(
-        ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE,
-            factors.indices.filter { ownership.factorOwner(it) == FactorOwner.CP },
-            ownership.cpIntVars.toList(), emptyList()),
-        ExecutionComponentDescriptor("boolean", ComponentResponsibility.BOOLEAN,
-            factors.indices.filter { ownership.factorOwner(it) == FactorOwner.SHARED }, emptyList(), emptyList(),
-            (0 until numBoolVars).toList()),
-        ExecutionComponentDescriptor(ownership.theoryPipeline.name, ComponentResponsibility.COMPLETION,
-            factors.indices.filter { ownership.factorOwner(it) == FactorOwner.THEORY },
-            ownership.theoryIntVars.toList(), (0 until numRealVars).toList()),
-    ).filter { it.factorIndices.isNotEmpty() || it.booleanCoordinates.isNotEmpty() ||
+        ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteFactors,
+            finiteIntegers, emptyList(), execution = finite),
+        ExecutionComponentDescriptor("boolean", ComponentResponsibility.BOOLEAN, sharedFactors,
+            emptyList(), emptyList(), (0 until numBoolVars).toList(),
+            checkedCompletionContract(ProcedureCompleteness.DECISION)),
+        ExecutionComponentDescriptor("arithmetic", ComponentResponsibility.COMPLETION, theoryFactors,
+            ownership.theoryIntVars.toList(), (0 until numRealVars).toList(), execution = completion),
+    ).filter { it.responsibility == ComponentResponsibility.FINITE ||
+        it.factorIndices.isNotEmpty() || it.booleanCoordinates.isNotEmpty() ||
         it.integerCoordinates.isNotEmpty() || it.realCoordinates.isNotEmpty() }
     return PreparedSourcePlan(original, this, PreparedExecutionKind.FINITE_LINEAR, ownership, null, descriptors,
         original.numBoolVars, original.numIntVars, original.numRealVars, objective, maximize,
         PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT.takeIf {
             ownership.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN
-        })
+        }, operations = if (ownership.hasTheoryComponent) sourceOperations else finiteOperations)
+
 }
 
 internal fun Problem.preparePolynomialExecutionPlan(
@@ -236,9 +311,13 @@ internal fun Problem.preparePolynomialExecutionPlan(
     val boundedIntegers = (0 until numIntVars).filter { intBounds.hasLower(it) && intBounds.hasUpper(it) }
     val descriptors = listOf(
         ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteFactors,
-            boundedIntegers, emptyList(), (0 until numBoolVars).toList()),
+            boundedIntegers, emptyList(), (0 until numBoolVars).toList(),
+            finiteComponentContract(finiteFactors, boundedIntegers, null, polynomial != null,
+                exactNeighborhood = false)),
         ExecutionComponentDescriptor("polynomial-real", ComponentResponsibility.COMPLETION,
-            factors.indices.filter { it !in finiteFactors }, emptyList(), (0 until numRealVars).toList()),
+            factors.indices.filter { it !in finiteFactors }, emptyList(), (0 until numRealVars).toList(),
+            execution = if (polynomial != null) checkedCompletionContract(ProcedureCompleteness.DECISION)
+            else unavailableContract(ExecutionDeclineCause.PREPARATION, "polynomial-real", cause)),
     ) + if (openInteger) listOf(ExecutionComponentDescriptor("unplaced-polynomial-integer",
         ComponentResponsibility.UNPLACED, emptyList(),
         (0 until numIntVars).filter { it !in boundedIntegers }, emptyList()))
@@ -263,7 +342,10 @@ fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = Prepare
     this, null, PreparedExecutionKind.NONLINEAR_INTEGER, null, null,
     listOf(ExecutionComponentDescriptor("polynomial-integer", ComponentResponsibility.COMPLETION,
         emptyList(), integerCoordinates, (0 until numericCount).filter { it !in integerCoordinates },
-        (0 until boolCount).toList())),
+        (0 until boolCount).toList(), checkedCompletionContract(ProcedureCompleteness.WITNESS_SEARCH,
+            setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION,
+                ExecutionClaimAuthority.OBJECTIVE_BOUND, ExecutionClaimAuthority.OPTIMALITY,
+                ExecutionClaimAuthority.UNBOUNDEDNESS)))),
     boolCount, integerCoordinates.size, realCoordinates.size,
     integerCoordinates = integerCoordinates, realCoordinates = realCoordinates,
 )

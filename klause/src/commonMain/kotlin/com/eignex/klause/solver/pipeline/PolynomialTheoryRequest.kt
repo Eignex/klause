@@ -129,6 +129,11 @@ fun OpenTheoryPipeline.minimize(
     engine: FiniteEngine = FiniteEngine.MIXED,
 ): PolynomialOptimizationExecution {
     val stop = params.timeout or params.cancellation
+    val operation = request.preparedPlan.withObjective(objective)
+    if (!operation.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable) {
+        return PolynomialOptimizationExecution(MinimizeResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
+            PolynomialTheoryStats())
+    }
     val shared = request.resolvedModel()
     val invocation = shared.service.invocation(QfNraParams(
         stop, params.maximumWork,
@@ -187,6 +192,9 @@ fun OpenTheoryPipeline.execute(
             stats,
         )
     val source = request.problem
+    if (!request.preparedPlan.capabilities.admission(engine).runnable) {
+        return incomplete(TerminationReason.Unsupported, PolynomialTheoryStats(), SolveStats.EMPTY)
+    }
     val shared = request.resolvedModel()
     val invocation = shared.service.invocation(QfNraParams(
         stop, params.maximumWork,
