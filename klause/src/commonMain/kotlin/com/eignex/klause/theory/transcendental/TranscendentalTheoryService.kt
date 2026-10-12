@@ -153,6 +153,18 @@ internal class TranscendentalTheoryService(
             }
             certify(proposed, bools, condition)?.let { return TranscendentalCheckResult.Witness(it) }
         }
+        val algebraicProposal = solveQfNra(
+            PolynomialRealFormula.And(listOf(polynomialProposal(source.formula, transcendental)) + strict),
+            source.boolCount, source.numericCount, QfNraParams(stop, 4096, polynomialLimits), pins,
+        )
+        if (algebraicProposal is QfNraResult.Satisfiable) {
+            val proposed = List(source.numericCount) { id ->
+                arithmetic.scalar(algebraicProposal.assignment.realValue(id))
+            }
+            certify(proposed, algebraicProposal.assignment.bools, condition)?.let {
+                return TranscendentalCheckResult.Witness(it)
+            }
+        }
         val hints = listOf(0L, 1L, -1L, 2L, -2L, 4L, -4L, 8L)
         for (attempt in 0 until minOf(maximumProposals, hints.size)) {
             transcendental.step()

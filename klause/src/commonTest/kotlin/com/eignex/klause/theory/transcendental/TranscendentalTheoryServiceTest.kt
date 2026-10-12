@@ -112,6 +112,23 @@ class TranscendentalTheoryServiceTest {
         assertEquals(TranscendentalCheckResult.Refuted, result)
     }
 
+    @Test
+    fun `polynomial completion retains algebraic inputs to symbolic functions`() {
+        val x = TranscendentalExpression.Variable(SourceRealId(0))
+        val y = TranscendentalExpression.Variable(SourceRealId(1))
+        val source = TranscendentalProblem(TranscendentalFormula.And(listOf(
+            atom(TranscendentalExpression.Power(x, 2), PolynomialRelation.EQ, constant(2)),
+            atom(x, PolynomialRelation.GT, constant(0)),
+            atom(y, PolynomialRelation.EQ, TranscendentalExpression.Function(TranscendentalFunction.EXP, x)),
+        )), emptyMap(), mapOf("x" to 0, "y" to 1), emptyMap())
+
+        val result = TranscendentalTheoryService(source).check()
+
+        val witness = assertIs<TranscendentalCheckResult.Witness>(result).value
+        assertEquals(2, witness.reals.size)
+        assertNull(witness.reals[1].algebraic)
+    }
+
     private fun atom(
         left: TranscendentalExpression,
         relation: PolynomialRelation,
