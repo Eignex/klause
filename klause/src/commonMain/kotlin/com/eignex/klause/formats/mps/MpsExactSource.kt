@@ -132,7 +132,9 @@ private fun MpsModel.integralSourceObjective(
         if (column.real) return null
         coefficients[column.id] += numbers.objectiveCoefficients[entry].fraction
     }
-    if (coefficients.any { it.den != BIG_ONE || !it.num.fitsLong() || it.num.toLongExact() == Long.MIN_VALUE }) return null
+    if (coefficients.any { it.den != BIG_ONE || !it.num.fitsLong() || it.num.toLongExact() == Long.MIN_VALUE }) {
+        return null
+    }
     return LinearObjectiveSpec(intCoefficients = LongArray(intCount) { coefficients[it].num.toLongExact() },
         constant = constant.num.toLongExact())
 }

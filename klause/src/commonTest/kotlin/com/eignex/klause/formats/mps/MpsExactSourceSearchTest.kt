@@ -97,7 +97,11 @@ class MpsExactSourceSearchTest {
 
         val unbounded = assertIs<OpenTheoryOptimum.Unbounded>(assertIs<OpenTheoryExecution.Optimize>(execution).result)
         val values = source.columns.map { column ->
-            val text = if (column.real) unbounded.witness.realValue(column.id) else unbounded.witness.intValue(column.id)
+            val text = if (column.real) {
+                unbounded.witness.realValue(column.id)
+            } else {
+                unbounded.witness.intValue(column.id)
+            }
             val parts = text.split('/')
             BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
         }
