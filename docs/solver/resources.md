@@ -51,6 +51,7 @@ bootstrap slices retain the containing lifetime scope and rearm their invocation
 | Open-theory limits | Open policy work, leaves and decisions, retained complete theory scope | `Long.MAX_VALUE` / exhausted scope | Unknown budget exhaustion; completed proofs only |
 | `QfNraParams.maximumWork` | Native normalization, CAD and Boolean work, one invocation | Null / zero prevents entry | Unknown before verdict publication |
 | Nonlinear integer candidate/move controls | Exact candidate attempts and heuristic moves, one pipeline invocation | Long maximum / zero prevents that stage | UNKNOWN; candidate exhaustion supplies no proof |
+| `PolynomialTheoryParams.maximumWork` for quadratic execution | One invocation: counted polynomial work plus numerical proposals and exact certification | Null / zero prevents entry | Incomplete result can retain a checked incumbent or independent global bound |
 | Neutral kernel controls | Caller-owned native work, optional maximum and cancellation | Missing maximum / zero maximum is exhausted | Kernel interruption without solver result semantics |
 
 Local-search initial preparation retains its progress between cancelled invocations.

@@ -10241,6 +10241,31 @@ public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
 	public static final fun sourceRoute (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 }
 
+public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecution {
+	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;
+	public final fun component2 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;
+	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNativeWork ()J
+	public final fun getNumericalWork ()J
+	public final fun getPolynomialStats ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
+	public final fun getResource ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;
+	public final fun getResult ()Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecutionKt {
+	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+}
+
 public abstract interface class com/eignex/klause/solver/pipeline/SourceProblemRoute {
 }
 
@@ -11268,6 +11293,164 @@ public final class com/eignex/klause/solver/result/PresolveStats {
 	public final fun getPasses ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticCertificate {
+	public final fun getClaim ()Lcom/eignex/klause/solver/result/QuadraticClaim;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticClaim : java/lang/Enum {
+	public static final field Bound Lcom/eignex/klause/solver/result/QuadraticClaim;
+	public static final field Infeasible Lcom/eignex/klause/solver/result/QuadraticClaim;
+	public static final field Optimal Lcom/eignex/klause/solver/result/QuadraticClaim;
+	public static final field UnattainedLimit Lcom/eignex/klause/solver/result/QuadraticClaim;
+	public static final field Unbounded Lcom/eignex/klause/solver/result/QuadraticClaim;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/result/QuadraticClaim;
+	public static fun values ()[Lcom/eignex/klause/solver/result/QuadraticClaim;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticIncumbent {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
+	public final fun component2 ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public final fun getValue ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticObjectiveBound {
+	public fun <init> (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;ZLcom/eignex/klause/solver/result/QuadraticCertificate;)V
+	public final fun component1 ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public final fun component2 ()Z
+	public final fun component3 ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public final fun copy (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;ZLcom/eignex/klause/solver/result/QuadraticCertificate;)Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;ZLcom/eignex/klause/solver/result/QuadraticCertificate;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCertificate ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public final fun getStrict ()Z
+	public final fun getValue ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/result/QuadraticOptimizationResult {
+	public abstract fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticOptimizationResult$BestFound : com/eignex/klause/solver/result/QuadraticOptimizationResult$WithIncumbent {
+	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public final fun component3 ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public final fun component4 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun component5 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$BestFound;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$BestFound;Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$BestFound;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBound ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public fun getIncumbent ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticOptimizationResult$Infeasible : com/eignex/klause/solver/result/QuadraticOptimizationResult {
+	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public final fun component2 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Infeasible;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Infeasible;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Infeasible;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCertificate ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal : com/eignex/klause/solver/result/QuadraticOptimizationResult$WithIncumbent {
+	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public final fun component3 ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public final fun component4 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun component5 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal;Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBound ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public final fun getCertificate ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public fun getIncumbent ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticOptimizationResult$UnattainedLimit : com/eignex/klause/solver/result/QuadraticOptimizationResult$WithIncumbent {
+	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public final fun component3 ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public final fun component4 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun component5 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$UnattainedLimit;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$UnattainedLimit;Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$UnattainedLimit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBound ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public final fun getCertificate ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public fun getIncumbent ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticOptimizationResult$Unbounded : com/eignex/klause/solver/result/QuadraticOptimizationResult$WithIncumbent {
+	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public final fun component3 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Unbounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Unbounded;Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Unbounded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCertificate ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
+	public fun getIncumbent ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
+	public fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/QuadraticOptimizationResult$Unknown : com/eignex/klause/solver/result/QuadraticOptimizationResult {
+	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public final fun component3 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Unknown;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Unknown;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBound ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
+	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/result/QuadraticOptimizationResult$WithIncumbent : com/eignex/klause/solver/result/QuadraticOptimizationResult {
+	public abstract fun getIncumbent ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
 }
 
 public final class com/eignex/klause/solver/result/RunStats {

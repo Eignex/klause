@@ -584,6 +584,20 @@ final enum class com.eignex.klause.solver.pipeline/VarSelectorKind : kotlin/Enum
     }
 }
 
+final enum class com.eignex.klause.solver.result/QuadraticClaim : kotlin/Enum<com.eignex.klause.solver.result/QuadraticClaim> { // com.eignex.klause.solver.result/QuadraticClaim|null[0]
+    enum entry Bound // com.eignex.klause.solver.result/QuadraticClaim.Bound|null[0]
+    enum entry Infeasible // com.eignex.klause.solver.result/QuadraticClaim.Infeasible|null[0]
+    enum entry Optimal // com.eignex.klause.solver.result/QuadraticClaim.Optimal|null[0]
+    enum entry UnattainedLimit // com.eignex.klause.solver.result/QuadraticClaim.UnattainedLimit|null[0]
+    enum entry Unbounded // com.eignex.klause.solver.result/QuadraticClaim.Unbounded|null[0]
+
+    final val entries // com.eignex.klause.solver.result/QuadraticClaim.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.result/QuadraticClaim> // com.eignex.klause.solver.result/QuadraticClaim.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.result/QuadraticClaim // com.eignex.klause.solver.result/QuadraticClaim.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.result/QuadraticClaim> // com.eignex.klause.solver.result/QuadraticClaim.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.solver.result/SharingChannel : kotlin/Enum<com.eignex.klause.solver.result/SharingChannel> { // com.eignex.klause.solver.result/SharingChannel|null[0]
     enum entry Bounds // com.eignex.klause.solver.result/SharingChannel.Bounds|null[0]
     enum entry Clauses // com.eignex.klause.solver.result/SharingChannel.Clauses|null[0]
@@ -3002,6 +3016,156 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Unknown.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Unknown.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Unknown.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.eignex.klause.solver.result/QuadraticOptimizationResult { // com.eignex.klause.solver.result/QuadraticOptimizationResult|null[0]
+    abstract val sense // com.eignex.klause.solver.result/QuadraticOptimizationResult.sense|{}sense[0]
+        abstract fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.sense.<get-sense>|<get-sense>(){}[0]
+    abstract val stats // com.eignex.klause.solver.result/QuadraticOptimizationResult.stats|{}stats[0]
+        abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.stats.<get-stats>|<get-stats>(){}[0]
+
+    sealed interface WithIncumbent : com.eignex.klause.solver.result/QuadraticOptimizationResult { // com.eignex.klause.solver.result/QuadraticOptimizationResult.WithIncumbent|null[0]
+        abstract val incumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.WithIncumbent.incumbent|{}incumbent[0]
+            abstract fun <get-incumbent>(): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.WithIncumbent.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
+    }
+
+    final class BestFound : com.eignex.klause.solver.result/QuadraticOptimizationResult.WithIncumbent { // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound|null[0]
+        constructor <init>(com.eignex.klause.solver.result/QuadraticIncumbent, com.eignex.klause.solver.result/QuadraticObjectiveBound?, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.ir/ObjectiveSense, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.<init>|<init>(com.eignex.klause.solver.result.QuadraticIncumbent;com.eignex.klause.solver.result.QuadraticObjectiveBound?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val bound // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.bound|{}bound[0]
+            final fun <get-bound>(): com.eignex.klause.solver.result/QuadraticObjectiveBound? // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.bound.<get-bound>|<get-bound>(){}[0]
+        final val incumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.incumbent|{}incumbent[0]
+            final fun <get-incumbent>(): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
+        final val reason // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.reason|{}reason[0]
+            final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.reason.<get-reason>|<get-reason>(){}[0]
+        final val sense // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.sense|{}sense[0]
+            final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.sense.<get-sense>|<get-sense>(){}[0]
+        final val stats // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/QuadraticObjectiveBound? // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.component3|component3(){}[0]
+        final fun component4(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.component4|component4(){}[0]
+        final fun component5(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.component5|component5(){}[0]
+        final fun copy(com.eignex.klause.solver.result/QuadraticIncumbent = ..., com.eignex.klause.solver.result/QuadraticObjectiveBound? = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.copy|copy(com.eignex.klause.solver.result.QuadraticIncumbent;com.eignex.klause.solver.result.QuadraticObjectiveBound?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.result/QuadraticOptimizationResult.BestFound.toString|toString(){}[0]
+    }
+
+    final class Infeasible : com.eignex.klause.solver.result/QuadraticOptimizationResult { // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible|null[0]
+        constructor <init>(com.eignex.klause.solver.result/QuadraticCertificate, com.eignex.klause.ir/ObjectiveSense, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.<init>|<init>(com.eignex.klause.solver.result.QuadraticCertificate;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val certificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.certificate|{}certificate[0]
+            final fun <get-certificate>(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.certificate.<get-certificate>|<get-certificate>(){}[0]
+        final val sense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.sense|{}sense[0]
+            final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.sense.<get-sense>|<get-sense>(){}[0]
+        final val stats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.result/QuadraticCertificate = ..., com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.copy|copy(com.eignex.klause.solver.result.QuadraticCertificate;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.result/QuadraticOptimizationResult.Infeasible.toString|toString(){}[0]
+    }
+
+    final class Optimal : com.eignex.klause.solver.result/QuadraticOptimizationResult.WithIncumbent { // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal|null[0]
+        constructor <init>(com.eignex.klause.solver.result/QuadraticIncumbent, com.eignex.klause.solver.result/QuadraticObjectiveBound, com.eignex.klause.solver.result/QuadraticCertificate, com.eignex.klause.ir/ObjectiveSense, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.<init>|<init>(com.eignex.klause.solver.result.QuadraticIncumbent;com.eignex.klause.solver.result.QuadraticObjectiveBound;com.eignex.klause.solver.result.QuadraticCertificate;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val bound // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.bound|{}bound[0]
+            final fun <get-bound>(): com.eignex.klause.solver.result/QuadraticObjectiveBound // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.bound.<get-bound>|<get-bound>(){}[0]
+        final val certificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.certificate|{}certificate[0]
+            final fun <get-certificate>(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.certificate.<get-certificate>|<get-certificate>(){}[0]
+        final val incumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.incumbent|{}incumbent[0]
+            final fun <get-incumbent>(): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
+        final val sense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.sense|{}sense[0]
+            final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.sense.<get-sense>|<get-sense>(){}[0]
+        final val stats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/QuadraticObjectiveBound // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.component3|component3(){}[0]
+        final fun component4(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.component4|component4(){}[0]
+        final fun component5(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.component5|component5(){}[0]
+        final fun copy(com.eignex.klause.solver.result/QuadraticIncumbent = ..., com.eignex.klause.solver.result/QuadraticObjectiveBound = ..., com.eignex.klause.solver.result/QuadraticCertificate = ..., com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.copy|copy(com.eignex.klause.solver.result.QuadraticIncumbent;com.eignex.klause.solver.result.QuadraticObjectiveBound;com.eignex.klause.solver.result.QuadraticCertificate;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.result/QuadraticOptimizationResult.Optimal.toString|toString(){}[0]
+    }
+
+    final class UnattainedLimit : com.eignex.klause.solver.result/QuadraticOptimizationResult.WithIncumbent { // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit|null[0]
+        constructor <init>(com.eignex.klause.solver.result/QuadraticIncumbent, com.eignex.klause.solver.result/QuadraticObjectiveBound, com.eignex.klause.solver.result/QuadraticCertificate, com.eignex.klause.ir/ObjectiveSense, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.<init>|<init>(com.eignex.klause.solver.result.QuadraticIncumbent;com.eignex.klause.solver.result.QuadraticObjectiveBound;com.eignex.klause.solver.result.QuadraticCertificate;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val bound // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.bound|{}bound[0]
+            final fun <get-bound>(): com.eignex.klause.solver.result/QuadraticObjectiveBound // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.bound.<get-bound>|<get-bound>(){}[0]
+        final val certificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.certificate|{}certificate[0]
+            final fun <get-certificate>(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.certificate.<get-certificate>|<get-certificate>(){}[0]
+        final val incumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.incumbent|{}incumbent[0]
+            final fun <get-incumbent>(): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
+        final val sense // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.sense|{}sense[0]
+            final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.sense.<get-sense>|<get-sense>(){}[0]
+        final val stats // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/QuadraticObjectiveBound // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.component3|component3(){}[0]
+        final fun component4(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.component4|component4(){}[0]
+        final fun component5(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.component5|component5(){}[0]
+        final fun copy(com.eignex.klause.solver.result/QuadraticIncumbent = ..., com.eignex.klause.solver.result/QuadraticObjectiveBound = ..., com.eignex.klause.solver.result/QuadraticCertificate = ..., com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.copy|copy(com.eignex.klause.solver.result.QuadraticIncumbent;com.eignex.klause.solver.result.QuadraticObjectiveBound;com.eignex.klause.solver.result.QuadraticCertificate;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.result/QuadraticOptimizationResult.UnattainedLimit.toString|toString(){}[0]
+    }
+
+    final class Unbounded : com.eignex.klause.solver.result/QuadraticOptimizationResult.WithIncumbent { // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded|null[0]
+        constructor <init>(com.eignex.klause.solver.result/QuadraticIncumbent, com.eignex.klause.solver.result/QuadraticCertificate, com.eignex.klause.ir/ObjectiveSense, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.<init>|<init>(com.eignex.klause.solver.result.QuadraticIncumbent;com.eignex.klause.solver.result.QuadraticCertificate;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val certificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.certificate|{}certificate[0]
+            final fun <get-certificate>(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.certificate.<get-certificate>|<get-certificate>(){}[0]
+        final val incumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.incumbent|{}incumbent[0]
+            final fun <get-incumbent>(): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
+        final val sense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.sense|{}sense[0]
+            final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.sense.<get-sense>|<get-sense>(){}[0]
+        final val stats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.component3|component3(){}[0]
+        final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.component4|component4(){}[0]
+        final fun copy(com.eignex.klause.solver.result/QuadraticIncumbent = ..., com.eignex.klause.solver.result/QuadraticCertificate = ..., com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.copy|copy(com.eignex.klause.solver.result.QuadraticIncumbent;com.eignex.klause.solver.result.QuadraticCertificate;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unbounded.toString|toString(){}[0]
+    }
+
+    final class Unknown : com.eignex.klause.solver.result/QuadraticOptimizationResult { // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown|null[0]
+        constructor <init>(com.eignex.klause.solver.result/QuadraticObjectiveBound?, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.ir/ObjectiveSense, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.QuadraticObjectiveBound?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val bound // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.bound|{}bound[0]
+            final fun <get-bound>(): com.eignex.klause.solver.result/QuadraticObjectiveBound? // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.bound.<get-bound>|<get-bound>(){}[0]
+        final val reason // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.reason|{}reason[0]
+            final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
+        final val sense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.sense|{}sense[0]
+            final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.sense.<get-sense>|<get-sense>(){}[0]
+        final val stats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/QuadraticObjectiveBound? // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.component3|component3(){}[0]
+        final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.component4|component4(){}[0]
+        final fun copy(com.eignex.klause.solver.result/QuadraticObjectiveBound? = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.copy|copy(com.eignex.klause.solver.result.QuadraticObjectiveBound?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.result/QuadraticOptimizationResult.Unknown.toString|toString(){}[0]
     }
 }
 
@@ -11316,6 +11480,31 @@ final class com.eignex.klause.solver.pipeline/PortfolioPlanRequest { // com.eign
         final fun <get-zeroObjectivePricing>(): com.eignex.klause.lp.engine/LpZeroObjectivePricing // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.zeroObjectivePricing.<get-zeroObjectivePricing>|<get-zeroObjectivePricing>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution { // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution|null[0]
+    constructor <init>(com.eignex.klause.solver.result/QuadraticOptimizationResult, com.eignex.klause.solver.pipeline/PolynomialTheoryStats, kotlin/Long, kotlin/Long, com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...) // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.<init>|<init>(com.eignex.klause.solver.result.QuadraticOptimizationResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;kotlin.Long;kotlin.Long;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+
+    final val nativeWork // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.nativeWork|{}nativeWork[0]
+        final fun <get-nativeWork>(): kotlin/Long // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.nativeWork.<get-nativeWork>|<get-nativeWork>(){}[0]
+    final val numericalWork // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.numericalWork|{}numericalWork[0]
+        final fun <get-numericalWork>(): kotlin/Long // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.numericalWork.<get-numericalWork>|<get-numericalWork>(){}[0]
+    final val polynomialStats // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.polynomialStats|{}polynomialStats[0]
+        final fun <get-polynomialStats>(): com.eignex.klause.solver.pipeline/PolynomialTheoryStats // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.polynomialStats.<get-polynomialStats>|<get-polynomialStats>(){}[0]
+    final val resource // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.resource|{}resource[0]
+        final fun <get-resource>(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.resource.<get-resource>|<get-resource>(){}[0]
+    final val result // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.result|{}result[0]
+        final fun <get-result>(): com.eignex.klause.solver.result/QuadraticOptimizationResult // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.result.<get-result>|<get-result>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver.result/QuadraticOptimizationResult // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.solver.pipeline/PolynomialTheoryStats // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component2|component2(){}[0]
+    final fun component3(): kotlin/Long // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component3|component3(){}[0]
+    final fun component4(): kotlin/Long // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component4|component4(){}[0]
+    final fun component5(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.component5|component5(){}[0]
+    final fun copy(com.eignex.klause.solver.result/QuadraticOptimizationResult = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryStats = ..., kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.copy|copy(com.eignex.klause.solver.result.QuadraticOptimizationResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;kotlin.Long;kotlin.Long;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klause.solver.pipeline/TheoryParams|null[0]
     constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.backtrack/NodeBudget? = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.backtrack.NodeBudget?){}[0]
 
@@ -12372,6 +12561,46 @@ final class com.eignex.klause.solver.result/PresolveStats { // com.eignex.klause
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/PresolveStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/PresolveStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/PresolveStats.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.result/QuadraticCertificate { // com.eignex.klause.solver.result/QuadraticCertificate|null[0]
+    final val claim // com.eignex.klause.solver.result/QuadraticCertificate.claim|{}claim[0]
+        final fun <get-claim>(): com.eignex.klause.solver.result/QuadraticClaim // com.eignex.klause.solver.result/QuadraticCertificate.claim.<get-claim>|<get-claim>(){}[0]
+}
+
+final class com.eignex.klause.solver.result/QuadraticIncumbent { // com.eignex.klause.solver.result/QuadraticIncumbent|null[0]
+    constructor <init>(com.eignex.klause.solver/Sample, com.eignex.klause.arithmetic.polynomial/AlgebraicReal) // com.eignex.klause.solver.result/QuadraticIncumbent.<init>|<init>(com.eignex.klause.solver.Sample;com.eignex.klause.arithmetic.polynomial.AlgebraicReal){}[0]
+
+    final val sample // com.eignex.klause.solver.result/QuadraticIncumbent.sample|{}sample[0]
+        final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/QuadraticIncumbent.sample.<get-sample>|<get-sample>(){}[0]
+    final val value // com.eignex.klause.solver.result/QuadraticIncumbent.value|{}value[0]
+        final fun <get-value>(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal // com.eignex.klause.solver.result/QuadraticIncumbent.value.<get-value>|<get-value>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/QuadraticIncumbent.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal // com.eignex.klause.solver.result/QuadraticIncumbent.component2|component2(){}[0]
+    final fun copy(com.eignex.klause.solver/Sample = ..., com.eignex.klause.arithmetic.polynomial/AlgebraicReal = ...): com.eignex.klause.solver.result/QuadraticIncumbent // com.eignex.klause.solver.result/QuadraticIncumbent.copy|copy(com.eignex.klause.solver.Sample;com.eignex.klause.arithmetic.polynomial.AlgebraicReal){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticIncumbent.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/QuadraticIncumbent.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.result/QuadraticIncumbent.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.result/QuadraticObjectiveBound { // com.eignex.klause.solver.result/QuadraticObjectiveBound|null[0]
+    constructor <init>(com.eignex.klause.arithmetic.polynomial/AlgebraicReal, kotlin/Boolean, com.eignex.klause.solver.result/QuadraticCertificate) // com.eignex.klause.solver.result/QuadraticObjectiveBound.<init>|<init>(com.eignex.klause.arithmetic.polynomial.AlgebraicReal;kotlin.Boolean;com.eignex.klause.solver.result.QuadraticCertificate){}[0]
+
+    final val certificate // com.eignex.klause.solver.result/QuadraticObjectiveBound.certificate|{}certificate[0]
+        final fun <get-certificate>(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticObjectiveBound.certificate.<get-certificate>|<get-certificate>(){}[0]
+    final val strict // com.eignex.klause.solver.result/QuadraticObjectiveBound.strict|{}strict[0]
+        final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticObjectiveBound.strict.<get-strict>|<get-strict>(){}[0]
+    final val value // com.eignex.klause.solver.result/QuadraticObjectiveBound.value|{}value[0]
+        final fun <get-value>(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal // com.eignex.klause.solver.result/QuadraticObjectiveBound.value.<get-value>|<get-value>(){}[0]
+
+    final fun component1(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal // com.eignex.klause.solver.result/QuadraticObjectiveBound.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticObjectiveBound.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.solver.result/QuadraticCertificate // com.eignex.klause.solver.result/QuadraticObjectiveBound.component3|component3(){}[0]
+    final fun copy(com.eignex.klause.arithmetic.polynomial/AlgebraicReal = ..., kotlin/Boolean = ..., com.eignex.klause.solver.result/QuadraticCertificate = ...): com.eignex.klause.solver.result/QuadraticObjectiveBound // com.eignex.klause.solver.result/QuadraticObjectiveBound.copy|copy(com.eignex.klause.arithmetic.polynomial.AlgebraicReal;kotlin.Boolean;com.eignex.klause.solver.result.QuadraticCertificate){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/QuadraticObjectiveBound.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/QuadraticObjectiveBound.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.result/QuadraticObjectiveBound.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.solver.result/RunStats { // com.eignex.klause.solver.result/RunStats|null[0]
@@ -14002,6 +14231,7 @@ final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.s
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryAssignment).com.eignex.klause.solver.pipeline/algebraicRealValue(kotlin/Int): com.eignex.klause.arithmetic.polynomial/AlgebraicReal? // com.eignex.klause.solver.pipeline/algebraicRealValue|algebraicRealValue@com.eignex.klause.solver.pipeline.OpenTheoryAssignment(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest, com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest;com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
+final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/minimize(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/minimize|minimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.ir.ObjectiveSense){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/minimize(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialOptimizationExecution // com.eignex.klause.solver.pipeline/minimize|minimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 final fun (com.eignex.klause.solver.search/SearchContext).com.eignex.klause.solver.search/explainAtoms(com.eignex.klause.solver.search/SearchAtomPremise, com.eignex.klause.solver.search/SearchDecision? = ..., kotlin/Int = ...): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/explainAtoms|explainAtoms@com.eignex.klause.solver.search.SearchContext(com.eignex.klause.solver.search.SearchAtomPremise;com.eignex.klause.solver.search.SearchDecision?;kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState>).com.eignex.klause.backtrack.selector/asSelector(): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/asSelector|asSelector@com.eignex.klause.solver.search.VariableBranching<com.eignex.klause.solver.search.BranchingState>(){}[0]
