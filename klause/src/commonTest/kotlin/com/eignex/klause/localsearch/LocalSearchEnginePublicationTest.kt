@@ -120,6 +120,34 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
+    fun `completion cannot replace verified discrete coordinates`() {
+        val solver = LocalSearchSolver(
+            source.bake(), greedyRepairOnRestart = false,
+            completion = CandidateCompletion { _, _ -> Completion.Witness(invalid) },
+        )
+
+        val result = solver.solve(params.copy(initialAssignment = valid))
+
+        assertIs<SolveResult.Unknown>(result)
+    }
+
+    @Test
+    fun `cancellation from a completion hook withholds its witness`() {
+        var cancelled = false
+        val solver = LocalSearchSolver(
+            source.bake(), greedyRepairOnRestart = false,
+            completion = CandidateCompletion { point, _ ->
+                cancelled = true
+                Completion.Witness(point)
+            },
+        )
+
+        val result = solver.solve(params.copy(initialAssignment = valid, cancellation = Cancellation { cancelled }))
+
+        assertIs<SolveResult.Unknown>(result)
+    }
+
+    @Test
     fun `finite source checks preserve exact real completion`() {
         val problem = Problem(
             2, 0, emptyArray(), arrayOf<Factor>(factor), numRealVars = 1,
