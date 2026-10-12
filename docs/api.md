@@ -56,8 +56,8 @@ polynomial controls. `PolynomialTheoryParams` supplies native polynomial limits 
 common pins; `TheoryParams` supplies open-linear limits. These are distinct work
 currencies. A source operation owns fresh private state; shared node allowances retain
 their identity. Deduction scopes and CP tolerance acceptance explicitly decline because
-source execution requires exact coordinates and cannot discard restrictions. Open pins,
-extra open CP components and finite-only open hooks return `Unknown(Unsupported)`.
+source execution requires exact coordinates and cannot discard restrictions. Extra CP
+components, open pins and finite-only open hooks return `Unknown(Unsupported)`.
 Exact polynomial LS also declines finite seeding, incumbent exchange, custom scoring
 and event hooks that its native neighborhood cannot consume.
 

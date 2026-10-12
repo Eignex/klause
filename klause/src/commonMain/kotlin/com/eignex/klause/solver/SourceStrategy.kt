@@ -59,7 +59,7 @@ class SourceStrategy internal constructor(
 
     /**
      * Solve through the shared source route. [polynomial] retains finite strategy controls and arithmetic limits;
-     * [theory] supplies open-linear controls. Open-source assumption pins, extra CP components and finite seeding
+     * [theory] supplies open-linear controls. Extra CP components, open-source assumption pins and finite seeding
      * hooks explicitly decline. Deduction scopes and tolerance acceptance also decline; exact polynomial LS
      * declines finite seeding and event hooks. A heuristic rejection never refutes the source.
      */
@@ -69,7 +69,7 @@ class SourceStrategy internal constructor(
     ): OpenTheoryResult {
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()
-        if (!scope.supportsSource(engine)) return scope.unsupported()
+        if (!scope.supportsSource()) return scope.unsupported()
         val route = source.pipelineRoute(
             routePureRealToTheory = true,
             boundCancellation = scope.stop,
@@ -300,19 +300,18 @@ class SourceStrategy internal constructor(
             else TerminationReason.Cancelled,
             stats,
         )
-        fun supportsSource(engine: FiniteEngine): Boolean = assumptions.deductions.isEmpty &&
-            (engine != FiniteEngine.BACKTRACK || backtrack.toleranceCheck == null)
-        fun supportsPolynomial(engine: FiniteEngine): Boolean = supportsSource(engine) &&
+        fun supportsSource(): Boolean = assumptions.deductions.isEmpty &&
+            backtrack.toleranceCheck == null && backtrack.componentFactory == null
+        fun supportsPolynomial(engine: FiniteEngine): Boolean = supportsSource() &&
             (engine != FiniteEngine.LOCAL_SEARCH || supportsLocalHooks())
         private fun supportsLocalHooks(): Boolean = localSearch.initialAssignment == null &&
             localSearch.pooledIncumbents == null && localSearch.lsObjective == null && localSearch.onEvent == null
         fun supportsOpen(engine: FiniteEngine): Boolean =
-            supportsSource(engine) && assumptions.isEmpty && when (engine) {
-            FiniteEngine.BACKTRACK -> backtrack.componentFactory == null && backtrack.nodeBudget == null &&
-                backtrack.onEvent == null
-            FiniteEngine.LOCAL_SEARCH -> supportsLocalHooks()
-            else -> false
-        }
+            supportsSource() && assumptions.isEmpty && when (engine) {
+                FiniteEngine.BACKTRACK -> backtrack.nodeBudget == null && backtrack.onEvent == null
+                FiniteEngine.LOCAL_SEARCH -> supportsLocalHooks()
+                else -> false
+            }
         fun unsupported(): OpenTheoryResult.Unknown =
             OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
     }

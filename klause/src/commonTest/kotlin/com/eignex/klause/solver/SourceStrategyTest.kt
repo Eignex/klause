@@ -27,6 +27,7 @@ import com.eignex.klause.schema.times
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -124,6 +125,25 @@ class SourceStrategyTest {
 
             assertEquals(1L, first + second)
             assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-2, 0, 1), exact))
+        }
+    }
+
+    @Test
+    fun `finite linear completion preserves exact original continuous coordinates`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+            Table(intArrayOf(0), longArrayOf(1)),
+            Linear(intArrayOf(0), doubleArrayOf(0.1), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.3),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 16, randomSeed = 17),
+        ))
+        for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
+            val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve(params)).assignment
+            val real = assertNotNull(assertIs<OpenTheoryAssignment.Sampled>(witness).sample.exactReals)[0]
+
+            assertEquals("1", witness.intValue(0))
+            assertEquals(assertNotNull(BigFraction.ofDouble(0.3)), real + assertNotNull(BigFraction.ofDouble(0.1)))
+            assertEquals(real.toString(), witness.realValue(0))
         }
     }
 
@@ -269,6 +289,24 @@ class SourceStrategyTest {
         val result = BacktrackSolver.source(source).solve(BacktrackParams(toleranceCheck = { calls++; true }))
 
         assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `source operations decline unbound component factories without invoking them`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 0.0))
+        var calls = 0
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(componentFactory = { calls++; emptyList() }),
+        ))
+        for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
+            val solve = strategy.solve(params)
+            val optimize = strategy.optimize(LinearObjective(realCoefficients = doubleArrayOf(0.0, 1.0)), params).result
+
+            assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(solve).reason)
+            assertEquals(TerminationReason.Unsupported, assertIs<QuadraticOptimizationResult.Unknown>(optimize).reason)
+        }
         assertEquals(0, calls)
     }
 
