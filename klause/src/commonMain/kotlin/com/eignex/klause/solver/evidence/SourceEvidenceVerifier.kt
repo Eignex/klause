@@ -129,10 +129,12 @@ class SourceEvidenceVerifier(
                     if (imported.scope.revision != scope.revision || imported.scope.objective != scope.objective ||
                         !scope.condition.implies(imported.scope.condition)
                     ) return reject("import has a foreign source, objective or stronger assumptions")
-                    if (claim != imported.claim || claim is SourceClaim.Witness || claim is SourceClaim.Ray ||
+                    if (claim is SourceClaim.Witness || claim is SourceClaim.Ray ||
                         claim is SourceClaim.Optimal || claim is SourceClaim.Limit || claim is SourceClaim.Extension) {
                         return reject("import does not establish the requested claim")
                     }
+                    val matching = matchSourceClaims(claim, imported.claim, cancellation)
+                    if (matching != SourceEvidenceCheck.Checked) return matching
                     return verify(imported, imported.scope, depth + 1)
                 }
                 is SourceDerivation.BooleanSplit -> {
