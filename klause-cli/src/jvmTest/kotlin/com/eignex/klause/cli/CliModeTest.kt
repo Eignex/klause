@@ -618,6 +618,23 @@ class CliModeTest {
     }
 
     @Test
+    fun `constant SMT sources execute with ALNS`() {
+        for ((source, expected) in listOf("" to "sat", "(assert (= 0.0 0.0))" to "sat",
+            "(assert (= 0.0 1.0))" to "unsat")) {
+            val smt = File.createTempFile("cliconstant", ".smt2").apply {
+                writeText(source)
+                deleteOnExit()
+            }
+            var code = -1
+
+            val out = capture { code = runCli(arrayOf("-e", "alns", smt.absolutePath)) }
+
+            assertEquals(0, code, out)
+            assertEquals(expected, out.lines().first(), out)
+        }
+    }
+
+    @Test
     fun `alns searches an open model with exact source completion`() {
         var code = -1
         val out = capture { code = runCli(arrayOf("-e", "alns", "--param", "max-flips=30", openSmt().absolutePath)) }

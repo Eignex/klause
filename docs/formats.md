@@ -61,10 +61,9 @@ That proof uses a slice of the shared preparation allowance and the solve's
 cancellation token. Failure to close a bound must not replace it with a guessed
 finite domain.
 
-`-e` selects a finite engine and can control an open local-search request. Linear
-models routed to a complete open theory use the shared theory solve independently
-of that choice. Composed polynomial routes use the selected finite strategies with
-exact completion. SMT-LIB and MPS can fall back to open local search for
+`-e` selects complete traversal, local search, ALNS or a mixed portfolio over the
+selected source route. Supported linear and polynomial sources retain the same
+constraints and objective across those strategies, with exact arithmetic completion. SMT-LIB and MPS can fall back to open local search for
 an unsupported fragment or objective; it supplies witnesses without a completeness
 claim. Exact FlatZinc declines unsupported open fragments.
 `--param open-bound-proof=false` disables the
