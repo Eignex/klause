@@ -31,7 +31,7 @@ internal class FiniteExactNeighborhood(
     fixed: Sample,
     private val params: TheoryParams,
     objective: LinearObjective?,
-) : ExactNeighborhoodCompletion {
+) : ExactNeighborhoodCompletion, AutoCloseable {
     private val linear = source.withIntDomains(source.rootIntDomainsInPlace).withFactors(
         source.factors.map { factor ->
             if (factor is RealProduct) ExactSearchRow.of(
@@ -58,13 +58,15 @@ internal class FiniteExactNeighborhood(
                 )
                 result
             }
-            is Verification.Rejected -> ExactNeighborhoodResult.Refuted
+            is Verification.Rejected -> ExactNeighborhoodResult.Undecided
             is Verification.Indeterminate -> ExactNeighborhoodResult.Undecided
         }
     }
 
     fun search(adaptive: Boolean, seed: Long): ExactNeighborhood = adapter.search(adaptive, seed, completion = this,
         maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null)
+
+    override fun close() = adapter.close()
 }
 
 internal fun finiteExactNeighborhoodWorker(
