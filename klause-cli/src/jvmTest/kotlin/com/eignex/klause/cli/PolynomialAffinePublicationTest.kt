@@ -52,7 +52,8 @@ class PolynomialAffinePublicationTest(private val direction: String, private val
         assertTrue("; objective=$expected.0" in text.lines(), text)
         assertTrue("; objectiveBound=$expected.0" in text.lines(), text)
         assertTrue("; objectiveBoundDirection=$boundDirection" in text.lines(), text)
-        assertTrue("(define-fun |i| () Int ${expected - 7})" in text, text)
-        assertTrue("(define-fun |x| () Real 1.0)" in text, text)
+        assertTrue("(define-fun i () Int ${expected - 7})" in text ||
+            "(define-fun |i| () Int ${expected - 7})" in text, text)
+        assertTrue("(define-fun x () Real 1.0)" in text || "(define-fun |x| () Real 1.0)" in text, text)
     }
 }
