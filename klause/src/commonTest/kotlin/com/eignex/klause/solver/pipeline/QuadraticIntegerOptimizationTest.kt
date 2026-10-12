@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
@@ -127,8 +128,9 @@ class QuadraticIntegerOptimizationTest {
         )
 
         val result = assertIs<QuadraticOptimizationResult.Unbounded>(execution.result)
-        assertEquals(BigFraction.of(result.incumbent.sample.exactIntValue(0), BigFraction.ONE.den),
-            result.incumbent.sample.algebraicReals?.single()?.rational)
+        val arithmetic = AlgebraicArithmetic()
+        val integer = arithmetic.rational(BigFraction.of(result.incumbent.sample.exactIntValue(0), BIG_ONE))
+        assertEquals(0, arithmetic.compare(integer, requireNotNull(result.incumbent.sample.algebraicReals).single()))
     }
 
     @Test
