@@ -42,10 +42,18 @@ internal class SmtLibPolynomialProblem(
 }
 
 internal object SmtLibPolynomial {
-    fun parse(text: String, cancellation: Cancellation = Cancellation.Never, allowIntegers: Boolean = false): SmtLibPolynomialProblem =
+    fun parse(
+        text: String,
+        cancellation: Cancellation = Cancellation.Never,
+        allowIntegers: Boolean = false,
+    ): SmtLibPolynomialProblem =
         parse(StringCharSource(text), cancellation, allowIntegers)
 
-    fun parse(source: CharSource, cancellation: Cancellation = Cancellation.Never, allowIntegers: Boolean = false): SmtLibPolynomialProblem {
+    fun parse(
+        source: CharSource,
+        cancellation: Cancellation = Cancellation.Never,
+        allowIntegers: Boolean = false,
+    ): SmtLibPolynomialProblem {
         cancellation.polynomialSourceCheckpoint()
         val reader = SExprReader(PolynomialSourceInput(source, cancellation))
         val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers)
@@ -201,7 +209,7 @@ internal class SmtLibPolynomialCompiler(
             macro.body, macro.environment.withValues(parametersForValidation),
         )
         if (macro.resultSort == Sort.BOOL) value.boolean() else if (value !is PolynomialValue.Real ||
-            macro.resultSort == Sort.INT && !value.integer
+            (macro.resultSort == Sort.INT && !value.integer)
         ) {
             smtUnsupported("polynomial macro result must be Real")
         }

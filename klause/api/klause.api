@@ -3136,6 +3136,8 @@ public final class com/eignex/klause/ir/ObjectiveSense : java/lang/Enum {
 	public static fun values ()[Lcom/eignex/klause/ir/ObjectiveSense;
 }
 
+public final class com/eignex/klause/ir/NonlinearIntegerProblem {
+
 public final class com/eignex/klause/ir/PolynomialRealProblem {
 	public final fun getBoolVarNames ()Ljava/util/Map;
 	public final fun getRealVarNames ()Ljava/util/Map;

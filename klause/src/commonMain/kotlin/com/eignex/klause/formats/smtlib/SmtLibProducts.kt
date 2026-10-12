@@ -11,6 +11,7 @@ import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.plus
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.times
@@ -43,11 +44,27 @@ internal fun Compiler.Builder.integerProduct(parts: List<IntComb>): IntComb {
 }
 
 private fun Compiler.Builder.finiteProductRange(term: LinComb): Pair<Long, Long> {
-    val (lo, hi) = linCombRange(term)
-    if (lo == null || hi == null || lo == Long.MIN_VALUE || hi == Long.MIN_VALUE) {
-        smtUnsupported("nonlinear product requires finite representable operands")
+    var lo = bigIntOf(term.constant)
+    var hi = lo
+    for ((id, coefficient) in term.coeffs) {
+        if (coefficient == 0L) continue
+        val domain = intDomains[id]
+        val lower = when (domain) {
+            is PresolveDomain.Finite -> domain.domain.min
+            is PresolveDomain.Open -> domain.lo
+        } ?: smtUnsupported("nonlinear product requires finite operands")
+        val upper = when (domain) {
+            is PresolveDomain.Finite -> domain.domain.max
+            is PresolveDomain.Open -> domain.hi
+        } ?: smtUnsupported("nonlinear product requires finite operands")
+        val scale = bigIntOf(coefficient)
+        lo += scale * bigIntOf(if (coefficient >= 0) lower else upper)
+        hi += scale * bigIntOf(if (coefficient >= 0) upper else lower)
     }
-    return lo to hi
+    if (!lo.fitsLong() || !hi.fitsLong() || lo == bigIntOf(Long.MIN_VALUE) || hi == bigIntOf(Long.MIN_VALUE) ||
+        term.constant == Long.MIN_VALUE || term.coeffs.values.any { it == Long.MIN_VALUE }
+    ) smtUnsupported("nonlinear product requires representable operands")
+    return lo.toLongExact() to hi.toLongExact()
 }
 
 private fun Compiler.Builder.productIntColumn(term: LinComb): Int {
@@ -75,8 +92,8 @@ internal fun Compiler.Builder.realProduct(parts: List<RealComb>): Res.R {
                     }
                 } else {
                     val value = nextReal++
-                    val left = if (leftInt != null) productIntColumn(leftInt) else productRealColumn(result)
-                    val right = if (rightInt != null) productIntColumn(rightInt) else productRealColumn(part)
+                    val left = if (leftInt != null) mixedProductIntColumn(leftInt) else productRealColumn(result)
+                    val right = if (rightInt != null) mixedProductIntColumn(rightInt) else productRealColumn(part)
                     factors.add(if (leftInt != null) {
                         RealProduct(left, right, value, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
                     } else if (rightInt != null) {
@@ -88,6 +105,15 @@ internal fun Compiler.Builder.realProduct(parts: List<RealComb>): Res.R {
         }
     }
     return Res.R(result)
+}
+
+private fun Compiler.Builder.mixedProductIntColumn(term: LinComb): Int {
+    val (lo, hi) = finiteProductRange(term)
+    val exactMagnitude = 1L shl 53
+    if (lo < -exactMagnitude || hi > exactMagnitude) {
+        smtUnsupported("mixed product integer operand exceeds exact floating coefficient range")
+    }
+    return productIntColumn(term)
 }
 
 private fun Compiler.Builder.productRealColumn(term: RealComb): Int {
