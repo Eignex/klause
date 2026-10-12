@@ -342,10 +342,14 @@ fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = Prepare
     this, null, PreparedExecutionKind.NONLINEAR_INTEGER, null, null,
     listOf(ExecutionComponentDescriptor("polynomial-integer", ComponentResponsibility.COMPLETION,
         emptyList(), integerCoordinates, (0 until numericCount).filter { it !in integerCoordinates },
-        (0 until boolCount).toList(), checkedCompletionContract(ProcedureCompleteness.WITNESS_SEARCH,
-            setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION,
-                ExecutionClaimAuthority.OBJECTIVE_BOUND, ExecutionClaimAuthority.OPTIMALITY,
-                ExecutionClaimAuthority.UNBOUNDEDNESS)))),
+        (0 until boolCount).toList(), ComponentExecutionContract(
+            ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH,
+                setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION)),
+            ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority),
+            optimization = ComponentStrategySupport(ProcedureCompleteness.EXHAUSTIVE,
+                setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION,
+                    ExecutionClaimAuthority.OBJECTIVE_BOUND, ExecutionClaimAuthority.OPTIMALITY,
+                    ExecutionClaimAuthority.UNBOUNDEDNESS))))),
     boolCount, integerCoordinates.size, realCoordinates.size,
     integerCoordinates = integerCoordinates, realCoordinates = realCoordinates,
 )

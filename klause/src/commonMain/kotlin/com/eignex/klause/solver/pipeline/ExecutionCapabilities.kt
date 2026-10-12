@@ -126,9 +126,13 @@ internal class ComponentExecutionContract(
     private val complete: ComponentStrategySupport,
     private val local: ComponentStrategySupport,
     private val adaptive: ComponentStrategySupport = local,
+    private val optimization: ComponentStrategySupport = complete,
 ) {
-    fun support(strategy: ExecutionStrategy): ComponentStrategySupport = when (strategy) {
-        ExecutionStrategy.COMPLETE -> complete
+    fun support(
+        strategy: ExecutionStrategy,
+        operation: ExecutionOperation = ExecutionOperation.SATISFY,
+    ): ComponentStrategySupport = when (strategy) {
+        ExecutionStrategy.COMPLETE -> if (operation == ExecutionOperation.OPTIMIZE) optimization else complete
         ExecutionStrategy.LOCAL_SEARCH -> local
         ExecutionStrategy.ALNS -> adaptive
         ExecutionStrategy.MIXED -> error("mixed admission composes component arms")
@@ -173,7 +177,7 @@ class ExecutionCapabilities internal constructor(
         val completeCell = operation in setOf(ExecutionOperation.EXACT_COUNT, ExecutionOperation.APPROXIMATE_COUNT,
             ExecutionOperation.UNIFORM_SAMPLE)
         val executedStrategy = if (completeCell) ExecutionStrategy.COMPLETE else strategy
-        val support = components.map { it.execution.support(executedStrategy) }
+        val support = components.map { it.execution.support(executedStrategy, operation) }
         val runnable = support.all { it.runnable }
         val completeness = when {
             !runnable -> ProcedureCompleteness.UNAVAILABLE
