@@ -28,7 +28,10 @@ internal class LinearAuthoritySemantics(private val source: SourceProofContext) 
         source.objective, source.objectiveConstant)
 
     override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
-        exact.witness(sample, scope, cancellation)
+        exact.witness(sample, scope, cancellation).let { checked ->
+            if (checked != SourceEvidenceCheck.Checked) checked
+            else source.semanticsChecker?.witness(sample, scope, cancellation) ?: checked
+        }
 
     override fun objectiveEquals(
         sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
@@ -41,28 +44,28 @@ internal class LinearAuthoritySemantics(private val source: SourceProofContext) 
         claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
     ): SourceEvidenceCheck {
         if (claim == SourceClaim.Refutation && derivation is LinearPinnedRefutation) {
-            if (scope != source.scope || source.coordinates.any {
+            if (!compatible(scope) || source.coordinates.any {
                     it.kind == SourceCoordinate.Kind.Boolean && it.id !in scope.condition.bools
                 }
             ) return SourceEvidenceCheck.Rejected("linear refutation requires complete Boolean scope")
-            return SourceEvidenceVerifier(source.numericContext()).verify(
+            return SourceEvidenceVerifier(source.atScope(scope).numericContext()).verify(
                 SourceEvidence(scope, claim, derivation.conflict), cancellation)
         }
         if (claim is SourceClaim.Bound && derivation is LinearPinnedObjective) {
-            if (scope != source.scope || source.coordinates.any {
+            if (!compatible(scope) || source.coordinates.any {
                     it.kind == SourceCoordinate.Kind.Boolean && it.id !in scope.condition.bools
                 }
             ) return SourceEvidenceCheck.Rejected("linear bound requires complete Boolean scope")
-            return SourceEvidenceVerifier(source.numericContext()).verify(
+            return SourceEvidenceVerifier(source.atScope(scope).numericContext()).verify(
                 SourceEvidence(scope, claim, derivation.bound), cancellation)
         }
         if (claim !is SourceClaim.Limit || derivation !is LinearApproach) {
             return SourceEvidenceCheck.Unavailable("unsupported linear authority derivation")
         }
-        if (scope != source.scope) return SourceEvidenceCheck.Rejected("linear approach has a foreign scope")
+        if (!compatible(scope)) return SourceEvidenceCheck.Rejected("linear approach has a foreign scope")
         val base = witness(claim.sample, scope, cancellation)
         if (base != SourceEvidenceCheck.Checked) return base
-        val bound = SourceEvidenceVerifier(source.withLinearAuthority()).verify(SourceEvidence(scope,
+        val bound = SourceEvidenceVerifier(source.atScope(scope).withLinearAuthority()).verify(SourceEvidence(scope,
             SourceClaim.Bound(claim.value, strict = true), derivation.strictBound), cancellation)
         if (bound != SourceEvidenceCheck.Checked) return bound
         val endpoint = derivation.endpoint
@@ -84,13 +87,20 @@ internal class LinearAuthoritySemantics(private val source: SourceProofContext) 
         val closure = LinearSourceSemanticsChecker(source.coordinates, source.premises.values.map {
             SourcePremise(SourceInequality(it.inequality.coefficients, it.inequality.rhs), it.guards)
         }, source.objective, source.objectiveConstant)
-        // Convex affine rows keep every positive mixture strictly feasible; fixed discrete coordinates keep its lattice.
+        // Positive mixtures preserve strict affine rows. Fixed discrete coordinates preserve the source lattice.
         return closure.objectiveEquals(endpoint, claim.value, scope, cancellation)
     }
+
+    private fun compatible(scope: SourceScope): Boolean = scope.revision == source.scope.revision &&
+        scope.objective == source.scope.objective && scope.condition.implies(source.scope.condition)
 }
 
 internal fun SourceProofContext.withLinearAuthority(): SourceProofContext = SourceProofContext(
     scope, coordinates, premises, objective, objectiveConstant, LinearAuthoritySemantics(this),
+)
+
+internal fun SourceProofContext.atScope(scope: SourceScope): SourceProofContext = SourceProofContext(
+    scope, coordinates, premises, objective, objectiveConstant, semanticsChecker,
 )
 
 internal fun SourceProofContext.numericCoordinates(): List<SourceCoordinate> = coordinates

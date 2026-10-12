@@ -11,13 +11,26 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
 
 internal class LinearAuthorityLp(private val budget: SourceLpBudget) {
+    private val observer = object : LpCertificationObserver {
+        override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
+        override fun observeExactInput(accepted: Boolean) = Unit
+        override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        override fun observeContinuation(metrics: ExactContinuationMetrics) {
+            budget.observe(continuation = metrics.work)
+        }
+    }
     fun solve(
         rows: List<ExactRationalInequality>,
         costs: List<BigFraction>,
@@ -40,7 +53,7 @@ internal class LinearAuthorityLp(private val budget: SourceLpBudget) {
         val owner = LpScopedSolver(LpExactState(model), token, context = budget.context,
             iterationLimit = 1024, workLimit = 2_000_000L)
         try {
-            val solved = owner.solve(token = token)
+            val solved = owner.solve(token = token, observer = observer)
             solved?.takeIf { result -> result.exactPrimal?.admittedSourcePoint() != false &&
                 result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false }
         } finally {
