@@ -4,6 +4,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -127,7 +128,7 @@ class SourceEvidenceVerifierTest {
     @Test
     fun `integer coverage includes adjacent integral alternatives`() {
         val i = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val half = BigFraction.ONE / BigFraction.ofLong(2)
+        val half = BigFraction.of(bigIntOf(1), bigIntOf(2))
         val context = SourceProofContext(scope, setOf(i), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(i to BigFraction.MINUS_ONE), half.negated())),
             "upper" to SourcePremise(SourceInequality(mapOf(i to BigFraction.ONE), half)),
@@ -209,5 +210,46 @@ class SourceEvidenceVerifierTest {
         repeat(5) { evidence = SourceEvidence(scope, claim, SourceDerivation.Import(evidence)) }
 
         assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context, maximumSteps = 5).verify(evidence))
+    }
+
+    @Test
+    fun `optimality requires the witness objective to equal the checked bound`() {
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0), exactReals = listOf(BigFraction.ofLong(2)))
+        val checker = LinearSourceSemanticsChecker(setOf(x), premises.values.toList(), mapOf(x to BigFraction.ONE))
+        val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE), semanticsChecker = checker)
+        val claim = SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE))
+        val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("lower"))
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(SourceEvidence(scope, claim, proof)))
+    }
+
+    @Test
+    fun `an attained original source bound certifies optimality`() {
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
+        val checker = LinearSourceSemanticsChecker(setOf(x), premises.values.toList(), mapOf(x to BigFraction.ONE))
+        val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE), semanticsChecker = checker)
+        val claim = SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE))
+        val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("lower"))
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(SourceEvidence(scope, claim, proof)))
+    }
+
+    @Test
+    fun `an unattained limit requires approach and nonattainment derivations`() {
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0), exactReals = listOf(BigFraction.ofLong(2)))
+        val claim = SourceClaim.Limit(sample, SourceValue.Rational(BigFraction.ONE))
+
+        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, claim, SourceDerivation.Premise("lower")),
+        ))
+    }
+
+    @Test
+    fun `a malformed Boolean coverage coordinate is rejected`() {
+        val proof = SourceDerivation.BooleanSplit(-1, SourceDerivation.Premise("lower"), SourceDerivation.Premise("lower"))
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, SourceClaim.Refutation, proof),
+        ))
     }
 }

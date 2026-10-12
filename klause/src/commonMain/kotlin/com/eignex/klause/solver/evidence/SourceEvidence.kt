@@ -29,7 +29,16 @@ sealed interface SourceClaim {
     /** A complete source assignment. Its coordinates are independently checked. */
     data class Witness(val sample: Sample) : SourceClaim
     /** Global objective bound in source units. */
-    data class Bound(val value: BigFraction, val strict: Boolean = false) : SourceClaim
+    data class Bound(val value: SourceValue, val strict: Boolean = false) : SourceClaim {
+        /** Construct a rational objective bound without converting to floating point. */
+        constructor(value: BigFraction, strict: Boolean = false) : this(SourceValue.Rational(value), strict)
+    }
+    /** A feasible point attaining a proved global bound in source objective units. */
+    data class Optimal(val sample: Sample, val value: SourceValue) : SourceClaim
+    /** An exact unattained infimum or supremum, with a feasible source point. */
+    data class Limit(val sample: Sample, val value: SourceValue) : SourceClaim
+    /** Typed source-specific claims whose semantics belong to the source checker. */
+    interface Extension : SourceClaim
     /** No assignment exists in this invocation. */
     data object Refutation : SourceClaim
     /** Unlimited improvement from a feasible source point. */
@@ -50,6 +59,10 @@ sealed interface SourceDerivation {
     data object SourceRay : SourceDerivation
     /** A cited original row or declaration. */
     data class Premise(val id: String) : SourceDerivation
+    /** A witness and an equal global bound establishing an attained optimum. */
+    data class Optimum(val witness: SourceDerivation, val bound: SourceDerivation) : SourceDerivation
+    /** Source-specific derivation data; an unsupported semantics checker must decline it. */
+    interface Extension : SourceDerivation
     /** An inclusive numeric invocation restriction. */
     data class Assumption(val coordinate: SourceCoordinate, val upper: Boolean) : SourceDerivation
     /** A nonnegative exact combination of inequalities. */

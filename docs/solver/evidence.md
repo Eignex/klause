@@ -17,7 +17,7 @@ refutation cannot refute a weaker parent invocation.
 combinations, Boolean alternatives and adjacent integer alternatives. Integer
 coverage requires an integral threshold and both `x <= threshold` and
 `x >= threshold + 1`. Guarded premises are usable only in branches establishing
-their guards. Bounds are checked in original objective units and direction;
+their guards. Bounds retain rational or algebraic values and are checked in original objective units and direction;
 refutations must derive an exact contradiction. A branch flag, traversal exhaustion
 or numerical engine identity supplies no derivation authority.
 
@@ -35,6 +35,13 @@ derivation uses `SourceDerivation.Unavailable` and cannot gain proof coverage fr
 the producer's type. Cancellation and traversal limits also withhold coverage;
 imports and branches spend one containing verification allowance. Engine
 attestations and reference agreement remain distinct from checked derivations.
+
+`SourceResultEvidence` captures derivations separately from `SourceEngineAttestation`.
+Checking a completed package requires the actual expected claim and matching source
+context; an engine completion label or evidence for another claim cannot substitute.
+An attained optimum requires a feasible witness, an equal global bound and original
+objective evaluation. An unattained limit additionally requires supported approach
+and nonattainment derivations; a strict bound alone does not establish convergence.
 
 The checker is an additive mechanism. Existing completed-result and portfolio
 adapters retain their documented in-memory attestation contracts until they supply
