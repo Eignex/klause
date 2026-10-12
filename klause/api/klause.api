@@ -2780,6 +2780,17 @@ public final class com/eignex/klause/formats/smtlib/SmtLibInput$Quadratic : com/
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/formats/smtlib/SmtLibInput$Transcendental : com/eignex/klause/formats/smtlib/SmtLibInput {
+	public fun <init> (Lcom/eignex/klause/ir/TranscendentalProblem;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/TranscendentalProblem;
+	public final fun copy (Lcom/eignex/klause/ir/TranscendentalProblem;)Lcom/eignex/klause/formats/smtlib/SmtLibInput$Transcendental;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtLibInput$Transcendental;Lcom/eignex/klause/ir/TranscendentalProblem;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibInput$Transcendental;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProblem ()Lcom/eignex/klause/ir/TranscendentalProblem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/formats/smtlib/SmtLibProblem {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -3544,7 +3555,9 @@ public final class com/eignex/klause/ir/Term {
 
 public final class com/eignex/klause/ir/TranscendentalProblem {
 	public final fun getBoolVarNames ()Ljava/util/Map;
+	public final fun getHasObjective ()Z
 	public final fun getIntVarNames ()Ljava/util/Map;
+	public final fun getObjectiveSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun getRealVarNames ()Ljava/util/Map;
 }
 

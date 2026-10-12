@@ -68,8 +68,8 @@ internal class FunctionSourceLowering(
         while (pending.isNotEmpty()) {
             cancellation.polynomialSourceCheckpoint(1)
             val node = pending.last()
-            if (node is PolynomialExpression && node in expressions ||
-                node is PolynomialRealFormula && node in formulas) {
+            if ((node is PolynomialExpression && node in expressions) ||
+                (node is PolynomialRealFormula && node in formulas)) {
                 pending.removeLast()
                 continue
             }

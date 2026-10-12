@@ -2060,6 +2060,19 @@ sealed interface com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.kl
         final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.toString|toString(){}[0]
     }
 
+    final class Transcendental : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental|null[0]
+        constructor <init>(com.eignex.klause.ir/TranscendentalProblem) // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.<init>|<init>(com.eignex.klause.ir.TranscendentalProblem){}[0]
+
+        final val problem // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.problem|{}problem[0]
+            final fun <get-problem>(): com.eignex.klause.ir/TranscendentalProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.problem.<get-problem>|<get-problem>(){}[0]
+
+        final fun component1(): com.eignex.klause.ir/TranscendentalProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.ir/TranscendentalProblem = ...): com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.copy|copy(com.eignex.klause.ir.TranscendentalProblem){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Transcendental.toString|toString(){}[0]
+    }
+
     final object Interrupted : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted|null[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.hashCode|hashCode(){}[0]
@@ -7045,8 +7058,12 @@ final class com.eignex.klause.ir/TaggedLinearRow : com.eignex.klause.ir/LinearRo
 final class com.eignex.klause.ir/TranscendentalProblem { // com.eignex.klause.ir/TranscendentalProblem|null[0]
     final val boolVarNames // com.eignex.klause.ir/TranscendentalProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
+    final val hasObjective // com.eignex.klause.ir/TranscendentalProblem.hasObjective|{}hasObjective[0]
+        final fun <get-hasObjective>(): kotlin/Boolean // com.eignex.klause.ir/TranscendentalProblem.hasObjective.<get-hasObjective>|<get-hasObjective>(){}[0]
     final val intVarNames // com.eignex.klause.ir/TranscendentalProblem.intVarNames|{}intVarNames[0]
         final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
+    final val objectiveSense // com.eignex.klause.ir/TranscendentalProblem.objectiveSense|{}objectiveSense[0]
+        final fun <get-objectiveSense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.ir/TranscendentalProblem.objectiveSense.<get-objectiveSense>|<get-objectiveSense>(){}[0]
     final val realVarNames // com.eignex.klause.ir/TranscendentalProblem.realVarNames|{}realVarNames[0]
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
 }
