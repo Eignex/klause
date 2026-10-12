@@ -72,6 +72,8 @@ class SourceQuadraticEvidenceTest {
         val captured = SourceResultCapture(context).quadratic(result, "fixture-engine",
             boundDerivation = SourceQuadraticBoxDerivation)
 
+        val terminalResult = assertIs<QuadraticOptimizationResult.Optimal>(captured)
+        assertEquals(context.scope, assertNotNull(terminalResult.evidence).scope)
         assertEquals(SourceEvidenceCheck.Checked, captured.verifySourceEvidence(context))
     }
 

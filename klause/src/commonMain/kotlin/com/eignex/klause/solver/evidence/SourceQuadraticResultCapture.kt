@@ -98,7 +98,9 @@ fun QuadraticOptimizationResult.verifySourceEvidence(
         is QuadraticOptimizationResult.BestFound -> SourceClaim.Witness(incumbent.sample)
         is QuadraticOptimizationResult.Unknown -> return SourceEvidenceCheck.Unavailable("no completed quadratic claim")
     }
-    val proof = evidence ?: return SourceEvidenceCheck.Unavailable("quadratic source derivation capture unavailable")
+    val proof = capturedEvidence() ?: return SourceEvidenceCheck.Unavailable(
+        "quadratic source derivation capture unavailable",
+    )
     val checked = proof.verify(claim, context, cancellation)
     if (checked != SourceEvidenceCheck.Checked) return checked
     if (this is QuadraticOptimizationResult.BestFound) {
@@ -110,7 +112,7 @@ fun QuadraticOptimizationResult.verifySourceEvidence(
 }
 
 private fun QuadraticOptimizationResult.capturedScopes(): List<SourceScope> = buildList {
-    evidence?.scope?.let(::add)
+    capturedEvidence()?.scope?.let(::add)
     when (val result = this@capturedScopes) {
         is QuadraticOptimizationResult.Optimal -> {
             result.certificate.scope?.let(::add)
@@ -125,4 +127,13 @@ private fun QuadraticOptimizationResult.capturedScopes(): List<SourceScope> = bu
         is QuadraticOptimizationResult.BestFound -> result.bound?.certificate?.scope?.let(::add)
         is QuadraticOptimizationResult.Unknown -> result.bound?.certificate?.scope?.let(::add)
     }
+}
+
+private fun QuadraticOptimizationResult.capturedEvidence(): SourceResultEvidence? = when (this) {
+    is QuadraticOptimizationResult.Optimal -> evidence
+    is QuadraticOptimizationResult.UnattainedLimit -> evidence
+    is QuadraticOptimizationResult.Unbounded -> evidence
+    is QuadraticOptimizationResult.Infeasible -> evidence
+    is QuadraticOptimizationResult.BestFound -> evidence
+    is QuadraticOptimizationResult.Unknown -> evidence
 }
