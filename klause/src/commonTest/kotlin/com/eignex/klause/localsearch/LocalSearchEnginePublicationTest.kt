@@ -2,8 +2,10 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.meta.alns.Alns
@@ -18,6 +20,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
@@ -223,6 +226,27 @@ class LocalSearchEnginePublicationTest {
         val complete = assertIs<SolveResult.Sat>(BacktrackSolver(problem).solve(BacktrackParams())).assignment
 
         for (sample in listOf(standalone, paired, complete)) assertEquals(sample.boolValue(0), sample.boolValue(1))
+    }
+
+    @Test
+    fun `an uncovered continuous constraint explicitly declines execution`() {
+        val real = object : Factor by Linear(
+            intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0,
+        ), Propagator {}
+        val problem = Problem(
+            0, 0, emptyArray(), arrayOf<Factor>(real), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        ).bake()
+        var completed = false
+        val solver = LocalSearchSolver(problem, completion = CandidateCompletion { point, _ ->
+            completed = true
+            Completion.Witness(point)
+        })
+
+        val result = solver.solve(LocalSearchParams(maxFlips = 1L, randomSeed = 7L))
+
+        assertEquals(TerminationReason.Unsupported, assertIs<SolveResult.Unknown>(result).reason)
+        assertFalse(completed)
     }
 
     @Test
