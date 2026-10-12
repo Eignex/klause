@@ -146,16 +146,19 @@ internal class PolynomialStrategyAdapters(
         require(objective.realCoefficientValues.none { it != 0.0 }) {
             "polynomial optimization requires a finite objective"
         }
-        return when (engine) {
-            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> BacktrackSolver(finite).minimize(objective, backtrackParams())
-            FiniteEngine.LOCAL_SEARCH -> neighborhood(false, objective)?.improvements(
+        val searchObjective = objective.searchObjective()
+        val result = when (engine) {
+            FiniteEngine.BACKTRACK, FiniteEngine.FIXED ->
+                BacktrackSolver(finite).minimize(searchObjective, backtrackParams())
+            FiniteEngine.LOCAL_SEARCH -> neighborhood(false, searchObjective)?.improvements(
                 { Double.POSITIVE_INFINITY }, cancellation, null, params.localSearch.maxInstructions,
-            )?.last() ?: heuristic(localSearch().minimize(objective, localParams()))
-            FiniteEngine.ALNS -> neighborhood(true, objective)?.improvements(
+            )?.last() ?: heuristic(localSearch().minimize(searchObjective, localParams()))
+            FiniteEngine.ALNS -> neighborhood(true, searchObjective)?.improvements(
                 { Double.POSITIVE_INFINITY }, cancellation, null, params.localSearch.maxInstructions,
-            )?.last() ?: heuristic(alnsMinimize(objective, cancellation))
-            FiniteEngine.MIXED -> portfolio(objective).use { it.minimize(cancellation) }
+            )?.last() ?: heuristic(alnsMinimize(searchObjective, cancellation))
+            FiniteEngine.MIXED -> portfolio(searchObjective).use { it.minimize(cancellation) }
         }
+        return result.sourceValue(objective)
     }
 
     private fun alns(stop: Cancellation, instructions: Long? = null): SolveResult {

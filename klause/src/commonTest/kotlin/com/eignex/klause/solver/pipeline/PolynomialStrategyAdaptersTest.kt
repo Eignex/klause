@@ -162,7 +162,7 @@ class PolynomialStrategyAdaptersTest {
             localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 30), alnsIterations = 2,
         ))
 
-        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED)) {
+        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.FIXED, FiniteEngine.MIXED)) {
             val result = OpenTheoryPipeline.minimize(request, objective, params, engine).result
 
             val sample = assertIs<MinimizeResult.Optimal>(result).sample

@@ -319,7 +319,9 @@ Finite real models with fixed discrete coordinates use the same repair driver. M
 products become exact linear rows under those fixed coordinates and are checked
 against their original relation before publication. Their exchanges order exact
 objective values and project scalar cutoffs outward. Finite-column objectives,
-including polynomial composition, also use exact incumbent ordering. Witness-only
+including polynomial composition, also use exact incumbent ordering. Their search
+objectives omit additive constants so scalar cutoffs retain small improvements;
+publication recomputes the complete source value from the assignment. Witness-only
 workers retain that authority through outer binding.
 
 Exact neighborhood handles retain centers, radii, random state and adaptive weights

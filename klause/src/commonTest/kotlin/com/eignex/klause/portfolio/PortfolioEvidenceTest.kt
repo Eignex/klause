@@ -102,14 +102,12 @@ class PortfolioEvidenceTest {
             val optimum = if (real) Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
                 listOf(BigFraction.ofLong(2))) else Sample(booleanArrayOf(), longArrayOf(2))
             val identity = ModelIdentity.of(Any(), objective)
-            val heuristic = PortfolioWorker.ofMinimize("ls/exact", 0) { _, _, _, _ ->
+            val complete = PortfolioWorker.ofMinimize("bt/exact", 0) { _, _, _, _ ->
                 sequenceOf(MinimizeResult.BestFound(first, objective.evaluateExact(first).toDouble(),
-                    TerminationReason.BudgetExhausted))
-            }.bindEvidence(identity, provesResults = false)
-            val complete = PortfolioWorker.ofMinimize("bt/exact", 1) { _, _, _, _ ->
-                sequenceOf(MinimizeResult.Optimal(optimum, objective.evaluateExact(optimum).toDouble()))
+                    TerminationReason.BudgetExhausted),
+                    MinimizeResult.Optimal(optimum, objective.evaluateExact(optimum).toDouble()))
             }.bindEvidence(identity)
-            val portfolio = Portfolio.thompson(listOf(heuristic, complete))
+            val portfolio = Portfolio.thompson(listOf(complete))
             portfolio.exactLinearObjective = objective
             portfolio.evidenceVerification = PortfolioEvidence(identity, CandidateVerifier.trusting())
 
