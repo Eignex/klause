@@ -222,6 +222,7 @@ class ComponentPlan internal constructor(
     internal fun forLinearConditions(spec: Problem): ComponentPlan? {
         requireBelongsTo(spec)
         if (unplaceable != null) return null
+        if (spec.numIntVars == 0 && spec.numRealVars == 0) return this
         val owners = Array(factorOwners.size) { index ->
             val factor = spec.factors[index]
             if (factorOwners[index] == FactorOwner.CP && factor.variables.reals.isNotEmpty()) {

@@ -91,7 +91,11 @@ requests capture this plan once for complete, LS, ALNS and quadratic execution.
 Pure polynomial snapshots retain declaration identities separately from private
 lowering auxiliaries. The shared polynomial assembler explicitly declines open
 integer declarations and continuous linear objectives; preparation invents no
-finite bounds or operation support.
+finite bounds or operation support. `prepareConditionedLinearQuery()` selects an
+exact linear completion capable of source-coordinate windows and strict cutoffs
+once, preserving finite ownership and original identity. Query state and rollback
+belong to each worker. Required nonlinear completion declines this hook; an empty
+numeric namespace retains its finite/Boolean checker.
 
 `Problem.componentPlan()` remains the finite/linear projection entry point. It
 builds a compact remapped CP projection and theory fragments. Plans belong to the
