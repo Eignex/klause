@@ -94,7 +94,7 @@ fun MpsModel.toExactSourceProblem(settings: ProblemSettings = KlauseConfig.curre
     }
     val integralObjective = source.integralSourceObjective(columns, numbers, intCount)
     val objective = when {
-        source.objective.indices.isEmpty() -> null
+        source.objective.name.isEmpty() && source.objective.indices.isEmpty() -> null
         integralObjective != null -> integralObjective
         else -> {
             val objectiveColumn = realCount++
