@@ -12275,8 +12275,12 @@ final class com.eignex.klause.solver.pipeline/PolynomialStrategyParams { // com.
 }
 
 final class com.eignex.klause.solver.pipeline/PolynomialTheoryExecution { // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution|null[0]
-    constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryResult, com.eignex.klause.solver.pipeline/PolynomialTheoryStats, com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...) // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryResult, com.eignex.klause.solver.pipeline/PolynomialTheoryStats, com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?;kotlin.String?;kotlin.String?){}[0]
 
+    final val nativeResource // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.nativeResource|{}nativeResource[0]
+        final fun <get-nativeResource>(): kotlin/String? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.nativeResource.<get-nativeResource>|<get-nativeResource>(){}[0]
+    final val nativeWorkScope // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.nativeWorkScope|{}nativeWorkScope[0]
+        final fun <get-nativeWorkScope>(): kotlin/String? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.nativeWorkScope.<get-nativeWorkScope>|<get-nativeWorkScope>(){}[0]
     final val resource // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.resource|{}resource[0]
         final fun <get-resource>(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.resource.<get-resource>|<get-resource>(){}[0]
     final val result // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.result|{}result[0]
@@ -12287,7 +12291,9 @@ final class com.eignex.klause.solver.pipeline/PolynomialTheoryExecution { // com
     final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.solver.pipeline/PolynomialTheoryStats // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component2|component2(){}[0]
     final fun component3(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component3|component3(){}[0]
-    final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryResult = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryStats = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+    final fun component4(): kotlin/String? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component5|component5(){}[0]
+    final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryResult = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryStats = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ..., kotlin/String? = ..., kotlin/String? = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?;kotlin.String?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.toString|toString(){}[0]
@@ -12593,9 +12599,11 @@ final class com.eignex.klause.solver.pipeline/TranscendentalTheoryParams { // co
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.toString|toString(){}[0]
 }
 
-final class com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest { // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest|null[0]
+final class com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest : com.eignex.klause.solver.pipeline/ExactTheorySatisfactionRequest { // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest|null[0]
     final val problem // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/TranscendentalProblem // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.problem.<get-problem>|<get-problem>(){}[0]
+
+    final fun execute(com.eignex.klause.solver.pipeline/PolynomialTheoryParams, com.eignex.klause.solver.pipeline/FiniteEngine, kotlin/Int): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.execute|execute(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;kotlin.Int){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/UnplaceableColumn { // com.eignex.klause.solver.pipeline/UnplaceableColumn|null[0]
