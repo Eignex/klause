@@ -20,6 +20,18 @@ The source [objective representation](../model.md#quadratic-objective-representa
 retains literal cross coefficients; callers own Hessian conversion, source
 mappings, objective direction and invocation assumptions.
 
+## Candidate generation
+
+`QuadraticCandidates` uses floating penalty-gradient iterations only to propose
+active rows. Nonfinite arithmetic declines the proposal. Selected rows and all
+source equality rows form an exact rational KKT system; rank-revealing elimination
+rejects inconsistent systems and chooses zero free coordinates in consistent
+singular systems. The reconstructed anchor and multipliers still require the
+independent certificate checks below. A numerical active-set selection or a
+rational stationary candidate alone supplies no bound or optimum. Both proposal
+and reconstruction retain the containing numerical control; their work is not
+refunded when a candidate fails certification.
+
 ## Certificate checks
 
 Exact Schur elimination checks positive semidefiniteness, including singular
