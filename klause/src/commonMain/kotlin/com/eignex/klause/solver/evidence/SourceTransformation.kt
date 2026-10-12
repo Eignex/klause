@@ -84,7 +84,10 @@ class SourceTransformationVerifier(
                 SourceCoordinate.Kind.Real -> Unit
             }
         }
-        if (target.scope.condition.bools.any { (id, value) -> source.scope.condition.bools[id] != value }) {
+        val unjustifiedPin = target.scope.condition.bools.any { (id, value) ->
+            source.scope.condition.bools[id] != value
+        }
+        if (unjustifiedPin) {
             return SourceEvidenceCheck.Rejected("target invocation adds an unjustified Boolean restriction")
         }
         val verifier = SourceEvidenceVerifier(source)

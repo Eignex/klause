@@ -9168,31 +9168,36 @@ public final class com/eignex/klause/solver/Session$DefaultImpls {
 }
 
 public abstract interface class com/eignex/klause/solver/SolveResult {
+	public abstract fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 }
 
 public final class com/eignex/klause/solver/SolveResult$Sat : com/eignex/klause/solver/SolveResult {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/SolveResult$Sat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Sat;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Sat;
+	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/SolveResult$Sat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Sat;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Sat;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/SolveResult$Unknown : com/eignex/klause/solver/SolveResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/SolveResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Unknown;
+	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/SolveResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Unknown;
 	public fun equals (Ljava/lang/Object;)Z
+	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
@@ -9201,16 +9206,18 @@ public final class com/eignex/klause/solver/SolveResult$Unknown : com/eignex/kla
 
 public final class com/eignex/klause/solver/SolveResult$Unsat : com/eignex/klause/solver/SolveResult {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/UnsatCore;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component3 ()Lcom/eignex/klause/propagation/Assumptions;
-	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolveResult$Unsat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Unsat;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Unsat;
+	public final fun component4 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/SolveResult$Unsat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/SolveResult$Unsat;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult$Unsat;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssumptionCore ()Lcom/eignex/klause/propagation/Assumptions;
 	public final fun getCore ()Lcom/eignex/klause/solver/result/UnsatCore;
+	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -9306,6 +9313,19 @@ public final class com/eignex/klause/solver/evidence/LinearSourceSemanticsChecke
 	public fun objectiveEquals (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
 	public fun ray (Lcom/eignex/klause/solver/evidence/SourceClaim$Ray;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
 	public fun witness (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+}
+
+public final class com/eignex/klause/solver/evidence/ProblemSourceEvidenceKt {
+	public static final fun sourceCondition (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/evidence/SourceCondition;
+	public static final fun sourceProofContext (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceProofContext;
+	public static synthetic fun sourceProofContext$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceProofContext;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceAffineImage {
+	public fun <init> (Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public synthetic fun <init> (Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCoefficients ()Ljava/util/Map;
+	public final fun getConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
 }
 
 public abstract interface class com/eignex/klause/solver/evidence/SourceClaim {
@@ -9678,6 +9698,15 @@ public final class com/eignex/klause/solver/evidence/SourceProofContext {
 	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
 }
 
+public final class com/eignex/klause/solver/evidence/SourceResultCapture {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceProofContext;)V
+	public final fun getContext ()Lcom/eignex/klause/solver/evidence/SourceProofContext;
+	public final fun minimize (Lcom/eignex/klause/solver/result/MinimizeResult;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/String;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/evidence/SourceResultCapture;Lcom/eignex/klause/solver/result/MinimizeResult;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/String;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public final fun solve (Lcom/eignex/klause/solver/SolveResult;Ljava/lang/String;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/SolveResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/evidence/SourceResultCapture;Lcom/eignex/klause/solver/SolveResult;Ljava/lang/String;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
+}
+
 public final class com/eignex/klause/solver/evidence/SourceResultEvidence {
 	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/List;Ljava/util/List;)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -9727,6 +9756,28 @@ public abstract interface class com/eignex/klause/solver/evidence/SourceSemantic
 public final class com/eignex/klause/solver/evidence/SourceSemanticsChecker$DefaultImpls {
 	public static fun derivation (Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceDerivation$Extension;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
 	public static fun objectiveEquals (Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceTransformation {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getImages ()Ljava/util/Map;
+	public final fun getObjectiveOffset ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getObjectiveScale ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getPremiseDerivations ()Ljava/util/Map;
+	public final fun getSource ()Lcom/eignex/klause/solver/evidence/SourceScope;
+	public final fun getTarget ()Lcom/eignex/klause/solver/evidence/SourceScope;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceTransformationVerifier {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceProofContext;Lcom/eignex/klause/solver/evidence/SourceProofContext;II)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceProofContext;Lcom/eignex/klause/solver/evidence/SourceProofContext;IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun objective (Lcom/eignex/klause/solver/evidence/SourceTransformation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public static synthetic fun objective$default (Lcom/eignex/klause/solver/evidence/SourceTransformationVerifier;Lcom/eignex/klause/solver/evidence/SourceTransformation;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public final fun refutation (Lcom/eignex/klause/solver/evidence/SourceTransformation;Lcom/eignex/klause/solver/evidence/SourceEvidence;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public static synthetic fun refutation$default (Lcom/eignex/klause/solver/evidence/SourceTransformationVerifier;Lcom/eignex/klause/solver/evidence/SourceTransformation;Lcom/eignex/klause/solver/evidence/SourceEvidence;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public final fun verify (Lcom/eignex/klause/solver/evidence/SourceTransformation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public static synthetic fun verify$default (Lcom/eignex/klause/solver/evidence/SourceTransformationVerifier;Lcom/eignex/klause/solver/evidence/SourceTransformation;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
 }
 
 public abstract interface class com/eignex/klause/solver/evidence/SourceValue {
@@ -11590,21 +11641,24 @@ public final class com/eignex/klause/solver/result/LpStats {
 
 public abstract interface class com/eignex/klause/solver/result/MinimizeResult {
 	public abstract fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public abstract fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public abstract fun getObjectiveValue ()Ljava/lang/Double;
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 }
 
 public final class com/eignex/klause/solver/result/MinimizeResult$BestFound : com/eignex/klause/solver/result/MinimizeResult$WithSample {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component2 ()D
 	public final fun component3 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;
+	public final fun component5 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$BestFound;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getObjective ()D
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
@@ -11616,15 +11670,17 @@ public final class com/eignex/klause/solver/result/MinimizeResult$BestFound : co
 
 public final class com/eignex/klause/solver/result/MinimizeResult$Infeasible : com/eignex/klause/solver/result/MinimizeResult {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/UnsatCore;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;
+	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;Lcom/eignex/klause/solver/result/UnsatCore;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Infeasible;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public final fun getCore ()Lcom/eignex/klause/solver/result/UnsatCore;
+	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
@@ -11632,15 +11688,17 @@ public final class com/eignex/klause/solver/result/MinimizeResult$Infeasible : c
 }
 
 public final class com/eignex/klause/solver/result/MinimizeResult$Optimal : com/eignex/klause/solver/result/MinimizeResult$WithSample {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component2 ()D
 	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;
+	public final fun component4 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;Lcom/eignex/klause/solver/Sample;DLcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Optimal;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getObjective ()D
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public fun getSample ()Lcom/eignex/klause/solver/Sample;
@@ -11650,17 +11708,19 @@ public final class com/eignex/klause/solver/result/MinimizeResult$Optimal : com/
 }
 
 public final class com/eignex/klause/solver/result/MinimizeResult$Unbounded : com/eignex/klause/solver/result/MinimizeResult$WithSample {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
 	public final fun component2 ()D
 	public final fun component3 ()Ljava/util/List;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
+	public final fun component5 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;Lcom/eignex/klause/solver/Sample;DLjava/util/List;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Unbounded;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
 	public final fun getDirection ()Ljava/util/List;
+	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getObjective ()D
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public fun getSample ()Lcom/eignex/klause/solver/Sample;
@@ -11670,14 +11730,16 @@ public final class com/eignex/klause/solver/result/MinimizeResult$Unbounded : co
 }
 
 public final class com/eignex/klause/solver/result/MinimizeResult$Unknown : com/eignex/klause/solver/result/MinimizeResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;
+	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/MinimizeResult$Unknown;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getAssignment ()Lcom/eignex/klause/solver/Sample;
+	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public fun getObjectiveValue ()Ljava/lang/Double;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
