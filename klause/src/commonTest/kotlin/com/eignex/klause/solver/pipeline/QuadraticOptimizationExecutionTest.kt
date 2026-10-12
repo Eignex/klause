@@ -157,7 +157,7 @@ class QuadraticOptimizationExecutionTest {
 
         val unknown = assertIs<QuadraticOptimizationResult.Unknown>(execution.result)
         assertEquals(BigFraction.ofLong(-4), unknown.bound?.value?.rational)
-        assertEquals(0L, unknown.stats.ls.moves.sum)
+        assertEquals(0.0, unknown.stats.ls.moves.sum)
     }
 
     @Test
