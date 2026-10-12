@@ -9,6 +9,7 @@ import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import platform.posix.SEEK_END
 import platform.posix.fclose
+import platform.posix.ferror
 import platform.posix.fflush
 import platform.posix.fopen
 import platform.posix.fprintf
@@ -32,7 +33,7 @@ internal actual fun errPrintln(message: String) {
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun flushCliOutput() {
-    check(fflush(stdout) == 0) { "CLI output failed" }
+    check(fflush(stdout) == 0 && ferror(stdout) == 0) { "CLI output failed" }
 }
 
 internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
