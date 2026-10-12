@@ -107,6 +107,17 @@ class PreparedSourcePlan internal constructor(
     /** Independent component list whose values own their coordinate and factor lists. */
     val components: List<ExecutionComponentDescriptor> get() = descriptions.toList()
 
+    /**
+     * Prepare the same ownership for exact linear coordinate windows and strict objective cutoffs.
+     * Returns null when a required source factor has no such completion. The returned plan admits
+     * registered source rows; each query's conditions and mutable session belong to its worker.
+     */
+    fun prepareConditionedLinearQuery(): PreparedSourcePlan? {
+        val ownership = componentPlan?.forLinearConditions(model) ?: return null
+        val original = originalSource as? Problem ?: return null
+        return model.preparedWithComponents(ownership, original, objective, maximize)
+    }
+
     /** Whether this plan retains [source] as its original source object. */
     fun belongsTo(source: Any): Boolean = originalSource === source
 
