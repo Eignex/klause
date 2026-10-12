@@ -86,21 +86,24 @@ deliberately omit CP propagation. Every inert built-in role carries a reason. A 
 family can decline emission under feature, resource or domain gates, and omitted rows
 weaken the relaxation.
 
-### Custom factor publication gap
+### Custom factor publication checks
 
 Custom factors retain the `Propagator` and `Invariant` extension paths. A custom
 `Propagator` without an `Invariant` maps to `NoInvariant`, which contributes no
-local violation. Unlike redundant built-in helpers, that choice does not establish
-that another factor enforces its source semantics. Standalone LS without completion
-can accept a zero-score candidate without checking the omitted constraint after
-its coordinates change. Root propagation alone does not validate that candidate.
+local violation. Before publishing a zero-score candidate, standalone LS and its
+ALNS consumers pin every Boolean and integer coordinate in a private propagation
+state containing the uncovered constraints. A completed full-assignment fixpoint
+checks the candidate; root consistency alone does not. Custom propagators must
+reject invalid complete assignments, as required by their CP execution path.
+Constraints requiring continuous coordinates without an exact local checker
+explicitly decline finite local-search execution.
 
-This is a source-publication misalignment tracked in
-[#2653](https://github.com/Eignex/klause/issues/2653). A propagation-only constraint
-needs a complete candidate check or another representation enforcing its semantics;
-omitted scoring alone cannot justify feasibility. A custom `Invariant` supplies
-local checking and scoring through its interface contract but does not supply a CP
-propagator. Engine-specific extension roles do not meet shared coverage by themselves.
+Rejection applies only to the candidate. Interrupted checking withholds publication
+without refuting the source or its assumptions. Caller completion runs after the
+uncovered finite checks and retains responsibility for exact arithmetic completion.
+Covered invariants and deliberately redundant built-in factors do not require this
+extra propagation check. A custom `Invariant` supplies local checking and scoring
+through its interface contract but does not supply a CP propagator.
 Structural-only custom factors refuse CP and local-search execution with route-specific
 errors. Custom implied linear rows remain available to LP relaxation independently of
 either execution interface.

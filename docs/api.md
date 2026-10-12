@@ -30,8 +30,8 @@ keeps borrowed arrays and structural keys stable; a custom component supplies co
 checks and sound explanations; a custom objective agrees at feasible assignments.
 The type system does not certify any of those semantic obligations.
 Engine-specific custom factor roles do not establish portable constraint coverage.
-The [custom factor publication gap](solver/search.md#custom-factor-publication-gap)
-must be considered when a propagation-only factor has no local checker.
+The [custom factor publication check](solver/search.md#custom-factor-publication-checks)
+pins every candidate coordinate when a propagation-only factor has no local checker.
 
 ## Model construction and solving
 
