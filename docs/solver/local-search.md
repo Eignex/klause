@@ -281,6 +281,11 @@ at most four variants over at most 32 selected factors. Conflicts, pins, ownersh
 defined cells reject a variant; original candidates remain available, and complete
 compound scoring checks every affected constraint.
 
+Cumulative repair generation separates peak preparation from proposal emission.
+The emission helper receives the borrowed payload and prepared peak coordinates
+and tasks. Conditional-duration proposals precede start proposals and swaps,
+keeping task, target and random-draw order.
+
 Opt-in Cumulative residual snapshots prioritize the start,
 duration and demand coordinates of tasks participating in the maximum overload,
 retaining coordinate bounds and omission counts.
