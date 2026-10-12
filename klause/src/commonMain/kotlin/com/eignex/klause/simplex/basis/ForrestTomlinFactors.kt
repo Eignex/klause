@@ -77,40 +77,8 @@ internal class ForrestTomlinFactors(factors: LuFactors) {
         var published = false
         lastUpdateWork = null
         try {
-            scatterSpike(spike)
-            val rows = rowsWithSpike(pivot)
-            row.load(rows[pivot])
-            val order = upper.order
-            val position = order.indexOf(pivot)
-            eliminateSpikeRow(rows, order, position)
-            val diagonal = row.values[pivot]
-            if (!diagonal.isFinite() || diagonal == 0.0 || abs(diagonal) < tolerance) return false
-            basisQuotient(1.0, diagonal)
-            rows[pivot] = BasisSlice(intArrayOf(pivot), doubleArrayOf(diagonal))
-            copiedEntries++
-            column.set(pivot, diagonal)
-            val columns = columnsWithSpike(pivot)
-            val nextOrder = pivotMovedLast(order, position, pivot)
-            val transform = ForrestTomlinRow(pivot, compact(multipliers))
-            val entries = columns.sumOf { it.count }
-            val report = ForrestTomlinWork(
-                columnProducts,
-                rowProducts,
-                copiedEntries,
-                entries,
-                transformEntries + transform.entries.count,
-            )
-            // Publish the two adjacency views and their shared order only after all checked arithmetic succeeds.
-            transforms.add(transform)
-            upper.columns = columns
-            transpose.columns = rows
-            upper.order = nextOrder
-            transpose.order = nextOrder
-            upperEntries = entries
-            transformEntries = report.transformEntries
-            lastUpdateWork = report
-            published = true
-            return true
+            published = prepareAndPublishUpdate(pivot, spike, tolerance)
+            return published
         } catch (_: ArithmeticException) {
             return false
         } finally {
@@ -124,6 +92,42 @@ internal class ForrestTomlinFactors(factors: LuFactors) {
                 )
             }
         }
+    }
+
+    private fun prepareAndPublishUpdate(pivot: Int, spike: BasisWorkspace, tolerance: Double): Boolean {
+        scatterSpike(spike)
+        val rows = rowsWithSpike(pivot)
+        row.load(rows[pivot])
+        val order = upper.order
+        val position = order.indexOf(pivot)
+        eliminateSpikeRow(rows, order, position)
+        val diagonal = row.values[pivot]
+        if (!diagonal.isFinite() || diagonal == 0.0 || abs(diagonal) < tolerance) return false
+        basisQuotient(1.0, diagonal)
+        rows[pivot] = BasisSlice(intArrayOf(pivot), doubleArrayOf(diagonal))
+        copiedEntries++
+        column.set(pivot, diagonal)
+        val columns = columnsWithSpike(pivot)
+        val nextOrder = pivotMovedLast(order, position, pivot)
+        val transform = ForrestTomlinRow(pivot, compact(multipliers))
+        val entries = columns.sumOf { it.count }
+        val report = ForrestTomlinWork(
+            columnProducts,
+            rowProducts,
+            copiedEntries,
+            entries,
+            transformEntries + transform.entries.count,
+        )
+        // Publish the two adjacency views and their shared order only after all checked arithmetic succeeds.
+        transforms.add(transform)
+        upper.columns = columns
+        transpose.columns = rows
+        upper.order = nextOrder
+        transpose.order = nextOrder
+        upperEntries = entries
+        transformEntries = report.transformEntries
+        lastUpdateWork = report
+        return true
     }
 
     // The spike column `U * spike` in [column].

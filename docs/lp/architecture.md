@@ -215,6 +215,9 @@ owns sparse and small dense elimination, DFS reach/density switching, Forrest-To
 logical repair, indexed forward/transpose solves and rational factors. Each
 owner has fixed dimension, named columns, both permutations and three-valued
 update results. Operation-owned buffers control scratch lifetime.
+Forrest-Tomlin update reset and failure-ledger finalization belong to the caller.
+The private update transaction prepares both adjacency views and their shared
+order, validates the diagonal, then publishes them together with the work report.
 `KotlinBasisSolver.refactorize` selects dense partial-row-pivot LU only for dimensions
 2–6 with at least 50% nonzero selected entries and more nonzeros than rows. The selected basis, rather than the
 whole source matrix or stored zeros, determines density. Windowed Koblas GER updates only
