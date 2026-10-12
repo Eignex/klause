@@ -56,8 +56,8 @@ internal fun quadraticBoxBound(
             first.second * second.first, first.second * second.second,
         )
         val scaled = values.map { it * coefficient }
-        lower += scaled.minOrNull()!!
-        upper += scaled.maxOrNull()!!
+        lower += scaled.reduce { left, right -> if (left < right) left else right }
+        upper += scaled.reduce { left, right -> if (left > right) left else right }
     }
     step()
     return (if (sense == ObjectiveSense.MINIMIZE) lower else upper) to QuadraticBoxEvidence(lower, upper)
