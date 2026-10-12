@@ -16,6 +16,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -66,6 +69,28 @@ class QuadraticIntegerOptimizationTest {
         assertEquals(value, result.incumbent.sample.exactIntValue(0))
         assertEquals(BigFraction.ZERO, result.incumbent.sample.algebraicReals?.single()?.rational)
         assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
+    }
+
+    @Test
+    fun `fractional optimum branches at an arbitrary width integer threshold`() {
+        val source = NonlinearIntegerProblem(
+            PolynomialRealFormula.Constant(true), 1, 0, mapOf("i" to 0), emptyMap(), emptyMap(),
+        )
+        val wide = parseBigInt("100000000000000000000")
+        val i = QuadraticVariable.Int(SourceIntId(0))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, i, i),
+            QuadraticObjectiveTerm(QuadraticCoefficient.of(parseBigInt("-200000000000000000001")), i),
+        ), QuadraticCoefficient.of(wide * (wide + BIG_ONE)))
+
+        val execution = OpenTheoryPipeline.minimize(
+            source.pipelineRequest(), objective, engine = FiniteEngine.BACKTRACK,
+        )
+
+        val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
+        assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
+        assertTrue(result.incumbent.sample.exactIntValue(0) in listOf(wide, wide + BIG_ONE))
+        assertTrue(result.stats.search.nodes.sum > 1)
     }
 
     @Test
