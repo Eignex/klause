@@ -52,7 +52,8 @@ class ProblemSetsTest {
         val root = File("sets")
         val sweep = ProblemSets.load(listOf("sweep"), root)
         val focused = listOf(
-            "open-int", "linear-real", "nonlinear-real", "mip", "scheduling", "routing", "packing", "globals", "sat", "maxsat", "pb",
+            "open-int", "linear-real", "nonlinear-real", "mip", "scheduling", "routing", "packing",
+            "globals", "sat", "maxsat", "pb",
         )
         val expected = focused.flatMap { ProblemSets.load(listOf(it), root) }
         assertEquals(
