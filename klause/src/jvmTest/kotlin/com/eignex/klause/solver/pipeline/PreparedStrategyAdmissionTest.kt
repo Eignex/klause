@@ -134,7 +134,7 @@ class PreparedStrategyAdmissionTest(private val model: String, private val engin
         val admission = plan.capabilities.admission(engine)
         assertTrue(admission.runnable)
         if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
-            assertTrue(stats.ls.moves.sum > 0 || model == "finite")
+            assertTrue(stats.ls.moves.sum > 0 || (model == "finite" && stats.ls.incumbentViolation == 0.0))
             assertEquals(setOf(ExecutionClaimAuthority.WITNESS), admission.claimAuthorities)
         }
     }
