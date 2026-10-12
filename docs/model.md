@@ -155,6 +155,16 @@ arrays. Local-search projections prepare table column maps, AllDifferent occurre
 and circuit scoring. Each engine interprets presence literals in its own state.
 Source lowering shares relation data without allocating engine preparation.
 
+## Public strategy construction
+
+Source strategy factories retain the original Problem and captured schema metadata.
+They consume the shared prepared route and arrange its required arithmetic completion
+before publishing original-coordinate witnesses. Finite preparation retains that same
+PreparedSourcePlan. Exact optimization results remain the existing native result types;
+source construction does not issue certificates or normalize proof payloads.
+[Library API](api.md#source-aware-strategy-entry-points) defines the supported controls
+and distinguishes the retained finite facades.
+
 ## Search state ownership
 
 Shared search exchanges Boolean literals, semantic integer bounds and typed opaque

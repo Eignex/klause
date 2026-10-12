@@ -2,24 +2,37 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.compile.CompiledSchema
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
+import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
+import com.eignex.klause.solver.pipeline.PreparedExecutionKind
+import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.minimize
+import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.pipeline.polynomialRequest
+import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -36,11 +49,18 @@ class SourceStrategy internal constructor(
     val source: Problem,
     /** Complete traversal or heuristic execution, without changing source constraints. */
     val engine: FiniteEngine,
+    /** Captured schema names and typed source locations, when constructed from a schema or compilation. */
+    val compiledSchema: CompiledSchema? = null,
 ) {
+    init {
+        require(engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.LOCAL_SEARCH)
+        require(compiledSchema == null || compiledSchema.problem === source)
+    }
+
     /**
      * Solve through the shared source route. [polynomial] retains finite strategy controls and arithmetic limits;
-     * [theory] supplies open-linear controls. Open-source assumption pins and extra CP components explicitly decline
-     * until that invocation service supports them. A heuristic rejection never refutes the source.
+     * [theory] supplies open-linear controls. Open-source assumption pins, extra CP components and finite seeding
+     * hooks explicitly decline. A heuristic rejection never refutes the source.
      */
     fun solve(
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
@@ -96,7 +116,104 @@ class SourceStrategy internal constructor(
         return solve(polynomial.copy(strategy = polynomial.strategy.copy(localSearch = params)), theory)
     }
 
+    /**
+     * Optimize an affine objective over bounded integer declarations and exact continuous constraints.
+     * The lossless shared bridge retains exact values, objective direction, bounds and attainment results.
+     * Open integer optimization uses [optimizeOpen]; an unsupported polynomial encoding explicitly declines.
+     */
+    fun optimize(
+        objective: LinearObjective,
+        polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    ): QuadraticOptimizationExecution {
+        val scope = scope(polynomial, TheoryParams())
+        if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
+        val plan = source.preparePolynomialExecutionPlan()
+        if (plan.kind != PreparedExecutionKind.POLYNOMIAL) return unsupportedQuadratic(sense)
+        return OpenTheoryPipeline.optimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
+    }
+
+    /** Optimize with complete finite controls and the shared exact affine-objective bridge. */
+    fun optimize(
+        objective: LinearObjective,
+        params: BacktrackParams,
+        polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    ): QuadraticOptimizationExecution {
+        require(engine == FiniteEngine.BACKTRACK) { "BacktrackParams require a backtracking source strategy" }
+        return optimize(objective, polynomial.copy(strategy = polynomial.strategy.copy(backtrack = params)), sense)
+    }
+
+    /** Optimize with finite heuristic controls and the shared exact affine-objective bridge. */
+    fun optimize(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+        polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    ): QuadraticOptimizationExecution {
+        require(engine == FiniteEngine.LOCAL_SEARCH) { "LocalSearchParams require a local-search source strategy" }
+        return optimize(objective, polynomial.copy(strategy = polynomial.strategy.copy(localSearch = params)), sense)
+    }
+
+    /** Optimize a captured exact quadratic objective over the same bounded-integer source and real constraints. */
+    fun optimize(
+        objective: QuadraticObjectiveSpec,
+        polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    ): QuadraticOptimizationExecution {
+        val scope = scope(polynomial, TheoryParams())
+        if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
+        val plan = source.preparePolynomialExecutionPlan()
+        if (plan.kind != PreparedExecutionKind.POLYNOMIAL) return unsupportedQuadratic(sense)
+        return OpenTheoryPipeline.minimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
+    }
+
+    /**
+     * Optimize a supported open-integer linear source through the existing native linear execution.
+     * Native costs and bounds retain minimization sense; [sense] selects the source objective direction.
+     * Unsupported fragment or invocation controls return the native incomplete result, without finite boxing.
+     */
+    fun optimizeOpen(
+        objective: LinearObjective,
+        polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
+        theory: TheoryParams = TheoryParams(),
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    ): OpenTheoryExecution {
+        val scope = scope(polynomial, theory)
+        fun incomplete(reason: TerminationReason): OpenTheoryExecution = OpenTheoryExecution.Optimize(
+            OpenTheoryOptimum.Bounded(null, null, reason, SolveStats.EMPTY),
+        )
+        if (scope.stop()) return incomplete(scope.unknown().reason)
+        if (!scope.supportsOpen(engine)) return incomplete(TerminationReason.Unsupported)
+        val route = source.pipelineRoute(
+            objective, maximize = sense == ObjectiveSense.MAXIMIZE,
+            routePureRealToTheory = true, routeLinearToTheory = true, boundCancellation = scope.stop,
+        )
+        if (scope.stop()) return incomplete(scope.unknown().reason)
+        return when (route) {
+            is SourceProblemRoute.OpenTheory -> OpenTheoryPipeline.execute(route.request, scope.theory, engine)
+            is SourceProblemRoute.UnsupportedOpen -> OpenTheoryPipeline.searchWithoutTheory(
+                route.problem, scope.theory,
+                if (sense == ObjectiveSense.MAXIMIZE) objective.negated() else objective, engine,
+            )
+            SourceProblemRoute.Refuted -> OpenTheoryExecution.Optimize(OpenTheoryOptimum.Infeasible(SolveStats.EMPTY))
+            else -> incomplete(TerminationReason.Unsupported)
+        }
+    }
+
+    private fun unsupportedQuadratic(
+        sense: ObjectiveSense,
+        reason: TerminationReason = TerminationReason.Unsupported,
+    ): QuadraticOptimizationExecution = QuadraticOptimizationExecution(
+        QuadraticOptimizationResult.Unknown(null, reason, sense, SolveStats.EMPTY),
+        PolynomialTheoryStats(), 0, 0,
+    )
+
     private fun finiteSolve(route: SourceProblemRoute.Finite, scope: SourceInvocation): OpenTheoryResult {
+        if (route.problem.numRealVars == 0 && route.problem.factors.any {
+                it.executionCapabilities().assignmentCheck == AssignmentCheckCapability.SOURCE_CERTIFICATION
+            }
+        ) return scope.unsupported()
         val preparation = FinitePipeline.prepare(FinitePipelineRequest(
             problem = route.problem, engine = engine, preparedPlan = route.preparedPlan,
             presolveConfig = PresolveConfig.NONE, explicitPresolveConfig = true, solutionSetSensitive = true,
@@ -173,7 +290,9 @@ class SourceStrategy internal constructor(
         val polynomial: PolynomialTheoryParams,
     ) {
         fun unknown(stats: SolveStats = SolveStats.EMPTY): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(
-            if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout else TerminationReason.Cancelled, stats,
+            if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
+            else TerminationReason.Cancelled,
+            stats,
         )
         fun supportsOpen(engine: FiniteEngine): Boolean = assumptions.isEmpty && when (engine) {
             FiniteEngine.BACKTRACK -> backtrack.componentFactory == null && backtrack.nodeBudget == null &&

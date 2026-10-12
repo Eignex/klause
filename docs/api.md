@@ -43,13 +43,37 @@ contexts; [input semantics](formats.md) defines route coverage.
 
 ### Source-aware strategy entry points
 
-Shared pipeline entry points compose finite search and arithmetic completion.
-`BacktrackSolver(compiled)` and `LocalSearchSolver(compiled)` instead bake directly;
-their constructors do not arrange the polynomial source decomposition. Continuous
-products supported by the pipeline can consequently fail those finite projections.
-These advertised facade restrictions are a coverage misalignment tracked in
-[#2656](https://github.com/Eignex/klause/issues/2656), not a requirement to move real
-domains into finite propagation.
+`BacktrackSolver.source(problem/compiled/schema)` and
+`LocalSearchSolver.source(problem/compiled/schema)` return a `SourceStrategy` that
+arranges shared preparation and required arithmetic completion. Schema construction
+captures the compilation once; `compiledSchema` retains names and typed source
+locations. `solve` returns `OpenTheoryResult` and exact source-coordinate assignments,
+including algebraic reals and arbitrary-width open integers. Finite globals remain
+part of the same source rather than becoming an unconstrained finite projection.
+
+Typed `BacktrackParams` and `LocalSearchParams` overloads retain their finite and
+polynomial controls. `PolynomialTheoryParams` supplies native polynomial limits and
+common pins; `TheoryParams` supplies open-linear limits. These are distinct work
+currencies. A source operation owns fresh private state; shared node allowances retain
+their identity. Unsupported open pins, extra CP components and finite-only hooks return
+`Unknown(Unsupported)` rather than losing their constraints or controls.
+
+`optimize` preserves the existing `QuadraticOptimizationExecution` surface through
+the shared exact affine or quadratic entry point. It supports bounded integer
+sources, continuous products and open real coordinates, with exact objective values,
+direction-aware bounds, attainment and incomplete results. `optimizeOpen` exposes
+the existing native `OpenTheoryExecution` for supported open-integer linear sources;
+its values retain native minimization sense. Neither entry point converts rounded
+finite scores into exact source claims.
+
+The baked `BacktrackSolver` and `LocalSearchSolver` classes retain their finite
+sessions, streams, enumeration and resumable APIs. Their compiled/schema constructors
+remain compatible with warning-level finite-only migration messages. Source strategies
+do not advertise those finite enumeration/counting/retained-stream operations for
+continuous or open models. Source support follows [input coverage](formats.md) and
+[theory contracts](theories.md); resource stops and incomplete procedures remain honest.
+Finite integer-only floating rows requiring external source certification explicitly
+decline satisfaction when the selected finite route provides no arithmetic completion.
 
 ### Objective admission
 
