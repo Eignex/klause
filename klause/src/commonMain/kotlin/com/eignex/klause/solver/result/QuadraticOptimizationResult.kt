@@ -42,8 +42,13 @@ class QuadraticCertificate private constructor(
         expected: SourceClaim,
         context: SourceProofContext,
         cancellation: Cancellation = Cancellation.Never,
-    ): SourceEvidenceCheck = evidence?.verify(expected, context, cancellation)
-        ?: SourceEvidenceCheck.Unavailable("quadratic original-source derivation capture unavailable")
+    ): SourceEvidenceCheck {
+        if (attestedScope != null && attestedScope != context.scope) {
+            return SourceEvidenceCheck.Rejected("quadratic attestation belongs to a different source invocation")
+        }
+        return evidence?.verify(expected, context, cancellation)
+            ?: SourceEvidenceCheck.Unavailable("quadratic original-source derivation capture unavailable")
+    }
 
     internal companion object {
         fun attested(model: ModelIdentity, scope: SourceScope, claim: QuadraticClaim): QuadraticCertificate =

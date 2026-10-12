@@ -90,4 +90,14 @@ class SourceQuadraticEvidenceTest {
 
         assertIs<SourceEvidenceCheck.Unavailable>(captured.verifySourceEvidence(context))
     }
+
+    @Test
+    fun `a scoped quadratic attestation cannot be used for another invocation`() {
+        val context = assertNotNull(model.quadraticSourceProofContext(scope, objective))
+        val foreign = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
+        val certificate = QuadraticCertificate.attested(ModelIdentity.of(model, objective), foreign, QuadraticClaim.Bound)
+
+        assertIs<SourceEvidenceCheck.Rejected>(certificate.verify(SourceClaim.Bound(BigFraction.ZERO), context))
+    }
+
 }
