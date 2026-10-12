@@ -35,6 +35,7 @@ internal sealed interface QuadraticIntegerNode {
     data class Pruned(val proof: Any) : QuadraticIntegerNode
     data class Split(val coordinate: Int, val threshold: BigInt) : QuadraticIntegerNode
     data class Unbounded(val assignment: QfNraAssignment, val proof: Any) : QuadraticIntegerNode
+    data object BranchBooleans : QuadraticIntegerNode
     data object Unknown : QuadraticIntegerNode
 }
 

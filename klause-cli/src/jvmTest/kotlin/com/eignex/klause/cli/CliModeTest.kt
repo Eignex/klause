@@ -27,6 +27,99 @@ import kotlin.test.assertTrue
 class CliModeTest {
 
     @Test
+    fun `SMT quadratic optimum reports an exact incumbent and certified bound`() {
+        val source = File.createTempFile("quad-optimum", ".smt2").apply {
+            writeText("(declare-const x Real) (minimize (* x x)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
+
+        assertTrue("sat" in output.lines(), output)
+        assertTrue("; objective=0.0" in output.lines(), output)
+        assertTrue("; objectiveBound=0.0" in output.lines(), output)
+        assertTrue("; optimizationStatus=optimal" in output.lines(), output)
+        assertTrue("; solvePipeline=quadratic-polynomial" in output.lines(), output)
+    }
+
+    @Test
+    fun `SMT strict quadratic infimum retains a feasible model distinct from its bound`() {
+        val source = File.createTempFile("quad-infimum", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (> x 0)) (minimize (* x x)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+
+        assertTrue("; optimizationStatus=unattained-infimum" in output.lines(), output)
+        assertTrue("; objectiveBound=0.0" in output.lines(), output)
+        assertTrue("; objectiveBoundStrict=true" in output.lines(), output)
+        assertFalse("; optimizationStatus=optimal" in output.lines(), output)
+        assertFalse("(define-fun x () Real 0.0)" in output, output)
+    }
+
+    @Test
+    fun `SMT strict quadratic maximization reports its nonzero supremum in source direction`() {
+        val source = File.createTempFile("quad-supremum", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (> x 0)) (maximize (- 5 (* x x))) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+
+        assertTrue("; optimizationStatus=unattained-supremum" in output.lines(), output)
+        assertTrue("; objectiveBoundDirection=upper" in output.lines(), output)
+        assertTrue("; objectiveBound=5.0" in output.lines(), output)
+        assertFalse("; objective=5.0" in output.lines(), output)
+    }
+
+    @Test
+    fun `SMT algebraic quadratic objective renders an exact root value`() {
+        val source = File.createTempFile("quad-algebraic", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (minimize x)")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+
+        assertTrue("; objective=(root-obj (+ (- 2) (* 1 (^ x 2))) 2)" in output.lines(), output)
+        assertTrue("; optimizationStatus=optimal" in output.lines(), output)
+    }
+
+    @Test
+    fun `SMT quadratic local search preserves a wide integer objective without optimal status`() {
+        val source = File.createTempFile("quad-wide", ".smt2").apply {
+            writeText("(declare-const i Int) (assert (= i 100000000000000000000)) (minimize (* i i))")
+            deleteOnExit()
+        }
+
+        val output = capture {
+            assertEquals(0, runCli(arrayOf("-e", "ls", "-s", "--param", "nia-moves=1", source.absolutePath)))
+        }
+
+        assertTrue("; objective=10000000000000000000000000000000000000000.0" in output.lines(), output)
+        assertTrue("(define-fun i () Int 100000000000000000000)" in output, output)
+        assertTrue("; optimizationStatus=best-found" in output.lines(), output)
+        assertTrue("; lsMoves=1" in output.lines(), output)
+    }
+
+    @Test
+    fun `SMT zero quadratic native allowance publishes unknown without a model`() {
+        val source = File.createTempFile("quad-zero", ".smt2").apply {
+            writeText("(declare-const x Real) (minimize (* x x))")
+            deleteOnExit()
+        }
+
+        val output = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nra-work-limit=0", source.absolutePath)))
+        }
+
+        assertTrue("unknown" in output.lines(), output)
+        assertTrue("; quadraticNativeWork=0" in output.lines(), output)
+        assertFalse("define-fun" in output, output)
+    }
+
+    @Test
     fun `exact FlatZinc optimizes a continuous objective in either direction`() {
         for ((direction, expected) in listOf("minimize" to -1.5, "maximize" to 1.5)) {
             val fzn = File.createTempFile("floatobj", ".fzn").apply {

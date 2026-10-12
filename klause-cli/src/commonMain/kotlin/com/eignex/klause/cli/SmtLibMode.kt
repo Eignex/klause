@@ -16,6 +16,8 @@ import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -76,6 +78,11 @@ internal object SmtLibMode : CliMode {
                         { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
                         admissionStart.elapsedNow().inWholeMilliseconds,
                     )
+                }
+
+                is SmtLibInput.Quadratic -> {
+                    common.takeOpenBoundProof()
+                    return quadraticSmtSolvable(admitted, admissionStart.elapsedNow().inWholeMilliseconds)
                 }
 
                 SmtLibInput.Interrupted -> return interruptedSolvable(
@@ -162,6 +169,35 @@ internal object SmtLibMode : CliMode {
 
         override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput { latestSourceObjective }
     }
+}
+
+private fun quadraticSmtSolvable(input: SmtLibInput.Quadratic, admissionElapsedMs: Long): Solvable {
+    val request: QuadraticRequest
+    val ints: Map<String, Int>
+    val bools: Map<String, Int>
+    val reals: Map<String, Int>
+    when (val source = input.source) {
+        is SmtLibInput.Polynomial -> {
+            request = QuadraticRequest.Polynomial(source.problem.pipelineRequest())
+            ints = emptyMap()
+            bools = source.problem.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
+            reals = source.problem.realVarNames.mapKeys { smtSourceSymbol(it.key) }
+        }
+        is SmtLibInput.NonlinearInteger -> {
+            request = QuadraticRequest.Integer(source.problem.pipelineRequest())
+            ints = source.problem.intVarNames.mapKeys { smtSourceSymbol(it.key) }
+            bools = source.problem.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
+            reals = source.problem.realVarNames.mapKeys { smtSourceSymbol(it.key) }
+        }
+        else -> error("quadratic SMT source snapshot is invalid")
+    }
+    return quadraticSolvable(request, input.objective, input.sense, { sample ->
+        val assignment = OpenTheoryAssignment.Rebuilt(
+            OpenTheoryAssignment.ExactNra(ExactNraAssignment(sample.bools, requireNotNull(sample.algebraicReals))),
+            sample.bools, Array(sample.numIntVars) { sample.exactIntValue(it) },
+        )
+        renderOpenTheoryModel(ints, bools, reals, assignment)
+    }, admissionElapsedMs)
 }
 
 private fun LinearObjective.requiresExactRoute(model: Problem): Boolean {
@@ -266,6 +302,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
         sourceObjective()?.toString() ?: super.formatContinuousObjective(objective)
 
     private var optimize = false
+    private var quadraticResult: QuadraticOptimizationResult? = null
 
     override val commentPrefix: String = ";"
     override val streamObjective: Boolean = true
@@ -273,10 +310,41 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     override fun begin(optimize: Boolean, maximize: Boolean) {
         this.optimize = optimize
+        quadraticResult = null
+        best = null
     }
 
-    override fun completionMetadata(verdict: Verdict): String? =
-        if (optimize) "optimizationStatus=${verdict.name.lowercase().replace('_', '-')}" else null
+    override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
+        quadraticResult = result
+        best = rendered
+        (result as? QuadraticOptimizationResult.WithIncumbent)?.let {
+            println("; objective=${smtAlgebraicValue(it.incumbent.value)}")
+        }
+        val bound = when (result) {
+            is QuadraticOptimizationResult.Optimal -> result.bound
+            is QuadraticOptimizationResult.UnattainedLimit -> result.bound
+            is QuadraticOptimizationResult.BestFound -> result.bound
+            is QuadraticOptimizationResult.Unknown -> result.bound
+            else -> null
+        }
+        bound?.let {
+            val direction = if (result.sense == ObjectiveSense.MINIMIZE) "lower" else "upper"
+            println("; objectiveBoundDirection=$direction")
+            println("; objectiveBound=${smtAlgebraicValue(it.value)}")
+            println("; objectiveBoundStrict=${it.strict}")
+        }
+    }
+
+    override fun completionMetadata(verdict: Verdict): String? {
+        if (!optimize) return null
+        val status = when (val result = quadraticResult) {
+            is QuadraticOptimizationResult.UnattainedLimit -> if (result.sense == ObjectiveSense.MINIMIZE) {
+                "unattained-infimum"
+            } else "unattained-supremum"
+            else -> verdict.name.lowercase().replace('_', '-')
+        }
+        return "optimizationStatus=$status"
+    }
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND, Verdict.UNBOUNDED -> "sat"

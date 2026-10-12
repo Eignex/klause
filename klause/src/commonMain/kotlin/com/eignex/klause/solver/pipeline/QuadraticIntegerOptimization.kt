@@ -11,6 +11,7 @@ import com.eignex.klause.arithmetic.polynomial.exactInteger
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
+import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -31,6 +32,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecisionBudget
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -101,6 +103,7 @@ internal class QuadraticIntegerOptimization(
     private lateinit var root: PolynomialCondition
     private lateinit var scope: QuadraticIntegerProofScope
     private lateinit var identity: ModelIdentity
+    private var relevantBooleans: Set<Int> = emptySet()
     private val sink = SolveStatsSink("quadratic-integer").also { it.start() }
     private val random = Random(controls.strategy.localSearch.randomSeed ?: 1L)
     private var incumbent: QuadraticIncumbent? = null
@@ -115,6 +118,23 @@ internal class QuadraticIntegerOptimization(
     fun execute(): QuadraticOptimizationResult = try {
         preparation.step()
         val expression = objective.openPolynomial(source, preparation::step)
+        val booleanWork = ArrayDeque<PolynomialRealFormula>()
+        val booleanSeen = HashSet<PolynomialRealFormula>()
+        val booleanIds = linkedSetOf<Int>()
+        booleanWork.addLast(expression.formula)
+        while (booleanWork.isNotEmpty()) {
+            preparation.step()
+            val formula = booleanWork.removeLast()
+            if (!booleanSeen.add(formula)) continue
+            when (formula) {
+                is PolynomialRealFormula.BooleanVariable -> booleanIds += formula.id.index
+                is PolynomialRealFormula.And -> booleanWork.addAll(formula.operands)
+                is PolynomialRealFormula.Or -> booleanWork.addAll(formula.operands)
+                is PolynomialRealFormula.Not -> booleanWork.addLast(formula.operand)
+                else -> Unit
+            }
+        }
+        relevantBooleans = booleanIds.toSet()
         val canonical = if (sense == ObjectiveSense.MINIMIZE) expression.expression else PolynomialExpression.Product(
             listOf(PolynomialExpression.Constant.of(bigIntOf(-1)), expression.expression),
         )
@@ -225,7 +245,13 @@ internal class QuadraticIntegerOptimization(
                 source.boolCount, SearchSolveParams(maxDecisions = minOf(
                     params.maximumCandidates, controls.strategy.backtrack.maxDecisions,
                     controls.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE,
-                )), BooleanBranching.None,
+                )), BooleanBranching { context ->
+                    relevantBooleans.firstOrNull {
+                        it !in condition.bools && context.boolValue(it) == null
+                    }?.let { id ->
+                        listOf(SearchDecision.Bool((id shl 1) or 1), SearchDecision.Bool(id shl 1))
+                    }
+                },
                 decisionBudget = SearchDecisionBudget {
                     if (budget?.exhausted() == true) false else { budget?.spend(); true }
                 }, nodePolicy = component,
@@ -265,6 +291,7 @@ internal class QuadraticIntegerOptimization(
         stop: Cancellation,
         global: Boolean,
     ): QuadraticIntegerNode {
+        if (relevantBooleans.any { it !in condition.bools }) return QuadraticIntegerNode.BranchBooleans
         val result = relaxation.check(condition, stop, mandatory = false)
         if (result is QuadraticRelaxationResult.Infeasible) {
             if (global) proofs += result
@@ -489,7 +516,9 @@ internal class QuadraticIntegerOptimization(
                 lower[id] = center - spread
                 upper[id] = center + spread
             }
-            incumbent?.sample?.algebraicReals?.forEachIndexed { id, value ->
+            incumbent?.sample?.algebraicReals?.takeIf {
+                released.none { it < source.boolCount + intCount }
+            }?.forEachIndexed { id, value ->
                 val spread = if (source.boolCount + intCount + id in released) radius else BigFraction.ZERO
                 lower[intCount + id] = value.lowerBound - spread
                 upper[intCount + id] = value.upperBound + spread

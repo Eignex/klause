@@ -21,7 +21,10 @@ internal class PolynomialIntegerRecession(
     val objective: PolynomialExpression,
     val integers: List<Int>,
     val certificate: CheckedQuadraticUnbounded,
-)
+    bools: Map<Int, Boolean>,
+) {
+    val bools = bools.toMap()
+}
 
 internal fun tryPolynomialIntegerRecession(
     formula: PolynomialRealFormula,
@@ -39,7 +42,8 @@ internal fun tryPolynomialIntegerRecession(
     }
     if (integers.any { base[it].den != BIG_ONE }) return null
     val bools = (0 until assignment.boolCount).associateWith(assignment::boolValue)
-    val model = polynomialQuadraticModel(formula, objective, base.size, bools, arithmetic, control) ?: return null
+    val conditioned = PolynomialBooleanCondition.apply(formula, bools, arithmetic::step)
+    val model = polynomialQuadraticModel(conditioned, objective, base.size, bools, arithmetic, control) ?: return null
     val rows = model.rows.map { row ->
         arithmetic.step()
         QuadraticRow(row.coefficients, BigFraction.ZERO,
@@ -54,7 +58,7 @@ internal fun tryPolynomialIntegerRecession(
         val certificate = checker.unbounded(model, base, scaled) ?: return null
         check(integers.all { certificate.direction[it].den == BIG_ONE })
         arithmetic.step()
-        return PolynomialIntegerRecession(formula, objective, integers.toList(), certificate)
+        return PolynomialIntegerRecession(formula, objective, integers.toList(), certificate, bools)
     }
     val targets = buildList {
         add(model.linear.map { it.negated() })

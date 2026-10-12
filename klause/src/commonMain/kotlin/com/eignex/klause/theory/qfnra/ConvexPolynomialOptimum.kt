@@ -22,7 +22,10 @@ internal class ConvexPolynomialOptimum(
     val objective: PolynomialExpression,
     val assignment: QfNraAssignment,
     val certificate: CheckedQuadraticOptimum,
-)
+    bools: Map<Int, Boolean>,
+) {
+    val bools = bools.toMap()
+}
 
 internal fun tryConvexPolynomialOptimum(
     formula: PolynomialRealFormula,
@@ -36,7 +39,8 @@ internal fun tryConvexPolynomialOptimum(
     formula.requireVariableCounts(boolCount, realCount, arithmetic::step)
     require(bools.keys.all { it in 0 until boolCount })
     val algebraic = AlgebraicArithmetic(arithmetic)
-    val model = polynomialQuadraticModel(formula, objective, realCount, bools, arithmetic, control) ?: return null
+    val conditioned = PolynomialBooleanCondition.apply(formula, bools, arithmetic::step)
+    val model = polynomialQuadraticModel(conditioned, objective, realCount, bools, arithmetic, control) ?: return null
     val candidates = QuadraticCandidates(control)
     val checker = QuadraticCertification(control)
     val proposed = candidates.proposeActiveRows(model, List(realCount) { 0.0 })
@@ -73,7 +77,7 @@ internal fun tryConvexPolynomialOptimum(
             algebraic.evaluate(originalObjective, coordinates), algebraic.rational(bound.value),
         ) == 0)
         arithmetic.step()
-        return ConvexPolynomialOptimum(formula, objective, assignment, optimum)
+        return ConvexPolynomialOptimum(formula, objective, assignment, optimum, bools)
     }
     return null
 }

@@ -9,6 +9,8 @@ import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
@@ -33,6 +35,18 @@ sealed interface SmtLibInput {
         /** Neutral source formula and separate original coordinate identities. */
         val problem: NonlinearIntegerProblem,
     ) : SmtLibInput
+
+    /** A captured quadratic objective on an existing exact source snapshot. */
+    data class Quadratic(
+        /** Polynomial real or nonlinear integer source, retaining original declarations. */
+        val source: SmtLibInput,
+        /** Exact quadratic coefficients and typed original coordinate identities. */
+        val objective: QuadraticObjectiveSpec,
+        /** Original source optimization direction. */
+        val sense: ObjectiveSense,
+    ) : SmtLibInput {
+        init { require(source is Polynomial || source is NonlinearInteger) }
+    }
 
     /** Admission stopped before a complete source snapshot could be published. */
     data object Interrupted : SmtLibInput
@@ -79,7 +93,7 @@ object SmtLibAdmission {
                 val polynomial = withSource(openSource, cancellation) { source ->
                     SmtLibPolynomial.parse(source, cancellation, allowIntegers = true)
                 }
-                if (polynomial.intVarNames.isNotEmpty()) {
+                val source = if (polynomial.intVarNames.isNotEmpty()) {
                     SmtLibInput.NonlinearInteger(NonlinearIntegerProblem(
                         polynomial.formula, polynomial.realCount, polynomial.boolCount,
                         polynomial.intVarNames, polynomial.realVarNames, polynomial.boolVarNames,
@@ -95,6 +109,7 @@ object SmtLibAdmission {
                         polynomial.boolVarNames,
                     ),
                 )
+                polynomial.objective?.let { SmtLibInput.Quadratic(source, it, polynomial.objectiveSense) } ?: source
             }
             if (cancellation()) SmtLibInput.Interrupted else result
         } catch (_: PolynomialSourceInterrupted) {
@@ -127,6 +142,7 @@ private fun parseLinearAdmission(
     var invalidNonlinearSession = false
     var nonlinearSyntax = false
     var signedSymbols = false
+    var quadraticObjective = false
     while (true) {
         val command = reader.readCommandOrNull() ?: break
         if (!scope.command(command)) smtUnsupported("source symbol is outside its lexical scope")
@@ -134,6 +150,9 @@ private fun parseLinearAdmission(
         nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
         signedSymbols = signedSymbols || hasSignedNumberSymbol(command, cancellation)
         val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
+        if (head == "minimize" || head == "maximize") {
+            quadraticObjective = quadraticObjective || hasNonlinearSyntax(command, cancellation)
+        }
         if (exited || (querySeen && head !in setOf("get-model", "exit", "set-info", "set-option"))) {
             invalidNonlinearSession = true
         }
@@ -142,6 +161,7 @@ private fun parseLinearAdmission(
         if (head == "define-fun") integerHelpers = integerHelpers || hasIntegerSyntax(command, cancellation)
         if (head == "set-logic") logic = ((command as SExpr.SList).items.getOrNull(1) as? SExpr.Atom)?.text
     }
+    if (quadraticObjective) smtUnsupported("quadratic objectives require exact source capture")
     // Definition scopes exclude caller-local bindings in pure satisfaction helpers.
     val polynomialLogic = logic == null || logic in setOf("QF_NRA", "QF_LRA", "QF_RDL", "ALL")
     if (polynomialLogic && !integerHelpers && builder.intNames.isEmpty() &&

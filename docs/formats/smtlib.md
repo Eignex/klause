@@ -79,6 +79,14 @@ Finite witnesses report objectives from certified real values and exact integer
 sums. Supported linear integer optimization uses the complete theory route when
 its objective range can exceed the consecutive-integer range of binary64.
 
+Quadratic objectives retain exact rational/algebraic incumbent values and report a
+separate `objectiveBound`, `objectiveBoundDirection` and `objectiveBoundStrict`
+when a global bound is checked. An unattained boundary reports
+`optimizationStatus=unattained-infimum` or `unattained-supremum`; its model remains
+a feasible incumbent with its own objective value. The boundary is never printed
+as an attained model. Local search and ALNS report `best-found`, even when a
+neighborhood optimum is known. `sat` describes source feasibility only.
+
 Open integers retain arbitrary-precision source bounds. A linear relaxation witness
 does not establish integrality: shared search splits fractional integers at exact
 floor/ceiling thresholds. Strict real inequalities require an interior witness or
@@ -94,7 +102,7 @@ exact `to_real` embedding. Its `pipelineRequest()` selects sound incomplete inte
 execution. Native admission validates declaration visibility and canonical names.
 Syntactically nonlinear helpers use lexical fallback even when a constant argument
 makes the expanded expression linear; caller-local bindings cannot alter definition
-scope. Nonlinear sessions accept one nonincremental satisfaction query.
+scope. Nonlinear sessions accept one nonincremental query with at most one objective.
 
 The internal `SmtLibPolynomial.parse` entry point preserves pure Real/Bool polynomial
 satisfaction sources separately from `SmtLib.parse` and its linear factors. It performs
@@ -121,12 +129,23 @@ with an exact integer
 defining polynomial and one-based distinct real-root index. Canonical names are
 quoted in the model. A negative SMT numeral is `(- n)`; a bare `-n` is a symbol.
 
-This route supports one satisfaction result and model publication. It declines
-all-solution enumeration and polynomial optimization. Local search and ALNS generate finite candidates or exact coordinate neighborhoods and request exact continuous
+This route supports one satisfaction or quadratic optimization result and model publication.
+It declines all-solution enumeration. Local search and ALNS generate finite candidates or exact coordinate neighborhoods and request exact continuous
 completion. They publish exact witnesses and retain heuristic proof guarantees:
 failed completion never establishes global UNSAT. Mixed solving schedules complete
 backtracking, local search and ALNS over the same polynomial constraints. Native
 polynomial allowances belong to the containing invocation across all workers.
+
+`SmtLibInput.Quadratic` binds an exact `QuadraticObjectiveSpec` and its source
+direction to the existing polynomial or nonlinear integer snapshot. The lexical
+evaluator captures the objective in the environment visible at its command.
+Generic degree-two lowering retains literal cross coefficients and separate
+original Bool/Int/Real identities. Numeric selections controlled by original
+Boolean coordinates expand into their exact Boolean polynomial terms; their
+guarded auxiliary definitions remain private to the formula. Hidden nonpolynomial
+coordinates and objectives above degree two decline. Nonlinear objective syntax
+cannot be published as a finite proxy objective. Ordinary successful linear
+objectives retain linear admission.
 
 ### Source representation
 
@@ -168,8 +187,10 @@ Unsupported syntax is rejected even inside a constant Boolean
 branch. One `check-sat` or `check-sat-assuming` query is accepted; Boolean literal
 assumptions are conjoined with the assertions. `get-model` is accepted as a request.
 Symbolic or zero division, negative/noninteger powers, nonlinear integer div/mod/to_int,
-uninterpreted functions, nonpolynomial operations, quantifiers, objectives, incremental
+uninterpreted functions, nonpolynomial operations, quantifiers, multiple or nonquadratic objectives, incremental
 commands, multiple queries and `get-value` decline explicitly.
+`get-objectives` is accepted for a captured objective; the CLI reports exact
+objective and bound metadata alongside its source status.
 
 ### Parsing resources
 

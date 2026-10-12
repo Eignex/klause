@@ -1,6 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Sample
@@ -104,8 +106,13 @@ internal class Solvable(
 
     /** Finite CP problem. */
     val problem: Problem? get() = finite?.problem
-    val optimize: Boolean get() = finite?.optimize ?: (openRequest?.objective != null || polynomial?.objective != null)
-    val maximize: Boolean get() = finite?.maximize ?: (openRequest?.maximize ?: polynomial?.maximize ?: false)
+    val optimize: Boolean get() = finite?.optimize ?: (
+        openRequest?.objective != null || polynomial?.objective != null || quadratic != null
+    )
+    val maximize: Boolean get() = finite?.maximize ?: (
+        openRequest?.maximize ?: polynomial?.maximize ?: (quadratic?.sense == ObjectiveSense.MAXIMIZE)
+    )
+    private val quadratic: SolvablePipeline.QuadraticTheory? get() = pipeline as? SolvablePipeline.QuadraticTheory
     private val polynomial: SolvablePipeline.PolynomialTheory? get() = pipeline as? SolvablePipeline.PolynomialTheory
     private val openRequest: OpenTheoryRequest? get() = (pipeline as? SolvablePipeline.OpenTheory)?.request
     val lsObjective: IncrementalObjective? get() = finite?.localSearchObjective
@@ -178,6 +185,13 @@ internal sealed interface SolvablePipeline {
     data class NonlinearIntegerTheory(
         val request: NonlinearIntegerTheoryRequest,
         val render: (OpenTheoryAssignment) -> String,
+    ) : SolvablePipeline
+
+    data class QuadraticTheory(
+        val request: QuadraticRequest,
+        val objective: QuadraticObjectiveSpec,
+        val sense: ObjectiveSense,
+        val render: (Sample) -> String,
     ) : SolvablePipeline
 
     data class Interrupted(val reason: TerminationReason) : SolvablePipeline

@@ -8,7 +8,10 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 
-internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
+internal class PolynomialRealLowering(
+    firstAuxiliaryReal: Int,
+    private val captureConditional: ((PolynomialConditional) -> Unit)? = null,
+) {
     var realCount = firstAuxiliaryReal
         private set
     private val definitions = ArrayList<PolynomialRealFormula>()
@@ -24,6 +27,7 @@ internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
         val value = PolynomialExpression.Variable(SourceRealId(realCount++))
         definitions.add(or(listOf(not(condition), relation(value, PolynomialRelation.EQ, whenTrue))))
         definitions.add(or(listOf(condition, relation(value, PolynomialRelation.EQ, whenFalse))))
+        captureConditional?.invoke(PolynomialConditional(value.id.index, condition, whenTrue, whenFalse))
         return value
     }
 
@@ -152,6 +156,13 @@ internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
         ): PolynomialRealFormula = or(listOf(and(listOf(condition, whenTrue)), and(listOf(not(condition), whenFalse))))
     }
 }
+
+internal class PolynomialConditional(
+    val coordinate: Int,
+    val condition: PolynomialRealFormula,
+    val whenTrue: PolynomialExpression,
+    val whenFalse: PolynomialExpression,
+)
 
 internal class PolynomialSourceInterrupted : RuntimeException("polynomial source lowering interrupted")
 

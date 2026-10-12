@@ -84,6 +84,10 @@ are the implementation source for supported names, aliases and help text.
 SMT-LIB optimization streams `; objective=<value>` for each incumbent in the source
 objective's direction and emits `; optimizationStatus=<status>` at completion.
 These comments appear without `-s`; `sat` alone does not establish optimality.
+Quadratic results additionally separate the exact incumbent objective from its
+certified `objectiveBound`, direction and strictness. Unattained boundaries report
+`unattained-infimum` or `unattained-supremum` with a feasible model distinct from
+the boundary.
 See [SMT-LIB result semantics](formats/smtlib.md) for the status contract and
 [saved benchmark results](../klause-bench/README.md#saved-results) for proof credit and
 the interpretation of interrupted incumbents and unbounded witness objectives.
@@ -182,8 +186,8 @@ Solver-control flags are common to **every** mode:
 Polynomial-real satisfaction composes complete finite traversal, local search,
 ALNS and mixed portfolios with exact polynomial completion. Pure-real sources and
 fixed finite projections use exact coordinate neighborhoods in heuristic arms.
-Finite-column objectives are supported; continuous objectives and enumeration
-remain outside this route. Its native parameters are
+Finite-column and exact quadratic objectives are supported; all-solution
+enumeration remains outside this route. Its native parameters are
 `nra-work-limit=auto|unlimited|N`, `nra-dense-coefficients=auto|unlimited|N` and
 `nra-matrix-cells=auto|unlimited|N`: defaults are unlimited work, 65,536 coefficients
 and 262,144 matrix cells. Work/matrix zero exhausts the allowance; a dense cap must
@@ -200,6 +204,15 @@ zero. The whole-run deadline includes source admission. `open-bound-proof=false`
 does not disable admission or polynomial solving because this route has no finite
 bound proof. [Polynomial source semantics](formats/smtlib.md#polynomial-source-lowering)
 defines exact root rendering and supported syntax.
+
+Quadratic optimization uses the same source request and native controls. Its
+`nra-work-limit` caps combined numerical and polynomial work; `nraWork` retains
+the polynomial subset, while `quadraticNumericalWork` and `quadraticNativeWork`
+report numerical and combined totals. Open integer quadratic requests also use
+`nia-candidates` as their shared branch-decision cap and `nia-moves` as their
+heuristic move cap. Complete source traversal can certify optima, unattained
+limits, unboundedness or infeasibility. LS/ALNS retain checked incumbents and
+independently checked bounds; neighborhood exhaustion supplies no global claim.
 
 An open theory is selected by the model route. Complete engines run its traversal;
 `-e ls` and `-e alns` search exact-coordinate neighborhoods with witness-only authority,
@@ -234,7 +247,8 @@ arithmetic residual at each leaf. Activity order is opt-in.
 defines their scopes and the distinction from native CP analysis.
 
 Every format's `-s` output includes `solvePipeline`: `finite-cp`, `open-theory`,
-`polynomial-theory`, `open-local-search`, `interrupted` or `refuted`, the frontend's
+`polynomial-theory`, `quadratic-polynomial`, `quadratic-integer`,
+`open-local-search`, `interrupted` or `refuted`, the frontend's
 selected solve entry point or terminal admission outcome.
 `declaredTheoryRoute` is the open request's theory classification before source-safe
 preparation. `reportedBackend` is the final statistics snapshot's backend identifier;
