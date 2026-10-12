@@ -45,9 +45,28 @@ An attained optimum requires a feasible witness, an equal global bound and origi
 objective evaluation. An unattained limit additionally requires supported approach
 and nonattainment derivations; a strict bound alone does not establish convergence.
 
-The checker is an additive mechanism. Existing completed-result and portfolio
-adapters retain their documented in-memory attestation contracts until they supply
-original-source contexts and these typed derivations. It does not implement proof
-file export. [Portfolio publication](portfolio.md) owns admission and transport;
-[LP certification](../lp/certification.md) owns numerical evidence;
-[presolve](presolve.md) owns reconstruction and transformation guarantees.
+`SourceResultCapture` attaches optional evidence to ordinary completed satisfaction
+and minimization results. It retains source assignments and exact objective values;
+engine completion labels are captured separately. A caller can supply actual bound
+or traversal derivations. Without them, optimum/refutation coverage remains explicitly
+unavailable. Existing workers retain their documented engine admission contract;
+this optional capture does not convert producer identity into a derivation.
+
+`Problem.sourceProofContext` binds the exact original IR's declared bounds and
+implied rows. Guarded premises retain Boolean pins; source disequality alternatives
+are not invented. Open integer sides provide no finite-box premise. Other declared
+frontend semantics require their own original-source checker. Explicit invocation
+pins are captured; derived restrictions require their own justifications.
+
+`SourceMapping` retains optional typed transformation justifications at each stage.
+`SourceTransformationVerifier` requires a total coordinate image, original-source
+justifications for substituted target premises and invocation restrictions, and
+integral images of target integers. Objective adjustments additionally require
+positive scale, matching direction and checked source equalities. A verified affine
+projection transfers only a proof using its covered premises; source-specific target
+semantic extensions remain unavailable without their own projection justification.
+Projection obligations and terminal checks share one containing verification allowance.
+
+Capture does not implement proof file export. [Portfolio publication](portfolio.md)
+owns admission and transport; [LP certification](../lp/certification.md) owns numerical
+evidence; [presolve](presolve.md) owns reconstruction and transformation guarantees.

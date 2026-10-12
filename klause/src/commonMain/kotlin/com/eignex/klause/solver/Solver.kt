@@ -14,6 +14,7 @@ import com.eignex.klause.count.combineCounts
 import com.eignex.klause.count.countingScope
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
@@ -68,11 +69,15 @@ sealed interface SolveResult {
      *  backends that haven't opted in; populated by backends that have. */
     val stats: SolveStats
 
+    /** Optional original-source claims and derivations; null when capture was not requested. */
+    val evidence: SourceResultEvidence?
+
     /** Satisfiable, carrying a model. */
     data class Sat(
         /** The satisfying assignment. */
         val assignment: Sample,
         override val stats: SolveStats = SolveStats.EMPTY,
+        override val evidence: SourceResultEvidence? = null,
     ) : SolveResult
 
     /**
@@ -94,6 +99,7 @@ sealed interface SolveResult {
          * `minimizeCore = true` deletion-MUS fallback.
          */
         val assumptionCore: Assumptions? = null,
+        override val evidence: SourceResultEvidence? = null,
     ) : SolveResult
 
     /** Indeterminate (e.g. timeout or budget exhaustion). */
@@ -101,6 +107,7 @@ sealed interface SolveResult {
         /** Why the result is indeterminate (e.g. timeout). */
         val reason: TerminationReason,
         override val stats: SolveStats = SolveStats.EMPTY,
+        override val evidence: SourceResultEvidence? = null,
     ) : SolveResult
 }
 

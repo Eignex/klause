@@ -63,6 +63,16 @@ attestations capture source, objective, direction and invocation assumptions;
 they retain no mutable arithmetic or cancellation owner. These attestations are
 in-memory evidence and do not implement exported proof files.
 
+## Optional completed-result evidence
+
+Completed satisfaction and minimization results can retain `SourceResultEvidence`
+when capture is requested through `SourceResultCapture`. Claims name the original
+revision, invocation restrictions, objective identity/direction and declared semantics.
+Exact coordinates and objective values remain separate from floating telemetry.
+Captured engine attestations do not supply independently checked derivation coverage;
+missing traversal, transformation or bound data is explicit. [Derivation checking](solver/evidence.md)
+owns the consumer-provided original-source contexts and coverage checks.
+
 ## Configuration and resources
 
 `ProblemSettings` carries immutable resource metadata through source rewrites,
