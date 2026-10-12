@@ -117,6 +117,13 @@ Rounding selects proposals; it cannot replace an exact witness coordinate.
 
 ## State and resources
 
+`NonlinearIntegerCursor` retains source bounds, tuple enumeration, visited candidates,
+proposal RNG, widening radius and the polynomial invocation through candidate slices.
+Segment cancellation yields before another candidate; a conditioned arithmetic call
+and its source witness check are atomic with respect to that segment. Containing
+cancellation continues to poll inside arithmetic. Closing releases the invocation
+and candidate buffers; captured witnesses keep their owned exact coordinates.
+
 One cancellation and work scope spans hint collection, candidate generation,
 condition assembly, all real completion queries and the final source check.
 Native work reaches the caller's meter once. Candidate allowances, cancellation,
