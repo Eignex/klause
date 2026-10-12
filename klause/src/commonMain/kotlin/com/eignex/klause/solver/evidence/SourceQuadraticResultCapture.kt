@@ -17,7 +17,7 @@ fun SourceResultCapture.quadratic(
     require(context.scope.objective?.sense == result.sense) {
         "quadratic capture requires the source objective direction"
     }
-    if (cancellation()) return result
+    if (cancellation() || result.capturedScopes().any { it != context.scope }) return result
     val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
     val witness = point?.let { SourceClaim.Witness(it.sample) }
     fun payload(claim: SourceClaim, proof: SourceDerivation): SourceResultEvidence {
@@ -76,6 +76,9 @@ fun QuadraticOptimizationResult.verifySourceEvidence(
     context: SourceProofContext,
     cancellation: Cancellation = Cancellation.Never,
 ): SourceEvidenceCheck {
+    if (capturedScopes().any { it != context.scope }) {
+        return SourceEvidenceCheck.Rejected("quadratic result contains a foreign source invocation")
+    }
     if (context.scope.objective?.sense != sense) {
         return SourceEvidenceCheck.Rejected("quadratic result has a different source objective direction")
     }
@@ -104,4 +107,22 @@ fun QuadraticOptimizationResult.verifySourceEvidence(
             ?: SourceEvidenceCheck.Unavailable("quadratic original-source objective checker unavailable")
     }
     return SourceEvidenceCheck.Checked
+}
+
+private fun QuadraticOptimizationResult.capturedScopes(): List<SourceScope> = buildList {
+    evidence?.scope?.let(::add)
+    when (val result = this@capturedScopes) {
+        is QuadraticOptimizationResult.Optimal -> {
+            result.certificate.scope?.let(::add)
+            result.bound.certificate.scope?.let(::add)
+        }
+        is QuadraticOptimizationResult.UnattainedLimit -> {
+            result.certificate.scope?.let(::add)
+            result.bound.certificate.scope?.let(::add)
+        }
+        is QuadraticOptimizationResult.Unbounded -> result.certificate.scope?.let(::add)
+        is QuadraticOptimizationResult.Infeasible -> result.certificate.scope?.let(::add)
+        is QuadraticOptimizationResult.BestFound -> result.bound?.certificate?.scope?.let(::add)
+        is QuadraticOptimizationResult.Unknown -> result.bound?.certificate?.scope?.let(::add)
+    }
 }

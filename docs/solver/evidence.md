@@ -96,6 +96,11 @@ an attained optimum or approach to an unattained limit.
 `Problem.quadraticSourceProofContext` reuses original constraints and exact quadratic
 objective evaluation. The typed quadratic interval rule derives bounds from original
 declarations and invocation intervals through the shared exact interval arithmetic.
+Typed engine extensions retain convex, objective-image, recession, conditional and
+branch data without opaque payloads. Their source checker must justify coordinate
+bindings and complete coverage; a flat branch list is not a traversal proof. A
+known conditioned result cannot be recaptured under a different original scope.
+
 Absent affine data does not become a constant objective. Unsupported traversal,
 trajectory or approach mechanisms retain unavailable coverage.
 
