@@ -11,7 +11,11 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 
 /** An original-source inequality, optionally guarded by Boolean source pins. */
-class SourcePremise(val inequality: SourceInequality, guards: Map<Int, Boolean> = emptyMap()) {
+class SourcePremise(
+    /** Original-source affine inequality. */
+    val inequality: SourceInequality,
+    guards: Map<Int, Boolean> = emptyMap(),
+) {
     private val captured = guards.toMap()
     /** Source pins required to use this premise. */
     val guards: Map<Int, Boolean> get() = captured.toMap()
@@ -38,10 +42,12 @@ interface SourceSemanticsChecker {
 
 /** Immutable consumer-owned original-source premises and objective, independent of a proof producer. */
 class SourceProofContext(
+    /** Original-source invocation and objective. */
     val scope: SourceScope,
     coordinates: Set<SourceCoordinate>,
     premises: Map<String, SourcePremise>,
     objective: Map<SourceCoordinate, BigFraction> = emptyMap(),
+    /** Exact original-source objective constant. */
     val objectiveConstant: BigFraction = BigFraction.ZERO,
     internal val semanticsChecker: SourceSemanticsChecker? = null,
 ) {
@@ -96,8 +102,12 @@ class SourceEvidenceVerifier(
 
         fun verify(evidence: SourceEvidence, expected: SourceScope, depth: Int): SourceEvidenceCheck {
             step(depth)
-            if (evidence.scope != expected) return reject("evidence belongs to a different source invocation or objective")
-            if (!validCondition(expected.condition)) return reject("invocation references undeclared source coordinates")
+            if (evidence.scope != expected) {
+                return reject("evidence belongs to a different source invocation or objective")
+            }
+            if (!validCondition(expected.condition)) {
+                return reject("invocation references undeclared source coordinates")
+            }
             return claim(evidence.claim, evidence.derivation, expected, depth + 1).also { step(depth) }
         }
 
@@ -111,7 +121,8 @@ class SourceEvidenceVerifier(
             step(depth)
             when (derivation) {
                 is SourceDerivation.Unavailable -> return SourceEvidenceCheck.Unavailable(derivation.reason)
-                is SourceDerivation.Extension -> return context.semanticsChecker?.derivation(claim, derivation, scope, cancellation)
+                is SourceDerivation.Extension -> return context.semanticsChecker?.derivation(claim,
+                    derivation, scope, cancellation)
                     ?: SourceEvidenceCheck.Unavailable("source-specific derivation checker unavailable")
                 is SourceDerivation.Import -> {
                     val imported = derivation.evidence
@@ -131,9 +142,11 @@ class SourceEvidenceVerifier(
                         return reject("Boolean coverage must split an unpinned declared coordinate")
                     }
                     return both(
-                        claim(claim, derivation.whenFalse, scope.copy(condition = scope.condition.pin(derivation.id, false)), depth + 1),
+                        claim(claim, derivation.whenFalse,
+                            scope.copy(condition = scope.condition.pin(derivation.id, false)), depth + 1),
                     ) {
-                        claim(claim, derivation.whenTrue, scope.copy(condition = scope.condition.pin(derivation.id, true)), depth + 1)
+                        claim(claim, derivation.whenTrue,
+                            scope.copy(condition = scope.condition.pin(derivation.id, true)), depth + 1)
                     }
                 }
                 is SourceDerivation.IntegerSplit -> {
@@ -146,7 +159,8 @@ class SourceEvidenceVerifier(
                             scope.condition.bound(id, derivation.threshold, upper = true)), depth + 1),
                     ) {
                         claim(claim, derivation.above, scope.copy(condition =
-                            scope.condition.bound(id, derivation.threshold + BigFraction.ONE, upper = false)), depth + 1)
+                            scope.condition.bound(id, derivation.threshold + BigFraction.ONE,
+                                upper = false)), depth + 1)
                     }
                 }
                 else -> Unit
@@ -162,7 +176,8 @@ class SourceEvidenceVerifier(
                     ?: SourceEvidenceCheck.Unavailable("original-source recession checker unavailable")
                 is SourceClaim.Bound -> {
                     val objective = scope.objective ?: return reject("objective bound has no objective scope")
-                    val sign = if (objective.sense == ObjectiveSense.MINIMIZE) BigFraction.ofLong(-1) else BigFraction.ONE
+                    val sign = if (objective.sense == ObjectiveSense.MINIMIZE) BigFraction.MINUS_ONE
+                        else BigFraction.ONE
                     val derived = inequality(derivation, scope, depth + 1)
                     if (derived.contradicts()) return SourceEvidenceCheck.Checked
                     if (derived.coefficients != context.objective.mapValues { (_, value) -> sign * value }) {
@@ -172,13 +187,16 @@ class SourceEvidenceVerifier(
                     val exact = when (val value = claim.value) {
                         is SourceValue.Rational -> algebraic.rational(value.value)
                         is SourceValue.Algebraic -> value.value
-                        is SourceValue.Extension -> return SourceEvidenceCheck.Unavailable("symbolic objective checker unavailable")
+                        is SourceValue.Extension -> {
+                            return SourceEvidenceCheck.Unavailable("symbolic objective checker unavailable")
+                        }
                     }
                     val rhs = algebraic.multiply(algebraic.rational(sign),
                         algebraic.subtract(exact, algebraic.rational(context.objectiveConstant)))
                     val comparison = algebraic.compare(algebraic.rational(derived.rhs), rhs)
-                    if (comparison < 0 || comparison == 0 && (derived.strict || !claim.strict)) SourceEvidenceCheck.Checked
-                    else reject("derivation does not establish the objective bound")
+                    if (comparison < 0 || (comparison == 0 && (derived.strict || !claim.strict))) {
+                        SourceEvidenceCheck.Checked
+                    } else reject("derivation does not establish the objective bound")
                 }
                 is SourceClaim.Optimal -> {
                     val pair = derivation as? SourceDerivation.Optimum
@@ -195,7 +213,10 @@ class SourceEvidenceVerifier(
                 SourceClaim.Refutation -> if (inequality(derivation, scope, depth + 1).contradicts()) {
                     SourceEvidenceCheck.Checked
                 } else reject("derivation is not a contradiction")
-                is SourceClaim.Consequence -> if (claim.inequality.coefficients.keys.any { it !in context.coordinates }) {
+                is SourceClaim.Consequence -> if (claim.inequality.coefficients.keys.any {
+                        it !in context.coordinates
+                    }
+                ) {
                     reject("consequence references undeclared source coordinates")
                 } else {
                     val row = inequality(derivation, scope, depth + 1)
@@ -210,18 +231,19 @@ class SourceEvidenceVerifier(
             return when (derivation) {
                 is SourceDerivation.Premise -> {
                     val premise = context.premises[derivation.id]
-                        ?: throw ProofStop(reject("unknown original-source premise ${derivation.id}"))
+                        ?: rejectProof("unknown original-source premise ${derivation.id}")
                     if (premise.guards.any { (id, value) -> scope.condition.bools[id] != value }) {
-                        throw ProofStop(reject("original-source premise guard is not established"))
+                        rejectProof("original-source premise guard is not established")
                     }
                     premise.inequality
                 }
                 is SourceDerivation.Assumption -> {
                     if (derivation.coordinate !in context.coordinates) {
-                        throw ProofStop(reject("assumption references an undeclared coordinate"))
+                        rejectProof("assumption references an undeclared coordinate")
                     }
-                    val value = (if (derivation.upper) scope.condition.upper else scope.condition.lower)[derivation.coordinate]
-                        ?: throw ProofStop(reject("assumption is absent from the invocation"))
+                    val restrictions = if (derivation.upper) scope.condition.upper else scope.condition.lower
+                    val value = restrictions[derivation.coordinate]
+                        ?: rejectProof("assumption is absent from the invocation")
                     val sign = if (derivation.upper) BigFraction.ONE else BigFraction.ofLong(-1)
                     SourceInequality(mapOf(derivation.coordinate to sign), value * sign)
                 }
@@ -231,26 +253,26 @@ class SourceEvidenceVerifier(
                     var strict = false
                     for (term in derivation.terms) {
                         step(depth)
-                        if (term.weight < BigFraction.ZERO) throw ProofStop(reject("negative inequality multiplier"))
+                        if (term.weight < BigFraction.ZERO) rejectProof("negative inequality multiplier")
                         val row = inequality(term.derivation, scope, depth + 1)
                         for ((id, value) in row.coefficients) {
                             step(depth)
                             coefficients[id] = (coefficients[id] ?: BigFraction.ZERO) + term.weight * value
                         }
                         rhs += term.weight * row.rhs
-                        strict = strict || !term.weight.isZero && row.strict
+                        strict = strict || (!term.weight.isZero && row.strict)
                     }
                     SourceInequality(coefficients, rhs, strict)
                 }
                 is SourceDerivation.Import -> {
                     val consequence = derivation.evidence.claim as? SourceClaim.Consequence
-                        ?: throw ProofStop(reject("inequality import requires a proved consequence"))
+                        ?: rejectProof("inequality import requires a proved consequence")
                     val check = claim(consequence, derivation, scope, depth + 1)
-                    if (check != SourceEvidenceCheck.Checked) throw ProofStop(check)
+                    if (check != SourceEvidenceCheck.Checked) stopProof(check)
                     consequence.inequality
                 }
-                is SourceDerivation.Unavailable -> throw ProofStop(SourceEvidenceCheck.Unavailable(derivation.reason))
-                else -> throw ProofStop(reject("derivation does not produce a source inequality"))
+                is SourceDerivation.Unavailable -> stopProof(SourceEvidenceCheck.Unavailable(derivation.reason))
+                else -> rejectProof("derivation does not produce a source inequality")
             }
         }
     }
@@ -262,3 +284,7 @@ private fun reject(reason: String): SourceEvidenceCheck.Rejected = SourceEvidenc
 
 private inline fun both(first: SourceEvidenceCheck, second: () -> SourceEvidenceCheck): SourceEvidenceCheck =
     if (first == SourceEvidenceCheck.Checked) second() else first
+
+private fun rejectProof(reason: String): Nothing = stopProof(reject(reason))
+
+private fun stopProof(verdict: SourceEvidenceCheck): Nothing = throw ProofStop(verdict)

@@ -45,11 +45,14 @@ class LinearSourceSemanticsChecker(
         val expected = when (value) {
             is SourceValue.Rational -> algebraic.rational(value.value)
             is SourceValue.Algebraic -> value.value
-            is SourceValue.Extension -> return@checked SourceEvidenceCheck.Unavailable("symbolic objective checker unavailable")
+            is SourceValue.Extension -> {
+                return@checked SourceEvidenceCheck.Unavailable("symbolic objective checker unavailable")
+            }
         }
         var evaluated = algebraic.rational(objectiveConstant)
         for ((id, coefficient) in objective) {
-            evaluated = algebraic.add(evaluated, algebraic.multiply(at(sample, id, algebraic), algebraic.rational(coefficient)))
+            evaluated = algebraic.add(evaluated, algebraic.multiply(at(sample, id, algebraic),
+                algebraic.rational(coefficient)))
         }
         if (algebraic.compare(evaluated, expected) == 0) SourceEvidenceCheck.Checked
         else SourceEvidenceCheck.Rejected("witness objective disagrees with the claimed bound")
@@ -61,8 +64,8 @@ class LinearSourceSemanticsChecker(
             if (pointCheck != SourceEvidenceCheck.Checked) return@checked pointCheck
             val direction = claim.direction
             if (direction.keys.any { it !in coordinates } || direction.any { (id, value) ->
-                    id.kind == SourceCoordinate.Kind.Boolean && !value.isZero ||
-                        id.kind == SourceCoordinate.Kind.Integer && value.den != BIG_ONE
+                    (id.kind == SourceCoordinate.Kind.Boolean && !value.isZero) ||
+                        (id.kind == SourceCoordinate.Kind.Integer && value.den != BIG_ONE)
                 }
             ) return@checked SourceEvidenceCheck.Rejected("ray has invalid source coordinates or integer steps")
             for (row in premises) {
@@ -80,7 +83,8 @@ class LinearSourceSemanticsChecker(
             val slope = dot(objective, direction)
             val improves = if (objectiveScope.sense == ObjectiveSense.MINIMIZE) slope < BigFraction.ZERO
                 else slope > BigFraction.ZERO
-            if (improves) SourceEvidenceCheck.Checked else SourceEvidenceCheck.Rejected("ray does not improve the objective")
+            if (improves) SourceEvidenceCheck.Checked
+            else SourceEvidenceCheck.Rejected("ray does not improve the objective")
         }
 
     private fun point(sample: Sample, scope: SourceScope, algebraic: AlgebraicArithmetic): SourceEvidenceCheck {
@@ -111,10 +115,11 @@ class LinearSourceSemanticsChecker(
             val row = premise.inequality
             var value = algebraic.rational(BigFraction.ZERO)
             for ((id, coefficient) in row.coefficients) {
-                value = algebraic.add(value, algebraic.multiply(at(sample, id, algebraic), algebraic.rational(coefficient)))
+                value = algebraic.add(value, algebraic.multiply(at(sample, id, algebraic),
+                    algebraic.rational(coefficient)))
             }
             val comparison = algebraic.compare(value, algebraic.rational(row.rhs))
-            if (comparison > 0 || comparison == 0 && row.strict) {
+            if (comparison > 0 || (comparison == 0 && row.strict)) {
                 return SourceEvidenceCheck.Rejected("witness violates an original-source premise")
             }
         }
@@ -126,10 +131,15 @@ class LinearSourceSemanticsChecker(
     private fun active(premise: SourcePremise, sample: Sample): Boolean =
         premise.guards.all { (id, value) -> sample.boolValue(id) == value }
 
-    private fun at(sample: Sample, id: SourceCoordinate, algebraic: AlgebraicArithmetic): AlgebraicReal = when (id.kind) {
-        SourceCoordinate.Kind.Boolean -> algebraic.rational(if (sample.boolValue(id.id)) BigFraction.ONE else BigFraction.ZERO)
+    private fun at(
+        sample: Sample, id: SourceCoordinate, algebraic: AlgebraicArithmetic,
+    ): AlgebraicReal = when (id.kind) {
+        SourceCoordinate.Kind.Boolean -> algebraic.rational(
+            if (sample.boolValue(id.id)) BigFraction.ONE else BigFraction.ZERO,
+        )
         SourceCoordinate.Kind.Integer -> algebraic.rational(BigFraction.of(sample.exactIntValue(id.id), BIG_ONE))
-        SourceCoordinate.Kind.Real -> sample.algebraicReals?.get(id.id) ?: algebraic.rational(checkNotNull(sample.exactReals)[id.id])
+        SourceCoordinate.Kind.Real -> sample.algebraicReals?.get(id.id)
+            ?: algebraic.rational(checkNotNull(sample.exactReals)[id.id])
     }
 
     private fun dot(left: Map<SourceCoordinate, BigFraction>, right: Map<SourceCoordinate, BigFraction>): BigFraction =

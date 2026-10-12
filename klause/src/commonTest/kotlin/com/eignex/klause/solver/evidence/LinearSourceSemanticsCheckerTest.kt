@@ -23,7 +23,8 @@ class LinearSourceSemanticsCheckerTest {
     @Test
     fun `an exact rational point satisfies original source rows`() {
         val value = BigFraction.of(bigIntOf(3), bigIntOf(2))
-        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble()), exactReals = listOf(value))
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble()),
+            exactReals = listOf(value))
 
         assertEquals(SourceEvidenceCheck.Checked, checker.witness(sample, scope, Cancellation.Never))
     }
@@ -89,12 +90,14 @@ class LinearSourceSemanticsCheckerTest {
         val checker = LinearSourceSemanticsChecker(setOf(x), listOf(lower, upper), mapOf(x to BigFraction.MINUS_ONE))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
 
-        assertIs<SourceEvidenceCheck.Rejected>(checker.ray(SourceClaim.Ray(sample, mapOf(x to BigFraction.ONE)), scope, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Rejected>(checker.ray(SourceClaim.Ray(sample,
+            mapOf(x to BigFraction.ONE)), scope, Cancellation.Never))
     }
 
     @Test
     fun `strict source rows reject their boundary`() {
-        val row = SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE, strict = true))
+        val row = SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE,
+            strict = true))
         val checker = LinearSourceSemanticsChecker(setOf(x), listOf(row))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
 
