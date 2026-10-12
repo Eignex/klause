@@ -2,6 +2,7 @@ package com.eignex.klause.solver.objective
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
+import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
@@ -16,7 +17,7 @@ class ExactQuadraticEvaluationTest {
         val arithmetic = AlgebraicArithmetic()
         val x = QuadraticVariable.Real(SourceRealId(0))
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(BigFraction.ONE, x, x)))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
 
         val value = objective.evaluateExact(arithmetic) { root }
 
@@ -29,7 +30,7 @@ class ExactQuadraticEvaluationTest {
         val x = QuadraticVariable.Real(SourceRealId(0))
         val y = QuadraticVariable.Real(SourceRealId(1))
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(BigFraction.ofLong(3), x, y)))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(3), x, y)))
 
         val value = objective.evaluateExact(arithmetic) {
             if (it == x) root else arithmetic.rational(BigFraction.ofLong(2))
