@@ -20,6 +20,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
 internal data class LinearAuthorityResult(
@@ -99,7 +100,8 @@ internal class LinearAuthority(private val budget: SourceLpBudget) {
             checked(SourceClaim.Witness(it), SourceDerivation.SourceWitness) != null
         }
         if (endpointAccepted != null && bound != null && closure.lowerBound == closure.witness?.objective) {
-            val proof = checked(SourceClaim.Optimal(endpointAccepted, bound.claim.let { (it as SourceClaim.Bound).value }),
+            val value = (bound.claim as SourceClaim.Bound).value
+            val proof = checked(SourceClaim.Optimal(endpointAccepted, value),
                 SourceDerivation.Optimum(SourceDerivation.SourceWitness, bound.derivation))
             if (proof != null) return LinearAuthorityResult(proof, bound, endpointAccepted)
         }
@@ -114,7 +116,13 @@ internal class LinearAuthority(private val budget: SourceLpBudget) {
         }
         if (feasible == null) return LinearAuthorityResult(bound = bound)
         closure.unboundedness?.let { unbounded ->
-            val direction = coordinates.zip(unbounded.direction.take(coordinates.size)).toMap()
+            var scale = BIG_ONE
+            for (id in coordinates.indices) {
+                if (cancellation()) return LinearAuthorityResult(bound = bound, incumbent = feasible)
+                if (coordinates[id].kind == SourceCoordinate.Kind.Integer) scale *= unbounded.direction[id].den
+            }
+            val multiplier = BigFraction.of(scale, BIG_ONE)
+            val direction = coordinates.zip(unbounded.direction.take(coordinates.size).map { it * multiplier }).toMap()
             val proof = checked(SourceClaim.Ray(feasible, direction), SourceDerivation.SourceRay)
             if (proof != null) return LinearAuthorityResult(proof, bound, feasible)
         }
