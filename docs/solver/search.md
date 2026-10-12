@@ -240,6 +240,12 @@ Difference graphs, exact linear systems and polynomial completion keep their own
 state while sharing the traversal's source facts and decision lifetime. Integer
 integrality and finite factors cannot be dropped to obtain an arithmetic witness.
 
+Open quadratic integer optimization supplies exact complementary wide predicates
+through a theory brancher. Its optimization node policy prunes against certified
+real bounds and checked feasible incumbents, without turning objective cutoffs
+into source infeasibility conflicts. Closed integer nodes continue chronologically
+through the shared frames. See [nonlinear integer quadratic objectives](../theories/nonlinear-integer.md#quadratic-objectives).
+
 ## Contributed model ownership
 
 Components contribute immutable values through typed keys, with one owner per key.

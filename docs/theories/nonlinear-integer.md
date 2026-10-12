@@ -65,6 +65,47 @@ Default whole-source candidates are 1,024, heuristic moves 256 and ALNS iteratio
 
 ## Results and proof authority
 
+### Quadratic objectives
+
+`OpenTheoryPipeline.minimize` accepts the same nonlinear integer request with an
+exact source `QuadraticObjectiveSpec`. Declaration-ordered integer and real output
+identities map into the existing numeric source coordinates; conditional numeric
+auxiliaries remain completion-owned. Every incumbent checks source integrality,
+the original formula and the exact source objective before publication.
+
+Quadratic complete traversal uses `solver.search.SearchSession` with a theory
+component. Exact real optimization supplies node lower bounds in canonical
+minimization direction. Fractional source integer coordinates split into
+complementary arbitrary-precision predicates `i <= k` and `i >= k + 1`. The shared
+session owns assertions, retraction and the frame stack. An integral attained real
+minimum closes its integer node. A fixed-integer continuous completion reaching
+the same real infimum can close an unattained node. Other integral samples select
+exhaustive integer splits; they do not close an unresolved node. This search may
+remain incomplete on unbounded trees.
+
+Bounds prune only against checked feasible incumbents. Objective pruning belongs
+to the shared node policy and supplies no source conflict or learned infeasibility
+clause. Complete exhaustion combines closed branch limits and pruning evidence
+before publishing an optimum, unattained limit or refutation. A stopped or
+undecided branch withholds these claims while retaining its incumbent and any
+separately checked root relaxation bound.
+
+A real relaxation's unboundedness does not establish integer unboundedness.
+A fixed-integer continuous unbounded completion is sufficient. Affine source
+constraints also admit checked rational quadratic recession rays whose integer
+direction coordinates are scaled to exact integers. An integral source base and
+nonnegative integer ray parameters then give unlimited source improvement.
+Unproved recession proposals supply no global claim.
+
+LS and ALNS optimize exact bounded integer neighborhoods through the same shared
+traversal and real completion. Single-coordinate, block and whole-tuple moves
+retain wide exact centers; adaptive operator weights reward incumbent improvement.
+Neighborhood proof does not become a whole-source proof. MIXED offers a bounded
+adaptive phase before complete traversal. Every branch and repair shares cumulative
+numerical/polynomial work and the containing decision/move allowance. Optional real
+representation decline allows a fixed-integer completion attempt; an unresolved
+whole-source decline remains explicit.
+
 Witness publication requires integral original integer coordinates and exact
 completion of the entire formula. A separate iterative evaluator checks the
 original expression DAG using exact rational/algebraic arithmetic, including both
@@ -94,3 +135,6 @@ capture independent conditions and retain the source snapshot unchanged.
 `theory.qfnia` owns integer proposals, exact bounds and source checking.
 `solver.pipeline.NonlinearIntegerTheoryRequest` adapts them to the shared
 strategy and verdict surface; frontends render that surface.
+`QuadraticIntegerComponent` owns trailed integer predicates and delegates bound
+classification to the quadratic pipeline policy. The generic numerical kernel
+remains independent of source factors, traversal and theory state.

@@ -36,7 +36,7 @@ internal fun tryConvexPolynomialOptimum(
     formula.requireVariableCounts(boolCount, realCount, arithmetic::step)
     require(bools.keys.all { it in 0 until boolCount })
     val algebraic = AlgebraicArithmetic(arithmetic)
-    val model = convexModel(formula, objective, realCount, bools, arithmetic, control) ?: return null
+    val model = polynomialQuadraticModel(formula, objective, realCount, bools, arithmetic, control) ?: return null
     val candidates = QuadraticCandidates(control)
     val checker = QuadraticCertification(control)
     val proposed = candidates.proposeActiveRows(model, List(realCount) { 0.0 })
@@ -78,7 +78,7 @@ internal fun tryConvexPolynomialOptimum(
     return null
 }
 
-private fun convexModel(
+internal fun polynomialQuadraticModel(
     formula: PolynomialRealFormula,
     objective: PolynomialExpression,
     dimension: Int,

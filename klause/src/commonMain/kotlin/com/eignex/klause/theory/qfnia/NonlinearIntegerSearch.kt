@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qfnia
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.ceilInteger
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
@@ -17,7 +18,6 @@ import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
@@ -291,17 +291,7 @@ private class NonlinearIntegerWork(private val params: QfNraParams) : Cancellati
 }
 
 private fun integerNear(value: AlgebraicReal, arithmetic: PolynomialArithmetic): BigInt {
-    value.rational?.let { return it.ceilInteger() }
-    val algebraic = AlgebraicArithmetic(arithmetic)
-    var lower = value.lowerBound.ceilInteger()
-    var upper = value.upperBound.ceilInteger()
-    while (lower < upper) {
-        arithmetic.step()
-        val middle = -BigFraction.of(-(lower + upper), BIG_TWO).ceilInteger()
-        val comparison = algebraic.compare(value, algebraic.rational(BigFraction.of(middle, BIG_ONE)))
-        if (comparison <= 0) upper = middle else lower = middle + BIG_ONE
-    }
-    return lower
+    return AlgebraicArithmetic(arithmetic).ceilInteger(value)
 }
 
 private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: PolynomialArithmetic): List<BigInt> {
