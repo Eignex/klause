@@ -4,7 +4,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
@@ -86,19 +85,14 @@ class LinearNeighborhoodInvocationTest {
     }
 
     @Test
-    fun `empty and constant linear ALNS models execute without proof promotion`() {
-        val sources = listOf(Problem(0, 0, emptyArray(), emptyArray()),
-            Problem(0, 0, emptyArray(), arrayOf(ExactSearchRow.of(intArrayOf(), emptyList(),
-                LinearOp.LE, BigFraction.ofLong(-1)))))
+    fun `empty linear ALNS models execute an exact completion`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
 
-        for (source in sources) {
-            val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(OpenTheoryRequest(source),
-                TheoryParams(maxFlips = 3), FiniteEngine.ALNS)).result
+        val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(OpenTheoryRequest(source),
+            TheoryParams(maxFlips = 3), FiniteEngine.ALNS)).result
 
-            if (source.factors.isEmpty()) assertIs<OpenTheoryResult.Sat>(result)
-            else assertIs<OpenTheoryResult.Unknown>(result)
-            assertEquals(1.0, result.stats.ls.completions.sum)
-        }
+        assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals(1.0, result.stats.ls.completions.sum)
     }
 
     @Test

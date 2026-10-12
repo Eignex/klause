@@ -179,9 +179,11 @@ Solver-control flags are common to **every** mode:
     them in model order. Both yield the same solutions; the order decides how many variables the pass
     eliminates within its fill-in budget, so `stable_id` is only there as a measurement baseline.
 
-Pure polynomial-real satisfaction uses the complete exact polynomial route for
-complete engines. Explicit `-e ls` returns UNKNOWN and `-e alns` rejects the open route.
-The route does not support enumeration or optimization. Its parameters are
+Polynomial-real satisfaction composes complete finite traversal, local search,
+ALNS and mixed portfolios with exact polynomial completion. Pure-real sources and
+fixed finite projections use exact coordinate neighborhoods in heuristic arms.
+Finite-column objectives are supported; continuous objectives and enumeration
+remain outside this route. Its native parameters are
 `nra-work-limit=auto|unlimited|N`, `nra-dense-coefficients=auto|unlimited|N` and
 `nra-matrix-cells=auto|unlimited|N`: defaults are unlimited work, 65,536 coefficients
 and 262,144 matrix cells. Work/matrix zero exhausts the allowance; a dense cap must
@@ -199,9 +201,15 @@ does not disable admission or polynomial solving because this route has no finit
 bound proof. [Polynomial source semantics](formats/smtlib.md#polynomial-source-lowering)
 defines exact root rendering and supported syntax.
 
-An open theory is selected by the model route and uses the shared complete theory solver
-independently of `-e`. SMT-LIB and source-exact MPS fragments/objectives that lack a complete
-theory route can use open local search for witnesses; its engine policy is described by
+An open theory is selected by the model route. Complete engines run its traversal;
+`-e ls` and `-e alns` search exact-coordinate neighborhoods with witness-only authority,
+and `-e mixed` combines those arms. Supported linear Boolean or real objectives use
+strict-improvement theory rounds when integral descent is ineligible; an unattained
+infimum can exhaust the invocation allowance. Open and polynomial heuristic controls
+include `seed`, `max-flips`, `max-instructions` and `alns-iterations`; zero improving
+iterations still permits ALNS bootstrap. SMT-LIB and source-exact MPS fragments or
+objectives that lack a complete theory route can use open local search for witnesses;
+its engine policy is described by
 [input semantics](formats.md#finite-and-open-models).
 `--param node-limit=N` is a solve-wide work budget. Finite routes charge decision nodes
 and counted local-search instructions at five quarters per instruction; parallel finite
