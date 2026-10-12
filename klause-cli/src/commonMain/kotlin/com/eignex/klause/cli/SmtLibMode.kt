@@ -310,7 +310,6 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
     override val objectivePrefix: String = "; objective="
 
     override fun begin(optimize: Boolean, maximize: Boolean) {
-        super.begin(optimize, maximize)
         this.optimize = optimize
         quadraticResult = null
     }
