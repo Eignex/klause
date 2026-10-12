@@ -5,14 +5,19 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.OpenTheoryExecution
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryRequest
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.magnitudeBitLength
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class MpsExactSourceTest {
@@ -117,11 +122,15 @@ class MpsExactSourceTest {
             "\nRHS\n RHS R 0.00000000000000001\nENDATA"
         val compiled = Mps.parse(text).toExactSourceProblem()
 
-        compiled.sourceWitness(List(100) { BigFraction.ONE })
+        val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model),
+            TheoryParams(openWorkLimit = 10000))
 
-        val row = compiled.model.factors.last().linearRows.single()
-        val constants = row.constants as IntegralConstants
-        assertTrue(constants.exactBound.magnitudeBitLength() < 4096)
-        assertTrue((0 until row.size).all { constants.exactCoeff(it).magnitudeBitLength() < 4096 })
+        val sat = assertIs<OpenTheoryResult.Sat>(
+            assertIs<OpenTheoryExecution.Satisfy>(execution).result,
+        )
+        compiled.sourceWitness(compiled.columns.map { column ->
+            val parts = sat.assignment.realValue(column.id).split('/')
+            BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
+        })
     }
 }
