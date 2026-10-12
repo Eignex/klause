@@ -91,6 +91,7 @@ Packages below are under `com.eignex.klause` in
 | `count` | Exact/approximate counting and near-uniform sampling | Uses compiled finite models and bounded solver cells |
 | `theory.difference` | Integer difference checks and shared graph components | Must not materialize finite CP domains |
 | `theory.qflra` | Linear integer, real and mixed checks, including real difference graphs | Reads source models and arithmetic services; no finite-domain materialization |
+| `theory.qfnia` | Sound incomplete nonlinear integer candidate search and source checking | Uses neutral polynomial metadata and exact real completion; never finite CP domains |
 | `theory.qfnra` | Complete polynomial-real decision with exact CAD and Boolean search | Reads neutral polynomial formulas and the exact kernel; no finite domains or linear-engine state |
 | `solver.pipeline` | Source routing and one verdict surface | Selects theory once; frontends render assignments |
 | `solver.search` | Component protocol, decisions, traversal, retraction, learning and complete checks | Owns shared lifecycle across CP and theory components |

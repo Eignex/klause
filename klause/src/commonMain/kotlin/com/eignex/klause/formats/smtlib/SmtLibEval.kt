@@ -211,6 +211,11 @@ private fun Compiler.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pai
         Sort.INT -> when (head) {
             "+", "-", "*" -> args.map { it to Sort.INT }
 
+            "^" -> {
+                requireArgCount(head, args, 2)
+                args.map { it to Sort.INT }
+            }
+
             "to_real", "abs" -> {
                 requireArgCount(head, args, 1)
                 args.map { it to Sort.INT }
@@ -235,6 +240,11 @@ private fun Compiler.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pai
 
         Sort.REAL -> when (head) {
             "+", "-", "*", "/" -> args.map { it to (if (isRealExpr(it)) Sort.REAL else Sort.INT) }
+
+            "^" -> {
+                requireArgCount(head, args, 2)
+                listOf(args[0] to Sort.REAL, args[1] to Sort.INT)
+            }
 
             "to_real" -> {
                 requireArgCount(head, args, 1)
@@ -283,12 +293,15 @@ private fun Compiler.Builder.combineReal(head: String, args: List<Res>): Res = w
     "*" -> {
         val parts = args.map { it.asReal() }
         val nonConst = parts.filter { !it.isConstant }
-        if (nonConst.size > 1) smtUnsupported("nonlinear multiplication")
-        val k = parts.filter { it.isConstant }.fold(BigFraction.ONE) { a, c -> a * c.constant }
-        if (nonConst.isEmpty()) {
-            Res.R(RealComb(emptyMap(), emptyMap(), k))
+        if (nonConst.size > 1) {
+            realProduct(parts)
         } else {
-            Res.R(nonConst[0].scaled(k))
+            val k = parts.filter { it.isConstant }.fold(BigFraction.ONE) { a, c -> a * c.constant }
+            if (nonConst.isEmpty()) {
+                Res.R(RealComb(emptyMap(), emptyMap(), k))
+            } else {
+                Res.R(nonConst[0].scaled(k))
+            }
         }
     }
 
@@ -299,6 +312,8 @@ private fun Compiler.Builder.combineReal(head: String, args: List<Res>): Res = w
         }
         Res.R(den.fold(args[0].asReal()) { acc, d -> acc.scaled(d.constant.reciprocal()) })
     }
+
+    "^" -> realPower(args[0].asReal(), (args[1] as? Res.I)?.term ?: smtUnsupported("power requires an integer exponent"))
 
     "to_real" -> Res.R(args[0].asReal())
 
@@ -371,10 +386,18 @@ private fun Compiler.Builder.combineInt(head: String, args: List<Res>): Res = wh
     "*" -> {
         val parts = args.map { it.asIntComb() }
         val nonConst = parts.filterNot { it.isConstant() }
-        if (nonConst.size > 1) smtUnsupported("nonlinear multiplication")
-        val k = constProduct(parts.filter { it.isConstant() })
-        if (nonConst.isEmpty()) Res.I(k) else Res.I(scaleByConst(nonConst[0], k))
+        if (nonConst.size > 1) {
+            Res.I(integerProduct(parts))
+        } else {
+            val k = constProduct(parts.filter { it.isConstant() })
+            if (nonConst.isEmpty()) Res.I(k) else Res.I(scaleByConst(nonConst[0], k))
+        }
     }
+
+    "^" -> Res.I(integerPower(
+        args[0].asIntComb(),
+        (args[1] as? Res.I)?.term ?: smtUnsupported("power requires an integer exponent"),
+    ))
 
     "to_real" -> Res.I(args[0].asIntComb())
 

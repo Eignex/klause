@@ -48,6 +48,7 @@ composition, result authority, state/resources and implementation.
 | [Linear integer arithmetic](theories/linear-integer.md) | Exact integer constraints, open bounds and integer branching |
 | [Linear real arithmetic](theories/linear-real.md) | Rational feasibility, Boolean structure and strict inequalities |
 | [Linear mixed arithmetic](theories/linear-mixed.md) | Coupled integer/real constraints, integrality and reconstruction |
+| [Nonlinear integer arithmetic](theories/nonlinear-integer.md) | Exact integer candidate search, real completion and source witness validation |
 | [Polynomial real arithmetic](theories/polynomial-real.md) | Exact nonlinear completion, finite composition and algebraic witnesses |
 
 ## Numerical mechanisms
