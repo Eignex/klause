@@ -5,8 +5,14 @@ import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,4 +39,21 @@ class FiniteExactNeighborhoodTest {
             assertTrue(result.stats.ls.completionsRefuted.sum > 0)
         }
     }
+    @Test
+    fun `finite mixed portfolios retain fractional cost improvements across integer branches`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(longArrayOf(-1), intArrayOf(0), doubleArrayOf(3.0), intArrayOf(0), LinearOp.EQ, 0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(constant = 1L shl 62, realCoefficients = doubleArrayOf(-1.0))
+        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP,
+            engine = EngineMix.BACKTRACK, seed = 17, lpCeiling = LpConfig.OFF)
+        val executor = FinitePipeline.portfolioExecutor(source, scenario, objective, null, null, null)
+
+        val result = executor.use { it.minimize() }
+
+        val sample = assertIs<MinimizeResult.Optimal>(result).sample
+        assertEquals(2L, sample.intValue(0))
+        assertEquals("2/3", sample.exactReals?.single().toString())
+    }
+
 }
