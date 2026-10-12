@@ -50,7 +50,9 @@ class SharedPolynomialStrategyTest(private val engine: FiniteEngine) {
             realLower = doubleArrayOf(0.0, Double.NEGATIVE_INFINITY, 2.0),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, 2.0),
         )
-        val shared = assertNotNull(SharedPolynomialModel.assemble(source))
+        val request = source.pipelineRequest()
+        val shared = request.resolvedModel()
+        kotlin.test.assertSame(source, request.preparedPlan.originalSource)
 
         shared.service.invocation().use { invocation ->
             val result = PolynomialStrategyAdapters(

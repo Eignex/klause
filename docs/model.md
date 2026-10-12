@@ -80,7 +80,20 @@ model settings. Search effort stays in the existing per-call backend parameters.
 
 ## Engine projections and factor capabilities
 
-`Problem.componentPlan()` selects an immutable ownership plan before search. It
+`Problem.prepareExecutionPlan()` selects immutable model-facing ownership and
+completion data before search. `PreparedSourcePlan` retains the original source
+object, canonical execution model, source declaration counts, coordinate mappings,
+component descriptors and objective direction. Its descriptors use extensible
+semantic identifiers and retain original factor indices. `ComponentPlan` supplies
+the finite/linear projection mechanism; `SharedPolynomialModel` supplies polynomial
+lowering and exact completion data under the same preparation owner. Polynomial
+requests capture this plan once for complete, LS, ALNS and quadratic execution.
+Pure polynomial snapshots retain declaration identities separately from private
+lowering auxiliaries. The shared polynomial assembler explicitly declines open
+integer declarations and continuous linear objectives; preparation invents no
+finite bounds or operation support.
+
+`Problem.componentPlan()` remains the finite/linear projection entry point. It
 builds a compact remapped CP projection and theory fragments. Plans belong to the
 actual source model object. Fresh rewrites need a new plan or the explicit
 objective-round adapter, which checks retained factor identity, bound narrowing

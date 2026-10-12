@@ -53,13 +53,22 @@ class OpenTheoryRequest internal constructor(
     internal val presolveCancellation: Cancellation = Cancellation.Never,
     /** Optional preparation allowance shared with source passes. */
     internal val presolveBudget: PresolveBudget? = null,
+    /** Shared ownership preparation, retaining source identity through routing. */
+    val preparedPlan: PreparedSourcePlan = model.prepareExecutionPlan(objective, maximize),
 ) {
     /** Build a request and select its source decomposition. */
     constructor(
         model: Problem,
         objective: LinearObjective? = null,
         maximize: Boolean = false,
-    ) : this(model, objective, maximize, model.componentPlan())
+    ) : this(model, objective, maximize, model.prepareExecutionPlan(objective, maximize))
+
+    private constructor(
+        model: Problem,
+        objective: LinearObjective?,
+        maximize: Boolean,
+        plan: PreparedSourcePlan,
+    ) : this(model, objective, maximize, requireNotNull(plan.componentPlan), preparedPlan = plan)
 
     /** Complete open-theory route [model] declares, before source-safe preparation transforms it. */
     val route: ProblemPipeline get() = componentPlan.theoryPipeline
@@ -84,6 +93,7 @@ class OpenTheoryRequest internal constructor(
         solutionSetSensitive,
         cancellation,
         budget,
+        preparedPlan,
     )
 }
 

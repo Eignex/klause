@@ -1,8 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
@@ -50,7 +48,10 @@ sealed interface SourceProblemRoute {
         val objective: LinearObjective? = null,
         /** Whether [objective] is maximized. */
         val maximize: Boolean = false,
-    ) : SourceProblemRoute
+    ) : SourceProblemRoute {
+        /** Shared source preparation used by every polynomial strategy. */
+        val preparedPlan: PreparedSourcePlan get() = request.preparedPlan
+    }
 
     /** A fully bounded source model selected for deferred finite-domain preparation. */
     data class Finite(
@@ -58,13 +59,18 @@ sealed interface SourceProblemRoute {
         val problem: Problem,
         /** Component ownership selected from the same canonical source model. */
         val componentPlan: ComponentPlan,
+        /** Shared source preparation retaining the original source identity. */
+        val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan(preferFinite = true),
     ) : SourceProblemRoute
 
     /** A supported open source model with its selected theory request. */
     data class OpenTheory(
         /** The complete open-theory request. */
         val request: OpenTheoryRequest,
-    ) : SourceProblemRoute
+    ) : SourceProblemRoute {
+        /** Shared source preparation used by every open strategy. */
+        val preparedPlan: PreparedSourcePlan get() = request.preparedPlan
+    }
 
     /** An open source model for which no complete route exists. */
     data class UnsupportedOpen(
@@ -72,6 +78,8 @@ sealed interface SourceProblemRoute {
         val unplaceable: UnplaceableColumn?,
         /** The model as routing proved it, which local search can still search for a witness. */
         val problem: Problem,
+        /** Prepared ownership and explicit completion decline. */
+        val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan(),
     ) : SourceProblemRoute
 
     /**
@@ -136,14 +144,12 @@ private fun Problem.pipelineRouteObserved(
     onLpStats: ((LpStats) -> Unit)?,
     routeLinearToTheory: Boolean,
 ): SourceProblemRoute {
-    val continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true
-    if (factors.any { it is ContinuousProduct } || (!continuousObjective && factors.any { it is RealProduct })) {
-        val shared = SharedPolynomialModel.assemble(this)
-        return if (shared != null && objective?.realCoefficientValues?.any { it != 0.0 } != true) {
-            SourceProblemRoute.PolynomialTheory(shared.request(), objective, maximize)
-        } else {
-            SourceProblemRoute.UnsupportedOpen(null, this)
-        }
+    val initial = prepareExecutionPlan(objective, maximize)
+    if (initial.kind == PreparedExecutionKind.POLYNOMIAL) {
+        return SourceProblemRoute.PolynomialTheory(initial.polynomialRequest(), objective, maximize)
+    }
+    if (initial.kind == PreparedExecutionKind.DECLINED) {
+        return SourceProblemRoute.UnsupportedOpen(null, this, initial)
     }
     val lpStats = onLpStats?.let { LpStatsSink(LpRoute.STANDALONE) }
     val bounded = proveBounded(boundCancellation, lpStats)
@@ -155,13 +161,14 @@ private fun Problem.pipelineRouteObserved(
     val finiteIntegerRanges = routed.hasFiniteIntegerRanges()
     val preferExact = routeLinearToTheory && (routed.supportsExactLra() || routed.supportsExactLira())
     val preferFinite = finiteIntegerRanges && !preferExact && (!routePureRealToTheory || !routed.supportsExactLra())
-    val plan = routed.componentPlan(preferFinite)
+    val prepared = routed.prepareExecutionPlan(this, objective, maximize, preferFinite)
+    val plan = requireNotNull(prepared.componentPlan)
     if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
-        return SourceProblemRoute.Finite(routed, plan)
+        return SourceProblemRoute.Finite(routed, plan, prepared)
     }
-    val request = OpenTheoryRequest(routed, objective, maximize, plan)
+    val request = OpenTheoryRequest(routed, objective, maximize, plan, preparedPlan = prepared)
     return if (request.route == ProblemPipeline.UNSUPPORTED_OPEN || request.route == ProblemPipeline.FINITE_CP) {
-        SourceProblemRoute.UnsupportedOpen(request.componentPlan.unplaceable, routed)
+        SourceProblemRoute.UnsupportedOpen(request.componentPlan.unplaceable, routed, prepared)
     } else {
         SourceProblemRoute.OpenTheory(request)
     }
