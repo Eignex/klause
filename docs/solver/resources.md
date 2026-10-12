@@ -1,10 +1,18 @@
 # Resource allowances
 
-Allowances belong to the scope that owns the counter. Resuming a handle, reseeding an
-arm, entering a repair or rebuilding a presolve model does not renew a containing
-allowance. A completed atomic operation can overspend; its work stays charged and the
-next polling boundary stops optional work. An exhausted allowance cannot certify that
-a search space was exhausted. Only a completed engine proof can do that.
+A solve has a containing deadline and work limits. Preparation phases, workers,
+resumable slices and arithmetic services consume parts of that allowance in their
+own units. Keeping the ledger with its scope prevents a restart or nested repair
+from silently receiving a fresh solve budget.
+
+Resuming a handle, reseeding an arm or rebuilding a model does not renew the
+containing allowance. Completed atomic operations can overspend; their work stays
+charged and the next polling boundary stops optional work. An exhausted resource
+allowance never establishes that the search space was exhausted.
+
+This page defines configuration, work currencies and quota lifetimes.
+[Sessions](sessions.md) owns handles; [presolve](presolve.md) and
+[portfolios](portfolio.md) own phase and slice policy.
 
 ## Configuration and lifetime
 
@@ -79,6 +87,12 @@ preparation-to-search transition. Overspend debt is settled once and repaid by l
 slices. A nested private search leaves debt ownership with its containing budget.
 Relative counters and saturating additions prevent a large allowance from wrapping.
 
+`Cancellation` and `WorkMeter` live in the neutral `util` package within `klause`. Their units come
+from the caller's adapter; they contain no portfolio pricing. Composing tokens carries
+one available meter, rather than charging all possible ancestors. Presolve's adapter
+explicitly owns native root-work conversion. Numerical kernels consume native controls;
+solver policy owns conversions and result/proof semantics.
+
 ## Parallel cap
 
 Built-in finite portfolios with more than one lane partition the remaining solve
@@ -95,40 +109,17 @@ whole-run cap before another worker spends its quota. Low-level callers sharing 
 budget directly receive synchronized cooperative accounting, rather than reservations.
 Parallel scheduling and stopping order are not reproducible.
 
-`Cancellation` and `WorkMeter` live in the neutral `util` package within `klause`. Their units come
-from the caller's adapter; they contain no portfolio pricing. Composing tokens carries
-one available meter, rather than charging all possible ancestors. Presolve's adapter
-explicitly owns native root-work conversion. Numerical kernels consume native controls;
-solver policy owns conversions and result/proof semantics.
+## Native arithmetic allowances
 
-The [polynomial real theory](qfnra.md#results-and-invocation-resources) retains one
-counted scope through its final publication poll. Its native work reaches a supplied
-caller meter once and remains separate from legacy open-theory policy counters.
-Kernel representation or allocation declines produce a resource-unknown result.
-Public `PolynomialTheoryParams.maximumWork` is nullable for unlimited native work;
-zero prevents entry. Dense coefficients default to 65,536 and must be positive or
-unlimited. Matrix cells default to 262,144 and accept zero or unlimited. Disabling
-an allocation cap retains checked native dimensions. `PolynomialTheoryExecution`
-reports these counters and the resource cause separately from `SolveStats`.
-Timeout and external cancellation keep separate common termination reasons.
+Arithmetic services retain their own work currencies inside the containing solve.
+A conditioned check receives only its invocation's remaining allowance; new branches,
+retractions and candidate retries do not renew it. Native work is forwarded once to
+the caller meter, and resource exhaustion withholds an incomplete verdict.
 
-The SMT CLI starts its whole-run deadline before admission and retains that deadline
-through polynomial solving. Source parsing polls separately and charges its own exact
-coefficient-folding units when a caller meter exists. Parsing is excluded from native
-engine counters. `nra-work-limit`, `nra-dense-coefficients` and `nra-matrix-cells` own
-the polynomial limits; `node-limit` and legacy open-work settings do not price them.
+[Theory contracts](../theories.md#state-and-resources) link each service's native
+units, representation caps and controls. Finite decision and move counters cannot
+reconstruct arithmetic charges.
 
 See [sessions](sessions.md) for handle ownership, [presolve](presolve.md) for phase
 telemetry, [portfolio scheduling](portfolio.md) for coverage and
 [LP certification](../lp/certification.md) for partial numerical evidence.
-
-A `PolynomialTheoryInvocation` shares one cumulative native allowance across its
-conditioned checks. Every check receives only the remaining allowance and forwards
-its observed arithmetic work once to the containing caller meter. Query condition
-assembly belongs to that work scope. New finite branches and retractions do not renew
-it. Independent invocations receive independent ledgers.
-
-Polynomial strategy composition stops its containing search when the cumulative
-native work allowance is exhausted or a representation resource declines. Workers
-cannot restart the allowance or spin on completion queries after that stop. Native
-resource causes and finite search telemetry remain visible in the pipeline result.

@@ -1,4 +1,14 @@
-# Presolve transformations, cancellation and accounting
+# Presolve transformations and reconstruction
+
+Presolve reduces a model before search while retaining the information needed to
+interpret results in the original source. It can fix variables, substitute
+expressions or strengthen bounds. The required preservation guarantee depends on
+the operation: satisfiability, optimization and counting need different contracts.
+
+Preparation applies only reductions justified for that query, records reconstruction
+and objective mappings, and forwards resource scopes into rebuilt models. This page
+owns those guarantees and phase accounting. [Model ownership](../model.md) owns
+source identity; [search](search.md) owns propagation and traversal after preparation.
 
 ## Guarantees and source mappings
 

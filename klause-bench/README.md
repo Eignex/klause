@@ -464,7 +464,7 @@ are outside that query allowance and require an enclosing job budget.
 The recorded command's `--exact` flag requires exact source feasibility; its absence
 selects default MPS checking even when the arm name ends in `-exact`. Legacy records
 without a command use that arm suffix. Default MPS `toleranceAccepted`
-is separate from exact feasibility, using [scaled source tolerance](../docs/formats.md#mps).
+is separate from exact feasibility, using [scaled source tolerance](../docs/formats/mps.md).
 Original rational coefficients/printed values avoid binary64 row overflow.
 
 MPS objectives retain source coefficients, sense and RHS offsets. Default exact

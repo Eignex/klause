@@ -1,5 +1,13 @@
 # Numerical dependencies
 
+External numerical libraries supply data containers and kernels within Klause's
+owned LP engine. They do not select source models, solving routes or result
+semantics. This page explains what comes from each dependency, how it is pinned,
+and the consumer and runtime obligations at that boundary.
+
+[LP architecture](architecture.md) owns the engine and its working state;
+[certification](certification.md) owns result authority.
+
 Klause owns sparse and small dense LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic and scratch
 lifetime. Koblas supplies validated CSC containers, indexed/vector Level 1 kernels and generic sparse
 primitives. There is one floating simplex with exact certification; vendor selection does not change

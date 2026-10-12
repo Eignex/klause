@@ -5,6 +5,15 @@ engine serves finite CP/COP relaxations, mixed-integer models and open linear
 arithmetic. Shared search owns integer, comparison and disequality branches;
 LP feasibility alone does not establish integrality.
 
+
+The flow is to assemble a source-aware linear model, solve its floating working
+representation, certify the requested result, then let the consumer reconstruct
+or apply it. Bound changes and retraction update that same numerical scope.
+
+This page covers engine boundaries, exact authority and consumer integration before
+private basis mechanics. [Certification](certification.md) defines accepted proof
+packages; [dependency integration](dependencies.md) defines kernel interfaces.
+
 ## Boundaries
 
 ```text
@@ -27,6 +36,9 @@ Among Klause packages, `lp.engine` depends only on `util`, `simplex.exact`,
 `lp.lattice` and `simplex.basis`. Model assembly, factors, propagation, presolve
 and search stay outside it. `lp.lattice` depends only on `util`.
 Consumers use interfaces and factories. See [system boundaries](../architecture.md).
+The exact LP projection of `QfLraRelaxation` belongs to its theory adapter, beside
+the source declarations. Arithmetic kernels do not acquire that model-facing
+responsibility.
 
 ## Numerical authority
 
@@ -44,12 +56,66 @@ Compact Long inputs retain authority beyond `2^53`; wider data uses rational
 authority. Double-only input denotes its exact finite IEEE value. Projection to
 Double must preserve the source maps and must not infer fixedness from equal
 rounded endpoints. MPS decimal authority and tolerance correspondence are separate
-from the engine's exact model; see [MPS semantics](../formats.md#mps).
+from the engine's exact model; see [MPS semantics](../formats/mps.md).
 
 The engine supports missing bound sides and native FREE statuses. The CP adapter
 still splits lower-unbounded real variables as `x = x+ - x-` and adds a row for
 a finite upper side. A nonbasic status must refer to an existing exact bound, or
 zero for a free column.
+
+## Consumers, explanations and cuts
+
+[LpPropagator](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/LpPropagator.kt)
+maps source decisions to bound assertions, retracts through the trail and supplies
+certified bounds, fixings and Farkas conflicts under an effort governor. Open
+adapters share normalized terms and justified root-fixed substitutions. They
+retain defining rows needed by any active bound, objective or reconstruction map.
+
+Farkas explanations cite selected bound witnesses and all contributing scoped
+row premises. Every learned literal is false at the conflict, and the cited
+antecedents alone must imply it. One integer/disjunction leaf cannot refute its
+sibling branches. Resolve branch proofs or retain a chronological unexplained
+conflict. Current source explanations recursively expand derived premises.
+
+Cuts aggregate exact source rows and apply their rounding rule's bound and
+integrality checks. Local cuts retain substitutions, rounding bounds and
+expanded premises. Guards are revalidated after pop or remap; unsupported maps
+withhold the proof. Cut policy considers efficacy, parallelism, orthogonality,
+age and row caps. An integer-specialized separator does not imply general
+mixed-integer coverage.
+
+For unrounded Lagrangian bound `L`, reduced cost `d(j)` and cutoff `U`, a fixing
+allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoint.
+Use that certificate's costs and scale, round integer movement on the source
+lattice, and retain cutoff and row/bound premises.
+
+Objective changes retract dependent bounds, cuts and clauses. If dependent
+learning cannot be retracted selectively, restore an objective-independent
+region or prepare a fresh root. Portfolio sharing requires matching objectives,
+cutoffs and assumptions; source publication validation precedes admission.
+
+Finite satisfaction and optimization searches share root hull pruning and global
+cut harvesting. Satisfaction uses a zero objective and admits variable shaving;
+objective shaving and incumbent-relative fixings remain optimization work. Root
+preparation runs once before shared initialization publishes the resulting bounds,
+under a common time/work allowance. Enabled preparation defers shared initialization
+into the first slice; node-only searches initialize eagerly. A slice can retain pending initialization;
+a cancelled optional root phase contributes only completed certified deductions.
+`lp-variable-shaving` and `lp-prune-hulls` are explicit backtrack overrides;
+`lp-root-cuts=false` disables root harvesting while retaining node separation.
+Curated satisfaction pools require `lp-root-cuts=true` to enable harvesting.
+
+Problem-level presolve/inprocessing and LP root harvesting are reused. There
+is no general problem presolve inside the tree or elimination of shared variable
+IDs after portfolio forks. Owner-local exact factors, bounded refinement reuse,
+counter-proofs and component OBBT remain scoped mechanisms. Triangular crash
+initialization belongs to the optional LP tree-search route. Production primal
+pricing recomputes scores; there is no optional exact-row propagation or
+conflict-weakening framework.
+
+[Certification](certification.md) defines accepted proof packages and budgets.
+[Capture and replay](replay.md) describes diagnostics without equating a kernel
+replay to a complete source solve.
 
 ## Bound trail and warm state
 
@@ -172,57 +238,3 @@ never reuse approximate numeric factors as exact factors. Unavailable updated-ow
 hints decline before expensive identity traversal. Exact fill is recomputed,
 zero pivots reorder exactly, and only complete exact rank determination establishes
 singularity.
-
-## Consumers, explanations and cuts
-
-[LpPropagator](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/LpPropagator.kt)
-maps source decisions to bound assertions, retracts through the trail and supplies
-certified bounds, fixings and Farkas conflicts under an effort governor. Open
-adapters share normalized terms and justified root-fixed substitutions. They
-retain defining rows needed by any active bound, objective or reconstruction map.
-
-Farkas explanations cite selected bound witnesses and all contributing scoped
-row premises. Every learned literal is false at the conflict, and the cited
-antecedents alone must imply it. One integer/disjunction leaf cannot refute its
-sibling branches. Resolve branch proofs or retain a chronological unexplained
-conflict. Current source explanations recursively expand derived premises.
-
-Cuts aggregate exact source rows and apply their rounding rule's bound and
-integrality checks. Local cuts retain substitutions, rounding bounds and
-expanded premises. Guards are revalidated after pop or remap; unsupported maps
-withhold the proof. Cut policy considers efficacy, parallelism, orthogonality,
-age and row caps. An integer-specialized separator does not imply general
-mixed-integer coverage.
-
-For unrounded Lagrangian bound `L`, reduced cost `d(j)` and cutoff `U`, a fixing
-allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoint.
-Use that certificate's costs and scale, round integer movement on the source
-lattice, and retain cutoff and row/bound premises.
-
-Objective changes retract dependent bounds, cuts and clauses. If dependent
-learning cannot be retracted selectively, restore an objective-independent
-region or prepare a fresh root. Portfolio sharing requires matching objectives,
-cutoffs and assumptions; source publication validation precedes admission.
-
-Finite satisfaction and optimization searches share root hull pruning and global
-cut harvesting. Satisfaction uses a zero objective and admits variable shaving;
-objective shaving and incumbent-relative fixings remain optimization work. Root
-preparation runs once before shared initialization publishes the resulting bounds,
-under a common time/work allowance. Enabled preparation defers shared initialization
-into the first slice; node-only searches initialize eagerly. A slice can retain pending initialization;
-a cancelled optional root phase contributes only completed certified deductions.
-`lp-variable-shaving` and `lp-prune-hulls` are explicit backtrack overrides;
-`lp-root-cuts=false` disables root harvesting while retaining node separation.
-Curated satisfaction pools require `lp-root-cuts=true` to enable harvesting.
-
-Problem-level presolve/inprocessing and LP root harvesting are reused. There
-is no general problem presolve inside the tree or elimination of shared variable
-IDs after portfolio forks. Owner-local exact factors, bounded refinement reuse,
-counter-proofs and component OBBT remain scoped mechanisms. Triangular crash
-initialization belongs to the optional LP tree-search route. Production primal
-pricing recomputes scores; there is no optional exact-row propagation or
-conflict-weakening framework.
-
-[Certification](certification.md) defines accepted proof packages and budgets.
-[Capture and replay](replay.md) describes diagnostics without equating a kernel
-replay to a complete source solve.

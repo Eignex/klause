@@ -1,67 +1,89 @@
 # Internal developer documentation
 
-These pages define Klause's implemented architecture, ownership, invariants and
-developer workflows. Read [system architecture](architecture.md) first, then the
-contract for the subsystem you are changing. Commands run from the repository root
-unless a page states otherwise.
+Klause uses one source model across finite search, local search and arithmetic
+services. These docs explain that system from the overall solving flow down to
+component contracts and diagnostic tools. User-facing documentation is maintained
+separately at [eignex.com/docs/klause](https://eignex.com/docs/klause/).
 
-User-facing documentation is maintained separately at
-[eignex.com/docs/klause](https://eignex.com/docs/klause/).
+## Start here
 
-The [solver identity and support policy](architecture.md#solver-identity-and-support-policy)
-requires shared model breadth and an available complete-search/local-search
-portfolio for every supported problem. Current route restrictions are recorded as
-coverage gaps; mathematical completeness and proof authority remain distinct.
-The [proof-file vision](architecture.md#independently-checkable-proof-files) extends
-that contract to independent verification of source results; current in-memory
-certificates do not implement proof export.
+1. Read [system architecture](architecture.md) for the source-to-result flow and
+   the responsibilities of each layer.
+2. Read [solver vision](vision.md) for the intended model breadth, paired portfolios
+   and independent proof verification. [Current coverage](formats.md#solving-coverage)
+   records the implemented limits separately.
+3. Use [development](development.md) to build and contribute, or follow the
+   subsystem links below for the contract you are changing.
 
-## Development and frontends
+## Models and inputs
 
-| Page | Owns |
+| Page | Purpose |
 |---|---|
-| [Development](development.md) | Build smoke commands, Kotlin entry points, tests, validation and contribution rules |
-| [CLI](cli.md) | Runtime setup, format dispatch, engine selection, flags and environment defaults |
-| [MiniZinc](minizinc.md) | Solver registration, wrappers and native predicate coverage |
-| [Input semantics](formats.md) | Source lowering, finite/open routing and frontend result guarantees |
+| [Model representation and ownership](model.md) | Source declarations, engine views, immutable results and configuration capture |
+| [Library API](api.md) | Supported entry points, extension contracts, mappings and public value ownership |
+| [Input semantics](formats.md) | Shared routing, current coverage and a directory of source-format contracts |
+| [CLI](cli.md) | Build and run, format dispatch, engine selection and control flags |
+| [MiniZinc integration](minizinc.md) | Solver registration, wrappers and native predicate coverage |
 
-## Solver contracts
+## Solving lifecycle
 
-| Page | Owns |
+| Stage | Contract |
 |---|---|
-| [System architecture](architecture.md) | Solver identity, support and result guarantees, arithmetic routes, modules, dependency boundaries and source-model ownership |
-| [Library API](api.md) | Supported surfaces, migration, typed mappings and snapshot/buffer ownership |
-| [Sessions and streams](solver/sessions.md) | Assumptions, conditioned queries, cursor ownership and retained caller state |
-| [Search and propagation](solver/search.md) | Shared traversal, finite fixpoints, explanations, learned clauses, open real feasibility and clausal primal preparation |
-| [Presolve](solver/presolve.md) | Transformation guarantees, source mappings, cancellation and phase accounting |
-| [Local search](solver/local-search.md) | Projections, resumable state, initialization, definitions, moves and scoring |
-| [Polynomial real theory](solver/qfnra.md) | Complete polynomial-real decision, CAD projection and lifting, exact witnesses and invocation resources |
-| [Resource allowances](solver/resources.md) | Scope composition, units, sentinels, overspend and parallel quotas |
-| [Portfolios](solver/portfolio.md) | Witness/proof admission, slice scheduling, arm selection, reseeding and failures |
-| [LP architecture](lp/architecture.md) | Exact model authority, bound trails, basis owners, consumers and cuts |
-| [LP certification](lp/certification.md) | Bounds, witnesses, conflicts, rays and resource limits |
-| [Exact polynomial arithmetic](arithmetic/polynomial.md) | Polynomial projection, rational/algebraic roots, specialization and arithmetic resources |
-| [Numerical dependencies](lp/dependencies.md) | Koblas/Kumulant pins, kernel contracts and runtime support |
+| Caller scope | [Sessions and streams](solver/sessions.md): assumptions, active operations and retained state |
+| Preparation | [Presolve](solver/presolve.md): sound reductions, reconstruction and phase accounting |
+| Complete traversal | [Search and propagation](solver/search.md): decisions, finite fixpoints, theory checks and explanations |
+| Heuristic search | [Local search](solver/local-search.md): assignments, definitions, moves, scoring and restarts |
+| Combined execution | [Portfolios](solver/portfolio.md): result admission, scheduling, shared incumbents and worker lifetimes |
+| Interruption | [Resource allowances](solver/resources.md): scope lifetimes, work currencies and parallel quotas |
 
-## Measurement and fixtures
+## Theory contracts
 
-| Page | Owns |
+[Theory services](theories.md) defines the shared composition and result contract.
+The theories below are peers, with the same overview structure: scope, solving and
+composition, result authority, state/resources and implementation.
+
+| Theory | Contract |
 |---|---|
-| [Benchmark README](../klause-bench/README.md) | Harness and Klause-lab usage, records, provenance, source validation, comparisons and profiling |
+| [Difference logic](theories/difference.md) | Integer and real difference constraints, graph checks and explanations |
+| [Linear integer arithmetic](theories/linear-integer.md) | Exact integer constraints, open bounds and integer branching |
+| [Linear real arithmetic](theories/linear-real.md) | Rational feasibility, Boolean structure and strict inequalities |
+| [Linear mixed arithmetic](theories/linear-mixed.md) | Coupled integer/real constraints, integrality and reconstruction |
+| [Polynomial real arithmetic](theories/polynomial-real.md) | Exact nonlinear completion, finite composition and algebraic witnesses |
+
+## Numerical mechanisms
+
+These mechanisms supply the theory and search layers. Their implementation detail
+does not change the relative place of each theory in the model or support contract.
+
+| Page | Purpose |
+|---|---|
+| [LP architecture](lp/architecture.md) | Linear model authority, numerical engine boundaries, basis state and consumers |
+| [LP certification](lp/certification.md) | Exact checks for witnesses, bounds, conflicts and rays |
+| [Exact quadratic certificates](arithmetic/quadratic.md) | Rational quadratic bounds, attainment, approach paths and rays |
+| [Exact polynomial arithmetic](arithmetic/polynomial.md) | Polynomial operations, algebraic scalars, root isolation and arithmetic limits |
+| [Numerical dependencies](lp/dependencies.md) | Kernel provenance, integration contracts and runtime support |
+
+## Validation and diagnostics
+
+| Page | Purpose |
+|---|---|
+| [Development](development.md#validation) | Local checks, CI responsibilities and test conventions |
+| [Benchmark README](../klause-bench/README.md) | Harness, corpus sets, source validation and measurement workflows |
 | [LP capture and replay](lp/replay.md) | Basis traces and retained/fresh consumer diagnostics |
-| [Fixture provenance](testing/fixtures.md) | Committed input identities, hashes, licenses and capture exclusions |
-| [Portfolio slice evidence](evidence/slice-policy.md) | Bounded selection and validation supporting the common slice defaults |
-| [Numerical kernel evidence](evidence/numerical-kernels.md) | Bounded evidence for current dense-basis, rational and polling decisions |
-| [State ownership evidence](evidence/coordinator-ownership.md) | Bounded source, work and allocation validation for concrete lifecycle owners |
+| [Fixture provenance](testing/fixtures.md) | Input identities, hashes, licenses and capture exclusions |
+| [Portfolio slice evidence](evidence/slice-policy.md) | Evidence supporting scheduling defaults |
+| [Numerical kernel evidence](evidence/numerical-kernels.md) | Evidence supporting arithmetic implementation choices |
+| [State ownership evidence](evidence/coordinator-ownership.md) | Evidence supporting concrete lifecycle owners |
 
-Keep one authoritative page for each contract; link to it from related workflows.
-Update the affected contract in the same change as ownership, dependency,
-soundness, lifecycle or resource-policy changes. The LP engine's closed dependency
-list is a hard boundary.
+## Maintaining this documentation
 
-[Development rules](development.md#documentation) define documentation and evidence
-placement. System guides live here; benchmark workflows live in
-`klause-bench/README.md`. Other READMEs are short entry points.
-Fixture inputs and reusable tools stay with their consumers. Generated measurements
-belong outside the repository. Remove superseded pages and repair their links when
-consolidating; document the current system and preserve fixture attribution.
+Give each page a short explanation of its role before its detailed contract. Keep
+architecture, intended requirements, source semantics and mechanism details in
+their respective owners; link across boundaries instead of repeating them.
+Update the affected contracts whenever implementation changes those guarantees.
+
+[Development rules](development.md#documentation) define placement and maintenance.
+Standalone system documentation lives under `docs/`; benchmark workflows live in
+`klause-bench/README.md`. Preserve fixture attribution and keep generated measurement
+archives outside the repository. Commands run from the repository root unless
+stated otherwise.

@@ -1,18 +1,9 @@
 # Development
 
-Start with [system architecture](architecture.md) before changing subsystem
-boundaries. This guide owns setup smoke commands and contribution workflows;
-the [CLI](cli.md) owns launcher and runtime details.
-
-## Package boundary check
-
-`python3 scripts/check_architecture.py` checks documented outbound dependencies across
-production Kotlin source sets. `python3 scripts/test_check_architecture.py` checks the
-checker itself. `./gradlew checkArchitecture` runs both without compiling Kotlin,
-and every module's `check` depends on it. Python 3 is required for this check.
-The checker is lexical; JVM/native compilation and consumer tests validate symbol
-resolution and module visibility. [System architecture](architecture.md) defines
-the enforced ownership rules.
+This guide takes a contributor from building the CLI to changing and validating a
+subsystem. Start with [system architecture](architecture.md) for the solving flow,
+then read the contract for the component you are changing. The [CLI](cli.md) owns
+launcher and runtime details; [library API](api.md) owns supported extension surfaces.
 
 ## Getting started
 
@@ -110,6 +101,16 @@ The default build targets JVM and Linux x64. Releases opt into Linux arm64 and
 macOS arm64 with `-Ptargets.full`. Native tests and documentation checks run in
 CI. Benchmarks, capture and timing tools are opt-in; see [benchmarking](../klause-bench/README.md).
 
+## Package boundary check
+
+`python3 scripts/check_architecture.py` checks documented outbound dependencies across
+production Kotlin source sets. `python3 scripts/test_check_architecture.py` checks the
+checker itself. `./gradlew checkArchitecture` runs both without compiling Kotlin,
+and every module's `check` depends on it. Python 3 is required for this check.
+The checker is lexical; JVM/native compilation and consumer tests validate symbol
+resolution and module visibility. [System architecture](architecture.md) defines
+the enforced ownership rules.
+
 ## Tests
 
 Unit tests define focused behavior and subsystem contracts: parsing and lowering,
@@ -154,7 +155,11 @@ System guides live under `docs/` and are indexed by its [README](README.md).
 `solver/` owns search-state and scheduling contracts; `lp/` owns numerical
 authority, certification and dependency integration. `testing/` owns fixture
 provenance, and `evidence/` contains short summaries supporting current decisions.
-Root guides provide development, architecture and frontend entry points.
+Root guides provide development, architecture, model ownership and frontend entry
+points. [Solver vision](vision.md) records intended requirements separately from
+implemented coverage. `formats/` owns detailed source-specific contracts.
+`theories/` gives each arithmetic fragment a peer contract; `theories.md` owns the
+shared composition rules.
 Benchmark usage, records, independent source checks and diagnostics live in
 [klause-bench/README.md](../klause-bench/README.md). Other module and artifact
 READMEs are short entry points. Public API details belong
@@ -202,7 +207,12 @@ Extend the page that owns a contract and link to it from related guides;
 split a page only when it combines distinct responsibilities. Remove competing
 descriptions and superseded files.
 
-Document implemented behavior and its limits. Verify claims against the current
+Open each page with its role in the system and its main flow before naming concrete
+classes, thresholds or diagnostic fields. Keep specialized arithmetic and frontend
+rules in their owner pages. The vision page records intended requirements; other
+contracts describe implemented behavior and its limits. Verify claims against the current
 source rather than importing old plans, removed APIs, historical benchmark
 outcomes or comparisons into system guides. Update links and remove the
 superseded document as part of consolidation.
+Give all theories the same place in navigation and the same overview structure;
+keep shared theory rules in the index and specialized algorithms in their owner.

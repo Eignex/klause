@@ -1,5 +1,15 @@
 # LP capture and replay
 
+These opt-in tools isolate numerical basis operations and LP consumer lifetimes.
+Capture records a bounded operation stream; verification checks its identities
+and residuals; replay or paired comparisons measure that recorded work. A kernel
+trace does not establish correctness or performance of an entire source solve.
+
+Use the basis corpus for numerical regressions, the owner-lifecycle comparator for
+retained versus rebuilt consumer state, and dense comparisons for basis selection.
+[LP architecture](architecture.md) owns implementation contracts;
+[benchmark workflows](../../klause-bench/README.md) owns full solve measurements.
+
 ## Basis corpus
 
 The `:klause:basisTrace` task operates on the committed, versioned basis corpus under

@@ -1,16 +1,19 @@
 # Portfolio scheduling and publication
 
-Portfolios admit engine results under a shared source scope and schedule retained
-workers. [Sessions](sessions.md) own assumptions; [LP
-certification](../lp/certification.md) owns numerical proof checks.
+A portfolio runs multiple strategies over one source model and objective. Workers
+can improve incumbents, establish bounds or complete a proof. The coordinator
+schedules their work and admits shared results only with the authority required for
+that claim. One worker's failure to find a solution does not refute the model.
 
-The [solver identity contract](../architecture.md#solver-identity-and-support-policy)
-requires callers to be able to pair complete search and local search for every
-supported problem, with both arms executing the same source constraints and
-objective. A standalone theory route or a filtered-out unsupported LS arm does
-not meet that requirement. Route restrictions below describe implemented coverage;
-they are gaps to close rather than exceptions to the contract. Complete-search
-proof authority does not imply mathematical completeness for every admitted theory.
+Execution has three parts: prepare retained workers, give them bounded slices, and
+verify their publications before sharing or returning them. Slices preserve state;
+reseeding or retiring a worker has its own lifetime and accounting rules.
+
+The [solver vision](../vision.md#shared-model-breadth) requires an available
+complete-search/local-search pair for every supported model. Current admission gaps
+remain implementation limits. [Sessions](sessions.md) owns assumptions;
+[resource allowances](resources.md) owns containing budgets;
+[LP certification](../lp/certification.md) owns numerical proof checks.
 
 ## Witnesses and proof scope
 
@@ -19,7 +22,7 @@ registry. `exactInts` and `exactReals` carry immutable authoritative coordinates
 samples retain private compact arrays. Constructor inputs and exported arrays cannot
 mutate a published incumbent. Exact theory and reconstruction carriers follow the
 same owned snapshot contract; live producer workspaces remain private. See
-[model and ownership](../architecture.md#model-and-ownership). Copying an unchanged assignment preserves its
+[model and ownership](../model.md). Copying an unchanged assignment preserves its
 coordinates and theory acceptance. Changing coordinates requires a fresh witness check.
 The exact objective is evaluated from the carried assignment, including integers outside
 `Long`.
@@ -51,10 +54,8 @@ attestation of the engine's check, not a serialized proof or an independent proo
 checker. Numerical proofs remain owned by their engines; a point alone never certifies a
 recession direction.
 
-The [proof-file vision](../architecture.md#independently-checkable-proof-files)
-requires independently checkable evidence back to the source, including justified
-imports across workers. These in-memory attestations do not meet that target;
-serializing a certificate token alone does not provide a derivation.
+Independent proof export remains a [vision requirement](../vision.md#independently-checkable-proof-files).
+Serializing an in-memory certificate token does not provide a derivation.
 
 Built-in shared channels belong to the same model and objective. Workers reject foreign
 pools; objective and variable bound imports require matching certificates. The shared
@@ -68,26 +69,16 @@ replicas on parallel lanes. A lone complete worker keeps its learned database lo
 without exporting portable clauses. Shared preparation and incumbent channels retain
 their own lifetimes even when there is no clause peer.
 
-## Scheduling neighborhood diversity
+### Theory-backed workers
 
-A curated sequential mixed optimization pool over a scheduling model pairs the original
-plateau local-search arm with a primary-repair plateau variant in the preceding generic
-CBLS slot. Both start from the original plateau arm's seed; the original arm and every
-remaining worker retain their positions and seeds. The variant defers supplemental
-Element repairs to complete improving fallback selection. The original arm retains
-its full repair neighborhood. Explicit local-search pools, local-search-only execution,
-parallel pools and non-scheduling models retain their selected recipes.
+Workers that need arithmetic completion share the same source scope and require
+that check before publishing a witness. A neighbourhood refutation or failed
+candidate check cannot establish global infeasibility. Complete workers retain
+proof authority; heuristic workers retain witness authority.
 
-## Finite objective recipe diversity
-
-A curated single-core mixed finite-CP optimization pool with at least six configured
-slots admits the restart-level selector portfolio beside the SAT guard when its initial
-backtrack pair has no LP recipe. The selector worker uses its own UCB1 policy over
-variable and value heuristics at internal restarts. It occupies the conflict-driven
-slot; an expanded pool containing both recipes swaps their positions. The configured
-pool size, local-search positions, slice allowances and family scheduling are preserved.
-Explicit recipes, backtrack edits, source annotations, continuous models and parallel
-lanes retain their selected recipes.
+[Theory contracts](../theories.md) define the available completion routes and their
+invocation lifetimes. [Resource allowances](resources.md) owns cumulative budgets
+across workers.
 
 ## Slice accounting and coverage
 
@@ -192,7 +183,44 @@ diagnostics. Reseeding preserves terminal verdicts. Arm policy, scheduling and a
 continuous-column capability determine which arms run; unsupported local-search arms are
 filtered from mixed pools while local-search-only requests retain their own behavior.
 
-## LP arm admission
+## Incumbent guidance
+
+FlatZinc search hints select tiered variable and value heuristics without inheriting the
+free-search preset's phase saving or restart schedule. The source hint's solution-guided
+value wrapper remains available without saved phases taking precedence over it.
+Optimization updates guidance only after admitting a complete improving incumbent.
+Solution-guided selectors retain their first descent, then adopt better verified pooled
+incumbents when traversal resumes, without discarding their trail or learned state.
+Other pooled solution phasing retains its restart-boundary import policy.
+
+## Model-specific worker recipes
+
+These policies choose workers for particular model structures within the shared
+scheduling and publication contract. Explicit worker pools retain their requested
+composition.
+
+### Scheduling neighborhood diversity
+
+A curated sequential mixed optimization pool over a scheduling model pairs the original
+plateau local-search arm with a primary-repair plateau variant in the preceding generic
+CBLS slot. Both start from the original plateau arm's seed; the original arm and every
+remaining worker retain their positions and seeds. The variant defers supplemental
+Element repairs to complete improving fallback selection. The original arm retains
+its full repair neighborhood. Explicit local-search pools, local-search-only execution,
+parallel pools and non-scheduling models retain their selected recipes.
+
+### Finite objective recipe diversity
+
+A curated single-core mixed finite-CP optimization pool with at least six configured
+slots admits the restart-level selector portfolio beside the SAT guard when its initial
+backtrack pair has no LP recipe. The selector worker uses its own UCB1 policy over
+variable and value heuristics at internal restarts. It occupies the conflict-driven
+slot; an expanded pool containing both recipes swaps their positions. The configured
+pool size, local-search positions, slice allowances and family scheduling are preserved.
+Explicit recipes, backtrack edits, source annotations, continuous models and parallel
+lanes retain their selected recipes.
+
+### LP arm admission
 
 Continuous-column optimization models rank the default LP backtrack arm after the SAT
 guard and conflict-driven core. A curated sequential mixed optimization pool with at
@@ -225,7 +253,7 @@ See
 [SliceBudget](../../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)
 and [portfolio](../../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).
 
-### Satisfaction pools
+#### Satisfaction pools
 
 The satisfaction backtrack palette includes conservative LP after default and aggressive
 LP. Applicability, model class and LP ceilings order and filter the palette. Root variable shaving and hull
@@ -254,16 +282,6 @@ using tabu tenure 10 and an improving aspiration rule without a strategy restart
 schedule. Optimizing clausal models retain the general local-search order. Explicit
 local-search pools retain their selected recipes.
 
-## Incumbent guidance
-
-FlatZinc search hints select tiered variable and value heuristics without inheriting the
-free-search preset's phase saving or restart schedule. The source hint's solution-guided
-value wrapper remains available without saved phases taking precedence over it.
-Optimization updates guidance only after admitting a complete improving incumbent.
-Solution-guided selectors retain their first descent, then adopt better verified pooled
-incumbents when traversal resumes, without discarding their trail or learned state.
-Other pooled solution phasing retains its restart-boundary import policy.
-
 ## Statistics
 
 The portfolio owns `SolveStats.run.wallMs` for each satisfaction or optimization
@@ -285,11 +303,3 @@ segment time and live propagation counters; it is not included in opening time.
 [Search statistics](search.md#statistics) and [benchmark
 records](../../klause-bench/README.md#saved-results) define propagation, conflict and
 saved-result accounting.
-
-Polynomial composition builds workers over one finite projection and one immutable
-polynomial source scope. Its sequential mixed pool contains complete backtracking,
-finite local search and ALNS bootstrap/repair workers. Exact continuous completion
-is required before a sample receives that source's witness certificate. Only the
-complete worker receives proof admission; heuristic failure and neighbourhood
-exhaustion do not certify infeasibility. The containing polynomial invocation owns
-native work across workers and is closed after portfolio handles and sessions.

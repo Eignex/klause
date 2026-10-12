@@ -1,39 +1,18 @@
 # Local-search state and moves
 
-Local search maintains assignments and graded factor violations. Source witnesses pass
-the [portfolio publication contract](portfolio.md#witnesses-and-proof-scope); an
-unsuccessful walk supplies no completeness claim.
+Local search searches for feasible or improving assignments by changing values and
+measuring constraint violations. It keeps incremental scores so a candidate move
+can be evaluated without rebuilding the whole model. Defined outputs and coordinated
+moves keep related coordinates consistent as the walk progresses.
 
-## Handles and exclusive ownership
+A run prepares its model projection, initializes an assignment, generates and scores
+moves, accepts selected changes, and restarts when needed. Candidate publication
+checks every required source constraint, including arithmetic completion. A low
+score guides the walk; it does not prove feasibility, optimality or infeasibility.
 
-Local-search optimization handles retain the live assignment, RNG, factor payloads,
-restart progress and incumbent between segments. A slice pauses at an instruction
-checkpoint or cancellation poll; an interrupted continuous-candidate check retains its
-candidate for the next slice. Moves and restart transitions count as instructions. The
-scheduler charges the observed instruction delta, while the solve-wide move allowance is
-charged once across slices. Closing or reseeding discards the retained state. Root
-refutations remain authoritative; an unsuccessful local-search walk is incomplete. An
-active local-search handle acquires exclusive ownership of its solver when opened.
-Overlapping handle creation and other search execution throw `IllegalStateException`,
-including searches through another session of that solver. Completion, failure and
-idempotent close release ownership; a cancelled slice remains paused and retains it. The
-owning session rejects assumption changes and warm-state reset until release. Strategy
-and restart policy are shared by the solver; legacy streaming draws must be consumed
-sequentially, while open streams hold exclusive ownership. Portfolio workers use
-separate solvers and close a handle before reseeding it. Optimization handles open
-through their session so its assumptions and state apply. Sessions that decline
-resumable optimization retain their one-shot improvement stream.
-
-[LocalSearchEngine](../../klause/src/commonMain/kotlin/com/eignex/klause/localsearch/LocalSearchEngine.kt)
-owns model preparation, exclusive acquisition, strategies and restart policies.
-Each retained handle owns its cursor, terminal verdict and idempotent release through
-[LocalSearchRun](../../klause/src/commonMain/kotlin/com/eignex/klause/localsearch/LocalSearchRun.kt).
-Concrete satisfaction and optimization handles advance the existing streams.
-`LocalSearchRunControl` combines lifetime and segment cancellation and retains the
-instruction checkpoint; `LocalSearchProgress` owns residual observations, warm-state
-capture and incremental solve-wide charging at stream checkpoints. Assignment buffers,
-RNG and unfinished initialization belong to the retained state. Model projections and
-complete immutable preparation indexes can be shared; mutable run progress cannot.
+The sections follow preparation, move mechanics and run lifetime, then diagnostics.
+[Search](search.md) owns complete traversal; [sessions](sessions.md) owns caller
+scopes; [portfolios](portfolio.md#witnesses-and-proof-scope) owns result admission.
 
 ## Projections and preparation
 
@@ -201,6 +180,47 @@ counter-shifts cannot overwrite those coordinates. Unsupported definitions, over
 nonintegral inverses decline the candidate; an unreachable matching cell does not stop
 the remaining element scan.
 
+## Maintained literal channels
+
+Domain-aware definition inference derives hinted unit equality channels only when their
+source bounds are within 0/1. A channel's predicate is derived only from a unique unit
+unary equality, disequality or ordered comparison whose other Boolean occurrences are
+channels. Negative unit coefficients reverse ordered comparisons; unrepresentable
+negated bounds and inputs admitting `Long.MIN_VALUE` decline that normalization. Mixed integer and Boolean
+definitions are ordered together; competing outputs and cyclic cones stay searched.
+Pinned values survive evaluation, and clipped channels retain their factor violations
+without replacing a maintained predicate during seeding. Implicitly owned integer
+outputs remain unchanged during per-move propagation; the affected definition factors
+retain any resulting violations. Diversification kicks also exclude maintained Boolean
+outputs from direct flips. Repairs into retained literal channels change an admissible
+Boolean input or backsolve a retained unary predicate into a searched integer or an
+existing extremum inverse. When a Boolean predicate remains searched, unit unary
+equality sources supply bounded coordinated choice moves before a direct flip; all other
+constraints and duration fanout remain graded. These repairs check output domains, pins
+and implicit owners; false equality targets sample at most four alternatives from at
+most 32 present values, including bounded walks through larger domains. Literal chains
+stop at depth 16. The Cumulative duration neighborhood uses the same inverse route.
+Clause, cardinality and weighted Boolean-row repairs backsolve maintained equality
+predicates through their integer inputs after binary lowering removes the integer
+channels. Substituted integer pins remain in place; source-coordinate pins and owners
+still filter every inverse move. Ordered predicate inverses round toward the requested
+truth through root-domain holes and reject unreachable thresholds, including strict
+complements at signed endpoints. Equality and disequality inverses retain the bounded
+alternative walk.
+
+Functional objective inference follows admitted unary predicates, literal channels,
+Boolean folds and arithmetic definitions across both coordinate spaces in their shared
+topological order. Integer and Boolean leaves remain separate; mixed objective terms
+and polarity retain their source meaning. Unsupported reachable definitions decline
+functional inference. The objective computes the defining expressions for shaping;
+domain-clipped, pinned or owned outputs retain ordinary constraint violations and do
+not establish source feasibility. Complete propagated probes reconcile predicted and
+committed objective deltas. The portfolio's ALNS inner local search shares the definition
+sweep and immutable network used by ordinary LS workers using invariants. Boolean
+break/make vectors initialize on their first score query and are maintained
+incrementally thereafter; strategies that do not query them avoid their initialization
+pass.
+
 ## Coordinated channels and tuple moves
 
 Value-driven moves carry equality indicator flips through directly connected unit
@@ -290,47 +310,6 @@ Opt-in Cumulative residual snapshots prioritize the start,
 duration and demand coordinates of tasks participating in the maximum overload,
 retaining coordinate bounds and omission counts.
 
-## Maintained literal channels
-
-Domain-aware definition inference derives hinted unit equality channels only when their
-source bounds are within 0/1. A channel's predicate is derived only from a unique unit
-unary equality, disequality or ordered comparison whose other Boolean occurrences are
-channels. Negative unit coefficients reverse ordered comparisons; unrepresentable
-negated bounds and inputs admitting `Long.MIN_VALUE` decline that normalization. Mixed integer and Boolean
-definitions are ordered together; competing outputs and cyclic cones stay searched.
-Pinned values survive evaluation, and clipped channels retain their factor violations
-without replacing a maintained predicate during seeding. Implicitly owned integer
-outputs remain unchanged during per-move propagation; the affected definition factors
-retain any resulting violations. Diversification kicks also exclude maintained Boolean
-outputs from direct flips. Repairs into retained literal channels change an admissible
-Boolean input or backsolve a retained unary predicate into a searched integer or an
-existing extremum inverse. When a Boolean predicate remains searched, unit unary
-equality sources supply bounded coordinated choice moves before a direct flip; all other
-constraints and duration fanout remain graded. These repairs check output domains, pins
-and implicit owners; false equality targets sample at most four alternatives from at
-most 32 present values, including bounded walks through larger domains. Literal chains
-stop at depth 16. The Cumulative duration neighborhood uses the same inverse route.
-Clause, cardinality and weighted Boolean-row repairs backsolve maintained equality
-predicates through their integer inputs after binary lowering removes the integer
-channels. Substituted integer pins remain in place; source-coordinate pins and owners
-still filter every inverse move. Ordered predicate inverses round toward the requested
-truth through root-domain holes and reject unreachable thresholds, including strict
-complements at signed endpoints. Equality and disequality inverses retain the bounded
-alternative walk.
-
-Functional objective inference follows admitted unary predicates, literal channels,
-Boolean folds and arithmetic definitions across both coordinate spaces in their shared
-topological order. Integer and Boolean leaves remain separate; mixed objective terms
-and polarity retain their source meaning. Unsupported reachable definitions decline
-functional inference. The objective computes the defining expressions for shaping;
-domain-clipped, pinned or owned outputs retain ordinary constraint violations and do
-not establish source feasibility. Complete propagated probes reconcile predicted and
-committed objective deltas. The portfolio's ALNS inner local search shares the definition
-sweep and immutable network used by ordinary LS workers using invariants. Boolean
-break/make vectors initialize on their first score query and are maintained
-incrementally thereafter; strategies that do not query them avoid their initialization
-pass.
-
 ## Scoring and probe restoration
 
 Moves feeding definitions score the complete propagated assignment, including derived
@@ -390,6 +369,36 @@ and callers must read the post-move degree for scoring. Reified linear invariant
 an internal fused payload-update and exact-degree path. Other invariants update payloads
 and then read their degree, independently of the returned apply value.
 
+## Continuous candidate completion
+
+A finite projection can use `CandidateCompletion` when the source also requires
+arithmetic coordinates, even if its assignment workspace has no continuous buffer.
+The completion service checks a pinned finite candidate
+against those constraints before publication; a rejected or indeterminate candidate
+cannot refute the source model. Completed samples retain authoritative coordinates
+and source scope rather than substituting the local-search score for a witness check.
+
+[Theory contracts](../theories.md) define the supported graph, linear and polynomial
+checks. Their source semantics and resource ledgers remain authoritative across
+candidate retries. Completion coordinates are distinct from the finite factors
+that guide the walk.
+
+## Exact coordinate neighborhoods
+
+The retained exact-coordinate driver proposes rational coordinate windows and
+Boolean pins to a source-bound completion adapter. A coordinate repair relaxes one
+pin; compound repairs relax a block. Adaptive neighborhood search weights the
+block sizes by accepted improvements. Centers, window radii, random state, weights
+and incumbents survive slices. A rejected repair widens search windows without
+changing the source domain or establishing infeasibility.
+
+The linear adapter adds exact rational rows, retains arbitrary-width integers and
+checks the conditioned source through its selected theory. Native work, decisions
+and legacy checks share one allowance across repairs; completion work also charges
+the heuristic instruction ledger. Exact objective cutoffs require strict source
+improvement. Only checked completions publish witnesses or best-found incumbents.
+Repair refutations and exhausted windows carry no source proof authority.
+
 ## Restart anchors
 
 Optimization restart policies receive only accepted feasible incumbents. Before an
@@ -407,6 +416,37 @@ alter the retained anchor or live assignment. Initialization and the restart imm
 after publication receive null. Anchor capture and expansion consume no RNG draws or
 search instructions. Anchor capture and expansion remain ordinary loop work outside the
 restart seeding timer.
+
+## Handles and exclusive ownership
+
+Local-search optimization handles retain the live assignment, RNG, factor payloads,
+restart progress and incumbent between segments. A slice pauses at an instruction
+checkpoint or cancellation poll; an interrupted continuous-candidate check retains its
+candidate for the next slice. Moves and restart transitions count as instructions. The
+scheduler charges the observed instruction delta, while the solve-wide move allowance is
+charged once across slices. Closing or reseeding discards the retained state. Root
+refutations remain authoritative; an unsuccessful local-search walk is incomplete. An
+active local-search handle acquires exclusive ownership of its solver when opened.
+Overlapping handle creation and other search execution throw `IllegalStateException`,
+including searches through another session of that solver. Completion, failure and
+idempotent close release ownership; a cancelled slice remains paused and retains it. The
+owning session rejects assumption changes and warm-state reset until release. Strategy
+and restart policy are shared by the solver; legacy streaming draws must be consumed
+sequentially, while open streams hold exclusive ownership. Portfolio workers use
+separate solvers and close a handle before reseeding it. Optimization handles open
+through their session so its assumptions and state apply. Sessions that decline
+resumable optimization retain their one-shot improvement stream.
+
+[LocalSearchEngine](../../klause/src/commonMain/kotlin/com/eignex/klause/localsearch/LocalSearchEngine.kt)
+owns model preparation, exclusive acquisition, strategies and restart policies.
+Each retained handle owns its cursor, terminal verdict and idempotent release through
+[LocalSearchRun](../../klause/src/commonMain/kotlin/com/eignex/klause/localsearch/LocalSearchRun.kt).
+Concrete satisfaction and optimization handles advance the existing streams.
+`LocalSearchRunControl` combines lifetime and segment cancellation and retains the
+instruction checkpoint; `LocalSearchProgress` owns residual observations, warm-state
+capture and incremental solve-wide charging at stream checkpoints. Assignment buffers,
+RNG and unfinished initialization belong to the retained state. Model projections and
+complete immutable preparation indexes can be shared; mutable run progress cannot.
 
 ## Phase timing
 
@@ -462,28 +502,3 @@ CLI pairs use `lsBestResidualFactorDetails.<factor-id>.<key>`; existing coordina
 pairs retain their format. Captures own detached metadata and never grade or mutate
 the assignment. Coordinate-only construction and the legacy constructor/copy
 compatibility descriptors remain available; copies retain captured details.
-
-A finite projection can use `CandidateCompletion` even when its assignment workspace
-has no continuous coordinates. The polynomial adapter pins the complete finite
-candidate and asks the exact theory for its continuous completion. Rejected or
-indeterminate candidates trigger the ordinary restart path; neither result refutes
-the source model. Finite factor degrees guide the walk, while native polynomial
-work has its own cumulative allowance. Completed samples own exact algebraic
-coordinates and a source witness certificate. ALNS bootstrap and CP repairs use
-the same shared polynomial component; neighbourhood pins do not renew its allowance.
-
-## Exact coordinate neighborhoods
-
-The retained exact-coordinate driver proposes rational coordinate windows and
-Boolean pins to a source-bound completion adapter. A coordinate repair relaxes one
-pin; compound repairs relax a block. Adaptive neighborhood search weights the
-block sizes by accepted improvements. Centers, window radii, random state, weights
-and incumbents survive slices. A rejected repair widens search windows without
-changing the source domain or establishing infeasibility.
-
-The linear adapter adds exact rational rows, retains arbitrary-width integers and
-checks the conditioned source through its selected theory. Native work, decisions
-and legacy checks share one allowance across repairs; completion work also charges
-the heuristic instruction ledger. Exact objective cutoffs require strict source
-improvement. Only checked completions publish witnesses or best-found incumbents.
-Repair refutations and exhausted windows carry no source proof authority.

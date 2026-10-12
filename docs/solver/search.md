@@ -1,9 +1,19 @@
 # Search and propagation
 
-Shared traversal and finite propagation implement the ownership boundaries in [system
-architecture](../architecture.md). Caller scopes belong to [sessions](sessions.md);
-local-search state and portfolio policy are defined in [local search](local-search.md)
-and [portfolios](portfolio.md).
+Complete search explores alternatives, restores state when a branch fails and
+checks complete assignments before publication. Finite propagation narrows Bool+Int
+domains; arithmetic components enforce the parts of the source model they own.
+Learning reuses conflicts only when their explanations remain valid in that scope.
+
+The traversal loop is shared: establish a fixpoint, check or choose a decision,
+apply it, and retract to another alternative after conflict. Exhausting alternatives
+supports a refutation only if all required checks completed. Interruption leaves the
+unexplored space undecided.
+
+This page owns traversal, finite state and reasons. [Sessions](sessions.md) owns
+caller assumptions; [presolve](presolve.md) owns reconstruction;
+[local search](local-search.md) and [portfolios](portfolio.md) own their strategy
+state and scheduling. [Model ownership](../model.md) defines the engine views.
 
 ## Shared component search
 
@@ -217,89 +227,28 @@ See
 and
 [ClauseDb](../../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ClauseDb.kt).
 
-Continuous-by-continuous `ContinuousProduct` factors declare no finite execution
-route. Their real memberships never demand finite domains. Propagation and local
-scoring projections reject the factor; exact and tolerance LP leaf completions
-withhold nonlinear feasibility. See [continuous source lowering](../formats.md#schema-continuous-products).
+## Theory completion
 
-## Open real arithmetic
+A component's partial consistency check or relaxation witness does not accept a
+complete source assignment. Every participating owner must finish its required
+check before publication. Extra theory components also constrain finite LP primal
+proposals and transferred initial candidates; ordinary traversal remains available
+when a proposal cannot be completed.
 
-The `theory.qflra` component owns exact real feasibility in shared search. [Input
-semantics](../formats.md#smt-lib) defines supported source syntax and output.
+[Theory contracts](../theories.md) define the fragment-specific checks and evidence.
+Difference graphs, exact linear systems and polynomial completion keep their own
+state while sharing the traversal's source facts and decision lifetime. Integer
+integrality and finite factors cannot be dropped to obtain an arithmetic witness.
 
-The exact real component uses a difference graph when every arithmetic row is a
-one-column bound or a two-column difference with an integral normalized bound. Boolean
-guards select active edges. With `n` graph vertices, scaling bounds by `n+1` and
-subtracting one from strict edges preserves every simple cycle's sign, including
-zero-weight strict cycles. Feasible graphs supply rational potentials; witnesses still
-pass the complete source-row check. A verified negative predecessor cycle supplies a
-conflict clause containing the complements of its active signed guards. Immutable
-unconditional source rows and declared bounds need no Boolean premise; assigned root
-guards remain in the clause. Cycle capture reuses the feasibility traversal rather than
-running another graph sweep. The component checks that every clause literal is false
-in the current shared context before publishing the conflict for ordinary learning.
-Cancelled checks withhold the proof, and missing cycle capture retains the shared LP
-route. Private source-bound branches and overridden LP certification policies also
-retain that route.
+## Contributed model ownership
 
-Admitted pure-real difference components under the production certification policy
-defer LP construction and check the active graph at partial and complete Boolean states,
-including the root. A feasible partial graph supplies consistency without a numerical
-guide or a model contribution. Complete graph points still pass the complete source-row
-check before publication. Missing cycle evidence, declined source validation and private
-source-bound branches retain the shared LP route. Late LP installation reaches the
-current decision scope before asserting resolved source rows, so retraction removes their
-guards and original witness premises together. Unconditional source rows can be reasserted
-after that scope is popped; declared bounds remain immutable root facts.
-
-If every Boolean is published at the root, initialization waits for those publications
-to reach the theory before checking the pinned arithmetic.
-
-Pure-real local-search completions keep their source rows and Boolean pins, skipping
-source presolve before the selected exact real theory certifies the leaf. Mixed
-integer/real completions retain source preparation. Bounded potentials from an earlier
-feasible graph seed relaxation, which must still settle every active edge. Fragments
-outside graph admission retain the full shared LP solve and its numerical guide.
-
-Graph admission is capped at 10,000 real variables and 100,000 edges. Larger models,
-fractional normalized bounds, unsafe Long magnitudes, disequalities, private
-disjunctions, Boolean arithmetic beyond shared clauses/cardinalities, and mixed
-integer/real models retain the exact LP route. Overridden LP certification policies
-retain the LP route because graph evidence has no LP certifier identity. No finite CP
-domains are created by this graph.
-
-## Statistics
-
-| Field | Meaning |
-|---|---|
-| `propagations` | Finite Boolean, singleton, bound, hole and survivor-set deductions reported by completed search fixpoints; excludes decision and root pins |
-| `learned` | Learned consequences observed by the traversal, including native CP learning |
-| `caNotApplicable`, `caNonAsserting` | Native CP analyses declining a usable or asserting consequence; exported by every CLI format |
-| `propagationWork` | Monotonic dispatch, literal, watcher, level and linear-term/reason visits, including work across undo |
-| `rootPropagationWork`, `rootPropagationMs` | Initialization root-fixpoint work and time, including private preparation |
-| `propagationMs` | Fixpoint elapsed time; some counted reason scans are outside it |
-| `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |
-| `openNonAssertingConflicts` | Sound shared conflicts retaining chronological fallback |
-| `openReductionNs` | Total shared reduction selection and watch-rebuild time |
-
-A nonzero non-asserting count is a reason to capture the conflict and inspect component
-reasons. Zero does not establish complete factor reason coverage. Missing metrics remain
-missing, including root theory refutations that never enter shared search. Ratios of
-visit work to fixpoint time are coarse because their scopes differ.
-
-The CLI exports these native work/time fields under `nativeCpPropagationWork`,
-`nativeCpRootPropagationWork`, `nativeCpPropagationMs` and
-`nativeCpRootPropagationMs` when the aggregate snapshot has positive native work
-or time. Root work and time are subsets of the respective propagation totals,
-not additive phases. Worker snapshots aggregate their native measurements; these
-values are not an invocation wall-time partition. An absent native block cannot
-classify open-theory root or propagation activity, whose elapsed times are not
-measured by these native providers. A zero emitted millisecond value can result
-from truncating an evidenced sub-millisecond measurement. The
-[CLI invocation fields](../cli.md) distinguish frontend routing, selected solve
-pipeline, declared theory and reported backend without extending search clocks.
-
-`openReductionNs` is zero when the cap is off or no reduction pass is needed.
+Components contribute immutable values through typed keys, with one owner per key.
+The assembled model captures its map and each typed key's ownership hook at publication;
+reads retain the associated value type without copying. Exact source integer and real
+keys preserve arbitrary-precision and rational coordinates alongside the compatibility
+keys. Opaque legacy values remain borrowed read-only. Extensions retain open keys for
+arrays, functions and native theory values; their captured payloads must be immutable.
+See [API migration and mappings](../api.md#typed-contributions-and-migration).
 
 ## Monotone clausal primal probe
 
@@ -358,22 +307,35 @@ stages it did not reach. Outcome counters distinguish private refutations from
 incomplete stops without a model. These counters describe heuristic progress and carry
 no proof.
 
-## Contributed model ownership
+## Statistics
 
-Components contribute immutable values through typed keys, with one owner per key.
-The assembled model captures its map and each typed key's ownership hook at publication;
-reads retain the associated value type without copying. Exact source integer and real
-keys preserve arbitrary-precision and rational coordinates alongside the compatibility
-keys. Opaque legacy values remain borrowed read-only. Extensions retain open keys for
-arrays, functions and native theory values; their captured payloads must be immutable.
-See [API migration and mappings](../api.md#typed-contributions-and-migration).
+| Field | Meaning |
+|---|---|
+| `propagations` | Finite Boolean, singleton, bound, hole and survivor-set deductions reported by completed search fixpoints; excludes decision and root pins |
+| `learned` | Learned consequences observed by the traversal, including native CP learning |
+| `caNotApplicable`, `caNonAsserting` | Native CP analyses declining a usable or asserting consequence; exported by every CLI format |
+| `propagationWork` | Monotonic dispatch, literal, watcher, level and linear-term/reason visits, including work across undo |
+| `rootPropagationWork`, `rootPropagationMs` | Initialization root-fixpoint work and time, including private preparation |
+| `propagationMs` | Fixpoint elapsed time; some counted reason scans are outside it |
+| `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |
+| `openNonAssertingConflicts` | Sound shared conflicts retaining chronological fallback |
+| `openReductionNs` | Total shared reduction selection and watch-rebuild time |
 
-Polynomial components consume the shared trail's semantic finite bounds. Exact
-refutation of their real relaxation rejects the containing branch; only a query
-with all participating finite coordinates fixed may supply a completed witness.
-The shared model carries that completed sample beside the finite contribution, so
-backtracking satisfaction and optimization retain exact algebraic coordinates.
-Optimization installs additional component factories before its first shared check.
-Finite LP primal proposals and transferred initial candidates are withheld when
-additional theory components still require a complete check; ordinary traversal
-remains available. See [polynomial composition](qfnra.md#conditioned-theory-service).
+A nonzero non-asserting count is a reason to capture the conflict and inspect component
+reasons. Zero does not establish complete factor reason coverage. Missing metrics remain
+missing, including root theory refutations that never enter shared search. Ratios of
+visit work to fixpoint time are coarse because their scopes differ.
+
+The CLI exports these native work/time fields under `nativeCpPropagationWork`,
+`nativeCpRootPropagationWork`, `nativeCpPropagationMs` and
+`nativeCpRootPropagationMs` when the aggregate snapshot has positive native work
+or time. Root work and time are subsets of the respective propagation totals,
+not additive phases. Worker snapshots aggregate their native measurements; these
+values are not an invocation wall-time partition. An absent native block cannot
+classify open-theory root or propagation activity, whose elapsed times are not
+measured by these native providers. A zero emitted millisecond value can result
+from truncating an evidenced sub-millisecond measurement. The
+[CLI invocation fields](../cli.md) distinguish frontend routing, selected solve
+pipeline, declared theory and reported backend without extending search clocks.
+
+`openReductionNs` is zero when the cap is off or no reduction pass is needed.

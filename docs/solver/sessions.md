@@ -1,7 +1,13 @@
 # Solver sessions and streams
 
-The public session owns caller scopes and active operations. Backend state follows the
-[search](search.md) and [local-search](local-search.md) contracts.
+A session groups operations under caller assumptions. A stream or resumable handle
+keeps one operation alive across consumption or slices. The session owns those
+scopes and prevents overlapping operations from mutating active state.
+
+The caller opens a session, establishes assumptions, starts an operation, consumes
+or resumes it, and closes its owner before changing scope. Published results remain
+readable independently of the live operation. This page defines capture, exclusion
+and cleanup; backend state follows [search](search.md) and [local search](local-search.md).
 
 ## Assumptions and conditioned queries
 
@@ -11,40 +17,6 @@ pins and per-call parameters; popping restores the previous scope. The source mo
 unchanged. Solve, sample, enumerate and minimize require parameters that enforce
 assumptions; unsupported parameters reject non-empty pins or deductions explicitly. The
 default methods of custom sessions reject scoped operations they cannot implement.
-
-Counting builds an isolated conditioned model. Integer domains carry the scope's pins,
-holes and bounds; Boolean root pins become source unit clauses so hash extensions and
-rebuilds preserve them. Exact, approximate and hybrid counting use that same model.
-Accurate sampling also conditions on both call parameters and session scopes. Counting
-and accurate sampling use complete finite-model machinery independently of the session's
-sampling backend; local-search enumeration remains sampling with replacement.
-
-Approximate counting and accurate sampling project only Boolean and finite integer
-values. Real columns remain existential feasibility constraints: neither a real
-interval nor multiple real completions multiply the projected count. Integer channels,
-conditioned models and XOR extensions retain real declarations, resource settings and
-implied/symmetry metadata. Decoded representatives retain all source coordinates,
-including approximate and certified rational real values and any exact integer payload;
-an augmented model's witness certificate does not certify the source projection.
-An empty declared real interval proves a cell empty before witness completion.
-Cell exhaustion requires complete feasibility checks, and an indeterminate real leaf
-cannot establish an exact count. Polynomial algebraic assignments belong to the
-[polynomial pipeline](qfnra.md), whose opaque source snapshots are outside these
-`Solver` counting and sampling entry points.
-
-## Exact count bounds
-
-Anytime exact counting reports proven projected assignments as its lower bound and
-adds all unchecked or undecided subtree mass to its upper bound. A feasibility check
-replaces only the checked child's mass, so exhausting `maxChecks` partway through an
-expansion retains its unchecked siblings and the deeper frontier. An `Unknown` check
-retains its entire subtree in the upper bound and prevents an exact result.
-
-Subtree products and frontier updates use exact integer arithmetic, including integer
-domain widths and holes. Published lower bounds rise and upper bounds fall.
-`Count.upper == Long.MAX_VALUE` is an unbounded sentinel when the bound exceeds the
-public `Long` range; saturation does not establish exactness. Exactness requires all
-projected branches to be decided and a representable count.
 
 ## Streams and exclusive ownership
 
@@ -81,17 +53,50 @@ Repair handles are a separate internal contract. Their cutoff must be monotone
 non-increasing because retained objective-bound clauses survive fragment reseeding.
 General session push/pop starts a fresh search and does not reuse repair machinery.
 
-## Polynomial invocations
+## Counting and sampling
 
-A polynomial pipeline request retains an immutable source snapshot and can be reused
-for fresh calls. Each execution constructs its own arithmetic context, Boolean
-search and CAD traversal. It exposes no resumable handle, scoped mutation or retained
-refinement state. Complete exact scalar metadata remains readable after subsequent
-executions or cancellation; published witnesses own only original source coordinates.
-See [polynomial theory](qfnra.md) and [resource allowances](resources.md).
+Counting builds an isolated conditioned model. Integer domains carry the scope's pins,
+holes and bounds; Boolean root pins become source unit clauses so hash extensions and
+rebuilds preserve them. Exact, approximate and hybrid counting use that same model.
+Accurate sampling also conditions on both call parameters and session scopes. Counting
+and accurate sampling use complete finite-model machinery independently of the session's
+sampling backend; local-search enumeration remains sampling with replacement.
 
-A conditioned polynomial service invocation retains its native allowance across
-queries. Each query captures its own Boolean pins and exact rational bounds and owns
-fresh traversal state. Retraction discards the adapter's current result; it does not
-refund work. The scope owner closes the invocation after search, while published
-algebraic scalars remain independent of that lifecycle.
+Approximate counting and accurate sampling project only Boolean and finite integer
+values. Real columns remain existential feasibility constraints: neither a real
+interval nor multiple real completions multiply the projected count. Integer channels,
+conditioned models and XOR extensions retain real declarations, resource settings and
+implied/symmetry metadata. Decoded representatives retain all source coordinates,
+including approximate and certified rational real values and any exact integer payload;
+an augmented model's witness certificate does not certify the source projection.
+An empty declared real interval proves a cell empty before witness completion.
+Cell exhaustion requires complete feasibility checks, and an indeterminate real leaf
+cannot establish an exact count. Polynomial algebraic assignments belong to the
+[polynomial pipeline](../theories/polynomial-real.md), whose opaque source snapshots are outside these
+`Solver` counting and sampling entry points.
+
+## Exact count bounds
+
+Anytime exact counting reports proven projected assignments as its lower bound and
+adds all unchecked or undecided subtree mass to its upper bound. A feasibility check
+replaces only the checked child's mass, so exhausting `maxChecks` partway through an
+expansion retains its unchecked siblings and the deeper frontier. An `Unknown` check
+retains its entire subtree in the upper bound and prevents an exact result.
+
+Subtree products and frontier updates use exact integer arithmetic, including integer
+domain widths and holes. Published lower bounds rise and upper bounds fall.
+`Count.upper == Long.MAX_VALUE` is an unbounded sentinel when the bound exceeds the
+public `Long` range; saturation does not establish exactness. Exactness requires all
+projected branches to be decided and a representable count.
+
+## Theory invocation scopes
+
+Theory services can retain immutable source snapshots while each solve owns a fresh
+invocation. Published exact scalars outlive that invocation; its mutable traversal,
+query results and work ledger remain private. Conditioned queries capture their pins
+without changing the source model. The containing owner closes the invocation after
+its operation finishes.
+
+[Polynomial invocation ownership](../theories/polynomial-real.md#invocation-ownership) defines that adapter's
+fresh-call and conditioned-query lifetimes. [Resource allowances](resources.md)
+owns cumulative scope composition.

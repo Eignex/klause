@@ -1,10 +1,16 @@
 # Exact LP certification
 
+Certification turns a numerical candidate into evidence about the exact active
+linear model. Feasible points, objective bounds, infeasibility and unboundedness
+require different packages; one cannot substitute for another. The engine first
+obtains a candidate, checks the required exact conditions and returns only the
+strength of claim established by those checks.
+
 [LpSolve](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt)
-certifies numerical candidates against exact active authority. A floating optimum,
+owns these numerical checks. A floating optimum,
 failed check or resource decline cannot prune, exhaust search or prove an exact
 result. MPS tolerance acceptance has its own
-[publication contract](../formats.md#mps).
+[publication contract](../formats/mps.md).
 
 ## Proof packages
 

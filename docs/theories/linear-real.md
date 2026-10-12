@@ -1,0 +1,63 @@
+# Linear real arithmetic
+
+Linear real constraints combine real coordinates with constant coefficients and
+Boolean structure. Exact rational checks decide the active linear system; shared
+search explores Boolean or arithmetic alternatives. Strict inequalities require
+an interior point, rather than a point on the closure's boundary.
+
+This theory follows the [shared theory contract](../theories.md). Integer
+integrality belongs to [linear integer](linear-integer.md) or
+[linear mixed](linear-mixed.md) arithmetic.
+
+## Scope and boundaries
+
+The pure-real route requires real variables, no source integer variables, and
+factors wholly represented by admitted exact linear forms. Source bounds,
+reification, disjunction and strictness remain authoritative. Nonconstant real
+products belong to [polynomial real arithmetic](polynomial-real.md).
+
+[Difference logic](difference.md) supplies a graph mechanism for an admitted
+pure-real subfragment. General linear rows retain the LP-backed route; a graph
+admission decline does not itself reject a supported linear source.
+
+## Solving and composition
+
+Shared decisions activate rows and comparisons. The arithmetic component retains
+those assertions through their decision scope, checks the residual system and
+contributes exact source coordinates at a complete check. Disequalities require
+an applicable direction and remain part of the source check.
+
+Linear completion also serves finite mixed models and local-search candidates.
+Boolean pins and source rows stay intact through completion. The shared search
+session owns traversal; [LP architecture](../lp/architecture.md) owns numerical
+state; the source adapter owns projection and reconstruction.
+
+## Results and proof authority
+
+`ExactLraAssignment` captures Boolean values and rational real coordinates.
+Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
+[LP certification](../lp/certification.md); a floating status alone is insufficient.
+Strict infeasibility requires a completed strict-feasibility check, not failure to
+find a positive margin within a budget.
+
+Continuous objective optimization has its own LP-backed admission and publication
+conditions. The open integer-objective descent does not cover arbitrary real
+objectives. An unattained infimum cannot be presented as an attained optimum.
+[Input semantics](../formats.md) defines each frontend's exact or tolerance policy.
+
+## State and resources
+
+Immutable row addresses, forms and Boolean dependencies are prepared once per
+component. Scoped assertions, graph potentials, LP bases and witness candidates
+remain invocation-owned. Retraction restores their premises and invalidates
+incompatible evidence. Open work and numerical limits retain their own currencies;
+a stopped source check withholds the witness or proof.
+
+## Implementation
+
+[ExactLinearFragment](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/ExactLinearFragment.kt)
+defines `supportsExactLra`.
+[ExactLiraSearchComponent](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/QfLiraSolver.kt)
+shares the linear checking machinery without integer branching for a pure-real source.
+[QfLraSystem](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/QfLraSystem.kt)
+owns model-facing linear assertions; the pipeline names this route `EXACT_LRA`.

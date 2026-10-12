@@ -1,35 +1,13 @@
 # Command-line interface
 
-Klause solves one input instance per invocation. All formats share the solver-control
-flags and solve driver; each frontend supplies parsing and output.
+The CLI reads one input instance, admits its source model, runs the selected solve
+route and renders assignments or a terminal verdict. All formats share the
+solve-control flags and driver; each frontend owns parsing and output semantics.
 
-## Formats and dispatch
-
-| Format name | Extensions | Output |
-|---|---|---|
-| `minizinc` | `.fzn` | FlatZinc solution separators and verdicts; `%%%mzn-stat` statistics |
-| `xcsp3` | `.xml`, `.xcsp`, `.xcsp3` | XCSP3 status, objective and named instantiation |
-| `smtlib` | `.smt2`, `.smt` | `sat` / `unsat` / `unknown` and model definitions |
-| `dimacs` | `.cnf` | SAT status and Boolean assignment |
-| `opb` | `.opb`, `.wbo` | Pseudo-Boolean status, objective and assignment |
-| `wcnf` | `.wcnf` | Weighted MaxSAT status, objective and assignment |
-| `mps` | `.mps` | Linear/mixed-integer status, objective and named values |
-
-`--format <name>` (alias `--mode`) takes priority over the input extension. An
-unrecognized extension defaults to MiniZinc mode. Compressed `.zst` inputs require
-`zstd` on `PATH`. MiniZinc source models go through the [MiniZinc integration](minizinc.md),
-which compiles them to FlatZinc before invoking the CLI.
-
-The registry in [Main.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/Main.kt)
-and the flag declarations in [CliMode.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/CliMode.kt)
-are the implementation source for supported names, aliases and help text.
-
-SMT-LIB optimization streams `; objective=<value>` for each incumbent in the source
-objective's direction and emits `; optimizationStatus=<status>` at completion.
-These comments appear without `-s`; `sat` alone does not establish optimality.
-See [SMT-LIB result semantics](formats.md#smt-lib) for the status contract and
-[saved benchmark results](../klause-bench/README.md#saved-results) for proof credit and
-the interpretation of interrupted incumbents and unbounded witness objectives.
+Start with the build and run commands, choose a format and operation, then use the
+flag reference to control search and resources. [Input semantics](formats.md)
+explains coverage and result strength; [architecture](architecture.md) explains the
+pipeline behind the command.
 
 ## Build and run
 
@@ -81,6 +59,34 @@ MiniZinc integration goes through `klause-mzn-lib` (see [setup](minizinc.md)): t
 `klause.msc` / `klause-ls.msc` solver configs point at the
 `klause-mzn-lib/bin/klause-fzn` / `klause-fzn-ls` wrappers, which delegate to
 this distribution.
+
+## Formats and dispatch
+
+| Format name | Extensions | Output |
+|---|---|---|
+| `minizinc` | `.fzn` | FlatZinc solution separators and verdicts; `%%%mzn-stat` statistics |
+| `xcsp3` | `.xml`, `.xcsp`, `.xcsp3` | XCSP3 status, objective and named instantiation |
+| `smtlib` | `.smt2`, `.smt` | `sat` / `unsat` / `unknown` and model definitions |
+| `dimacs` | `.cnf` | SAT status and Boolean assignment |
+| `opb` | `.opb`, `.wbo` | Pseudo-Boolean status, objective and assignment |
+| `wcnf` | `.wcnf` | Weighted MaxSAT status, objective and assignment |
+| `mps` | `.mps` | Linear/mixed-integer status, objective and named values |
+
+`--format <name>` (alias `--mode`) takes priority over the input extension. An
+unrecognized extension defaults to MiniZinc mode. Compressed `.zst` inputs require
+`zstd` on `PATH`. MiniZinc source models go through the [MiniZinc integration](minizinc.md),
+which compiles them to FlatZinc before invoking the CLI.
+
+The registry in [Main.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/Main.kt)
+and the flag declarations in [CliMode.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/CliMode.kt)
+are the implementation source for supported names, aliases and help text.
+
+SMT-LIB optimization streams `; objective=<value>` for each incumbent in the source
+objective's direction and emits `; optimizationStatus=<status>` at completion.
+These comments appear without `-s`; `sat` alone does not establish optimality.
+See [SMT-LIB result semantics](formats/smtlib.md) for the status contract and
+[saved benchmark results](../klause-bench/README.md#saved-results) for proof credit and
+the interpretation of interrupted incumbents and unbounded witness objectives.
 
 ## Flags
 
@@ -184,7 +190,7 @@ The library result retains backend `exact-nra`. `-s` reports `nraWork`, `nraProj
 `nraLiftedCells` and, on a resource stop, `nraResource`. Legacy open counters remain
 zero. The whole-run deadline includes source admission. `open-bound-proof=false`
 does not disable admission or polynomial solving because this route has no finite
-bound proof. [Polynomial source semantics](formats.md#polynomial-source-lowering)
+bound proof. [Polynomial source semantics](formats/smtlib.md#polynomial-source-lowering)
 defines exact root rendering and supported syntax.
 
 An open theory is selected by the model route and uses the shared complete theory solver
@@ -258,7 +264,7 @@ MiniZinc-mode-only flags:
   declarations without a range, including array elements. Defaults are `-1000000.0` and `1000000.0`;
   finite choices and `--exact` preserve open float bounds instead.
 
-The [FlatZinc float contract](formats.md#flatzinc-floats) defines finite images,
+The [FlatZinc float contract](formats/flatzinc.md#flatzinc-floats) defines finite images,
 conditional linear rows, bucket fallback, expansion limits and exact-mode declines.
 Keep lowering and source-publication changes consistent with that contract.
 

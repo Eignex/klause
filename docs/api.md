@@ -1,11 +1,13 @@
 # Library API and ownership
 
-The JVM and Kotlin/Native API dumps record published compatibility descriptors.
-Publication alone does not make a solver implementation type an extension contract.
-The classifications below apply to the entire published surface; unlisted mechanisms
-in those packages are implementation APIs. Existing descriptors remain available
-when a supported replacement is introduced, with warning-level deprecations for
-migration rather than an immediate visibility or signature break.
+Library callers construct a source model, choose an operation and consume owned
+results. Extensions can add factors, search components, objectives or theories,
+provided they uphold the same source semantics and publication checks.
+
+This page identifies supported contracts and defines public mappings and value
+ownership. [Model representation](model.md) owns source and engine lifetimes;
+[sessions](solver/sessions.md) owns operation scopes. Mechanism-specific solving
+rules remain in their subsystem pages.
 
 ## Supported library and extension surfaces
 
@@ -28,53 +30,33 @@ keeps borrowed arrays and structural keys stable; a custom component supplies co
 checks and sound explanations; a custom objective agrees at feasible assignments.
 The type system does not certify any of those semantic obligations.
 
-## Quadratic objective representation
+## Model construction and solving
 
-`ir.QuadraticObjectiveSpec` captures an exact rational constant and an ordered list
-of `QuadraticObjectiveTerm` values over typed Boolean, integer and real source IDs.
-`QuadraticCoefficient` owns reduced source numerator/denominator values with a
-positive denominator, independently of numerical engine types.
-An affine term denotes `coefficient * first`; a product denotes
-`coefficient * first * second`. Repeating the coordinate expresses a square.
-Cross coefficients are literal source coefficients, without Hessian scaling.
-Boolean coordinates denote zero or one; integer values retain arbitrary width and
-real values may be algebraic. Objective direction belongs to the invocation.
+A schema declares variables and constraints, compilation produces a `Problem`, and
+solver entry points return assignments or optimization results for decoding. Direct
+model construction uses the same source declarations and factor semantics.
+[Schema lowering](formats/schema.md) defines representation choices and refused
+contexts; [input semantics](formats.md) defines route coverage.
 
-Construction and term getters capture independent lists. Remapping preserves each
-namespace and rejects removed objective coordinates; elimination requires an
-exact source substitution. Internal evaluation uses the existing exact algebraic
-arithmetic and returns an owned scalar. Floating scores supply no objective or
-proof authority. The independent [certificate kernel](arithmetic/polynomial.md#quadratic-objective-certificates)
-checks rational convex subproblems. Pipeline quadratic optimization is not exposed
-by this representation alone.
+`Problem.pipelineRequest()` composes shared finite factors with exact continuous
+completion where supported. `OpenTheoryPipeline.minimize` uses a finite objective
+in every polynomial strategy; `PolynomialOptimizationExecution` preserves exact
+algebraic incumbents and native work counters. Only complete traversal admits an
+optimality or infeasibility proof. See [polynomial composition](theories/polynomial-real.md#shared-model-composition)
+for that route's limits.
 
-## Continuous product representation
+The [quadratic objective representation](model.md#quadratic-objective-representation)
+preserves exact source terms and remapping. Its certificate primitives do not alone
+expose quadratic optimization through the pipeline.
 
-`factor.arithmetic.ContinuousProduct(a, b, result)` describes the exact real equality
-`result = a * b`. All three IDs belong to the real namespace. Repeated operands
-express squares; results can feed other products. Membership deduplicates real IDs,
-while fields and structural keys retain operand multiplicity and the result role.
-Keys treat operand order as commutative. Remapping applies the real mapping to every
-role and preserves aliases, including aliases introduced by a noninjective map.
-`Product` and `RealProduct` retain their integer and mixed semantics.
+## Compatibility and implementation surfaces
 
-`ContinuousRealExpr` stores affine terms and product trees in the model AST.
-The schema DSL supports `(x * x * y) eq z` for `FloatTerm` operands and
-continuous expression chains. Scalar `FloatTerm * Double` retains its affine DSL
-semantics; multiplying a continuous expression by a constant retains a product node.
-[Source lowering](formats.md#schema-continuous-products) defines exact constants,
-auxiliary columns and refused contexts.
-
-Continuous products have no finite propagator, local-search score or finite
-assignment checker. Direct finite execution projections reject them, and an LP
-completion cannot certify their nonlinear equalities. Model solver entry points
-route them through [shared polynomial completion](solver/qfnra.md#shared-model-composition)
-beside finite factors across backtracking, local search, ALNS and mixed portfolios.
-Exact rational/algebraic witnesses retain their source coordinates. This route
-supports finite integer domains and finite-column objectives; open integer domains
-and continuous objectives remain unsupported.
-
-## Experimental and implementation surfaces
+The JVM and Kotlin/Native API dumps record published compatibility descriptors.
+Publication alone does not make a solver implementation type an extension contract.
+The classifications above apply to the entire published surface; unlisted mechanisms
+in those packages are implementation APIs. Existing descriptors remain available
+when a supported replacement is introduced, with warning-level deprecations for
+migration rather than an immediate visibility or signature break.
 
 Experimental composition includes `ComponentPlan`, CP projection planning, shared
 search session/runner construction, direct pipeline engines and concrete theory
@@ -89,31 +71,9 @@ state are implementation APIs unless the supported table names their contract.
 Consumers retain compatibility descriptors while migrating to a supported entry point;
 implementation visibility is not a promise of stable lifecycle or extension behavior.
 
-The `arithmetic.polynomial` algorithms and contexts are internal implementation
-mechanisms. `AlgebraicReal` exports only owned exact scalar metadata, as defined in
+Numerical algorithms and mutable contexts are implementation mechanisms. Exported
+exact scalar values retain the representation and ownership contracts defined in
 [exact polynomial arithmetic](arithmetic/polynomial.md#rational-roots-and-scalar-identity).
-
-`ExactNraAssignment` captures Boolean and exact algebraic real coordinates. Its real
-values include rational points and selected irrational roots; reading a coordinate
-does not refine it or require its producing arithmetic context. The common
-`OpenTheoryAssignment.ExactNra` witness preserves this representation.
-`algebraicRealValue(id)` returns its typed scalar through reconstruction wrappers.
-Other routes retain their existing rational text and return null from that accessor.
-Point-identified rational values use reduced rational text. Other algebraic values
-use `root(index;[c0,c1,...])` from `realValue(id)`: coefficients
-are exact rationals in ascending exponent order, and the index is one-based among
-the defining polynomial's distinct real roots in increasing order. This text carries
-an exact value; callers rendering another format use the typed metadata.
-Numerical equality requires exact arithmetic comparison rather than object identity.
-
-`SmtLibAdmission.parse` returns a linear model, opaque `PolynomialRealProblem`, or
-interrupted admission. The polynomial snapshot owns its source-name maps and returns
-independent metadata views. Its `pipelineRequest()` and `OpenTheoryPipeline.execute`
-extension provide complete polynomial satisfaction through the existing
-`OpenTheoryResult`. `PolynomialTheoryExecution` retains native counters/resource
-cause beside that common result; it does not reinterpret legacy open-work units.
-`PolynomialTheoryParams` captures one invocation's work, allocation and stop controls.
-The source snapshot can be reused for fresh invocations; no traversal state escapes.
 
 The `lp.lattice` package is an internal implementation mechanism within `klause`.
 Its reductions borrow caller-owned input rows and expose read-only result buffers
@@ -168,7 +128,7 @@ checks or authorize proof reuse across a rewrite.
 
 ## Snapshot and buffer ownership
 
-[Model ownership](architecture.md#model-and-ownership) distinguishes borrowed source
+[Model ownership](model.md) distinguishes borrowed source
 arrays from owned publications. `Problem`/`Factor` structures remain unchanged for the
 lifetime of every operation, plan or proof referring to them. Finite domains, assignments,
 LP scratch and packed restart anchors belong to their active owners.
@@ -186,14 +146,35 @@ protocols require immutable accepted assignment/objective payloads; custom verif
 capture producer state before acceptance. Built-in carriers can be shared through
 publication and repeated incumbent reads without copying in the search loop.
 
+## Exact assignment values
+
+An assignment can carry finite values, arbitrary-precision integers, rational reals
+or algebraic reals. Read the authoritative payload for checks and exact rendering;
+an approximate coordinate is display or heuristic data.
+
+Difference checks contribute their integer or rational potential coordinates.
+`ExactLraAssignment` owns Boolean and rational real values. `ExactLiraAssignment`
+owns Boolean values, arbitrary-precision integers and rational reals for integer or
+mixed linear sources. Their source association and publication checks follow the
+[theory contracts](theories.md). The following accessors preserve the algebraic
+representation used by polynomial completion.
+
+`ExactNraAssignment` captures Boolean and exact algebraic real coordinates. Its real
+values include rational points and selected irrational roots; reading a coordinate
+does not refine it or require its producing arithmetic context. The common
+`OpenTheoryAssignment.ExactNra` witness preserves this representation.
+`algebraicRealValue(id)` returns its typed scalar through reconstruction wrappers.
+Other routes retain their existing rational text and return null from that accessor.
+Point-identified rational values use reduced rational text. Other algebraic values
+use `root(index;[c0,c1,...])` from `realValue(id)`: coefficients
+are exact rationals in ascending exponent order, and the index is one-based among
+the defining polynomial's distinct real roots in increasing order. This text carries
+an exact value; callers rendering another format use the typed metadata.
+Numerical equality requires exact arithmetic comparison rather than object identity.
+
 `Sample.algebraicReals` carries immutable exact polynomial coordinates independently
 of its approximate real buffer. Approximate values remain display or heuristic
 metadata and carry no polynomial proof authority. An unchanged sample copy retains
 its source witness certificate; changing any coordinate or exact scalar list discards
 it. Polynomial pipeline strategy controls expose finite backtracking, local-search
 and ALNS effort separately from the native arithmetic allowance.
-
-`Problem.pipelineRequest()` composes shared finite factors with exact continuous
-completion. `OpenTheoryPipeline.minimize` uses a finite objective in every strategy;
-`PolynomialOptimizationExecution` preserves exact algebraic incumbents and native
-work counters. Only complete traversal admits an optimality or infeasibility proof.
