@@ -19,6 +19,7 @@ class SourceResultCapture(
 ) {
     /** Capture exact source assignments and explicitly classify missing complete-search proof data. */
     fun solve(result: SolveResult, producer: String, derivation: SourceDerivation? = null): SolveResult {
+        if (result.evidence?.scope?.let { it != context.scope } == true) return result
         val claim = when (result) {
             is SolveResult.Sat -> SourceClaim.Witness(result.assignment)
             is SolveResult.Unsat -> SourceClaim.Refutation
@@ -44,7 +45,9 @@ class SourceResultCapture(
         cancellation: Cancellation = Cancellation.Never,
     ): MinimizeResult {
         require(context.scope.objective != null) { "objective result capture requires an objective scope" }
-        if (cancellation() || result is MinimizeResult.Unknown) return result
+        if (cancellation() || result is MinimizeResult.Unknown ||
+            result.evidence?.scope?.let { it != context.scope } == true
+        ) return result
         val sample = result.assignment
         val witness = sample?.let { SourceClaim.Witness(it) }
         val value = if (result is MinimizeResult.Optimal) {

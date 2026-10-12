@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.evidence
 
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticObjectiveBound
@@ -18,66 +19,83 @@ fun SourceResultCapture.quadratic(
         "quadratic capture requires the source objective direction"
     }
     if (cancellation() || result.capturedScopes().any { it != context.scope }) return result
-    val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
-    val witness = point?.let { SourceClaim.Witness(it.sample) }
-    fun payload(claim: SourceClaim, proof: SourceDerivation): SourceResultEvidence {
-        val derivations = buildList {
-            if (witness != null && claim !is SourceClaim.Witness) {
-                add(SourceEvidence(context.scope, witness, SourceDerivation.SourceWitness))
-            }
-            add(SourceEvidence(context.scope, claim, proof))
+    return SourceQuadraticResultCapture(context, producer, derivation, boundDerivation).capture(result)
+}
+
+private class SourceQuadraticResultCapture(
+    private val context: SourceProofContext,
+    private val producer: String,
+    private val derivation: SourceDerivation?,
+    private val boundDerivation: SourceDerivation?,
+) {
+    fun capture(result: QuadraticOptimizationResult): QuadraticOptimizationResult {
+        val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
+        val claim = when (result) {
+            is QuadraticOptimizationResult.Optimal -> SourceClaim.Optimal(result.incumbent.sample,
+                SourceValue.Algebraic(result.incumbent.value))
+            is QuadraticOptimizationResult.UnattainedLimit -> SourceClaim.Limit(result.incumbent.sample,
+                SourceValue.Algebraic(result.bound.value))
+            is QuadraticOptimizationResult.Unbounded -> SourceClaim.Unbounded(result.incumbent.sample)
+            is QuadraticOptimizationResult.Infeasible -> SourceClaim.Refutation
+            is QuadraticOptimizationResult.BestFound -> SourceClaim.Witness(result.incumbent.sample)
+            is QuadraticOptimizationResult.Unknown -> null
         }
+        val proof = derivation ?: when {
+            claim is SourceClaim.Witness -> SourceDerivation.SourceWitness
+            claim is SourceClaim.Optimal && boundDerivation != null ->
+                SourceDerivation.Optimum(SourceDerivation.SourceWitness, boundDerivation)
+            else -> SourceDerivation.Unavailable("quadratic traversal or objective completion derivation not captured")
+        }
+        val evidence = claim?.let { payload(it, proof, point?.sample) }
+        return when (result) {
+            is QuadraticOptimizationResult.Optimal -> QuadraticOptimizationResult.Optimal(
+                result.incumbent, bound(result.bound, point?.sample),
+                certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.Optimal),
+                result.sense, result.stats, evidence,
+            )
+            is QuadraticOptimizationResult.UnattainedLimit -> QuadraticOptimizationResult.UnattainedLimit(
+                result.incumbent, bound(result.bound, point?.sample),
+                certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.UnattainedLimit),
+                result.sense, result.stats, evidence,
+            )
+            is QuadraticOptimizationResult.Unbounded -> QuadraticOptimizationResult.Unbounded(
+                result.incumbent, certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.Unbounded),
+                result.sense, result.stats, evidence,
+            )
+            is QuadraticOptimizationResult.Infeasible -> QuadraticOptimizationResult.Infeasible(
+                certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.Infeasible),
+                result.sense, result.stats, evidence,
+            )
+            is QuadraticOptimizationResult.BestFound -> QuadraticOptimizationResult.BestFound(
+                result.incumbent, result.bound?.let { bound(it, point?.sample) },
+                result.reason, result.sense, result.stats, evidence,
+            )
+            is QuadraticOptimizationResult.Unknown -> QuadraticOptimizationResult.Unknown(
+                result.bound?.let { bound(it, point?.sample) }, result.reason, result.sense, result.stats,
+            )
+        }
+    }
+
+    private fun payload(claim: SourceClaim, proof: SourceDerivation, sample: Sample?): SourceResultEvidence {
+        val derivations = ArrayList<SourceEvidence>()
+        if (sample != null && claim !is SourceClaim.Witness) {
+            derivations.add(SourceEvidence(context.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness))
+        }
+        derivations.add(SourceEvidence(context.scope, claim, proof))
         return SourceResultEvidence(context.scope, derivations, listOf(SourceEngineAttestation(producer, claim)))
     }
-    fun bound(value: QuadraticObjectiveBound): QuadraticObjectiveBound {
+
+    private fun bound(value: QuadraticObjectiveBound, sample: Sample?): QuadraticObjectiveBound {
         val claim = SourceClaim.Bound(SourceValue.Algebraic(value.value), value.strict)
         val proof = boundDerivation ?: (derivation as? SourceDerivation.Optimum)?.bound
             ?: SourceDerivation.Unavailable("quadratic global bound derivation not captured")
         return QuadraticObjectiveBound(value.value, value.strict,
-            QuadraticCertificate.captured(value.certificate.model, QuadraticClaim.Bound, payload(claim, proof)))
+            certificate(value.certificate, payload(claim, proof, sample), QuadraticClaim.Bound))
     }
-    val claim = when (result) {
-        is QuadraticOptimizationResult.Optimal -> SourceClaim.Optimal(result.incumbent.sample,
-            SourceValue.Algebraic(result.incumbent.value))
-        is QuadraticOptimizationResult.UnattainedLimit -> SourceClaim.Limit(result.incumbent.sample,
-            SourceValue.Algebraic(result.bound.value))
-        is QuadraticOptimizationResult.Unbounded -> SourceClaim.Unbounded(result.incumbent.sample)
-        is QuadraticOptimizationResult.Infeasible -> SourceClaim.Refutation
-        is QuadraticOptimizationResult.BestFound -> checkNotNull(witness)
-        is QuadraticOptimizationResult.Unknown -> null
-    }
-    val proof = derivation ?: when {
-        claim is SourceClaim.Witness -> SourceDerivation.SourceWitness
-        claim is SourceClaim.Optimal && boundDerivation != null ->
-            SourceDerivation.Optimum(SourceDerivation.SourceWitness, boundDerivation)
-        else -> SourceDerivation.Unavailable("quadratic traversal or objective completion derivation not captured")
-    }
-    val evidence = claim?.let { payload(it, proof) }
-    fun certificate(value: QuadraticCertificate, kind: QuadraticClaim): QuadraticCertificate =
-        QuadraticCertificate.captured(value.model, kind, checkNotNull(evidence))
-    return when (result) {
-        is QuadraticOptimizationResult.Optimal -> QuadraticOptimizationResult.Optimal(
-            result.incumbent, bound(result.bound), certificate(result.certificate, QuadraticClaim.Optimal),
-            result.sense, result.stats, evidence,
-        )
-        is QuadraticOptimizationResult.UnattainedLimit -> QuadraticOptimizationResult.UnattainedLimit(
-            result.incumbent, bound(result.bound), certificate(result.certificate, QuadraticClaim.UnattainedLimit),
-            result.sense, result.stats, evidence,
-        )
-        is QuadraticOptimizationResult.Unbounded -> QuadraticOptimizationResult.Unbounded(
-            result.incumbent, certificate(result.certificate, QuadraticClaim.Unbounded),
-            result.sense, result.stats, evidence,
-        )
-        is QuadraticOptimizationResult.Infeasible -> QuadraticOptimizationResult.Infeasible(
-            certificate(result.certificate, QuadraticClaim.Infeasible), result.sense, result.stats, evidence,
-        )
-        is QuadraticOptimizationResult.BestFound -> QuadraticOptimizationResult.BestFound(
-            result.incumbent, result.bound?.let(::bound), result.reason, result.sense, result.stats, evidence,
-        )
-        is QuadraticOptimizationResult.Unknown -> QuadraticOptimizationResult.Unknown(
-            result.bound?.let(::bound), result.reason, result.sense, result.stats,
-        )
-    }
+
+    private fun certificate(
+        value: QuadraticCertificate, evidence: SourceResultEvidence, kind: QuadraticClaim,
+    ): QuadraticCertificate = QuadraticCertificate.captured(value.model, kind, evidence)
 }
 
 /** Check the completed quadratic result's actual coordinates, values, strictness and source direction. */
@@ -120,22 +138,24 @@ fun QuadraticOptimizationResult.verifySourceEvidence(
     return SourceEvidenceCheck.Checked
 }
 
-private fun QuadraticOptimizationResult.capturedScopes(): List<SourceScope> = buildList {
-    capturedEvidence()?.scope?.let(::add)
-    when (val result = this@capturedScopes) {
+private fun QuadraticOptimizationResult.capturedScopes(): List<SourceScope> {
+    val scopes = ArrayList<SourceScope>()
+    capturedEvidence()?.scope?.let { scopes.add(it) }
+    when (this) {
         is QuadraticOptimizationResult.Optimal -> {
-            result.certificate.scope?.let(::add)
-            result.bound.certificate.scope?.let(::add)
+            certificate.scope?.let { scopes.add(it) }
+            bound.certificate.scope?.let { scopes.add(it) }
         }
         is QuadraticOptimizationResult.UnattainedLimit -> {
-            result.certificate.scope?.let(::add)
-            result.bound.certificate.scope?.let(::add)
+            certificate.scope?.let { scopes.add(it) }
+            bound.certificate.scope?.let { scopes.add(it) }
         }
-        is QuadraticOptimizationResult.Unbounded -> result.certificate.scope?.let(::add)
-        is QuadraticOptimizationResult.Infeasible -> result.certificate.scope?.let(::add)
-        is QuadraticOptimizationResult.BestFound -> result.bound?.certificate?.scope?.let(::add)
-        is QuadraticOptimizationResult.Unknown -> result.bound?.certificate?.scope?.let(::add)
+        is QuadraticOptimizationResult.Unbounded -> certificate.scope?.let { scopes.add(it) }
+        is QuadraticOptimizationResult.Infeasible -> certificate.scope?.let { scopes.add(it) }
+        is QuadraticOptimizationResult.BestFound -> bound?.certificate?.scope?.let { scopes.add(it) }
+        is QuadraticOptimizationResult.Unknown -> bound?.certificate?.scope?.let { scopes.add(it) }
     }
+    return scopes
 }
 
 private fun QuadraticOptimizationResult.capturedEvidence(): SourceResultEvidence? = when (this) {

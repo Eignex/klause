@@ -69,11 +69,11 @@ class SourceQuadraticEvidenceTest {
         val result = QuadraticOptimizationResult.Optimal(point, QuadraticObjectiveBound(zero, false, boundCertificate),
             terminal, ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
 
-        assertIs<QuadraticOptimizationResult.Optimal>(result)
+        assertIs<QuadraticOptimizationResult.Optimal>(result, "input variant")
         val captured = SourceResultCapture(context).quadratic(result, "fixture-engine",
             boundDerivation = SourceQuadraticBoxDerivation)
 
-        val terminalResult = assertIs<QuadraticOptimizationResult.Optimal>(captured)
+        val terminalResult = assertIs<QuadraticOptimizationResult.Optimal>(captured, "captured variant")
         assertEquals(context.scope, assertNotNull(terminalResult.evidence).scope)
         assertEquals(SourceEvidenceCheck.Checked, captured.verifySourceEvidence(context))
     }
@@ -91,7 +91,8 @@ class SourceQuadraticEvidenceTest {
 
         val captured = SourceResultCapture(context).quadratic(result, "fixture-engine")
 
-        assertIs<SourceEvidenceCheck.Unavailable>(captured.verifySourceEvidence(context))
+        val checked = captured.verifySourceEvidence(context)
+        assertIs<SourceEvidenceCheck.Unavailable>(checked, checked.toString())
     }
 
     @Test

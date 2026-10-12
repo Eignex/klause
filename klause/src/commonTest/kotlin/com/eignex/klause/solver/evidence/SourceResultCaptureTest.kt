@@ -88,4 +88,42 @@ class SourceResultCaptureTest {
         assertNull(captured.evidence)
     }
 
+    @Test
+    fun `ordinary capture preserves a completed result from another source invocation`() {
+        val conditional = scope.copy(condition = SourceCondition(lower = mapOf(
+            SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ofLong(2),
+        )))
+        val conditionalContext = assertNotNull(model.sourceProofContext(conditional))
+        val originalContext = assertNotNull(model.sourceProofContext(scope))
+        val result = SourceResultCapture(conditionalContext).solve(SolveResult.Unsat(), "fixture-engine")
+
+        val captured = SourceResultCapture(originalContext).solve(result, "fixture-engine")
+
+        assertEquals(result, captured)
+        assertIs<SourceEvidenceCheck.Rejected>(assertNotNull(captured.evidence).verify(
+            SourceClaim.Refutation, originalContext,
+        ))
+    }
+
+    @Test
+    fun `objective capture preserves a completed optimum from another source invocation`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val original = scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val conditional = original.copy(condition = SourceCondition(lower = mapOf(
+            SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ofLong(2),
+        )))
+        val conditionalContext = assertNotNull(model.sourceProofContext(conditional, objective))
+        val originalContext = assertNotNull(model.sourceProofContext(original, objective))
+        val sample = Sample(booleanArrayOf(), longArrayOf(2))
+        val result = SourceResultCapture(conditionalContext).minimize(MinimizeResult.Optimal(sample, 2.0),
+            objective, "fixture-engine")
+
+        val captured = SourceResultCapture(originalContext).minimize(result, objective, "fixture-engine")
+
+        assertEquals(result, captured)
+        assertIs<SourceEvidenceCheck.Rejected>(assertNotNull(captured.evidence).verify(
+            SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ofLong(2))), originalContext,
+        ))
+    }
+
 }
