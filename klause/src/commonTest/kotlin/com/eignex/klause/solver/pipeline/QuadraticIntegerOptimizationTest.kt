@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.ir.NonlinearIntegerProblem
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
@@ -81,6 +82,48 @@ class QuadraticIntegerOptimizationTest {
 
         assertIs<QuadraticOptimizationResult.Unbounded>(execution.result)
         assertTrue(execution.numericalWork > 0)
+    }
+
+    @Test
+    fun `recession projection preserves coupled integer and real equality`() {
+        val source = NonlinearIntegerProblem(
+            PolynomialRealFormula.Atom(
+                PolynomialExpression.Variable(SourceRealId(0)), PolynomialRelation.EQ,
+                PolynomialExpression.Variable(SourceRealId(1)),
+            ), 2, 0, mapOf("i" to 1), mapOf("x" to 0), emptyMap(),
+        )
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x, x),
+        ))
+
+        val execution = OpenTheoryPipeline.minimize(
+            source.pipelineRequest(), objective, engine = FiniteEngine.BACKTRACK,
+        )
+
+        val result = assertIs<QuadraticOptimizationResult.Unbounded>(execution.result)
+        assertEquals(BigFraction.of(result.incumbent.sample.exactIntValue(0), BigFraction.ONE.den),
+            result.incumbent.sample.algebraicReals?.single()?.rational)
+    }
+
+    @Test
+    fun `integer maximization preserves a nonzero source optimum and upper bound`() {
+        val source = NonlinearIntegerProblem(
+            PolynomialRealFormula.Constant(true), 1, 0, mapOf("i" to 0), emptyMap(), emptyMap(),
+        )
+        val i = QuadraticVariable.Int(SourceIntId(0))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), i, i),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(1), i),
+        ), QuadraticCoefficient.ofLong(5))
+
+        val execution = OpenTheoryPipeline.minimize(
+            source.pipelineRequest(), objective, engine = FiniteEngine.BACKTRACK, sense = ObjectiveSense.MAXIMIZE,
+        )
+
+        val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
+        assertEquals(BigFraction.ofLong(5), result.incumbent.value.rational)
+        assertEquals(BigFraction.ofLong(5), result.bound.value.rational)
     }
 
     @Test

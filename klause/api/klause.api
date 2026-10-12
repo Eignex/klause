@@ -10245,6 +10245,11 @@ public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
 	public static final fun sourceRoute (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 }
 
+public final class com/eignex/klause/solver/pipeline/QuadraticIntegerOptimizationKt {
+	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+}
+
 public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecution {
 	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJLcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
