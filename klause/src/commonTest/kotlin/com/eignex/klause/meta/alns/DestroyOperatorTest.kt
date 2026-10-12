@@ -17,7 +17,7 @@ class DestroyOperatorTest {
         val count = 1024
         val problem = Problem(
             count, 0, emptyArray(),
-            List(32) { Clause(IntArray(count) { Lit.positive(it) }) },
+            List(32) { Clause(IntArray(count) { Lit.make(it, true) }) },
         ).bake()
         val incumbent = Sample(BooleanArray(count) { true }, LongArray(0))
         val seed = Random(17).nextInt(count)
