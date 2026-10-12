@@ -166,11 +166,25 @@ class LinearAuthorityTest {
             SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))),
             mapOf(real to BigFraction.ONE))
         val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
-        val changed = SourceProofContext(scope.copy(objective = SourceObjective("replacement", ObjectiveSense.MINIMIZE)),
+        val replacement = scope.copy(objective = SourceObjective("replacement", ObjectiveSense.MINIMIZE))
+        val changed = SourceProofContext(replacement,
             source.coordinates, source.premises, source.objective).withLinearAuthority()
 
         val checked = SourceEvidenceVerifier(changed).verify(assertNotNull(result.evidence))
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
+    }
+
+    @Test
+    fun `undeclared invocation coordinates withhold linear authority`() {
+        val absent = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val condition = SourceCondition(lower = mapOf(absent to BigFraction.ONE))
+        val source = SourceProofContext(scope.copy(condition = condition),
+            setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
+
+        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+
+        assertNull(result.evidence)
+        assertNull(result.bound)
     }
 }
