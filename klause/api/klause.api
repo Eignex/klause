@@ -3190,6 +3190,84 @@ public final class com/eignex/klause/ir/ProblemSettings {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/ir/QuadraticCoefficient {
+	public static final field Companion Lcom/eignex/klause/ir/QuadraticCoefficient$Companion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDenominator ()Ljava/math/BigInteger;
+	public final fun getNumerator ()Ljava/math/BigInteger;
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/ir/QuadraticCoefficient$Companion {
+	public final fun getONE ()Lcom/eignex/klause/ir/QuadraticCoefficient;
+	public final fun getZERO ()Lcom/eignex/klause/ir/QuadraticCoefficient;
+	public final fun of (Ljava/math/BigInteger;Ljava/math/BigInteger;)Lcom/eignex/klause/ir/QuadraticCoefficient;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/QuadraticCoefficient$Companion;Ljava/math/BigInteger;Ljava/math/BigInteger;ILjava/lang/Object;)Lcom/eignex/klause/ir/QuadraticCoefficient;
+	public final fun ofLong (J)Lcom/eignex/klause/ir/QuadraticCoefficient;
+}
+
+public final class com/eignex/klause/ir/QuadraticObjectiveSpec {
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/ir/QuadraticCoefficient;)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/ir/QuadraticCoefficient;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConstant ()Lcom/eignex/klause/ir/QuadraticCoefficient;
+	public final fun getTerms ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/QuadraticObjectiveSpec;
+}
+
+public final class com/eignex/klause/ir/QuadraticObjectiveTerm {
+	public fun <init> (Lcom/eignex/klause/ir/QuadraticCoefficient;Lcom/eignex/klause/ir/QuadraticVariable;Lcom/eignex/klause/ir/QuadraticVariable;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/QuadraticCoefficient;Lcom/eignex/klause/ir/QuadraticVariable;Lcom/eignex/klause/ir/QuadraticVariable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/QuadraticCoefficient;
+	public final fun component2 ()Lcom/eignex/klause/ir/QuadraticVariable;
+	public final fun component3 ()Lcom/eignex/klause/ir/QuadraticVariable;
+	public final fun copy (Lcom/eignex/klause/ir/QuadraticCoefficient;Lcom/eignex/klause/ir/QuadraticVariable;Lcom/eignex/klause/ir/QuadraticVariable;)Lcom/eignex/klause/ir/QuadraticObjectiveTerm;
+	public static synthetic fun copy$default (Lcom/eignex/klause/ir/QuadraticObjectiveTerm;Lcom/eignex/klause/ir/QuadraticCoefficient;Lcom/eignex/klause/ir/QuadraticVariable;Lcom/eignex/klause/ir/QuadraticVariable;ILjava/lang/Object;)Lcom/eignex/klause/ir/QuadraticObjectiveTerm;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoefficient ()Lcom/eignex/klause/ir/QuadraticCoefficient;
+	public final fun getFirst ()Lcom/eignex/klause/ir/QuadraticVariable;
+	public final fun getSecond ()Lcom/eignex/klause/ir/QuadraticVariable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/ir/QuadraticVariable {
+}
+
+public final class com/eignex/klause/ir/QuadraticVariable$Bool : com/eignex/klause/ir/QuadraticVariable {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-fb54piM ()I
+	public final fun copy-Tr0PeTE (I)Lcom/eignex/klause/ir/QuadraticVariable$Bool;
+	public static synthetic fun copy-Tr0PeTE$default (Lcom/eignex/klause/ir/QuadraticVariable$Bool;IILjava/lang/Object;)Lcom/eignex/klause/ir/QuadraticVariable$Bool;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-fb54piM ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/ir/QuadraticVariable$Int : com/eignex/klause/ir/QuadraticVariable {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-2srAOhM ()I
+	public final fun copy-BbWYBdc (I)Lcom/eignex/klause/ir/QuadraticVariable$Int;
+	public static synthetic fun copy-BbWYBdc$default (Lcom/eignex/klause/ir/QuadraticVariable$Int;IILjava/lang/Object;)Lcom/eignex/klause/ir/QuadraticVariable$Int;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-2srAOhM ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/ir/QuadraticVariable$Real : com/eignex/klause/ir/QuadraticVariable {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-P0Uu7zc ()I
+	public final fun copy-NWoOmUI (I)Lcom/eignex/klause/ir/QuadraticVariable$Real;
+	public static synthetic fun copy-NWoOmUI$default (Lcom/eignex/klause/ir/QuadraticVariable$Real;IILjava/lang/Object;)Lcom/eignex/klause/ir/QuadraticVariable$Real;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-P0Uu7zc ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/ir/RealConstants : com/eignex/klause/ir/LinearConstants {
 	public fun <init> (Lcom/eignex/klause/ir/RealConsts;Lcom/eignex/klause/ir/RealConsts;DZ)V
 	public final fun getBound ()D

@@ -1923,6 +1923,47 @@ sealed interface com.eignex.klause.ir/LongConstList : com.eignex.klause.ir/Const
     abstract fun toLongArray(): kotlin/LongArray // com.eignex.klause.ir/LongConstList.toLongArray|toLongArray(){}[0]
 }
 
+sealed interface com.eignex.klause.ir/QuadraticVariable { // com.eignex.klause.ir/QuadraticVariable|null[0]
+    final class Bool : com.eignex.klause.ir/QuadraticVariable { // com.eignex.klause.ir/QuadraticVariable.Bool|null[0]
+        constructor <init>(com.eignex.klause.ir/SourceBoolId) // com.eignex.klause.ir/QuadraticVariable.Bool.<init>|<init>(com.eignex.klause.ir.SourceBoolId){}[0]
+
+        final val id // com.eignex.klause.ir/QuadraticVariable.Bool.id|{}id[0]
+            final fun <get-id>(): com.eignex.klause.ir/SourceBoolId // com.eignex.klause.ir/QuadraticVariable.Bool.id.<get-id>|<get-id>(){}[0]
+
+        final fun component1(): com.eignex.klause.ir/SourceBoolId // com.eignex.klause.ir/QuadraticVariable.Bool.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.ir/SourceBoolId = ...): com.eignex.klause.ir/QuadraticVariable.Bool // com.eignex.klause.ir/QuadraticVariable.Bool.copy|copy(com.eignex.klause.ir.SourceBoolId){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/QuadraticVariable.Bool.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.ir/QuadraticVariable.Bool.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.ir/QuadraticVariable.Bool.toString|toString(){}[0]
+    }
+
+    final class Int : com.eignex.klause.ir/QuadraticVariable { // com.eignex.klause.ir/QuadraticVariable.Int|null[0]
+        constructor <init>(com.eignex.klause.ir/SourceIntId) // com.eignex.klause.ir/QuadraticVariable.Int.<init>|<init>(com.eignex.klause.ir.SourceIntId){}[0]
+
+        final val id // com.eignex.klause.ir/QuadraticVariable.Int.id|{}id[0]
+            final fun <get-id>(): com.eignex.klause.ir/SourceIntId // com.eignex.klause.ir/QuadraticVariable.Int.id.<get-id>|<get-id>(){}[0]
+
+        final fun component1(): com.eignex.klause.ir/SourceIntId // com.eignex.klause.ir/QuadraticVariable.Int.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.ir/SourceIntId = ...): com.eignex.klause.ir/QuadraticVariable.Int // com.eignex.klause.ir/QuadraticVariable.Int.copy|copy(com.eignex.klause.ir.SourceIntId){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/QuadraticVariable.Int.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.ir/QuadraticVariable.Int.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.ir/QuadraticVariable.Int.toString|toString(){}[0]
+    }
+
+    final class Real : com.eignex.klause.ir/QuadraticVariable { // com.eignex.klause.ir/QuadraticVariable.Real|null[0]
+        constructor <init>(com.eignex.klause.ir/SourceRealId) // com.eignex.klause.ir/QuadraticVariable.Real.<init>|<init>(com.eignex.klause.ir.SourceRealId){}[0]
+
+        final val id // com.eignex.klause.ir/QuadraticVariable.Real.id|{}id[0]
+            final fun <get-id>(): com.eignex.klause.ir/SourceRealId // com.eignex.klause.ir/QuadraticVariable.Real.id.<get-id>|<get-id>(){}[0]
+
+        final fun component1(): com.eignex.klause.ir/SourceRealId // com.eignex.klause.ir/QuadraticVariable.Real.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.ir/SourceRealId = ...): com.eignex.klause.ir/QuadraticVariable.Real // com.eignex.klause.ir/QuadraticVariable.Real.copy|copy(com.eignex.klause.ir.SourceRealId){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/QuadraticVariable.Real.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.ir/QuadraticVariable.Real.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.ir/QuadraticVariable.Real.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.ir/VarList { // com.eignex.klause.ir/VarList|null[0]
     open val boolVars // com.eignex.klause.ir/VarList.boolVars|{}boolVars[0]
         open fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.ir/VarList.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
@@ -6038,6 +6079,58 @@ final class com.eignex.klause.ir/ProblemSettings { // com.eignex.klause.ir/Probl
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/ProblemSettings.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.ir/ProblemSettings.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.ir/ProblemSettings.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.ir/QuadraticCoefficient { // com.eignex.klause.ir/QuadraticCoefficient|null[0]
+    final val denominator // com.eignex.klause.ir/QuadraticCoefficient.denominator|{}denominator[0]
+        final fun <get-denominator>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.ir/QuadraticCoefficient.denominator.<get-denominator>|<get-denominator>(){}[0]
+    final val numerator // com.eignex.klause.ir/QuadraticCoefficient.numerator|{}numerator[0]
+        final fun <get-numerator>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.ir/QuadraticCoefficient.numerator.<get-numerator>|<get-numerator>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/QuadraticCoefficient.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/QuadraticCoefficient.hashCode|hashCode(){}[0]
+
+    final object Companion { // com.eignex.klause.ir/QuadraticCoefficient.Companion|null[0]
+        final val ONE // com.eignex.klause.ir/QuadraticCoefficient.Companion.ONE|{}ONE[0]
+            final fun <get-ONE>(): com.eignex.klause.ir/QuadraticCoefficient // com.eignex.klause.ir/QuadraticCoefficient.Companion.ONE.<get-ONE>|<get-ONE>(){}[0]
+        final val ZERO // com.eignex.klause.ir/QuadraticCoefficient.Companion.ZERO|{}ZERO[0]
+            final fun <get-ZERO>(): com.eignex.klause.ir/QuadraticCoefficient // com.eignex.klause.ir/QuadraticCoefficient.Companion.ZERO.<get-ZERO>|<get-ZERO>(){}[0]
+
+        final fun of(com.ionspin.kotlin.bignum.integer/BigInteger, com.ionspin.kotlin.bignum.integer/BigInteger = ...): com.eignex.klause.ir/QuadraticCoefficient // com.eignex.klause.ir/QuadraticCoefficient.Companion.of|of(com.ionspin.kotlin.bignum.integer.BigInteger;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
+        final fun ofLong(kotlin/Long): com.eignex.klause.ir/QuadraticCoefficient // com.eignex.klause.ir/QuadraticCoefficient.Companion.ofLong|ofLong(kotlin.Long){}[0]
+    }
+}
+
+final class com.eignex.klause.ir/QuadraticObjectiveSpec { // com.eignex.klause.ir/QuadraticObjectiveSpec|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.ir/QuadraticObjectiveTerm>, com.eignex.klause.ir/QuadraticCoefficient = ...) // com.eignex.klause.ir/QuadraticObjectiveSpec.<init>|<init>(kotlin.collections.List<com.eignex.klause.ir.QuadraticObjectiveTerm>;com.eignex.klause.ir.QuadraticCoefficient){}[0]
+
+    final val constant // com.eignex.klause.ir/QuadraticObjectiveSpec.constant|{}constant[0]
+        final fun <get-constant>(): com.eignex.klause.ir/QuadraticCoefficient // com.eignex.klause.ir/QuadraticObjectiveSpec.constant.<get-constant>|<get-constant>(){}[0]
+    final val terms // com.eignex.klause.ir/QuadraticObjectiveSpec.terms|{}terms[0]
+        final fun <get-terms>(): kotlin.collections/List<com.eignex.klause.ir/QuadraticObjectiveTerm> // com.eignex.klause.ir/QuadraticObjectiveSpec.terms.<get-terms>|<get-terms>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/QuadraticObjectiveSpec.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/QuadraticObjectiveSpec.hashCode|hashCode(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/QuadraticObjectiveSpec // com.eignex.klause.ir/QuadraticObjectiveSpec.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+}
+
+final class com.eignex.klause.ir/QuadraticObjectiveTerm { // com.eignex.klause.ir/QuadraticObjectiveTerm|null[0]
+    constructor <init>(com.eignex.klause.ir/QuadraticCoefficient, com.eignex.klause.ir/QuadraticVariable, com.eignex.klause.ir/QuadraticVariable? = ...) // com.eignex.klause.ir/QuadraticObjectiveTerm.<init>|<init>(com.eignex.klause.ir.QuadraticCoefficient;com.eignex.klause.ir.QuadraticVariable;com.eignex.klause.ir.QuadraticVariable?){}[0]
+
+    final val coefficient // com.eignex.klause.ir/QuadraticObjectiveTerm.coefficient|{}coefficient[0]
+        final fun <get-coefficient>(): com.eignex.klause.ir/QuadraticCoefficient // com.eignex.klause.ir/QuadraticObjectiveTerm.coefficient.<get-coefficient>|<get-coefficient>(){}[0]
+    final val first // com.eignex.klause.ir/QuadraticObjectiveTerm.first|{}first[0]
+        final fun <get-first>(): com.eignex.klause.ir/QuadraticVariable // com.eignex.klause.ir/QuadraticObjectiveTerm.first.<get-first>|<get-first>(){}[0]
+    final val second // com.eignex.klause.ir/QuadraticObjectiveTerm.second|{}second[0]
+        final fun <get-second>(): com.eignex.klause.ir/QuadraticVariable? // com.eignex.klause.ir/QuadraticObjectiveTerm.second.<get-second>|<get-second>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/QuadraticCoefficient // com.eignex.klause.ir/QuadraticObjectiveTerm.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/QuadraticVariable // com.eignex.klause.ir/QuadraticObjectiveTerm.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.ir/QuadraticVariable? // com.eignex.klause.ir/QuadraticObjectiveTerm.component3|component3(){}[0]
+    final fun copy(com.eignex.klause.ir/QuadraticCoefficient = ..., com.eignex.klause.ir/QuadraticVariable = ..., com.eignex.klause.ir/QuadraticVariable? = ...): com.eignex.klause.ir/QuadraticObjectiveTerm // com.eignex.klause.ir/QuadraticObjectiveTerm.copy|copy(com.eignex.klause.ir.QuadraticCoefficient;com.eignex.klause.ir.QuadraticVariable;com.eignex.klause.ir.QuadraticVariable?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/QuadraticObjectiveTerm.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/QuadraticObjectiveTerm.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/QuadraticObjectiveTerm.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.ir/RealConstants : com.eignex.klause.ir/LinearConstants { // com.eignex.klause.ir/RealConstants|null[0]
