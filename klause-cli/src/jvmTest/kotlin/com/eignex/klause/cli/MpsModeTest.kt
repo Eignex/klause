@@ -90,7 +90,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `open continuous objectives use witness search in either direction`() {
+    fun `open continuous objectives retain source sense in either direction`() {
         for (sense in listOf("MIN", "MAX")) {
             val mps = File.createTempFile("mpsopenobjective", ".mps").apply {
                 writeText(
@@ -103,9 +103,9 @@ class MpsModeTest {
 
             val solvable = MpsMode.newSession().load(mps.absolutePath, CommonOptions())
 
-            val pipeline = solvable.pipeline as SolvablePipeline.OpenLocalSearch
-            assertNotNull(pipeline.objective)
-            assertEquals(sense == "MAX", pipeline.maximize)
+            val pipeline = solvable.pipeline as SolvablePipeline.OpenTheory
+            assertNotNull(pipeline.request.objective)
+            assertEquals(sense == "MAX", pipeline.request.maximize)
         }
     }
 
