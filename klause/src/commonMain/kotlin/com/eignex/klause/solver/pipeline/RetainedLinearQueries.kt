@@ -94,7 +94,7 @@ internal class RetainedLinearQueries(
                 val applied = apply(session, condition)
                 if (applied !is ComponentResult.Consistent) return applied.result()
             }
-            val policy = cutoffPolicy(session, conditions.mapNotNull { it.cutoff }.minOrNull())
+            val policy = cutoffPolicy(session, conditions.mapNotNull { it.cutoff }.reduceOrNull { left, right -> if (left <= right) left else right })
             val branching = when (params.openBranching) {
                 OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
