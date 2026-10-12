@@ -33,8 +33,8 @@ fun SourceResultCapture.quadratic(
         val claim = SourceClaim.Bound(SourceValue.Algebraic(value.value), value.strict)
         val proof = boundDerivation ?: (derivation as? SourceDerivation.Optimum)?.bound
             ?: SourceDerivation.Unavailable("quadratic global bound derivation not captured")
-        return value.copy(certificate = QuadraticCertificate.captured(value.certificate.model,
-            QuadraticClaim.Bound, payload(claim, proof)))
+        return QuadraticObjectiveBound(value.value, value.strict,
+            QuadraticCertificate.captured(value.certificate.model, QuadraticClaim.Bound, payload(claim, proof)))
     }
     val claim = when (result) {
         is QuadraticOptimizationResult.Optimal -> SourceClaim.Optimal(result.incumbent.sample,
@@ -56,18 +56,27 @@ fun SourceResultCapture.quadratic(
     fun certificate(value: QuadraticCertificate, kind: QuadraticClaim): QuadraticCertificate =
         QuadraticCertificate.captured(value.model, kind, checkNotNull(evidence))
     return when (result) {
-        is QuadraticOptimizationResult.Optimal -> result.copy(bound = bound(result.bound),
-            certificate = certificate(result.certificate, QuadraticClaim.Optimal), evidence = evidence)
-        is QuadraticOptimizationResult.UnattainedLimit -> result.copy(bound = bound(result.bound),
-            certificate = certificate(result.certificate, QuadraticClaim.UnattainedLimit), evidence = evidence)
-        is QuadraticOptimizationResult.Unbounded -> result.copy(
-            certificate = certificate(result.certificate, QuadraticClaim.Unbounded), evidence = evidence,
+        is QuadraticOptimizationResult.Optimal -> QuadraticOptimizationResult.Optimal(
+            result.incumbent, bound(result.bound), certificate(result.certificate, QuadraticClaim.Optimal),
+            result.sense, result.stats, evidence,
         )
-        is QuadraticOptimizationResult.Infeasible -> result.copy(
-            certificate = certificate(result.certificate, QuadraticClaim.Infeasible), evidence = evidence,
+        is QuadraticOptimizationResult.UnattainedLimit -> QuadraticOptimizationResult.UnattainedLimit(
+            result.incumbent, bound(result.bound), certificate(result.certificate, QuadraticClaim.UnattainedLimit),
+            result.sense, result.stats, evidence,
         )
-        is QuadraticOptimizationResult.BestFound -> result.copy(bound = result.bound?.let(::bound), evidence = evidence)
-        is QuadraticOptimizationResult.Unknown -> result.copy(bound = result.bound?.let(::bound))
+        is QuadraticOptimizationResult.Unbounded -> QuadraticOptimizationResult.Unbounded(
+            result.incumbent, certificate(result.certificate, QuadraticClaim.Unbounded),
+            result.sense, result.stats, evidence,
+        )
+        is QuadraticOptimizationResult.Infeasible -> QuadraticOptimizationResult.Infeasible(
+            certificate(result.certificate, QuadraticClaim.Infeasible), result.sense, result.stats, evidence,
+        )
+        is QuadraticOptimizationResult.BestFound -> QuadraticOptimizationResult.BestFound(
+            result.incumbent, result.bound?.let(::bound), result.reason, result.sense, result.stats, evidence,
+        )
+        is QuadraticOptimizationResult.Unknown -> QuadraticOptimizationResult.Unknown(
+            result.bound?.let(::bound), result.reason, result.sense, result.stats,
+        )
     }
 }
 

@@ -69,6 +69,7 @@ class SourceQuadraticEvidenceTest {
         val result = QuadraticOptimizationResult.Optimal(point, QuadraticObjectiveBound(zero, false, boundCertificate),
             terminal, ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
 
+        assertIs<QuadraticOptimizationResult.Optimal>(result)
         val captured = SourceResultCapture(context).quadratic(result, "fixture-engine",
             boundDerivation = SourceQuadraticBoxDerivation)
 
