@@ -35,8 +35,15 @@ class SourceResultEvidence(
         if (scope != context.scope || capturedDerivations.any { it.scope != scope }) {
             return SourceEvidenceCheck.Rejected("completed result evidence has mismatched original-source scopes")
         }
-        val evidence = capturedDerivations.firstOrNull { it.claim == claim }
-            ?: return SourceEvidenceCheck.Unavailable("completed result has no derivation for the requested claim")
-        return SourceEvidenceVerifier(context).verify(evidence, cancellation)
+        var mismatch: SourceEvidenceCheck? = null
+        for (evidence in capturedDerivations) {
+            if (!sameSourceClaimKind(evidence.claim, claim)) continue
+            when (val matching = matchSourceClaims(evidence.claim, claim, cancellation)) {
+                SourceEvidenceCheck.Checked -> return SourceEvidenceVerifier(context).verify(evidence, cancellation)
+                is SourceEvidenceCheck.Unavailable -> return matching
+                is SourceEvidenceCheck.Rejected -> mismatch = matching
+            }
+        }
+        return mismatch ?: SourceEvidenceCheck.Unavailable("completed result has no derivation for the requested claim")
     }
 }
