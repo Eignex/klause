@@ -430,7 +430,7 @@ internal class QuadraticIntegerOptimization(
         val instructionLimit = minOf(worker.maxFlips, worker.maxInstructions ?: Long.MAX_VALUE)
         val start = native.work
         val allowance = controls.maximumWork?.let { ((it - start).coerceAtLeast(0) * share).toLong() }
-        val stop = native.polynomial or worker.cancellation.shorten(share) or Cancellation {
+        val stop = native.phaseCancellation(worker.cancellation, share) or Cancellation {
             budget?.exhausted() == true || allowance?.let { native.work - start >= it } == true
         }
         if (stop() || maximum == 0L || instructionLimit == 0L) return
