@@ -28,6 +28,24 @@ keeps borrowed arrays and structural keys stable; a custom component supplies co
 checks and sound explanations; a custom objective agrees at feasible assignments.
 The type system does not certify any of those semantic obligations.
 
+## Quadratic objective representation
+
+`ir.QuadraticObjectiveSpec` captures an exact rational constant and an ordered list
+of `QuadraticObjectiveTerm` values over typed Boolean, integer and real source IDs.
+An affine term denotes `coefficient * first`; a product denotes
+`coefficient * first * second`. Repeating the coordinate expresses a square.
+Cross coefficients are literal source coefficients, without Hessian scaling.
+Boolean coordinates denote zero or one; integer values retain arbitrary width and
+real values may be algebraic. Objective direction belongs to the invocation.
+
+Construction and term getters capture independent lists. Remapping preserves each
+namespace and rejects removed objective coordinates; elimination requires an
+exact source substitution. Internal evaluation uses the existing exact algebraic
+arithmetic and returns an owned scalar. Floating scores supply no objective or
+proof authority. The independent [certificate kernel](arithmetic/polynomial.md#quadratic-objective-certificates)
+checks rational convex subproblems. Pipeline quadratic optimization is not exposed
+by this representation alone.
+
 ## Continuous product representation
 
 `factor.arithmetic.ContinuousProduct(a, b, result)` describes the exact real equality
