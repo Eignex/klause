@@ -564,7 +564,7 @@ internal interface OutputProtocol {
 
     fun onExactSolution(rendered: String, objective: BigFraction)
 
-    fun onArithmeticIncumbent(rendered: String, objective: SourceValue)
+    fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean
     fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
         rendered?.let { onSolution(it, null) }
     }

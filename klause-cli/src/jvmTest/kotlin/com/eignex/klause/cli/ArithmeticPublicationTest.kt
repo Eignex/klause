@@ -36,8 +36,9 @@ class ArithmeticPublicationTest {
     fun `two accepted incumbents reach the consumer before terminal return`() {
         val received = mutableListOf<Pair<String, SourceValue>>()
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
                 received.add(rendered to objective)
+                return true
             }
         }
         val publication = ArithmeticPublication(output)
@@ -56,8 +57,9 @@ class ArithmeticPublicationTest {
     fun `repeating the final assignment and objective emits no duplicate`() {
         val received = mutableListOf<String>()
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
                 received.add(rendered)
+                return true
             }
         }
         val publication = ArithmeticPublication(output)
@@ -72,7 +74,7 @@ class ArithmeticPublicationTest {
     @Test
     fun `consumer failure propagates without recording successful publication`() {
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
                 error("closed output")
             }
         }
@@ -86,11 +88,35 @@ class ArithmeticPublicationTest {
     }
 
     @Test
+    fun `a source renderer veto is not counted or retained as a publication`() {
+        var permitted = false
+        var emitted = 0
+        val output = object : OutputProtocol by SmtLibOutput() {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                if (!permitted) return false
+                emitted++
+                return true
+            }
+        }
+        val publication = ArithmeticPublication(output)
+        val objective = SourceValue.Rational(BigFraction.ONE)
+
+        publication.publish("x=1", objective)
+        assertEquals(0L, publication.solutions)
+        permitted = true
+        publication.publish("x=1", objective)
+
+        assertEquals(1, emitted)
+        assertEquals(1L, publication.solutions)
+    }
+
+    @Test
     fun `separate invocations each publish their own first incumbent`() {
         val received = mutableListOf<String>()
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
                 received.add(rendered)
+                return true
             }
         }
 

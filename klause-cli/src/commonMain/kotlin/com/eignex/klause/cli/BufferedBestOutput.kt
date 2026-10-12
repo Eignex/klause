@@ -89,14 +89,15 @@ internal abstract class BufferedBestOutput : OutputProtocol {
 
     protected open fun formatArithmeticObjective(objective: SourceValue): String = arithmeticObjectiveText(objective)
 
-    final override fun onArithmeticIncumbent(rendered: String, objective: SourceValue) {
-        if (!acceptsSourceWitness()) return
+    final override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+        if (!acceptsSourceWitness()) return false
         val value = formatArithmeticObjective(objective)
         best = rendered
         if (streamObjective) println("$objectivePrefix$value")
         println(rendered)
         flushCliOutput()
         emittedArithmeticWitness = rendered
+        return true
     }
 
     final override fun onComplete(verdict: Verdict) {
