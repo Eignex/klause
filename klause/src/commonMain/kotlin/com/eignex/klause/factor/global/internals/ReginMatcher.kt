@@ -72,6 +72,18 @@ internal fun reginFilter(
     // full per-fire rebuild below.
     if (cache != null && exceptSet.isEmpty()) return reginIncremental(state, filteredVars, cache, premises)
 
+    return reginFallbackFilter(state, filteredVars, exceptSet, cache, premises, n)
+}
+
+@Suppress("LongParameterList")
+private fun reginFallbackFilter(
+    state: PropagationState,
+    filteredVars: IntArray,
+    exceptSet: LongHashSet,
+    cache: ReginCache?,
+    premises: IntArray,
+    n: Int,
+): IntArray? {
     // Compact value-id mapping + per-var value-id lists (hole-aware). Non-except values get one
     // id; each except value gets `n` capacity-1 copies (contiguous ids) so up to n vars share it.
     // Both maps key on domain values and store non-negative ids, so -1 is a safe "absent"
