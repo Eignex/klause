@@ -235,7 +235,7 @@ internal class QuadraticStrategyAdapters(
             for (id in 0 until model.source.numIntVars) {
                 if (model.source.numBoolVars + id !in released) {
                     val point = assumptions.intValueOrNull(id) ?: current?.intValue(id)
-                        ?: model.source.declaredIntDomains[id].randomValue(random)
+                        ?: model.source.finiteIntDomain(id).randomValue(random)
                     val value = BigFraction.ofLong(point)
                     lower[id] = value
                     upper[id] = value

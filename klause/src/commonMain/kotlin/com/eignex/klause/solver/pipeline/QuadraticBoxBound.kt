@@ -8,7 +8,7 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 
-internal data class QuadraticBoxEvidence(val lower: BigFraction, val upper: BigFraction)
+internal data class QuadraticBoxBound(val lower: BigFraction, val upper: BigFraction)
 
 internal fun quadraticBoxBound(
     source: Problem,
@@ -16,7 +16,7 @@ internal fun quadraticBoxBound(
     assumptions: Assumptions,
     sense: ObjectiveSense,
     step: () -> Unit,
-): Pair<BigFraction, QuadraticBoxEvidence>? {
+): Pair<BigFraction, QuadraticBoxBound>? {
     fun range(variable: QuadraticVariable): Pair<BigFraction, BigFraction>? = when (variable) {
         is QuadraticVariable.Bool -> assumptions.boolValueOrNull(variable.id.index)?.let {
             val value = if (it) BigFraction.ONE else BigFraction.ZERO
@@ -60,5 +60,5 @@ internal fun quadraticBoxBound(
         upper += scaled.reduce { left, right -> if (left > right) left else right }
     }
     step()
-    return (if (sense == ObjectiveSense.MINIMIZE) lower else upper) to QuadraticBoxEvidence(lower, upper)
+    return (if (sense == ObjectiveSense.MINIMIZE) lower else upper) to QuadraticBoxBound(lower, upper)
 }
