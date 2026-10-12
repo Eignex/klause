@@ -91,7 +91,7 @@ class ExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `an unsupported polynomial objective does not make source satisfaction unsupported`() {
+    fun `affine polynomial admission consumes the installed exact objective bridge`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 0)),
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val plan = source.prepareExecutionPlan(LinearObjective(realCoefficients = doubleArrayOf(1.0)))
@@ -100,8 +100,12 @@ class ExecutionCapabilitiesTest {
         val optimization = plan.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.OPTIMIZE)
 
         assertTrue(satisfaction.runnable)
-        assertFalse(optimization.runnable)
-        assertEquals(ExecutionDeclineCause.OBJECTIVE, optimization.declines.single().cause)
+        assertTrue(optimization.runnable)
+        val execution = OpenTheoryPipeline.optimize(source.pipelineRequest(),
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)), PolynomialTheoryParams(maximumWork = 0),
+            FiniteEngine.BACKTRACK)
+        val stopped = assertIs<com.eignex.klause.solver.result.QuadraticOptimizationResult.Unknown>(execution.result)
+        assertEquals(TerminationReason.BudgetExhausted, stopped.reason)
     }
     @Test
     fun `polynomial invocation pins do not change prepared source admission or later witnesses`() {

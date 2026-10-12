@@ -154,7 +154,7 @@ class PreparedSourcePlan internal constructor(
             linear.boolWeightValues.size > sourceBoolCount
         ) return false
         if (kind == PreparedExecutionKind.NONLINEAR_INTEGER) return false
-        return polynomialModel == null || linear.realCoefficientValues.none { it != 0.0 }
+        return true
     }
 
     /** Bind an immutable linear objective without reselecting source ownership. */
