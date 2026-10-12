@@ -3,6 +3,9 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.TranscendentalProblem
+import com.eignex.klause.ir.TranscendentalExpression
+import com.eignex.klause.ir.TranscendentalFormula
+import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -32,7 +35,20 @@ import kotlin.time.TimeSource
 class TranscendentalTheoryRequest internal constructor(
     /** Immutable source declarations, formula and exact function semantics. */
     val problem: TranscendentalProblem,
-)
+) : ExactTheorySatisfactionRequest {
+    override fun execute(params: PolynomialTheoryParams, engine: FiniteEngine, cores: Int): PolynomialTheoryExecution {
+        require(cores > 0)
+        val result = OpenTheoryPipeline.execute(this, TranscendentalTheoryParams(
+            maximumWork = params.maximumWork,
+            maximumDenseCoefficients = params.maximumDenseCoefficients,
+            maximumMatrixCells = params.maximumMatrixCells,
+            timeout = params.timeout, cancellation = params.cancellation, strategy = params.strategy,
+        ), engine)
+        return PolynomialTheoryExecution(result.result, PolynomialTheoryStats(workSpent = result.workSpent),
+            nativeWorkScope = "transcendental",
+            nativeResource = if (result.representationDeclined) "RepresentationLimit" else null)
+    }
+}
 
 /** Select source-bound transcendental completion without materializing continuous finite domains. */
 fun TranscendentalProblem.pipelineRequest(): TranscendentalTheoryRequest = TranscendentalTheoryRequest(this)
@@ -185,7 +201,7 @@ private class TranscendentalInvocation(
     private fun walk(adaptive: Boolean, phase: Cancellation = Cancellation.Never): OpenTheoryResult {
         val local = params.strategy.localSearch
         val moves = if (adaptive) minOf(local.maxFlips, params.strategy.alnsIterations.toLong()) else local.maxFlips
-        val neighborhood = ExactNeighborhood(source.boolCount, List(source.numericCount) { BigFraction.ZERO }, this,
+        val neighborhood = ExactNeighborhood(source.boolCount, initialCenters(), this,
             coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = local.randomSeed ?: 0,
             nodeBudget = nodeBudget, maximumMoves = moves,
             maximumInstructions = local.maxInstructions ?: Long.MAX_VALUE,
@@ -234,7 +250,7 @@ private class TranscendentalInvocation(
             value.rational?.toDouble() ?: value.algebraic?.let {
                 it.lowerBound.toDouble() / 2 + it.upperBound.toDouble() / 2
             }
-                ?: 0.0
+                ?: Double.NaN
         }
         val finite = if (integers.all { it.fitsLong() }) {
             LongArray(integers.size) { integers[it].toLongExact() }
@@ -257,9 +273,40 @@ private class TranscendentalInvocation(
         return values
     }
 
+    private fun initialCenters(): List<BigFraction> {
+        val values = MutableList(source.numericCount) { BigFraction.ZERO }
+        val pending = ArrayDeque<TranscendentalFormula>()
+        pending.addLast(source.formula)
+        while (pending.isNotEmpty() && !stop()) {
+            when (val node = pending.removeLast()) {
+                is TranscendentalFormula.And -> pending.addAll(node.operands)
+                is TranscendentalFormula.Atom -> if (node.relation == PolynomialRelation.EQ) {
+                    for ((target, value) in listOf(node.left to node.right, node.right to node.left)) {
+                        if (target is TranscendentalExpression.Variable && value is TranscendentalExpression.Constant) {
+                            values[target.id.index] = BigFraction.of(value.value.numerator, value.value.denominator)
+                        }
+                    }
+                }
+                else -> Unit
+            }
+        }
+        for (id in values.indices) {
+            val lower = root.rational.lower[id]
+            val upper = root.rational.upper[id]
+            if (lower != null && lower == upper) values[id] = lower
+            else if (lower != null && values[id] <= lower) values[id] = lower + BigFraction.ONE
+            else if (upper != null && values[id] >= upper) values[id] = upper - BigFraction.ONE
+        }
+        return values
+    }
+
     private fun reason(): TerminationReason = when {
         params.timeout() -> TerminationReason.Timeout
         params.cancellation() -> TerminationReason.Cancelled
+        (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) &&
+            params.strategy.localSearch.cancellation() -> TerminationReason.Cancelled
+        (engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.FIXED || engine == FiniteEngine.MIXED) &&
+            params.strategy.backtrack.cancellation() -> TerminationReason.Cancelled
         else -> TerminationReason.BudgetExhausted
     }
 }

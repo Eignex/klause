@@ -148,6 +148,7 @@ sealed interface OpenTheoryAssignment {
  */
 fun OpenTheoryAssignment.algebraicRealValue(id: Int): AlgebraicReal? = when (this) {
     is OpenTheoryAssignment.ExactNra -> assignment.realValue(id)
+    is TranscendentalAssignment -> exactRealValue(id).algebraic
     is OpenTheoryAssignment.Rebuilt -> base.algebraicRealValue(id)
     else -> null
 }
