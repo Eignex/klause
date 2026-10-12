@@ -332,6 +332,7 @@ internal fun FinitePipeline.solve(
         FinitePipelineRequest(
             problem = request.shape.finiteProblem,
             componentPlan = request.shape.componentPlan,
+            preparedPlan = request.shape.preparedPlan,
             engine = request.engine,
             objective = request.shape.linearObjective,
             presolveConfig = request.presolveConfig,

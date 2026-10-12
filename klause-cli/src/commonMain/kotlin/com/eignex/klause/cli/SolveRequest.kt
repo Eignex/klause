@@ -145,6 +145,7 @@ private fun Problem.finiteSolveShape(
         definitionalSweep,
         searchHints,
         route.componentPlan,
+        route.preparedPlan,
     )
 }
 

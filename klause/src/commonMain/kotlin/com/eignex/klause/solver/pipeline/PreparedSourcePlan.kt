@@ -145,7 +145,7 @@ internal fun Problem.prepareExecutionPlan(
     preferFinite: Boolean,
 ): PreparedSourcePlan {
     val continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true
-    if (factors.any { it is ContinuousProduct } || (!continuousObjective && factors.any { it is RealProduct })) {
+    if (factors.any { it is ContinuousProduct } || (!preferFinite && !continuousObjective && factors.any { it is RealProduct })) {
         return preparePolynomialExecutionPlan(original = original, objective = objective, maximize = maximize)
     }
     return preparedWithComponents(componentPlan(preferFinite), original, objective, maximize)
