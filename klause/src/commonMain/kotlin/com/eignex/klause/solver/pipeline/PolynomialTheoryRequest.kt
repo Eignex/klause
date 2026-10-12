@@ -46,7 +46,7 @@ internal fun PreparedSourcePlan.polynomialRequest(): PolynomialTheoryRequest {
     val shared = requireNotNull(polynomialModel)
     return PolynomialTheoryRequest(
         PolynomialRealProblem(
-            shared.service.formula, shared.service.realCount, model.numBoolVars,
+            shared.service.formula, shared.service.realCount, shared.source.numBoolVars,
             sourceRealCount, sourceBoolCount, emptyMap(), emptyMap(),
         ),
         this,

@@ -70,7 +70,7 @@ class PreparedSourcePlanTest {
         val plan = request.preparedPlan
 
         assertSame(source, plan.originalSource)
-        assertTrue(plan.model.numRealVars > plan.sourceRealCount)
+        assertTrue(assertNotNull(plan.model).numRealVars > plan.sourceRealCount)
         assertEquals(0, plan.realCoordinate(source.realVarNames.getValue("x")))
         assertEquals(0, plan.booleanCoordinate(source.boolVarNames.getValue("b")))
         assertFailsWith<IllegalArgumentException> { plan.realCoordinate(plan.sourceRealCount) }

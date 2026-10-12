@@ -89,7 +89,9 @@ the finite/linear projection mechanism; `SharedPolynomialModel` supplies polynom
 lowering and exact completion data under the same preparation owner. Polynomial
 requests capture this plan once for complete, LS, ALNS and quadratic execution.
 Pure polynomial snapshots retain declaration identities separately from private
-lowering auxiliaries. The shared polynomial assembler explicitly declines open
+lowering auxiliaries. Nonlinear integer snapshots retain their own neutral source
+representation, with exact declaration-to-numeric coordinate mappings and no
+fabricated factor model or finite projection. The shared polynomial assembler explicitly declines open
 integer declarations and continuous linear objectives; preparation invents no
 finite bounds or operation support. `prepareConditionedLinearQuery()` selects an
 exact linear completion capable of source-coordinate windows and strict cutoffs

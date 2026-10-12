@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRealProblem
@@ -15,6 +16,9 @@ enum class PreparedExecutionKind {
 
     /** Finite candidates require exact polynomial completion. */
     POLYNOMIAL,
+
+    /** Original open or wide integer polynomial coordinates remain theory-owned. */
+    NONLINEAR_INTEGER,
 
     /** A required source component has no implemented execution adapter. */
     DECLINED,
@@ -41,18 +45,23 @@ class ExecutionComponentDescriptor internal constructor(
     factorIndices: List<Int>,
     integerCoordinates: List<Int>,
     realCoordinates: List<Int>,
+    booleanCoordinates: List<Int> = emptyList(),
 ) {
     private val factors = factorIndices.toList()
     private val integers = integerCoordinates.toList()
     private val reals = realCoordinates.toList()
+    private val booleans = booleanCoordinates.toList()
+
+    /** Canonical Boolean coordinates owned by this component. */
+    val booleanCoordinates: List<Int> get() = booleans.toList()
 
     /** Canonical source factor indices enforced by this component. */
     val factorIndices: List<Int> get() = factors.toList()
 
-    /** Source integer coordinates owned by this component. */
+    /** Canonical integer coordinates owned by this component. */
     val integerCoordinates: List<Int> get() = integers.toList()
 
-    /** Source real coordinates owned by this component. */
+    /** Canonical continuous coordinates, including private completion auxiliaries. */
     val realCoordinates: List<Int> get() = reals.toList()
 }
 
@@ -79,10 +88,10 @@ enum class PreparedPlanDecline {
  * namespaces agree with the source. Arithmetic-owned values never become guessed finite domains.
  */
 class PreparedSourcePlan internal constructor(
-    /** Original [Problem] or [PolynomialRealProblem], including its declaration identities. */
+    /** Original neutral source object, including its declaration identities and representation. */
     val originalSource: Any,
-    /** Canonical model whose factors index [components]. */
-    val model: Problem,
+    /** Canonical factor model, absent for a nonlinear integer source retaining its own representation. */
+    val model: Problem?,
     /** Representation selected for execution. */
     val kind: PreparedExecutionKind,
     /** Finite/linear projection data, absent for polynomial or declined preparation. */
@@ -101,8 +110,12 @@ class PreparedSourcePlan internal constructor(
     val maximize: Boolean = false,
     /** Explicit unsupported cause; resource stops belong to the invocation. */
     val decline: PreparedPlanDecline? = null,
+    integerCoordinates: List<Int> = (0 until sourceIntCount).toList(),
+    realCoordinates: List<Int> = (0 until sourceRealCount).toList(),
 ) {
     private val descriptions = components.toList()
+    private val integerMapping = integerCoordinates.toList()
+    private val realMapping = realCoordinates.toList()
 
     /** Independent component list whose values own their coordinate and factor lists. */
     val components: List<ExecutionComponentDescriptor> get() = descriptions.toList()
@@ -113,9 +126,10 @@ class PreparedSourcePlan internal constructor(
      * registered source rows; each query's conditions and mutable session belong to its worker.
      */
     fun prepareConditionedLinearQuery(): PreparedSourcePlan? {
-        val ownership = componentPlan?.forLinearConditions(model) ?: return null
+        val canonical = model ?: return null
+        val ownership = componentPlan?.forLinearConditions(canonical) ?: return null
         val original = originalSource as? Problem ?: return null
-        return model.preparedWithComponents(ownership, original, objective, maximize)
+        return canonical.preparedWithComponents(ownership, original, objective, maximize)
     }
 
     /** Whether this plan retains [source] as its original source object. */
@@ -132,10 +146,16 @@ class PreparedSourcePlan internal constructor(
     }
 
     /** Original integer coordinate's canonical location. */
-    fun integerCoordinate(sourceId: Int): Int = sourceId.also { require(it in 0 until sourceIntCount) }
+    fun integerCoordinate(sourceId: Int): Int {
+        require(sourceId in 0 until sourceIntCount)
+        return integerMapping[sourceId]
+    }
 
     /** Original real coordinate's canonical location; lowering auxiliaries are not source coordinates. */
-    fun realCoordinate(sourceId: Int): Int = sourceId.also { require(it in 0 until sourceRealCount) }
+    fun realCoordinate(sourceId: Int): Int {
+        require(sourceId in 0 until sourceRealCount)
+        return realMapping[sourceId]
+    }
 
     /** Polynomial completion column for a finite integer, or null when no embedding is required. */
     fun polynomialIntegerCoordinate(sourceId: Int): Int? =
@@ -174,11 +194,13 @@ internal fun Problem.preparedWithComponents(
             factors.indices.filter { ownership.factorOwner(it) == FactorOwner.CP },
             ownership.cpIntVars.toList(), emptyList()),
         ExecutionComponentDescriptor("boolean", ComponentResponsibility.BOOLEAN,
-            factors.indices.filter { ownership.factorOwner(it) == FactorOwner.SHARED }, emptyList(), emptyList()),
+            factors.indices.filter { ownership.factorOwner(it) == FactorOwner.SHARED }, emptyList(), emptyList(),
+            (0 until numBoolVars).toList()),
         ExecutionComponentDescriptor(ownership.theoryPipeline.name, ComponentResponsibility.COMPLETION,
             factors.indices.filter { ownership.factorOwner(it) == FactorOwner.THEORY },
             ownership.theoryIntVars.toList(), (0 until numRealVars).toList()),
-    ).filter { it.factorIndices.isNotEmpty() || it.integerCoordinates.isNotEmpty() || it.realCoordinates.isNotEmpty() }
+    ).filter { it.factorIndices.isNotEmpty() || it.booleanCoordinates.isNotEmpty() ||
+        it.integerCoordinates.isNotEmpty() || it.realCoordinates.isNotEmpty() }
     return PreparedSourcePlan(original, this, PreparedExecutionKind.FINITE_LINEAR, ownership, null, descriptors,
         original.numBoolVars, original.numIntVars, original.numRealVars, objective, maximize,
         PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT.takeIf { ownership.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN })
@@ -202,7 +224,7 @@ internal fun Problem.preparePolynomialExecutionPlan(
     val finiteFactors = polynomial?.finiteFactorIndices.orEmpty()
     val descriptors = listOf(
         ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteFactors,
-            (0 until numIntVars).toList(), emptyList()),
+            (0 until numIntVars).toList(), emptyList(), (0 until numBoolVars).toList()),
         ExecutionComponentDescriptor("polynomial-real", ComponentResponsibility.COMPLETION,
             factors.indices.filter { it !in finiteFactors }, emptyList(), (0 until numRealVars).toList()),
     )
@@ -220,3 +242,13 @@ fun PolynomialRealProblem.prepareExecutionPlan(): PreparedSourcePlan = Problem(
     realLower = DoubleArray(totalRealCount) { Double.NEGATIVE_INFINITY },
     realUpper = DoubleArray(totalRealCount) { Double.POSITIVE_INFINITY },
 ).preparePolynomialExecutionPlan(formula, original = this)
+
+/** Preserve nonlinear integer source syntax and its exact declaration-to-numeric projection. */
+fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = PreparedSourcePlan(
+    this, null, PreparedExecutionKind.NONLINEAR_INTEGER, null, null,
+    listOf(ExecutionComponentDescriptor("polynomial-integer", ComponentResponsibility.COMPLETION,
+        emptyList(), integerCoordinates, (0 until numericCount).filter { it !in integerCoordinates },
+        (0 until boolCount).toList())),
+    boolCount, integerCoordinates.size, realCoordinates.size,
+    integerCoordinates = integerCoordinates, realCoordinates = realCoordinates,
+)
