@@ -191,10 +191,10 @@ and conflict explanation protocol. Single-sided linear indicator deductions reco
 existing lazy linear payload during trailed search. Shared Boolean premise export
 resolves this payload into historical literals before traversing its proof graph.
 Conflict analysis resolves it against the bounds at the pin, rather than later domains;
-Lazy-reason resolution retains eager and memo hits in the caller. A marker builder
-combines extended premises or asks its factor for historical literals before the
-caller checks and memoizes the completed reason.
-untrailed and two-sided deductions retain eager explanations. Linear bound propagation
+untrailed and two-sided deductions retain eager explanations. Lazy-reason resolution
+retains eager and memo hits in the caller. A marker builder combines extended
+premises or asks its factor for historical literals before the caller checks and
+memoizes the completed reason. Linear bound propagation
 constructs a reason only when the proposed bound tightens the live domain; unchanged
 bounds skip eager explanations and lazy payload allocation. Single-variable equality and
 disequality indicators over root domains contained in `{0, 1}` propagate as direct
