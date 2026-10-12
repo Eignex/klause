@@ -333,6 +333,18 @@ internal class CumulativeInvariant(
         val tLow = ls.tLow
         val absT = if (peakT >= 0) peakT + tLow else 0L
         val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else EmptyIntArray
+        emitPreparedRepairs(state, ls, peakT >= 0, absT, peakTasks, sink)
+    }
+
+    @Suppress("LongParameterList")
+    private fun emitPreparedRepairs(
+        state: LocalSearchState,
+        ls: CumulativeLsState,
+        hasPeak: Boolean,
+        absT: Long,
+        peakTasks: IntArray,
+        sink: MoveSink,
+    ) {
         emitConditionalDurationRepairs(state, ls, peakTasks, sink)
         val maxTargets = 4
         for (i in 0 until n) {
@@ -343,7 +355,7 @@ internal class CumulativeInvariant(
             val r = curRes(state, i)
             if (d <= 0 || r <= 0) continue
             val dom = state.rootDomains[v]
-            val runsAtPeak = (peakT >= 0 && cur <= absT && absT < cur + d)
+            val runsAtPeak = (hasPeak && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
                 val afterPeak = absT + 1
                 if (afterPeak in dom && afterPeak != cur) sink.addChannelingIntSet(state, v, afterPeak)
