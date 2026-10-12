@@ -1,0 +1,141 @@
+package com.eignex.klause.solver.pipeline
+
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.arithmetic.quadratic.QuadraticControl
+import com.eignex.klause.arithmetic.quadratic.QuadraticInterrupted
+import com.eignex.klause.arithmetic.quadratic.QuadraticStop
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.PolynomialExpression
+import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.evaluateExact
+import com.eignex.klause.solver.objective.polynomialFor
+import com.eignex.klause.solver.result.QuadraticIncumbent
+import com.eignex.klause.theory.qfnra.PolynomialCondition
+import com.eignex.klause.theory.qfnra.PolynomialObjectiveResult
+import com.eignex.klause.theory.qfnra.QfNraAssignment
+import com.eignex.klause.theory.qfnra.QfNraParams
+import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
+import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.bigIntOf
+
+internal sealed interface QuadraticBranchResult {
+    data class Optimal(
+        val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: Any,
+    ) : QuadraticBranchResult
+    data class Limit(
+        val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: Any,
+    ) : QuadraticBranchResult
+    data class Unbounded(val incumbent: QuadraticIncumbent, val proof: Any) : QuadraticBranchResult
+    data class Infeasible(val proof: Any) : QuadraticBranchResult
+    data object Unknown : QuadraticBranchResult
+}
+
+internal class QuadraticBranchCompletion(
+    private val request: PolynomialTheoryRequest,
+    private val model: SharedPolynomialModel,
+    private val objective: QuadraticObjectiveSpec,
+    private val sense: ObjectiveSense,
+    private val params: PolynomialTheoryParams,
+    private val native: QuadraticNativeScope,
+) {
+    private val limits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells)
+    private var operation: Cancellation = Cancellation.Never
+    private fun token(parent: Cancellation): Cancellation = object : Cancellation {
+        override fun isCancelled(): Boolean = parent() || operation()
+        override fun workMeter(): WorkMeter? = parent.workMeter()
+        override fun deadline() = parent.deadline()?.let { outer ->
+            operation.deadline()?.let { inner -> minOf(outer, inner) } ?: outer
+        } ?: operation.deadline()
+    }
+    private val polynomial = token(native.polynomial)
+    private val numerical = token(native.numerical)
+    private val arithmetic = PolynomialArithmetic(polynomial, limits)
+    val algebraic = AlgebraicArithmetic(arithmetic)
+
+    fun check(
+        finite: Sample,
+        condition: PolynomialCondition,
+        cancellation: Cancellation = Cancellation.Never,
+    ): QuadraticBranchResult {
+        operation = cancellation
+        return try {
+            arithmetic.step()
+            val expression = objective.polynomialFor(finite).let {
+                if (sense == ObjectiveSense.MINIMIZE) it else PolynomialExpression.Product(listOf(
+                    PolynomialExpression.Constant.of(bigIntOf(-1)), it,
+                ))
+            }
+            val formula = condition.apply(
+                model.service.formula, model.service.boolCount, model.service.realCount, arithmetic::step,
+            )
+            val convex = try {
+                tryConvexPolynomialOptimum(
+                    formula, expression, model.service.boolCount, model.service.realCount, condition.bools,
+                    arithmetic, QuadraticControl(numerical, maximumMatrixCells = params.maximumMatrixCells),
+                )
+            } catch (stop: QuadraticInterrupted) {
+                if (stop.reason != QuadraticStop.MATRIX_LIMIT) throw stop
+                null
+            }
+            if (convex != null) {
+                val point = capture(convex.assignment, finite)
+                arithmetic.step()
+                QuadraticBranchResult.Optimal(point, point.value, convex)
+            } else {
+                val result = solvePolynomialObjectiveImage(
+                    model.service.formula, expression, model.service.boolCount, model.service.realCount,
+                    QfNraParams(polynomial, polynomialLimits = limits), condition,
+                )
+                native.observe(result.stats)
+                when (result) {
+                    is PolynomialObjectiveResult.Optimum -> QuadraticBranchResult.Optimal(
+                        capture(result.assignment, finite), sourceValue(result.value), result.evidence,
+                    )
+                    is PolynomialObjectiveResult.Infimum -> QuadraticBranchResult.Limit(
+                        capture(result.incumbent, finite), sourceValue(result.value), result.evidence,
+                    )
+                    is PolynomialObjectiveResult.Unbounded -> QuadraticBranchResult.Unbounded(
+                        capture(result.incumbent, finite), result.evidence,
+                    )
+                    is PolynomialObjectiveResult.Infeasible -> QuadraticBranchResult.Infeasible(condition)
+                    is PolynomialObjectiveResult.Unknown -> {
+                        result.resource?.let(native::decline)
+                        QuadraticBranchResult.Unknown
+                    }
+                }
+            }
+        } catch (_: PolynomialInterrupted) {
+            QuadraticBranchResult.Unknown
+        } catch (stop: PolynomialResourceLimit) {
+            native.decline(stop.resource)
+            QuadraticBranchResult.Unknown
+        } catch (_: QuadraticInterrupted) {
+            QuadraticBranchResult.Unknown
+        } finally {
+            operation = Cancellation.Never
+        }
+    }
+
+    private fun sourceValue(value: AlgebraicReal): AlgebraicReal =
+        if (sense == ObjectiveSense.MINIMIZE) value else algebraic.negate(value)
+
+    private fun capture(assignment: QfNraAssignment, finite: Sample): QuadraticIncumbent {
+        val full = model.capture(assignment, finite.bools, finite.ints)
+        val sample = if (request.sharedModel != null) full else Sample(
+            BooleanArray(request.problem.sourceBoolCount) { full.boolValue(it) }, full.ints,
+            DoubleArray(request.problem.sourceRealCount) { full.approximateRealValue(it) },
+            algebraicReals = requireNotNull(full.algebraicReals).take(request.problem.sourceRealCount),
+        )
+        val value = objective.evaluateExact(sample, algebraic)
+        arithmetic.step()
+        return QuadraticIncumbent(sample, value)
+    }
+}

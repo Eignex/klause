@@ -56,8 +56,12 @@ namespace and rejects removed objective coordinates; elimination requires an
 exact source substitution. Internal evaluation uses the existing exact algebraic
 arithmetic and returns an owned scalar. Floating scores supply no objective or
 proof authority. The independent [certificate kernel](arithmetic/quadratic.md)
-checks rational convex subproblems. Pipeline quadratic optimization is not exposed
-by this representation alone.
+checks rational convex subproblems. The quadratic pipeline overload returns exact
+source incumbents and direction-aware bounds, with separate attained-optimum,
+unattained-limit, unbounded, infeasible and incomplete result types. Opaque
+attestations capture source, objective, direction and invocation assumptions;
+they retain no mutable arithmetic or cancellation owner. These attestations are
+in-memory evidence and do not implement exported proof files.
 
 ## Configuration and resources
 

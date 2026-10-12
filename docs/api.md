@@ -39,11 +39,16 @@ model construction uses the same source declarations and factor semantics.
 contexts; [input semantics](formats.md) defines route coverage.
 
 `Problem.pipelineRequest()` composes shared finite factors with exact continuous
-completion where supported. `OpenTheoryPipeline.minimize` uses a finite objective
-in every polynomial strategy; `PolynomialOptimizationExecution` preserves exact
-algebraic incumbents and native work counters. Only complete traversal admits an
-optimality or infeasibility proof. See [polynomial composition](theories/polynomial-real.md#shared-model-composition)
-for that route's limits.
+completion where supported. `OpenTheoryPipeline.minimize` accepts a finite
+`LinearObjective` or an exact source `QuadraticObjectiveSpec`. The quadratic overload
+returns `QuadraticOptimizationExecution` with exactly evaluated incumbents,
+source-direction bounds and separate native counters. Complete traversal can prove
+optimality, nonattainment, unboundedness or infeasibility. Local search and ALNS
+retain checked incumbents and independently checked global box bounds; their
+neighborhood verdicts do not establish global claims.
+See [polynomial composition](theories/polynomial-real.md#shared-model-composition)
+for source coverage and [quadratic representation](model.md#quadratic-objective-representation)
+for exact coefficient and coordinate ownership.
 
 `NonlinearIntegerProblem.pipelineRequest()` exposes exact polynomial integer/mixed
 sources through `NonlinearIntegerTheoryRequest`. `NonlinearIntegerTheoryParams`
@@ -52,9 +57,6 @@ budget. Every engine returns the common verdict/witness surface. Rebuilt assignm
 retain arbitrary-width original integers and exact algebraic original reals;
 numeric conditional auxiliaries remain private. See [nonlinear integer semantics](theories/nonlinear-integer.md).
 
-The [quadratic objective representation](model.md#quadratic-objective-representation)
-preserves exact source terms and remapping. Its certificate primitives do not alone
-expose quadratic optimization through the pipeline.
 
 ## Compatibility and implementation surfaces
 
