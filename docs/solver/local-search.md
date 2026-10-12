@@ -164,6 +164,10 @@ initial objective evaluation. Objective failures and cancellation
 unwind the ordinary probe restoration; subsequent calls reuse cleared traversal marks.
 These operations remain atomic within the existing cancellation boundaries.
 
+Repair-chain preparation captures activity, configuration and assignment snapshots;
+its execution phase borrows those snapshots for the walk and ordinary restoration.
+This phase boundary retains effect, callback and random-draw order.
+
 Native Element result cones skip writes to unselected cells. Direct and transitive
 index dependencies retain the result cone, including compounds that change the index
 and its destination cell together. Probe saving and propagation use the same cone.
