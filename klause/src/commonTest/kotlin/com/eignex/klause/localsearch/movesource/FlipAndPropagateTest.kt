@@ -11,12 +11,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Behaviour tests for [FlipAndPropagate]: a seed flip is emitted together with the literals it forces
- * through [ImplicitSeeding.implicationGraph], the bundle is one atomic [Move.Compound] that applies
- * and reverts cleanly, and no-op forced parts are dropped. Implication directions are read off the
- * graph the problem actually builds, never assumed.
- */
 class FlipAndPropagateTest {
 
     /** `x0 -> x1` via clause `(¬x0 ∨ x1)`, with a unit clause `(x0)` so x0 sits in a violated factor

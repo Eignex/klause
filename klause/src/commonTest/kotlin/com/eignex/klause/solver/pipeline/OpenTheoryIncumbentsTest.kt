@@ -14,10 +14,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
-/**
- * An exact witness reaches a descent's incumbent through one strict-improvement gate, ordered by the
- * arbitrary-precision value offered with it.
- */
 class OpenTheoryIncumbentsTest {
     @Test
     fun `published exact witnesses retain their authoritative integer value`() {

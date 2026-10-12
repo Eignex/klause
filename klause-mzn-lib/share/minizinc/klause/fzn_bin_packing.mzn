@@ -1,7 +1,5 @@
-% Override std/fzn_bin_packing.mzn (uniform capacity c for every bin). Emits the per-bin weight
-% total as `bool_lin_le` — `Σ_i w[i]·(bin[i] = b) ≤ c` — which klause maps to a PseudoBoolean so the
-% knapsack-cover separator engages (#434). Equivalent to the std complement form
-% `Σ w[i]·(bin[i] != b) ≥ Σw − c`, but in the direct `≤ c` shape the cover separator needs.
+% Uniform-capacity bin packing uses per-bin bool_lin_le weight bounds
+% over assignment booleans, exposing PseudoBoolean knapsack-cover cuts.
 predicate fzn_bin_packing(int: c, array [int] of var int: bin, array [int] of int: w) =
   if length(bin) > 0 then
     forall (b in lb_array(bin)..ub_array(bin)) (

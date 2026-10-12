@@ -14,7 +14,6 @@ import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 
-/** LS invariant for [ReifiedLinear]: reified violation tracking and repair. */
 internal class ReifiedLinearInvariant(
     private val auxBoolVar: Int,
     private val coeffs: LongArray,

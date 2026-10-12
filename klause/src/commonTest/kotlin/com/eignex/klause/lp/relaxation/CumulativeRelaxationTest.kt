@@ -15,7 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #430: the energetic makespan LP lower bound for the scheduling globals. */
 class CumulativeRelaxationTest {
 
     private val eps = 1e-6

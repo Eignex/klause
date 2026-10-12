@@ -5,8 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** Coverage for [IntDisjointSet]: find/union/connected semantics, transitivity, path-compression
- *  idempotence, and the [IntDisjointSet.groups] partition. */
 class IntDisjointSetTest {
 
     @Test

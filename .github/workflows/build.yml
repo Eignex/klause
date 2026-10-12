@@ -37,9 +37,8 @@ jobs:
           distribution: temurin
           java-version: 25
 
-      # Persists the Gradle home incl. the local build cache; every branch writes so
-      # repeated PR pushes hit it (GitHub scopes entries to the branch plus main). The
-      # encryption key additionally persists the configuration cache across runs.
+      # Gradle caches are scoped to each branch and main; every branch may write.
+      # The encryption key enables configuration-cache persistence.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
@@ -56,9 +55,7 @@ jobs:
       # Default target set is host-only (jvm + linuxX64); the cross-compiled native targets
       # (linuxArm64, macosArm64) are opt-in via -Ptargets.full and build on release.
 
-      # `check` runs tests without lintDocs (detekt + dokka), which the parallel `lint` job
-      # already covers. Keeping them separate avoids running lintDocs twice per push. Kover only
-      # reports JVM coverage, so native tests run in their own job without its instrumentation.
+      # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
       - name: Run JVM tests with coverage
         run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist
 
@@ -133,10 +130,7 @@ jobs:
             klause-cli/build/test-results/
           if-no-files-found: ignore
 
-  # Repo-wide lintDocs: detekt plus dokka with fail-on-warning, for KDoc-link validation
-  # parity with the other modules. dokka's full doc generation is the slowest thing in CI,
-  # so it runs as its own job — still a required check, but in parallel with `test` rather
-  # than serially in front of it.
+  # Detekt and Dokka link validation run in parallel with tests.
   lint:
     name: Lint and validate docs
     runs-on: ubuntu-latest

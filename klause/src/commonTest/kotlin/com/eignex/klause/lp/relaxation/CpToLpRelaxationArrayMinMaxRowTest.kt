@@ -12,11 +12,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * LP relaxation rows for `ArrayMinMax` (`result = max(xs)` / `min(xs)`). The extremum is the
- * envelope of its operands, so the rows bound an objective that minimises a maximum (makespan)
- * or maximises a minimum — exactly where the bare per-variable domains say nothing.
- */
 class CpToLpRelaxationArrayMinMaxRowTest {
 
     private val eps = 1e-9

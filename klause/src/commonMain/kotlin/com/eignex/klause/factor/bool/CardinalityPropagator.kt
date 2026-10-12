@@ -6,7 +6,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.moveBoolWatcher
 
-/** CP propagator for [Cardinality]: generalised watched-literal propagation for `min ≤ count ≤ max`. */
 internal class CardinalityPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
@@ -22,7 +21,6 @@ internal class CardinalityPropagator(
     private val atLeastWatchSize: Int =
         if (min == 0) 0 else (min + 1).let { if (it > literals.size) -1 else it }
 
-    /** Mirror of [atLeastWatchSize] for the at-most-max side. */
     private val atMostWatchSize: Int =
         if (max == literals.size) {
             0

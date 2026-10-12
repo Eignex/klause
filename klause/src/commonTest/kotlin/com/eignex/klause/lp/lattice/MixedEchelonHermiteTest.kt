@@ -12,11 +12,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * The change of variables behind the mixed echelon-Hermite form. The property that carries everything is
- * that `x = V·y` is a bijection of the integer lattice: if it were not, a solution of the rewritten
- * system would not be a solution of the original, and an unsat proof would not transfer.
- */
 class MixedEchelonHermiteTest {
 
     private fun vec(vararg v: Long) = Array(v.size) { bigIntOf(v[it]) }

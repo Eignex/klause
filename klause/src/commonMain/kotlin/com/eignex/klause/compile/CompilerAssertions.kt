@@ -77,7 +77,7 @@ import com.eignex.klause.factor.table.Regular as RegularFactor
  * ([assertAllDifferent], [assertCircuit], [assertCumulative], ...) and the integer-
  * comparison normalisation ([assertIntCompare] / [emitTopLevelCmp] / [emitSingleVar]).
  * Sub-expression-level lowering (`lowerToLit`, `reify*`, `tseitin*`) lives in
- * `CompilerLowering`; affine-fragment lift lives in `CompilerLift`.
+ * `Compiler.kt`; affine-fragment lift lives in `CompilerLift`.
  */
 internal fun Lowering.assertExpr(expr: BoolExpr) {
     when (expr) {
@@ -504,7 +504,6 @@ internal fun Lowering.assertIncreasing(expr: IncreasingExpr) {
     require(lifted.all { it is IntRef }) {
         "increasing: every term must be a bare variable reference (no arithmetic)."
     }
-    // A chain of 0 or 1 variables is trivially ordered — post nothing.
     if (lifted.size < 2) return
     val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
     factors += IncreasingFactor(xs = ids, strict = expr.strict)
@@ -611,7 +610,6 @@ internal fun Lowering.emitSingleVar(name: String, coeff: Int, op: IntCmpOp, boun
         emitSingleVarCanonical(name, flipped, -bound)
         return
     }
-    // All coeffs: emit as a single-term Linear.
     val varId = intVarOf(name)
     factors += Linear(intArrayOf(coeff), intArrayOf(varId), op.toLinearOp(), bound)
 }

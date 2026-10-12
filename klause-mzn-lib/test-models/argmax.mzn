@@ -1,5 +1,4 @@
-% arg_max smoke: m is the index of the maximum element. Exercises klause's handling of the std
-% arg_max decomposition (int_max + reified comparisons) — verifies the niche global runs (#435).
+% arg_max selects the maximum element's index using int_max and reified comparisons.
 include "globals.mzn";
 
 array[1..4] of var 0..3: x;

@@ -15,7 +15,6 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntLongMap
 import com.eignex.klause.util.MutableLongObjectMap
 
-/** LS invariant for [PseudoBoolean]: violation scoring and break/make maintenance. */
 internal class PseudoBooleanInvariant(
     private val boolVars: IntArray,
     private val weights: LongArray,
@@ -81,7 +80,6 @@ internal class PseudoBooleanInvariant(
         }
     }
 
-    /** Self-preserving moves during objective descent. */
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (literals.size < 2) return
         val sum = state.longPayload[factorId]

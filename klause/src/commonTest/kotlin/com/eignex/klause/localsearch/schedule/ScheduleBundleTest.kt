@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The schedule-axis bundle: one round must drive every adaptive member. */
 class ScheduleBundleTest {
 
     private class SpyPolicy : AdaptivePolicy {

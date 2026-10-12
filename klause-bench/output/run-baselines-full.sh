@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# 300s BASELINE-ONLY sweep over the ENTIRE MiniZinc competition corpus (no name filter, no
-# per-family cap): 89 COP + 41 CSP = 130 problems. References only, one solver per invocation.
-#   Choco p8 (parallel+open), p1 (free), fixed (annotation); Yuck (ls).
-# Already-solved problems re-hit the cache (same content+budget+solver-label) → instant.
-# The `solve` metric writes one .out + .json per problem under klause-bench/output/<config>/ itself.
+# 300s reference sweep over the full MiniZinc competition corpus.
+# Runs Choco parallel, free and fixed tracks plus Yuck local search; completed solves replay from cache.
 set -u
 cd "$(git rev-parse --show-toplevel)"
 COP="suite=mzn-bench kind=cop"

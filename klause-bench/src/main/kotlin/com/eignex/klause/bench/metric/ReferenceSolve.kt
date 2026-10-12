@@ -8,10 +8,8 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 
 /**
- * One instance solved by the strong solver of its format: clasp for DIMACS/OPB/WCNF, the CPMpy cp-sat container for
- * XCSP3 (OR-Tools reads no XCSP3), z3 for SMT-LIB, SCIP for MPS, and `minizinc --solver <backend>` for MiniZinc.
- * `bench reference` and `solve-one backend=reference` both solve through here, so a reference row and a lab case of the
- * same instance come from the same invocation. Results are cached as `bench reference` always cached them.
+ * Format-specific reference solving shared by `bench reference` and `solve-one backend=reference`.
+ * Invocations use the same caching and result handling.
  */
 internal object ReferenceSolve {
     /** A reference solve: the solver that ran, its result, and the model's objective sense. */

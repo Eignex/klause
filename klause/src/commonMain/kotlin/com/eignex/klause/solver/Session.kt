@@ -29,7 +29,7 @@ import com.eignex.klause.solver.result.TerminationReason
  * operations and scope changes until completion, failure or close. [close] closes the active owner,
  * clears scopes and rejects subsequent operations. Repeated close is harmless.
  *
- * Legacy sequences capture scopes at invocation and must be consumed sequentially. Use the open
+ * Sequences capture scopes at invocation and must be consumed sequentially. Use the open
  * streaming methods with `use` when stopping early. Local-search sessions also retain learned weights;
  * the default [StatelessSession] retains only scopes and ownership.
  */
@@ -65,10 +65,10 @@ interface Session<P : SolverParams> : AutoCloseable {
         else SampleResult.Unknown(TerminationReason.BudgetExhausted)
     }
 
-    /** Legacy sample sequence under a scope captured at invocation; consume sequentially. */
+    /** Sample sequence under a scope captured at invocation; consume sequentially. */
     fun samples(params: P): Sequence<Sample>
 
-    /** Legacy enumeration under a scope captured at invocation; consume sequentially. */
+    /** Enumeration under a scope captured at invocation; consume sequentially. */
     fun enumerate(params: P): Sequence<Sample>
 
     /** Approximate count under the captured scope. */
@@ -104,7 +104,7 @@ interface Session<P : SolverParams> : AutoCloseable {
         return optimizer().minimize(objective, params)
     }
 
-    /** Legacy incumbent sequence under a scope captured at invocation; consume sequentially. */
+    /** Incumbent sequence under a scope captured at invocation; consume sequentially. */
     fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> {
         requireUnscoped()
         return optimizer().improvements(objective, params)

@@ -12,7 +12,6 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 
-/** LS invariant for [Linear]: violation tracking, repair, and structured moves. */
 internal class LinearInvariant(
     private val coeffs: LongArray,
     private val vars: IntArray,

@@ -28,32 +28,14 @@ import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration.Companion.milliseconds
 
 /*
- * Generic multi-mode CLI framework.
- *
- * The CLI is a thin dispatcher over a registry of [CliMode]s — one per front-end /
- * competition (MiniZinc, XCSP3, SMT-LIB, …). Everything that is genuinely shared lives here
- * or in [SolveCore]: the solver-control flag set ([CommonOptions] + [commonFlagSpecs]), the
- * spec-driven argument parser ([parseArgs]), and the unified solve driver ([SolveCore.solve]).
- *
- * A mode contributes only what differs between front-ends:
- *  1. **detection** — which `--format` names and file extensions route to it;
- *  2. **parsing** — turn an input file into a mode-neutral [Solvable];
- *  3. **mode flags** — any flags beyond the common set (e.g. MiniZinc's `--ozn`);
- *  4. **output protocol** — how verdicts and solutions are printed ([OutputProtocol]).
- *
- * Adding a new competition front-end is therefore a new [CliMode] object plus its
- * [OutputProtocol]; no change to the parser, the router, or the engines.
+ * CLI modes supply format detection, input loading, mode-specific flags and output
+ * protocols. Shared flag parsing lives here; [SolveCore] owns the solve driver.
  */
 
 /**
- * The allowance for work a frontend must do before the solve begins — today the bound proof
- * [com.eignex.klause.solver.pipeline.pipelineRoute] runs to decide which lane owns an open model.
- *
- * A slice of the shared presolve work allowance, stopped as well by the run's own deadline, so proving a
- * bound leaves time for search. The work allowance and elapsed ceiling both apply to routing.
- *
- * Consumes `open-bound-proof` from [CommonOptions.engineParams] once and retains the same token if a
- * frontend asks again. A route cannot restart its slice or change a disabled proof into an enabled one.
+ * Routing work allowance for [com.eignex.klause.solver.pipeline.pipelineRoute].
+ * Slices the shared presolve allowance and observes the invocation deadline.
+ * Consumes `open-bound-proof` once and retains the token across frontend requests.
  */
 internal fun CommonOptions.routingCancellation(): Cancellation {
     routingToken?.let { return it }
@@ -119,14 +101,9 @@ internal fun presolveWorkFor(budgetMs: Long): Long = if (budgetMs > Long.MAX_VAL
 }
 
 /**
- * Whether the routing bound proof runs, consuming `open-bound-proof` and **removing** it as it reads —
- * `EngineParams` rejects a key no engine claimed, so a param the CLI answers itself has to leave the list
- * (the same reason `node-limit` is taken this way).
- *
- * `--param open-bound-proof=false` is the only way to run one model down both lanes: with the proof, a
- * model whose open sides all close takes the finite route; without it, the same model goes to the open
- * theory. Shrinking `-t` cannot substitute, since it starves the solve along with the proof and the two
- * arms stop being comparable. Read only by the front-ends that route open models — MPS and SMT-LIB.
+ * Consumes and removes `open-bound-proof` from [CommonOptions.engineParams], so engines
+ * do not reject the CLI-owned key. Disabling the proof keeps an open model on its
+ * theory route even when the proof could close its bounds. Used by MPS and SMT-LIB.
  */
 internal fun CommonOptions.takeOpenBoundProof(): Boolean {
     val entries = engineParams.filter { it.startsWith("$OPEN_BOUND_PROOF_KEY=") }
@@ -187,15 +164,11 @@ internal class CommonOptions {
      *  `aggressive`. Parsed into a `PresolveConfig` by `PresolveConfig.parse`. */
     var presolve: String? = null
 
-    /** `--lp CEILING`: the LP-relaxation ceiling for the portfolio — an emphasis (`off` | `conservative`
-     *  | `default` | `aggressive`) optionally followed by `+/-<technique>` deltas (e.g.
-     *  `aggressive,-cuts`). Absent ⇒ uncapped (the pool spreads the LP intensity itself, so LP is on by
-     *  default); `off` disables LP across the portfolio. Parsed by `LpConfig.parse`.
-     *
-     *  The bare-invocation default is `aggressive`, which for a pool means "uncapped" rather than a
-     *  literal emphasis. `-e fixed` takes no LP at all and refuses any value but `off`, so the rendered
-     *  default applies to the pooled routes only — the one place `--help` still cannot say so, since the
-     *  flag specs are built before the engine is resolved (#1887). */
+    /**
+     * Portfolio LP ceiling: an emphasis plus optional technique deltas, parsed by `LpConfig.parse`.
+     * Absent or `aggressive` means uncapped; `off` disables LP across the pool.
+     * `-e fixed` accepts only `off`. Help defaults are rendered before engine resolution.
+     */
     var lp: String? = null
 
     /** `--lp-pricing POLICY`: entering-column policy for zero-objective LP solves. */

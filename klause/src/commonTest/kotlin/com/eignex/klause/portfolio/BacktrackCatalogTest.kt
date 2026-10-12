@@ -6,11 +6,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
-/**
- * Coverage for the backtrack worker-config catalog — the backtrack counterpart of
- * [LocalSearchWorkerConfigTest]. Guards that the typed [BacktrackArm] enum and the credit-ranked pools
- * stay in lockstep, so adding an arm to the enum without ranking it (or vice versa) fails here.
- */
 class BacktrackCatalogTest {
 
     @Test

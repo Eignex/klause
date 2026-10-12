@@ -1,4 +1,4 @@
-% Auto: keep `subcircuit` native (klause has a factor for it) instead of the std decomposition.
+% Maps `subcircuit` to its native factor.
 predicate klause_subcircuit(array [int] of var int: x);
 
 predicate fzn_subcircuit(array [int] of var int: x) =

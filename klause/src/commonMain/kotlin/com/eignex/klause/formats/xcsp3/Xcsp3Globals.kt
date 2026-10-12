@@ -996,12 +996,9 @@ internal fun Compiler.Builder.knapsack(e: XmlElement) {
 internal fun Compiler.Builder.nValues(e: XmlElement) {
     val vars = listVars(e)
     val condText = requireNotNull(e.child("condition")).textContent.trim()
-    // Use one native [NValue] factor only when the count meets a CONSTANT bound and there is no <except>.
-    // It replaces the `Σ used[v]` decomposition (an equality reified per (value, variable) pair —
-    // O(range × arity) factors, the dominant build+bake cost on nValues-heavy models). A variable operand
-    // (e.g. `(eq, z)` with z the minimized objective in BinPacking2) keeps the decomposition, whose
-    // per-value indicators give the objective a tight linear relaxation the monolithic factor lacks;
-    // <except> also keeps it, since the native factor counts every distinct value.
+    // Constant bounds without <except> use native NValue, avoiding O(range * arity) indicators.
+    // Variable bounds retain per-value indicators for a tight objective relaxation;
+    // <except> requires them because native NValue counts every distinct value.
     val constBound = splitCondition(condText).second.toIntOrNull() != null
     val cnt = if (constBound && e.child("except") == null) {
         newAuxVar(0L, vars.size.toLong()).also { factors.add(NValue(n = it, xs = vars, mode = NValue.Mode.Eq)) }

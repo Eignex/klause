@@ -8,7 +8,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** #18: overflow-checked Long arithmetic underpinning the fraction-free simplex tableau. */
 class CheckedLongTest {
 
     @Test

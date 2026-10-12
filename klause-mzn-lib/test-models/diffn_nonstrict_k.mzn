@@ -1,6 +1,5 @@
-% diffn_nonstrict_k smoke: k-dimensional non-overlapping boxes (k = 2 here). Exercises klause's
-% handling of the std diffn_k decomposition (reified disjunctions) — verifies the niche global runs
-% (#435). Two unit-ish boxes always fit apart in a 4×4 area, so it is satisfiable.
+% Two-dimensional non-overlap with variable box sizes in a 4x4 area.
+% The reified-disjunction decomposition admits a satisfying placement.
 include "globals.mzn";
 
 array[1..2, 1..2] of var 0..3: pos;

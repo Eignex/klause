@@ -12,17 +12,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/**
- * Implicit-solving neighbourhoods: elected structural globals offer feasibility-preserving
- * structured moves even during infeasibility, and those moves win the weighted-gradient race only
- * when they clear a *coupled* constraint.
- *
- * Fixture: a 2×2 Latin square — vars laid out `v0 v1 / v2 v3` over `{0,1}` with an
- * all-different on each row and each column. From the assignment `(0,1,0,1)` both rows are
- * satisfied but both columns clash (`v0=v2=0`, `v1=v3=1`). Swapping the satisfied second row
- * (`v2 ↔ v3`) keeps that row distinct and simultaneously fixes both columns — exactly the
- * structure-preserving move only an implicit neighbourhood produces.
- */
 class CblsImplicitNeighbourhoodTest {
 
     private fun row(a: Int, b: Int) = AllDifferent(vars = intArrayOf(a, b), domainMin = 0, domainSize = 2)

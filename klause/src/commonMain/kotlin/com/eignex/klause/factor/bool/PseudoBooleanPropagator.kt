@@ -135,8 +135,8 @@ internal class PseudoBooleanPropagator(
         return acc.loadPb(weights, flipped, geBound = sum - bound)
     }
 
-    /** True iff the equality's own literal on [forcedLit]'s variable is exactly [forcedLit] (now true) —
-     *  i.e. the lower-bound (`≥`) half needed it true. */
+    /** True iff the equality's own literal on [forcedLit]'s variable is exactly [forcedLit] (true) —
+     *  i.e. the lower-bound (`≥`) half requires it true. */
     private fun forcedByGeSide(forcedLit: Int): Boolean {
         val v = Lit.variable(forcedLit)
         for (lit in literals) if (Lit.variable(lit) == v) return lit == forcedLit

@@ -9,11 +9,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * Bounding a lower-triangular system by forward substitution. The cases that matter are the ones where a
- * side stays open: a bound invented where the system implies none would defeat the whole point of the
- * transformation, which is to replace an invented search box with the model's own bounds.
- */
 class TriangularBoundsTest {
 
     private fun big(v: Long) = bigIntOf(v)

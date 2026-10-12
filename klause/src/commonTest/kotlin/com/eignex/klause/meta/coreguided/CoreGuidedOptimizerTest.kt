@@ -13,7 +13,7 @@ class CoreGuidedOptimizerTest {
 
     @Test
     fun `returned sample true cost equals reported lower bound under overlapping cores`() {
-        // #80 regression. A "star" mutex: b0 conflicts with b1, b2, b3. All four softs
+        // A "star" mutex: b0 conflicts with b1, b2, b3. All four softs
         // want their var true (weight 1). The single optimum is to drop b0 (cost 1),
         // satisfying every mutex at once. The relaxer machinery re-cores the shared soft
         // s0 across the three mutex cores, which is exactly the spent-soft state where the

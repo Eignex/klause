@@ -23,12 +23,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * [LocalSearchState.synthesizeChannelingMove] reads the linear structure (coeffs/op/bound) from
- * the original factors, not the parallel invariants which no longer carry it after the
- * propagator/invariant split. These fixtures drive the EQ channeling paths the
- * [strategy.CblsStallSwapTest] fixture (GE/LE only) deliberately avoids.
- */
 class LocalSearchStateTest {
     @Test
     fun `scaled maintained literal channels backsolve exact binary targets`() {

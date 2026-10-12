@@ -33,7 +33,7 @@ class OllTest {
 
     @Test
     fun `recoverOptimalSample replaces an over-relaxed witness with a cost-lb model`() {
-        // #80: the witness violates both softs (cost 2) but the proven optimum is lb = 1.
+        // the witness violates both softs (cost 2) but the proven optimum is lb = 1.
         // recoverOptimalSample must re-solve under the true-cost cap and return a model
         // whose cost is exactly lb — here, exactly one of b0/b1 true.
         val overRelaxed = Sample(bools = booleanArrayOf(false, false), ints = longArrayOf())

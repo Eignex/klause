@@ -10,8 +10,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/** #632: the 0/1 multi-knapsack subgradient Lagrangian bound (one knapsack solved exactly by DP,
- *  the rest dualized). The bound must never exceed the true optimum, for any multipliers. */
 class KnapsackLagrangianBoundTest {
 
     private fun ceil(a: Long, b: Long): Long = if (a % b > 0L) a / b + 1 else a / b

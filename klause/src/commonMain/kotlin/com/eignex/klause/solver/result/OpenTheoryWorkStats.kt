@@ -8,7 +8,7 @@ data class OpenTheoryWorkStats(
     val openIntDecisions: Long = 0,
     /** Committed opaque theory decision frames. */
     val openTheoryDecisions: Long = 0,
-    /** Accepted legacy theory-check allowance uses. */
+    /** Accepted theory-check allowance uses. */
     val openTheoryChecks: Long = 0,
     /** Accounting-policy sum of committed decisions, checks, and charged hint moves. */
     val openWork: Long = 0,
@@ -56,7 +56,7 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
     /** Charge one committed opaque theory decision. */
     fun theoryDecision(): Boolean = consume().also { if (it) theoryDecisions++ }
 
-    /** Charge one accepted legacy theory check. */
+    /** Charge one accepted theory check. */
     fun theoryCheck(): Boolean = consume().also { if (it) theoryChecks++ }
 
     /**

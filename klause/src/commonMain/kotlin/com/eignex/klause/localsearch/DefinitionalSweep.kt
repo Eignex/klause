@@ -23,29 +23,15 @@ import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.toSortedIntArray
 
 /**
- * A local-search acceleration structure (consumed by [LocalSearchSolver]): the topologically-
- * ordered functional definitions of a model — every functionally-defined variable whose shape a
- * [SweepNode] can mirror exactly, over the *whole* model rather than just the objective cone. The
- * class is engine-side and format-agnostic (it depends only on the factor / objective IR); the
- * front-end supplies definition hints, or nodes built from source annotations. Definitions cover
- * both value spaces:
- * int DAGs (abs / min / linear aux chains) via [SweepNode.IntDef], and the bool-shaped
- * definitions decompositions lean on — comparison reifications, `bool2int` channels, literal
- * set membership, bool conjunction/disjunction — plus variable-index element access.
+ * Topologically ordered functional definitions consumed by [LocalSearchSolver]. The engine-side,
+ * format-agnostic DAG covers the whole model: integer definitions through [SweepNode.IntDef],
+ * Boolean reifications and channels, set membership, conjunction/disjunction, and variable-index
+ * element access. Frontends supply definition hints or source-annotation nodes.
  *
- * Why this exists: MiniZinc decompositions routinely make most of a model definitional. A local
- * search treating those as ordinary hard constraints must hand-repair the DAG one move at a time,
- * needing millions of flips to walk a random assignment toward feasibility. Sweeping instead
- * *evaluates* every defined var bottom-up from the free (decision) variables, so a freshly
- * randomized assignment starts at the "only real constraints violated" frontier at the cost of one
- * pass. [network] extends the same nodes to **per-move** maintenance: an incremental one-way
- * invariant index the engine consults after every applied move.
- *
- * Soundness: computed int values are clamped into the variable's domain, and an element access
- * with an out-of-range index leaves the output untouched. In both cases the affected
- * definitional factor simply remains violated and the search repairs it locally — the sweep
- * never fabricates feasibility, it only fast-forwards the part of the repair the definitions
- * determine.
+ * Sweeping evaluates defined variables from free variables so local search need only repair the
+ * remaining constraints. [network] maintains those definitions incrementally after each move.
+ * Integer results are clamped to their domains; out-of-range element accesses leave outputs
+ * untouched. Affected factors remain violated, so the sweep cannot fabricate feasibility.
  */
 class DefinitionalSweep internal constructor(
     /** Defining nodes in topological order — every node's inputs are free vars or earlier nodes. */

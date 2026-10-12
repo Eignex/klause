@@ -35,8 +35,10 @@ internal class FloatLpResult(
     val primal: DoubleArray,
     /** Dual-simplex pivots taken to reach this optimum (0 when the warm/cold start was already optimal). */
     val pivots: Int = 0,
-    /** Max fill ratio `(nnz of the factors)/nnz B` over this solve's factorizations (#27 sparsity
-     *  audit). Read off the basis solver, so it describes the backend that answered. */
+    /**
+     * Maximum factor fill ratio `(nnz factors)/nnz B` across this solve's factorizations,
+     * measured by the basis solver.
+     */
     val luMaxFill: Double = 0.0,
     /** Max factor density `(nnz of the factors)/m²` — approaching 1.0 means they filled in to dense. */
     val luMaxDensity: Double = 0.0,
@@ -428,7 +430,6 @@ internal class RevisedSimplex(
         }
     }
 
-    /** Nonzeros in column [j] of `columns`. */
     private fun columnNnz(j: Int): Int = colPtr[j + 1] - colPtr[j]
 
     /** Column [j] of `columns` scattered into [into], which is emptied first. Costs the column's nonzeros
@@ -819,7 +820,6 @@ internal class RevisedSimplex(
         }
     }
 
-    /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
     private fun duals(): DoubleArray {
         // Zero objective (the gated feasibility filter): the duals solve `Bᵀy = 0`, so the whole
         // BTRAN — a full pass over the factors, once per iteration — is a zero vector.
@@ -1890,7 +1890,6 @@ internal class RevisedSimplex(
         return (ARTIFICIAL_BOUND_FACTOR * magnitude).coerceIn(ARTIFICIAL_BOUND_FLOOR, ARTIFICIAL_BOUND_CEILING)
     }
 
-    /** Nonbasic columns seated on an artificial side. */
     private fun artificialSeats(): Int {
         val lower = artificialLower ?: return 0
         val upper = artificialUpper ?: return 0
@@ -3000,7 +2999,6 @@ private fun EngineRefactorTrigger.refactorReason(): LpRefactorReason = when (thi
     EngineRefactorTrigger.RESIDUAL -> LpRefactorReason.NUMERICAL_RECOVERY
 }
 
-/** What folding a pivot into the basis did to it. */
 private enum class PivotFold {
     /** The update went in and the factors are fit to carry on. */
     UPDATED,

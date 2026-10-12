@@ -1,7 +1,5 @@
-% connected smoke: the selected node/edge subgraph must be connected. Triangle graph with all
-% nodes selected — picking any two of its three edges connects them. Exercises klause's handling of
-% the std connected → reachable decomposition (reified reachability over the edges); verifies the
-% niche global runs (#435).
+% Connected selected subgraph of a triangle: all nodes are selected,
+% and any two edges connect them through the reachable decomposition.
 include "globals.mzn";
 
 array[1..3] of int: from = [1, 2, 3];

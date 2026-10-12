@@ -46,40 +46,9 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
- *
- * The bench does one thing — **solve** a **selection** of problems with one solver, as a subprocess,
- * saving per-problem output (see [SolveMetric]) plus a per-run `output/<config>.csv` result table in
- * the reference-table schema; the `credit` command / `output/credit.sh` compare those tables, and the
- * `output/compare.sh` MiniZinc-Challenge Borda scorer reads the saved dirs. The run form:
- *
- *   `bench solve [filters…]`   e.g. `bench solve suite=smtlib-core backend=choco`
- *
- * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
- * `category=SAT,OPT` `tag=…` `name=<glob>[,…]` (comma = OR) `per-family=N` `max=N` `seed=N`
- * `backend=choco|gecode|yuck` (the solver; default klause) `timeout=<ms>`
- * `engine=fixed|cp|mixed|ls` `processors=N` `fixed=true` (references) `param=key=value`
- * `lp=off|conservative|default|aggressive[±id…]` (klause-cli `--lp` LP-relaxation emphasis)
- * `presolve=off|conservative|default|aggressive[,±pass…]` (klause-cli `--presolve` presolve emphasis + deltas)
- * `label=<name>` (tag the run — e.g. a klause version — so re-runs coexist instead of overwriting)
- * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
- *
- * Other commands:
- *  - `reference [filters…]` — harvest per-instance reference optima/bounds with a format-native strong
- *    solver (cp-sat for MiniZinc/XCSP3, clasp for DIMACS/OPB, z3 for SMT-LIB) into the committed
- *    per-solver tables (see [reference]); the gap-to-optimum reward + a soundness oracle.
- *  - `credit [--by structure|format] <a.csv> <b.csv> …` — win-share + greedy set-cover credit between
- *    per-run result CSVs, keyed by (suite, problem), sliceable by a feature column (see [credit]).
- *  - `mine [by=config|suite|family|format|category|kind|class] <cases.json> …` — rank portfolio arms from lab
- *    case records (`deploy/lab cases <id>`) by wins and by the scheduler's per-arm credit (see [ArmMining]).
- *  - `preview [filters…]` — print the instances a run would cover, without running.
- *  - `select [filters…]` — the same selection as JSON lines naming each instance exactly, for `solve-one`.
- *  - `solve-one suite=<id> problem=<name> [solve args…] [out=<dir>]` — solve one instance and write its record.
- *  - `corpus compress [<dir>]` — store every plain instance in the corpus cache (or [dir]) zstd-compressed,
- *    in place; the migration for a cache fetched before the cache stored instances compressed.
- *  - `corpus gc` — evict least recently used collections until the corpus cache fits its cap, then list it.
- *  - `corpus status` — list the cached collections with size and last use.
- *  - `list` — suites; `list <suite>` — problems in a suite.
+ * Benchmark command dispatcher for solving, references, selection, result credit and corpus
+ * maintenance. Solves write per-problem [SolveMetric] outputs and a per-run result CSV;
+ * comparison and scoring operate on those saved records.
  */
 object BenchCli {
     /** Default reference-sweep concurrency: enough to keep cores busy, low enough that a handful of
@@ -162,7 +131,7 @@ object BenchCli {
 
     /** `corpus compress [<dir>]`: compress the plain instances under [dir] (default: the corpus cache) in
      *  place. Safe to interrupt and re-run; see [CorpusFiles.compressTree]. `corpus gc` applies the cache cap
-     *  now and `corpus status` lists the cached collections; see [CorpusCache]. */
+     *  and `corpus status` lists the cached collections; see [CorpusCache]. */
     private fun corpus(args: List<String>) {
         when (args.firstOrNull()) {
             "compress" -> corpusCompress(args.getOrNull(1)?.let { File(it) } ?: CorpusFetcher.cacheRoot)
@@ -415,8 +384,7 @@ object BenchCli {
             pool.shutdown()
         }
         val (added, tightened, unchanged) = ReferenceStore.mergeAndSave(harvested)
-        // Report the solvers that actually produced rows (per-format: cp-sat / clasp / z3 / scip), not
-        // just the requested MiniZinc `backend`, so an all-SMT or all-Boolean run names its true oracle.
+        // Name the solvers that produced the rows; each format may use a different reference.
         val solvers = harvested.map { it.solver }.distinct().sorted().joinToString("+").ifEmpty { backend }
         val decisive = harvested.count { it.feasible == true || it.proven }
         println(
@@ -437,9 +405,7 @@ object BenchCli {
         counter: AtomicInteger,
         total: Int,
     ): ReferenceEntry = runCatching {
-        // Per-format solver: DIMACS/OPB by clasp, XCSP3 by the CPMpy cp-sat container (OR-Tools reads no
-        // XCSP3), MiniZinc by `minizinc --solver`. Each row records the solver that produced it, so the
-        // table stays honest about which oracle each format came from. All cache and score identically.
+        // Every row records the format-specific solver that produced it.
         val run = ReferenceSolve.run(ref, backend, settings, budget)
         val solverId = run.solver
         val r = run.result
@@ -453,10 +419,7 @@ object BenchCli {
             else -> "??"
         }
         println("[${counter.incrementAndGet()}/$total] ${ref.name} = $verdict")
-        // Decisive = a witness (SAT) or a proof (optimum / UNSAT). An undecided timeout still gets a row
-        // — an honest "unknown" (feasible=null, no objective, unproven) — so every instance is covered;
-        // the virtual-best merge keeps it from displacing a decisive row of the same version, while one judged under
-        // another version ([ReferenceEntry.version]) gives way to it.
+        // Unknown rows preserve coverage without replacing decisive rows of the same validation version.
         if (r.feasible == true || r.proven) {
             ReferenceEntry(
                 ReferenceStore.suiteOf(ref),
@@ -562,9 +525,7 @@ object BenchCli {
         f["tag"]?.split(",")?.map { it.trim() }?.toSet()?.let { tags ->
             candidates = candidates.filter { it.ref.tags.any { t -> t in tags } }
         }
-        // `name=` is a comma-separated OR of substring-or-`*`-glob patterns: keep an instance if
-        // ANY pattern matches. Lets a curated selection list specific families, e.g.
-        // `name=cvrp,nfc,mario`.
+        // Comma-separated name patterns are ORed; each is a substring or * glob.
         f["name"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.let { pats ->
             candidates = candidates.filter { c -> pats.any { matches(it, c.ref.name) } }
         }
@@ -577,10 +538,7 @@ object BenchCli {
         )
         // Families are already capped; what is left is the round-robin interleave and the overall `max`.
         val sel = CorpusSelection.Selection(maxInstances = f["max"]?.toIntOrNull())
-        // `balance=format` splits `max` evenly across the formats present (water-filling short
-        // formats' surplus into larger ones) instead of across families globally — so a broad
-        // multi-format sweep touches every format rather than filling with the format that has the
-        // most families. Unset keeps the family-global cap.
+        // Format balancing water-fills the total cap across formats; unset uses the family-global cap.
         val selected = when (f["balance"]?.lowercase()) {
             null -> CorpusSelection.applySelectionBy(capped, sel) { it.family }
             "format" -> CorpusSelection.applyBalancedBy(capped, sel, { it.family }) { it.ref.format }

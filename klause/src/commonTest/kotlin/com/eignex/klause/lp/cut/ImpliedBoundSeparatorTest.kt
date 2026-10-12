@@ -9,13 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Soundness of the implied-bound cut encoding. For an implication `A ⇒ B`, the cut
- * `litVal(A) ≤ litVal(B)` must be satisfied at a 0/1 assignment **exactly when** the implication holds
- * — so it never removes a feasible point (where the implication, being sound, does hold) and does cut
- * points that break it. Proven exhaustively over all four literal polarities and all assignments, which
- * catches any polarity or sign error in [ImpliedBoundSeparator.impliedBoundCut].
- */
 class ImpliedBoundSeparatorTest {
 
     private fun holds(cut: Cut, x: DoubleArray): Boolean {

@@ -1171,11 +1171,10 @@ internal const val CUT_POOL_ROUNDS: Int = 8
  *  repeats deeper in the tree. */
 internal const val SEARCH_CUT_ROUNDS: Int = 4
 
-/** [RootRelaxationSize.cost] ceiling above which the harvest skips its shave/redundancy/equality probes:
- *  on a relaxation this large the per-candidate solves dominate the time budget and lose instances the
- *  search would otherwise solve. Calibrated from an mzn-bench A/B with a wide margin — the helped models
- *  measured ≤ ~48k (evilshop 155×155, the largest gain) while the cost regressions were ≥ ~1.6M
- *  (fast-food 501×1048, diameterc-mst 1797×4066), so the gap is two orders of magnitude. */
+/**
+ * [RootRelaxationSize.cost] ceiling for per-candidate shave, redundancy and equality probes.
+ * Bounds the cumulative cost of these solves during the root harvest.
+ */
 internal const val LP_HARVEST_MAX_RELAXATION_COST = 250_000L
 
 /** Inward relative rhs perturbation applied to strict rows for the float filter solve. */

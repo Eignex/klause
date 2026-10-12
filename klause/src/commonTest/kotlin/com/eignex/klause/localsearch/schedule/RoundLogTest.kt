@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/** [RoundLog] / [RoundAccumulator] statistics: counts, acceptance ratio, Welford moments. */
 class RoundLogTest {
 
     @Test

@@ -167,7 +167,7 @@ internal class SolveStatsSink(var backend: String, lpProbeRoute: LpRoute = LpRou
     fun elapsedMs(): Long = startMark?.elapsedNow()?.inWholeMilliseconds ?: 0L
 
     /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time uses the most
-     *  recent [start] / [stop] window; if [stop] hasn't been called yet, elapsed is read from now. */
+     *  recent [start] / [stop] window; if [stop] hasn't been called yet, elapsed uses the current clock. */
     fun snapshot(): SolveStats {
         val elapsedMs = endElapsedMs
             ?: startMark?.elapsedNow()?.inWholeMilliseconds

@@ -8,12 +8,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * How `--param` resolves the backtrack arm pool: which arms run, and how each is built.
- *
- * The two are independent — `bt-arm` chooses the arms, an override edits them — and a benchmarker
- * needs both at once to measure one knob on one arm rather than on a pool that dilutes it.
- */
 class BacktrackPoolResolutionTest {
 
     private fun pool(vararg params: String) = resolveBtRecipes(EngineParams(params.toList()), Kind.COP)

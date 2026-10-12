@@ -10,20 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Regression for #670. An interior-hole eq atom (`[v = k]` ruled out by a carve at `min < k < max`)
- * rests on its carve-time trail slot. If a later, deeper bound move crosses `k` while `k` sits below
- * the min / above the max, single-establishment [wakeAtom] leaves that first (carve) slot intact
- * rather than overwriting it with the bound move's level and reason. Backtracking the bound move
- * widens it back across `k`, so `k` is an interior hole again; the reversible atom trail restores
- * exactly the carve-time slot. Were the slot instead left citing the bound move, it would name a
- * bound atom no longer determined, at a level no longer on the trail, and conflict analysis would
- * ingest that undetermined atom and abort the solve ("ingest atom N at lower level undetermined").
- *
- * The invariant this guards: an atom's derived antecedents ([atomAntecedentsDerived]) must cite only
- * atoms that are currently determined — never one whose truth is undetermined — for every determined
- * atom, after any push/pop sequence.
- */
+// Undo restores the carve-time slot so hole-atom antecedents cite only determined atoms.
 class PropagationStateHoleEqAtomStaleReasonTest {
 
     private fun freshState(numVars: Int, hi: Int): PropagationState {
@@ -57,7 +44,7 @@ class PropagationStateHoleEqAtomStaleReasonTest {
         assertEquals(0, s.atomLevelForConflict(atom))
     }
 
-    /** No determined atom's derived antecedents may cite an undetermined atom (#670). */
+    /** No determined atom's derived antecedents may cite an undetermined atom. */
     private fun assertReasonsCiteOnlyDeterminedAtoms(s: PropagationState, where: String) {
         for (id in 0 until s.atoms.intVar.size) {
             if (s.atomCurrentTruth(id) == null) continue // undetermined atoms have no live reason
@@ -106,7 +93,7 @@ class PropagationStateHoleEqAtomStaleReasonTest {
         assertEquals(false, s.atomCurrentTruth(eqId), "hole at 2 still holds after backtrack")
 
         // The derived reason must be the carve premise [v1 <= 1] (determined true), not the stale
-        // [v0 >= 3] (undetermined after the widen). The crash was ingesting that undetermined atom.
+        // [v0 >= 3] is undetermined after the widen and cannot serve as an antecedent.
         val reason = assertNotNull(s.atomAntecedentsDerived(eqId))
         assertEquals(carveReason.toList(), reason.toList(), "hole eq atom must cite its carve reason")
         assertReasonsCiteOnlyDeterminedAtoms(s, "after backtrack")

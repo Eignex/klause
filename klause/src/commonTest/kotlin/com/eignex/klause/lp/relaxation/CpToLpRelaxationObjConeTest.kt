@@ -14,14 +14,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * #571: the objective-cone / precedence-only sub-relaxation. A scheduling-shaped problem — a
- * precedence chain feeding a makespan objective, plus big-M disjunctive [ReifiedLinear] ordering
- * rows — is relaxed both fully and in cone mode. Cone mode must (a) drop every disjunctive big-M
- * row and the ordering bools they introduce, leaving a strictly smaller model, and (b) still return
- * a valid lower bound: the critical-path length. The bound being a relaxation, it can never exceed
- * the full bound nor the true optimum, which the end-to-end solve confirms.
- */
 class CpToLpRelaxationObjConeTest {
 
     private val eps = 1e-9

@@ -25,10 +25,6 @@ import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Tests for the driver axis inputs: Break scoring, the schedule axis (weights, temperature), the
- * perturbation hook, and the configuration-checking filter.
- */
 class SourceDrivenStrategyAxisInputsTest {
 
     /** Infeasible-by-construction ring so the search stalls forever (weights keep bumping). */

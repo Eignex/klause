@@ -1,17 +1,7 @@
-% Override std/redefinitions-2.0.mzn. MiniZinc loads every version-keyed redefinitions file
-% (redefinitions-2.0.mzn, -2.1, … up to the running version) from the std library UNLESS the
-% solver library shadows it by basename. Those files carry decomposition *bodies* for builtins;
-% a solver that handles a builtin natively must shadow the file and drop the body, otherwise the
-% std decomposition wins (a body beats a bare `predicate p(...);` declaration elsewhere — so the
-% bare decls in our redefinitions.mzn alone are NOT enough).
-%
-% We keep the decompositions for builtins klause has no native consumer for, and let the int
-% array min/max pass through to klause's ArrayMinMax factor: `min([...])` / `max([...])` over a
-% var-int list lowers to array_int_minimum/array_int_maximum, and the std body here expands each
-% into a chain of n-1 pairwise int_min/int_max plus n intermediate vars — quadratic model blow-up
-% (e.g. road-cons: ~3300 int_min instead of ~520 native minimums) that throttles propagation.
-% array_int_minimum/array_int_maximum are bare-declared in redefinitions.mzn, so omitting their
-% bodies here makes them opaque builtins that the front-end maps to a single ArrayMinMax. (#492)
+% Solver files shadow versioned standard redefinitions by basename.
+% Integer array min/max remain bodyless, mapping directly to ArrayMinMax;
+% other predicates retain their decompositions. A body would override a bare
+% declaration from redefinitions.mzn.
 
 predicate bool_clause_reif(array [int] of var bool: as, array [int] of var bool: bs, var bool: b) =
   clause(as, bs ++ [b]) /\

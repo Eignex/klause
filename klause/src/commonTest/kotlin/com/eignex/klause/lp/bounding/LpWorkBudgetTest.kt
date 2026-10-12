@@ -4,13 +4,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * The adaptive node LP work budget.
- *
- * Every case here is a claim about what the *solve* said, never about what the search around it did —
- * that separation is the whole point, since a budget keyed on pruning cannot tell a useless relaxation
- * from one whose search has not yet produced an incumbent.
- */
 class LpWorkBudgetTest {
 
     private fun budget(initial: Long = 1_000L) = LpWorkBudget(minOps = 100L, maxOps = 100_000L, initialOps = initial)

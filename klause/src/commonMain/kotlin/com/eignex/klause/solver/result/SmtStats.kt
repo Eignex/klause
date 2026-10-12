@@ -71,7 +71,7 @@ data class SmtStats(
     val wideWitnessAccepted: Long = 0,
     /** Shared LP exact continuation invocation deltas. */
     val continuation: LpContinuationStats = LpContinuationStats(),
-    /** Common-engine source adapters, separate from retired cold-simplex counters. */
+    /** Common-engine source adapter counters. */
     val sourceLp: SourceLpWorkStats = SourceLpWorkStats(),
 ) {
     /** Combine independent solve slices. */

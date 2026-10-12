@@ -324,8 +324,8 @@ internal class ExactLinearInvariant(
         else -> (sum.big - bound).signum()
     }
 
-    // The value of the term `c·x`, now at [cur], that brings the body to [want]: exact when `bound − (sum − c·cur)`
-    // fits a `Long`, else estimated in `Double`. Null when an equality has no integer value for it.
+    // Target for `c·x` at [cur] and body truth [want]: exact if `bound − (sum − c·cur)` fits `Long`,
+    // otherwise estimated in `Double`. Null when an equality has no integer target.
     private fun proposedTarget(sum: Sum, c: Long, cur: Long, want: Boolean): Long? {
         if (sum.form == LONG) {
             val term = c * cur

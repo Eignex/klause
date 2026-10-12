@@ -18,14 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * Slicing a resumable search by nodes rather than by the clock.
- *
- * A slice measured in milliseconds pauses somewhere different on every run, and every counter
- * downstream of the search inherits that — which is why two identical invocations of the same model
- * report different `nodes` and `lpSolves`. A slice measured in nodes pauses at the same point in the
- * same tree every time, which is what makes a run's counters comparable at all.
- */
+// Node-based slices stop at reproducible points in the search tree.
 class ResumableNodeSliceTest {
 
     /** A minimisation wide enough to branch for a while rather than being refuted by propagation. */

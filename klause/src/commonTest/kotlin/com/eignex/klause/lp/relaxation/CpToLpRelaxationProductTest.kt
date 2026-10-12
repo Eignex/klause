@@ -12,11 +12,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Product McCormick envelope: `result = a·b`. The envelope is a *relaxation*, so its LP bound must
- * be **sound** — never cut off the true bilinear optimum over the box (an over-tight product hull is
- * the soundness failure). Layout: var 0 = a, 1 = b, 2 = result.
- */
 class CpToLpRelaxationProductTest {
 
     private val eps = 1e-7

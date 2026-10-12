@@ -48,7 +48,7 @@ object Dimacs {
         var triviallyUnsat = false
         var sawTrailer = false
 
-        @Suppress("DoubleMutabilityForCollection") // reset to a new list per clause
+        @Suppress("DoubleMutabilityForCollection")
         var current: IntArrayList? = null
         for (rawLine in source.lineSequence()) {
             val line = rawLine.trim()

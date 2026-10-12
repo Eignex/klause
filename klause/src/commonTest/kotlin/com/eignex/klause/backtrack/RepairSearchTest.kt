@@ -15,11 +15,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * The persistent LNS repair handle ([BacktrackSolver.openRepair], #644): one search re-seeded across
- * successive pin sets must stay correct — reusing the session (learned DB, LP) between fragments must not
- * let one repair's state corrupt the next.
- */
 class RepairSearchTest {
 
     @Test

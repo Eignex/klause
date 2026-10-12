@@ -21,11 +21,7 @@ import com.eignex.klause.util.subExact
  * conservative so it stays sound: required energy uses each task's **minimum** demand, **minimum**
  * duration and only **definitely-present** tasks (a lower bound on what must fit), while capacity uses
  * its **maximum** (an upper bound on what is available) — so a reported overflow is always real.
- *
- * Out of scope (deferred): energetic *cuts* added to the LP (they need a
- * time-indexed reformulation klause's start-variable LP does not have) and a Cumulative Lagrangian
- * subproblem via min-cost flow. Those overlap heavily with klause's existing theta-tree / edge-finding
- * propagation; this check is the sound, self-contained slice.
+
  */
 internal class CumulativeEnergeticBound(
     problem: Problem,

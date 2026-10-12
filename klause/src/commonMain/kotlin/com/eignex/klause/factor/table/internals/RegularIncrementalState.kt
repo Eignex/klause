@@ -10,16 +10,13 @@ import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.util.LongArrayList
 
 /*
- * Reversible, delta-driven GAC for [Regular] — the incremental counterpart to the full
- * forward+backward layered-DAG rebuild in Regular.propagate. The layered GAC keeps, per
- * layer, the set of DFA states forward-reachable from q0 and backward-co-reachable to an accepting
- * state; a symbol at position i survives iff some forward-reachable state at i transitions on it to a
- * backward-co-reachable state at i+1. Both layer-bitset arrays ride the engine undo trail
- * ([RevLongArray]), so a backtrack restores them in O(changed words) instead of triggering a rebuild,
- * and a forward fire recomputes only the layers a changed position actually propagates through (the
- * forward sweep climbs from the lowest dirty position until a layer is unchanged; the backward sweep
- * descends from the deepest changed layer likewise). Soundness is gated by enumerate-vs-brute under
- * full CDCL across deep backtracking (RegularTest) — a wrong reachability bit is an unsound prune.
+ * Reversible, delta-driven GAC for [Regular]. Each layer keeps DFA states forward-reachable
+ * from q0 and backward-reachable to accepting states. A symbol at position i survives iff a
+ * forward-reachable state at i transitions on it to a backward-reachable state at i+1.
+ *
+ * Layer bitsets live on the undo trail ([RevLongArray]), so backtracking restores changed words.
+ * The forward sweep starts at the lowest dirty position and stops at an unchanged layer;
+ * the backward sweep descends from the deepest affected layer with the same stopping rule.
  */
 internal class RegularIncrementalState(
     state: PropagationState,

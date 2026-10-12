@@ -1,20 +1,9 @@
 package com.eignex.klause.util
 
 /**
- * Read-only int→int lookup table backed by a flat [IntArray] indexed by `key - minKey`.
- * Keys outside `[minKey, minKey + values.size)` resolve to [absent]; callers that need a
- * "is key present" distinction beyond the sentinel can build the map with a sentinel
- * value the data never legitimately holds (`-1` for non-negative payloads, `Int.MIN_VALUE`
- * otherwise).
- *
- * Compared to a `Map<Int, Int>` from the stdlib this avoids autoboxing both keys and
- * values; the cost is one IntArray allocation sized to the key range. For sparse keys
- * (large range, few entries) it can waste memory — use [build] which transparently
- * falls back to a per-key linear-probed table in that case.
- *
- * Use this for per-factor caches keyed by variable id, since var ids are dense by
- * construction in klause's allocator. Examples: `Cardinality.signedOccurrencesByVar`,
- * `AllDifferent.occurrencesByVar`, `Clause.litIndexByVar`.
+ * Read-only primitive Int-to-Int map. [build] selects a dense offset array or sparse
+ * linear-probed table. Missing keys return [absent]; use a sentinel outside the
+ * payload range when callers need to distinguish absence.
  */
 internal class IntIntMap private constructor(
     private val minKey: Int,

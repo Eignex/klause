@@ -6,11 +6,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * [LinearObjective.singleIntObjective] recognises the objective as one integer variable. Callers treat
- * that variable as standing for the whole objective — LP bounding posts its relaxation bound onto it —
- * so the recognition has to fail whenever any other term carries cost.
- */
 class LinearObjectiveTest {
     @Test
     fun `coefficient buffers cannot change an objective value`() {

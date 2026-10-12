@@ -13,12 +13,6 @@ import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * #655 (Tranche B): the degree + channel arc relaxation of [Subcircuit]. The model is the permutation
- * polytope (self-loop = excluded node), a sound assignment relaxation — it must never change the
- * optimum, and (unlike Circuit) it registers no subtour-elimination model, since the Hamiltonian SEC
- * is unsound for a subcircuit.
- */
 class CpToLpRelaxationSubcircuitArcTest {
 
     /** [openSuccAbove] marks `succ[0]`'s upper endpoint as one the finite lane invented rather than one

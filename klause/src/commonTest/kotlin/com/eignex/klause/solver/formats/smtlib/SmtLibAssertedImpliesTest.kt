@@ -9,10 +9,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * An asserted top-level `=>` is a clause. `(=> a1 .. an)` is right-associative so it holds exactly when
- * some antecedent fails or the consequent holds which is `!a1 or .. or !a(n-1) or an`.
- */
 class SmtLibAssertedImpliesTest {
 
     private fun SmtLibProblem.bounded(): Problem = model.bake()

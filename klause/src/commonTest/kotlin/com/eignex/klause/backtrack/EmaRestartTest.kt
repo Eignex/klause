@@ -4,11 +4,6 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * EMA-based adaptive restart (Biere-Fröhlich): [EmaRestart] restarts when the fast LBD average runs
- * hotter than the slow one, unless trail-size blocking defers it. A fast fast-alpha and slow slow-alpha
- * make the trigger deterministic within a few conflicts.
- */
 class EmaRestartTest {
 
     private fun detector(warmup: Int = 8) =

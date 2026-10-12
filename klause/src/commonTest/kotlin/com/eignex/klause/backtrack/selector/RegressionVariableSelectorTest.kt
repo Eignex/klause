@@ -14,8 +14,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-/** The LinUCB variable heuristic only reorders branching choices, so every verdict must stay
- *  correct regardless of what the per-session model learns. */
 class RegressionVariableSelectorTest {
 
     @Test

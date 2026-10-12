@@ -181,13 +181,11 @@ class LpConfig(val emphasis: LpEmphasis = LpEmphasis.DEFAULT, val overrides: Map
     /** Predefined configs and the spec-string [parse]r. */
     companion object {
         /**
-         * The library default — [LpEmphasis.DEFAULT], no overrides: the `FAST` and `MEDIUM` tiers, so
-         * the simplex bounds and no cut separator runs (`cuts` being `EXHAUSTIVE`).
+         * The library default: [LpEmphasis.DEFAULT] with no overrides, permitting `FAST` and `MEDIUM`
+         * techniques. The simplex supplies bounds; cut separators require `EXHAUSTIVE`.
          *
-         * A bare `klause-cli` invocation does not apply this; it applies [AGGRESSIVE], which on a
-         * pooled route means "do not cap the arms" and on a single-solver route becomes a literal
-         * emphasis. See #1887 — the two readings need separating, and this is not the place that
-         * decides between them.
+         * The CLI applies [AGGRESSIVE]: it leaves pooled arms uncapped or selects aggressive emphasis
+         * for a single solver.
          */
         val AUTO = LpConfig(LpEmphasis.DEFAULT)
 

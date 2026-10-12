@@ -10,37 +10,18 @@ import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
 /**
- * Conflict-History-Based branching (Liang-Ganesh-Poupart-Czarnecki, "Learning Rate Based
- * Branching Heuristics for SAT Solvers", SAT 2016) in its ERWA (exponential recency
- * weighted average) form. A drop-in [VariableSelector] alternative to [Vsids] for
- * SAT-heavy configs: as cheap to maintain, and frequently stronger on structured SAT.
+ * Conflict-history branching using exponential recency weighted averages (Liang, Ganesh,
+ * Poupart and Czarnecki, "Learning Rate Based Branching Heuristics for SAT Solvers", SAT 2016).
+ * Each variable carries `Q(v) ← (1 − α)·Q(v) + α·r`, with
+ * `r = multiplier / (conflicts − lastConflict(v) + 1)`.
  *
- * Each variable carries a score `Q[v]`, updated by exponential recency weighting on every
- * event the variable participates in:
- *     `Q[v] ← (1 − α)·Q[v] + α·r,   r = multiplier / (conflicts − lastConflict[v] + 1)`
- * The reward `r` is *larger* the more recently `v` took part in a conflict (a smaller
- * denominator), and `multiplier` is [conflictReward] (1.0) for the variables in the conflict
- * reason set and [assignReward] (0.9) for variables merely assigned along the way — the
- * standard CHB split that values conflict participation above plain propagation. The step
- * size α starts at [alphaStart] and decays by [alphaStep] per conflict down to [alphaFloor],
- * so early conflicts move scores fast and the estimate settles as evidence accumulates.
+ * [onConflict] advances the conflict counter, decays α from [alphaStart] by [alphaStep] to
+ * [alphaFloor], and rewards reason variables and the failed decision with [conflictReward].
+ * [onPropagation] and [onCommit] use [assignReward], discounted by conflict recency.
+ * [onRestart] retains scores.
  *
- * Picks the unpinned variable with the highest `Q`. Ties follow the heap order.
- * Scores persist across [onRestart] — like VSIDS, the learned ordering is the
- * point. Uses the same combined-id [IndexedMaxHeap] and pinned-skip pick machinery as [Vsids], so
- * it drops into the [com.eignex.klause.backtrack.BacktrackParams.variableSelector] slot with
- * no engine changes.
- *
- * Hook mapping (exactly the hooks VSIDS already consumes):
- *  - [onConflict] — advances the conflict counter, decays α, and bumps every variable in the
- *    conflict reason set (and the failed decision, once) with the conflict multiplier; those
- *    variables' `lastConflict` is set to the current count, so their reward denominator is 1.
- *  - [onPropagation] / [onCommit] — assigned-variable reward, recency-discounted by how long
- *    ago the variable last appeared in a conflict.
- *  - [onRestart] — no-op; scores persist.
- *
- * Since every `Q` is a convex combination of rewards in `[0, 1]`, scores stay in `[0, 1]` and
- * never need rescaling (unlike VSIDS's growing increment).
+ * Picks the highest-scoring unpinned variable through [IndexedMaxHeap]; ties follow heap order.
+ * Scores are convex combinations of rewards in `[0, 1]` and need no rescaling.
  */
 class Chb(
     private val alphaStart: Double = 0.4,

@@ -29,13 +29,12 @@ interface RestartPolicy {
      *  including infeasible improvements. Initialization and post-publication restarts pass null. */
     fun restart(state: LocalSearchState, bestSoFar: Sample?)
 
-    /** Clear per-solve mutable state (tracked incumbents, perturbation strength, cadence position)
-     *  so a policy instance reused across solves — e.g. a tuning campaign running one recipe over
-     *  many problems — starts each solve clean. A stale incumbent from an earlier problem can even
-     *  carry a different variable arity, which the anchor/crossover paths then index against the new
-     *  problem's dimensions. [ScheduleBundle][com.eignex.klause.localsearch.schedule.ScheduleBundle]
-     *  deliberately leaves the restart policy out of its adaptive-member reset; the engine calls
-     *  this at the start of every solve instead. Stateless policies keep the default no-op. */
+    /**
+     * Clears per-solve incumbents, perturbation strength and cadence position so state from another
+     * problem cannot affect the next solve. The engine calls this at solve start;
+     * [ScheduleBundle][com.eignex.klause.localsearch.schedule.ScheduleBundle] excludes it from adaptive-member resets.
+     * Stateless policies use the default no-op.
+     */
     fun reset() {}
 }
 

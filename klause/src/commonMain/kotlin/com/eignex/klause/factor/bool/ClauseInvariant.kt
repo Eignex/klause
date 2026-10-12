@@ -11,7 +11,6 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.IntIntMap
 
-/** LS invariant for [Clause]: watched-literal violation tracking and break/make maintenance. */
 internal class ClauseInvariant private constructor(private val clause: Clause? = null) : Invariant {
 
     private val litIndexByVar: IntIntMap? = clause?.literals?.let { literals ->
@@ -164,15 +163,16 @@ internal class ClauseInvariant private constructor(private val clause: Clause? =
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    /** O(arity) — but typically O(1) — update of break/make counts after [flippedVar] is flipped.
+    /**
+     * Update break/make counts after [flippedVar] is flipped. Only transitions of `numTrueLits`
+     * between 0, 1 and 2 change contributions:
+     *  - `0→1`: [flippedVar] is the sole true literal and gains a break.
+     *  - `1→0`: every variable becomes a make candidate.
+     *  - `1→2`: the former sole true literal loses its break.
+     *  - `2→1`: the remaining true literal gains a break.
      *
-     *  Only the 0↔1 and 1↔2 transitions of `numTrueLits` change break/make contributions:
-     *   - `0→1`: clause was violated; now critically sat with [flippedVar] as the critical literal.
-     *   - `1→0`: critical was [flippedVar]; now violated; every var becomes a make candidate.
-     *   - `1→2`: previous critical (now non-critical) loses its break.
-     *   - `2→1`: the remaining true literal becomes critical and gains a break.
-     *
-     *  Transitions 2↔3, 3↔4, ... touch no break/make state. */
+     * Transitions among counts above 1 leave break/make counts unchanged. O(arity), typically O(1).
+     */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val clause = clause(state, factorId)
         val literals = clause.literals

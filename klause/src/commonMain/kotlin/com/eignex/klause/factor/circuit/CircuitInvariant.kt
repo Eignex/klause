@@ -7,8 +7,6 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
 
-/** LS implementation for [Circuit]: violation scoring and move proposal for the Hamiltonian-cycle
- *  constraint. */
 internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearchState, Int, Long) -> Int) :
     SuccessorCycleInvariant(succ, n, computeCost) {
 

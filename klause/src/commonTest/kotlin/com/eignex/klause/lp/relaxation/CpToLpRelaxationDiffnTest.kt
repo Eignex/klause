@@ -15,13 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * #655 (Tranche C): the per-axis cumulative energetic / area bound for [Diffn]. A constant-size diffn
- * projects onto each axis as a cumulative (capacity = the maximum perpendicular extent), so the
- * energetic makespan row lower-bounds a strip-length variable `L ≥ xs(i) + widths(i)`. Its `t1 = min-est`
- * case is the area bound `Σ wᵢ·hᵢ ≤ W·H`. The row is a sound relaxation, so the LP bound never exceeds
- * the true minimum extent — checked against brute force.
- */
 class CpToLpRelaxationDiffnTest {
 
     private val eps = 1e-6

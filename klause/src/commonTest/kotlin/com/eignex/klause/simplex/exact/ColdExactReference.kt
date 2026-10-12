@@ -27,7 +27,7 @@ internal enum class ExactSimplexStage { FRAC128, DIRECT_BIG, ESCALATED_BIG }
 /** Decisive or undecided result of an exact-simplex attempt. */
 internal enum class ExactSimplexRunResult { FEASIBLE, INFEASIBLE, UNKNOWN }
 
-/** Why a Frac128 run was replaced by an arbitrary-precision rerun. */
+/** Reason for escalating a Frac128 attempt to arbitrary precision. */
 internal enum class Frac128Escalation { INPUT, OVERFLOW }
 
 /** Optional kernel-local telemetry observer for exact simplex calls. */
@@ -169,15 +169,9 @@ internal fun exactBoundedRows(
 }
 
 /**
- * Whether the recession cone of [rows] carries a direction along which [activity] strictly decreases,
- * or `null` when the exact run was cut short.
- *
- * Such a direction exists exactly when `A*d <= 0` together with `a*d <= -1` is feasible, so the test
- * needs no numeric search radius and remains valid for coefficients and rational literals of arbitrary
- * precision. Strictness is intentionally ignored: it changes feasible offsets, not the recession cone.
- *
- * The affirmative answer is what a caller can build on. A cone direction is a ray of the system itself,
- * so an activity that descends along one is unbounded below over every point of it.
+ * Whether `A*d <= 0` and `activity*d <= -1` is exactly feasible, or null on interruption.
+ * A feasible cone direction proves the activity unbounded below. Strict rows have the same
+ * recession cone, so their strictness does not affect this test.
  */
 internal fun exactDescendingDirection(
     rows: List<ExactRationalInequality>,
@@ -204,13 +198,9 @@ internal fun exactDescendingDirection(
 }
 
 /**
- * Construct the Double-Bounded Reduction split for an exact rational inequality system.
- *
- * The homogeneous cone first identifies precisely the rows with finite lower activity. Each of those
- * activities is then minimized over the original system, yielding the explicit `lower <= a*x <= rhs`
- * row required by the bounded branch-and-bound phase. Rows without a finite lower activity are retained
- * by index as the absolutely unbounded lane used later for mixed witness extension. No result is exposed
- * if cancellation interrupts either phase.
+ * Splits rows by finite lower activity using homogeneous cone tests. Minimizing each bounded
+ * activity yields its explicit `lower <= a*x <= rhs` row; unbounded row indices support mixed
+ * witness extension. Cancellation exposes no partial reduction.
  */
 internal fun exactDoubleBoundedSplit(
     rows: List<ExactRationalInequality>,
@@ -252,16 +242,10 @@ internal fun exactDoubleBoundedSplit(
 }
 
 /**
- * Construct a mixed witness for an absolutely unbounded system.
- *
- * The rational columns are kept at the exact centre returned by simplex.  Every integer column is
- * rounded from a centre whose row right-hand side has been reduced by half that row's integer
- * one-norm.  The unit cube around the centre therefore remains inside every row.  Strict rows keep
- * their strict endpoint, so rounding cannot turn a valid strict centre into a boundary point.
- *
- * For the split systems produced by Double-Bounded Reduction, Lemma 22 of Bromberger's reduction
- * supplies exactly the absolute-unboundedness premise.  A null result is consequently reserved for
- * cancellation or an interrupted exact solve; callers must not substitute a finite search box.
+ * Constructs a mixed witness by reducing each rhs by half its integer one-norm, then rounding
+ * integer coordinates of the exact simplex centre. The surrounding unit cube satisfies every
+ * row; strict endpoints remain strict. Lemma 22 of Bromberger's reduction establishes absolute
+ * unboundedness for the split systems. Null denotes cancellation or an interrupted exact solve.
  */
 internal fun exactMixedUnitCubeSolution(
     rows: List<ExactRationalInequality>,
@@ -440,14 +424,9 @@ private fun bigRationalOutcomeUnobserved(
 }
 
 /**
- * Minimize a structural-column activity in arbitrary-precision arithmetic.
- *
- * The feasibility phase is the same Bland-style bounded-variable simplex used by
- * [bigRationalOutcome].  Once it has a feasible basis, primal pivots choose the least-index improving
- * non-basic column and the least-index tied blocker.  This is the exact optimization primitive needed
- * by Double-Bounded Reduction to materialize a row's finite lower activity, rather than replacing it
- * with an arbitrary witness radius.  Strict rows are optimized over their closure: their infimum is a
- * valid lower activity even when strictness prevents it from being attained.
+ * Minimizes an activity with exact bounded-variable simplex. Bland-style primal pivots choose
+ * the least-index improving column and tied blocker. Strict rows use their closure, whose
+ * infimum remains a valid lower activity even when unattained.
  */
 internal fun bigRationalMinimum(
     model: ExactSimplexModel,
@@ -914,24 +893,12 @@ private class SimplexState<F>(
 private class ObjectiveBlocker(val row: Int, val upper: Boolean)
 
 /**
- * Row-major sparse storage for the feasibility tableau: per row the column indices in strictly
- * ascending order with their values, plus per column a list of the rows holding a nonzero. A dense
- * `m x (n + m)` tableau is quadratic in the model size whatever its sparsity, and it is materialized
- * before the first pivot, so neither the pivot cap nor the cancellation token can intervene; here the
- * initial storage is the model's own nonzero count and growth is paid pivot by pivot, where both do.
+ * Sparse tableau with ascending column indices per row and row lists per column. Initial storage
+ * is proportional to nonzeros; pivots merge sorted rows and drop exact cancellations. Fill-in grows
+ * storage under the pivot cap and cancellation token.
  *
- * A pivot is a sequence of row combinations `row_i ← row_i − f·row_p`, each a two-pointer merge of
- * two ascending index lists in the style of Gustavson, "Two Fast Algorithms for Sparse Matrices:
- * Multiplication and Permuted Transposition", ACM TOMS 4(3), 1978. Exact cancellations are dropped,
- * so a row's length is its true nonzero count and a row that genuinely densifies simply grows to
- * dense — it degrades rather than declining the model. Fill-in is not steered by a pivot order (the
- * feasibility rule fixes the pivot, unlike Markowitz, "The Elimination Form of the Inverse and its
- * Application to Linear Programming", Management Science 3(3), 1957), so a long pivot chain can
- * still fill in; the pivot cap and the cancellation token are what bound that.
- *
- * The per-column row lists are a superset: fill-in appends a row, an exact cancellation does not
- * remove it. [columnRows] re-verifies every entry against the row and compacts in place, so a stale
- * entry costs one search and never accumulates.
+ * Column row lists retain cancelled entries. [columnRows] checks and compacts them in place so stale
+ * entries do not accumulate.
  */
 private class SparseTableau<F>(private val ops: FracOps<F>, m: Int, total: Int) {
     private val cols = Array(m) { EmptyIntArray }

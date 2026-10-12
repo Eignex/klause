@@ -1,4 +1,4 @@
-% Auto: keep `inverse` native (klause has a factor for it) instead of the std decomposition.
+% Maps `inverse` to its native factor.
 predicate klause_inverse(array [int] of var int: f, array [int] of var int: invf);
 
 predicate fzn_inverse(array [int] of var int: f, array [int] of var int: invf) =

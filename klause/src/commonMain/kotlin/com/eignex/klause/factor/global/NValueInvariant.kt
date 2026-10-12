@@ -13,7 +13,6 @@ import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap
 
-/** LS invariant logic for `nvalue`. */
 internal class NValueInvariant(
     private val n: Int,
     private val xs: IntArray,

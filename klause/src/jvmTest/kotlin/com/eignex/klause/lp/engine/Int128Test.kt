@@ -9,12 +9,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The portable 128-bit accumulator must agree exactly with an arbitrary-precision oracle across
- * add / multiply / shift / floor- and ceil-div, including the signed edge cases, and must latch
- * [Int128.overflow] rather than wrap. The oracle here is [java.math.BigInteger]; [Int128] is pure
- * platform-independent Kotlin (no `expect`/`actual`), so JVM coverage exercises every target's logic.
- */
 class Int128Test {
 
     private val two64: BigInteger = BigInteger.ONE.shiftLeft(64)

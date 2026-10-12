@@ -21,26 +21,15 @@ import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.toSortedLongArray
 
 /*
- * Reversible, delta-driven GAC for the constant-array element constraint `result = arr(idx)` — the
- * incremental counterpart to Element.propagateConstArray's full O(idx + result + len) rescan + per-
- * prune O(span) domain rebuild on every fire. That rebuild-each-fire shape is the dominant per-node
- * cost on element-heavy instances (liner-sf: ~28 O(span) excludeValues rebuilds/node).
+ * Reversible GAC for the constant-array element constraint `result = arr(idx)`.
  *
- * State (ElementConstState, stored in refPayload like ReginCache):
- *  - A *support count* per distinct constant value: how many live idx positions hold it. result value
- *    v is GAC-supported iff some surviving position holds v, i.e. supportCount[id(v)] > 0; idx value
- *    iv (position pos) is supported iff its constant arr[pos] is still a live result value. The counts
- *    ride the engine undo trail (RevIntArray), so a backtrack restores them in O(changes) and the next
- *    forward fire only accounts for the values that actually left.
- *  - Per-var reversible domain refs (domRefIdx/domRefResult): the fixpoint domains at the last fire,
- *    used to compute the delta. They roll back with the domains, so after a backtrack domRef == the
- *    restored domain and the delta is empty until the next forward narrowing.
+ * A support count per distinct constant value records how many live index positions hold it:
+ * result value v is supported iff supportCount(id(v)) > 0; index position pos is supported iff
+ * arr(pos) remains in the result domain. Counts and fixpoint domain references live on the undo
+ * trail, so a fire processes domain removals and backtracking restores the prior fixpoint.
  *
- * Each fire reaches the GAC fixpoint in ONE pass via an internal cascade worklist (an idx removal can
- * zero a result value's support → prune it → which kills idx positions holding that constant → …),
- * instead of relying on repeated re-fires. A pruned result value cites the idx positions that held it,
- * a pruned idx position the result value it held. Soundness is gated by the brute-force assertGac
- * oracle (AllFactorsOracle) and ElementTest across deep backtracking.
+ * An internal worklist cascades index and result removals to a GAC fixpoint. A pruned result
+ * value cites the index positions that hold it; a pruned index cites its result value.
  */
 
 /** Per-`Element` reversible state for incremental constant-array GAC. Built once per factor (the

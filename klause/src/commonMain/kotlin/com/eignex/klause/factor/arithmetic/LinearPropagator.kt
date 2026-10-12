@@ -11,7 +11,6 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
-/** CP propagator for [Linear]: bounds propagation and conflict reasons. */
 internal class LinearPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,

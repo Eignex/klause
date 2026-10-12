@@ -11,11 +11,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Behaviour tests for the at-most-one clique-swap source [CliqueSwap]: a clique with one member on
- * yields swaps that relocate the on member, an over-full clique yields a repair, and every emitted
- * compound applies and reverts cleanly.
- */
 class CliqueSwapTest {
 
     /** A single at-most-one clique over three positive literals on bool vars 0,1,2. */

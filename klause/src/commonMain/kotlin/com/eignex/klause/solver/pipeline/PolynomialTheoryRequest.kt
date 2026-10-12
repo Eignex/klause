@@ -67,7 +67,7 @@ data class PolynomialTheoryParams(
     }
 }
 
-/** Native arithmetic counters; these units are separate from legacy open-theory work. */
+/** Native arithmetic counters; these units are separate from open-theory work. */
 data class PolynomialTheoryStats(
     /** Number of captured projection polynomials. */
     val projectedPolynomials: Long = 0,

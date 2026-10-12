@@ -8,23 +8,14 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.OriginCounts
 
 /**
- * Two-watched-literal BCP over the arena-packed clauses of a pure-Boolean problem.
- * Replaces the general [PropagationState.runToFixpoint] factor-queue loop for a
- * native-SAT-eligible propagation problem: no order-literal atoms are ever
- * materialised, so the driver degenerates to classical CDCL, and propagation runs as a trail-pointer
- * literal sweep with no per-fire virtual dispatch, factor-object dereference, or payload cast.
+ * Two-watched-literal BCP for arena-packed pure-Boolean problems. A trail-pointer literal sweep
+ * avoids factor dispatch and order-literal atoms. The general lane's trail, pin machinery,
+ * antecedents and [ConflictAnalyzer] remain shared.
  *
- * Reuse boundary: this owns only the BCP inner loop and the clause watch state. The trail
- * ([PropagationState.boolPinOrder]), the pin machinery ([PropagationState.pinLit] / `pinBoolImpl`,
- * which records reasons, levels, and antecedents), 1UIP conflict analysis, VSIDS, restarts, and the
- * search driver are shared with the general lane — a forced unit records the same antecedent set (the
- * clause's other literals) the general path records, so [ConflictAnalyzer] reads it identically.
- *
- * Watches are advisory mutable state, rebuilt per session and allowed to drift across backtrack: the
- * two watched literals of clause `h` sit at within-clause indices `watchPos[2h]` / `watchPos[2h+1]`, and
- * `watchEntries[L]` lists the clauses watching literal `L`. Base-clause literals live in the shared,
- * immutable [ClauseArena]; learned clauses append into a growable side buffer. Watch relocation moves
- * indices, never the literals, so the arena stays shareable read-only.
+ * Watch positions `watchPos(2h)` and `watchPos(2h+1)` index the two watched literals of clause `h`;
+ * `watchEntries(L)` lists clauses watching `L`. Watches are rebuilt per session and may drift
+ * across backtracking. Base literals stay in the immutable [ClauseArena]; learned clauses use
+ * a growable side buffer. Relocation moves indices and leaves the arena shareable read-only.
  */
 internal class NativeSatState(private val state: PropagationState) {
 

@@ -6,13 +6,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * What a solve reports about its own cost when it has no result to report it on.
- *
- * A dual-unbounded termination returns null, and on a model whose relaxation is often infeasible that is
- * most of the solves. Reading pivots off the result alone therefore drops exactly the solves that prune,
- * which is why the engine carries the count itself.
- */
 class RevisedSimplexSolveCostTest {
 
     /** `x + y >= 8` and `x + y <= 7` over `[0, 5]²` — infeasible after one valid pivot. */

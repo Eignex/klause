@@ -79,8 +79,8 @@ sealed interface SampleResult {
 }
 
 /**
- * Result of [com.eignex.klause.solver.Optimizer.minimize]. Replaces `Sample?` with an explicit verdict so
- * "best-effort feasible at objective o" can't be confused with "proven optimal."
+ * Result of [com.eignex.klause.solver.Optimizer.minimize], distinguishing feasible incumbents
+ * from proven optimality.
  * Only complete backends (`BacktrackSolver`, `BruteForceSolver`) can
  * ever return [Optimal] or [Infeasible], and only the backtrack backend [Unbounded];
  * the local-search backend returns [BestFound] or [Unknown].

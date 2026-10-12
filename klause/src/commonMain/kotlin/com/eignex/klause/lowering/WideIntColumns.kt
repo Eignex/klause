@@ -6,17 +6,9 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.toLongExact
 
 /**
- * A wide integer quantity rewritten as digit columns.
- *
- * [columns] are the variables standing for the digits, least significant first, and the value is
- * `Σᵢ dᵢ·2^(width·i)`. Every digit but the last ranges over `[0, 2^width)`; the most significant one
- * ranges over `[−2^width, 2^width)` and carries the sign.
- *
- * The signed leading digit is what makes the encoding a *bijection*: every value in range has exactly
- * one digit vector, because the leading digit is the quotient by `2^(width·(n−1))` and the rest is its
- * remainder. Carrying the sign instead as the difference of two non-negative vectors would give a single
- * value as many representations as a digit has values, and search would wander through all of them
- * before deciding anything.
+ * Signed digit encoding `Σᵢ dᵢ·2^(width·i)`. [columns] are least significant first. All digits
+ * range over `[0, 2^width)` except the leading digit, which ranges over `[−2^width, 2^width)`.
+ * The leading quotient and lower remainder give each in-range value exactly one representation.
  */
 internal class WideIntColumns(val columns: IntArray, val width: Int) {
     /** `2^(width·i)` per digit position, the coefficient a rewritten row multiplies each digit by. */
@@ -24,18 +16,10 @@ internal class WideIntColumns(val columns: IntArray, val width: Int) {
 }
 
 /**
- * Allocate digit columns for a quantity reaching [magnitude], appearing with coefficients up to
- * [maxCoeff]. [fresh] supplies a new variable index per call, receiving the digit's inclusive bounds so
- * the caller can give the column its domain.
- *
- * Returns null when [maxCoeff] leaves no usable digit width ([WideIntDigits.NO_ROOM]): the coefficient
- * itself is out of range there, so the row belongs to the wide-coefficient propagators rather than to
- * this decomposition.
- *
- * The width is chosen so that `maxCoeff · 2^width` stays inside `Long`, which keeps the ordinary bound
- * reasoning working at the least significant position — decomposing alone is not enough, because a
- * propagator that overflows multiplying a coefficient by a domain bound stops deriving the bound and the
- * row silently loses its refutation strength while still admitting solutions.
+ * Allocate digit columns for [magnitude] with row coefficients up to [maxCoeff]. [fresh]
+ * receives each digit's inclusive bounds. Width keeps `maxCoeff · 2^width` inside `Long` so
+ * ordinary bound propagation remains usable. Returns null ([WideIntDigits.NO_ROOM]) when
+ * no digit width fits; such coefficients require wide-coefficient propagation.
  */
 internal fun wideIntColumns(magnitude: BigInt, maxCoeff: BigInt, fresh: (Long, Long) -> Int): WideIntColumns? {
     val width = WideIntDigits.widthFor(maxCoeff)

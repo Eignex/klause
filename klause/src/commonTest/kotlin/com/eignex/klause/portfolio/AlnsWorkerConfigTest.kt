@@ -17,10 +17,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * The hybrid-ALNS engine (#644): a diverse pool of ALNS arms cycling the curated regimes, mirroring the
- * LS/backtrack catalogs, with [EngineMix.ALNS] composing one arm per requested slot.
- */
 class AlnsWorkerConfigTest {
 
     @Test

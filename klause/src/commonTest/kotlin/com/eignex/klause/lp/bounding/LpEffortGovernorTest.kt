@@ -5,11 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * When the node LP stops earning its keep, and on what evidence.
- *
- * Work per node decides the adaptive effort; a cumulative work allowance caps optional LP work.
- */
 class LpEffortGovernorTest {
 
     private fun governor(opsPerNode: Long = 1_000L, allowance: Long = 5_000_000L, warmup: Int = 4) =

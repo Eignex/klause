@@ -7,12 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * The shared cross-engine incumbent port (#644) both [LocalSearchSolver] and
- * [com.eignex.klause.meta.alns.Alns] drive: publication reaches the exchange and nowhere else, and an
- * import is adopted only when its version is new and it is strictly better — inert under assumption
- * pins or without an exchange.
- */
 class PooledIncumbentsTest {
 
     private val sample = Sample(booleanArrayOf(true), LongArray(0))

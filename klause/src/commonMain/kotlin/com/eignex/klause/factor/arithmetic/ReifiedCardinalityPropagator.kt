@@ -6,7 +6,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
-/** CP propagator for [ReifiedCardinality]: reified cardinality propagation. */
 internal class ReifiedCardinalityPropagator(
     private val auxBoolVar: Int,
     private val literals: IntArray,

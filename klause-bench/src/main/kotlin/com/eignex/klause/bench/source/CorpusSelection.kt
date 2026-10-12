@@ -112,7 +112,7 @@ internal object CorpusSelection {
          *  e.g. XCSP3, where `AircraftAssemblyLine-1-178-00-0_c23` groups under `AircraftAssemblyLine`
          *  via the series prefix, so `per-family` samples across series instead of near-identical
          *  parameterizations. A `*.ext.zst` file is the same instance stored compressed, named without the
-         *  suffix; when both forms are present (a cache mid-migration) the instance is listed once. */
+         *  suffix; when both forms are present the instance is listed once. */
         data class Flat(
             val subDir: String,
             val ext: String,
@@ -147,10 +147,7 @@ internal object CorpusSelection {
     ): List<ProblemRef> {
         val root = CorpusFetcher.ensure(collection)
         val discovered = layout.discover(root)
-        // A layout prefix that does not match what the archive actually unpacks finds nothing, and an
-        // empty suite is indistinguishable downstream from a suite that ran and changed nothing - the
-        // failure mode that makes a measurement read as a clean negative result. Fail where the cause is
-        // still visible.
+        // Reject empty discovery so a mismatched archive layout cannot look like a completed measurement.
         require(discovered.isNotEmpty()) {
             "corpus '${collection.id}' yielded no instances under '$layout' in $root: " +
                 "the layout prefix does not match the fetched tree"
@@ -234,7 +231,7 @@ internal object CorpusSelection {
             ?.sortedBy { it.name } ?: return emptyList()
         val out = ArrayList<Discovered>()
         for (pd in families) {
-            // This legacy model uses the is_output annotation undefined in current MiniZinc.
+            // The model uses an is_output annotation undefined in MiniZinc.
             if (pd.relativeTo(root).path == "2010/depot_placement") continue
             val candidates = pd.listFiles { f -> f.isFile && f.extension == "mzn" }?.toList()
                 ?: pd.walkTopDown().maxDepth(3).filter { it.isFile && it.extension == "mzn" }.toList()

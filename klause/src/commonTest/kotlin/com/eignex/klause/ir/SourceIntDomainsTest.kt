@@ -8,10 +8,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * What a source model declares about a column, stated by the declaration itself: the range it admits and,
- * where it admits less than that range, the value set. Which engine owns the column is not part of it.
- */
 class SourceIntDomainsTest {
 
     private fun openUpperBounds(): IntBounds = IntBounds.fromModelBounds(

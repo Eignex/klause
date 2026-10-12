@@ -5,7 +5,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
 /**
- * Column-wise undo journal for [PropagationState] (replaces per-level full-array snapshots).
+ * Column-wise undo journal for [PropagationState].
  *
  * Each mutation that a pop must rewind appends one record capturing the cell's *prior* value. A pop
  * replays records from the top down to a [PropagationState.LevelMark]'s undo size —

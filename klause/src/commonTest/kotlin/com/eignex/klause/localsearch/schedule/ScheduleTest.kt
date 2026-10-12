@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/** Temperature trajectories for the SA schedules. All deterministic — no RNG involved. */
 class ScheduleTest {
 
     @Test

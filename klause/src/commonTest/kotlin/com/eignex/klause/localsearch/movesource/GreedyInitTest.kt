@@ -20,11 +20,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Behaviour test for the [GreedyInit] restart initializer. It is not a candidate generator (it
- * mutates in place), so the equivalence harness does not apply; instead this pins the two properties
- * the engine relies on: a forward pass reduces violation, and it is deterministic for a fixed seed.
- */
 class GreedyInitTest {
 
     @Test

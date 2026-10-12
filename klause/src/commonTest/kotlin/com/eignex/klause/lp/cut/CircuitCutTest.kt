@@ -15,12 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * #22 genuine subtour elimination for Circuit: the arc-indicator relaxation plus the max-flow
- * [CircuitSeparator]. The degree rows make the LP optimum a permutation; when that permutation is a
- * union of subtours, the separator must find a directed cutset inequality it violates, and that cut
- * must exclude no real Hamiltonian tour.
- */
 class CircuitCutTest {
 
     private val eps = 1e-7
@@ -119,7 +113,7 @@ class CircuitCutTest {
     @Test
     fun `arc relaxation is gated on candidate-arc count not node count`() {
         // n=30 (30·29 = 870 arcs ≤ MAX_CIRCUIT_ARCS) builds; n=40 (1560 arcs) exceeds the cap and is
-        // skipped, so the gate works both ways (#431).
+        // skipped, so the gate works both ways.
         fun fullCircuit(n: Int): LpRelaxation {
             val p = Problem(
                 numBoolVars = 0,

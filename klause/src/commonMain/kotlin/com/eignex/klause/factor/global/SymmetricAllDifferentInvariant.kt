@@ -7,7 +7,6 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
 
-/** LS invariant logic for `symmetric_all_different`. */
 internal class SymmetricAllDifferentInvariant(private val xs: IntArray, private val indexOffset: Int) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =

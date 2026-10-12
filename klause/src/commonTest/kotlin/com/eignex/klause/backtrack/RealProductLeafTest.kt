@@ -11,13 +11,6 @@ import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertIs
 
-/**
- * The [RealProduct] leaf verdict (issue #1232, Phase 7): `result = intOperand · realOperand` over an
- * integer CP variable and LP-only continuous columns. At a leaf the integer operand is fixed, so the
- * product is the exact linear equality `result = k · realOperand` and the residual real LP decides
- * feasibility exactly — feasible ⇒ SAT, no feasible real completion ⇒ UNSAT, checked across every value
- * the integer operand can take.
- */
 class RealProductLeafTest {
 
     // Reals: index 0 = realOperand, index 1 = result. The [RealProduct] and any extra rows are the factors.

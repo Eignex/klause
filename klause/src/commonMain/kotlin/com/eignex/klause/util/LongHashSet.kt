@@ -1,22 +1,10 @@
 package com.eignex.klause.util
 
 /**
- * Mutable open-addressing `Long` set specialised to avoid the per-element autoboxing a stdlib
- * `HashSet<Long>` pays. Use this on hot paths where the members are **arbitrary** longs — packed
- * `(var, side, bound)` reason keys, encoded `(var, value)` pairs, and the like. The `Long` twin of
- * [IntHashSet]; see it for the design rationale.
- *
- * Linear-probed, capacity a power of two, load factor kept ≤ 0.5. Occupancy is tracked by a
- * parallel `used` bitmap rather than a sentinel, so any `Long` (including [Long.MIN_VALUE] and `0`)
- * is a valid member. [remove] uses backward-shift deletion so the table is tombstone-free and
- * reusable via [clear].
- *
- * **Empty sets cost nothing.** A fresh set starts on a shared, immutable 1-slot table whose only
- * slot is permanently unoccupied: `contains` / `remove` / iteration are just the normal probe
- * (slot 0 reads as empty, so they return without a special case), and a set that never grows
- * allocates no backing. The first [add] copies onto a private power-of-two table.
- *
- * Not thread-safe. Iteration order is unspecified; callers needing determinism must sort.
+ * Primitive open-addressing Long set with linear probing and load factor at most 0.5.
+ * A separate occupancy bitmap permits every Long value; backward-shift deletion
+ * avoids tombstones. Empty sets share an immutable one-slot table until insertion.
+ * Not thread-safe; iteration order is unspecified.
  */
 internal class LongHashSet(initialCapacity: Int = 8) {
     private var keys: LongArray = EMPTY_KEYS

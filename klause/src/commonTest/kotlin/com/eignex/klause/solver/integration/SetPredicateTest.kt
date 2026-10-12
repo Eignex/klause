@@ -11,11 +11,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * End-to-end coverage of the bool-indicator decomposition for set predicates: each test
- * parses a tiny FZN model, runs the backtrack solver, and checks the indicator bools yield
- * a feasible set assignment matching the constraint's semantics.
- */
 class SetPredicateTest {
 
     @Test

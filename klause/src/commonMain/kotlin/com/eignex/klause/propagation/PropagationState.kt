@@ -423,8 +423,8 @@ class PropagationState private constructor(
 
     /** Indices in [refPayloadStore] currently holding a [SnapshottablePayload]. Maintained on every
      *  write through [refPayload] so [mark] visits only these slots instead of scanning the whole
-     *  factor list (incl. all learned clauses) per pin — the scan was an O(numFactors)-per-decision
-     *  cost, and pure-clause problems have none. Snapshottable payloads belong to static factors
+     *  factor list per pin, avoiding O(numFactors) work on each decision. Pure-clause problems have none.
+     *  Snapshottable payloads belong to static factors
      *  (Table / Mdd), so their ids stay below `numFactors` and never move under learned-clause
      *  forgetting. */
     internal val snapshottableIndices: IntHashSet = IntHashSet()
@@ -468,7 +468,7 @@ class PropagationState private constructor(
         projection.nonIntEventWatcherIntOccurrences
     }
 
-    /** Constraints learned during conflict analysis (clause-only today; see [LearnedClauseDb]). */
+    /** Constraints learned during conflict analysis; see [LearnedClauseDb]. */
     internal val learnedClauses: List<LearnedPropagator> get() = learned.store
 
     /** True iff any binary clause is known — the gate for binary-resolution minimization. */
@@ -488,18 +488,10 @@ class PropagationState private constructor(
     }
 
     /**
-     * Per-bool-var antecedent literals — the literal-form reason why this variable's
-     * current pin was implied. For a Clause that unit-propagated `v`, the antecedents are
-     * all the *other* literals in that clause, every one of which was already false at
-     * pin time (that's why the clause was unit). `null` = no antecedents recorded, which
-     * means either:
-     *   - the var was pinned as a decision / assumption (no factor reason), or
-     *   - the var was pinned by a factor that doesn't yet record antecedents
-     *     (everything except [Clause] today).
-     *
-     * Maintained alongside [boolReason] (factor id) for first-UIP conflict analysis
-     * (lazy clause generation). When the conflict analyzer hits a `null` entry it treats
-     * the variable as a search-tree leaf, same as a decision.
+     * Reasons for implied Boolean pins, stored as eager antecedent literals or [lazyReason] markers.
+     * A unit [Clause] cites its other literals, all false at pin time. Null denotes a decision,
+     * assumption or deduction with no recorded reason and is treated as a leaf in conflict analysis.
+     * Maintained alongside the factor id in [boolReason] for first-UIP analysis.
      */
     val boolAntecedents: Array<IntArray?> = prepared?.boolAntecedents ?: (arrayOfNulls(problem.numBoolVars))
 
@@ -683,7 +675,7 @@ class PropagationState private constructor(
     var unassignListener: ((Int) -> Unit)? = null
     internal var retractingListener: ((Int) -> Unit)? = null
 
-    /** Undo trail for bool/int cells (replaces per-level full-array snapshots) — see [UndoLog].
+    /** Undo trail for bool/int cells — see [UndoLog].
      *  Appended to by the `log*` functions in `Undo.kt`. Atom-table slots ride their own reversible
      *  trail ([AtomStore.undoAtomId] and parallels); [undoTo] replays both, with the pin trail
      *  [boolPinOrder] truncated to the mark so atoms established after it are dropped wholesale. */
@@ -787,8 +779,7 @@ class PropagationState private constructor(
     internal var nativeConflictReason: IntArray? = null
 
     init {
-        // The native lane replaces the per-literal / occurrence watch indices with its own arena
-        // watches, so it skips base-factor registration entirely.
+        // The native lane uses arena watches and skips general base-factor registration.
         if (prepared == null && nativeEngine == null) {
             for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid])
         }

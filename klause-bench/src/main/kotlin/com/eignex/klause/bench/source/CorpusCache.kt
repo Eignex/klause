@@ -7,13 +7,10 @@ import java.nio.file.StandardCopyOption
 import java.util.Properties
 
 /**
- * Bounds the corpus cache under [root] to [capBytes] by evicting whole collections, least recently used
- * first. Every collection directory is re-fetchable, so evicting one only costs a re-download.
- *
- * Each collection's size and last use live in `.meta/<id>.properties`, so neither a lookup nor an eviction
- * pass walks the instance files: the size is recorded when a fetch completes (and measured once for a
- * collection fetched before it was tracked), and the last use is written on the first use in this JVM.
- * Collections named in [inUse] are never evicted; [CorpusFetcher] shares one set across the run.
+ * Evicts whole collections under [root] in least-recently-used order until [capBytes] fits.
+ * Size and last-use metadata live in `.meta/<id>.properties`, avoiding instance-file walks.
+ * Missing size metadata is measured once; last use is written on first use in this JVM.
+ * Collections in [inUse] are pinned for the run; evicted collections can be fetched again.
  */
 internal class CorpusCache(
     private val root: File,
@@ -109,7 +106,7 @@ internal class CorpusCache(
         trashed.deleteRecursively()
     }
 
-    /** Finish interrupted evictions and drop the metadata of collections no longer in the cache. */
+    /** Finish interrupted evictions and drop metadata for collections absent from the cache. */
     private fun sweep() {
         trashDir.listFiles().orEmpty().forEach { it.deleteRecursively() }
         val pinned = synchronized(inUse) { inUse.toSet() }

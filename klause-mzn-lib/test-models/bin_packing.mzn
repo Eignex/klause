@@ -1,5 +1,5 @@
 % Bin-packing smoke: pack weighted items into capacity-bounded bins, exposing per-bin loads.
-% Exercises klause's bin_packing_load decomposition (#434) — the per-bin weight totals lower to
+% Exercises klause's bin_packing_load decomposition — the per-bin weight totals lower to
 % bool_lin_le (PseudoBoolean) so the knapsack-cover separator can engage. Total weight 16 fits in
 % 3 bins of capacity 6 (e.g. {4,2},{3,3},{2,2}).
 include "globals.mzn";

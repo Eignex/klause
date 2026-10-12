@@ -256,29 +256,19 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
     }
 }
 
-/**
- * Antecedent of a determined bound atom: the **per-var stored antecedent of the live endpoint** that
- * fixes its truth ([PropagationState.intMaxAntecedents] when [viaMax], else
- * [PropagationState.intMinAntecedents]) — the real reason the bound stands where it does, so
- * resolution flows straight to the *other* variables' bounds with no same-var GE<->LE round trip.
+/*
+ * A determined bound atom cites the stored antecedent of its live endpoint:
+ * [PropagationState.intMaxAntecedents] when [viaMax], otherwise [PropagationState.intMinAntecedents].
+ * Resolving directly to other variables' bounds avoids a same-variable GE/LE reason cycle that
+ * can leave a learned clause non-asserting.
  *
- * The classical lazy scheme cited the *complementary* bound atom (`¬[v ≥ k+1]` for a false
- * `[v ≤ k]`); the analyzer then unfolded that atom through its own reason, which couples a
- * GE atom to the LE atom of the same var and back — the same-level cycle that makes 1UIP
- * keep a resolved literal and the learned clause non-asserting (the 0.37%-asserting-rate
- * pathology this rewrite targets). Citing the endpoint directly avoids it.
+ * The endpoint justifies any entailed threshold in either polarity: `v ≤ d.max` implies false
+ * `[v ≥ k]` for `k > d.max` and true `[v ≤ k]` for `k ≥ d.max`; the min side is symmetric.
+ * A null antecedent denotes a root/bake fact.
  *
- * This holds for **any** looseness and **either** polarity, not just an atom adjacent to the
- * endpoint: a false `[v ≥ k]` for every `k > d.max` is justified by `v ≤ d.max`, and a true
- * `[v ≤ k]` for every `k ≥ d.max` is *entailed* by the same `v ≤ d.max` (symmetric on the min side).
- * A `null` stored antecedent means the endpoint is a root/bake fact (no search move set it), the
- * correct leaf.
- *
- * For a threshold strictly past the endpoint this attributes the endpoint's (possibly later)
- * establishment level rather than the exact level the atom's truth was first fixed — sound (a true
- * antecedent cited at its real level), and since the atom resolves against this reason in the 1UIP
- * loop it never lingers as a mis-levelled leaf. Citing the complementary atom instead would keep
- * the level tight but reintroduce a fatal reason cycle; avoiding the cycle wins.
+ * A threshold past the endpoint inherits the endpoint's establishment level, which can be later
+ * than the atom first became determined. This remains sound because resolution consumes the
+ * endpoint reason at its actual level rather than leaving a mis-levelled leaf.
  */
 internal fun PropagationState.endpointReason(v: Int, viaMax: Boolean): IntArray? =
     reasonOf(if (viaMax) intMaxAntecedents[v] else intMinAntecedents[v])

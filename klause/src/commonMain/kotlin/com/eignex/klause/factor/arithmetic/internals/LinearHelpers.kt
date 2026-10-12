@@ -521,10 +521,8 @@ private fun mulOverflows(a: Long, b: Long): Boolean {
     return (a * b) / b != a
 }
 
-/** True iff `a + b` wraps 64-bit range. */
 private fun addOverflows(a: Long, b: Long): Boolean = ((a xor (a + b)) and (b xor (a + b))) < 0L
 
-/** True iff `a - b` wraps 64-bit range. */
 private fun subOverflows(a: Long, b: Long): Boolean = ((a xor b) and (a xor (a - b))) < 0L
 
 /**

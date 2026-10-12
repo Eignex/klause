@@ -14,9 +14,6 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.IntLongMap
 
-/**
- * LS invariant for [ReifiedPseudoBoolean]: reified pseudo-Boolean violation tracking and repair.
- */
 internal class ReifiedPseudoBooleanInvariant(
     private val auxBoolVar: Int,
     private val weights: LongArray,

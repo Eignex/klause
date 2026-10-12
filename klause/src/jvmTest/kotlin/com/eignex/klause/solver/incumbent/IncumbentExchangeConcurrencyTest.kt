@@ -6,11 +6,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * The exchange under the parallel executor's concurrent publishers: every arm offers its own improving
- * series, and the exchange must hand exactly one publisher each version while keeping assignment and
- * objective paired.
- */
 class IncumbentExchangeConcurrencyTest {
 
     private val arms = 4

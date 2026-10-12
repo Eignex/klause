@@ -16,11 +16,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The integer-multiplier bound ([integerDualLowerBoundCeil]) must be SOUND — never exceeding
- * `ceil(LP optimum)` — and usefully tight (equal to it on the large majority), the same way
- * [SafeObjectiveBoundTest] checks the float bound.
- */
 class IntegerDualBoundTest {
 
     @Test

@@ -9,7 +9,6 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.klause.util.IntHashSet
 
-/** LS invariant logic for `lex_less` / `lex_lesseq`. */
 internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArray, private val strict: Boolean) :
     Invariant {
 

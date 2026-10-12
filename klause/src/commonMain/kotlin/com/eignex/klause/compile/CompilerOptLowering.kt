@@ -31,23 +31,10 @@ import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.util.LongHashSet
 
 /*
- * Reified (sub-expression-position) lowering for global constraints. Each entry-point
- * returns a Boolean literal `b` such that `b ↔ φ`, where `φ` is the constraint's
- * decomposition into already-supported AST primitives ([IntCompare], [And], [Or],
- * [IntIfThenElse], [IntSum]). The compiler's `reifyIntCompare` / `tseitinAnd` /
- * `tseitinOr` machinery does the actual reification — this file just builds the AST
- * skeleton.
- *
- * Why decomposition rather than reifying the native factor:
- *
- *  - Native factor propagators (matching, Theta-tree, max-flow) detect *infeasibility*
- *    on partial states but don't produce a "the constraint is false right now" witness. A
- *    reified form needs both directions — true *and* false — so we'd have to invent the
- *    false-side machinery from scratch per factor. Decomposition gives both directions for
- *    free via the existing reified primitives.
- *
- * Tradeoff: at non-top-level we trade stronger propagation (the native factor) for a
- * sound decomposition. Top-level uses keep the native factor through [CompilerAssertions].
+ * Reified global constraints return `b ↔ φ` by decomposing φ into [IntCompare], [And], [Or],
+ * [IntIfThenElse] and [IntSum]. The primitive lowering supplies both directions of reification.
+ * Native global propagators detect infeasibility but do not supply false-side witnesses, so only
+ * top-level assertions use native factors through CompilerAssertions.
  */
 
 /** Build a 0/1-valued IntExpr equal to 1 iff [cond] holds, 0 otherwise. The downstream
@@ -242,7 +229,6 @@ internal fun Lowering.reifyDisjunctiveOpt(expr: DisjunctiveExprOpt): Int {
     return if (pieces.isEmpty()) trueLit() else tseitinAnd(pieces)
 }
 
-/** `x_i + d_i ≤ x_j ∨ x_j + d_j ≤ x_i`. */
 private fun pairwiseNoOverlap(si: IntExpr, di: Int, sj: IntExpr, dj: Int): BoolExpr = Or(
     listOf(
         IntCompare(IntSum(listOf(si, IntLit(di))), IntCmpOp.LE, sj),
@@ -274,16 +260,12 @@ internal fun Lowering.reifyCircuit(expr: CircuitExpr): Int {
     val n = expr.succ.size
     val offset = expr.valueOffset
     val pieces = mutableListOf<BoolExpr>()
-    // 1. AllDifferent over succ — the assignment is a permutation.
     pieces += allDiffAsAnd(expr.succ)
-    // 2. No self-loops: succ[i] ≠ i + offset.
     for (i in 0 until n) {
         pieces += IntCompare(expr.succ[i], IntCmpOp.NE, IntLit(i + offset))
     }
     if (n <= 1) return tseitinAnd(pieces)
-    // 3. Position vars. pos[0] = 0 is implied; we allocate pos[1..n-1] ∈ [1, n-1]
-    //    pairwise-distinct, then enforce `pos[succ[i] - offset] = pos[i] + 1` whenever
-    //    succ[i] != offset (the closing edge to node 0).
+    // Position zero is fixed; the remaining positions range over [1, n-1].
     val posVars: List<IntExpr> = (0 until n).map { i ->
         if (i == 0) {
             IntLit(0)
@@ -291,12 +273,9 @@ internal fun Lowering.reifyCircuit(expr: CircuitExpr): Int {
             IntRef(newAuxIntVar(IntDomain(1L, (n - 1).toLong())))
         }
     }
-    // 4. AllDifferent over the non-zero positions.
     val nonZeroPos: List<IntExpr> = posVars.drop(1)
     if (nonZeroPos.size >= 2) pieces += allDiffAsAnd(nonZeroPos)
-    // 5. MTZ chain: for each i, either succ[i] = offset (closing edge to node 0) or
-    //    pos[succ[i] - offset] = pos[i] + 1. Use IntElement to index posVars by the
-    //    0-indexed successor; subtract valueOffset to bring succ[i] into [0, n-1].
+    // MTZ chain: each successor closes at node zero or advances its position by one.
     val posVarsAsList: List<IntExpr> = posVars
     val succIndex0: List<IntExpr> = expr.succ.map { s ->
         if (offset == 0) s else IntSum(listOf(s, IntLit(-offset)))
@@ -340,9 +319,7 @@ internal fun Lowering.reifySubcircuit(expr: SubcircuitExpr): Int {
     return tseitinAnd(pieces)
 }
 
-/** Pairwise NE over a list of IntExpr, materialised as a single [And] of [IntCompare]s.
- *  Used by the Circuit/Subcircuit reified lowerings; the AllDifferent AST node could be
- *  used directly but the And-of-pairs form lets the surrounding tseitin reify it cleanly. */
+/** Pairwise inequalities combined in an [And] for Tseitin reification of circuit constraints. */
 private fun allDiffAsAnd(terms: List<IntExpr>): BoolExpr {
     if (terms.size < 2) return IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
     val pairs = mutableListOf<BoolExpr>()

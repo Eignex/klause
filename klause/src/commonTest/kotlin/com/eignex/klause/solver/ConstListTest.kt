@@ -14,10 +14,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
-/**
- * Constants are stored at their true width, and a consumer that reasons in 64-bit integers gets the
- * narrowing or nothing.
- */
 class ConstListTest {
 
     @Test

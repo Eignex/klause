@@ -39,7 +39,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** #21: LP reduced-cost fixing wired into BacktrackSolver branch-and-bound. */
 class LpReducedCostFixingTest {
 
     @Test

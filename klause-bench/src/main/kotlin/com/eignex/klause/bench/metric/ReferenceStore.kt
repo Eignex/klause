@@ -47,22 +47,19 @@ internal data class ReferenceEntry(
      *  `QF_NRA`, …) or an MPS integrality class (`MIP` / `LP`). Blank for formats classified purely by
      *  [structure] (MiniZinc/XCSP3/OPB/DIMACS), or when unclassified. */
     val logic: String = "",
-    /** How the row was produced where that decides whether it still holds: an MPS reference's solver build, options
-     *  and validation rules ([MpsWitness.VERSION]). Blank for other solvers and for rows from before it was kept. */
+    /**
+     * Solver build, options and validation version ([MpsWitness.VERSION]) affecting row validity.
+     * Blank when provenance is unavailable or the solver does not record it.
+     */
     val version: String = "",
     val exactObjective: String? = null,
 )
 
 /**
- * Local reference tables under `klause-bench/reference/`, gitignored: the shared reference results live in
- * klause-lab's database. One CSV **per solver**, named after the solver that produced it (`cp-sat.csv`,
- * `clasp.csv`, `z3.csv`, …), so each instance's oracle is traceable to its source and independent solver runs
- * never overwrite one another. [load] unions them into one instance-keyed view, empty when no table has been
- * written. Merges are **virtual-best**: a proven optimum always wins, and among unproven bounds the tighter
- * objective (lower for minimize, higher for maximize) wins, so references only ever tighten and unproven bounds
- * stay honest. A row produced another way ([ReferenceEntry.version]) replaces a solver's own row whatever their
- * strengths: a proof the old way judged wrongly must not outlive its correction. Regenerable and incremental via
- * `bench reference`.
+ * Gitignored per-solver CSVs under `klause-bench/reference/`; shared results live in klause-lab.
+ * [load] unions the tables by instance. Merges prefer proven optima, then tighter unproven
+ * objectives. A differing [ReferenceEntry.version] replaces that solver's row regardless
+ * of result strength, because its validation rules may differ. `bench reference` regenerates rows.
  */
 internal object ReferenceStore {
     // No `solver` column: each row's solver is the file it lives in (`<solver>.csv` for a reference
@@ -72,8 +69,7 @@ internal object ReferenceStore {
         "format", "structure", "numGlobal", "numLinear", "boolHeavy", "logic", "version", "exactObjective",
     )
 
-    /** The oracle-only prefix — a legacy row (pre-features) has exactly this many columns and decodes
-     *  with blank/null features, so the schema extension stays backward-compatible. */
+    /** Oracle-only column count. Rows with this prefix decode with blank/null features. */
     private const val ORACLE_COLUMNS = 8
 
     private fun referenceDir() = File(CorpusFetcher.workspaceRoot(), "klause-bench/reference")
@@ -83,8 +79,7 @@ internal object ReferenceStore {
      *  rewrites another's rows. */
     private fun file(solver: String) = File(referenceDir(), "$solver.csv")
 
-    /** Every committed per-solver table (one `.csv` per solver in `reference/`), name-sorted so the
-     *  union is deterministic. */
+    /** Per-solver CSV tables in `reference/`, name-sorted for deterministic union. */
     private fun referenceFiles(): List<File> =
         referenceDir().listFiles { f -> f.isFile && f.extension == "csv" }?.sortedBy { it.name }.orEmpty()
 
@@ -248,7 +243,7 @@ internal object ReferenceStore {
             elapsedMs = f[6].toLong(),
             budgetMs = f[7].toLong(),
             solver = solver,
-            // Features are absent in a legacy (oracle-only) row — default to blank/null.
+            // Oracle-only rows decode absent features as blank/null.
             format = f.getOrElse(8) { "" },
             structure = f.getOrElse(9) { "" },
             numGlobal = f.getOrNull(10)?.ifEmpty { null }?.toInt(),

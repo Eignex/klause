@@ -20,11 +20,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * An untrusted producer's proposal reaches the incumbent only through composed verification and a
- * strict improvement: the whole factor set re-derives the assignment's feasibility and its objective,
- * and only then does the exchange weigh it against what already stands.
- */
 class IncumbentCandidatesTest {
 
     private val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))

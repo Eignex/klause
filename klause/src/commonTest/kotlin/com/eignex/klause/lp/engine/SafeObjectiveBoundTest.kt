@@ -16,8 +16,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** The Neumaier–Shcherbina safe bound must never exceed the true optimum (#567 component 3): a
- *  sound lower bound on `min cᵀz`, validated against the exact [DualSimplex]. */
 class SafeObjectiveBoundTest {
     @Test
     fun `supplied legacy certificates cannot preserve a bound after its objective changes`() {

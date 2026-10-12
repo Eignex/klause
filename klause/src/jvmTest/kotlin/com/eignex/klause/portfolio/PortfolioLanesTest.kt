@@ -176,7 +176,6 @@ class PortfolioLanesTest {
         // The best-bound dive arm carries the lb_tree_search flag on its base plan.
         val lbtree = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-lbtree" }
         assertTrue(lbtree.recipe.build(1L, null).lpPlan.lbTreeSearch, "the lp-lbtree arm must enable lb_tree_search")
-        // The #117 guard stays at slot 0.
         assertEquals("satOptimized", cop.first())
 
         // A satisfaction search has no objective to bound, but an infeasible relaxation refutes its node
@@ -220,7 +219,7 @@ class PortfolioLanesTest {
             annotationArm = annotation,
         )
         val labels = PortfolioComposition.compose(scenario).map { it.label }
-        assertEquals("satOptimized", labels.first(), "the #117 guard keeps slot 0")
+        assertEquals("satOptimized", labels.first(), "the SAT preset keeps slot 0")
         assertEquals("annotation", labels.last(), "the annotation arm takes the last slot")
     }
 
@@ -429,10 +428,7 @@ class PortfolioLanesTest {
 
     @Test
     fun `builder minimize wires a per-worker objective across a mixed pool`() {
-        // minimize x + 2y subject to x + y >= 3 — same as above, but built through
-        // PortfolioBuilder with BOTH a per-worker LS objective and a backtrack (linear) objective
-        // (#63). LS workers descend lsObjective, backtrack workers bound linearObjective; the
-        // shared scalar bound stays comparable, so the mixed pool still proves the optimum (3).
+        // LS and backtrack workers use separate objective interfaces with a comparable shared bound.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -442,10 +438,8 @@ class PortfolioLanesTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        // The LS workers are unbudgeted and shared-bound demotes backtrack to BestFound, so
-        // nothing self-cancels the pool: stop once any worker reports an incumbent at the known
-        // optimum (cancelled workers still yield their best — the anytime invariant). The
-        // fallback only bounds a regression.
+        // Unbudgeted LS workers keep the pool running, so cancel at the known optimum.
+        // Cancelled workers retain their best incumbent; the fallback deadline bounds the wait.
         val sawOptimum = AtomicBoolean(false)
         Portfolio.thompson(
             lanes = 4,

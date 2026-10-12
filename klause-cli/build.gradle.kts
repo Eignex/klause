@@ -51,9 +51,9 @@ tasks.named("check") { dependsOn(checkMznSolverConfig) }
 
 kotlin {
     jvm()
-    // Host-linkable native executables; Windows is served by the JVM dist for now
+    // Host-linkable native executables; Windows uses the JVM distribution.
     // (MinGW needs its own filesystem actuals). Full matrix is opt-in via -Ptargets.full,
-    // as in :klause; default stays jvm + linuxX64 so local builds and PR CI are fast.
+    // as in :klause; default targets are jvm + linuxX64 for local builds and CI.
     linuxX64()
     if (providers.gradleProperty("targets.full").isPresent) {
         linuxArm64()

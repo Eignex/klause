@@ -120,7 +120,7 @@ class RedundantConstraintsTest {
     @Test
     fun `proportional rows match standalone via GCD normalization`() {
         // x+y<=2 and 2x+2y<=4 are the same constraint. GCD-reducing inside the pass buckets them even
-        // without strengthen running first, so the duplicate drops (#466).
+        // without strengthen running first, so the duplicate drops.
         val problem = Problem(0, 2, dom(2, 3), listOf(le(2, 0, 1, 1, 1), le(4, 0, 2, 1, 2)))
         val out = checkPreserved("proportional-dup", problem, expectDrop = true)
         assertEquals(1, out.factors.size)
@@ -161,7 +161,7 @@ class RedundantConstraintsTest {
     fun `a zero coefficient carries no support and never divides by zero`() {
         // 0·x + y <= 2 has a zero coeff on x: its genuine support is {y}, a strict subset of x+y<=5's.
         // y<=2 and x<=3 give x+y<=5, so the larger row drops. A zero coeff must stay out of the support
-        // map: the dominance ratio check would otherwise compute cb % 0 and crash (#653).
+        // map: the dominance ratio check would otherwise compute cb % 0 and crash.
         val problem = Problem(0, 2, dom(2, 3), listOf(le(2, 0, 0, 1, 1), le(5, 0, 1, 1, 1)))
         val out = checkPreserved("zero-coeff-subset", problem, expectDrop = true)
         assertEquals(1, out.factors.size)

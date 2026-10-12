@@ -540,7 +540,7 @@ internal object RedundantConstraints {
             val f = factors[i]
             if (f is Clause) continue
             val fRows = f.impliedLinearRows
-            // This monotone-domination scan reads the integer side; skip Boolean-literal rows for now.
+            // This monotone-domination scan reads the integer side; skip Boolean-literal rows.
             if (fRows.isEmpty() || fRows.any { !it.isIntegerOnly }) continue
             val droppable = f.linearForm is LinearForm.Conjunction && f.linearRows.size == 1
             for (row in fRows) {
@@ -773,7 +773,5 @@ internal object RedundantConstraints {
     }
 }
 
-// Work units per factor indexed or domination test by subsumption, against one simplex op: fitted section time
-// per unit over 60 MIPLIB 2017, 40 QF_LIA and 40 MiniZinc Challenge models, ~4.0e-5 ms beside the pass's base
-// charge.
+// Work units per indexed factor or domination test, relative to one simplex operation.
 private const val SUBSUME_WORK_WEIGHT = 10L

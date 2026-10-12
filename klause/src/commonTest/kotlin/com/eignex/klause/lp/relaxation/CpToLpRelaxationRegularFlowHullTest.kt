@@ -11,12 +11,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * #655 (Tranche A): the layer-expanded DFA flow hull of [Regular]. The flow polytope is integral, so
- * the LP optimum of a linear objective over the sequence must **equal** the true optimum over the
- * automaton's accepting strings — checked against brute force. (Equality ⇒ both sound — never below
- * the true optimum — and tight.)
- */
 class CpToLpRelaxationRegularFlowHullTest {
 
     private val eps = 1e-9

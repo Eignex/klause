@@ -7,7 +7,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 
-/** LS invariant for [Xor]: parity violation tracking and break/make maintenance. */
 internal class XorInvariant(
     private val boolVars: IntArray,
     private val literals: IntArray,

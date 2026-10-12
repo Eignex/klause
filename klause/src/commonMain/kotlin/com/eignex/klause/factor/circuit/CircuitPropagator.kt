@@ -14,7 +14,6 @@ import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
-/** CP implementation for [Circuit]: propagation of the Hamiltonian-cycle constraint over successor vars. */
 internal class CircuitPropagator(private val succ: IntArray, private val n: Int) : Propagator {
 
     override val initialIntEventWatches: IntArray = buildSuccWatches(succ)

@@ -34,11 +34,7 @@ application {
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
 }
 
-// --- Choco as a faithful MiniZinc solver (`minizinc --solver choco`) ---
-// Choco is run end-to-end through MiniZinc (its own globals library), not via an in-process adapter.
-// choco-parsers isn't a runnable MiniZinc solver out of the box, so `installChoco` fetches the
-// FlatZinc parser jar + Choco's `mzn_lib` + the official `fzn-choco` wrapper, writes a `choco.msc`
-// pointing at them, and registers it under ~/.minizinc/solvers. Mirrors `:klause-yuck:installYuck`.
+// Choco installation includes its FlatZinc jar, globals library, wrapper and MiniZinc registration.
 val chocoVersion = "6.0.1"
 val chocoCacheDir = File(System.getProperty("user.home"), ".cache/klause-choco")
 
@@ -87,10 +83,7 @@ abstract class InstallChocoTask : DefaultTask() {
         }
         // Point the official wrapper at the cached jar and make it runnable.
         exec.exec { commandLine("sed", "-i", "s#^JAR_FILE=.*#JAR_FILE='${jar.absolutePath}'#", py.absolutePath) }
-        // Always run Choco with lazy clause generation (-lcg). klause is itself an LCG/CDCL engine,
-        // so an LCG Choco is the apples-to-apples reference; classic-CP Choco is unfairly strong on
-        // pure-CP models (e.g. Golomb) and understates klause. ChocoFZN forwards the extra flag, and
-        // -lcg is sound with the fixed/annotation track in Choco 6.0.1.
+        // Enable lazy clause generation for the Choco reference on free and fixed search tracks.
         sh.writeText("#!/bin/bash\nexec python3 \"\$(dirname \"\$0\")/fzn-choco.py\" -lcg \"\$@\"\n")
         exec.exec { commandLine("chmod", "+x", sh.absolutePath, py.absolutePath) }
         // Write the solver config and register it so `minizinc --solver choco` resolves.

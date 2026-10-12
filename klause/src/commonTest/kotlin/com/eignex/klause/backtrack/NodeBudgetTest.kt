@@ -20,11 +20,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * The solve-spanning node cap. What distinguishes it from [BacktrackParams.maxDecisions] is that the
- * allowance is not renewed when a driver re-enters the engine, which is the property that lets two runs
- * be held to the same work.
- */
+// Re-entering the engine consumes the same solve-wide node allowance.
 class NodeBudgetTest {
 
     /** [pigeons] pigeons into [holes] holes: each pigeon in >= 1 hole, each hole holds <= 1. UNSAT when

@@ -10,11 +10,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * The incremental objective bool lower bound ([PropagationState.objectiveBoolLowerBound]) must equal the
- * from-scratch scan `Σ_b contribution(b)` at every node — it is a reversible-trail accumulator standing in
- * for that O(numBoolVars) rescan, and a stale value would prune wrongly.
- */
 class ObjectiveBoolLowerBoundTest {
 
     /** Reference bound: pinned-true contributes its weight, pinned-false 0, unpinned min(weight, 0). */

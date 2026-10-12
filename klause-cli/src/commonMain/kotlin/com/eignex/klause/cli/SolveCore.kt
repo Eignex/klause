@@ -77,9 +77,7 @@ internal object SolveCore {
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
         val solutionSetSensitive = !rawSolvable.optimize && (common.allSolutions || (common.solutionCap ?: 1L) > 1L)
-        // The `-t` wall-clock deadline is captured once, here, and shared by every phase: presolve, the
-        // LP root build/solve inside the engine, and the search loop. Building it per-phase would let
-        // each phase restart the clock and blow the limit cumulatively.
+        // One invocation deadline covers presolve, LP preparation and search.
         // Taken before the token is built, because the allowance has to stop the driver and not only the
         // engine: an engine-local check leaves the driver re-entering arms that cancel at their first
         // poll, which burns the whole deadline and overshoots the cap several times over.
@@ -355,13 +353,9 @@ internal object SolveCore {
     }
 
     /**
-     * Whether the `-t` budget is gone by the time a verdict is rendered.
-     *
-     * [backendTimedOut] is the backend's own flag, which not every path sets — a census of corpus
-     * unknowns attributed 26 of 36 miplib instances to "stopped for no stated reason" purely because the
-     * MPS path leaves it false. The deadline itself is the reliable witness: it is anchored once at
-     * process start, so comparing against it here catches every path that ran out of time. Consulted only
-     * to explain a soft verdict, so a decided run finishing exactly on the boundary costs nothing.
+     * Whether the invocation deadline has expired when rendering an undecided verdict.
+     * Some backends leave [backendTimedOut] false, so the shared deadline also identifies
+     * timeouts. Decided verdicts are unaffected.
      */
     private fun budgetSpent(common: CommonOptions, backendTimedOut: Boolean): Boolean =
         backendTimedOut || common.deadlineAtMs?.let { nowMillis() >= it } == true
@@ -374,10 +368,8 @@ internal object SolveCore {
     }
 
     /**
-     * The `node-limit` engine param as a [NodeBudget], **removed** from [CommonOptions.engineParams] as
-     * it is read. One budget per invocation is the whole point — every arm spends the same allowance —
-     * and [EngineParams] consumes keys per instance, so leaving it in place would both build a second
-     * budget downstream and, where it did not, fail validation as an unknown key.
+     * Consumes `node-limit` as a shared [NodeBudget] and removes it from [CommonOptions.engineParams].
+     * Every arm spends the same invocation allowance; engines must not consume the key again.
      */
     private fun takeNodeBudget(common: CommonOptions): NodeBudget? = takeOpenNodeLimit(common)?.let(::NodeBudget)
 
@@ -564,12 +556,10 @@ internal object SolveCore {
         ", work ${it.spent() - before} in ${elapsed.inWholeMilliseconds}ms (${it.spent()} of ${it.allowance})"
     }.orEmpty()
 
-    /** Print what presolve did (`dry-run-presolve`) to stderr: the presolve-phase wall time,
-     *  variable/constraint counts, total integer-domain span, the per-factor-kind histogram delta, the LP
-     *  harvest's own contribution, and any proven infeasibility — so the effect (and cost) of a
-     *  `--presolve` config can be inspected and A/B-compared without solving. The elapsed time is the
-     *  presolve phase alone, excluding JVM startup and parsing, so it is the figure to watch when tuning
-     *  presolve cost. */
+    /**
+     * Print presolve timing, size and factor-count changes, LP harvest statistics and proven
+     * infeasibility for `dry-run-presolve`. Timing excludes JVM startup and parsing.
+     */
     private fun printPresolved(
         original: Problem,
         presolved: Problem,
@@ -644,14 +634,8 @@ internal object SolveCore {
     }
 
     /**
-     * Total integer-domain span `Σ (max − min)` — the coarse problem-size measure presolve shrinks —
-     * saturating at [Long.MAX_VALUE]. Both the per-domain width and the sum exceed a `Long` on a model
-     * with near-full-range domains, and a wrapped total reads as a plausible figure rather than as
-     * overflow, so each is checked. Matches the saturating convention of `PresolveShared.maxIntSpan`.
-     *
-     * A column the model leaves open on either side saturates it outright: what its width would measure
-     * is the box a lane invented to search it, not a size the model states. [openText] is the line that
-     * says how many columns that is.
+     * Saturating total integer-domain span `sum(max - min)`. Widths and the sum are checked
+     * for overflow. Any open side saturates the total; [openText] reports the open-column count.
      */
     private fun domainSpan(problem: Problem): Long {
         val bounds = problem.intBounds
@@ -674,15 +658,8 @@ internal object SolveCore {
     }
 
     /**
-     * How many integer columns carry no usable bound, as `<open> of <total>`.
-     *
-     * [spanText] saturates on the first column it cannot sum, so one open column and ten thousand read
-     * identically as "unbounded" - which is what makes an open-domain model look like a wall presolve
-     * cannot touch when it may be nothing of the sort. This is the count that line hides.
-     *
-     * A column counts as open when the model declares no bound on one of its sides, whatever finite box
-     * a lane materialized to search it — so a wide declared column is not miscounted as unbounded, and a
-     * narrow invented box does not hide one that is.
+     * Open integer columns as `<open> of <total>`. A column is open when either source bound
+     * is absent, regardless of any finite search box. Complements the saturated [spanText].
      */
     private fun openText(problem: Problem): String {
         val bounds = problem.intBounds

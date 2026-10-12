@@ -14,11 +14,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/**
- * [AggregationMirSeparator] {0,½} cuts must be valid — satisfied by every integer-feasible point — and
- * must actually separate the fractional LP point they were derived from. Validity is checked by brute
- * force against the full integer box, since an invalid cut would silently remove real solutions.
- */
 class AggregationMirSeparatorTest {
 
     private fun separate(p: Problem, obj: LinearObjective): Pair<List<Cut>, LpRelaxation>? {

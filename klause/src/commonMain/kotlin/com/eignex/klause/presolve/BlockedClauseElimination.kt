@@ -124,6 +124,5 @@ internal object BlockedClauseElimination {
         SourceRebuilds(asReversed().map { RebuildStep.RepairClause(it.clause, it.blockingLit) })
 }
 
-// Work units per occurrence visited, against one simplex op. No model in the calibration sample (60 MIPLIB 2017,
-// 40 QF_LIA and 40 MiniZinc Challenge) ran this pass, so it takes the weight the other per-term passes measured.
+// Work units per occurrence visited, relative to one simplex operation.
 private const val BCE_WORK_WEIGHT = 10L

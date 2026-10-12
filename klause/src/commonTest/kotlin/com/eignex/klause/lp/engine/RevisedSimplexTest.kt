@@ -11,9 +11,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/** The float revised simplex must find an optimal basis whose integer-multiplier certification
- *  ([integerDualLowerBoundCeil]) reproduces `ceil` of the float optimum — the float-iterate /
- *  certify-once contract (#567 / #705). */
 class RevisedSimplexTest {
 
     private fun randomModel(m: Int, n: Int, rng: Random): LpModel {

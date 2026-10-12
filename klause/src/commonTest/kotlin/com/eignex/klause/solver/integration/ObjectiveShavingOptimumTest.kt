@@ -15,10 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Objective shaving must not change the solved optimum end to end, and the proven objective floor must
- * reach the shared lower-bound sink for peer portfolio arms.
- */
 class ObjectiveShavingOptimumTest {
 
     /** `cost = x0+x1+x2` over {0,1}³ with the three pair-covering rows (triangle vertex cover): every

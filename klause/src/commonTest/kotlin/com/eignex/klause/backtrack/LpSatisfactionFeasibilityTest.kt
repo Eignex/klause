@@ -18,10 +18,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The relaxation participates in a satisfaction search, where it refutes by infeasibility rather than by
- * bounding an objective it does not have. What it must never do is change the verdict.
- */
 class LpSatisfactionFeasibilityTest {
 
     private fun solve(problem: Problem, lp: LpConfig?): SolveResult =

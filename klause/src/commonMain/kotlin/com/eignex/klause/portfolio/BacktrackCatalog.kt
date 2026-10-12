@@ -58,7 +58,7 @@ object BacktrackCatalog {
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent)
     }
 
-    /** The learned LinUCB variable heuristic ([RegressionVariableSelector], #8) on solution-guided
+    /** The learned LinUCB variable heuristic ([RegressionVariableSelector]) on solution-guided
      *  values — the COP routing / feasibility-reach diversity arm. */
     private fun linUcb() = BacktrackRecipe("linucb") { seed, onEvent ->
         BacktrackParams(
@@ -237,7 +237,7 @@ object BacktrackCatalog {
     /** Every arm label for [kind], in credit order — for enumerating the pool by name. */
     fun labels(kind: Kind): List<String> = catalog.labels(rankedArms(kind))
 
-    /** A fresh recipe for the arm named [label] (the single string boundary — CLI `bt-arm=`, campaigns). */
+    /** A fresh recipe for the arm named [label] (CLI `bt-arm=` boundary). */
     fun byLabel(label: String): BacktrackRecipe = catalog.byLabel(label)
 
     /** One fresh recipe for every arm of [kind], in credit order; see [rankedArms] for [realColumns]. */
@@ -263,14 +263,14 @@ object BacktrackCatalog {
     }
 
     /** Per-arm recipe factories for [kind], in credit order — each builds a fresh recipe (the factory
-     *  shape a campaign or the CLI feeds to `PortfolioScenario.btPool`). */
+     *  shape the CLI feeds to `PortfolioScenario.btPool`). */
     fun factories(kind: Kind): List<() -> BacktrackRecipe> = catalog.factories(rankedArms(kind))
 }
 
 /**
  * Typed identity of every backtrack catalog arm — the backtrack counterpart of
  * [LocalSearchArm]. [BacktrackCatalog] orders and instantiates these;
- * [label] is the external name (CLI `bt-arm=` / campaign / telemetry), kept in lockstep with the built
+ * [label] is the external name (CLI `bt-arm=` / telemetry), kept in lockstep with the built
  * recipe's label. [needs] is what the arm needs from a model to differ from the arm it is built on.
  */
 internal enum class BacktrackArm(val label: String, val needs: Set<ArmNeed> = emptySet()) {

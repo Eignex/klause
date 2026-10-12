@@ -14,14 +14,9 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 
 /**
- * A disjunction of single-variable comparison literals: `⋁ᵢ (vars(i) ⟨ops(i)⟩ consts(i))`, holding
- * iff at least one literal holds. The direct representation of an XCSP3 `<intension>` disjunction /
- * implication of comparisons against constants (`imp(gt(x,a), lt(y,b))` is `(x ≤ a) ∨ (y ≤ b−1)`),
- * lowered as one factor instead of a fresh reifying indicator plus a [ReifiedLinear] per comparison.
- *
- * Each literal is a comparison of one integer variable to a constant; the propagator evaluates each
- * literal's truth straight from the live domains, so no auxiliary Boolean, order atom, or channeling
- * clause is introduced. Parallel arrays [vars] / [ops] / [consts] pair index-for-index.
+ * Disjunction `⋁ᵢ (vars(i) ⟨ops(i)⟩ consts(i))` of single-variable comparisons against constants.
+ * Parallel arrays [vars], [ops] and [consts] align by index. The propagator evaluates literals
+ * directly from live domains without auxiliary Booleans or channeling clauses.
  */
 class ComparisonClause(val vars: IntArray, val ops: Array<LinearOp>, val consts: LongArray) : Factor {
 

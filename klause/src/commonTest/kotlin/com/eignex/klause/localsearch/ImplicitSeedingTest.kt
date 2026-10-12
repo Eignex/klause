@@ -14,13 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The seeding-side binary-implication graph feeding
- * [com.eignex.klause.localsearch.movesource.FlipAndPropagate]. The harvest is bounded to a
- * free-Boolean candidate cap: an uncapped full-`numBoolVars` probe materialises an O(numBoolVars²)
- * adjacency that exhausts the heap on Boolean-heavy models, so probing stops after the cap and later
- * seeds simply find no forced literals.
- */
+// The candidate cap bounds the quadratic implication-graph allocation on Boolean-heavy models.
 class ImplicitSeedingTest {
 
     @Test

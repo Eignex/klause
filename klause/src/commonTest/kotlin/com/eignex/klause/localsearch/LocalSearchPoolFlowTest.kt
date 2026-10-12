@@ -14,12 +14,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * The local-search side of bidirectional cross-engine solution flow (#644): an LS arm offers each
- * improving incumbent to the [LocalSearchParams.pooledIncumbents] exchange — which installs only what
- * it verifies and finds strictly better — and, on restart, adopts a better assignment the exchange
- * holds.
- */
 class LocalSearchPoolFlowTest {
 
     // Choose ≥ 4 of 12 booleans to minimise their weights: the optimum picks the four cheapest.

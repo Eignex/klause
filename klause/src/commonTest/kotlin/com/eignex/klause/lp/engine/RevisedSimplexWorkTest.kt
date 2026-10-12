@@ -10,13 +10,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The deterministic work meter.
- *
- * The point of counting operations rather than timing them is that a budget keyed on the count behaves
- * the same on a loaded machine as on an idle one. That only holds if the count is a function of the
- * model and the pivot path alone, so these pin exactly that.
- */
 class RevisedSimplexWorkTest {
     @Test
     fun `repair uses the retained invocation allowance and charges its completed overrun`() {

@@ -17,19 +17,13 @@ import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.util.IntArrayList
 
 /*
- * Decompositions for the "newer" globals. Each [decomposeXxx] returns a [BoolExpr] in
- * terms of existing primitives (And/Or/IntCompare/AllDifferent/Table). Top-level
- * [assertExpr] handles it via the normal pipeline; reified contexts go through
- * [lowerToLit]. Decompositions that need aux integer variables allocate via
- * [newAuxIntVar] and return a [BoolExpr] referring to those new names.
+ * Global-constraint decompositions into Boolean and integer primitives. Top-level assertions use
+ * [assertExpr]; reified contexts use [lowerToLit]. Auxiliary integer variables come from [newAuxIntVar].
  *
- * Globals that fundamentally require fresh int aux vars per layer (MDD, cost_regular,
- * cost_mdd, path, tree) are routed through dedicated `assertXxx` helpers since the
- * aux-state machinery doesn't compose cleanly with reified lowering; calling them inside
- * a reified context raises an error.
+ * MDD, cost_regular, cost_mdd, path and tree require per-layer state variables and use dedicated
+ * assertion helpers. They are unsupported in reified contexts.
  */
 
-// MDD / cost_mdd / cost_regular — table-based state-channel decompositions
 
 /** Helper: build the [Mdd] factor and emit it when
  *  `seq` is all bare IntRefs. Falls back to the table-based decomposition. */
@@ -90,7 +84,7 @@ internal fun Lowering.assertMddDecomposed(expr: MddExpr) {
 
     assertExpr(IntCompare(stateRefs[0], IntCmpOp.EQ, IntLit(expr.initial)))
     if (expr.accepting.isEmpty()) {
-        assertExpr(IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(1))) // UNSAT
+        assertExpr(IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(1)))
     } else {
         assertExpr(Or(expr.accepting.map { a -> IntCompare(stateRefs[n], IntCmpOp.EQ, IntLit(a)) }))
     }
@@ -106,7 +100,7 @@ internal fun Lowering.assertMddDecomposed(expr: MddExpr) {
             k += 3
         }
         if (tuples.isEmpty()) {
-            assertExpr(IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(1))) // UNSAT
+            assertExpr(IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(1)))
         } else {
             assertExpr(
                 TableConstraint(
@@ -150,7 +144,6 @@ internal fun Lowering.assertCostMddDecomposed(expr: CostMddExpr) {
     }
     assertExpr(Or(expr.accepting.map { a -> IntCompare(stateRefs[n], IntCmpOp.EQ, IntLit(a)) }))
 
-    // Allocate per-layer edge-weight var w[i] = weight of the chosen transition.
     val allWeights = IntArrayList()
     var idx = 0
     while (idx < expr.transitions.size) {
@@ -187,7 +180,6 @@ internal fun Lowering.assertCostMddDecomposed(expr: CostMddExpr) {
             ),
         )
     }
-    // cost = Σ w[i].
     val sumTerms = mutableListOf<IntExpr>()
     for (i in 0 until n) sumTerms += weightRefs[i]
     sumTerms += IntScale(-1, expr.cost)
@@ -204,7 +196,6 @@ internal fun Lowering.assertCostRegular(expr: CostRegularExpr) {
     val liftedSeq = expr.seq.map { lift(it) }
     val liftedCost = lift(expr.cost)
     if (liftedSeq.all { it is IntRef } && liftedCost is IntRef) {
-        // Build a single layer's transition rows then replicate per layer.
         val baseRows = IntArrayList()
         for (q in 0 until numStates) {
             for (s in 0 until numSymbols) {

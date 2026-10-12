@@ -50,7 +50,7 @@ data class LocalSearchResidualFactor(
         omittedInts: Int = 0,
     ) : this(id, kind, degree, bools, ints, omittedBools, omittedInts, emptyMap())
 
-    /** Copy coordinates while retaining [details], including through the legacy JVM copy descriptor. */
+    /** Copy coordinates while retaining [details]. */
     fun copy(
         id: Int = this.id,
         kind: String = this.kind,

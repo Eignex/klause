@@ -43,8 +43,7 @@ internal object Probing {
      *    `min` of the two implied lower bounds, `max` of the two implied upper bounds. Taking the
      *    tighter bound of the pair instead would discard the solutions of the weaker case.
      *
-     * Discovered binary implications are deliberately **not** persisted: there is no implication
-     * store to hold them, and inventing one is out of scope. They are simply dropped.
+     * Binary implications are dropped; this pass persists only units and unconditional bounds.
      *
      * Idempotent: a derived unit already present is not re-added and a bound already at least as
      * tight is not re-applied, so the round engine reaches a fixpoint instead of churning. Bounded
@@ -511,7 +510,7 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     }
 }
 
-// Uncalibrated: one unit per row term visited, scaled like the other source passes.
+// Work units per row term visited, scaled like the other source passes.
 private const val PROBE_SOURCE_WORK_WEIGHT = 10L
 
 // Row visits one fixpoint may spend, per row of the model.

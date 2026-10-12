@@ -113,17 +113,8 @@ class ElementPropagatorTest {
         assertEquals(setOf(0, 1, 2, 3), byVar.keys, "all of idx/result/array vars subscribed")
     }
 
-    /**
-     * Pinned-index channel over a var array: `result = arr[idx]` with `idx` pinned copies
-     * bounds both ways between `result` and the selected element. The copied bound is the
-     * other var's search-derived state, so the recorded reason must cite that var — a
-     * reason carrying only the index pin records `idx = pos → bound` as if it held for
-     * every value of the other var, and conflict analysis resolving through it learns a
-     * clause that prunes feasible assignments (surfaced as a false UNSAT on
-     * project-planning). The element→result direction is also covered by the union bound,
-     * which cites the array; the result→element direction below is served by the channel
-     * alone.
-     */
+    // Pinned-index channel bounds depend on the selected variable's search-derived bound as well
+    // as the index pin. Omitting that bound would let learning prune valid assignments.
     @Test
     fun `pinned index channel cites the result bound when lifting the element`() {
         // ints: idx(0) root-pinned to 0, result(1), element(2); result = [element][idx].

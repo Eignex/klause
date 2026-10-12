@@ -20,10 +20,6 @@ import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Which lane can hold a factor is the factor's own statement, not a list of classes the plan keeps. A
- * factor kind the plan has never heard of is placed by what it declares.
- */
 class TheoryOwnableTest {
 
     private fun factorDeclaring(complete: Boolean) = object : Factor {

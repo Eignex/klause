@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# 300s BASELINE-ONLY sweep over the agreed subset of the MiniZinc Challenge corpus.
-# No klause — just the reference solvers, one per invocation:
-#   Choco backs the complete-search tracks (free=p1, parallel/open=p8, fixed=annotation)
-#   Yuck  backs the local-search track (ls)
-# The `solve` metric writes one .out + .json per problem under klause-bench/output/<config>/ itself,
-# so there's nothing to copy here — each config's dir name encodes solver+settings+budget.
+# 300s reference sweep over the selected MiniZinc Challenge problems.
+# Runs Choco free, parallel and fixed tracks plus Yuck local search.
 set -u
 cd "$(git rev-parse --show-toplevel)"
 COP="suite=mzn-bench kind=cop per-family=1 name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus"

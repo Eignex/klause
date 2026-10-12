@@ -13,7 +13,7 @@ import kotlin.reflect.KClass
  * The contract remains open for extension-defined arrays, functions and source symbols.
  */
 interface TypedSearchValueKey<V : Any> : SearchValueKey {
-    /** Runtime check for legacy untyped contribution paths; generic arguments remain the extension's contract. */
+    /** Runtime check for untyped contribution paths; generic arguments remain the extension's contract. */
     val valueType: KClass<V>
 
     /** Owned immutable value retained by the assembled model. Immutable values may be returned unchanged. */

@@ -15,7 +15,6 @@ import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
-/** LS invariant logic for `global_cardinality`. */
 internal class GlobalCardinalityInvariant(
     private val xs: IntArray,
     private val cover: LongArray,

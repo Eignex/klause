@@ -9,10 +9,8 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 /**
- * Reads and writes corpus instance files, which the cache stores zstd-compressed as `<name>.<ext>.zst`.
- * zstd because decompression lands inside the measured solve time and it decodes at memory speed.
- * Plain files read the same way, so vendored instances and a cache that predates compression keep
- * working. Every reader of an instance file goes through [open], [readText] or [withPlainFile].
+ * Corpus file IO for plain and zstd-compressed instances. All readers use [open],
+ * [readText] or [withPlainFile]; decompression is included in solve timing.
  */
 internal object CorpusFiles {
 

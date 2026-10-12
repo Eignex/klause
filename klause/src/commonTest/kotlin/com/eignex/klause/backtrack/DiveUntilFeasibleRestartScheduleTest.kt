@@ -5,11 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Feasibility-first gate: [DiveUntilFeasibleRestartSchedule] suppresses all restarts until the first
- * solution, then delegates to its inner schedule. A stub inner that always wants to restart makes the
- * hand-over observable.
- */
 class DiveUntilFeasibleRestartScheduleTest {
 
     /** An inner that always asks to restart and reports a FOCUSED regime, so the gate is observable. */

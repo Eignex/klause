@@ -8,29 +8,12 @@ import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
 /**
- * Activity-Based Search (Michel-Van Hentenryck 2012). Maintains a per-variable *activity*
- * counter that increments every time the variable is
- * forced into a singleton by a propagation step (read off [PropagationResult.Implied]).
- * Different from VSIDS: VSIDS bumps only on conflicts; ABS bumps on *every* propagation
- * event the variable participates in — a broader, lower-variance signal of which variables
- * the constraint network is structurally hardest at.
+ * Activity-based search (Michel–Van Hentenryck 2012). Picks `argmax activity(v) / dom(v)`
+ * over unpinned variables. [PropagationResult.Implied] bumps variables forced into singletons;
+ * partial domain reductions do not contribute.
  *
- * Picks `argmax a(v) / dom(v)` over unpinned variables. Decay is implicit via geometric
- * `increment` growth (same trick as VSIDS); per-decision rescale when `increment` nears
- * `Double` overflow. Activities persist across [onRestart] by default — that's how ABS
- * learns from one run to the next; set [resetOnRestart] to true to clear them at every
- * Luby restart for an aggressive variant.
- *
- *  - [decay] ∈ (0, 1): higher = more conservative (gives long-tail history more weight),
- *    lower = more aggressive (forgets old conflicts fast).
- *  - [resetOnRestart] = false (default): preserve activities across restarts; true clears
- *    them, useful for "ABS restart" mode where each run rebuilds the activity map.
- *
- * Caveat: klause's [PropagationResult.Implied] currently reports newly-singletoned
- * variables, not every var whose domain was reduced. So our ABS activity is a narrower
- * signal than the textbook version (which counts every domain-reduction event). Still
- * captures the dominant signal on most CSPs — vars frequently forced into singletons are
- * exactly the structurally-critical ones.
+ * Decay uses geometric increment growth and rescales near [Double] overflow. Higher [decay]
+ * retains older evidence. Activities survive [onRestart] unless [resetOnRestart] is true.
  */
 internal class ActivityBasedSearch(
     private val decay: Double = 0.999,

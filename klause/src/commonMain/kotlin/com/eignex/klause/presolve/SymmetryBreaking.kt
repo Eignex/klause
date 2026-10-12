@@ -384,8 +384,8 @@ internal object SymmetryBreaking {
      * Only the value-anonymous setting is handled: there an orbit equals a value-incidence class, so
      * every fully-internal variable's domain is *exactly* the orbit (incidence-equality forces it),
      * which is what makes ordering the first occurrences sound. Non-anonymous problems keep the
-     * verified single-variable pin. Unlike the original decomposition this needs no auxiliary
-     * variables — the native factor reasons over arbitrary (not just consecutive) value pairs — so
+     * verified single-variable pin. The native factor reasons over arbitrary value pairs without
+     * auxiliary variables, so
      * the variable space is unchanged and no reconstruction is required.
      *
      * Variables in [objectiveIntVars] are excluded (ordering them would change the optimum). Returns
@@ -677,13 +677,8 @@ internal object SymmetryBreaking {
                 Array(
                     nBool,
                 ) { v -> portSignature(problem, boolInc[v], v, isBool = true, intMap, boolMap, mapping, boolColour[v]) }
-            // Charge the real per-round work, not just the arc count: each round also builds an
-            // O(nInt + nBool) signature array per variable space and re-groups them in [assignColours]
-            // (a sort over the distinct colours). On a sparse model — few factors over many variables,
-            // so arcs per round is tiny while the per-variable work dominates — charging arcs alone
-            // vastly under-counts, letting the refinement run thousands of rounds (hundred_doors:
-            // 10 factors, 10394 vars, ~23s at budget=0). Including the per-variable term bounds the
-            // round count by the work budget as intended.
+            // Signature construction and color regrouping cost O(nInt + nBool) even on sparse models;
+            // charge those variables alongside arcs so the work budget bounds refinement rounds.
             if (budget != null) budget[0] -= arcsPerRound + nInt + nBool
             cancellation.charge(arcsPerRound.toLong() + nInt + nBool)
             val next = assignColours(sigInt, sigBool, intColour, boolColour)
@@ -777,14 +772,8 @@ internal object SymmetryBreaking {
      *  factor `w ≈ d`, so this reduces to `Σ d²`; a data-heavy factor like a wide table has `w ≫ d`).
      *  Per-arc work here is a structural-key rebuild rather than a graph-edge walk, so the realistic
      *  guard is on that weighted work rather than a raw node/arc count. Above this even the first
-     *  round cannot complete within
-     *  [GENERATOR_WORK_BUDGET], and such large models empirically carry no verifiable variable symmetry,
-     *  so the search is skipped outright. Sound — skipping only finds fewer symmetries. Calibrated
-     *  against the corpus: every instance that carries verifiable symmetry has a round cost at or below a
-     *  crossword grid's ≈ 3.5·10⁵, while the many-rows / many-column models that only burn a fruitless
-     *  search (constraint-programming rosters, rack placement, linear systems) sit from ≈ 5·10⁵ into the
-     *  tens of millions. The cap sits above the symmetry-bearing band with margin: it skips the fruitless one
-     *  (~0.25–0.35s of dead search each) without dropping any symmetry the corpus actually breaks. */
+     *  round consumes too much of [GENERATOR_WORK_BUDGET], so the search is skipped.
+     *  Skipping is sound and only reduces the symmetries found. */
     private const val GENERATOR_ROUND_COST_BUDGET = 500_000L
 
     /** Deterministic work budget for the whole generator search, charged per refinement arc visited

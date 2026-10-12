@@ -7,7 +7,6 @@ import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
-/** CP propagator for [Regular]. Constructed by the propagation projection. */
 internal class RegularPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,

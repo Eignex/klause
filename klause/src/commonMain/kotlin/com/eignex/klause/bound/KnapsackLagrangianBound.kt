@@ -31,11 +31,6 @@ import kotlin.math.ceil
  * bound. The exact knapsack captures integrality the monolithic LP relaxes away, so at good λ the
  * bound can exceed the LP bound — the point of decomposition over plain relaxation.
  *
- * ## Why a knapsack (and not a single-machine scheduling subproblem)
- * The 0/1 knapsack DP is exact, pseudo-polynomial, and unambiguously sound; the single-machine
- * scheduling alternative overlaps klause's edge-finding propagation and was deferred
- * for that reason (see [CumulativeEnergeticBound]). This is the self-contained, clearly-sound slice.
- *
  * ## Exactness
  * Multipliers are integers `p_r` over a fixed denominator [Q] (`λ_r = p_r / Q`). The adjusted cost of
  * variable `i` is the integer `Wᵢ = Q·cᵢ + Σ_r p_r·a_ri`, so the subproblem (free variables in closed

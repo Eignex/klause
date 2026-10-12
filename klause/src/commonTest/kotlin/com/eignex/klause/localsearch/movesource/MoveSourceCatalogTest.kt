@@ -5,11 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/**
- * Tests for the sources-axis registry [MoveSourceCatalog]: labels resolve to the right
- * default-configured sources, the `sources=` parser preserves order and skips blanks, and unknown
- * labels fail loudly.
- */
 class MoveSourceCatalogTest {
 
     @Test

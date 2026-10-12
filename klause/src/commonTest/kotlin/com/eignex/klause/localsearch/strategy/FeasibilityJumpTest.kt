@@ -19,11 +19,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * Behaviour tests for the Feasibility-Jump [SourceDrivenStrategy] recipe: a weighted-violation
- * argmin-jump strategy must reach feasibility on a solvable instance, make progress (driven by the
- * adaptive weights) on a coupled one, and be deterministic for a fixed seed.
- */
 class FeasibilityJumpTest {
 
     @Test

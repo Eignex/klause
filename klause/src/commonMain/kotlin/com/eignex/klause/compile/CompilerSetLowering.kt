@@ -32,13 +32,9 @@ import com.eignex.klause.model.SetSubsetOf
 import com.eignex.klause.model.SetUnion
 
 /**
- * Materialise a [SetExpr] into a [SetLayout]. Looks up named set vars; for compound
- * expressions (union / intersect / diff / literal) allocates aux indicator bools and
- * ties them via clauses, then returns the new layout.
- *
- * The universe of the result is the union of the operand universes (for binary ops) or
- * the literal's own element list (for [SetLiteral] / [SetNominalLiteral]). This keeps
- * the lowering uniform — every downstream consumer iterates the universe once.
+ * Materialise [SetExpr] as a [SetLayout]: named sets reuse their layout; literals and compound
+ * expressions allocate indicators tied by clauses. Binary operations use the union universe,
+ * except difference, which uses the left operand universe.
  */
 internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
     is SetRef -> setLayouts[expr.name]
@@ -116,12 +112,9 @@ internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
 }
 
 /**
- * Shared scaffold for the binary set-materialisation ops (∪, ∩, \). Materialises both operands,
- * allocates one fresh indicator bool per result-universe element, and for each element invokes
- * [emit] with the result literal plus each operand's indicator literal at that element (`null`
- * when the element is absent from that operand's universe). [fullUnion] picks the result universe:
- * the union of both operand universes (∪, ∩), or just the left operand's (\, where the result can
- * only hold left-side elements). The per-element clause logic lives in [emit].
+ * Materialise both operands and allocate result indicators. [emit] receives each result literal
+ * and operand indicators (`null` for elements outside an operand universe). [fullUnion] selects
+ * the union universe for ∪ and ∩, or the left universe for difference.
  */
 private fun Lowering.materializeSetBinary(
     left: SetExpr,
@@ -144,7 +137,6 @@ private fun Lowering.materializeSetBinary(
     return SetLayout(universe, ids)
 }
 
-/** Sorted ascending union of two universe arrays. */
 private fun unionUniverse(a: IntArray, b: IntArray): IntArray {
     val merged = LinkedHashSet<Int>(a.size + b.size)
     for (v in a) merged.add(v)
@@ -387,7 +379,6 @@ private fun Lowering.indicatorBoolExpr(boolId: Int): BoolExpr {
     return BoolRef(name)
 }
 
-/** Resolve a [SetExpr] to a set-var name if it's a bare [SetRef]; else null. */
 private fun setRefName(expr: SetExpr): String? = (expr as? SetRef)?.name
 
 private fun andOf(pieces: List<BoolExpr>): BoolExpr = if (pieces.size == 1) pieces[0] else And(pieces)

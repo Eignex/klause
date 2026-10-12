@@ -41,12 +41,9 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 
 /**
- * Exact feasibility for the supported open QF_LIRA and QF_LIA fragments.
- *
- * The Boolean skeleton is fixed first. At a Boolean leaf the rational simplex sees both integer and
- * real columns. A fractional integer witness is split at its exact [BigInt] floor, so the child
- * boxes are disjoint and cover every integer value. This deliberately lives beside QF_LRA rather than
- * entering finite CP: the only branching here is theory-local integrality branching.
+ * Exact open QF_LIRA/QF_LIA feasibility: fix the Boolean skeleton, solve each leaf with rational
+ * simplex, then split a fractional integer witness at its exact [BigInt] floor. The disjoint
+ * child boxes cover every integer value without materializing finite CP domains.
  */
 class ExactLiraSolver(override val model: Problem) : Theory<ExactLiraAssignment> {
     private var smtStats: SmtStatsSink? = null

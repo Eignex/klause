@@ -384,11 +384,8 @@ data class BacktrackParams(
      * otherwise lacks (it has no objective variable to tighten). Ignored when the objective is a single
      * integer variable (that path tightens the variable directly).
      *
-     * **Off by default.** It is a proving-speed win (fewer nodes, and it proves the odd extra instance) but
-     * enforcing the bound by propagation turns free incumbent-ratcheting into a harder constrained search,
-     * so as a uniform default it costs more in anytime incumbent quality than it gains — measured
-     * net-negative on the pb07 corpus at both 20s and 60s. It belongs on a proving-focused arm rather than
-     * every search; enable it per arm (or via the CLI) where proving matters more than fast incumbents.
+     * Off by default and enabled per proving-focused arm: enforcing the cutoff strengthens optimality
+     * reasoning but constrains the search for improving incumbents.
      */
     val pbObjectiveCutoff: Boolean = false,
     /**

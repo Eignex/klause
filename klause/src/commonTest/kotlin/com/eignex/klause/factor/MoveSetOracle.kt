@@ -12,23 +12,15 @@ import kotlin.random.Random
 import kotlin.test.assertTrue
 
 /**
- * Brute-force oracle for [Factor.proposeRepairMoves]. Builds the ground-truth set
- * of single-step repairs from a violating assignment by enumerating the 1-flip / 1-IntSet
- * neighborhood, then asserts the factor's proposed moves cover at least one improving move
- * whenever one exists.
- *
- * "Improving" means: after applying the move, the factor's `isViolated` drops to `false`
- * (a single factor's violation is binary). Compound moves are evaluated by sequential apply.
+ * Enumerates single-flip and single-IntSet repairs and requires [Factor.proposeRepairMoves] to
+ * include an improving move whenever one exists. Improvement means satisfying the factor;
+ * compound moves are applied sequentially.
  */
 object MoveSetOracle {
 
     /**
-     * For [iters] random starting assignments, force violation if possible, then check the
-     * propose-cover property: brute-improving ⇒ propose-improving. Throws AssertionError on
-     * any failure with a description of the offending state and the brute oracle's witness.
-     *
-     * `requireImprovement`: when true (default), every proposed move must be non-worsening
-     *   (delta ≤ 0); set false for factors that intentionally propose neutral/diversifying moves.
+     * Checks proposed repairs on [iters] random violating assignments.
+     * [requireImprovement] additionally requires each proposed move to have nonpositive delta.
      */
     fun assertRepairsCoverImproving(
         problem: Problem,

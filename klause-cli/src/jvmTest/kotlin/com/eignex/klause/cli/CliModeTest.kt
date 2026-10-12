@@ -1507,7 +1507,7 @@ class CliModeTest {
             5_000L to 1250L,
             // 0.1 of 30s is 3s; the floor lifts it to 5s, which is under the 25% ceiling of 7.5s.
             30_000L to 5_000L,
-            // Long enough for the floor to no longer bind: a plain 0.1 share.
+            // The budget exceeds the floor, so the allowance is a 0.1 share.
             120_000L to 12_000L,
             // No time limit at all falls back to the flat backstop.
             null to CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS,

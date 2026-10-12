@@ -16,11 +16,6 @@ import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * [lpFeasibilityPump] must propose only feasible assignments — every returned assignment satisfies all
- * Linear factors — so its proposals survive the caller's verification instead of being thrown away.
- * Checked by brute force over random 0/1 covering/packing problems.
- */
 class LpPrimalHeuristicsFeasibilityPumpTest {
 
     private fun satisfies(f: Linear, x: LongArray): Boolean {

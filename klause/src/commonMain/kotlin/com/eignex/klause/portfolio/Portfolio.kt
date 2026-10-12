@@ -35,49 +35,30 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
- * A bandit-scheduled portfolio of klause solver arms running on `lanes` threads. Each lane repeatedly claims an
- * arm a kumulant [UnivariateBandit] picks, runs it for one segment, and settles what the segment earned; the
- * shared incumbent, bound and pools pass between segments and lanes. One lane is the single-core track, where the
- * policy shares time by family, balancing complete-search work until a witness is accepted and then favoring
- * arms making progress; more lanes run that same schedule
- * concurrently, never two at once on one arm. With a lane for every arm there is nothing to share, and each lane
- * runs its own arm for the whole solve.
+ * Bandit-scheduled portfolio of [PortfolioWorker] arms built by [PortfolioBuilder], mixing local
+ * search, backtrack and ALNS. Each lane claims an arm selected by [UnivariateBandit], runs one
+ * segment and settles its reward. An arm runs on at most one lane at a time. Single-lane
+ * scheduling balances complete-search work until a witness is accepted, then favors progress.
+ * With a lane per arm, each arm runs for the whole solve.
  *
- * An **arm** is a [PortfolioWorker], built by [PortfolioBuilder], so a portfolio may mix local search, backtrack
- * and ALNS. Across segments the shared incumbent bound prunes backtrack arms (their `objectiveBoundSupplier`) and
- * the incumbent assignment warm-starts local-search arms (their `initialAssignment` seam, threaded through
- * [PortfolioWorker.improvements]'s `warmStart`).
+ * The shared incumbent cutoff prunes backtrack arms and its assignment warm-starts local-search
+ * arms. [RewardLedger] scores contributions per unit of work against the pool's rate: first
+ * feasibility, objective improvement, proven lower-bound increases, root deductions and residual
+ * violation improvements ([ProgressCredit]). It begins a new reward phase at first feasibility.
+ * [ContributionTally] credits peers' use of imported clauses, cuts and bounds.
  *
- * **Reward** (folded into the bandit in `[0, 1]`) comes from a [RewardLedger]: each arm is credited for what it
- * contributed and scored on the rate it earned that at, per unit of work, against the rest of the pool's rate.
- * Before any incumbent exists the credit is a first feasible solution, which drives the feasibility hunt; once
- * one exists it is the objective improvement, which drives anytime convergence. A rise in the pool's proven
- * lower bound is credited to the arm that proved it, so an arm closing the gap from below earns as one closing it
- * from above does. Progress short of a solution earns credit in both: variables a backtrack arm fixes at its root,
- * and a local-search arm lowering the record violation ([ProgressCredit]). The ledger starts a new phase at the
- * first incumbent, since the rates a feasibility hunt earned say nothing about who improves one. An arm is also
- * credited when another arm uses what it shared: an imported clause in a conflict or unit, an imported cut
- * selected into a relaxation, an imported bound tightening a domain ([ContributionTally]).
+ * [ResumableSearch] and [ResumableSolve] handles retain traversal, learned clauses, heuristics
+ * and warm-start state across segments. Local-search satisfaction handles retain assignment,
+ * RNG and restart state. Optimizing arms without handles restart from the shared incumbent.
+ * Counted segment allowances grow by [sliceGrowth] equally across arms so restarting searches
+ * can explore deeper while scheduled work shares remain comparable.
  *
- * **Resumable arms:** a backtrack arm exposes a [ResumableSearch] ([PortfolioWorker.newResumableSearch])
- * or, for satisfaction, a [ResumableSolve] ([PortfolioWorker.newResumableSolve]). The portfolio holds one handle
- * per such arm and *resumes* it each time the arm is scheduled, on whichever lane, so the arm continues its exact
- * search — learned clauses, trail, heuristics and LP warm-start caches intact. Local-search satisfaction handles
- * retain the assignment, RNG and restart state between segments. An optimising arm without a handle runs a fresh
- * segment warm-started from the shared incumbent. Every counted arm's segment spends the same work,
- * growing by [sliceGrowth] after each segment: a restarting arm needs the growth to dig deeper than one short
- * restart reaches, and a resumable arm takes it too, since an arm whose turns were shorter than its peers' would get
- * less of the core than the policy picks it for.
+ * [reseedStaleThreshold] rebuilds plateaued observable or restart-configured workers from the
+ * shared incumbent. Complete search without restarts retains its traversal and imports tighter
+ * cutoffs, since a segment without improvement can advance an optimality proof.
  *
- * **Re-seeding plateaued arms ([reseedStaleThreshold]):** observable search families and restart-configured
- * complete workers that fail to improve the incumbent have their handles rebuilt from the shared incumbent.
- * Complete search without a restart schedule retains its traversal and imports tighter incumbent cutoffs:
- * a segment without an improvement can advance an optimality proof.
- *
- * **Quarantine ([witnessCheck]):** every model and incumbent an arm reports is checked against the model before it
- * counts, and an arm that claims infeasibility while the pool holds a verified solution is caught too. An arm
- * caught claiming a result the model refutes is retired, its claim discarded and [onFault] told, so one faulty
- * configuration cannot hand the run a wrong answer while the other arms carry on.
+ * [witnessCheck] validates reported models and incumbents and rejects infeasibility claims when
+ * a verified solution exists. A faulty arm is retired, its claim discarded and [onFault] notified.
  */
 class Portfolio(
     /** The arms; each carries its own engine, params, and objective form. */

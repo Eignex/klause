@@ -46,7 +46,7 @@ internal class SymmetricAllDifferentPropagator(
             if (!state.tightenIntMin(v, lo.toLong())) return false
             if (!state.tightenIntMax(v, hi.toLong())) return false
         }
-        // Every domain now lies in [lo, hi], so a fixed value indexes its claimant directly.
+        // Every domain lies in [lo, hi], so a fixed value indexes its claimant directly.
         val claimedBy = IntArray(xs.size) { -1 }
         for (v in xs) {
             val d = state.intDomains[v]

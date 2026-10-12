@@ -1,29 +1,14 @@
 package com.eignex.klause.lp.bounding
 
 /**
- * Adaptive work budget for a node LP: how much a solve may spend, adjusted from what the last one did.
+ * Adaptive per-node LP work budget, adjusted from solve completion and dual degeneracy:
+ *  - Incomplete, nondegenerate solves double the budget.
+ *  - Incomplete, degenerate solves shrink it.
+ *  - Optimal, nondegenerate solves reset it to the caller's size baseline.
+ *  - Optimal, degenerate solves shrink it further.
  *
- * The signal is the solve itself, not the search around it. Two facts are available every time and need
- * no incumbent: whether the solve reached its optimum, and how dually degenerate the basis it stopped on
- * was. Budgeting on prune counts instead cannot work, because a relaxation that has pruned nothing is
- * indistinguishable from one whose search has not yet produced a bound to prune against — the two want
- * opposite treatment, and the models with the most to gain from a budget are exactly the ones that never
- * find an incumbent.
- *
- * So:
- *  - **stopped short, not degenerate** — the budget was the binding constraint and the solve was making
- *    progress, so double it;
- *  - **stopped short, degenerate** — it was stalling among tied columns, so shrink it;
- *  - **reached the optimum, not degenerate** — the model's own size predicts the cost better than any
- *    history, so reset to the size baseline the caller supplies;
- *  - **reached the optimum, degenerate** — shrink harder still.
- *
- * Bounded by [minOps] and [maxOps]: the floor keeps a weak bound coming rather than switching the LP off,
- * which with a persistent basis is never wasted — a stopped solve is progress the next node resumes from.
- *
- * Kept off [LpEngine] as a small value so the decision is deterministic and unit-testable. Mirrors
- * CP-SAT's `UpdateSimplexIterationLimit`, in work rather than iterations because a pivot is not a unit
- * of cost.
+ * [minOps] and [maxOps] bound the budget. A persistent basis retains partial progress between
+ * solves. Prune counts are unsuitable feedback because pruning also depends on the incumbent.
  */
 internal class LpWorkBudget(private val minOps: Long, private val maxOps: Long, initialOps: Long) {
     private var next: Long = initialOps.coerceIn(minOps, maxOps)

@@ -77,7 +77,7 @@ internal object SolverInvocation {
         /** The solution a reference returned, as `name value` lines: kept beside its record so the verdict can be
          *  checked again. Null when it returned none, or for a solver that does not report one. */
         val assignment: String? = null,
-        /** Subprocess wall-clock duration, including launch and output consumption; null in legacy caches. */
+        /** Subprocess wall-clock duration, including launch and output consumption; null when unavailable. */
         val elapsedMs: Long? = null,
         val exactObjective: String? = null,
     ) {
@@ -440,24 +440,16 @@ internal object SolverInvocation {
             process.waitFor()
         }
         val elapsedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
-        // Three-way split on a non-zero exit. A clean exit, or any verdict line (solution / unsat),
-        // is a usable run. A child *we* force-killed for blowing its wall-clock ceiling exits non-zero
-        // with no verdict, but that is an honest "ran out of time, undecided": recording it as an error
-        // would discard its partial output and stats and misattribute a timeout as a failure, so it
-        // returns a feasible=null Result carrying a kill marker instead. Anything else — a missing
-        // binary, bad arguments, a crash — stays loud, since the callers' per-instance runCatching
-        // already contains the throw without aborting the sweep.
+        // Force-killed children yield an undecided result with partial output; other nonzero exits
+        // without verdicts raise errors for the per-instance handler.
         if (process.exitValue() != 0 && !anySolution && !unsat) {
-            // The drain runs on its own thread, and what it collected is now read for control flow
-            // rather than only for a message: wait for it, or a refusal races with its own stderr.
+            // Join the stderr drain before classification so a refusal cannot race with its message.
             drain.join(STDERR_DRAIN_WAIT_MS)
             val refusal = unsupportedModelRefusal(stderr.toString())
             check(killed.get() || refusal != null) {
                 "${cmd.first()} failed (exit ${process.exitValue()}): ${stderr.toString().take(STDERR_CAP)}"
             }
-            // A solver that declines a model it parsed decided nothing, which is not the same as
-            // crashing on it: recorded undecided and labelled, so a sweep can tell the two apart
-            // instead of reading every refusal as a failed run.
+            // Unsupported models yield labelled undecided results.
             if (refusal != null) stats["unsupported"] = refusal else stats["killed"] = "hard-timeout"
             stats["exit"] = process.exitValue().toString()
         }
@@ -496,14 +488,8 @@ internal object SolverInvocation {
     internal fun parsePbObjective(text: String): Double? = ExactObjective.parse(text)?.approximate()
 
     /**
-     * The reason a solver declined a model it had already parsed, or null when the failure is anything
-     * else.
-     *
-     * A frontend that refuses an unsupported-but-well-formed model exits non-zero with one
-     * `klause <format>: <reason>` line and no verdict, which is indistinguishable at the exit code from a
-     * crash. It is not one: nothing went wrong, the model is simply outside what the solver covers, and a
-     * sweep that scores it as a failed run hides both the refusals and the real crashes among them. A
-     * stack trace anywhere in the stream means it *is* a crash, whatever else was printed.
+     * Decline reason from a nonzero exit with a `klause <format>: <reason>` line and no verdict,
+     * or null for other failures. Any stack trace classifies the run as a crash.
      */
     internal fun unsupportedModelRefusal(stderr: String): String? {
         if (stderr.lineSequence().any { it.trimStart().startsWith("at ") || it.contains("Exception") }) return null
@@ -589,16 +575,15 @@ internal object SolverInvocation {
     private const val REGISTRY_WAIT_MILLIS = 10_000L
 }
 
-/** One strict global improvement, parsed off a klause portfolio's `%%%klause-arm:` line. The exact
- *  model-oriented discrete value is [exactObjective], encoded as decimal text so JSON never rounds a
- *  value past 2^53. [continuousObjective] is the whole model-oriented objective when a continuous
- *  column carries cost; it is null only for an exact discrete objective. [objective] decodes
- *  pre-two-channel records and must not be used where exactness matters, nor written by new code.
+/**
+ * A portfolio incumbent record parsed from `%%%klause-arm:`. [exactObjective] stores
+ * model-oriented discrete cost as decimal text; [continuousObjective] stores the whole
+ * cost when a continuous column contributes. [objective] supports numeric persisted
+ * records and must not be used for exact comparisons or new output.
  *
- * The list across a solve is the per-arm credit signal, in arrival order — **not** improvement order:
- * a concurrent portfolio's shared-bound CAS and its attribution-emit lock are separate critical
- * sections, so a worse incumbent's line can print after a better one's under thread scheduling. Find
- * the best-holder with [SolveMetric.best], never `.last()`. */
+ * Arrival order may differ from improvement order because publication and emission
+ * use separate critical sections. Find the best holder with [SolveMetric.best].
+ */
 @Serializable
 internal data class Attribution(
     val label: String,

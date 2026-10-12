@@ -28,10 +28,7 @@ import com.eignex.klause.util.subExact
 /**
  * Sound LP makespan lower bound for the scheduling globals ([Cumulative]).
  *
- * The start-variable LP has no resource–time coupling, so [CpToLpRelaxation] drops every scheduling
- * global and the only scheduling-aware reasoning, [CumulativeEnergeticBound], is a feasibility test
- * that can never tighten the objective. This class restores an *objective* contribution by the one
- * inequality the start-variable LP can carry: an **energetic makespan bound**.
+ * Couples task energy to the makespan variable through an energetic makespan inequality.
  *
  * ## The bound
  * Fix a makespan variable `M` that is provably ≥ the end of every task in a set `T` (`M ≥ startᵢ +

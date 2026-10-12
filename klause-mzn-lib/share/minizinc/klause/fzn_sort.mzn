@@ -1,4 +1,4 @@
-% Auto: keep `sort` native (klause has a factor for it) instead of the std decomposition.
+% Maps `sort` to its native factor.
 predicate klause_sort(array [int] of var int: x, array [int] of var int: y);
 
 predicate fzn_sort(array [int] of var int: x, array [int] of var int: y) =

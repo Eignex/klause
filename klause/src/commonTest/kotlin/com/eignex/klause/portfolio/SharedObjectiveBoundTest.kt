@@ -6,11 +6,6 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * The shared objective lower-bound manager keeps the cross-arm maximum of the bounds arms
- * prove, ignoring non-informative values. Verified in isolation (no executor), since the logic is a
- * deterministic monotone fold.
- */
 class SharedObjectiveBoundTest {
 
     @Test

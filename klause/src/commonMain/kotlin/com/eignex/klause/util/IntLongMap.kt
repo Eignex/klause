@@ -1,15 +1,8 @@
 package com.eignex.klause.util
 
 /**
- * Read-only int→long lookup table backed by a flat [LongArray] indexed by `key - minKey`.
- * Keys outside `[minKey, minKey + values.size)` resolve to [absent]; callers that need a
- * "is key present" distinction beyond the sentinel can build the map with a sentinel
- * value the data never legitimately holds (`-1` for non-negative payloads, `Long.MIN_VALUE`
- * otherwise).
- *
- * The int-value twin [IntIntMap], with the same dense/sparse backing choice — use this when the
- * payload is a value that may exceed 32-bit range (a signed pseudo-Boolean weight). Keys are
- * variable ids, dense by construction in klause's allocator.
+ * Read-only primitive Int-to-Long map with the dense/sparse backing choice of [IntIntMap].
+ * Missing keys return [absent]; choose a sentinel outside the payload range when needed.
  */
 internal class IntLongMap private constructor(private val backing: Backing, private val absent: Long) {
     operator fun get(key: Int): Long = backing.get(key, absent)

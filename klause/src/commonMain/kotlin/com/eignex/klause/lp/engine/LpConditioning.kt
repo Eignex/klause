@@ -5,22 +5,12 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The spread of a relaxation's structural coefficients used by [LpScalingView]'s eligibility gate.
+ * Structural coefficient magnitudes used by [LpScalingView]'s eligibility gate. Logical
+ * columns are excluded: their unit entries would bias conditioning measurements toward one.
+ * The source measurement remains available alongside the numerical view.
  *
- * HiGHS gates its own equilibration on exactly this: `scaleLp` skips scaling outright when every
- * `|a_ij|` already lies in `[0.2, 5]`, on the grounds that a matrix that narrow has nothing to gain.
- * The unscaled reading is retained alongside the live numerical view so acceptance and decline are
- * observable in source terms.
- *
- * Only *structural* entries are measured. The logical columns [lpColumns] appends carry a single
- * `±1` each, so counting them would drag every ratio toward 1 and report a well-conditioned matrix
- * whatever the model looks like.
- *
- * [rowRatio] and [columnRatio] are the worst single row's and single column's `max/min` magnitude.
- * They matter separately from [matrixRatio]: a matrix can span decades overall while each row is
- * internally tight (nothing to equilibrate away, only a global rescale), and it can look narrow
- * overall while individual rows mix magnitudes (exactly what row scaling fixes). An empty row or
- * column contributes no ratio.
+ * [rowRatio] and [columnRatio] give the largest within-row and within-column spreads;
+ * [matrixRatio] measures overall spread. Empty rows and columns contribute no ratio.
  */
 internal class LpConditioning(
     /** Smallest `|a_ij|` over the structural entries; 0 when there are none. */

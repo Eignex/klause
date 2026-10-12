@@ -5,10 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * What a solve reports about how it started. A warm basis and a fresh factorization are separate costs:
- * reusing the basis saves pivots, and only reusing the factorization saves the `O(nnz)` LU rebuild.
- */
 class RevisedSimplexWarmStartTest {
 
     /** `x + y >= 3`, `x <= 4`, `y <= 4`, minimising `x + 2y` — small, feasible, and not optimal at the

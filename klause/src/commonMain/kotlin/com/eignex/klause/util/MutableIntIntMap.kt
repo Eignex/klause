@@ -1,20 +1,10 @@
 package com.eignex.klause.util
 
 /**
- * Mutable open-addressing `Int → Int` hash map specialised to avoid the key/value autoboxing
- * a stdlib `HashMap<Int, Int>` pays on every `put`/`get`. This is the mutable sibling of the
- * build-once read-only [IntIntMap]: use [IntIntMap] for a fixed lookup table built from parallel
- * arrays, and this when entries are inserted/incremented/removed on a hot path — count maps in
- * `propagate()`, per-move delta accumulators in local search, etc.
- *
- * Linear-probed, capacity a power of two, load factor kept ≤ 0.5 so probe chains stay short.
- * Occupancy is tracked by a parallel `used` bitmap rather than a sentinel empty key, so **any**
- * `Int` key (including [Int.MIN_VALUE] and `0`) is storable. Removal uses backward-shift deletion
- * (Knuth 6.4 algorithm R), so the table holds no tombstones and stays compact across reuse —
- * making [clear] + refill cheap enough to reuse one instance per factor instead of reallocating.
- *
- * Not thread-safe. Iteration order is unspecified (hash order); callers needing a deterministic
- * order must sort the keys themselves.
+ * Primitive-key Int-to-Int map with linear probing, power-of-two capacity and load
+ * factor at most 0.5. A separate occupancy bitmap permits every key value;
+ * backward-shift deletion avoids tombstones. See [IntIntMap] for related lookup
+ * storage. Not thread-safe; iteration order is unspecified.
  */
 internal class MutableIntIntMap(initialCapacity: Int = 8) {
     private var keys: IntArray

@@ -20,13 +20,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Regression for issue #72 — the local-search incremental payloads accumulate weighted sums
- * and products that, with coefficients ~2^20 and domains ~2^12, exceed 32 bits. A 32-bit
- * accumulator wraps and makes `isViolated` / `violationDegree` / the `deltaIf*` gradient
- * silently wrong. Every case here is constructed so the *true* (Long) total is well past
- * `Int.MAX_VALUE` while a naive Int product would wrap to a misleading value.
- */
 class IntOverflowTest {
 
     private companion object {

@@ -5,13 +5,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertFalse
 
-/**
- * What a solve hands back when it stops before reaching the optimum.
- *
- * The dual simplex is dual-feasible from its first basis, so every iterate it passes through carries a
- * valid lower bound. Discarding one throws away a usable bound and leaves the node unpruned, which is
- * the whole cost of returning nothing.
- */
 class RevisedSimplexTruncatedTest {
 
     /** A model big enough that the solve takes several pivots, so stopping it lands mid-solve. */

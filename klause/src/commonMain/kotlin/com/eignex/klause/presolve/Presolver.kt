@@ -75,9 +75,8 @@ internal fun passBaseUnits(factors: Array<Factor>): Long {
 }
 
 /**
- * Work units per [passBaseUnits] unit for this pass, against one simplex op: the pass's section time per unit
- * fitted over the 60 MIPLIB 2017, 40 QF_LIA and 40 MiniZinc Challenge models of the calibration sample, beside
- * the units the pass charges itself. A pass the sample never ran takes [DEFAULT_PASS_BASE_WORK_WEIGHT].
+ * Base work charge per [passBaseUnits] unit, relative to one simplex operation.
+ * Added to the pass's own charges; unlisted passes use [DEFAULT_PASS_BASE_WORK_WEIGHT].
  */
 internal val PresolvePass.baseWorkWeight: Long
     get() = when (this) {
@@ -94,7 +93,7 @@ internal val PresolvePass.baseWorkWeight: Long
         else -> DEFAULT_PASS_BASE_WORK_WEIGHT
     }
 
-/** The base weight of a pass the calibration sample never ran: the median the measured passes fitted. */
+/** Default base work weight for passes without a specific weight. */
 private const val DEFAULT_PASS_BASE_WORK_WEIGHT = 10L
 
 /** [liveFactors] plus every column of [problem], the scale a pass's change is weighed against. */

@@ -859,16 +859,10 @@ private fun splitRealRow(
 }
 
 /**
- * The multiplier restating a row that touches a continuous column in whole numbers, or `null` when the
- * row's values carry no recoverable source decimal.
- *
- * The LP reads these coefficients exactly, so a field written `0.9` and kept as its binary double states
- * a row the file does not: `0.9·x = 54` and `x = 60` are together infeasible over that double, and the
- * relaxation then certifies a feasible model refuted. Multiplying the row through by the denominator its
- * own decimals name restates it — `9·x = 540` — rather than approximating it.
- *
- * Only [RowScale.Exact] is used. A rounded multiplier would move coefficients the double already holds,
- * trading a faithful row for a whole-numbered one, and the exactness this fixes is the whole point.
+ * Exact multiplier restating source decimal coefficients as whole numbers for LP rows.
+ * For example, `0.9*x = 54` becomes `9*x = 540`, avoiding a different equality from
+ * the binary double approximation. Uses only [RowScale.Exact]; null when source
+ * decimals cannot be recovered.
  */
 private fun MpsConstraint.realRowScale(): RowScale? {
     val builder = RowScaleBuilder()

@@ -22,13 +22,9 @@ import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
 /**
- * The operations that need a *variable* holding a value, for values past the 64-bit range.
- *
- * `abs`, `div`, `mod` and `ite` all introduce a fresh quantity and pin it to their operands. A folded
- * term can already carry arbitrary precision ([IntComb.Wide]), but a fresh quantity used to need a
- * 64-bit domain, so these four rejected any operand beyond `Long`. Here the fresh quantity is a
- * combination over digit columns instead — ordinary variables with ordinary `Long` domains, weighted
- * `2^(width·i)` — so the value it can take is unlimited while the kernel sees only what it always saw.
+ * Wide-valued `abs`, `div`, `mod` and `ite` auxiliaries. Each quantity is represented
+ * by digit variables with `Long` domains and weights `2^(width*i)`, allowing values
+ * beyond 64 bits while preserving exact operand relations through [IntComb.Wide].
  */
 
 private val LONG_MAX = bigIntOf(Long.MAX_VALUE)

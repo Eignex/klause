@@ -24,12 +24,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * The hybrid MIP/CP leaf verdict (issue #1232): a Linear row with an LP-only continuous term does not
- * propagate in CP, so a CP-consistent leaf is a solution only if the residual real LP is feasible. These
- * exercise that verdict — feasible ⇒ SAT, exact-infeasible ⇒ UNSAT, uncertifiable ⇒ UNKNOWN — and that
- * local search declines a model it cannot evaluate.
- */
 class LpOnlyContinuousLeafTest {
 
     private fun problem(numInt: Int, intDoms: Array<IntDomain>, realLo: Double, realHi: Double, row: Linear) = Problem(

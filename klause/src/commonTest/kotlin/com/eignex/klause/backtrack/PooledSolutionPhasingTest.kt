@@ -18,11 +18,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Solution phasing seeded from a peer arm's incumbent (#644 collaboration): the engine polls
- * [BacktrackParams.pooledIncumbents] at each restart and adopts the pooled assignment as
- * phase hints. The hint only reorders value trials, so it must never compromise the proven optimum.
- */
 class PooledSolutionPhasingTest {
 
     // Choose ≥ 3 of 8 booleans to minimise their weights: the optimum picks the three cheapest.

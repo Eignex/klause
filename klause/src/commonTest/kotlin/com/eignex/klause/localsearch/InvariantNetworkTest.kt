@@ -19,11 +19,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/**
- * Per-move one-way invariants (issue #153): after any applied move, the affected definitional
- * cone re-evaluates through the incremental apply path, and defined vars are excluded from
- * move generation at the sink.
- */
 class InvariantNetworkTest {
     @Test
     fun `shared definition preparation resumes without exposing unfinished readers`() {

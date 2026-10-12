@@ -16,18 +16,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Exhaustive oracle for [com.eignex.klause.propagation.Propagator.propagate] over a source
- * [Problem] whose original declarations have not been baked. Enumerates every declared assignment
- * and checks deductions against the satisfying ones.
- *
- * An optional semantic predicate classifies assignments independently of local-search invariants
- * and checks their agreement on the entire space, including rejected assignments.
- *
- * Two strength levels:
- *  - [assertSound] (default): every pin/bound/hole the propagator emits must hold on *all*
- *    satisfying assignments — no over-pruning. Propagation weaker than GAC passes this.
- *  - [assertGac]: stronger — the propagator must additionally prune every value with no
- *    supporting assignment. Use only when the factor claims GAC.
+ * Enumerates declared assignments before baking and checks propagation against satisfying ones.
+ * An optional semantic predicate independently checks local-search invariants on the entire space.
+ * [assertSound] forbids pruning supported values; [assertGac] also requires pruning unsupported ones.
  */
 object FactorPropagationOracle {
 

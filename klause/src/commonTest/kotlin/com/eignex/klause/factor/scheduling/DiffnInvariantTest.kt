@@ -11,11 +11,8 @@ import kotlin.test.assertEquals
 
 class DiffnInvariantTest {
 
-    /** Drives [Diffn.deltaIfIntSet] (the affected-pair fast path): for a stream of random single-var
-     *  moves, the predicted violation delta must equal the transition observed after
-     *  [LocalSearchState.apply]. Both the delta and the incremental apply share the affected-pair
-     *  formula; `incremental apply stays exact vs a full recount` independently pins the apply against
-     *  a from-scratch recount so the two can't drift together. */
+    // Delta probing and incremental apply share the affected-pair formula; a separate full recount
+    // prevents their agreeing on the same incorrect delta.
     private fun assertDeltaMatchesRecompute(
         numIntVars: Int,
         domains: Array<IntDomain>,

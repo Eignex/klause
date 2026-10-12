@@ -6,10 +6,6 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * The shared globally-valid variable-bound manager keeps, per variable, the tightest lower and upper
- * bound any arm has published — a monotone intersection. Verified in isolation (a deterministic fold).
- */
 class SharedVarBoundsTest {
 
     @Test

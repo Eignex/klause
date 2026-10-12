@@ -284,6 +284,5 @@ private class ConflictGraph(private val cliques: List<Set<Int>>) {
     }
 }
 
-// Presolve work units per clique-extension step, against one simplex op: fitted section time per unit over the
-// 60 MIPLIB 2017, 40 QF_LIA and 40 MiniZinc Challenge models, ~1.2e-5 ms.
+// Charge clique-extension work in simplex-operation units.
 private const val CLIQUE_MERGE_WORK_WEIGHT = 5L

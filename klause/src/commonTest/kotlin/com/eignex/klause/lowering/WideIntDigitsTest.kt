@@ -9,11 +9,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * The positional encoding behind wide-integer support. Round-tripping is the obvious property; the one
- * that actually decides whether refutation survives is the width rule, since a coefficient times a digit
- * bound must never leave `Long` — that overflow is what silently costs the solver its bound reasoning.
- */
 class WideIntDigitsTest {
 
     private fun big(s: String) = parseBigInt(s)

@@ -23,7 +23,7 @@ import kotlin.concurrent.Volatile
 /**
  * Disjunction of Boolean literals.
  *
- * Uses two-watched-literal scheme (Zhang–Stickel 1996, ported to local search). Two indices
+ * Uses two-watched-literal scheme (Zhang–Stickel 1996). Two indices
  * into [literals] are watched at any time; the clause is satisfied iff at least one watched
  * literal evaluates to true. When an accepted flip turns a watched literal false, we scan the
  * unwatched literals for a true one to rewatch, finishing in O(1) amortized when most flips
@@ -59,15 +59,12 @@ class Clause(literals: IntArray) :
 
     override val variables: VarList = BoolVars(literals.litVars())
 
-    /** CP-only memo: are all literals plain bool vars (no atom-lits)? Encoded as a primitive
-     *  tri-state (−1 unknown / 0 no / 1 yes) rather than a boxed `Boolean?`, since this is read
-     *  once per clause fire on the BCP hot path and a boxed read costs a load + null-check +
-     *  unbox each time. A pure-bool clause only ever fires when a watched bool literal just went
-     *  false at the *current* decision level, so its effective level is exactly the current
-     *  decision level — letting the propagation dispatch skip the per-fire level scan. Atom-lit
-     *  clauses can fire on an atom that flipped at a sub-decision level, so they still need the
-     *  scan. Intrinsic to the clause (numBoolVars is fixed per Problem), so it's valid across
-     *  learned-clause forget/remap. Unused by the local-search path. */
+    /**
+     * CP-only tri-state cache: −1 unknown, 0 contains atom literals, 1 contains only Boolean variables.
+     * A pure-Boolean clause fires at the current decision level, allowing dispatch to skip its level
+     * scan. Atom literals may fire below that level and still require the scan. Fixed per Problem
+     * and valid across learned-clause forgetting/remapping; unused by local search.
+     */
     private var pureBoolMemo: Int = -1
 
     /** True iff every literal is a plain bool var (variable id `< numBoolVars`), memoised. */

@@ -26,11 +26,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * Per-solve [SolveStats] sanity. Verifies that backend tags, counters, and depth
- * distributions are populated where the backend supports them, and that the type
- * defaults behave correctly for backends that don't.
- */
 class SolveStatsTest {
 
     private class Queens6 : VariableSchema() {
@@ -113,7 +108,7 @@ class SolveStatsTest {
         // smallest values first, which violate the >= sums and conflict before the descent
         // climbs to a feasible leaf — so the optimality proof genuinely backtracks on conflicts
         // (the optimum is x=y=z=2, total 6). A search like this cannot honestly report zero
-        // failures (#509).
+        // failures.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -144,7 +139,7 @@ class SolveStatsTest {
         // propagation conflict, and a two-variable objective has no single objective var to pin
         // as a domain bound — so the optimum (0) is found immediately and every remaining subtree
         // dies purely by the objective lower bound (linearLowerBound >= incumbent). Those
-        // bound-pruned nodes are failed nodes too and must be counted (#509), matching solvers
+        // bound-pruned nodes are failed nodes too and must be counted, matching solvers
         // that post the objective bound as a constraint.
         val problem = Problem(
             numBoolVars = 0,

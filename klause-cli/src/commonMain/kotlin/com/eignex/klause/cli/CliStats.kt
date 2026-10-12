@@ -12,19 +12,10 @@ import com.eignex.klause.solver.result.SolveStats
 import kotlin.math.round
 
 /**
- * LP-relaxation success metrics for `-s`, as ordered `key`/`value` pairs each mode prints with its
- * own comment prefix. Returns empty when no LP-family technique ran (so non-LP solves print nothing
- * extra), keyed off [LpStats.solves] plus the standalone Lagrangian / energetic prunes and the
- * component splits (which the certify paths record without a node solve).
- *
- * The headline measure is the prune *rate* (`lpPruneRate = lpPruned / lpSolves`) against the cost
- * (`lpPivotsPerSolve`, `lpMs`): a relaxation earns its place only if it prunes often enough to repay
- * the pivots it spends. [LpStats.rootBound] versus the reported objective is the integrality
- * gap — the direct measure of how tight the relaxation is. The technique split (`lpInfeasible`,
- * `lpBoundPruned`, `lpLagrangianPruned`, `lpEnergeticPruned`, `lpBackjumps`) attributes the wins as
- * far as the engine can soundly separate them; cuts/hull columns feed the same `lpPruned` bound and
- * so cannot be split per node — `lpCuts` reports their volume instead. Every emitted key is
- * `lp`-prefixed so the block is unambiguously LP even in the flat `key=value` stat stream.
+ * Ordered LP `-s` metrics, empty when no LP-family technique ran. The counters cover solve
+ * cost, prune rates, root bounds and standalone Lagrangian/energetic deductions.
+ * Cuts and hull columns contribute to shared bounds; `lpCuts` reports their volume.
+ * Every key has an `lp` prefix.
  */
 internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val solves = stats.lp.solves.sum
@@ -252,17 +243,9 @@ private fun appendRouteCertifierStats(
 }
 
 /**
- * Local-search telemetry for `-s`, as ordered `key`/`value` pairs. Returns empty unless the LS engine
- * actually ran — keyed off `backend == "ls"` (a pure-LS solve) or `moves > 0` (an LS arm inside a
- * `"mixed"` portfolio), so complete-only solves print nothing here.
- *
- * The MiniZinc statistics schema standardises no runtime LS counters, so these mirror nothing upstream
- * — they are the engine's own progress fingerprint. The headline pair is
- * `lsMoves` against `lsMovesPerSec` (raw throughput) and `lsTimeToBest` against `solveTime` (the anytime
- * profile: how early the best incumbent landed). `lsStalls` over `lsRestarts` shows how much of the
- * search was plateau-thrashing. `lsIncumbentViolation` is 0 once feasible, else the lowest residual cost
- * reached — the only signal of how close an otherwise-UNKNOWN run got. Every key is `ls`-prefixed so the
- * block is unambiguous in the flat stat stream, matching the `lp`-prefix convention.
+ * Ordered local-search `-s` telemetry, emitted for LS backends or portfolio arms with moves.
+ * Reports throughput, incumbent timings, stalls, restarts and best residual violation
+ * (zero when feasible). Every key has an `ls` prefix.
  */
 internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> {
     val moves = stats.ls.moves.sum

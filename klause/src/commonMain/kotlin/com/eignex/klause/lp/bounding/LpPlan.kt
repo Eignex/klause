@@ -322,10 +322,10 @@ data class LpPlan(
      *  iterations tighten the bound. */
     val lagrangianIterations: Int = 15,
     /**
-     * Energetic-reasoning infeasibility check for Cumulative globals (#22/#23). When true, a node is
+     * Energetic-reasoning infeasibility check for Cumulative globals. When true, a node is
      * pruned if some Cumulative is energetically over-subscribed (required mandatory energy in a time
      * window exceeds capacity·width). Pure feasibility test; off by default; a no-op without a
-     * Cumulative. Currently applied on the minimization path alongside the other LP bounds.
+     * Cumulative. Applied on the minimization path alongside the other LP bounds.
      */
     val energeticReasoning: Boolean = false,
     /**

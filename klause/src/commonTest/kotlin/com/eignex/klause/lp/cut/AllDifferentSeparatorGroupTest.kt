@@ -16,11 +16,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * #22 (assignment-polytope reach): the Hall-sum and assignment-objective separators apply to every
- * all-different group, not just plain `AllDifferent` — covering `SymmetricAllDifferent` (a
- * self-inverse permutation) and each injective side of `Inverse`.
- */
 class AllDifferentSeparatorGroupTest {
 
     private fun relax(p: Problem, obj: LinearObjective): Pair<LpRelaxation, FloatLpResult> {

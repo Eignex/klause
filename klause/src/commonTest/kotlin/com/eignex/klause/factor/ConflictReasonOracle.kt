@@ -12,14 +12,8 @@ import com.eignex.klause.solver.Sample
 import kotlin.test.assertTrue
 
 /**
- * Brute-force soundness check for [com.eignex.klause.propagation.Propagator.conflictReason]. A conflict
- * reason is a learned clause, so it must be *entailed* by the constraint: every satisfying
- * assignment of the factor must satisfy the clause. If some solution falsifies every literal the
- * reason is an unsound nogood — exactly the defect that produces false UNSAT / wrong optima, which
- * the propagation oracle ([FactorPropagationOracle]) cannot see because it only checks deductions.
- *
- * Call with a [state] already driven to a conflict on [factorId] (its `propagate` returned false);
- * the reason's atom literals are interpreted against that state's atom registry.
+ * Exhaustively checks that every satisfying assignment of a factor satisfies its conflict clause.
+ * [state] must already hold a conflict on [factorId]; its atom registry interprets the clause literals.
  */
 object ConflictReasonOracle {
 

@@ -14,11 +14,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * Soundness of pseudo-Boolean cutting-planes learning (#1119 Phase 3): a PB problem must decide exactly
- * the same as the clause-learning path, and every witness must satisfy every constraint. The differential
- * cases run the same instances with `pbLearning` on and off.
- */
 class PbLearningTest {
 
     private fun pbParams(seed: Long) = BacktrackParams(randomSeed = seed, pbLearning = true)

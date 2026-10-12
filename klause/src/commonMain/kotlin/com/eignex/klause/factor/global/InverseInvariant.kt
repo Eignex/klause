@@ -9,7 +9,6 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
-/** LS invariant logic for `inverse`. */
 internal class InverseInvariant(
     private val f: IntArray,
     private val g: IntArray,

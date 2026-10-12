@@ -8,14 +8,10 @@ import kotlin.math.max
 import kotlin.math.round
 
 /**
- * Checks an MPS reference solver's claim against the model it solved, so a reference row says only what the model
- * itself confirms. A solver's own feasibility report is not enough: it judges its presolved, scaled model under its
- * own tolerances, and a binary at 8e-7 times a 1e6 coefficient passes as zero while carrying 0.8 units through a row.
- *
- * A witness is checked as a MIP checker checks it: every integer variable rounded and fixed, then every bound and
- * row of the original model recomputed under [FEAS_TOL]. One that fails is repaired once, by solving the LP over the
- * continuous variables with the integers fixed ([Repair]); the repaired assignment is checked again from scratch.
- * The objective a row records is the one recomputed from the checked assignment, never the solver's.
+ * Checks MPS witnesses against the original model: integer values are rounded and fixed,
+ * and all bounds and rows are recomputed under [FEAS_TOL]. A failed witness is repaired
+ * once by solving the continuous LP with integers fixed, then checked again. Recorded
+ * objectives come from the checked assignment.
  */
 internal object MpsWitness {
     /** The adapter and validation rules, part of every MPS reference's cache identity and lab row: a change to how

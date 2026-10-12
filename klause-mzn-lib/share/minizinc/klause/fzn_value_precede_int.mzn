@@ -1,4 +1,4 @@
-% Auto: keep `value_precede_int` native (klause has a factor for it) instead of the std decomposition.
+% Maps `value_precede_int` to its native factor.
 predicate klause_value_precede_int(int: s, int: t, array [int] of var int: x);
 
 predicate fzn_value_precede_int(int: s, int: t, array [int] of var int: x) =

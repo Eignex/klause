@@ -75,8 +75,7 @@ internal object CorpusFetcher {
         is ProblemSource.InCode -> error("InCode sources have no file")
     }
 
-    /** [file] as stored: itself when present, else its compressed or plain counterpart. A catalog path names
-     *  either form, and a cache mid-migration may hold either. */
+    /** [file] when present, otherwise its plain or compressed counterpart. Catalog paths may name either form. */
     private fun stored(file: File): File {
         if (file.isFile) return file
         val counterpart = if (CorpusFiles.isCompressed(file)) {

@@ -15,8 +15,6 @@ import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/** The LP-success measurements surfaced in `-s` (#472 follow-up): solve count, prune split, root
- *  bound and LP time must populate on an LP-bounded cumulative minimize. */
 class LpSuccessStatsTest {
 
     /** `min M  s.t.  M ≥ startᵢ + durᵢ,  cumulative(...)`; ints 0..n-1 starts, n is the makespan. */

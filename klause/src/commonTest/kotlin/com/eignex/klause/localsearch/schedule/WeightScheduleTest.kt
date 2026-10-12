@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The shared violation-weight schedule: parity with the Cbls/FJ formulas + stall cadence. */
 class WeightScheduleTest {
 
     @Test

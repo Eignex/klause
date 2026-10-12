@@ -12,10 +12,6 @@ import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * An asserted top-level `or` is a clause. Posting it directly states the same thing as reifying it and
- * forcing the auxiliary true, without allocating that auxiliary or the implications defining it.
- */
 class SmtLibAssertedOrTest {
 
     private fun SmtLibProblem.bounded(): Problem = model.bake()

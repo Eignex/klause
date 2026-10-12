@@ -12,7 +12,6 @@ class ArrayMinMaxState(
     var bestValue: Long,
 )
 
-/** LS invariant for [ArrayMinMax]: violation tracking and repair for `result = max/min(xs)`. */
 internal class ArrayMinMaxInvariant(private val result: Int, private val xs: IntArray, private val max: Boolean) :
     Invariant {
 

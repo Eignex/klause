@@ -39,7 +39,7 @@ internal interface RestartSchedule : SearchRestartPolicy {
      *  the optimize path). Lets a schedule change regime once the search has something to hold onto. */
     override fun onSolution() {}
 
-    /** The phase regime the schedule wants the engine's [PhaseSaving] to run right now.
+    /** The phase regime the schedule wants the engine's [PhaseSaving] to run.
      *  [PhaseMode.UNMANAGED] (the default) leaves phasing to its own rephase rotation; a schedule that
      *  alternates a proving and a diving regime returns [PhaseMode.STABLE] / [PhaseMode.FOCUSED] to
      *  couple the polarity source to the mode. */

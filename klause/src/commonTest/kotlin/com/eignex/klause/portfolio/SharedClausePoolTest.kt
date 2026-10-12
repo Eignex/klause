@@ -51,7 +51,7 @@ class SharedClausePoolTest {
     @Test
     fun `publishGlobal shares a globally-valid nogood the glue export would drop`() {
         // A long / high-LBD LP Farkas nogood is globally valid but never clears the LBD glue filter, so
-        // it must reach peers through the direct publish path instead (#844).
+        // it must reach peers through the direct publish path instead.
         val problem = twoIntVars()
         val pool = SharedClausePool()
         val producer = PoolClauseExchange(pool)
@@ -141,7 +141,7 @@ class SharedClausePoolTest {
 
     @Test
     fun `onSearchStart re-imports the arm's own clauses into a rebuilt session`() {
-        // Models a single-threaded portfolio segment boundary (#381): one arm learns and exports a
+        // Models a single-threaded portfolio segment boundary: one arm learns and exports a
         // clause, its session is discarded, and the next segment's fresh session must get it back —
         // the per-arm `seen`/`cursor` would otherwise suppress re-importing the arm's own clauses.
         val problem = twoIntVars()

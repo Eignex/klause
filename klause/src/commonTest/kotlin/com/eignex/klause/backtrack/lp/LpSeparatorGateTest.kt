@@ -5,12 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * #59: the per-separator activity gate. Verified in isolation (no solver), since the controller is
- * count-based and therefore deterministic. It must disable a family that never produces a cut, keep a
- * productive family running, re-probe a disabled family on backoff and re-enable it when a probe is
- * productive, and gate each family independently so disabling one leaves the others untouched.
- */
 class LpSeparatorGateTest {
 
     @Test

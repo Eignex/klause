@@ -11,13 +11,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Blocking literals (#200) cache, per watch entry, another literal of the clause; when that
- * blocker is already true the propagation engine skips waking the clause. The cache is a pure
- * throughput optimization, so these tests check two things: the bookkeeping stays consistent
- * (blocker list size-aligned with the watcher list across watch moves) and the search still
- * produces the right verdicts under heavy clause propagation.
- */
 class BlockingLiteralTest {
 
     @Test

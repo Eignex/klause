@@ -279,7 +279,7 @@ class Linear private constructor(
     }
 
     override fun remap(mapping: VarRemap): Factor = when (val c = constants) {
-        // The row was already canonicalised (any `>=` negated) at construction, so re-emit as-is (op is
+        // Rows are canonical at construction (`>=` is negated), so re-emit as-is (op is
         // LE/EQ/NE, never GE) via the double form to preserve the exact continuous coefficients and bound.
         is RealConstants -> Linear(
             mapping.ints(vars),

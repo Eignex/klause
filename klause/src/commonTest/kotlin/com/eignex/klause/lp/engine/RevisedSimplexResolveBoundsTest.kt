@@ -12,13 +12,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Re-solving a bound-only revision of the model on the same engine.
- *
- * A search node differs from its parent in column bounds alone, and neither the basis matrix nor the
- * reduced costs read a bound — so the parent's factorization is still valid and re-solving should not
- * rebuild it. That saving is the whole point: the factorization is the expensive half of a node solve.
- */
 class RevisedSimplexResolveBoundsTest {
 
     /** `x + y >= 3` over `[0, 10]²`, minimising `x + 2y`. */

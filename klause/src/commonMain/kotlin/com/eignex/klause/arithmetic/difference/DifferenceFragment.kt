@@ -64,7 +64,7 @@ internal fun indexOfSorted(sorted: IntArray, value: Int): Int {
     return -1
 }
 
-/** One value per integer column witnessing feasibility, or why none was produced. */
+/** One value per integer column witnessing feasibility, or an infeasible/abandoned outcome. */
 internal fun DifferenceFragment.potentialSample(
     numIntVars: Int,
     bools: BooleanArray,

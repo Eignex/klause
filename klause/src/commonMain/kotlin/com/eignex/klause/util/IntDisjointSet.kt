@@ -1,16 +1,8 @@
 package com.eignex.klause.util
 
 /**
- * Dense disjoint-set (union-find) over the elements `0 until size`, with path compression on
- * [find] and union-by-arbitrary-root. Use it to coalesce indices that pairwise satisfy an
- * equivalence-generating relation — e.g. verified variable/value/block transpositions in presolve
- * symmetry breaking — and then read off the resulting partition with [groups].
- *
- * Path compression keeps [find] near-constant amortised, so the pairwise `O(n²)` union loops that
- * drive it stay dominated by the relation check rather than by tree walks.
- *
- * Not thread-safe. The element ids are the dense indices; callers grouping a payload (values,
- * blocks) map each member index back to its payload after [groups].
+ * Dense union-find over `0 until size`, with path compression and arbitrary-root union.
+ * [groups] returns member indices; callers map them to payloads. Not thread-safe.
  */
 internal class IntDisjointSet(size: Int) {
     private val parent = IntArray(size) { it }

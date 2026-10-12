@@ -5,22 +5,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.isClausal
 
 /**
- * Flat, arena-packed store of the clauses of a pure-Boolean (native-SAT) problem. Every clause
- * literal lives contiguously in one [lits] array; clause `c` occupies the half-open range
- * `[start(c), end(c))`. This replaces the per-clause [com.eignex.klause.factor.bool.ClausePropagator]
- * heap objects (each with its own literal array and out-of-line watch state) with a single
- * cache-friendly buffer, so the native-SAT BCP loop can walk clauses without a
- * per-fire virtual dispatch, object dereference, or payload cast.
+ * Immutable arena-packed clauses for a pure-Boolean propagation projection whose factors are all
+ * [Clause]s. Clause `c` occupies `[start(c), end(c))` in [lits]. Contiguous storage avoids per-fire
+ * factor dispatch and payload casts. Literals retain [com.eignex.klause.ir.Lit] encoding; clause
+ * indices match `Problem.factors`, so reason indices identify their source factors.
  *
- * Built only for a native-SAT-eligible propagation projection: no integer variables and every factor a
- * [Clause]. The literals keep their original [com.eignex.klause.ir.Lit] encoding, and clause
- * indices line up 1:1 with `Problem.factors`, so a learned reason expressed as a clause index maps
- * straight back to the originating factor.
- *
- * Immutable: the two-watched-literal scheme keeps the *watched* literals in the first two slots of
- * each clause and swaps them in place during search, but that mutable watch state lives on the
- * session (rebuilt per solve, allowed to drift across backtrack like all CDCL watches), not here —
- * the arena is the stable clause text and is safe to share read-only across portfolio arms.
+ * Mutable watch positions belong to the session and may drift across backtracking. The arena
+ * holds stable clause text and can be shared read-only across portfolio arms.
  */
 internal class ClauseArena private constructor(
     /** All clause literals, concatenated in clause order. */
