@@ -75,6 +75,13 @@ internal fun solvePolynomialObjectiveImage(
         arithmetic.step()
         require(realCount < Int.MAX_VALUE)
         val conditioned = condition.apply(formula, boolCount, realCount, arithmetic::step)
+        val fixed = condition.lower.filter { (id, value) ->
+            arithmetic.step()
+            condition.upper[id] == value
+        }.entries.associate { (id, value) ->
+            arithmetic.step()
+            id + 1 to value
+        }
         PolynomialRealFormula.Atom(objective, PolynomialRelation.EQ, objective)
             .requireVariableCounts(boolCount, realCount, arithmetic::step)
         conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
@@ -92,7 +99,7 @@ internal fun solvePolynomialObjectiveImage(
             PolynomialRealFormula.Atom(imageVariable, PolynomialRelation.EQ, shiftedObjective),
         ))
         arithmetic.step()
-        val normalized = PolynomialFormula.normalize(image, arithmetic)
+        val normalized = PolynomialFormula.normalize(image, arithmetic, fixed)
         val projection = PolynomialProjection.compute(normalized.atoms.map { it.polynomial }, realCount + 1, arithmetic)
         work.projected = projection.polynomialCount
         val roots = objectiveRoots(projection, algebraic, arithmetic)
@@ -107,8 +114,8 @@ internal fun solvePolynomialObjectiveImage(
                 image, algebraicFixing(imageVariable, value, arithmetic::step),
             ))
             val fixing = value.rational?.let {
-                PolynomialCondition(lower = mapOf(0 to it), upper = mapOf(0 to it))
-            } ?: PolynomialCondition()
+                PolynomialCondition(lower = fixed + (0 to it), upper = fixed + (0 to it))
+            } ?: PolynomialCondition(lower = fixed, upper = fixed)
             val checked = solveQfNra(query, boolCount, realCount + 1, params.copy(
                 cancellation = work, maximumWork = null,
             ), fixing)

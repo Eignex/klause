@@ -151,4 +151,22 @@ class PolynomialObjectiveImageTest {
 
         assertEquals(BigFraction.ZERO, assertIs<PolynomialObjectiveResult.Optimum>(result).value.rational)
     }
+
+    @Test
+    fun `fixed source coordinates are restored after objective projection`() {
+        val source = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (assert (= x y)) (check-sat)",
+        )
+        val objective = PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2)
+        val fixed = mapOf(1 to BigFraction.ofLong(2))
+
+        val result = solvePolynomialObjectiveImage(
+            source.formula, objective, source.boolCount, source.realCount,
+            condition = PolynomialCondition(lower = fixed, upper = fixed),
+        )
+
+        val optimum = assertIs<PolynomialObjectiveResult.Optimum>(result)
+        assertEquals(BigFraction.ofLong(4), optimum.value.rational)
+        assertEquals(BigFraction.ofLong(2), optimum.assignment.realValue(1).rational)
+    }
 }
