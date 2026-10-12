@@ -9,6 +9,8 @@ import com.eignex.klause.ir.TranscendentalFunction
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -83,6 +85,32 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
 
         assertIs<OpenTheoryResult.Unknown>(execution.result)
         assertEquals(0L, execution.workSpent)
+    }
+
+    @Test
+    fun `strategy cancellation stops native work during an active completion`() {
+        val x = TranscendentalExpression.Variable(SourceRealId(0))
+        val source = TranscendentalProblem(
+            TranscendentalFormula.Atom(TranscendentalExpression.Function(TranscendentalFunction.EXP, x),
+                PolynomialRelation.EQ, constant(2)), emptyMap(), mapOf("x" to 0), emptyMap(),
+        )
+        var charged = 0L
+        val meter = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val cancelled = Cancellation { charged >= 8 }
+        val controls = params()
+        val params = controls.copy(cancellation = meter, strategy = controls.strategy.copy(
+            backtrack = controls.strategy.backtrack.copy(cancellation = cancelled),
+            localSearch = controls.strategy.localSearch.copy(cancellation = cancelled),
+        ))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
+
+        assertIs<OpenTheoryResult.Unknown>(execution.result)
+        assertTrue(execution.workSpent in 1L..8L)
+        assertEquals(execution.workSpent, charged)
     }
 
     private fun params(): TranscendentalTheoryParams = TranscendentalTheoryParams(

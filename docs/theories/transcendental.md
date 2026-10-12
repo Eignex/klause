@@ -72,7 +72,8 @@ relaxation and source-check work. Queries, repairs, branches and retractions do 
 renew it. Native work is reported separately from strategy nodes and moves, and
 each arithmetic charge reaches the containing caller meter once.
 
-Cancellation, timeout, work allowance, bit limits and polynomial allocation limits
+Strategy cancellation reaches active native completion through the shared search
+context or neighborhood token. Cancellation, timeout, work allowance, bit limits and polynomial allocation limits
 cannot produce partial certificates. Required representation declines remain
 visible. Zero native work prevents entry. A checked witness remains valid after
 subsequent interruption. Published immutable values retain no invocation owner.
