@@ -60,7 +60,8 @@ class SourceStrategy internal constructor(
     /**
      * Solve through the shared source route. [polynomial] retains finite strategy controls and arithmetic limits;
      * [theory] supplies open-linear controls. Open-source assumption pins, extra CP components and finite seeding
-     * hooks explicitly decline. A heuristic rejection never refutes the source.
+     * hooks explicitly decline. Deduction scopes and tolerance acceptance also decline; exact polynomial LS
+     * declines finite seeding and event hooks. A heuristic rejection never refutes the source.
      */
     fun solve(
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
@@ -68,14 +69,17 @@ class SourceStrategy internal constructor(
     ): OpenTheoryResult {
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()
+        if (!scope.supportsSource(engine)) return scope.unsupported()
         val route = source.pipelineRoute(
             routePureRealToTheory = true,
             boundCancellation = scope.stop,
         )
         if (scope.stop()) return scope.unknown()
         val result = when (route) {
-            is SourceProblemRoute.PolynomialTheory ->
+            is SourceProblemRoute.PolynomialTheory -> {
+                if (!scope.supportsPolynomial(engine)) return scope.unsupported()
                 OpenTheoryPipeline.execute(route.request, scope.polynomial, engine).result
+            }
             is SourceProblemRoute.Finite -> finiteSolve(route, scope)
             is SourceProblemRoute.OpenTheory -> {
                 if (!scope.supportsOpen(engine)) {
@@ -128,6 +132,7 @@ class SourceStrategy internal constructor(
     ): QuadraticOptimizationExecution {
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
+        if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
         val plan = source.preparePolynomialExecutionPlan()
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL) return unsupportedQuadratic(sense)
         return OpenTheoryPipeline.optimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
@@ -163,6 +168,7 @@ class SourceStrategy internal constructor(
     ): QuadraticOptimizationExecution {
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
+        if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
         val plan = source.preparePolynomialExecutionPlan()
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL) return unsupportedQuadratic(sense)
         return OpenTheoryPipeline.minimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
@@ -246,8 +252,8 @@ class SourceStrategy internal constructor(
         else polynomial.strategy.localSearch.cancellation
         val stop = polynomial.timeout or polynomial.cancellation or
             theory.timeout or theory.cancellation or selectedStop
-        val backtrack = polynomial.strategy.backtrack.withAssumptions(assumptions).withCancellation(stop)
-        val localSearch = polynomial.strategy.localSearch.withAssumptions(assumptions).withCancellation(stop)
+        val backtrack = polynomial.strategy.backtrack.copy(assumptions = assumptions, cancellation = stop)
+        val localSearch = polynomial.strategy.localSearch.copy(assumptions = assumptions, cancellation = stop)
         val selectedBudget = if (engine == FiniteEngine.BACKTRACK) backtrack.nodeBudget else localSearch.nodeBudget
         require(theory.nodeBudget == null || selectedBudget == null || theory.nodeBudget === selectedBudget) {
             "source execution requires one shared node allowance"
@@ -294,11 +300,17 @@ class SourceStrategy internal constructor(
             else TerminationReason.Cancelled,
             stats,
         )
-        fun supportsOpen(engine: FiniteEngine): Boolean = assumptions.isEmpty && when (engine) {
+        fun supportsSource(engine: FiniteEngine): Boolean = assumptions.deductions.isEmpty &&
+            (engine != FiniteEngine.BACKTRACK || backtrack.toleranceCheck == null)
+        fun supportsPolynomial(engine: FiniteEngine): Boolean = supportsSource(engine) &&
+            (engine != FiniteEngine.LOCAL_SEARCH || supportsLocalHooks())
+        private fun supportsLocalHooks(): Boolean = localSearch.initialAssignment == null &&
+            localSearch.pooledIncumbents == null && localSearch.lsObjective == null && localSearch.onEvent == null
+        fun supportsOpen(engine: FiniteEngine): Boolean =
+            supportsSource(engine) && assumptions.isEmpty && when (engine) {
             FiniteEngine.BACKTRACK -> backtrack.componentFactory == null && backtrack.nodeBudget == null &&
                 backtrack.onEvent == null
-            FiniteEngine.LOCAL_SEARCH -> localSearch.initialAssignment == null &&
-                localSearch.pooledIncumbents == null && localSearch.lsObjective == null && localSearch.onEvent == null
+            FiniteEngine.LOCAL_SEARCH -> supportsLocalHooks()
             else -> false
         }
         fun unsupported(): OpenTheoryResult.Unknown =
