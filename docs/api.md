@@ -55,7 +55,9 @@ domains into finite propagation.
 
 `Problem.pipelineRequest()` composes shared finite factors with exact continuous
 completion where supported. `OpenTheoryPipeline.minimize` accepts a finite
-`LinearObjective` or an exact source `QuadraticObjectiveSpec`. The quadratic overload
+`LinearObjective` or an exact source `QuadraticObjectiveSpec`. `OpenTheoryPipeline.optimize`
+accepts an affine `LinearObjective` with continuous costs and explicit source direction,
+using the same exact quadratic executor. The quadratic overload and affine `optimize`
 returns `QuadraticOptimizationExecution` with exactly evaluated incumbents,
 source-direction bounds and separate native counters. Complete traversal can prove
 optimality, nonattainment, unboundedness or infeasibility. Local search and ALNS
@@ -65,8 +67,14 @@ See [polynomial composition](theories/polynomial-real.md#shared-model-compositio
 for source coverage and [quadratic representation](model.md#quadratic-objective-representation)
 for exact coefficient and coordinate ownership.
 
-The polynomial `LinearObjective` overload rejects nonzero real costs, while the
-quadratic overload accepts equivalent affine real terms. Ordinary
+`LinearObjective.toQuadraticObjectiveSpec()` and the equivalent lowered objective
+extension capture affine terms in the exact source representation. Integer weights
+and constants retain their full width; real weights retain the exact rational value
+of the declared binary64 coefficient. Nonfinite weights reject. Exact source rational
+or decimal objectives use `QuadraticObjectiveSpec` directly without a binary64 conversion.
+
+The polynomial finite-result `minimize(LinearObjective)` overload rejects nonzero real
+costs; callers requiring continuous optimization use `optimize`. Ordinary
 `Problem.pipelineRoute(objective=...)` also declines continuous products with those
 linear costs. This representation-dependent admission is a vision misalignment
 tracked in [#2655](https://github.com/Eignex/klause/issues/2655); it is not a different

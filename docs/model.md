@@ -51,6 +51,12 @@ Cross coefficients are literal source coefficients, without Hessian scaling.
 Boolean coordinates denote zero or one; integer values retain arbitrary width and
 real values may be algebraic. Objective direction belongs to the invocation.
 
+Affine linear objectives bridge into this representation with unchanged source IDs
+and true-Boolean polarity. Long coefficients and constants become exact integers;
+Double real coefficients become their exact binary64 rational values. The bridge
+does not negate coefficients for maximization or reinterpret binary64 as decimal
+text. Exact source decimal/rational quadratic specifications retain their own authority.
+
 Construction and term getters capture independent lists. Remapping preserves each
 namespace and rejects removed objective coordinates; elimination requires an
 exact source substitution. Internal evaluation uses the existing exact algebraic
