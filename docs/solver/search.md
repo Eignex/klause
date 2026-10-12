@@ -83,6 +83,10 @@ keeps its own state and leaves general CP failure storage unallocated.
 `FactorExecutionCapabilities` inventories each built-in family's execution routes.
 `SOUND_FILTERING`, `BOUNDS_FILTERING` and `DOMAIN_FILTERING` describe deduction
 mechanisms; they do not promise full consistency at every size or resource limit.
+AllDifferent filtering selects its cached incremental path before the full matching
+fallback. The fallback retains value mapping, matching, Hall reasons, pruning and
+cache publication in one private phase with borrowed state.
+
 Complete finite checks pin the full assignment and run a completed CP fixpoint.
 Local-search invariant satisfaction is a separate check from its graded score.
 Continuous arithmetic and floating objective scores require the existing source
