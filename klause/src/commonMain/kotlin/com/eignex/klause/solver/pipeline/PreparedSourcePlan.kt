@@ -34,6 +34,9 @@ enum class ComponentResponsibility {
 
     /** Arithmetic completion supplies authoritative coordinates and source checks. */
     COMPLETION,
+
+    /** Source coordinates have no implemented execution owner. */
+    UNPLACED,
 }
 
 /** Immutable component description; [semantics] is extensible by model-facing theory adapters. */
@@ -116,6 +119,10 @@ class PreparedSourcePlan internal constructor(
     private val descriptions = components.toList()
     private val integerMapping = integerCoordinates.toList()
     private val realMapping = realCoordinates.toList()
+
+    init {
+        require(integerMapping.size == sourceIntCount && realMapping.size == sourceRealCount)
+    }
 
     /** Independent component list whose values own their coordinate and factor lists. */
     val components: List<ExecutionComponentDescriptor> get() = descriptions.toList()
@@ -222,12 +229,15 @@ internal fun Problem.preparePolynomialExecutionPlan(
         else -> null
     }
     val finiteFactors = polynomial?.finiteFactorIndices.orEmpty()
+    val boundedIntegers = (0 until numIntVars).filter { intBounds.hasLower(it) && intBounds.hasUpper(it) }
     val descriptors = listOf(
         ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteFactors,
-            (0 until numIntVars).toList(), emptyList(), (0 until numBoolVars).toList()),
+            boundedIntegers, emptyList(), (0 until numBoolVars).toList()),
         ExecutionComponentDescriptor("polynomial-real", ComponentResponsibility.COMPLETION,
             factors.indices.filter { it !in finiteFactors }, emptyList(), (0 until numRealVars).toList()),
-    )
+    ) + if (openInteger) listOf(ExecutionComponentDescriptor("unplaced-polynomial-integer",
+        ComponentResponsibility.UNPLACED, emptyList(), (0 until numIntVars).filter { it !in boundedIntegers }, emptyList()))
+    else emptyList()
     val sourceBools = (original as? PolynomialRealProblem)?.sourceBoolCount ?: numBoolVars
     val sourceReals = (original as? PolynomialRealProblem)?.sourceRealCount ?: numRealVars
     return PreparedSourcePlan(original, this,
