@@ -116,7 +116,7 @@ class CliModeTest {
             assertEquals(0, runCli(arrayOf("-e", "cp", "--param", "nia-candidates=2", source.absolutePath)))
         }
 
-        assertEquals("unknown", output.trim())
+        assertEquals(listOf("unknown", "; fixed work exhausted"), output.trim().lines())
     }
 
     @Test
