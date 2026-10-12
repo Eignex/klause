@@ -114,6 +114,13 @@ Parallel scheduling and stopping order are not reproducible.
 
 ## Native arithmetic allowances
 
+Quadratic native worker slots retain their scope by arm identity. Reopening a slot
+cannot renew or change its quota. Per-worker native counters and the containing
+ledger record each charge; only one charge reaches the caller meter. A worker's
+representation decline stops that worker, while containing resource stops and
+cancellation stop all workers. Shared accounting does not share mutable arithmetic
+workspaces.
+
 Arithmetic services retain their own work currencies inside the containing solve.
 A conditioned check receives only its invocation's remaining allowance; new branches,
 retractions and candidate retries do not renew it. Native work is forwarded once to
