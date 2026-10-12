@@ -285,7 +285,7 @@ internal class MpsOutput(
             }
 
         Verdict.UNBOUNDED -> when {
-            proofExact && sourceWitnessAccepted() -> "s UNBOUNDED"
+            proofExact && sourceWitnessAccepted() && exactSourceWitness() != false -> "s UNBOUNDED"
             best != null -> "s SATISFIABLE"
             else -> "s UNKNOWN"
         }
@@ -296,6 +296,16 @@ internal class MpsOutput(
     }
 
     override fun keepStat(key: String): Boolean = true
+
+    override fun completionMetadata(verdict: Verdict): String? {
+        if (verdict != Verdict.OPTIMAL || best == null || !sourceExact || !sourceWitnessAccepted()) return null
+        val status = when (exactSourceWitness()) {
+            true -> "attained-optimum"
+            false -> "tolerance-optimum"
+            null -> return null
+        }
+        return "optimizationStatus=$status"
+    }
 
     override fun verdictReason(verdict: Verdict): String? {
         val cause = super.verdictReason(verdict)

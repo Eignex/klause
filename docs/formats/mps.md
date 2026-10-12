@@ -59,6 +59,8 @@ Exact adapter witnesses require original decimal feasibility. Working-model
 witnesses on the default finite LP lane retain the separate tolerance guarantee.
 Output comments identify an exact original-source witness or a source-tolerance
 witness independently of the optimization status.
+Optimal output includes `optimizationStatus=attained-optimum` or
+`optimizationStatus=tolerance-optimum` for that accepted witness guarantee.
 
 ## Routing and result strength
 
