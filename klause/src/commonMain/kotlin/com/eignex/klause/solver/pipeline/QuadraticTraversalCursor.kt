@@ -26,10 +26,10 @@ internal class QuadraticTraversalCursor(
     private var pending: Sample? = null
     private var terminal: SearchOutcome? = null
     private var completionWork = 0L
-    private val slice = SliceBudget({
+    private val slice: SliceBudget = SliceBudget({
         sink.search.searchWork + minOf(completionWork, Long.MAX_VALUE - sink.search.searchWork)
     }, { traversal.lpWork() }, { traversal.propagationWork() })
-    private val traversal = CpSatisfactionTraversal(
+    private val traversal: CpSatisfactionTraversal = CpSatisfactionTraversal(
         problem,
         params.copy(cancellation = cancelledWhen({
             listOfNotNull(global.deadline(), slice.deadline).minOrNull()
