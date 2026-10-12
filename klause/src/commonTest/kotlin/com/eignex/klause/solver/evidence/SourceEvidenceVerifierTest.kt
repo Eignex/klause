@@ -265,4 +265,50 @@ class SourceEvidenceVerifierTest {
             SourceEvidence(scope, SourceClaim.Refutation, proof),
         ))
     }
+
+    @Test
+    fun `a checked conditional refutation justifies a source Boolean clause`() {
+        val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val context = SourceProofContext(scope, setOf(b), mapOf(
+            "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
+        ))
+        val conditional = scope.copy(condition = SourceCondition(bools = mapOf(0 to false)))
+        val refutation = SourceEvidence(conditional, SourceClaim.Refutation, SourceDerivation.Premise("false"))
+        val evidence = SourceEvidence(scope, SourceClaim.Clause(mapOf(0 to true)),
+            SourceDerivation.Discharge(refutation))
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
+    }
+
+    @Test
+    fun `clause discharge cannot hide a numeric neighborhood restriction`() {
+        val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val context = SourceProofContext(scope, setOf(b, x), mapOf(
+            "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
+        ))
+        val conditional = scope.copy(condition = SourceCondition(
+            bools = mapOf(0 to false), lower = mapOf(x to BigFraction.ONE),
+        ))
+        val refutation = SourceEvidence(conditional, SourceClaim.Refutation, SourceDerivation.Premise("false"))
+        val evidence = SourceEvidence(scope, SourceClaim.Clause(mapOf(0 to true)),
+            SourceDerivation.Discharge(refutation))
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
+    }
+
+    @Test
+    fun `an imported forged source clause is rejected`() {
+        val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val context = SourceProofContext(scope, setOf(b), mapOf(
+            "true" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ONE), mapOf(0 to true)),
+        ))
+        val conditional = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
+        val refutation = SourceEvidence(conditional, SourceClaim.Refutation, SourceDerivation.Premise("true"))
+        val clause = SourceClaim.Clause(mapOf(0 to false))
+        val imported = SourceEvidence(scope, clause, SourceDerivation.Discharge(refutation))
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, clause, SourceDerivation.Import(imported)),
+        ))
+    }
 }

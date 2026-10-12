@@ -57,6 +57,17 @@ sealed interface SourceClaim {
         /** Exact unattained objective limit. */
         val value: SourceValue,
     ) : SourceClaim
+    /** A disjunction of original-source Boolean literals. */
+    class Clause(literals: Map<Int, Boolean>) : SourceClaim {
+        private val captured = literals.toMap()
+        /** Boolean coordinates and the values satisfying their literals. */
+        val literals: Map<Int, Boolean> get() = captured.toMap()
+
+        init { require(captured.keys.all { it >= 0 }) }
+
+        override fun equals(other: Any?): Boolean = other is Clause && captured == other.captured
+        override fun hashCode(): Int = captured.hashCode()
+    }
     /** Typed source-specific claims whose semantics belong to the source checker. */
     interface Extension : SourceClaim
     /** No assignment exists in this invocation. */
@@ -95,6 +106,11 @@ sealed interface SourceDerivation {
         val witness: SourceDerivation,
         /** Global bound equal to the witness objective. */
         val bound: SourceDerivation,
+    ) : SourceDerivation
+    /** Discharge exactly the negations of a Boolean clause using a checked conditional refutation. */
+    data class Discharge(
+        /** Original-source refutation under precisely the negated clause literals. */
+        val refutation: SourceEvidence,
     ) : SourceDerivation
     /** Source-specific derivation data; an unsupported semantics checker must decline it. */
     interface Extension : SourceDerivation
