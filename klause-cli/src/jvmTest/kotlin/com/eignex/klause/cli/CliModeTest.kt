@@ -154,15 +154,16 @@ class CliModeTest {
 
     @Test
     fun `SMT local search publishes checked symbolic function witnesses`() {
-        val source = File.createTempFile("function-sine", ".smt2").apply {
-            writeText("(declare-const x Real) (assert (= (sin x) 1)) (check-sat)")
+        val source = File.createTempFile("function-ls-exp", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (exp x) 2)) (check-sat)")
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "ls", source.absolutePath))) }
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "ls", "--param", "nra-work-limit=20000",
+                "--param", "max-flips=16", "--param", "max-instructions=20000", source.absolutePath))) }
 
         assertTrue("sat" in output.lines(), output)
-        assertTrue("((_ klause-real pi))" in output, output)
+        assertTrue("((_ klause-real log) 2.0)" in output, output)
     }
 
     @Test
