@@ -1,4 +1,4 @@
-"""Independently evaluate exact named polynomial real witnesses at original sources."""
+"""Independently evaluate exact named polynomial integer and real witnesses at original sources."""
 
 import argparse
 import hashlib
@@ -49,7 +49,7 @@ def exact_value(expression):
 def source_formula(text):
     commands = expressions(text)
     variables = smt_variables(text)
-    assert all(str(value.sort()) in ('Real', 'Bool') for value in variables.values()), 'mixed source sorts'
+    assert all(str(value.sort()) in ('Int', 'Real', 'Bool') for value in variables.values()), 'unsupported source sorts'
     semantic, query_seen = [], False
     for command in commands:
         assert command, 'empty source command'
@@ -57,8 +57,8 @@ def source_formula(text):
         if operator in ('declare-const', 'declare-fun', 'define-fun', 'assert'):
             assert not query_seen, 'source changes after query'
             if operator == 'define-fun':
-                assert len(command) == 5 and command[3] in ('Real', 'Bool'), 'unsupported function result sort'
-                assert all(len(parameter) == 2 and parameter[1] in ('Real', 'Bool')
+                assert len(command) == 5 and command[3] in ('Int', 'Real', 'Bool'), 'unsupported function result sort'
+                assert all(len(parameter) == 2 and parameter[1] in ('Int', 'Real', 'Bool')
                            for parameter in command[2]), 'unsupported function argument sort'
             semantic.append(command)
         elif operator in ('check-sat', 'check-sat-assuming'):
@@ -128,6 +128,10 @@ def witness_values(witness, variables):
         if sort == 'Bool':
             assert expression in ('true', 'false'), 'nonliteral Boolean coordinate'
             values[name] = z3.BoolVal(expression == 'true')
+        elif sort == 'Int':
+            value = number(expression)
+            assert value.denominator == 1, 'nonintegral integer coordinate'
+            values[name] = z3.IntVal(value.numerator)
         else:
             values[name] = exact_value(expression)
     assert values.keys() == variables.keys(), 'incomplete source model'

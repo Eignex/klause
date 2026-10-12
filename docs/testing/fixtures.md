@@ -90,6 +90,16 @@ remain frozen. Auditing all 66 originals for unquoted negative numeric atoms fou
 only these two sources; that narrow audit does not prove every other source form
 is admitted or decided.
 
+## Nonlinear integer SMT fixtures
+
+[Nonlinear integer version 1](../../klause-bench/smoke-corpus/nonlinear-integer-v1/manifest.json)
+fixes twelve self-authored Apache-2.0 inputs covering bounded products, powers,
+Int/Real composition, Boolean correlation, lexical helpers and assumptions,
+arbitrary-width arithmetic and open integer search limits. The suite and named
+set share these identities. SAT/UNSAT expectations describe source mathematics;
+incomplete search can return UNKNOWN, including the integer equation `n*n = 2`.
+Every manifest entry pins the exact original bytes, attribution and license.
+
 ## XCSP3 reference importer
 
 [`test_solve.py`](../../klause-bench/xcsp3-cpsat/test_solve.py) contains self-authored

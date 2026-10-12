@@ -89,7 +89,7 @@ class NraSourceCheckTest(unittest.TestCase):
 
     def test_nonpolynomial_and_incremental_sources_are_declined(self):
         variants = (
-            '(declare-const x Int) (assert (= x 1))',
+            '(declare-const x Int) (assert (= (div x 2) 1))',
             '(declare-const x Real) (declare-const y Real) (assert (= (/ x y) 1))',
             '(declare-const x Real) (assert (= (^ x (- 1)) 1))',
             '(declare-const x Real) (assert (= (^ x (/ 1 2)) 1))',
@@ -102,6 +102,34 @@ class NraSourceCheckTest(unittest.TestCase):
         for source in variants:
             with self.subTest(source=source), self.assertRaises(AssertionError):
                 check.source_formula(source)
+
+    def test_mixed_integer_witness_checks_original_products_and_exact_real_roots(self):
+        source = '(declare-const n Int) (declare-const x Real) ' \
+                 '(assert (= (* n n) 4)) (assert (= (* x x) (to_real n)))'
+        witness = f'((define-fun n () Int 2) (define-fun x () Real {self.positive_sqrt_two}))'
+        with mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+            self.assertEqual(check.check_witness(source, witness)['assertions'], 2)
+
+    def test_wide_integer_source_arithmetic_does_not_wrap(self):
+        source = '(declare-const n Int) (assert (= (* n n) 10000000000000000000000000000000000000000))'
+        witness = '((define-fun n () Int 100000000000000000000))'
+        self.assertEqual(check.check_witness(source, witness)['coordinates'], 1)
+        with self.assertRaisesRegex(AssertionError, 'original source assertion 0 is false'):
+            check.check_witness(source, '((define-fun n () Int 7766279631452241920))')
+
+    def test_fractional_integer_coordinate_is_rejected_before_substitution(self):
+        source = '(declare-const n Int) (assert (= (* n n) 2))'
+        with self.assertRaisesRegex(AssertionError, 'nonintegral integer coordinate'):
+            check.check_witness(source, '((define-fun n () Int (/ 3 2)))')
+
+    def test_integer_functions_and_assumptions_keep_lexical_meaning(self):
+        source = '(declare-const n Int) (declare-const p Bool) ' \
+                 '(define-fun square ((x Int)) Int (* n x)) ' \
+                 '(assert (let ((n 99)) (= p (= (square 2) 6)))) (check-sat-assuming (p))'
+        witness = '((define-fun n () Int 3) (define-fun p () Bool true))'
+        self.assertEqual(check.check_witness(source, witness)['assertions'], 2)
+        with self.assertRaisesRegex(AssertionError, 'original source assertion 0 is false'):
+            check.check_witness(source, '((define-fun n () Int 99) (define-fun p () Bool true))')
 
     def test_reference_unsat_comparison_is_not_labeled_a_proof_certificate(self):
         result = check.compare_verdict('(declare-const x Real) (assert (< (* x x) 0))', 'unsat')

@@ -56,6 +56,14 @@ open integers, linear reals, polynomial (nonlinear) reals, scheduling, routing, 
 SAT, MaxSAT and PB. `sweep` includes them all. Material membership changes take
 new names so results under one name stay comparable.
 
+`nonlinear-integer-v1` fixes twelve self-authored SMT product/power sources covering
+bounded integer factors, mixed real completion, lexical helpers and assumptions,
+wide arithmetic and open integer proof limits. The matching
+`smtlib-nonlinear-integer-v1` suite retains mathematical SAT/UNSAT expectations;
+resource-limited or incomplete procedures can return UNKNOWN. The
+[manifest](smoke-corpus/nonlinear-integer-v1/manifest.json) pins original hashes and
+Apache-2.0 attribution.
+
 `continuous-mip-v1` fixes 167 MIPLIB 2017 optimization sources with both integer
 and continuous columns. It includes finite and open routes and selects every member
 without a changing reference filter. It is separate from the smaller `mip` theme set.
@@ -502,17 +510,18 @@ checking unknown; a feasible point receives no optimum credit without that check
 Errors are recorded per case and make the command exit unsuccessfully. The checker
 supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
 
-### Polynomial real witness verifier
+### Polynomial source witness verifier
 
 [verify_nra_source_results.py](tools/verify_nra_source_results.py) independently
-checks complete named Real/Bool models against an original polynomial SMT source.
+checks complete named Int/Real/Bool models against an original polynomial SMT source.
 It reconstructs rational coordinates and `root-obj` algebraic coordinates using the
 pinned Z3 dependency, substitutes every source variable, and requires every
 original assertion and Boolean query assumption to evaluate exactly to true.
 Algebraic coordinates use integer defining polynomials and one-based distinct
 ordered real-root indices. Approximate decimal coordinates do not establish exact
 irrational equalities. Missing, duplicate, unknown or sort-mismatched coordinates
-are rejected. Nonpolynomial, mixed-sort, optimization and incremental sources decline.
+are rejected. Integer coordinates must be integral and retain arbitrary precision.
+Nonpolynomial, optimization and incremental sources decline.
 
 ```sh
 python3 klause-bench/tools/verify_nra_source_results.py original.smt2 --witness model.smt2

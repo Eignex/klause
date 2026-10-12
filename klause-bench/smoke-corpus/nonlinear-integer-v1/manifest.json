@@ -1,0 +1,112 @@
+{
+  "cases": [
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "bounded-product-sat",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/bounded-product-sat.smt2",
+      "sha256": "e2e12371fbcaa5020dfc577a182feb3bd47900dd0e33257556f65abb88ae28e9",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "bounded-product-unsat",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/bounded-product-unsat.smt2",
+      "sha256": "462e2baa1a96826588121a94698f619e14c62a5f642701e6015c12013da7a369",
+      "expected": "unsat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "bounded-power-chain",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/bounded-power-chain.smt2",
+      "sha256": "9a7d5040a4869e298de1f5c9596528d1f3f5e660dde11630f67d072cebf981f3",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "mixed-finite-product",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/mixed-finite-product.smt2",
+      "sha256": "78b78cb923f10d6b5cdca9b8100c89f8b42fd810a5c42d5fcdadd93c80421759",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "mixed-product-power",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/mixed-product-power.smt2",
+      "sha256": "819d88120613657c124b81a79bb682940a7f425707e5bf33e5465dc0aa949ecb",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "boolean-product-conditional",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/boolean-product-conditional.smt2",
+      "sha256": "1fc6de5453b7a146513b0e2c7c8fda97f5e35fddcf06a239c7de964a8c8c6df5",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "lexical-integer-helper",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/lexical-integer-helper.smt2",
+      "sha256": "ce984ccc09fb2a1dd9b214c384f6eb4316423d0f5b62f87ead7250712b1da99c",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "wide-integer-square",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/wide-integer-square.smt2",
+      "sha256": "75290cc997d8ed5420adf8ec057e434465fa4f4405a025400e0fc00d18439a70",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "overflow-cancellation",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/overflow-cancellation.smt2",
+      "sha256": "f609beabd234df9aa7622a54b189da3ce359da05e2f92e70a0564625e6fcf895",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "open-integer-product",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/open-integer-product.smt2",
+      "sha256": "202137952b5257c10df889653d466dd19ec5765bf5dc706cc9c2bcc7c4de6fb0",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "open-no-integer-root",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/open-no-integer-root.smt2",
+      "sha256": "20cf9b97e16df64d191ea2b1b751310d02320662eb8e797493a9b80d25e3e452",
+      "expected": "unsat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "whole-real-refutation",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/whole-real-refutation.smt2",
+      "sha256": "640c2f7ae8a98dcf40cf760576a3c263f0248caa15fbe6ac069eae2b333e292e",
+      "expected": "unsat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    }
+  ]
+}
