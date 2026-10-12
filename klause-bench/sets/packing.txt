@@ -1,23 +1,15 @@
 # packing: problems with the packing theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
-# easy: 8
-hakank/buckets/buckets
-mzn-bench/2015/mapping/ring_2
-mzn-bench/2019/multi-knapsack/mknap2-1
+# 2026-10-12: trimmed to 11, keeping the problems whose sweep result varied over the last 30 runs and at most 6 never solved
+# easy: 5
 mzn-bench/2021/carpet-cutting/mzn_rnd_test.01
 mzn-bench/2023/kidney-exchange/3_20_0.40_2
 mzn-bench/2025/stripboard/stripboard_w20_h15_l4_c4_n24
 xcsp3-cop/BinPacking2-n1c1w1a_c24
 xcsp3-cop/IHTC-i04_c25
-# medium: 11
+# medium: 5
 mzn-bench/2010/filters/dct_3_4
-mzn-bench/2013/cargo/challenge05_1s_954
-mzn-bench/2013/filters/dct_2_2
-mzn-bench/2016/mapping/mesh4x4_1
-mzn-bench/2018/cargo/challenge24
-mzn-bench/2018/mapping/ring_mp3
 mzn-bench/2018/team-assignment/data2_6_12
-mzn-bench/2021/mapping/mesh3x3_4
 mzn-bench/2022/team-assignment/data3_4_31
 xcsp3-cop/GeneralizedMKP-0-OR05x100-75-1_c23
 xcsp3-cop/KidneyExchange-4-041_c23

@@ -1,25 +1,17 @@
 # sat: problems with the sat theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
-# easy: 8
+# 2026-10-12: trimmed to 11, keeping the problems whose sweep result varied over the last 30 runs and at most 6 never solved
+# easy: 5
 satlib/ais8
-satlib/dubois21
 satlib/ai/hoos/Research/SAT/Formulae/UF175.753.100/uf175-064
 satlib/uf50-0491
-satlib/UUF125.538.100/uuf125-015
-satlib/UUF150.645.100/uuf150-055
 satlib/UUF225.960.100/uuf225-097
 satlib/UUF250.1065.100/uuf250-016
-# medium: 11
-satlib/hole9
+# medium: 6
 satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-0100
-satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-02
-satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-024
-satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-032
-satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-038
 satlib/UUF250.1065.100/uuf250-014
 satlib/UUF250.1065.100/uuf250-020
 satlib/UUF250.1065.100/uuf250-032
 satlib/UUF250.1065.100/uuf250-046
 satlib/UUF250.1065.100/uuf250-082
-# hard: 1
-satlib/hole10
+# hard: 0
