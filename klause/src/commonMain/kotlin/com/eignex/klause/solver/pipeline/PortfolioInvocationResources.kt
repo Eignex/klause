@@ -6,10 +6,33 @@ import com.eignex.kumulant.core.Concurrency
 
 internal class PortfolioWorkerSlot(
     val index: Int,
-    val seed: Long,
+    val baseSeed: Long,
     val cancellation: Cancellation,
     val nodeBudget: NodeBudget?,
-)
+) : AutoCloseable {
+    val seed: Long get() = baseSeed + index
+    private var closed = false
+    private val owned = ArrayList<AutoCloseable>()
+
+    fun <T : AutoCloseable> own(resource: T): T {
+        check(!closed) { "portfolio worker slot is closed" }
+        owned.add(resource)
+        return resource
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        var failure: Throwable? = null
+        for (resource in owned.asReversed()) {
+            runCatching { resource.close() }.exceptionOrNull()?.let { error ->
+                if (failure == null) failure = error else requireNotNull(failure).addSuppressed(error)
+            }
+        }
+        owned.clear()
+        failure?.let { throw it }
+    }
+}
 
 internal class PortfolioInvocationResources(
     count: Int,
@@ -17,19 +40,29 @@ internal class PortfolioInvocationResources(
     seed: Long,
     cancellation: Cancellation,
     nodeBudget: NodeBudget?,
-) {
+) : AutoCloseable {
     init { require(count > 0 && parallelism > 0) }
     val lanes: Int = minOf(count, parallelism)
     val concurrency: Concurrency = if (lanes > 1) Concurrency.Strict else Concurrency.None
     private val quotas = if (lanes > 1) nodeBudget?.quotas(count) else null
     private val workerSlots: List<PortfolioWorkerSlot> = List(count) { index ->
-        PortfolioWorkerSlot(index, seed + index, cancellation, quotas?.get(index) ?: nodeBudget)
+        PortfolioWorkerSlot(index, seed, cancellation, quotas?.get(index) ?: nodeBudget)
     }
 
     val slots: List<PortfolioWorkerSlot> get() = workerSlots.toList()
 
     fun nativeAllowances(limit: Long, complete: Set<Int>): LongArray =
         nativeWorkerAllowances(workerSlots.size, limit, complete)
+
+    override fun close() {
+        var failure: Throwable? = null
+        for (slot in workerSlots.asReversed()) {
+            runCatching { slot.close() }.exceptionOrNull()?.let { error ->
+                if (failure == null) failure = error else requireNotNull(failure).addSuppressed(error)
+            }
+        }
+        failure?.let { throw it }
+    }
 }
 
 internal fun nativeWorkerAllowances(count: Int, limit: Long, complete: Set<Int>): LongArray {

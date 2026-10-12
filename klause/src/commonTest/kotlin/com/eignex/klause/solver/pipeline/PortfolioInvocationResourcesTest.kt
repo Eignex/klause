@@ -5,6 +5,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -88,6 +89,28 @@ class PortfolioInvocationResourcesTest {
         val allowances = heuristicWorkerAllowances(3, Long.MAX_VALUE, setOf(0))
 
         assertContentEquals(longArrayOf(0, Long.MAX_VALUE, Long.MAX_VALUE), allowances)
+    }
+
+
+    @Test
+    fun `source cleanup preserves failures while releasing every worker slot`() {
+        val resources = PortfolioInvocationResources(2, 2, 1, Cancellation.Never, null)
+        val closed = mutableListOf<Int>()
+        resources.slots[0].own(AutoCloseable {
+            closed += 0
+            throw IllegalStateException("first slot")
+        })
+        resources.slots[1].own(AutoCloseable {
+            closed += 1
+            throw IllegalStateException("second slot")
+        })
+
+        val failure = assertFailsWith<IllegalStateException> { resources.close() }
+        resources.close()
+
+        assertEquals(listOf(1, 0), closed)
+        assertEquals("second slot", failure.message)
+        assertEquals("first slot", failure.suppressedExceptions.single().message)
     }
 
 }
