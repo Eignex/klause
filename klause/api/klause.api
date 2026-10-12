@@ -5512,6 +5512,36 @@ public final class com/eignex/klause/lp/engine/LpZeroObjectivePricing : java/lan
 	public static fun values ()[Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 }
 
+public final class com/eignex/klause/lp/optimization/LinearApproach : com/eignex/klause/solver/evidence/SourceDerivation$Extension {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/Sample;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/Sample;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBase ()Lcom/eignex/klause/solver/Sample;
+	public final fun getEndpoint ()Lcom/eignex/klause/solver/Sample;
+	public final fun getStrictBound ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+}
+
+public final class com/eignex/klause/lp/optimization/LinearApproachKt {
+	public static final fun withLinearAuthority (Lcom/eignex/klause/solver/evidence/SourceProofContext;)Lcom/eignex/klause/solver/evidence/SourceProofContext;
+}
+
+public final class com/eignex/klause/lp/optimization/LinearAuthoritySemantics : com/eignex/klause/solver/evidence/SourceSemanticsChecker {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceProofContext;)V
+	public fun derivation (Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceDerivation$Extension;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public fun objectiveEquals (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public fun ray (Lcom/eignex/klause/solver/evidence/SourceClaim$Ray;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public fun witness (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+}
+
+public final class com/eignex/klause/lp/optimization/LinearPinnedObjective : com/eignex/klause/solver/evidence/SourceDerivation$Extension {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public final fun getBound ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+}
+
+public final class com/eignex/klause/lp/optimization/LinearPinnedRefutation : com/eignex/klause/solver/evidence/SourceDerivation$Extension {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public final fun getConflict ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+}
+
 public final class com/eignex/klause/model/AllDifferent : com/eignex/klause/model/BoolExpr {
 	public static final field Companion Lcom/eignex/klause/model/AllDifferent$Companion;
 	public fun <init> (Ljava/util/List;)V
@@ -10502,6 +10532,11 @@ public final class com/eignex/klause/solver/pipeline/IntVariableOwner : java/lan
 	public static fun values ()[Lcom/eignex/klause/solver/pipeline/IntVariableOwner;
 }
 
+public final class com/eignex/klause/solver/pipeline/LinearOptimizationExecutionKt {
+	public static final fun optimizeLinear (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/evidence/SourceProofContext;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/solver/result/LinearOptimizationResult;
+	public static synthetic fun optimizeLinear$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/evidence/SourceProofContext;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/LinearOptimizationResult;
+}
+
 public final class com/eignex/klause/solver/pipeline/LsResolution {
 	public fun <init> (Ljava/util/List;Z)V
 	public final fun getDryRunSolver ()Z
@@ -11490,6 +11525,17 @@ public final class com/eignex/klause/solver/result/ConflictAnalysisStats {
 	public fun hashCode ()I
 	public final fun mergedWith (Lcom/eignex/klause/solver/result/ConflictAnalysisStats;)Lcom/eignex/klause/solver/result/ConflictAnalysisStats;
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/LinearOptimizationResult {
+	public final fun getBound ()Lcom/eignex/klause/solver/evidence/SourceEvidence;
+	public final fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun getIncumbent ()Lcom/eignex/klause/solver/Sample;
+	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
+	public final fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun getTerminal ()Lcom/eignex/klause/solver/evidence/SourceEvidence;
+	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
 }
 
 public final class com/eignex/klause/solver/result/LocalSearchResidual {
