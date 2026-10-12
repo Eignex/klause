@@ -1,14 +1,21 @@
 # nonlinear-real: problems with the nonlinear-real theme, drawn 2026-10-12 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
 # 2026-10-12: piecewise.bpl_Iteration1_Loop_4-pieceTemplate replaced by medium problems; no reference had an answer within the sweep's 10 s
-# 2026-10-12: trimmed to 7, keeping the problems whose sweep result varied over the last 30 runs and at most 6 never solved
-# easy: 6
+# 2026-10-12: trimmed to 14; klause solved none of the theme over the last 30 sweeps, so these are spread over families, fastest reference first
+# easy: 10
+smtlib-qfnra/20161105-Sturm-MBO/mbo_E15E26
 smtlib-qfnra/20161105-Sturm-MGC/mgc_08
+smtlib-qfnra/20170501-Heizmann-UltimateInvariantSynthesis/sorting_bubblesort_ground.i_4_3_3.bpl_5
 smtlib-qfnra/20180501-Economics-Mulligan/MulliganEconomicsModel0015e
 smtlib-qfnra/2019-ezsmt/generator/inst-ijcai-lin7.ez
 smtlib-qfnra/20240407-pPDA-Chiari-Pontiggia-Winkler/certificate_no_hints/mod5_POMC_no_hints
+smtlib-qfnra/LassoRanker/CooperatingT2/bubbleSort.t2.c_Iteration6_Loop_4-pieceTemplate
+smtlib-qfnra/UltimateAutomizer/InVarSynth_ShortCircuit-SideEffect-SwitchStatement-Unsafe.c_Iteration1_0
 smtlib-qfnra/hong/hong_13
 smtlib-qfnra/hycomp/ball_count_2d_hill_simple.05.qfree_global_4
-# medium: 1
+# medium: 4
 smtlib-qfnra/2019-ezsmt/bouncingBall/inst_1_1000000
+smtlib-qfnra/20200911-Pine/1599121902699953000
+smtlib-qfnra/kissing/kissing_4_8
+smtlib-qfnra/zankl/matrix-4-all-7
 # hard: 0
