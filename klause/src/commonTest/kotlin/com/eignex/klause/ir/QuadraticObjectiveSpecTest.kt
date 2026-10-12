@@ -36,7 +36,8 @@ class QuadraticObjectiveSpecTest {
         val objective = QuadraticObjectiveSpec(listOf(
             QuadraticObjectiveTerm(QuadraticCoefficient.ONE, QuadraticVariable.Bool(SourceBoolId(0))),
             QuadraticObjectiveTerm(
-                QuadraticCoefficient.ONE, QuadraticVariable.Int(SourceIntId(0)), QuadraticVariable.Real(SourceRealId(0)),
+                QuadraticCoefficient.ONE,
+                QuadraticVariable.Int(SourceIntId(0)), QuadraticVariable.Real(SourceRealId(0)),
             ),
         ))
 
