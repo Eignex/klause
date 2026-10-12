@@ -32,6 +32,12 @@ scalar reads retain exact integer/rational authority without copying arrays.
 unchanged sample copy can share its private immutable buffers and certificate;
 replacement coordinates are captured and require a fresh witness check.
 
+`Sample.symbolicReals` retains exact analytic expressions with rational/algebraic
+leaves for transcendental coordinates. Its approximate view supplies heuristic or
+display data. Exact source checks retain domain validity and function identities;
+replacing the approximate coordinates discards symbolic authority unless replacement
+metadata is explicitly supplied. See [exact analytic real coordinates](arithmetic/real.md).
+
 Lowered and solver linear objectives capture their coefficient arrays at construction.
 Their getters, copies and destructuring cannot mutate the captured objective. Solver
 consumers borrow those private coefficients read-only inside the module. Generic
@@ -154,6 +160,16 @@ indexes belong to a propagation projection, keyed by shared immutable relation
 arrays. Local-search projections prepare table column maps, AllDifferent occurrence counts
 and circuit scoring. Each engine interprets presence literals in its own state.
 Source lowering shares relation data without allocating engine preparation.
+
+## Public strategy construction
+
+Source strategy factories retain the original Problem and captured schema metadata.
+They consume the shared prepared route and arrange its required arithmetic completion
+before publishing original-coordinate witnesses. Finite preparation retains that same
+PreparedSourcePlan. Exact optimization results remain the existing native result types;
+source construction does not issue certificates or normalize proof payloads.
+[Library API](api.md#source-aware-strategy-entry-points) defines the supported controls
+and distinguishes the retained finite facades.
 
 ## Search state ownership
 

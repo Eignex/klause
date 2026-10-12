@@ -54,9 +54,7 @@ are work to close, not permanent exceptions to shared breadth or source checking
 
 | Gap | Current behavior | Tracking |
 |---|---|---|
-| Source-inexact open MPS models | Witness-only fallback has no runnable complete arm; BACKTRACK/FIXED return Unsupported | [#2654](https://github.com/Eignex/klause/issues/2654) |
 | Real linear objectives on polynomial models | Linear objective admission rejects costs accepted by an equivalent quadratic objective specification | [#2655](https://github.com/Eignex/klause/issues/2655) |
-| Public solver facades | Direct finite baking bypasses source services used by the shared pipeline | [#2656](https://github.com/Eignex/klause/issues/2656) |
 
 ## Finite and open models
 
@@ -83,6 +81,12 @@ claim. Exact FlatZinc declines unsupported open fragments.
 routing proof for MPS, SMT-LIB and exact FlatZinc, allowing a supported source to
 be measured through its open route. Unsupported syntax or a declined exact
 operation remains undecided.
+
+MPS mixed models whose hybrid lowering differs from source decimals prepare exact
+original rows and objective definitions before routing. Their complete and heuristic
+arms operate on the same source-equivalent model; the default purely continuous LP
+lane retains its separately identified tolerance guarantee. See
+[MPS source semantics](formats/mps.md).
 
 ## Execution metadata
 

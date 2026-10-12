@@ -163,7 +163,8 @@ Solver-control flags are common to **every** mode:
 - `--exact` — preserve continuous FlatZinc floats and their open bounds; use the shared LRA/LIRA
   route for supported linear satisfaction models and exact LP certification for continuous objectives.
   Float constraints without exact lowering are declined. For MPS, require exact certificates instead
-  of accepting continuous leaves by source tolerance, and decline a lowering that differs from its source.
+  of accepting continuous leaves by source tolerance. Decimal lowering differences select an exact
+  original-source arithmetic model.
 - `--format <name>` / `--mode <name>` — force a mode regardless of file extension.
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):
@@ -255,7 +256,8 @@ and `-e mixed` combines those arms. Supported linear Boolean or real objectives 
 strict-improvement theory rounds when integral descent is ineligible; an unattained
 infimum can exhaust the invocation allowance. Open and polynomial heuristic controls
 include `seed`, `max-flips`, `max-instructions` and `alns-iterations`; zero improving
-iterations still permits ALNS bootstrap. SMT-LIB and source-exact MPS fragments or
+iterations still permits ALNS bootstrap. MPS mixed decimal sources use original exact
+rows for those strategies; default continuous LP tolerance remains separate. SMT-LIB and MPS fragments or
 objectives that lack a complete theory route can use open local search for witnesses;
 its engine policy is described by
 [input semantics](formats.md#finite-and-open-models).

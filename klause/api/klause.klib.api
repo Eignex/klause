@@ -6,6 +6,19 @@
 // - Show declarations: true
 
 // Library unique name: <com.eignex:klause>
+final enum class com.eignex.klause.arithmetic.real/ExactRealFunction : kotlin/Enum<com.eignex.klause.arithmetic.real/ExactRealFunction> { // com.eignex.klause.arithmetic.real/ExactRealFunction|null[0]
+    enum entry COS // com.eignex.klause.arithmetic.real/ExactRealFunction.COS|null[0]
+    enum entry EXP // com.eignex.klause.arithmetic.real/ExactRealFunction.EXP|null[0]
+    enum entry LOG // com.eignex.klause.arithmetic.real/ExactRealFunction.LOG|null[0]
+    enum entry SIN // com.eignex.klause.arithmetic.real/ExactRealFunction.SIN|null[0]
+
+    final val entries // com.eignex.klause.arithmetic.real/ExactRealFunction.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.arithmetic.real/ExactRealFunction> // com.eignex.klause.arithmetic.real/ExactRealFunction.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.arithmetic.real/ExactRealFunction // com.eignex.klause.arithmetic.real/ExactRealFunction.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.arithmetic.real/ExactRealFunction> // com.eignex.klause.arithmetic.real/ExactRealFunction.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.backtrack/TierVarSelect : kotlin/Enum<com.eignex.klause.backtrack/TierVarSelect> { // com.eignex.klause.backtrack/TierVarSelect|null[0]
     enum entry InputOrder // com.eignex.klause.backtrack/TierVarSelect.InputOrder|null[0]
     enum entry LargestDomain // com.eignex.klause.backtrack/TierVarSelect.LargestDomain|null[0]
@@ -1616,6 +1629,67 @@ sealed interface <#A: out kotlin/Any?> com.eignex.klause.theory/TheoryCheck { //
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryCheck.Cancelled.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryCheck.Cancelled.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryCheck.Cancelled.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression|null[0]
+    final class Algebraic : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic|null[0]
+        constructor <init>(com.eignex.klause.arithmetic.polynomial/AlgebraicReal) // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.<init>|<init>(com.eignex.klause.arithmetic.polynomial.AlgebraicReal){}[0]
+
+        final val value // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.value|{}value[0]
+            final fun <get-value>(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.arithmetic.polynomial/AlgebraicReal = ...): com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.copy|copy(com.eignex.klause.arithmetic.polynomial.AlgebraicReal){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.toString|toString(){}[0]
+    }
+
+    final class Function : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Function|null[0]
+        constructor <init>(com.eignex.klause.arithmetic.real/ExactRealFunction, com.eignex.klause.arithmetic.real/ExactRealExpression) // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.<init>|<init>(com.eignex.klause.arithmetic.real.ExactRealFunction;com.eignex.klause.arithmetic.real.ExactRealExpression){}[0]
+
+        final val argument // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.argument|{}argument[0]
+            final fun <get-argument>(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.argument.<get-argument>|<get-argument>(){}[0]
+        final val function // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.function|{}function[0]
+            final fun <get-function>(): com.eignex.klause.arithmetic.real/ExactRealFunction // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.function.<get-function>|<get-function>(){}[0]
+
+        final fun component1(): com.eignex.klause.arithmetic.real/ExactRealFunction // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.arithmetic.real/ExactRealFunction = ..., com.eignex.klause.arithmetic.real/ExactRealExpression = ...): com.eignex.klause.arithmetic.real/ExactRealExpression.Function // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.copy|copy(com.eignex.klause.arithmetic.real.ExactRealFunction;com.eignex.klause.arithmetic.real.ExactRealExpression){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.toString|toString(){}[0]
+    }
+
+    final class Power : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Power|null[0]
+        final val base // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.base|{}base[0]
+            final fun <get-base>(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.base.<get-base>|<get-base>(){}[0]
+        final val exponent // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.exponent|{}exponent[0]
+            final fun <get-exponent>(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.exponent.<get-exponent>|<get-exponent>(){}[0]
+
+        final fun component1(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.component1|component1(){}[0]
+        final fun component2(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.arithmetic.real/ExactRealExpression = ..., kotlin/Int = ...): com.eignex.klause.arithmetic.real/ExactRealExpression.Power // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.copy|copy(com.eignex.klause.arithmetic.real.ExactRealExpression;kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.toString|toString(){}[0]
+    }
+
+    final class Product : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Product|null[0]
+        final val operands // com.eignex.klause.arithmetic.real/ExactRealExpression.Product.operands|{}operands[0]
+            final fun <get-operands>(): kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealExpression> // com.eignex.klause.arithmetic.real/ExactRealExpression.Product.operands.<get-operands>|<get-operands>(){}[0]
+    }
+
+    final class Sum : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Sum|null[0]
+        final val operands // com.eignex.klause.arithmetic.real/ExactRealExpression.Sum.operands|{}operands[0]
+            final fun <get-operands>(): kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealExpression> // com.eignex.klause.arithmetic.real/ExactRealExpression.Sum.operands.<get-operands>|<get-operands>(){}[0]
+    }
+
+    final object Pi : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Pi|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.arithmetic.real/ExactRealExpression.Pi.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Pi.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.arithmetic.real/ExactRealExpression.Pi.toString|toString(){}[0]
     }
 }
 
@@ -4467,6 +4541,15 @@ final class com.eignex.klause.arithmetic.polynomial/AlgebraicReal { // com.eigne
         final fun <get-upperBound>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.upperBound.<get-upperBound>|<get-upperBound>(){}[0]
 }
 
+final class com.eignex.klause.arithmetic.real/ExactRealValue { // com.eignex.klause.arithmetic.real/ExactRealValue|null[0]
+    final val algebraic // com.eignex.klause.arithmetic.real/ExactRealValue.algebraic|{}algebraic[0]
+        final fun <get-algebraic>(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal? // com.eignex.klause.arithmetic.real/ExactRealValue.algebraic.<get-algebraic>|<get-algebraic>(){}[0]
+    final val expression // com.eignex.klause.arithmetic.real/ExactRealValue.expression|{}expression[0]
+        final fun <get-expression>(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealValue.expression.<get-expression>|<get-expression>(){}[0]
+    final val rational // com.eignex.klause.arithmetic.real/ExactRealValue.rational|{}rational[0]
+        final fun <get-rational>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.arithmetic.real/ExactRealValue.rational.<get-rational>|<get-rational>(){}[0]
+}
+
 final class com.eignex.klause.backtrack.selector/Chb : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/Chb|null[0]
     constructor <init>(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...) // com.eignex.klause.backtrack.selector/Chb.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
 
@@ -4723,6 +4806,12 @@ final class com.eignex.klause.backtrack/BacktrackSolver : com.eignex.klause.solv
     final fun samples(com.eignex.klause.backtrack/BacktrackParams): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.backtrack/BacktrackSolver.samples|samples(com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun solve(): com.eignex.klause.solver/SolveResult // com.eignex.klause.backtrack/BacktrackSolver.solve|solve(){}[0]
     final fun solve(com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver/SolveResult // com.eignex.klause.backtrack/BacktrackSolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
+
+    final object Companion { // com.eignex.klause.backtrack/BacktrackSolver.Companion|null[0]
+        final fun source(com.eignex.klause.compile/CompiledSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.backtrack/BacktrackSolver.Companion.source|source(com.eignex.klause.compile.CompiledSchema){}[0]
+        final fun source(com.eignex.klause.ir/Problem): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.backtrack/BacktrackSolver.Companion.source|source(com.eignex.klause.ir.Problem){}[0]
+        final fun source(com.eignex.klause.schema/VariableSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.backtrack/BacktrackSolver.Companion.source|source(com.eignex.klause.schema.VariableSchema){}[0]
+    }
 }
 
 final class com.eignex.klause.backtrack/NodeBudget { // com.eignex.klause.backtrack/NodeBudget|null[0]
@@ -6953,6 +7042,15 @@ final class com.eignex.klause.ir/TaggedLinearRow : com.eignex.klause.ir/LinearRo
     final fun ref(kotlin/Int): kotlin/Int // com.eignex.klause.ir/TaggedLinearRow.ref|ref(kotlin.Int){}[0]
 }
 
+final class com.eignex.klause.ir/TranscendentalProblem { // com.eignex.klause.ir/TranscendentalProblem|null[0]
+    final val boolVarNames // com.eignex.klause.ir/TranscendentalProblem.boolVarNames|{}boolVarNames[0]
+        final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
+    final val intVarNames // com.eignex.klause.ir/TranscendentalProblem.intVarNames|{}intVarNames[0]
+        final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
+    final val realVarNames // com.eignex.klause.ir/TranscendentalProblem.realVarNames|{}realVarNames[0]
+        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+}
+
 final class com.eignex.klause.ir/UnitConsts : com.eignex.klause.ir/LongConstList { // com.eignex.klause.ir/UnitConsts|null[0]
     constructor <init>(kotlin/Int) // com.eignex.klause.ir/UnitConsts.<init>|<init>(kotlin.Int){}[0]
 
@@ -7938,6 +8036,12 @@ final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.
     final fun session(): com.eignex.klause.localsearch/LocalSearchSession // com.eignex.klause.localsearch/LocalSearchSolver.session|session(){}[0]
     final fun solve(): com.eignex.klause.solver/SolveResult // com.eignex.klause.localsearch/LocalSearchSolver.solve|solve(){}[0]
     final fun solve(com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/SolveResult // com.eignex.klause.localsearch/LocalSearchSolver.solve|solve(com.eignex.klause.localsearch.LocalSearchParams){}[0]
+
+    final object Companion { // com.eignex.klause.localsearch/LocalSearchSolver.Companion|null[0]
+        final fun source(com.eignex.klause.compile/CompiledSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.localsearch/LocalSearchSolver.Companion.source|source(com.eignex.klause.compile.CompiledSchema){}[0]
+        final fun source(com.eignex.klause.ir/Problem): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.localsearch/LocalSearchSolver.Companion.source|source(com.eignex.klause.ir.Problem){}[0]
+        final fun source(com.eignex.klause.schema/VariableSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.localsearch/LocalSearchSolver.Companion.source|source(com.eignex.klause.schema.VariableSchema){}[0]
+    }
 }
 
 final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klause.localsearch/LocalSearchState|null[0]
@@ -11621,7 +11725,7 @@ final class com.eignex.klause.solver.evidence/SourcePremise { // com.eignex.klau
 }
 
 final class com.eignex.klause.solver.evidence/SourceProofContext { // com.eignex.klause.solver.evidence/SourceProofContext|null[0]
-    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate>, kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourcePremise>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.evidence/SourceSemanticsChecker? = ...) // com.eignex.klause.solver.evidence/SourceProofContext.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.Set<com.eignex.klause.solver.evidence.SourceCoordinate>;kotlin.collections.Map<kotlin.String,com.eignex.klause.solver.evidence.SourcePremise>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceSemanticsChecker?){}[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate>, kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourcePremise>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>? = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.evidence/SourceSemanticsChecker? = ...) // com.eignex.klause.solver.evidence/SourceProofContext.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.Set<com.eignex.klause.solver.evidence.SourceCoordinate>;kotlin.collections.Map<kotlin.String,com.eignex.klause.solver.evidence.SourcePremise>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>?;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceSemanticsChecker?){}[0]
 
     final val coordinates // com.eignex.klause.solver.evidence/SourceProofContext.coordinates|{}coordinates[0]
         final fun <get-coordinates>(): kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate> // com.eignex.klause.solver.evidence/SourceProofContext.coordinates.<get-coordinates>|<get-coordinates>(){}[0]
@@ -12171,8 +12275,12 @@ final class com.eignex.klause.solver.pipeline/PolynomialStrategyParams { // com.
 }
 
 final class com.eignex.klause.solver.pipeline/PolynomialTheoryExecution { // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution|null[0]
-    constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryResult, com.eignex.klause.solver.pipeline/PolynomialTheoryStats, com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...) // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryResult, com.eignex.klause.solver.pipeline/PolynomialTheoryStats, com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ..., kotlin/String? = ..., kotlin/String? = ...) // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?;kotlin.String?;kotlin.String?){}[0]
 
+    final val nativeResource // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.nativeResource|{}nativeResource[0]
+        final fun <get-nativeResource>(): kotlin/String? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.nativeResource.<get-nativeResource>|<get-nativeResource>(){}[0]
+    final val nativeWorkScope // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.nativeWorkScope|{}nativeWorkScope[0]
+        final fun <get-nativeWorkScope>(): kotlin/String? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.nativeWorkScope.<get-nativeWorkScope>|<get-nativeWorkScope>(){}[0]
     final val resource // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.resource|{}resource[0]
         final fun <get-resource>(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.resource.<get-resource>|<get-resource>(){}[0]
     final val result // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.result|{}result[0]
@@ -12183,7 +12291,9 @@ final class com.eignex.klause.solver.pipeline/PolynomialTheoryExecution { // com
     final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.solver.pipeline/PolynomialTheoryStats // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component2|component2(){}[0]
     final fun component3(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component3|component3(){}[0]
-    final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryResult = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryStats = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+    final fun component4(): kotlin/String? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component4|component4(){}[0]
+    final fun component5(): kotlin/String? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component5|component5(){}[0]
+    final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryResult = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryStats = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ..., kotlin/String? = ..., kotlin/String? = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?;kotlin.String?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.toString|toString(){}[0]
@@ -12409,6 +12519,91 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/TheoryParams.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TheoryParams.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/TranscendentalAssignment : com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/TranscendentalAssignment|null[0]
+    final val sample // com.eignex.klause.solver.pipeline/TranscendentalAssignment.sample|{}sample[0]
+        final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.pipeline/TranscendentalAssignment.sample.<get-sample>|<get-sample>(){}[0]
+
+    final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/TranscendentalAssignment.boolValue|boolValue(kotlin.Int){}[0]
+    final fun exactRealValue(kotlin/Int): com.eignex.klause.arithmetic.real/ExactRealValue // com.eignex.klause.solver.pipeline/TranscendentalAssignment.exactRealValue|exactRealValue(kotlin.Int){}[0]
+    final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/TranscendentalAssignment.intValue|intValue(kotlin.Int){}[0]
+    final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/TranscendentalAssignment.realValue|realValue(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution { // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution|null[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryResult, kotlin/Long, kotlin/Boolean) // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryResult;kotlin.Long;kotlin.Boolean){}[0]
+
+    final val representationDeclined // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.representationDeclined|{}representationDeclined[0]
+        final fun <get-representationDeclined>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.representationDeclined.<get-representationDeclined>|<get-representationDeclined>(){}[0]
+    final val result // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.result|{}result[0]
+        final fun <get-result>(): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.result.<get-result>|<get-result>(){}[0]
+    final val workSpent // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.workSpent|{}workSpent[0]
+        final fun <get-workSpent>(): kotlin/Long // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.workSpent.<get-workSpent>|<get-workSpent>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.component3|component3(){}[0]
+    final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryResult = ..., kotlin/Long = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryResult;kotlin.Long;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/TranscendentalTheoryParams { // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams|null[0]
+    constructor <init>(kotlin/Long? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Long? = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.pipeline/PolynomialStrategyParams = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Set<kotlin/Int> = ..., kotlin.collections/Set<kotlin/Int> = ...) // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.<init>|<init>(kotlin.Long?;kotlin.Int;kotlin.Int;kotlin.Int?;kotlin.Long?;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.pipeline.PolynomialStrategyParams;com.eignex.klause.backtrack.NodeBudget?;kotlin.collections.Map<kotlin.Int,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Map<kotlin.Int,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Set<kotlin.Int>;kotlin.collections.Set<kotlin.Int>){}[0]
+
+    final val cancellation // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.cancellation|{}cancellation[0]
+        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    final val maximumBits // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumBits|{}maximumBits[0]
+        final fun <get-maximumBits>(): kotlin/Int // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumBits.<get-maximumBits>|<get-maximumBits>(){}[0]
+    final val maximumDenseCoefficients // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumDenseCoefficients|{}maximumDenseCoefficients[0]
+        final fun <get-maximumDenseCoefficients>(): kotlin/Int? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumDenseCoefficients.<get-maximumDenseCoefficients>|<get-maximumDenseCoefficients>(){}[0]
+    final val maximumDepth // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumDepth|{}maximumDepth[0]
+        final fun <get-maximumDepth>(): kotlin/Int // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumDepth.<get-maximumDepth>|<get-maximumDepth>(){}[0]
+    final val maximumMatrixCells // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumMatrixCells|{}maximumMatrixCells[0]
+        final fun <get-maximumMatrixCells>(): kotlin/Long? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumMatrixCells.<get-maximumMatrixCells>|<get-maximumMatrixCells>(){}[0]
+    final val maximumWork // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumWork|{}maximumWork[0]
+        final fun <get-maximumWork>(): kotlin/Long? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.maximumWork.<get-maximumWork>|<get-maximumWork>(){}[0]
+    final val nodeBudget // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.nodeBudget|{}nodeBudget[0]
+        final fun <get-nodeBudget>(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.nodeBudget.<get-nodeBudget>|<get-nodeBudget>(){}[0]
+    final val realLower // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realLower|{}realLower[0]
+        final fun <get-realLower>(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realLower.<get-realLower>|<get-realLower>(){}[0]
+    final val realUpper // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realUpper|{}realUpper[0]
+        final fun <get-realUpper>(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realUpper.<get-realUpper>|<get-realUpper>(){}[0]
+    final val strategy // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.strategy|{}strategy[0]
+        final fun <get-strategy>(): com.eignex.klause.solver.pipeline/PolynomialStrategyParams // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.strategy.<get-strategy>|<get-strategy>(){}[0]
+    final val strictRealLower // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.strictRealLower|{}strictRealLower[0]
+        final fun <get-strictRealLower>(): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.strictRealLower.<get-strictRealLower>|<get-strictRealLower>(){}[0]
+    final val strictRealUpper // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.strictRealUpper|{}strictRealUpper[0]
+        final fun <get-strictRealUpper>(): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.strictRealUpper.<get-strictRealUpper>|<get-strictRealUpper>(){}[0]
+    final val timeout // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.timeout|{}timeout[0]
+        final fun <get-timeout>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.timeout.<get-timeout>|<get-timeout>(){}[0]
+
+    final fun component1(): kotlin/Long? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component1|component1(){}[0]
+    final fun component10(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component10|component10(){}[0]
+    final fun component11(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component11|component11(){}[0]
+    final fun component12(): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component12|component12(){}[0]
+    final fun component13(): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component13|component13(){}[0]
+    final fun component2(): kotlin/Int // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component3|component3(){}[0]
+    final fun component4(): kotlin/Int? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component4|component4(){}[0]
+    final fun component5(): kotlin/Long? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component5|component5(){}[0]
+    final fun component6(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component6|component6(){}[0]
+    final fun component7(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component7|component7(){}[0]
+    final fun component8(): com.eignex.klause.solver.pipeline/PolynomialStrategyParams // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component8|component8(){}[0]
+    final fun component9(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component9|component9(){}[0]
+    final fun copy(kotlin/Long? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Long? = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.pipeline/PolynomialStrategyParams = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Set<kotlin/Int> = ..., kotlin.collections/Set<kotlin/Int> = ...): com.eignex.klause.solver.pipeline/TranscendentalTheoryParams // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.copy|copy(kotlin.Long?;kotlin.Int;kotlin.Int;kotlin.Int?;kotlin.Long?;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.pipeline.PolynomialStrategyParams;com.eignex.klause.backtrack.NodeBudget?;kotlin.collections.Map<kotlin.Int,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Map<kotlin.Int,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Set<kotlin.Int>;kotlin.collections.Set<kotlin.Int>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest : com.eignex.klause.solver.pipeline/ExactTheorySatisfactionRequest { // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest|null[0]
+    final val problem // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.ir/TranscendentalProblem // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.problem.<get-problem>|<get-problem>(){}[0]
+
+    final fun execute(com.eignex.klause.solver.pipeline/PolynomialTheoryParams, com.eignex.klause.solver.pipeline/FiniteEngine, kotlin/Int): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.execute|execute(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;kotlin.Int){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/UnplaceableColumn { // com.eignex.klause.solver.pipeline/UnplaceableColumn|null[0]
@@ -14114,7 +14309,7 @@ final class com.eignex.klause.solver/ProblemProfile { // com.eignex.klause.solve
 }
 
 final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample|null[0]
-    constructor <init>(kotlin/BooleanArray, kotlin/LongArray, kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ..., kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? = ...) // com.eignex.klause.solver/Sample.<init>|<init>(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?;kotlin.collections.List<com.ionspin.kotlin.bignum.integer.BigInteger>?;kotlin.collections.List<com.eignex.klause.arithmetic.polynomial.AlgebraicReal>?){}[0]
+    constructor <init>(kotlin/BooleanArray, kotlin/LongArray, kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ..., kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealValue>? = ...) // com.eignex.klause.solver/Sample.<init>|<init>(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?;kotlin.collections.List<com.ionspin.kotlin.bignum.integer.BigInteger>?;kotlin.collections.List<com.eignex.klause.arithmetic.polynomial.AlgebraicReal>?;kotlin.collections.List<com.eignex.klause.arithmetic.real.ExactRealValue>?){}[0]
 
     final val algebraicReals // com.eignex.klause.solver/Sample.algebraicReals|{}algebraicReals[0]
         final fun <get-algebraicReals>(): kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? // com.eignex.klause.solver/Sample.algebraicReals.<get-algebraicReals>|<get-algebraicReals>(){}[0]
@@ -14134,15 +14329,35 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
         final fun <get-numRealVars>(): kotlin/Int // com.eignex.klause.solver/Sample.numRealVars.<get-numRealVars>|<get-numRealVars>(){}[0]
     final val reals // com.eignex.klause.solver/Sample.reals|{}reals[0]
         final fun <get-reals>(): kotlin/DoubleArray // com.eignex.klause.solver/Sample.reals.<get-reals>|<get-reals>(){}[0]
+    final val symbolicReals // com.eignex.klause.solver/Sample.symbolicReals|{}symbolicReals[0]
+        final fun <get-symbolicReals>(): kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealValue>? // com.eignex.klause.solver/Sample.symbolicReals.<get-symbolicReals>|<get-symbolicReals>(){}[0]
 
     final fun approximateRealValue(kotlin/Int): kotlin/Double // com.eignex.klause.solver/Sample.approximateRealValue|approximateRealValue(kotlin.Int){}[0]
     final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/Sample.boolValue|boolValue(kotlin.Int){}[0]
-    final fun copy(kotlin/BooleanArray = ..., kotlin/LongArray = ..., kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ..., kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? = ...): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Sample.copy|copy(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?;kotlin.collections.List<com.ionspin.kotlin.bignum.integer.BigInteger>?;kotlin.collections.List<com.eignex.klause.arithmetic.polynomial.AlgebraicReal>?){}[0]
+    final fun copy(kotlin/BooleanArray = ..., kotlin/LongArray = ..., kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ..., kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealValue>? = ...): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Sample.copy|copy(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?;kotlin.collections.List<com.ionspin.kotlin.bignum.integer.BigInteger>?;kotlin.collections.List<com.eignex.klause.arithmetic.polynomial.AlgebraicReal>?;kotlin.collections.List<com.eignex.klause.arithmetic.real.ExactRealValue>?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/Sample.equals|equals(kotlin.Any?){}[0]
     final fun exactIntValue(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver/Sample.exactIntValue|exactIntValue(kotlin.Int){}[0]
     final fun hammingDistanceTo(com.eignex.klause.solver/Sample): kotlin/Int // com.eignex.klause.solver/Sample.hammingDistanceTo|hammingDistanceTo(com.eignex.klause.solver.Sample){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver/Sample.hashCode|hashCode(){}[0]
     final fun intValue(kotlin/Int): kotlin/Long // com.eignex.klause.solver/Sample.intValue|intValue(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.solver/SourceStrategy { // com.eignex.klause.solver/SourceStrategy|null[0]
+    final val compiledSchema // com.eignex.klause.solver/SourceStrategy.compiledSchema|{}compiledSchema[0]
+        final fun <get-compiledSchema>(): com.eignex.klause.compile/CompiledSchema? // com.eignex.klause.solver/SourceStrategy.compiledSchema.<get-compiledSchema>|<get-compiledSchema>(){}[0]
+    final val engine // com.eignex.klause.solver/SourceStrategy.engine|{}engine[0]
+        final fun <get-engine>(): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver/SourceStrategy.engine.<get-engine>|<get-engine>(){}[0]
+    final val source // com.eignex.klause.solver/SourceStrategy.source|{}source[0]
+        final fun <get-source>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver/SourceStrategy.source.<get-source>|<get-source>(){}[0]
+
+    final fun optimize(com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver/SourceStrategy.optimize|optimize(com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun optimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.backtrack/BacktrackParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver/SourceStrategy.optimize|optimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.backtrack.BacktrackParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun optimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.localsearch/LocalSearchParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver/SourceStrategy.optimize|optimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.localsearch.LocalSearchParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun optimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver/SourceStrategy.optimize|optimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun optimizeOpen(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver/SourceStrategy.optimizeOpen|optimizeOpen(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun solve(com.eignex.klause.backtrack/BacktrackParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver/SourceStrategy.solve|solve(com.eignex.klause.backtrack.BacktrackParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
+    final fun solve(com.eignex.klause.localsearch/LocalSearchParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver/SourceStrategy.solve|solve(com.eignex.klause.localsearch.LocalSearchParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
+    final fun solve(com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver/SourceStrategy.solve|solve(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
 }
 
 final class com.eignex.klause.theory.difference/DifferenceSearchComponent : com.eignex.klause.solver.search/TheoryComponent { // com.eignex.klause.theory.difference/DifferenceSearchComponent|null[0]
@@ -14991,6 +15206,7 @@ final fun (com.eignex.klause.formats.dimacs/CnfDocument).com.eignex.klause.forma
 final fun (com.eignex.klause.formats.dimacs/WcnfDocument).com.eignex.klause.formats.dimacs/toProblem(com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.dimacs/WcnfProblem // com.eignex.klause.formats.dimacs/toProblem|toProblem@com.eignex.klause.formats.dimacs.WcnfDocument(com.eignex.klause.ir.ProblemSettings){}[0]
 final fun (com.eignex.klause.formats.flatzinc/FlatZincProgram).com.eignex.klause.formats.flatzinc/linearObjective(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.flatzinc/linearObjective|linearObjective@com.eignex.klause.formats.flatzinc.FlatZincProgram(){}[0]
 final fun (com.eignex.klause.formats.flatzinc/FlatZincSearchHints).com.eignex.klause.formats.flatzinc/toSearchHints(): com.eignex.klause.ir/SearchHints // com.eignex.klause.formats.flatzinc/toSearchHints|toSearchHints@com.eignex.klause.formats.flatzinc.FlatZincSearchHints(){}[0]
+final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toExactSourceProblem(com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toExactSourceProblem|toExactSourceProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.ProblemSettings){}[0]
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toProblem(com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.ProblemSettings){}[0]
 final fun (com.eignex.klause.formats.opb/OpbDocument).com.eignex.klause.formats.opb/toProblem(com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/toProblem|toProblem@com.eignex.klause.formats.opb.OpbDocument(com.eignex.klause.ir.ProblemSettings){}[0]
 final fun (com.eignex.klause.ir/ConstList).com.eignex.klause.ir/longsOrNull(): com.eignex.klause.ir/LongConstList? // com.eignex.klause.ir/longsOrNull|longsOrNull@com.eignex.klause.ir.ConstList(){}[0]
@@ -15019,6 +15235,7 @@ final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver/hasFiniteInteg
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver/isClausal(): kotlin/Boolean // com.eignex.klause.solver/isClausal|isClausal@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.theory.qflra/supportsExactLra(): kotlin/Boolean // com.eignex.klause.theory.qflra/supportsExactLra|supportsExactLra@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/SearchHints).com.eignex.klause.backtrack/toBacktrackParams(kotlin/Int, kotlin/Int): com.eignex.klause.backtrack/BacktrackParams // com.eignex.klause.backtrack/toBacktrackParams|toBacktrackParams@com.eignex.klause.ir.SearchHints(kotlin.Int;kotlin.Int){}[0]
+final fun (com.eignex.klause.ir/TranscendentalProblem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.TranscendentalProblem(){}[0]
 final fun (com.eignex.klause.lp/RelaxationBuilder).com.eignex.klause.lp/boolColumn(com.eignex.klause.ir/SourceBoolId): com.eignex.klause.lp.engine/LpColumnId? // com.eignex.klause.lp/boolColumn|boolColumn@com.eignex.klause.lp.RelaxationBuilder(com.eignex.klause.ir.SourceBoolId){}[0]
 final fun (com.eignex.klause.lp/RelaxationBuilder).com.eignex.klause.lp/intColumn(com.eignex.klause.propagation/CpIntId): com.eignex.klause.lp.engine/LpColumnId? // com.eignex.klause.lp/intColumn|intColumn@com.eignex.klause.lp.RelaxationBuilder(com.eignex.klause.propagation.CpIntId){}[0]
 final fun (com.eignex.klause.lp/RelaxationBuilder).com.eignex.klause.lp/realColumn(com.eignex.klause.ir/SourceRealId): com.eignex.klause.lp.engine/LpColumnId? // com.eignex.klause.lp/realColumn|realColumn@com.eignex.klause.lp.RelaxationBuilder(com.eignex.klause.ir.SourceRealId){}[0]
@@ -15097,12 +15314,15 @@ final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.s
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Function1<com.eignex.klause.portfolio/ArmFault, kotlin/Unit>? = ...): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Function1<com.eignex.klause.portfolio.ArmFault,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/solve(com.eignex.klause.solver.pipeline/FiniteSolveRequest, com.eignex.klause.solver.pipeline/FiniteSolveCallbacks): com.eignex.klause.solver.pipeline/FiniteSolveResult // com.eignex.klause.solver.pipeline/solve|solve@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteSolveRequest;com.eignex.klause.solver.pipeline.FiniteSolveCallbacks){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryAssignment).com.eignex.klause.solver.pipeline/algebraicRealValue(kotlin/Int): com.eignex.klause.arithmetic.polynomial/AlgebraicReal? // com.eignex.klause.solver.pipeline/algebraicRealValue|algebraicRealValue@com.eignex.klause.solver.pipeline.OpenTheoryAssignment(kotlin.Int){}[0]
+final fun (com.eignex.klause.solver.pipeline/OpenTheoryAssignment).com.eignex.klause.solver.pipeline/symbolicRealValue(kotlin/Int): com.eignex.klause.arithmetic.real/ExactRealValue? // com.eignex.klause.solver.pipeline/symbolicRealValue|symbolicRealValue@com.eignex.klause.solver.pipeline.OpenTheoryAssignment(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest, com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest;com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
+final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest, com.eignex.klause.solver.pipeline/TranscendentalTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.TranscendentalTheoryRequest;com.eignex.klause.solver.pipeline.TranscendentalTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/minimize(com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest, com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/minimize|minimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.ir.ObjectiveSense){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/minimize(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/minimize|minimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.ir.ObjectiveSense){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/minimize(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialOptimizationExecution // com.eignex.klause.solver.pipeline/minimize|minimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/optimize(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/optimize|optimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.ir.ObjectiveSense){}[0]
+final fun (com.eignex.klause.solver.pipeline/PreparedSourcePlan).com.eignex.klause.solver.evidence/sourceResultCapture(com.eignex.klause.solver.evidence/SourceRevision, com.eignex.klause.propagation/Assumptions = ..., kotlin/String? = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceResultCapture? // com.eignex.klause.solver.evidence/sourceResultCapture|sourceResultCapture@com.eignex.klause.solver.pipeline.PreparedSourcePlan(com.eignex.klause.solver.evidence.SourceRevision;com.eignex.klause.propagation.Assumptions;kotlin.String?;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.solver.search/SearchContext).com.eignex.klause.solver.search/explainAtoms(com.eignex.klause.solver.search/SearchAtomPremise, com.eignex.klause.solver.search/SearchDecision? = ..., kotlin/Int = ...): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/explainAtoms|explainAtoms@com.eignex.klause.solver.search.SearchContext(com.eignex.klause.solver.search.SearchAtomPremise;com.eignex.klause.solver.search.SearchDecision?;kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState>).com.eignex.klause.backtrack.selector/asSelector(): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/asSelector|asSelector@com.eignex.klause.solver.search.VariableBranching<com.eignex.klause.solver.search.BranchingState>(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]

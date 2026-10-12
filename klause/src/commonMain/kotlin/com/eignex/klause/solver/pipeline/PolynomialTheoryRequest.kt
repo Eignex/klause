@@ -108,6 +108,10 @@ data class PolynomialTheoryExecution(
     val stats: PolynomialTheoryStats,
     /** Representation resource on an incomplete resource-limited result, otherwise null. */
     val resource: PolynomialTheoryResource? = null,
+    /** Native owner when the exact source's arithmetic work extends beyond polynomial steps. */
+    val nativeWorkScope: String? = null,
+    /** Required representation decline reported by that native owner, otherwise null. */
+    val nativeResource: String? = null,
 )
 
 /** Finite-objective optimization with exact polynomial witnesses and separately scoped theory work. */

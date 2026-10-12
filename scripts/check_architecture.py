@@ -19,6 +19,9 @@ ALLOWED = {
     "arithmetic.polynomial": ("arithmetic.polynomial", "simplex.exact", "util"),
     "arithmetic.quadratic": ("arithmetic.quadratic", "simplex.exact", "util"),
     "arithmetic.transcendental": ("arithmetic.transcendental", "simplex.exact", "util"),
+    "arithmetic.real": (
+        "arithmetic.real", "arithmetic.polynomial", "arithmetic.transcendental", "simplex.exact", "util",
+    ),
     "arithmetic.difference": ("arithmetic.difference", "ir", "util"),
 }
 FORBIDDEN = {

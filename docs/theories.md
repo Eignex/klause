@@ -20,6 +20,7 @@ a separate semantic contract does not require a separate implementation package.
 | [Linear mixed arithmetic](theories/linear-mixed.md) | Linear integer/real constraints with Boolean structure | Exact linear checks with integrality-preserving search |
 | [Nonlinear integer arithmetic](theories/nonlinear-integer.md) | Polynomial Int/Real/Bool satisfaction | Incomplete integer search and repairs with exact real completion |
 | [Polynomial real arithmetic](theories/polynomial-real.md) | Polynomial real constraints with Boolean structure, optionally beside finite factors | Exact algebraic completion and CAD |
+| [Transcendental real arithmetic](theories/transcendental.md) | Exact exp/log/sin/cos constraints with Boolean and mixed numeric declarations | Certified enclosures, symbolic checks and incomplete traversal/neighborhoods |
 
 These are implemented fragments, not a requirement that every source or operation
 use the same algorithm. [Input semantics](formats.md) owns frontend admission and

@@ -62,9 +62,9 @@ supports finite integer domains and finite-column linear objectives. Continuous
 quadratic objectives use the separate exact objective overload. Rejecting an
 equivalent real linear objective is an admission misalignment tracked in
 [#2655](https://github.com/Eignex/klause/issues/2655). Open integer domains require
-their separate theory route rather than this finite projection. Direct solver
-facades bake finite projections without arranging that source composition; their
-coverage gap is tracked in [#2656](https://github.com/Eignex/klause/issues/2656).
+their separate theory route rather than this finite projection. [Source-aware strategy factories](../api.md#source-aware-strategy-entry-points) arrange
+shared source composition for CP and LS. The retained baked solver facades expose
+finite sessions and projections, with explicit finite-only constructor guidance.
 
 ### Schema continuous products
 

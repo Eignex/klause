@@ -8,6 +8,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -66,4 +69,15 @@ class ProblemSourceEvidenceTest {
         assertEquals(BigFraction.ofLong(2), condition.lower[SourceCoordinate(SourceCoordinate.Kind.Integer, 0)])
         assertEquals(BigFraction.ofLong(2), condition.upper[SourceCoordinate(SourceCoordinate.Kind.Integer, 0)])
     }
+
+    @Test
+    fun `an in memory witness token cannot rescue an invalid original assignment`() {
+        val context = assertNotNull(model.sourceProofContext(scope))
+        val sample = Sample(booleanArrayOf(), longArrayOf(1))
+        sample.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(model), EvidenceKind.Witness)
+        val evidence = SourceEvidence(scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
+    }
+
 }

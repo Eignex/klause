@@ -148,6 +148,31 @@ internal fun LocalSearchState.buildRepairChain(first: Move, maxDepth: Int, propo
     // baseline that "newly regressed" is measured against.
     val baseDegree = repairChainDegrees.also { it.clear() }
 
+    return runRepairChain(
+        first, maxDepth, propose, parts, inverses, savedSlots, savedTouched,
+        savedCounts, pinnedSlots, baseDegree, startCost, oldStep, oldBest,
+        oldBoolConf, oldIntConf,
+    )
+}
+
+@Suppress("LongParameterList")
+private fun LocalSearchState.runRepairChain(
+    first: Move,
+    maxDepth: Int,
+    propose: MoveSink,
+    parts: ArrayList<Move>,
+    inverses: ArrayList<Move>,
+    savedSlots: IntArrayList,
+    savedTouched: LongArrayList,
+    savedCounts: IntArrayList,
+    pinnedSlots: IntHashSet,
+    baseDegree: RepairChainDegrees,
+    startCost: Long,
+    oldStep: Long,
+    oldBest: Long,
+    oldBoolConf: BooleanArray,
+    oldIntConf: BooleanArray,
+): List<Move>? {
     fun applyPart(p: Move) {
         val slot = slotOf(p)
         if (pinnedSlots.add(slot)) {

@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
@@ -142,6 +143,7 @@ class Sample private constructor(
     exactReals: List<BigFraction>?,
     exactInts: List<BigInt>?,
     algebraicReals: List<AlgebraicReal>?,
+    symbolicReals: List<ExactRealValue>?,
     owned: Boolean,
 ) {
     /** Capture caller-owned coordinates, preserving exact authority when supplied. */
@@ -152,7 +154,8 @@ class Sample private constructor(
         exactReals: List<BigFraction>? = null,
         exactInts: List<BigInt>? = null,
         algebraicReals: List<AlgebraicReal>? = null,
-    ) : this(bools, ints, reals, exactReals, exactInts, algebraicReals, owned = false)
+        symbolicReals: List<ExactRealValue>? = null,
+    ) : this(bools, ints, reals, exactReals, exactInts, algebraicReals, symbolicReals, owned = false)
 
     /** Arbitrary-precision integer coordinates, when supplied by an exact open theory. */
     val exactInts: List<BigInt>? = exactInts?.let { snapshotValues(it) }
@@ -182,6 +185,8 @@ class Sample private constructor(
     val exactReals: List<BigFraction>? = exactReals?.let { snapshotValues(it) }
     /** Exact rational or algebraic coordinates certified by a polynomial theory component. */
     val algebraicReals: List<AlgebraicReal>? = algebraicReals?.let { snapshotValues(it) }
+    /** Authoritative exact real expression coordinates, when supplied by a source owner. */
+    val symbolicReals: List<ExactRealValue>? = symbolicReals?.let { snapshotValues(it) }
     private val approximateReals = if (owned) reals else reals.copyOf()
 
     /** Independent copy of the approximate real coordinates. */
@@ -202,6 +207,9 @@ class Sample private constructor(
             } else {
                 require(integerValues.isEmpty()) { "a wide witness has no finite integer coordinates" }
             }
+        }
+        require(this.symbolicReals == null || this.symbolicReals.size == approximateReals.size) {
+            "symbolic and approximate real coordinates differ"
         }
         require(this.algebraicReals == null || this.algebraicReals.size == approximateReals.size) {
             "algebraic and approximate real coordinates differ"
@@ -224,6 +232,7 @@ class Sample private constructor(
         exactReals: List<BigFraction>? = if (reals === approximateReals) this.exactReals else null,
         exactInts: List<BigInt>? = if (ints === integerValues) this.exactInts else null,
         algebraicReals: List<AlgebraicReal>? = if (reals === approximateReals) this.algebraicReals else null,
+        symbolicReals: List<ExactRealValue>? = if (reals === approximateReals) this.symbolicReals else null,
     ): Sample = fromOwned(
         if (bools === booleanValues) bools else bools.copyOf(),
         if (ints === integerValues) ints else ints.copyOf(),
@@ -231,10 +240,11 @@ class Sample private constructor(
         exactReals,
         exactInts,
         algebraicReals,
+        symbolicReals,
     ).also {
         if (bools.contentEquals(booleanValues) && ints.contentEquals(integerValues) &&
             reals.contentEquals(approximateReals) && exactInts == this.exactInts && exactReals == this.exactReals &&
-            algebraicReals == this.algebraicReals
+            algebraicReals == this.algebraicReals && symbolicReals == this.symbolicReals
         ) it.witnessCertificate = witnessCertificate
     }
 
@@ -254,12 +264,13 @@ class Sample private constructor(
         if (other !is Sample) return false
         return booleanValues.contentEquals(other.booleanValues) && integerValues.contentEquals(other.integerValues) &&
             exactInts == other.exactInts && approximateReals.contentEquals(other.approximateReals) &&
-            exactReals == other.exactReals && algebraicReals == other.algebraicReals
+            exactReals == other.exactReals && algebraicReals == other.algebraicReals &&
+            symbolicReals == other.symbolicReals
     }
     override fun hashCode(): Int =
         31 * (31 * (31 * (31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
             (exactInts?.hashCode() ?: 0)) + approximateReals.contentHashCode()) +
-            (exactReals?.hashCode() ?: 0)) + (algebraicReals?.hashCode() ?: 0)
+            (exactReals?.hashCode() ?: 0)) + (algebraicReals?.hashCode() ?: 0) + 31 * (symbolicReals?.hashCode() ?: 0)
 
     /** Authoritative integer coordinate, widened on demand for finite samples. */
     fun exactIntValue(id: Int): BigInt = exactInts?.get(id) ?: bigIntOf(integerValues[id])
@@ -292,7 +303,8 @@ class Sample private constructor(
             exactReals: List<BigFraction>? = null,
             exactInts: List<BigInt>? = null,
             algebraicReals: List<AlgebraicReal>? = null,
-        ): Sample = Sample(bools, ints, reals, exactReals, exactInts, algebraicReals, owned = true)
+            symbolicReals: List<ExactRealValue>? = null,
+        ): Sample = Sample(bools, ints, reals, exactReals, exactInts, algebraicReals, symbolicReals, owned = true)
     }
 }
 

@@ -6,6 +6,76 @@ public final class com/eignex/klause/arithmetic/polynomial/AlgebraicReal {
 	public final fun getUpperBound ()Lcom/eignex/klause/simplex/exact/BigFraction;
 }
 
+public abstract interface class com/eignex/klause/arithmetic/real/ExactRealExpression {
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Algebraic : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public fun <init> (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)V
+	public final fun component1 ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public final fun copy (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Algebraic;
+	public static synthetic fun copy$default (Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Algebraic;Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;ILjava/lang/Object;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Algebraic;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Function : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public fun <init> (Lcom/eignex/klause/arithmetic/real/ExactRealFunction;Lcom/eignex/klause/arithmetic/real/ExactRealExpression;)V
+	public final fun component1 ()Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public final fun component2 ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun copy (Lcom/eignex/klause/arithmetic/real/ExactRealFunction;Lcom/eignex/klause/arithmetic/real/ExactRealExpression;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Function;
+	public static synthetic fun copy$default (Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Function;Lcom/eignex/klause/arithmetic/real/ExactRealFunction;Lcom/eignex/klause/arithmetic/real/ExactRealExpression;ILjava/lang/Object;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Function;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArgument ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun getFunction ()Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Pi : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public static final field INSTANCE Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Pi;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Power : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public final fun component1 ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun component2 ()I
+	public final fun copy (Lcom/eignex/klause/arithmetic/real/ExactRealExpression;I)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Power;
+	public static synthetic fun copy$default (Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Power;Lcom/eignex/klause/arithmetic/real/ExactRealExpression;IILjava/lang/Object;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Power;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBase ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun getExponent ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Product : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public final fun getOperands ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Sum : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public final fun getOperands ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealFunction : java/lang/Enum {
+	public static final field COS Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static final field EXP Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static final field LOG Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static final field SIN Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static fun values ()[Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealValue {
+	public final fun getAlgebraic ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public final fun getExpression ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun getRational ()Lcom/eignex/klause/simplex/exact/BigFraction;
+}
+
 public final class com/eignex/klause/backtrack/BacktrackParams : com/eignex/klause/solver/SolverParams {
 	public fun <init> ()V
 	public fun <init> (Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;IZIZIZIILkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZ)V
@@ -141,6 +211,7 @@ public final class com/eignex/klause/backtrack/BacktrackRecipe {
 }
 
 public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver, com/eignex/klause/solver/Solver {
+	public static final field Companion Lcom/eignex/klause/backtrack/BacktrackSolver$Companion;
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;)V
 	public fun <init> (Lcom/eignex/klause/schema/VariableSchema;)V
@@ -183,6 +254,12 @@ public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klau
 	public final fun solve ()Lcom/eignex/klause/solver/SolveResult;
 	public fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SolveResult;
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
+}
+
+public final class com/eignex/klause/backtrack/BacktrackSolver$Companion {
+	public final fun source (Lcom/eignex/klause/compile/CompiledSchema;)Lcom/eignex/klause/solver/SourceStrategy;
+	public final fun source (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/SourceStrategy;
+	public final fun source (Lcom/eignex/klause/schema/VariableSchema;)Lcom/eignex/klause/solver/SourceStrategy;
 }
 
 public final class com/eignex/klause/backtrack/NodeBudget {
@@ -2388,6 +2465,11 @@ public final class com/eignex/klause/formats/mps/MpsConstraint {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/formats/mps/MpsExactSourceKt {
+	public static final fun toExactSourceProblem (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static synthetic fun toExactSourceProblem$default (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+}
+
 public final class com/eignex/klause/formats/mps/MpsFormatException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;)V
 }
@@ -3460,6 +3542,12 @@ public final class com/eignex/klause/ir/Term {
 	public final fun realVar (I)I
 }
 
+public final class com/eignex/klause/ir/TranscendentalProblem {
+	public final fun getBoolVarNames ()Ljava/util/Map;
+	public final fun getIntVarNames ()Ljava/util/Map;
+	public final fun getRealVarNames ()Ljava/util/Map;
+}
+
 public final class com/eignex/klause/ir/UnitConsts : com/eignex/klause/ir/LongConstList {
 	public fun <init> (I)V
 	public fun at (I)J
@@ -4072,6 +4160,7 @@ public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver {
+	public static final field Companion Lcom/eignex/klause/localsearch/LocalSearchSolver$Companion;
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -4124,6 +4213,12 @@ public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/
 	public final fun solve ()Lcom/eignex/klause/solver/SolveResult;
 	public fun solve (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/SolveResult;
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
+}
+
+public final class com/eignex/klause/localsearch/LocalSearchSolver$Companion {
+	public final fun source (Lcom/eignex/klause/compile/CompiledSchema;)Lcom/eignex/klause/solver/SourceStrategy;
+	public final fun source (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/SourceStrategy;
+	public final fun source (Lcom/eignex/klause/schema/VariableSchema;)Lcom/eignex/klause/solver/SourceStrategy;
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchState {
@@ -9087,12 +9182,12 @@ public final class com/eignex/klause/solver/ResumableSolver$DefaultImpls {
 }
 
 public final class com/eignex/klause/solver/Sample {
-	public fun <init> ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;)V
-	public synthetic fun <init> ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun approximateRealValue (I)D
 	public final fun boolValue (I)Z
-	public final fun copy ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/solver/Sample;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/Sample;[Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/solver/Sample;
+	public final fun copy ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/solver/Sample;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/Sample;[Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/solver/Sample;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun exactIntValue (I)Ljava/math/BigInteger;
 	public final fun getAlgebraicReals ()Ljava/util/List;
@@ -9104,6 +9199,7 @@ public final class com/eignex/klause/solver/Sample {
 	public final fun getNumIntVars ()I
 	public final fun getNumRealVars ()I
 	public final fun getReals ()[D
+	public final fun getSymbolicReals ()Ljava/util/List;
 	public final fun hammingDistanceTo (Lcom/eignex/klause/solver/Sample;)I
 	public fun hashCode ()I
 	public final fun intValue (I)J
@@ -9277,6 +9373,28 @@ public final class com/eignex/klause/solver/SolverParams$DefaultImpls {
 	public static fun withLifetimeCancellation (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 }
 
+public final class com/eignex/klause/solver/SourceStrategy {
+	public final fun getCompiledSchema ()Lcom/eignex/klause/compile/CompiledSchema;
+	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public final fun getSource ()Lcom/eignex/klause/ir/Problem;
+	public final fun optimize (Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public final fun optimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public final fun optimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public final fun optimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public final fun optimizeOpen (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public static synthetic fun optimizeOpen$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun solve (Lcom/eignex/klause/localsearch/LocalSearchParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun solve (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/localsearch/LocalSearchParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+}
+
 public class com/eignex/klause/solver/StatelessSession : com/eignex/klause/solver/Session {
 	public fun <init> (Lcom/eignex/klause/solver/Solver;)V
 	protected final fun applyStack (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolverParams;
@@ -9313,6 +9431,11 @@ public final class com/eignex/klause/solver/evidence/LinearSourceSemanticsChecke
 	public fun objectiveEquals (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
 	public fun ray (Lcom/eignex/klause/solver/evidence/SourceClaim$Ray;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
 	public fun witness (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+}
+
+public final class com/eignex/klause/solver/evidence/PreparedSourceEvidenceKt {
+	public static final fun sourceResultCapture (Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Lcom/eignex/klause/solver/evidence/SourceRevision;Lcom/eignex/klause/propagation/Assumptions;Ljava/lang/String;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceResultCapture;
+	public static synthetic fun sourceResultCapture$default (Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Lcom/eignex/klause/solver/evidence/SourceRevision;Lcom/eignex/klause/propagation/Assumptions;Ljava/lang/String;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceResultCapture;
 }
 
 public final class com/eignex/klause/solver/evidence/ProblemSourceEvidenceKt {
@@ -10730,14 +10853,18 @@ public final class com/eignex/klause/solver/pipeline/PolynomialStrategyParams {
 }
 
 public final class com/eignex/klause/solver/pipeline/PolynomialTheoryExecution {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 	public final fun component2 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
 	public final fun component3 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNativeResource ()Ljava/lang/String;
+	public final fun getNativeWorkScope ()Ljava/lang/String;
 	public final fun getResource ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryResource;
 	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 	public final fun getStats ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
@@ -11085,6 +11212,81 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalAssignment : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
+	public fun boolValue (I)Z
+	public final fun exactRealValue (I)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun intValue (I)Ljava/lang/String;
+	public fun realValue (I)Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalAssignmentKt {
+	public static final fun symbolicRealValue (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;I)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryExecution {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;JZ)V
+	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun component2 ()J
+	public final fun component3 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;JZ)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;JZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRepresentationDeclined ()Z
+	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun getWorkSpent ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryParams {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Long;IILjava/lang/Integer;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/lang/Long;IILjava/lang/Integer;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Long;
+	public final fun component10 ()Ljava/util/Map;
+	public final fun component11 ()Ljava/util/Map;
+	public final fun component12 ()Ljava/util/Set;
+	public final fun component13 ()Ljava/util/Set;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()Ljava/lang/Long;
+	public final fun component6 ()Lcom/eignex/klause/util/Cancellation;
+	public final fun component7 ()Lcom/eignex/klause/util/Cancellation;
+	public final fun component8 ()Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;
+	public final fun component9 ()Lcom/eignex/klause/backtrack/NodeBudget;
+	public final fun copy (Ljava/lang/Long;IILjava/lang/Integer;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Ljava/lang/Long;IILjava/lang/Integer;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getMaximumBits ()I
+	public final fun getMaximumDenseCoefficients ()Ljava/lang/Integer;
+	public final fun getMaximumDepth ()I
+	public final fun getMaximumMatrixCells ()Ljava/lang/Long;
+	public final fun getMaximumWork ()Ljava/lang/Long;
+	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
+	public final fun getRealLower ()Ljava/util/Map;
+	public final fun getRealUpper ()Ljava/util/Map;
+	public final fun getStrategy ()Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;
+	public final fun getStrictRealLower ()Ljava/util/Set;
+	public final fun getStrictRealUpper ()Ljava/util/Set;
+	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryRequest : com/eignex/klause/solver/pipeline/ExactTheorySatisfactionRequest {
+	public fun execute (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public final fun getProblem ()Lcom/eignex/klause/ir/TranscendentalProblem;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryRequestKt {
+	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static final fun pipelineRequest (Lcom/eignex/klause/ir/TranscendentalProblem;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;
 }
 
 public final class com/eignex/klause/solver/pipeline/UnplaceableColumn {

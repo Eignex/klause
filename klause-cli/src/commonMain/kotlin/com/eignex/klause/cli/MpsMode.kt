@@ -4,6 +4,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
 import com.eignex.klause.formats.mps.MpsLoweringException
 import com.eignex.klause.formats.mps.MpsSourceWitness
+import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -36,26 +37,22 @@ internal object MpsMode : CliMode {
     override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        private var objectiveScale = 1L
-        private var toleranceDifference: String? = null
-        private var sourceExact = true
-        private var sourceDifference: String? = null
-        private var latestSourceObjective: BigFraction? = null
-        private var sourceWitnessAccepted = true
-        private var witnessOnly = false
+        private var outputState = MpsOutputState()
 
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val compiled = Mps.parse(openFileSource(path)).toProblem(common.config.problemSettings())
+            val source = Mps.parse(openFileSource(path))
+            val settings = common.config.problemSettings()
+            val lowered = source.toProblem(settings)
+            val hasConstantObjective = lowered.objective == null && source.objective.name.isNotEmpty()
+            val usesExactSource = hasConstantObjective ||
+                (!lowered.sourceExact && (common.exact || lowered.model.numIntVars > 0))
+            val compiled = if (usesExactSource) source.toExactSourceProblem(settings) else lowered
             if (common.exact) requireExactMpsSource(compiled)
-            objectiveScale = compiled.objectiveScale
-            toleranceDifference = compiled.toleranceDifference
-            sourceExact = compiled.sourceExact
-            sourceDifference = compiled.sourceDifference
-            latestSourceObjective = null
-            sourceWitnessAccepted = true
-            witnessOnly = false
+            val state = MpsOutputState(compiled.objectiveScale, compiled.toleranceDifference,
+                compiled.sourceExact, compiled.sourceDifference)
+            outputState = state
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
@@ -64,31 +61,32 @@ internal object MpsMode : CliMode {
             val render: (Sample) -> String = { sample ->
                 if (sample.exactReals == null && compiled.model.numRealVars > 0) {
                     // A float leaf under tolerance semantics: its values are the doubles themselves.
-                    latestSourceObjective = compiled.sourceObjective(sample.ints, sample.reals)
+                    state.latestSourceObjective = compiled.sourceObjective(sample.ints, sample.reals)
+                    state.exactSourceWitness = false
                     renderMpsFloat(compiled, sample)
                 } else {
                     val witness = compiled.sourceWitness(sample.ints, sample.exactReals)
-                    latestSourceObjective = witness.objective
+                    state.latestSourceObjective = witness.objective
+                    state.exactSourceWitness = compiled.sourceExact
                     renderMpsWitness(compiled, witness)
                 }
             }
             val renderOpen: (OpenTheoryAssignment) -> String = { assignment ->
-                if (witnessOnly) {
-                    val witness = try {
-                        compiled.sourceWitness(compiled.columns.map { column ->
-                            val value = if (column.real) {
-                                assignment.realValue(column.id)
-                            } else {
-                                assignment.intValue(column.id)
-                            }
-                            parseOpenMpsNumber(value)
-                        })
-                    } catch (_: MpsLoweringException) {
-                        null
-                    }
-                    sourceWitnessAccepted = witness != null
-                    latestSourceObjective = witness?.objective
+                val witness = try {
+                    compiled.sourceWitness(compiled.columns.map { column ->
+                        val value = if (column.real) {
+                            assignment.realValue(column.id)
+                        } else {
+                            assignment.intValue(column.id)
+                        }
+                        parseOpenMpsNumber(value)
+                    })
+                } catch (_: IllegalArgumentException) {
+                    null
                 }
+                state.sourceWitnessAccepted = witness != null
+                state.latestSourceObjective = witness?.objective
+                if (witness != null) state.exactSourceWitness = compiled.sourceExact
                 renderMpsOpenModel(compiled, assignment)
             }
             val objective = compiled.objective?.toLinearObjective()
@@ -97,7 +95,9 @@ internal object MpsMode : CliMode {
             val route = compiled.model.pipelineRoute(
                 objective,
                 compiled.maximize,
+                routePureRealToTheory = usesExactSource,
                 boundCancellation = common.routingCancellation(),
+                routeLinearToTheory = usesExactSource,
                 onLpStats = { routingLpStats = it },
             )
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
@@ -119,10 +119,10 @@ internal object MpsMode : CliMode {
                 )
 
                 is SourceProblemRoute.OpenTheory -> {
-                    witnessOnly = !compiled.sourceExact
+                    state.witnessOnly = !compiled.sourceExact
                     // Refuting a lowered objective bound does not refute the corresponding decimal source bound.
                     val canDecide = when {
-                        witnessOnly -> false
+                        state.witnessOnly -> false
                         route.request.objective == null -> true
                         else -> OpenTheoryPipeline.canMinimize(route.request)
                     }
@@ -147,7 +147,7 @@ internal object MpsMode : CliMode {
 
                 // No theory decides it, so local search looks for incumbents alone.
                 is SourceProblemRoute.UnsupportedOpen -> {
-                    witnessOnly = !compiled.sourceExact
+                    state.witnessOnly = !compiled.sourceExact
                     openLocalSearchSolvable(
                         route.problem,
                         renderOpen,
@@ -162,15 +162,31 @@ internal object MpsMode : CliMode {
             }
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(
-            objectiveScale,
-            toleranceDifference == null && !witnessOnly,
-            toleranceDifference ?: sourceDifference,
-            { latestSourceObjective },
-            sourceExact && !witnessOnly,
-            { sourceWitnessAccepted },
-        )
+        override fun output(common: CommonOptions): OutputProtocol {
+            val state = outputState
+            return MpsOutput(
+                state.objectiveScale,
+                state.toleranceDifference == null && !state.witnessOnly,
+                state.toleranceDifference ?: state.sourceDifference,
+                { state.latestSourceObjective },
+                state.sourceExact && !state.witnessOnly,
+                { state.sourceWitnessAccepted },
+                { state.exactSourceWitness },
+            )
+        }
     }
+}
+
+private class MpsOutputState(
+    val objectiveScale: Long = 1L,
+    val toleranceDifference: String? = null,
+    val sourceExact: Boolean = true,
+    val sourceDifference: String? = null,
+) {
+    var latestSourceObjective: BigFraction? = null
+    var sourceWitnessAccepted = true
+    var witnessOnly = false
+    var exactSourceWitness: Boolean? = null
 }
 
 private fun parseOpenMpsNumber(value: String): BigFraction {
@@ -235,6 +251,7 @@ internal class MpsOutput(
     // An infeasibility or unboundedness proof covers the lowered model only, so it needs the source exactly.
     private val proofExact: Boolean = sourceExact,
     private val sourceWitnessAccepted: () -> Boolean = { true },
+    private val exactSourceWitness: () -> Boolean? = { null },
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
@@ -261,14 +278,14 @@ internal class MpsOutput(
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
             if (best == null) {
                 "s UNKNOWN"
-            } else if (verdict == Verdict.OPTIMAL && sourceExact) {
+            } else if (verdict == Verdict.OPTIMAL && sourceExact && sourceWitnessAccepted()) {
                 "s OPTIMUM FOUND"
             } else {
                 "s SATISFIABLE"
             }
 
         Verdict.UNBOUNDED -> when {
-            proofExact -> "s UNBOUNDED"
+            proofExact && sourceWitnessAccepted() && exactSourceWitness() != false -> "s UNBOUNDED"
             best != null -> "s SATISFIABLE"
             else -> "s UNKNOWN"
         }
@@ -280,10 +297,25 @@ internal class MpsOutput(
 
     override fun keepStat(key: String): Boolean = true
 
+    override fun completionMetadata(verdict: Verdict): String? {
+        if (verdict != Verdict.OPTIMAL || best == null || !sourceExact || !sourceWitnessAccepted()) return null
+        val status = when (exactSourceWitness()) {
+            true -> "attained-optimum"
+            false -> "tolerance-optimum"
+            null -> return null
+        }
+        return "optimizationStatus=$status"
+    }
+
     override fun verdictReason(verdict: Verdict): String? {
         val cause = super.verdictReason(verdict)
         val sourceQualification = sourceDifference?.let { "lowered model differs from MPS source at $it" }
-        return listOfNotNull(sourceQualification, cause)
+        val witnessQualification = when (exactSourceWitness()) {
+            true -> "exact original MPS source witness"
+            false -> "MPS source tolerance witness"
+            null -> null
+        }
+        return listOfNotNull(sourceQualification, witnessQualification, cause)
             .joinToString("; ").ifEmpty { null }
     }
 }

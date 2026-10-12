@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.Assumptions
@@ -21,10 +22,12 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.SourceStrategy
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStats
@@ -72,10 +75,25 @@ class BacktrackSolver internal constructor(
             PropagationProblem(model)
         }
 
-    /** Solve a [CompiledSchema]'s problem. */
+    /** Source-aware construction retaining the original model. */
+    companion object {
+        /** Select this strategy with shared source preparation and exact witness completion. */
+        fun source(problem: Problem): SourceStrategy = SourceStrategy(problem, FiniteEngine.BACKTRACK)
+
+        /** Select this strategy for the original compiled source, including continuous products. */
+        fun source(compiled: CompiledSchema): SourceStrategy =
+            SourceStrategy(compiled.problem, FiniteEngine.BACKTRACK, compiled)
+
+        /** Compile once and select this strategy for the resulting original source. */
+        fun source(schema: VariableSchema): SourceStrategy = source(schema.compile())
+    }
+
+    /** Finite-only facade over a [CompiledSchema]; use [source] for shared model breadth. */
+    @Deprecated("Finite-only facade; use BacktrackSolver.source(compiled) for shared source execution.")
     constructor(compiled: CompiledSchema) : this(compiled.problem.bake(), LpSolveContext.Production)
 
-    /** Compile [schema] with the default config and solve the resulting problem. */
+    /** Compile [schema] into this finite-only facade; use [source] for shared model breadth. */
+    @Deprecated("Finite-only facade; use BacktrackSolver.source(schema) for shared source execution.")
     constructor(schema: VariableSchema) : this(schema.compile().problem.bake(), LpSolveContext.Production)
 
     /** Solve once and return a [SolveResult]. */

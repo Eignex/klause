@@ -43,13 +43,41 @@ contexts; [input semantics](formats.md) defines route coverage.
 
 ### Source-aware strategy entry points
 
-Shared pipeline entry points compose finite search and arithmetic completion.
-`BacktrackSolver(compiled)` and `LocalSearchSolver(compiled)` instead bake directly;
-their constructors do not arrange the polynomial source decomposition. Continuous
-products supported by the pipeline can consequently fail those finite projections.
-These advertised facade restrictions are a coverage misalignment tracked in
-[#2656](https://github.com/Eignex/klause/issues/2656), not a requirement to move real
-domains into finite propagation.
+`BacktrackSolver.source(problem/compiled/schema)` and
+`LocalSearchSolver.source(problem/compiled/schema)` return a `SourceStrategy` that
+arranges shared preparation and required arithmetic completion. Schema construction
+captures the compilation once; `compiledSchema` retains names and typed source
+locations. `solve` returns `OpenTheoryResult` and exact source-coordinate assignments,
+including algebraic reals and arbitrary-width open integers. Finite globals remain
+part of the same source rather than becoming an unconstrained finite projection.
+
+Typed `BacktrackParams` and `LocalSearchParams` overloads retain their finite and
+polynomial controls. `PolynomialTheoryParams` supplies native polynomial limits and
+common pins; `TheoryParams` supplies open-linear limits. These are distinct work
+currencies. A source operation owns fresh private state; shared node allowances retain
+their identity. Deduction scopes and CP tolerance acceptance explicitly decline because
+source execution requires exact coordinates and cannot discard restrictions. Extra CP
+components, open pins and finite-only open hooks return `Unknown(Unsupported)`.
+Exact polynomial LS also declines finite seeding, incumbent exchange, custom scoring
+and event hooks that its native neighborhood cannot consume.
+
+`optimize` preserves the existing `QuadraticOptimizationExecution` surface through
+the shared exact affine or quadratic entry point. It supports bounded integer
+sources, continuous products and open real coordinates, with exact objective values,
+direction-aware bounds, attainment and incomplete results. `optimizeOpen` exposes
+the existing native `OpenTheoryExecution` for supported open-integer linear sources;
+its values retain native minimization sense. Neither entry point converts rounded
+finite scores into exact source claims.
+
+The baked `BacktrackSolver` and `LocalSearchSolver` classes retain their finite
+sessions, streams, enumeration and resumable APIs. Their compiled/schema constructors
+remain compatible with warning-level finite-only migration messages. Source strategies
+do not advertise those finite enumeration/counting/retained-stream operations for
+continuous or open models. Source support follows [input coverage](formats.md) and
+[theory contracts](theories.md); resource stops and incomplete procedures remain honest.
+Source execution consumes `PreparedSourcePlan.capabilities` for finite admission and
+binds exact optimization objectives on that same preparation. Missing source checks or
+unsupported objective coordinates decline before constructing an executor.
 
 ### Objective admission
 
@@ -196,6 +224,14 @@ capture producer state before acceptance. Built-in carriers can be shared throug
 publication and repeated incumbent reads without copying in the search loop.
 
 ## Exact assignment values
+
+`TranscendentalAssignment.exactRealValue(id)` and `symbolicRealValue(id)` expose
+immutable exact expression metadata for transcendental witnesses, including through
+reconstruction wrappers. Rational and algebraic leaves retain their existing exact
+metadata. `Sample.symbolicReals` captures the same authority. An expression describes
+a coordinate; its publication still requires an original-source check. See
+[exact analytic real coordinates](arithmetic/real.md) and the
+[transcendental service contract](theories/transcendental.md).
 
 An assignment can carry finite values, arbitrary-precision integers, rational reals
 or algebraic reals. Read the authoritative payload for checks and exact rendering;

@@ -24,7 +24,16 @@ result. MPS tolerance acceptance has its own
 | Indeterminate | No complete required package within the available policy/resources |
 
 A bound does not imply feasibility or attainment. A point does not imply
-unboundedness. Ceiling an objective bound requires a proved integral objective
+unboundedness. Integer certificates expose exact multiplier snapshots; rational certification and
+reconstruction retain owned multiplier coordinates with their numerical bound.
+Reconstruction charges the retained snapshot allocation. Optional
+[original-source capture](../solver/evidence.md) consumes these typed values without
+adding model or solver dependencies to the numerical engine. It must justify each
+mapped endpoint against original declarations, rows or invocation restrictions.
+Missing source origins withhold derivation coverage even when numerical certification
+has completed.
+
+Ceiling an objective bound requires a proved integral objective
 lattice. Combine packages only when authority, scope and objective units match.
 Exact rejection of one candidate is not a refutation of the model. Cross-arm
 publication also requires the [portfolio model and objective scope](../solver/portfolio.md#witnesses-and-proof-scope);
@@ -123,6 +132,24 @@ non-strict rows and maximizes `0 <= t <= 1`. An exact witness at positive `t`
 proves strict feasibility. An exact bound `t <= 0` or auxiliary infeasibility
 refutes it; other outcomes decline. Strict premises survive elimination of
 auxiliary variables. A strict infimum need not be attained.
+
+The model-facing `lp.optimization` adapter accepts consumer-owned exact affine
+source premises, objective identity/direction and invocation restrictions. It
+projects their closure to the existing LP owner, reconstructs nonnegative source
+row combinations for bounds, and checks source witnesses and recession directions.
+Boolean substitution is checked under complete invocation pins. A limit requires
+a checked strict global bound and a closure endpoint with that exact objective;
+the feasible base and endpoint have identical Boolean and integer coordinates.
+Positive rational mixtures then approach the endpoint while satisfying every strict
+source row. Fractional or differing integer coordinates request an exhaustive
+integer split rather than inheriting the continuous limit. Missing packages retain
+separately checked bounds and witnesses without issuing a global result.
+
+These adapters do not confer original-source semantics on a rounded or tolerance
+model. Consumers supply the authoritative source context and its correspondence.
+The adapter's bounded numerical owners share one source operation budget through
+closure, feasibility and dual reconstruction. Production traversal and result
+publication retain their separate admission contracts.
 
 ## Tolerance recovery
 

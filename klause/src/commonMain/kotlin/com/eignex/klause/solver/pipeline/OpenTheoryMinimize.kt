@@ -553,6 +553,10 @@ class OpenTheoryMinimizer internal constructor(
                 total += bigIntOf(coefficients[i]) * bigIntOf(assignment.sample.intValue(terms[i]))
             }
 
+            is TranscendentalAssignment -> for (i in terms.indices) {
+                total += bigIntOf(coefficients[i]) * assignment.sample.exactIntValue(terms[i])
+            }
+
             // A mixed model carries continuous columns the objective does not weight, so its value is
             // still the integer sum; the reals are decided alongside and contribute nothing to it.
             is OpenTheoryAssignment.ExactLira -> for (i in terms.indices) {
@@ -616,6 +620,13 @@ private fun Problem.sameDeclaredIntegerRanges(other: Problem): Boolean {
  * arbitrary precision. Linear optimization certificates require rational coordinates.
  */
 private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = when (this) {
+    is TranscendentalAssignment -> RouteWitness(
+        realColumns,
+        sample::boolValue,
+        { requireNotNull(exactRealValue(it).rational) { "linear certificates require rational real coordinates" } },
+        { BigFraction.of(sample.exactIntValue(it), BIG_ONE) },
+    )
+
     is OpenTheoryAssignment.Difference -> RouteWitness(
         realColumns,
         { sample.boolValue(it) },

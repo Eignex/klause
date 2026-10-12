@@ -1,5 +1,11 @@
 # Local-search state and moves
 
+Transcendental sources use the shared exact-neighborhood move owner with
+original-source function completion. Rational windows and approximate centers
+guide proposals; checked symbolic real expressions carry coordinate authority.
+Neighborhood failures cannot refute an unrestricted source. See
+[transcendental real arithmetic](../theories/transcendental.md).
+
 Local search searches for feasible or improving assignments by changing values and
 measuring constraint violations. It keeps incremental scores so a candidate move
 can be evaluated without rebuilding the whole model. Defined outputs and coordinated
@@ -163,6 +169,10 @@ on the same state throws before mutating live scratch, including callbacks durin
 initial objective evaluation. Objective failures and cancellation
 unwind the ordinary probe restoration; subsequent calls reuse cleared traversal marks.
 These operations remain atomic within the existing cancellation boundaries.
+
+Repair-chain preparation captures activity, configuration and assignment snapshots;
+its execution phase borrows those snapshots for the walk and ordinary restoration.
+This phase boundary retains effect, callback and random-draw order.
 
 Native Element result cones skip writes to unselected cells. Direct and transitive
 index dependencies retain the result cone, including compounds that change the index
