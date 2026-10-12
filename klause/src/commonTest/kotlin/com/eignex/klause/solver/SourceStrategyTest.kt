@@ -160,6 +160,17 @@ class SourceStrategyTest {
 
 
     @Test
+    fun `source factors without execution checks explicitly decline before finite construction`() {
+        val unchecked = object : Factor by Clause(intArrayOf(Lit.make(0, true))) {}
+        val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(unchecked))
+        for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
+            val result = strategy.solve()
+
+            assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        }
+    }
+
+    @Test
     fun `factory and direct pipeline witnesses satisfy the same original square`() {
         val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
             realLower = doubleArrayOf(-2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0))

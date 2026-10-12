@@ -75,8 +75,9 @@ remain compatible with warning-level finite-only migration messages. Source stra
 do not advertise those finite enumeration/counting/retained-stream operations for
 continuous or open models. Source support follows [input coverage](formats.md) and
 [theory contracts](theories.md); resource stops and incomplete procedures remain honest.
-Finite integer-only floating rows requiring external source certification explicitly
-decline satisfaction when the selected finite route provides no arithmetic completion.
+Source execution consumes `PreparedSourcePlan.capabilities` for finite admission and
+binds exact optimization objectives on that same preparation. Missing source checks or
+unsupported objective coordinates decline before constructing an executor.
 
 ### Objective admission
 

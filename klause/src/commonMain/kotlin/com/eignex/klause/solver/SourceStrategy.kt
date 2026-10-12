@@ -12,6 +12,7 @@ import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
@@ -26,6 +27,7 @@ import com.eignex.klause.solver.pipeline.PreparedExecutionKind
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.pipeline.admission
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.minimize
 import com.eignex.klause.solver.pipeline.optimize
@@ -134,7 +136,10 @@ class SourceStrategy internal constructor(
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
         val plan = source.preparePolynomialExecutionPlan()
-        if (plan.kind != PreparedExecutionKind.POLYNOMIAL) return unsupportedQuadratic(sense)
+            .withObjective(objective, maximize = sense == ObjectiveSense.MAXIMIZE)
+        if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
+            !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
+        ) return unsupportedQuadratic(sense)
         return OpenTheoryPipeline.optimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
     }
 
@@ -169,8 +174,10 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = source.preparePolynomialExecutionPlan()
-        if (plan.kind != PreparedExecutionKind.POLYNOMIAL) return unsupportedQuadratic(sense)
+        val plan = source.preparePolynomialExecutionPlan().withObjective(objective, sense)
+        if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
+            !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
+        ) return unsupportedQuadratic(sense)
         return OpenTheoryPipeline.minimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
     }
 
@@ -216,10 +223,7 @@ class SourceStrategy internal constructor(
     )
 
     private fun finiteSolve(route: SourceProblemRoute.Finite, scope: SourceInvocation): OpenTheoryResult {
-        if (route.problem.numRealVars == 0 && route.problem.factors.any {
-                it.executionCapabilities().assignmentCheck == AssignmentCheckCapability.SOURCE_CERTIFICATION
-            }
-        ) return scope.unsupported()
+        if (!route.preparedPlan.capabilities.admission(engine).runnable) return scope.unsupported()
         val preparation = FinitePipeline.prepare(FinitePipelineRequest(
             problem = route.problem, engine = engine, preparedPlan = route.preparedPlan,
             presolveConfig = PresolveConfig.NONE, explicitPresolveConfig = true, solutionSetSensitive = true,
