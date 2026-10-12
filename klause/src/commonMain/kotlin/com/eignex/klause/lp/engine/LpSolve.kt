@@ -39,7 +39,11 @@ internal class CertifiedLpBound(
     val value: BigFraction,
     val certificate: IntegerCertificate? = null,
     val support: LpExactSupport? = null,
-)
+    dualMultipliers: List<BigFraction>? = null,
+) {
+    private val capturedDualMultipliers = dualMultipliers?.toList()
+    val dualMultipliers: List<BigFraction>? get() = capturedDualMultipliers?.toList()
+}
 
 internal data class LpExactCitedSide(val column: Int, val upper: Boolean, val side: ExactLpSide, val witness: Long?)
 
@@ -846,7 +850,7 @@ private fun rationalLpBound(model: LpModel, duals: DoubleArray): CertifiedLpBoun
     val scale = BigFraction.ofLong(rounded.scale).reciprocal()
     val y = List(model.m) { row -> BigFraction.ofLong(rounded.mult[row]) * scale }
     val value = exactLagrangian(model, y) ?: return null
-    return CertifiedLpBound(value, support = model.exactSupport(y, objective = true))
+    return CertifiedLpBound(value, support = model.exactSupport(y, objective = true), dualMultipliers = y)
 }
 
 internal fun LpModel.exactConflictSupport(conflict: BigRationalConflict): LpExactSupport? {

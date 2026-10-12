@@ -104,7 +104,8 @@ class SourceTransformationVerifier(
             var condition = source.scope.condition
             for ((variable, value) in premise.guards) condition = condition.pin(variable, value)
             val scope = source.scope.copy(condition = condition)
-            val context = SourceProofContext(scope, source.coordinates, source.premises, source.objective,
+            val context = SourceProofContext(scope, source.coordinates, source.premises,
+                source.objective.takeIf { source.affineObjectiveAvailable },
                 source.objectiveConstant, source.semanticsChecker)
             val obligation = substitute(premise.inequality, transformation)
             val proof = transformation.premiseDerivations[id]
@@ -148,6 +149,9 @@ class SourceTransformationVerifier(
         transformation: SourceTransformation,
         cancellation: Cancellation = Cancellation.Never,
     ): SourceEvidenceCheck {
+        if (!source.affineObjectiveAvailable || !target.affineObjectiveAvailable) {
+            return SourceEvidenceCheck.Unavailable("transformation has no original affine objective authority")
+        }
         if (source.scope.objective == null || target.scope.objective == null ||
             source.scope.objective.sense != target.scope.objective.sense ||
             transformation.objectiveScale <= BigFraction.ZERO

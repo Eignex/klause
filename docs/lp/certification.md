@@ -24,7 +24,16 @@ result. MPS tolerance acceptance has its own
 | Indeterminate | No complete required package within the available policy/resources |
 
 A bound does not imply feasibility or attainment. A point does not imply
-unboundedness. Ceiling an objective bound requires a proved integral objective
+unboundedness. Integer certificates expose exact multiplier snapshots; rational certification and
+reconstruction retain owned multiplier coordinates with their numerical bound.
+Reconstruction charges the retained snapshot allocation. Optional
+[original-source capture](../solver/evidence.md) consumes these typed values without
+adding model or solver dependencies to the numerical engine. It must justify each
+mapped endpoint against original declarations, rows or invocation restrictions.
+Missing source origins withhold derivation coverage even when numerical certification
+has completed.
+
+Ceiling an objective bound requires a proved integral objective
 lattice. Combine packages only when authority, scope and objective units match.
 Exact rejection of one candidate is not a refutation of the model. Cross-arm
 publication also requires the [portfolio model and objective scope](../solver/portfolio.md#witnesses-and-proof-scope);

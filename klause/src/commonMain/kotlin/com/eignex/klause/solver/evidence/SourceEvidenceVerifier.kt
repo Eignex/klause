@@ -46,24 +46,25 @@ class SourceProofContext(
     val scope: SourceScope,
     coordinates: Set<SourceCoordinate>,
     premises: Map<String, SourcePremise>,
-    objective: Map<SourceCoordinate, BigFraction> = emptyMap(),
+    objective: Map<SourceCoordinate, BigFraction>? = null,
     /** Exact original-source objective constant. */
     val objectiveConstant: BigFraction = BigFraction.ZERO,
     internal val semanticsChecker: SourceSemanticsChecker? = null,
 ) {
     private val capturedCoordinates = coordinates.toSet()
     private val capturedPremises = premises.toMap()
-    private val capturedObjective = objective.filterValues { !it.isZero }.toMap()
+    private val capturedObjective = objective?.filterValues { !it.isZero }?.toMap()
+    internal val affineObjectiveAvailable: Boolean get() = capturedObjective != null
     /** Declared source coordinates. */
     val coordinates: Set<SourceCoordinate> get() = capturedCoordinates.toSet()
     /** Original rows and declarations indexed by stable premise identifiers. */
     val premises: Map<String, SourcePremise> get() = capturedPremises.toMap()
-    /** Exact affine source objective coefficients. */
-    val objective: Map<SourceCoordinate, BigFraction> get() = capturedObjective.toMap()
+    /** Exact affine source objective coefficients; an omitted constructor objective has no affine authority. */
+    val objective: Map<SourceCoordinate, BigFraction> get() = capturedObjective.orEmpty().toMap()
 
     init {
         require(capturedPremises.keys.none { it.isBlank() })
-        require(capturedObjective.keys.all { it in capturedCoordinates })
+        require(capturedObjective.orEmpty().keys.all { it in capturedCoordinates })
         require(capturedPremises.values.all { premise ->
             premise.inequality.coefficients.keys.all { it in capturedCoordinates } &&
                 premise.guards.keys.all { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in capturedCoordinates }
@@ -187,6 +188,9 @@ class SourceEvidenceVerifier(
                         else BigFraction.ONE
                     val derived = inequality(derivation, scope, depth + 1)
                     if (derived.contradicts()) return SourceEvidenceCheck.Checked
+                    if (!context.affineObjectiveAvailable) {
+                        return SourceEvidenceCheck.Unavailable("original affine objective derivation unavailable")
+                    }
                     if (derived.coefficients != context.objective.mapValues { (_, value) -> sign * value }) {
                         return reject("derivation does not establish the source objective coefficients")
                     }

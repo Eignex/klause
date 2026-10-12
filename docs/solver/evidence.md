@@ -4,7 +4,9 @@
 The consumer supplies that context independently of the producer's evidence. It
 owns the declared coordinate namespaces, stable source-premise identifiers, exact
 affine objective and source semantics checker. A claimed revision or a producer's
-row snapshot cannot substitute for that original-source binding.
+row snapshot cannot substitute for that original-source binding. An omitted affine
+objective has no affine bound authority; it does not describe a constant objective.
+Source-specific objective derivations belong to the declared semantics checker.
 
 `SourceScope` captures original revision and declared semantics, exact invocation
 restrictions, objective identity and direction. Every check compares this scope
@@ -57,6 +59,20 @@ implied rows. Guarded premises retain Boolean pins; source disequality alternati
 are not invented. Open integer sides provide no finite-box premise. Other declared
 frontend semantics require their own original-source checker. Explicit invocation
 pins are captured; derived restrictions require their own justifications.
+
+`PreparedSourcePlan.sourceResultCapture` uses the plan's retained original exact IR,
+explicit invocation pins and source objective direction. Narrowed execution bounds
+are not original premises. Other frontend semantics and unrepresented deductions
+withhold this capture rather than relabel their source.
+
+`LpSourceEvidenceCapture` optionally converts retained exact LP dual and Farkas
+coefficients into original-premise combinations. Structural coordinates retain their
+source declarations and shifts; slack coordinates retain exact row images. Every
+selected endpoint must have a compatible original premise or invocation citation.
+Missing cut/lowering justifications, foreign integer certificates, unsupported
+column bindings and interrupted capture remain unavailable. Numerical model labels
+and supplied multiplier values do not confer authority; the resulting source claim
+still requires original-context verification.
 
 `SourceMapping` retains optional typed transformation justifications at each stage.
 `SourceTransformationVerifier` requires a total coordinate image, original-source
