@@ -97,6 +97,21 @@ query results and work ledger remain private. Conditioned queries capture their 
 without changing the source model. The containing owner closes the invocation after
 its operation finishes.
 
+Internal conditioned linear query owners retain one private prepared search and
+native work ledger. Each query captures Boolean pins, exact rational coordinate
+bounds and a strict source-objective cutoff. Assertions retract after success,
+refutation, representation decline or cancellation; nested descriptor scopes add
+conditions without changing the source. Invocation deadlines and meters retract
+with their conditions. Check and decision allowances belong to the containing
+owner, and a sibling query cannot renew them. Closing disposes arithmetic state;
+published witness coordinates remain owned by their samples.
+
+Conditioned traversal retains its opening decision level through restarts and
+learned backjumps. Its exhaustion refutes only the active condition. The source
+decomposition is supplied by preparation, and query owners issue no whole-source
+proof. [Search](search.md#shared-component-search) defines that traversal floor;
+[resources](resources.md#native-arithmetic-allowances) defines cumulative charging.
+
 [Polynomial invocation ownership](../theories/polynomial-real.md#invocation-ownership) defines that adapter's
 fresh-call and conditioned-query lifetimes. [Resource allowances](resources.md)
 owns cumulative scope composition.
