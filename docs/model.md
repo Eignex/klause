@@ -69,6 +69,16 @@ attestations capture source, objective, direction and invocation assumptions;
 they retain no mutable arithmetic or cancellation owner. These attestations are
 in-memory evidence and do not implement exported proof files.
 
+## Optional completed-result evidence
+
+Completed satisfaction and minimization results can retain `SourceResultEvidence`
+when capture is requested through `SourceResultCapture`. Claims name the original
+revision, invocation restrictions, objective identity/direction and declared semantics.
+Exact coordinates and objective values remain separate from floating telemetry.
+Captured engine attestations do not supply independently checked derivation coverage;
+missing traversal, transformation or bound data is explicit. [Derivation checking](solver/evidence.md)
+owns the consumer-provided original-source contexts and coverage checks.
+
 ## Configuration and resources
 
 `ProblemSettings` carries immutable resource metadata through source rewrites,
@@ -112,6 +122,21 @@ objective-round adapter, which checks retained factor identity, bound narrowing
 and the appended row's unchanged columns and coefficients. Variables owned by
 an open theory never become finite CP domains. Continuous coordinates remain
 arithmetic-owned and are not integer branch candidates.
+
+`PreparedSourcePlan.capabilities` reduces the execution contracts captured on its
+components. `admission(strategy, operation)` reports participating arms, procedure
+completeness, worker claim authority and explicit unsupported causes. Complete
+integer traversal may remain nonterminating; nonlinear integer candidate traversal
+retains its incomplete guarantee. LS and ALNS offer checked witnesses only.
+A mixed strategy exposes its admitted siblings and their individual declines.
+Resource exhaustion belongs to invocation results, rather than build-time admission.
+
+`withObjective` captures linear or exact quadratic operation data without reselecting
+source ownership. Unsupported objectives do not erase supported satisfaction.
+Finite counting and accurate sampling use complete cells independently of the
+sampling backend. Their real coordinates remain existential. Native polynomial and
+nonlinear requests have no enumeration, count or sampling surface solely because a
+finite projection exists. A relaxation supplies no omitted source check or operation.
 
 Built-in factor execution capabilities are declared by
 `solver/FactorExecutionCapabilities.kt`, outside `ir`. The declarations distinguish

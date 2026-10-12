@@ -31,7 +31,9 @@ internal fun refuteOpenWitness(model: Problem, sample: Sample): String? =
         is Verification.Indeterminate -> verdict.reason
     }
 
-internal fun verifyOpenWitness(model: Problem, sample: Sample): Verification<Sample, Unit> {
+internal fun verifyOpenWitness(
+    model: Problem, sample: Sample, cancellation: Cancellation = Cancellation.Never,
+): Verification<Sample, Unit> {
     if (sample.exactInts?.any { !it.fitsLong() } == true) {
         return Verification.Indeterminate("wide integer coordinates require an exact theory witness check")
     }
@@ -54,7 +56,7 @@ internal fun verifyOpenWitness(model: Problem, sample: Sample): Verification<Sam
         }
     }
     val point = model.withIntDomains(Array(model.numIntVars) { IntDomain(sample.intValue(it), sample.intValue(it)) })
-    return composedFixpoint(point.bake(), Candidate(sample, Unit), Cancellation.Never)
+    return composedFixpoint(point.bake(), Candidate(sample, Unit), cancellation)
 }
 
 internal fun OpenTheoryAssignment.toSample(model: Problem): Sample {

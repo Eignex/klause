@@ -2,6 +2,7 @@ package com.eignex.klause.solver.result
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -103,6 +104,9 @@ sealed interface MinimizeResult {
      *  incumbents — totals belong to the verdict that ends the run). */
     val stats: SolveStats
 
+    /** Optional original-source claims and derivations; null when capture was not requested. */
+    val evidence: SourceResultEvidence?
+
     /** Objective value at the [assignment] if any, else `null`. */
     val objectiveValue: Double?
 
@@ -122,6 +126,7 @@ sealed interface MinimizeResult {
         override val sample: Sample,
         override val objective: Double,
         override val stats: SolveStats = SolveStats.EMPTY,
+        override val evidence: SourceResultEvidence? = null,
     ) : WithSample
 
     /** Best solution found before the search stopped. */
@@ -131,6 +136,7 @@ sealed interface MinimizeResult {
         /** Why the search stopped before proving optimality. */
         val reason: TerminationReason,
         override val stats: SolveStats = SolveStats.EMPTY,
+        override val evidence: SourceResultEvidence? = null,
     ) : WithSample
 
     /**
@@ -146,11 +152,16 @@ sealed interface MinimizeResult {
         /** Exact recession ray of the continuous variables through [sample]. */
         val direction: List<BigFraction>,
         override val stats: SolveStats = SolveStats.EMPTY,
+        override val evidence: SourceResultEvidence? = null,
     ) : WithSample
 
     /** Proven infeasible. See [com.eignex.klause.solver.SolveResult.Unsat.core] for [core] semantics. */
-    data class Infeasible(val core: UnsatCore? = null, override val stats: SolveStats = SolveStats.EMPTY) :
-        MinimizeResult {
+    data class Infeasible(
+        /** Optional jointly infeasible source factor subset. */
+        val core: UnsatCore? = null,
+        override val stats: SolveStats = SolveStats.EMPTY,
+        override val evidence: SourceResultEvidence? = null,
+    ) : MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null
     }
@@ -160,6 +171,7 @@ sealed interface MinimizeResult {
         /** Why optimisation ended without a definitive answer. */
         val reason: TerminationReason,
         override val stats: SolveStats = SolveStats.EMPTY,
+        override val evidence: SourceResultEvidence? = null,
     ) : MinimizeResult {
         override val assignment: Sample? = null
         override val objectiveValue: Double? = null

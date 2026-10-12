@@ -53,6 +53,7 @@ class SharedPolynomialStrategyTest(private val engine: FiniteEngine) {
         val request = source.pipelineRequest()
         val shared = request.resolvedModel()
         kotlin.test.assertSame(source, request.preparedPlan.originalSource)
+        assertTrue(request.preparedPlan.capabilities.admission(engine).runnable)
 
         shared.service.invocation().use { invocation ->
             val result = PolynomialStrategyAdapters(
