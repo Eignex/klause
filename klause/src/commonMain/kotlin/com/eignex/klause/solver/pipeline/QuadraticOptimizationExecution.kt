@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
@@ -35,14 +34,7 @@ fun OpenTheoryPipeline.minimize(
         null, native.reason(), sense, SolveStats.EMPTY,
     )
     if (!native.stopped) {
-        val model = request.sharedModel ?: requireNotNull(SharedPolynomialModel.assemble(
-            Problem(
-                numBoolVars = request.problem.totalBoolCount, numIntVars = 0,
-                intDomains = emptyArray(), factors = emptyArray(), numRealVars = request.problem.totalRealCount,
-                realLower = DoubleArray(request.problem.totalRealCount) { Double.NEGATIVE_INFINITY },
-                realUpper = DoubleArray(request.problem.totalRealCount) { Double.POSITIVE_INFINITY },
-            ), request.problem.formula,
-        ))
+        val model = request.resolvedModel()
         for (term in objective.terms) for (variable in listOfNotNull(term.first, term.second)) {
             require(when (variable) {
                 is QuadraticVariable.Bool -> variable.id.index < request.problem.sourceBoolCount

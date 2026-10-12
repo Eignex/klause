@@ -24,8 +24,9 @@ owns mathematical operations; [search](../solver/search.md) owns finite traversa
 
 ### Shared model composition
 
+`PreparedSourcePlan` owns the shared source decomposition. Its captured
 `SharedPolynomialModel` separates exactly encodable continuous factors from finite
-factors. Integer columns appearing in the continuous equations receive symbolic
+factors, retaining original factor indices and integer embeddings for every strategy. Integer columns appearing in the continuous equations receive symbolic
 real coordinates for conditioned queries; their source finite domains and global
 constraints remain in CP. Exact linear rows, Boolean reification, real bounds and
 integer/real products and `ContinuousProduct` become neutral polynomial formulas. AllDifferent, scheduling
@@ -33,9 +34,11 @@ and other finite factors remain intact in the finite projection. Linear relaxati
 rows cannot stand in for a factor's semantics. Binary64 constants denote their exact
 binary rational values. Equal finite real bounds remain source equations and are
 substituted before projection, retaining their exact coordinate in captured models.
-`Problem.pipelineRoute()` selects `SourceProblemRoute.PolynomialTheory` for shared
-continuous products before finite or linear routing. Open integer domains and
-continuous objectives decline this route; they are not boxed or discretized.
+`Problem.pipelineRoute()` consumes the same prepared plan for polynomial, finite
+and linear route construction. Polynomial requests and quadratic execution resolve
+the captured completion data from that plan. Open integer declarations and continuous
+linear objectives carry explicit preparation declines; they are not boxed or discretized.
+Exact quadratic objectives retain their separate objective contract.
 
 Backtracking checks interval relaxations and fixed finite branches. Local search
 generates candidates from finite factors, rechecks their pinned finite fixpoint, then

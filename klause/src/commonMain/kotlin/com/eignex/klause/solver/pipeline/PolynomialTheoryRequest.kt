@@ -20,8 +20,12 @@ import com.eignex.klause.util.Cancellation
 class PolynomialTheoryRequest internal constructor(
     /** Original source identities and polynomial formula. */
     val problem: PolynomialRealProblem,
-    internal val sharedModel: SharedPolynomialModel? = null,
-)
+    /** Shared source ownership and exact completion used by every strategy. */
+    val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan(),
+) {
+    internal val sharedModel: SharedPolynomialModel?
+        get() = preparedPlan.polynomialModel.takeIf { preparedPlan.originalSource is Problem }
+}
 
 /** Select the complete polynomial-real theory without materializing finite domains. */
 fun PolynomialRealProblem.pipelineRequest(): PolynomialTheoryRequest = PolynomialTheoryRequest(this)
@@ -31,19 +35,26 @@ fun PolynomialRealProblem.pipelineRequest(): PolynomialTheoryRequest = Polynomia
  * Integer columns require finite source domains; every continuous factor must have an exact encoding.
  */
 fun Problem.pipelineRequest(): PolynomialTheoryRequest {
-    val shared = requireNotNull(SharedPolynomialModel.assemble(this)) {
+    val plan = preparePolynomialExecutionPlan()
+    require(plan.kind == PreparedExecutionKind.POLYNOMIAL) {
         "the shared polynomial pipeline requires finite integers and exactly encodable continuous factors"
     }
-    return shared.request()
+    return plan.polynomialRequest()
 }
 
-internal fun SharedPolynomialModel.request(): PolynomialTheoryRequest = PolynomialTheoryRequest(
-    PolynomialRealProblem(
-        service.formula, service.realCount, source.numBoolVars, source.numRealVars, source.numBoolVars,
-        emptyMap(), emptyMap(),
-    ),
-    this,
-)
+internal fun PreparedSourcePlan.polynomialRequest(): PolynomialTheoryRequest {
+    val shared = requireNotNull(polynomialModel)
+    return PolynomialTheoryRequest(
+        PolynomialRealProblem(
+            shared.service.formula, shared.service.realCount, model.numBoolVars,
+            sourceRealCount, sourceBoolCount, emptyMap(), emptyMap(),
+        ),
+        this,
+    )
+}
+
+internal fun PolynomialTheoryRequest.resolvedModel(): SharedPolynomialModel =
+    requireNotNull(preparedPlan.polynomialModel) { "polynomial request has no prepared completion" }
 
 /** Controls for one complete polynomial-real invocation, in native arithmetic units. */
 data class PolynomialTheoryParams(
@@ -153,17 +164,6 @@ private fun PolynomialTheoryRequest.capture(sample: Sample): Sample = Sample(
     DoubleArray(problem.sourceRealCount) { sample.approximateRealValue(it) },
     algebraicReals = requireNotNull(sample.algebraicReals).take(problem.sourceRealCount),
 )
-
-private fun PolynomialTheoryRequest.resolvedModel(): SharedPolynomialModel = sharedModel
-    ?: requireNotNull(SharedPolynomialModel.assemble(
-        Problem(
-            numBoolVars = problem.totalBoolCount, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray(),
-            numRealVars = problem.totalRealCount,
-            realLower = DoubleArray(problem.totalRealCount) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(problem.totalRealCount) { Double.POSITIVE_INFINITY },
-        ),
-        problem.formula,
-    ))
 
 /**
  * Execute a pipeline-selected polynomial source as one complete exact invocation.

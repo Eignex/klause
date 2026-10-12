@@ -27,6 +27,7 @@ internal class SharedPolynomialModel private constructor(
     val finite: Problem,
     val service: PolynomialTheoryService,
     val integerColumns: Map<Int, Int>,
+    val finiteFactorIndices: List<Int>,
 ) {
     fun capture(assignment: QfNraAssignment, bools: BooleanArray, ints: LongArray): Sample {
         val reals = List(source.numRealVars) { assignment.realValue(it) }
@@ -45,6 +46,14 @@ internal class SharedPolynomialModel private constructor(
             source: Problem,
             sourceFormula: PolynomialRealFormula? = null,
             formulaForFactor: (Factor) -> PolynomialRealFormula? = { null },
+        ): SharedPolynomialModel? {
+            return source.preparePolynomialExecutionPlan(sourceFormula, formulaForFactor).polynomialModel
+        }
+
+        internal fun lower(
+            source: Problem,
+            sourceFormula: PolynomialRealFormula?,
+            formulaForFactor: (Factor) -> PolynomialRealFormula?,
         ): SharedPolynomialModel? {
             if ((0 until source.numIntVars).any { !source.intBounds.hasLower(it) || !source.intBounds.hasUpper(it) }) {
                 return null
@@ -109,6 +118,7 @@ internal class SharedPolynomialModel private constructor(
                 ),
                 PolynomialTheoryService(formula, source.numBoolVars, lowering.realCount, fixedReals),
                 integerIds.toMap(),
+                kept.toList(),
             )
         }
 

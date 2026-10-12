@@ -36,7 +36,7 @@ enum class FactorOwner {
     SHARED,
 }
 
-/** Immutable build-time decomposition of a [Problem]. */
+/** Finite/linear projection mechanism retained by a [PreparedSourcePlan]. */
 class ComponentPlan internal constructor(
     private val source: Problem,
     private val intOwners: Array<IntVariableOwner>,
@@ -218,6 +218,8 @@ class ComponentPlan internal constructor(
             }
         }
     }
+
+    internal fun requireSource(spec: Problem) = requireBelongsTo(spec)
 
     private fun requireBelongsTo(spec: Problem) {
         require(spec === source) {

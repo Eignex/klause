@@ -95,6 +95,9 @@ class UnplaceableColumnTest {
 
         val route = model.pipelineRoute()
 
-        assertIs<SourceProblemRoute.OpenTheory>(route, "the bounded column leaves nothing unplaceable")
+        val planned = assertIs<SourceProblemRoute.OpenTheory>(route, "the bounded column leaves nothing unplaceable")
+        kotlin.test.assertSame(model, planned.preparedPlan.originalSource)
+        assertEquals(5L, planned.preparedPlan.model.intBounds.upper(1))
+        assertEquals(false, model.intBounds.hasUpper(1))
     }
 }

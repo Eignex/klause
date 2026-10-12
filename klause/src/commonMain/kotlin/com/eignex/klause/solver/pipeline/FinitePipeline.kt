@@ -49,8 +49,19 @@ class FinitePipelineRequest(
      * Preparation re-selects it whenever a source pass rewrote factors, so this is the plan for the model
      * as the frontend handed it over, not necessarily the one the engine is built from.
      */
-    val componentPlan: ComponentPlan = problem.componentPlan(preferFinite = true),
-)
+    componentPlan: ComponentPlan? = null,
+    /** Shared source plan from routing, or captured here for direct finite callers. */
+    val preparedPlan: PreparedSourcePlan = if (componentPlan == null) {
+        problem.prepareExecutionPlan(objective, preferFinite = true)
+    } else {
+        problem.preparedWithComponents(componentPlan, objective = objective)
+    },
+) {
+    /** Finite projection data selected by [preparedPlan]. */
+    val componentPlan: ComponentPlan = requireNotNull(preparedPlan.componentPlan) {
+        "finite preparation requires a finite/linear source plan"
+    }
+}
 
 /** The finite model handed from policy to a concrete search engine. */
 class FinitePipelinePreparation(
@@ -101,7 +112,7 @@ object FinitePipeline {
         // A source rewrite moves factor ownership with the factors, so the routing plan no longer indexes
         // the model the engine is built from; an untouched model keeps the plan routing already built.
         val plan = if (prepared.changed) {
-            prepared.problem.componentPlan(preferFinite = true)
+            requireNotNull(prepared.problem.prepareExecutionPlan(prepared.objective, preferFinite = true).componentPlan)
         } else {
             request.componentPlan
         }
