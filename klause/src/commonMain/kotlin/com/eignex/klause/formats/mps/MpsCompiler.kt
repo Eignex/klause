@@ -668,7 +668,7 @@ internal fun MpsModel.toExactLpModel(source: MpsSourceNumbers = sourceNumbers())
     )
 }
 
-private fun MpsModel.exactAdapterSnapshot(): MpsModel = MpsModel(
+internal fun MpsModel.exactAdapterSnapshot(): MpsModel = MpsModel(
     name,
     sense,
     MpsObjective(objective.name, objective.indices.copyOf(), objective.coeffs.copyOf(), objective.constant),
