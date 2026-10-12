@@ -2,11 +2,36 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceValue
+import java.io.IOException
+import java.io.OutputStream
+import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class ArithmeticPublicationTest {
+    @Test
+    fun `a failed stdout stream aborts actual protocol publication`() {
+        val output = SmtLibOutput()
+        val publication = ArithmeticPublication(output)
+        val previous = System.out
+        val failed = PrintStream(object : OutputStream() {
+            override fun write(b: Int) { throw IOException("closed consumer") }
+        })
+
+        System.setOut(failed)
+        try {
+            assertFailsWith<IllegalStateException> {
+                publication.publish("(\n  (define-fun x () Int 1)\n)", SourceValue.Rational(BigFraction.ONE))
+            }
+        } finally {
+            System.setOut(previous)
+            failed.close()
+        }
+
+        assertEquals(0L, publication.solutions)
+    }
+
     @Test
     fun `two accepted incumbents reach the consumer before terminal return`() {
         val received = mutableListOf<Pair<String, SourceValue>>()

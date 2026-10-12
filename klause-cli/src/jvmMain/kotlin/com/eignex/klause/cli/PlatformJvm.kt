@@ -12,6 +12,11 @@ import kotlin.system.exitProcess
 internal actual fun cliProp(name: String): String? =
     System.getProperty(name) ?: System.getenv(name.uppercase().replace('.', '_'))
 
+internal actual fun flushCliOutput() {
+    System.out.flush()
+    check(!System.out.checkError()) { "CLI output failed" }
+}
+
 internal actual fun errPrintln(message: String) = System.err.println(message)
 
 internal actual fun exitCli(code: Int): Nothing = exitProcess(code)

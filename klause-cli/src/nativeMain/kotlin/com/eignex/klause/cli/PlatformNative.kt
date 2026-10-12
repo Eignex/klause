@@ -2,12 +2,14 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
+import kotlin.system.exitProcess
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import platform.posix.SEEK_END
 import platform.posix.fclose
+import platform.posix.fflush
 import platform.posix.fopen
 import platform.posix.fprintf
 import platform.posix.fread
@@ -18,7 +20,7 @@ import platform.posix.pclose
 import platform.posix.popen
 import platform.posix.rewind
 import platform.posix.stderr
-import kotlin.system.exitProcess
+import platform.posix.stdout
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun cliProp(name: String): String? = getenv(name.uppercase().replace('.', '_'))?.toKString()
@@ -26,6 +28,11 @@ internal actual fun cliProp(name: String): String? = getenv(name.uppercase().rep
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun errPrintln(message: String) {
     fprintf(stderr, "%s\n", message)
+}
+
+@OptIn(ExperimentalForeignApi::class)
+internal actual fun flushCliOutput() {
+    check(fflush(stdout) == 0) { "CLI output failed" }
 }
 
 internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
