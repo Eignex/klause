@@ -38,6 +38,10 @@ internal fun cliInvocationStats(common: CommonOptions, pipeline: SolvablePipelin
             is SolvablePipeline.OpenTheory -> "open-theory"
             is SolvablePipeline.PolynomialTheory -> "polynomial-theory"
             is SolvablePipeline.NonlinearIntegerTheory -> "nonlinear-integer-theory"
+            is SolvablePipeline.QuadraticTheory -> when (pipeline.request) {
+                is QuadraticRequest.Polynomial -> "quadratic-polynomial"
+                is QuadraticRequest.Integer -> "quadratic-integer"
+            }
             is SolvablePipeline.ExactTheorySatisfaction -> pipeline.pipelineName
             is SolvablePipeline.Interrupted -> "interrupted"
             is SolvablePipeline.OpenLocalSearch -> "open-local-search"
@@ -47,6 +51,7 @@ internal fun cliInvocationStats(common: CommonOptions, pipeline: SolvablePipelin
             is SolvablePipeline.OpenTheory -> pipeline.request.route.name.lowercase()
             is SolvablePipeline.PolynomialTheory -> "exact_nra"
             is SolvablePipeline.NonlinearIntegerTheory -> "incomplete_nia"
+            is SolvablePipeline.QuadraticTheory -> "quadratic_optimization"
             is SolvablePipeline.ExactTheorySatisfaction -> pipeline.declaredTheoryRoute
             else -> null
         },

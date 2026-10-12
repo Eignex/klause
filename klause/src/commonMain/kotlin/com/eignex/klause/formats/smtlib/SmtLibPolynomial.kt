@@ -1,8 +1,11 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.requireVariableCounts
 import com.eignex.klause.lowering.PolynomialRealLowering
+import com.eignex.klause.lowering.PolynomialConditional
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
@@ -19,6 +22,8 @@ internal class SmtLibPolynomialProblem(
     realVarNames: Map<String, Int>,
     boolVarNames: Map<String, Int>,
     checkpoint: () -> Unit = {},
+    val objective: QuadraticObjectiveSpec? = null,
+    val objectiveSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
 ) {
     init {
         require(sourceRealCount in 0..realCount && sourceBoolCount in 0..boolCount) {
@@ -78,13 +83,15 @@ internal class SmtLibPolynomialCompiler(
     private val assertions = ArrayList<Pair<SExpr, PolynomialEnvironment>>()
     private var querySeen = false
     private var exited = false
+    private var objective: Pair<SExpr, PolynomialEnvironment>? = null
+    private var objectiveSense = ObjectiveSense.MINIMIZE
 
     fun command(expression: SExpr) {
         cancellation.polynomialSourceCheckpoint()
         val command = expression as? SExpr.SList ?: smtUnsupported("expected a parenthesized polynomial command")
         if (exited) smtUnsupported("polynomial command after exit")
         val head = command.polynomialHead()
-        if (querySeen && head !in setOf("get-model", "exit", "set-info", "set-option")) {
+        if (querySeen && head !in setOf("get-model", "get-objectives", "exit", "set-info", "set-option")) {
             smtUnsupported("multiple or incremental polynomial queries are unsupported")
         }
         when (head) {
@@ -104,6 +111,12 @@ internal class SmtLibPolynomialCompiler(
             "assert" -> {
                 command.polynomialSize(2)
                 assertions.add(command.items[1] to environment)
+            }
+            "minimize", "maximize" -> {
+                command.polynomialSize(2)
+                if (objective != null) smtUnsupported("multiple polynomial objectives are unsupported")
+                objective = command.items[1] to environment
+                objectiveSense = if (head == "minimize") ObjectiveSense.MINIMIZE else ObjectiveSense.MAXIMIZE
             }
             "set-logic" -> {
                 command.polynomialSize(2)
@@ -141,6 +154,10 @@ internal class SmtLibPolynomialCompiler(
                 querySeen = true
             }
             "get-model" -> command.polynomialSize(1)
+            "get-objectives" -> {
+                command.polynomialSize(1)
+                if (objective == null) smtUnsupported("get-objectives requires an objective")
+            }
             "exit" -> {
                 command.polynomialSize(1)
                 exited = true
@@ -150,16 +167,28 @@ internal class SmtLibPolynomialCompiler(
     }
 
     fun build(): SmtLibPolynomialProblem {
-        val lowering = PolynomialRealLowering(numericCount)
+        val conditionals = ArrayList<PolynomialConditional>()
+        val captureConditional: ((PolynomialConditional) -> Unit)? = if (objective == null) null else {
+            conditional -> conditionals.add(conditional)
+        }
+        val lowering = PolynomialRealLowering(numericCount, captureConditional)
         val evaluator = SmtLibPolynomialEvaluator(
             lowering, allowWidePowers = allowIntegers, cancellation = cancellation,
         )
         val formulas = assertions.map { (expression, environment) ->
             evaluator.evaluate(expression, environment).boolean()
         }
+        val captured = objective?.let { (expression, environment) ->
+            val value = evaluator.evaluate(expression, environment) as? PolynomialValue.Real
+                ?: smtUnsupported("polynomial objective must be numeric")
+            SmtLibQuadraticObjective.capture(
+                value.expression, intNames, realNames, boolNames.size, lowering.realCount, conditionals, cancellation,
+            )
+        }
         return SmtLibPolynomialProblem(
             lowering.formula(formulas), lowering.realCount, boolNames.size, numericCount, boolNames.size,
             evaluator.hasNonlinearTerms, intNames, realNames, boolNames, { cancellation.polynomialSourceCheckpoint() },
+            captured, objectiveSense,
         )
     }
 

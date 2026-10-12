@@ -24,6 +24,7 @@ import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -561,6 +562,9 @@ internal interface OutputProtocol {
     fun onSolution(rendered: String, objective: Long?, continuousObjective: Double? = null)
 
     fun onExactSolution(rendered: String, objective: BigFraction)
+    fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
+        rendered?.let { onSolution(it, null) }
+    }
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
     fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {}

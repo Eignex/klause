@@ -22,6 +22,7 @@ import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
 import com.eignex.klause.theory.qfnra.polynomialPointFixings
 import com.eignex.klause.theory.qfnra.PolynomialIntegerRecession
 import com.eignex.klause.theory.qfnra.tryPolynomialIntegerRecession
+import com.eignex.klause.theory.qfnra.PolynomialBooleanCondition
 import com.eignex.klause.util.Cancellation
 
 internal sealed interface QuadraticRelaxationResult {
@@ -89,7 +90,11 @@ internal class QuadraticSourceRelaxation(
         operation = cancellation
         return try {
             arithmetic.step()
-            val points = fixedPoints ?: polynomialPointFixings(formula, arithmetic::step).also { fixedPoints = it }
+            val points = if (proposed.bools.isEmpty()) {
+                fixedPoints ?: polynomialPointFixings(formula, arithmetic::step).also { fixedPoints = it }
+            } else polynomialPointFixings(
+                PolynomialBooleanCondition.apply(formula, proposed.bools, arithmetic::step), arithmetic::step,
+            )
             val lower = proposed.lower.toMutableMap()
             val upper = proposed.upper.toMutableMap()
             for ((id, value) in points) {

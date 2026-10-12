@@ -18,6 +18,7 @@ import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.polynomialFor
 import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.theory.qfnra.PolynomialCondition
+import com.eignex.klause.theory.qfnra.PolynomialBooleanCondition
 import com.eignex.klause.theory.qfnra.PolynomialObjectiveResult
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.theory.qfnra.QfNraParams
@@ -66,6 +67,12 @@ internal class QuadraticBranchCompletion(
     fun pointFixings(step: () -> Unit = arithmetic::step): Map<Int, BigFraction> =
         fixedPoints ?: polynomialPointFixings(model.service.formula, step).also { fixedPoints = it }
 
+    fun conditionedPointFixings(
+        bools: Map<Int, Boolean>, step: () -> Unit = arithmetic::step,
+    ): Map<Int, BigFraction> = if (bools.isEmpty()) pointFixings(step) else polynomialPointFixings(
+        PolynomialBooleanCondition.apply(model.service.formula, bools, step), step,
+    )
+
     fun check(
         finite: Sample,
         proposed: PolynomialCondition,
@@ -76,7 +83,7 @@ internal class QuadraticBranchCompletion(
             arithmetic.step()
             val lower = proposed.lower.toMutableMap()
             val upper = proposed.upper.toMutableMap()
-            for ((id, value) in pointFixings()) {
+            for ((id, value) in conditionedPointFixings(proposed.bools)) {
                 arithmetic.step()
                 lower[id] = lower[id]?.let { if (it > value) it else value } ?: value
                 upper[id] = upper[id]?.let { if (it < value) it else value } ?: value

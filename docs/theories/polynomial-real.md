@@ -146,8 +146,11 @@ result with `PolynomialTheoryStats` and an optional native resource cause. Sourc
 Both verdicts receive a final stop check, and SAT capture receives another check
 before publication. Timeout, external cancellation and budget/resource exhaustion
 retain distinct common termination reasons. Exact source scalars survive invocation
-cleanup. [Input semantics](../formats/smtlib.md#polynomial-source-lowering) owns admission
-and model rendering; [resources](../solver/resources.md) owns containing allowances. Native
+cleanup. [Input semantics](../formats/smtlib.md#polynomial-source-lowering) owns admission,
+exact quadratic objective capture and model rendering;
+[resources](../solver/resources.md) owns containing allowances. The frontend passes
+the retained request, objective and source direction to the pipeline and renders
+its exact result; it performs no polynomial or numerical proof selection. Native
 controls and units are defined below.
 
 ### Objective certificates

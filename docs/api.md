@@ -60,6 +60,9 @@ The quadratic `minimize` overload uses shared exact integer branching and return
 the same quadratic incumbent/bound result surface for open and arbitrary-width
 integer coordinates. Heuristic engines retain checked incumbents; complete
 traversal must cover every remaining integer branch before a global claim.
+SMT-LIB quadratic admission retains the same existing source snapshots under
+`SmtLibInput.Quadratic`, with exact original coordinate terms and objective sense.
+The CLI forwards this captured request and renders its exact optimization result.
 
 
 ## Compatibility and implementation surfaces

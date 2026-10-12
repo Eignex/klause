@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.portfolio.ArmFault
@@ -87,6 +88,29 @@ internal object SolveCore {
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
         val openCores = common.parallel ?: 1
         when (val pipeline = rawSolvable.pipeline) {
+            is SolvablePipeline.QuadraticTheory -> {
+                if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for quadratic objectives")
+                output.begin(optimize = true, maximize = pipeline.sense == ObjectiveSense.MAXIMIZE)
+                val execution = when (val request = pipeline.request) {
+                    is QuadraticRequest.Polynomial -> OpenTheoryPipeline.minimize(
+                        request.request, pipeline.objective, polynomialParams(common, deadlineCancel),
+                        engine, pipeline.sense,
+                    )
+                    is QuadraticRequest.Integer -> {
+                        val budget = takeNodeBudget(common).also { common.nodeBudget = it }
+                        OpenTheoryPipeline.minimize(
+                            request.request, pipeline.objective, nonlinearIntegerParams(common, deadlineCancel, budget),
+                            engine, pipeline.sense,
+                        )
+                    }
+                }
+                reportQuadraticOptimization(
+                    execution, pipeline, output, common.statistics, rawSolvable.routingElapsedMs,
+                    completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
+                )
+                return
+            }
+
             is SolvablePipeline.PolynomialTheory -> {
                 if (solutionSetSensitive) {
                     usageError("all-solution enumeration is unavailable for polynomial real models")

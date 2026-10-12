@@ -259,9 +259,14 @@ internal class QuadraticStrategyAdapters(
                 }
             }
             val realStart = sourceBoolCount + model.source.numIntVars
+            val scopedCenters = completion.conditionedPointFixings(pins + assumptions.bools) {
+                if (stop()) throw PolynomialInterrupted()
+                completion.algebraic.arithmetic.step()
+            }
             for (id in 0 until sourceRealCount) {
+                if (current != null && released.any { it < realStart }) continue
                 val value = current?.algebraicReals?.get(id)
-                val center = centers[id]
+                val center = scopedCenters[id] ?: centers[id]
                     ?: BigFraction.ofDouble(model.source.realLower[id])?.takeIf { it > BigFraction.ZERO }
                     ?: BigFraction.ofDouble(model.source.realUpper[id])?.takeIf { it < BigFraction.ZERO }
                     ?: BigFraction.ZERO
