@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealProblem
@@ -14,6 +15,7 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -156,5 +158,30 @@ class QuadraticOptimizationExecutionTest {
         val unknown = assertIs<QuadraticOptimizationResult.Unknown>(execution.result)
         assertEquals(BigFraction.ofLong(-4), unknown.bound?.value?.rational)
         assertEquals(0L, unknown.stats.ls.moves.sum)
+    }
+
+    @Test
+    fun `private worker cancellation retains a checked incumbent without an optimum certificate`() {
+        val source = Problem(
+            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+        )
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+        var cancelled = false
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(
+                cancellation = Cancellation { cancelled },
+                onEvent = { if (it is SearchEvent.Incumbent) cancelled = true },
+            ),
+        ))
+
+        val execution = OpenTheoryPipeline.minimize(
+            source.pipelineRequest(), objective, params, FiniteEngine.BACKTRACK,
+        )
+
+        val result = assertIs<QuadraticOptimizationResult.BestFound>(execution.result)
+        assertEquals(TerminationReason.Cancelled, result.reason)
+        assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
     }
 }
