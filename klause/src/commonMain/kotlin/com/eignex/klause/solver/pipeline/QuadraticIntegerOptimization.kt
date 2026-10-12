@@ -434,7 +434,17 @@ internal class QuadraticIntegerOptimization(
             budget?.exhausted() == true || allowance?.let { native.work - start >= it } == true
         }
         if (stop() || maximum == 0L || instructionLimit == 0L) return
-        val seeds = source.integerSeeds(stop, relaxation.arithmetic::step)
+        val seeds = source.integerSeeds(stop, relaxation.arithmetic::step).mapIndexed { id, value ->
+            relaxation.arithmetic.step()
+            val coordinate = source.integerCoordinates[id]
+            val lower = root.lower[coordinate]
+            val upper = root.upper[coordinate]
+            when {
+                lower != null && value < lower -> lower
+                upper != null && value > upper -> upper
+                else -> value
+            }
+        }
         var radius = BigFraction.ONE
         var moves = 0L
         var instructions = 0L

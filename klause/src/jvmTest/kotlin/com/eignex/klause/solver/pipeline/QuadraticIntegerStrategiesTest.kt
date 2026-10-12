@@ -46,7 +46,7 @@ class QuadraticIntegerStrategiesTest(private val engine: FiniteEngine) {
         val params = NonlinearIntegerTheoryParams(
             polynomial = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
                 localSearch = LocalSearchParams(maxFlips = 1000, randomSeed = 17), alnsIterations = 2,
-            )), maximumMoves = 2,
+            )), maximumMoves = 1,
         )
 
         val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, params, engine)
