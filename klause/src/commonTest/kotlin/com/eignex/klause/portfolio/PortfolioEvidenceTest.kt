@@ -94,24 +94,30 @@ class PortfolioEvidenceTest {
 
     @Test
     fun `exact objective ordering preserves improvements hidden by floating projection`() {
-        val objective = LinearObjective(constant = 1L shl 62, realCoefficients = doubleArrayOf(-1.0))
-        val first = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), listOf(BigFraction.ONE))
-        val optimum = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0), listOf(BigFraction.ofLong(2)))
-        val identity = ModelIdentity.of(Any(), objective)
-        val heuristic = PortfolioWorker.ofMinimize("ls/exact", 0) { _, _, _, _ ->
-            sequenceOf(MinimizeResult.BestFound(first, objective.evaluateExact(first).toDouble(),
-                TerminationReason.BudgetExhausted))
-        }.bindEvidence(identity, provesResults = false)
-        val complete = PortfolioWorker.ofMinimize("bt/exact", 1) { _, _, _, _ ->
-            sequenceOf(MinimizeResult.Optimal(optimum, objective.evaluateExact(optimum).toDouble()))
-        }.bindEvidence(identity)
-        val portfolio = Portfolio.thompson(listOf(heuristic, complete))
-        portfolio.exactLinearObjective = objective
-        portfolio.evidenceVerification = PortfolioEvidence(identity, CandidateVerifier.trusting())
+        for (real in listOf(false, true)) {
+            val objective = if (real) LinearObjective(constant = 1L shl 62, realCoefficients = doubleArrayOf(-1.0))
+                else LinearObjective(constant = 1L shl 62, intCoefficients = longArrayOf(-1))
+            val first = if (real) Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), listOf(BigFraction.ONE))
+                else Sample(booleanArrayOf(), longArrayOf(1))
+            val optimum = if (real) Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
+                listOf(BigFraction.ofLong(2))) else Sample(booleanArrayOf(), longArrayOf(2))
+            val identity = ModelIdentity.of(Any(), objective)
+            val heuristic = PortfolioWorker.ofMinimize("ls/exact", 0) { _, _, _, _ ->
+                sequenceOf(MinimizeResult.BestFound(first, objective.evaluateExact(first).toDouble(),
+                    TerminationReason.BudgetExhausted))
+            }.bindEvidence(identity, provesResults = false)
+            val complete = PortfolioWorker.ofMinimize("bt/exact", 1) { _, _, _, _ ->
+                sequenceOf(MinimizeResult.Optimal(optimum, objective.evaluateExact(optimum).toDouble()))
+            }.bindEvidence(identity)
+            val portfolio = Portfolio.thompson(listOf(heuristic, complete))
+            portfolio.exactLinearObjective = objective
+            portfolio.evidenceVerification = PortfolioEvidence(identity, CandidateVerifier.trusting())
 
-        val result = portfolio.use { it.minimize() }
+            val result = portfolio.use { it.minimize() }
 
-        assertEquals(BigFraction.ofLong(2), assertIs<MinimizeResult.Optimal>(result).sample.exactReals?.single())
+            assertEquals(objective.evaluateExact(optimum),
+                objective.evaluateExact(assertIs<MinimizeResult.Optimal>(result).sample))
+        }
     }
 
 }

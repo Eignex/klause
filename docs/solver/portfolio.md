@@ -318,8 +318,9 @@ do not guarantee terminating optimization for every admitted source.
 Finite real models with fixed discrete coordinates use the same repair driver. Mixed
 products become exact linear rows under those fixed coordinates and are checked
 against their original relation before publication. Their exchanges order exact
-objective values and project scalar cutoffs outward. Witness-only workers retain
-that authority through outer binding.
+objective values and project scalar cutoffs outward. Finite-column objectives,
+including polynomial composition, also use exact incumbent ordering. Witness-only
+workers retain that authority through outer binding.
 
 Exact neighborhood handles retain centers, radii, random state and adaptive weights
 through slices. Their widening policy handles stalls without reopening the native

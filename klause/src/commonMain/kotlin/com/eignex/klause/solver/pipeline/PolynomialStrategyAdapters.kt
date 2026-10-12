@@ -201,6 +201,7 @@ internal class PolynomialStrategyAdapters(
                 })
         }.bindEvidence(identity, provesResults = false)
         val portfolio = Portfolio.thompson(listOf(bt, ls, alns))
+        portfolio.exactLinearObjective = objective
         portfolio.evidenceVerification = PortfolioEvidence(identity, CandidateVerifier { candidate ->
             val certificate = candidate.assignment.witnessCertificate
             if (certificate?.kind == EvidenceKind.Witness && certificate.model.sameModel(identity)) {
