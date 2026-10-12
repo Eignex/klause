@@ -28,24 +28,36 @@ internal class PortfolioInvocationResources(
 
     val slots: List<PortfolioWorkerSlot> get() = workerSlots.toList()
 
-    fun nativeAllowances(limit: Long, complete: Set<Int>): LongArray {
-        require(limit >= 0 && complete.all { it in workerSlots.indices })
-        if (limit == Long.MAX_VALUE) return LongArray(workerSlots.size) { Long.MAX_VALUE }
-        val result = LongArray(workerSlots.size)
-        val completeSlots = workerSlots.indices.filter { it in complete }
-        val heuristicSlots = workerSlots.indices.filter { it !in complete }
-        val completeAllowance = when {
-            completeSlots.isEmpty() -> 0L
-            heuristicSlots.isEmpty() -> limit
-            else -> limit / 4 * 3 + limit % 4 * 3 / 4
-        }
-        fun allocate(amount: Long, indexes: List<Int>) {
-            for ((position, index) in indexes.withIndex()) {
-                result[index] = amount / indexes.size + if (position < amount % indexes.size) 1L else 0L
-            }
-        }
-        allocate(completeAllowance, completeSlots)
-        allocate(limit - completeAllowance, heuristicSlots)
-        return result
+    fun nativeAllowances(limit: Long, complete: Set<Int>): LongArray =
+        nativeWorkerAllowances(workerSlots.size, limit, complete)
+}
+
+internal fun nativeWorkerAllowances(count: Int, limit: Long, complete: Set<Int>): LongArray {
+    require(count > 0 && limit >= 0 && complete.all { it in 0 until count })
+    if (limit == Long.MAX_VALUE) return LongArray(count) { Long.MAX_VALUE }
+    val result = LongArray(count)
+    val completeSlots = (0 until count).filter { it in complete }
+    val heuristicSlots = (0 until count).filter { it !in complete }
+    val completeAllowance = when {
+        completeSlots.isEmpty() -> 0L
+        heuristicSlots.isEmpty() -> limit
+        else -> limit / 4 * 3 + limit % 4 * 3 / 4
+    }
+    allocateNativeAllowance(completeAllowance, completeSlots, result)
+    allocateNativeAllowance(limit - completeAllowance, heuristicSlots, result)
+    return result
+}
+
+internal fun heuristicWorkerAllowances(count: Int, limit: Long, complete: Set<Int>): LongArray {
+    require(count > 0 && limit >= 0 && complete.all { it in 0 until count })
+    return LongArray(count).also {
+        allocateNativeAllowance(limit, (0 until count).filter { it !in complete }, it)
+    }
+}
+
+private fun allocateNativeAllowance(amount: Long, indexes: List<Int>, result: LongArray) {
+    for ((position, index) in indexes.withIndex()) {
+        result[index] = if (amount == Long.MAX_VALUE) Long.MAX_VALUE else
+            amount / indexes.size + if (position < amount % indexes.size) 1L else 0L
     }
 }
