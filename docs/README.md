@@ -34,6 +34,7 @@ separately at [eignex.com/docs/klause](https://eignex.com/docs/klause/).
 | Complete traversal | [Search and propagation](solver/search.md): decisions, finite fixpoints, theory checks and explanations |
 | Heuristic search | [Local search](solver/local-search.md): assignments, definitions, moves, scoring and restarts |
 | Combined execution | [Portfolios](solver/portfolio.md): result admission, scheduling, shared incumbents and worker lifetimes |
+| Evidence | [Original-source derivations](solver/evidence.md): typed claims, premise checking, imports and branch coverage |
 | Interruption | [Resource allowances](solver/resources.md): scope lifetimes, work currencies and parallel quotas |
 
 ## Theory contracts
