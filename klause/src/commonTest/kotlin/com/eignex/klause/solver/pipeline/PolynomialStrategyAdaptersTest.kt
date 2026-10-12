@@ -150,4 +150,25 @@ class PolynomialStrategyAdaptersTest {
         }
     }
 
+    @Test
+    fun `complete polynomial portfolios retain finite cost improvements below floating precision`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+        val request = source.pipelineRequest()
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, -1), constant = 1L shl 62)
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(randomSeed = 17),
+            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 30), alnsIterations = 2,
+        ))
+
+        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED)) {
+            val result = OpenTheoryPipeline.minimize(request, objective, params, engine).result
+
+            val sample = assertIs<MinimizeResult.Optimal>(result).sample
+            assertEquals(1L, sample.intValue(0))
+            assertEquals(2L, sample.intValue(1))
+        }
+    }
+
 }
