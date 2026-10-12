@@ -208,6 +208,24 @@ class SourceEvidenceVerifier(
                         }
                     }
                 }
+                is SourceClaim.Clause -> {
+                    val discharged = derivation as? SourceDerivation.Discharge
+                        ?: return reject("clause requires a checked conditional refutation")
+                    if (claim.literals.keys.any {
+                            SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in context.coordinates ||
+                                it in scope.condition.bools
+                        }
+                    ) return reject("clause discharge requires unpinned declared source Booleans")
+                    var condition = scope.condition
+                    for ((id, value) in claim.literals) {
+                        step(depth)
+                        condition = condition.pin(id, !value)
+                    }
+                    if (discharged.refutation.claim != SourceClaim.Refutation) {
+                        return reject("clause discharge has no refutation claim")
+                    }
+                    verify(discharged.refutation, scope.copy(condition = condition), depth + 1)
+                }
                 is SourceClaim.Limit, is SourceClaim.Extension ->
                     SourceEvidenceCheck.Unavailable("source-specific claim requires a supported derivation")
                 SourceClaim.Refutation -> if (inequality(derivation, scope, depth + 1).contradicts()) {

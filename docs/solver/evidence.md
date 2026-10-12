@@ -10,7 +10,9 @@ row snapshot cannot substitute for that original-source binding.
 restrictions, objective identity and direction. Every check compares this scope
 before considering the derivation. Imports must name the same revision, semantics
 and objective and may assume only restrictions implied by the importing scope.
-Their derivations are rechecked against the same original premises. A conditioned
+Their derivations are rechecked against the same original premises. Boolean clauses
+require a checked refutation under exactly their negated literals; discharge cannot
+hide an additional numeric neighborhood restriction. A conditioned
 refutation cannot refute a weaker parent invocation.
 
 `SourceDerivation` retains premise references, exact nonnegative linear
