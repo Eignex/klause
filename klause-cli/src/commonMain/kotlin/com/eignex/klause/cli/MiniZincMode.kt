@@ -9,6 +9,7 @@ import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.SolveStats
@@ -207,6 +208,11 @@ internal class MiniZincOutput(private val floatApproximation: Boolean = false) :
     }
 
     override fun onExactSolution(rendered: String, objective: BigFraction) {
+        print(rendered)
+    }
+
+    override fun onArithmeticIncumbent(rendered: String, objective: SourceValue) {
+        println("% objective=${arithmeticObjectiveText(objective)}")
         print(rendered)
     }
 

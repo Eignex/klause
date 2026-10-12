@@ -6,6 +6,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
@@ -15,8 +16,8 @@ import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
@@ -309,15 +310,18 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
     override val objectivePrefix: String = "; objective="
 
     override fun begin(optimize: Boolean, maximize: Boolean) {
+        super.begin(optimize, maximize)
         this.optimize = optimize
         quadraticResult = null
     }
 
     override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
         quadraticResult = result
-        best = rendered
-        (result as? QuadraticOptimizationResult.WithIncumbent)?.let {
-            println("; objective=${smtAlgebraicValue(it.incumbent.value)}")
+        if (rendered != null) {
+            best = rendered
+            (result as? QuadraticOptimizationResult.WithIncumbent)?.let {
+                println("; objective=${smtAlgebraicValue(it.incumbent.value)}")
+            }
         }
         val bound = when (result) {
             is QuadraticOptimizationResult.Optimal -> result.bound
@@ -333,6 +337,12 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
             println("; objectiveBoundStrict=${it.strict}")
         }
     }
+
+    override fun formatArithmeticObjective(objective: SourceValue): String =
+        when (objective) {
+            is SourceValue.Algebraic -> smtAlgebraicValue(objective.value)
+            else -> arithmeticObjectiveText(objective)
+        }
 
     override fun completionMetadata(verdict: Verdict): String? {
         if (!optimize) return null

@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.SolveStats
 
 /**
@@ -13,6 +14,7 @@ import com.eignex.klause.solver.result.SolveStats
  */
 internal abstract class BufferedBestOutput : OutputProtocol {
     protected var best: String? = null
+    private var emittedArithmeticWitness: String? = null
 
     /** Comment-line prefix for the statistics block (e.g. `;`, `c`). */
     protected abstract val commentPrefix: String
@@ -55,6 +57,12 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     protected open fun verdictReason(verdict: Verdict): String? =
         if (verdict == Verdict.UNKNOWN) context.softVerdictCause() else null
 
+    override fun begin(optimize: Boolean, maximize: Boolean) {
+        best = null
+        emittedArithmeticWitness = null
+        context = VerdictContext()
+    }
+
     final override fun onVerdictContext(context: VerdictContext) {
         this.context = context
     }
@@ -79,6 +87,17 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         if (streamObjective) println("$objectivePrefix${formatExactObjective(objective)}")
     }
 
+    protected open fun formatArithmeticObjective(objective: SourceValue): String = arithmeticObjectiveText(objective)
+
+    final override fun onArithmeticIncumbent(rendered: String, objective: SourceValue) {
+        if (!acceptsSourceWitness()) return
+        val value = formatArithmeticObjective(objective)
+        best = rendered
+        if (streamObjective) println("$objectivePrefix$value")
+        println(rendered)
+        emittedArithmeticWitness = rendered
+    }
+
     final override fun onComplete(verdict: Verdict) {
         println(statusLine(verdict))
         completionMetadata(verdict)?.let { println("$commentPrefix $it") }
@@ -87,7 +106,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         verdictReason(verdict)?.let { println("$commentPrefix $it") }
         // The buffered model follows a feasible verdict only; UNSAT / UNKNOWN print the status alone.
         if (verdict in FEASIBLE_VERDICTS) {
-            best?.let { println(it) }
+            best?.takeUnless { it == emittedArithmeticWitness }?.let { println(it) }
         }
     }
 
