@@ -9315,6 +9315,11 @@ public final class com/eignex/klause/solver/evidence/LinearSourceSemanticsChecke
 	public fun witness (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
 }
 
+public final class com/eignex/klause/solver/evidence/PreparedSourceEvidenceKt {
+	public static final fun sourceResultCapture (Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Lcom/eignex/klause/solver/evidence/SourceRevision;Lcom/eignex/klause/propagation/Assumptions;Ljava/lang/String;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceResultCapture;
+	public static synthetic fun sourceResultCapture$default (Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Lcom/eignex/klause/solver/evidence/SourceRevision;Lcom/eignex/klause/propagation/Assumptions;Ljava/lang/String;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceResultCapture;
+}
+
 public final class com/eignex/klause/solver/evidence/ProblemSourceEvidenceKt {
 	public static final fun sourceCondition (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/evidence/SourceCondition;
 	public static final fun sourceProofContext (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceProofContext;
