@@ -50,13 +50,27 @@ internal class TranscendentalRelaxationModel(
         return when (source) {
             is TranscendentalFormula.Constant -> PolynomialRealFormula.Constant(source.value)
             is TranscendentalFormula.BooleanVariable -> PolynomialRealFormula.BooleanVariable(source.id)
-            is TranscendentalFormula.Atom -> relation(
-                expression(source.left, guard).first, source.relation, expression(source.right, guard).first,
-            )
+            is TranscendentalFormula.Atom -> atom(source, guard)
             is TranscendentalFormula.Not -> not(boolean(source.operand, guard))
             is TranscendentalFormula.And -> and(source.operands.map { boolean(it, guard) })
             is TranscendentalFormula.Or -> or(source.operands.map { boolean(it, guard) })
         }
+    }
+
+    private fun atom(source: TranscendentalFormula.Atom, guard: PolynomialRealFormula): PolynomialRealFormula {
+        val left = source.left as? TranscendentalExpression.Function
+        val right = source.right as? TranscendentalExpression.Function
+        val monotone = left?.function in setOf(TranscendentalFunction.EXP, TranscendentalFunction.LOG)
+        if (left != null && right != null && monotone && left.function == right.function) {
+            val first = expression(left.argument, guard).first
+            val second = expression(right.argument, guard).first
+            if (left.function == TranscendentalFunction.LOG) {
+                enforce(guard, relation(first, PolynomialRelation.GT, constant(BigFraction.ZERO)))
+                enforce(guard, relation(second, PolynomialRelation.GT, constant(BigFraction.ZERO)))
+            }
+            return relation(first, source.relation, second)
+        }
+        return relation(expression(source.left, guard).first, source.relation, expression(source.right, guard).first)
     }
 
     private fun expression(

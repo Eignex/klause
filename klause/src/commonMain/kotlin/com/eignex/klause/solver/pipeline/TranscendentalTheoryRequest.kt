@@ -214,9 +214,11 @@ private class TranscendentalInvocation(
             }
             return result
         }
-        val scoped = TranscendentalCondition(PolynomialCondition(condition.bools + pins.bools,
-            intersection(condition.lower, pins.lower, true), intersection(condition.upper, pins.upper, false)),
-            root.lowerStrict, root.upperStrict)
+        val lower = intersection(condition.lower, pins.lower, true)
+        val upper = intersection(condition.upper, pins.upper, false)
+        val scoped = TranscendentalCondition(PolynomialCondition(condition.bools + pins.bools, lower, upper),
+            root.lowerStrict.filter { lower[it] == pins.lower[it] }.toSet(),
+            root.upperStrict.filter { upper[it] == pins.upper[it] }.toSet())
         return when (val result = service.check(scoped, cancellation)) {
             is TranscendentalCheckResult.Witness -> ExactNeighborhoodResult.Witness(capture(result.value))
             TranscendentalCheckResult.Refuted -> ExactNeighborhoodResult.Refuted

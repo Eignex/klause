@@ -6,6 +6,19 @@
 // - Show declarations: true
 
 // Library unique name: <com.eignex:klause>
+final enum class com.eignex.klause.arithmetic.real/ExactRealFunction : kotlin/Enum<com.eignex.klause.arithmetic.real/ExactRealFunction> { // com.eignex.klause.arithmetic.real/ExactRealFunction|null[0]
+    enum entry COS // com.eignex.klause.arithmetic.real/ExactRealFunction.COS|null[0]
+    enum entry EXP // com.eignex.klause.arithmetic.real/ExactRealFunction.EXP|null[0]
+    enum entry LOG // com.eignex.klause.arithmetic.real/ExactRealFunction.LOG|null[0]
+    enum entry SIN // com.eignex.klause.arithmetic.real/ExactRealFunction.SIN|null[0]
+
+    final val entries // com.eignex.klause.arithmetic.real/ExactRealFunction.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.arithmetic.real/ExactRealFunction> // com.eignex.klause.arithmetic.real/ExactRealFunction.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.arithmetic.real/ExactRealFunction // com.eignex.klause.arithmetic.real/ExactRealFunction.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.arithmetic.real/ExactRealFunction> // com.eignex.klause.arithmetic.real/ExactRealFunction.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.backtrack/TierVarSelect : kotlin/Enum<com.eignex.klause.backtrack/TierVarSelect> { // com.eignex.klause.backtrack/TierVarSelect|null[0]
     enum entry InputOrder // com.eignex.klause.backtrack/TierVarSelect.InputOrder|null[0]
     enum entry LargestDomain // com.eignex.klause.backtrack/TierVarSelect.LargestDomain|null[0]
@@ -1616,6 +1629,67 @@ sealed interface <#A: out kotlin/Any?> com.eignex.klause.theory/TheoryCheck { //
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryCheck.Cancelled.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryCheck.Cancelled.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryCheck.Cancelled.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression|null[0]
+    final class Algebraic : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic|null[0]
+        constructor <init>(com.eignex.klause.arithmetic.polynomial/AlgebraicReal) // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.<init>|<init>(com.eignex.klause.arithmetic.polynomial.AlgebraicReal){}[0]
+
+        final val value // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.value|{}value[0]
+            final fun <get-value>(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.arithmetic.polynomial/AlgebraicReal = ...): com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.copy|copy(com.eignex.klause.arithmetic.polynomial.AlgebraicReal){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.arithmetic.real/ExactRealExpression.Algebraic.toString|toString(){}[0]
+    }
+
+    final class Function : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Function|null[0]
+        constructor <init>(com.eignex.klause.arithmetic.real/ExactRealFunction, com.eignex.klause.arithmetic.real/ExactRealExpression) // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.<init>|<init>(com.eignex.klause.arithmetic.real.ExactRealFunction;com.eignex.klause.arithmetic.real.ExactRealExpression){}[0]
+
+        final val argument // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.argument|{}argument[0]
+            final fun <get-argument>(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.argument.<get-argument>|<get-argument>(){}[0]
+        final val function // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.function|{}function[0]
+            final fun <get-function>(): com.eignex.klause.arithmetic.real/ExactRealFunction // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.function.<get-function>|<get-function>(){}[0]
+
+        final fun component1(): com.eignex.klause.arithmetic.real/ExactRealFunction // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.arithmetic.real/ExactRealFunction = ..., com.eignex.klause.arithmetic.real/ExactRealExpression = ...): com.eignex.klause.arithmetic.real/ExactRealExpression.Function // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.copy|copy(com.eignex.klause.arithmetic.real.ExactRealFunction;com.eignex.klause.arithmetic.real.ExactRealExpression){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.arithmetic.real/ExactRealExpression.Function.toString|toString(){}[0]
+    }
+
+    final class Power : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Power|null[0]
+        final val base // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.base|{}base[0]
+            final fun <get-base>(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.base.<get-base>|<get-base>(){}[0]
+        final val exponent // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.exponent|{}exponent[0]
+            final fun <get-exponent>(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.exponent.<get-exponent>|<get-exponent>(){}[0]
+
+        final fun component1(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.component1|component1(){}[0]
+        final fun component2(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.arithmetic.real/ExactRealExpression = ..., kotlin/Int = ...): com.eignex.klause.arithmetic.real/ExactRealExpression.Power // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.copy|copy(com.eignex.klause.arithmetic.real.ExactRealExpression;kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.arithmetic.real/ExactRealExpression.Power.toString|toString(){}[0]
+    }
+
+    final class Product : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Product|null[0]
+        final val operands // com.eignex.klause.arithmetic.real/ExactRealExpression.Product.operands|{}operands[0]
+            final fun <get-operands>(): kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealExpression> // com.eignex.klause.arithmetic.real/ExactRealExpression.Product.operands.<get-operands>|<get-operands>(){}[0]
+    }
+
+    final class Sum : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Sum|null[0]
+        final val operands // com.eignex.klause.arithmetic.real/ExactRealExpression.Sum.operands|{}operands[0]
+            final fun <get-operands>(): kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealExpression> // com.eignex.klause.arithmetic.real/ExactRealExpression.Sum.operands.<get-operands>|<get-operands>(){}[0]
+    }
+
+    final object Pi : com.eignex.klause.arithmetic.real/ExactRealExpression { // com.eignex.klause.arithmetic.real/ExactRealExpression.Pi|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.arithmetic.real/ExactRealExpression.Pi.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.arithmetic.real/ExactRealExpression.Pi.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.arithmetic.real/ExactRealExpression.Pi.toString|toString(){}[0]
     }
 }
 
@@ -4467,6 +4541,15 @@ final class com.eignex.klause.arithmetic.polynomial/AlgebraicReal { // com.eigne
         final fun <get-upperBound>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.upperBound.<get-upperBound>|<get-upperBound>(){}[0]
 }
 
+final class com.eignex.klause.arithmetic.real/ExactRealValue { // com.eignex.klause.arithmetic.real/ExactRealValue|null[0]
+    final val algebraic // com.eignex.klause.arithmetic.real/ExactRealValue.algebraic|{}algebraic[0]
+        final fun <get-algebraic>(): com.eignex.klause.arithmetic.polynomial/AlgebraicReal? // com.eignex.klause.arithmetic.real/ExactRealValue.algebraic.<get-algebraic>|<get-algebraic>(){}[0]
+    final val expression // com.eignex.klause.arithmetic.real/ExactRealValue.expression|{}expression[0]
+        final fun <get-expression>(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealValue.expression.<get-expression>|<get-expression>(){}[0]
+    final val rational // com.eignex.klause.arithmetic.real/ExactRealValue.rational|{}rational[0]
+        final fun <get-rational>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.arithmetic.real/ExactRealValue.rational.<get-rational>|<get-rational>(){}[0]
+}
+
 final class com.eignex.klause.backtrack.selector/Chb : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/Chb|null[0]
     constructor <init>(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...) // com.eignex.klause.backtrack.selector/Chb.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
 
@@ -6957,6 +7040,15 @@ final class com.eignex.klause.ir/TaggedLinearRow : com.eignex.klause.ir/LinearRo
         final fun <get-size>(): kotlin/Int // com.eignex.klause.ir/TaggedLinearRow.size.<get-size>|<get-size>(){}[0]
 
     final fun ref(kotlin/Int): kotlin/Int // com.eignex.klause.ir/TaggedLinearRow.ref|ref(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.ir/TranscendentalProblem { // com.eignex.klause.ir/TranscendentalProblem|null[0]
+    final val boolVarNames // com.eignex.klause.ir/TranscendentalProblem.boolVarNames|{}boolVarNames[0]
+        final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
+    final val intVarNames // com.eignex.klause.ir/TranscendentalProblem.intVarNames|{}intVarNames[0]
+        final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
+    final val realVarNames // com.eignex.klause.ir/TranscendentalProblem.realVarNames|{}realVarNames[0]
+        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
 }
 
 final class com.eignex.klause.ir/UnitConsts : com.eignex.klause.ir/LongConstList { // com.eignex.klause.ir/UnitConsts|null[0]

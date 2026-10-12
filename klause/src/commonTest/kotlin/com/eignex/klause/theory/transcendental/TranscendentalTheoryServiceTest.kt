@@ -97,6 +97,21 @@ class TranscendentalTheoryServiceTest {
         assertEquals(TranscendentalCheckResult.Unknown, result)
     }
 
+    @Test
+    fun `exponential ordering retains a complete monotonic refutation`() {
+        val x = TranscendentalExpression.Variable(SourceRealId(0))
+        val y = TranscendentalExpression.Variable(SourceRealId(1))
+        val expX = TranscendentalExpression.Function(TranscendentalFunction.EXP, x)
+        val expY = TranscendentalExpression.Function(TranscendentalFunction.EXP, y)
+        val source = TranscendentalProblem(TranscendentalFormula.And(listOf(
+            atom(x, PolynomialRelation.LE, y), atom(expX, PolynomialRelation.GT, expY),
+        )), emptyMap(), mapOf("x" to 0, "y" to 1), emptyMap())
+
+        val result = TranscendentalTheoryService(source).check()
+
+        assertEquals(TranscendentalCheckResult.Refuted, result)
+    }
+
     private fun atom(
         left: TranscendentalExpression,
         relation: PolynomialRelation,
