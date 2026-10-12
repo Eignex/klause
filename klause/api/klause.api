@@ -2683,6 +2683,21 @@ public final class com/eignex/klause/formats/smtlib/SmtLibInput$Polynomial : com
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/formats/smtlib/SmtLibInput$Quadratic : com/eignex/klause/formats/smtlib/SmtLibInput {
+	public fun <init> (Lcom/eignex/klause/formats/smtlib/SmtLibInput;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/ir/ObjectiveSense;)V
+	public final fun component1 ()Lcom/eignex/klause/formats/smtlib/SmtLibInput;
+	public final fun component2 ()Lcom/eignex/klause/ir/QuadraticObjectiveSpec;
+	public final fun component3 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun copy (Lcom/eignex/klause/formats/smtlib/SmtLibInput;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/formats/smtlib/SmtLibInput$Quadratic;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtLibInput$Quadratic;Lcom/eignex/klause/formats/smtlib/SmtLibInput;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibInput$Quadratic;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getObjective ()Lcom/eignex/klause/ir/QuadraticObjectiveSpec;
+	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun getSource ()Lcom/eignex/klause/formats/smtlib/SmtLibInput;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/formats/smtlib/SmtLibProblem {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
