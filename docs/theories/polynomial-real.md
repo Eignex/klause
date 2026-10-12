@@ -36,9 +36,10 @@ binary rational values. Equal finite real bounds remain source equations and are
 substituted before projection, retaining their exact coordinate in captured models.
 `Problem.pipelineRoute()` consumes the same prepared plan for polynomial, finite
 and linear route construction. Polynomial requests and quadratic execution resolve
-the captured completion data from that plan. Open integer declarations and continuous
-linear objectives carry explicit preparation declines; they are not boxed or discretized.
-Exact quadratic objectives retain their separate objective contract.
+the captured completion data from that plan. Open integer declarations carry explicit
+preparation declines; they are not boxed. Source ownership is selected without the
+objective, then the original objective and direction are bound to the same plan.
+Affine continuous costs use the existing exact quadratic executor without discretization.
 
 Backtracking checks interval relaxations and fixed finite branches. Local search
 generates candidates from finite factors, rechecks their pinned finite fixpoint, then
@@ -65,10 +66,12 @@ proof admission. The separate quadratic overload handles continuous quadratic
 objectives; all-solution enumeration remains outside these interfaces. [Search](../solver/search.md), [local search](../solver/local-search.md),
 [portfolio](../solver/portfolio.md) and [sessions](../solver/sessions.md) own their execution lifecycles.
 
-The real-cost restriction on `LinearObjective` also rejects objectives that the
-quadratic overload accepts as affine terms. This admission mismatch is tracked in
-[#2655](https://github.com/Eignex/klause/issues/2655), rather than defining a permanent
-objective boundary between search strategies.
+`OpenTheoryPipeline.optimize` normalizes affine `LinearObjective` values losslessly
+and returns the precise quadratic result surface. It retains the original caller
+objective and source snapshot in an immutable operation request. The finite-result
+`minimize(LinearObjective)` surface retains its discrete-objective contract.
+Source frontend optimization uses the exact publisher, including strict limits,
+source-direction bounds and algebraic objective values.
 
 The sequential mixed pool shares one finite projection and immutable polynomial
 source scope across complete backtracking, finite local search and ALNS

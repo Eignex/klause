@@ -8,10 +8,14 @@ import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.skema.SchemaDef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertIs
+import kotlin.test.assertSame
 
 class CompiledAffineObjectiveTest {
     @Test
@@ -25,7 +29,10 @@ class CompiledAffineObjectiveTest {
         val objective = source.minimize(y)
 
         val exact = objective.toQuadraticObjectiveSpec()
+        val route = assertIs<SourceProblemRoute.PolynomialTheory>(source.problem.pipelineRoute(objective))
 
+        assertSame(objective, route.objective)
+        assertSame(objective, route.preparedPlan.objective)
         assertEquals(QuadraticVariable.Real(assertNotNull(source.sourceRealId(y))), exact.terms.single().first)
     }
 }
