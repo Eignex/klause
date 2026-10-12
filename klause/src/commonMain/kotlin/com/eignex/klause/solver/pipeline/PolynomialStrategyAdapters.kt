@@ -69,10 +69,12 @@ internal class PolynomialStrategyAdapters(
         val point = fixed ?: return null
         val adapter = PolynomialExactNeighborhood(model, invocation, finite, point, params.assumptions, objective)
         return exactNeighborhoodWorker(if (adaptive) "alns+exact-nra-neighborhood" else "ls+exact-nra-neighborhood",
-            if (adaptive) 2 else 1, objective, cancellation,
-            exhausted = { cancellation() }, open = { adapter.search(adaptive, params.localSearch.randomSeed ?: 0, 
-                params.localSearch.maxFlips, params.localSearch.maxInstructions ?: Long.MAX_VALUE,
-                if (adaptive) params.alnsIterations.toLong() else null) }).bindEvidence(identity, provesResults = false)
+            if (adaptive) 2 else 1, objective, cancellation or params.localSearch.cancellation,
+            exhausted = { cancellation() }, open = {
+                adapter.search(adaptive, params.localSearch.randomSeed ?: 0,
+                    params.localSearch.maxFlips, params.localSearch.maxInstructions ?: Long.MAX_VALUE,
+                    if (adaptive) params.alnsIterations.toLong() else null, params.localSearch.nodeBudget)
+            }).bindEvidence(identity, provesResults = false)
     }
 
     private fun certified(sample: Sample): Sample = sample.also {
