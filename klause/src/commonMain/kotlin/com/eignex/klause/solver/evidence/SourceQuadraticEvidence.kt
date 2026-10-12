@@ -14,9 +14,6 @@ import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.intervalBounds
 import com.eignex.klause.util.Cancellation
 
-/** Bound a quadratic source objective over its original declarations and invocation intervals. */
-data object SourceQuadraticBoxDerivation : SourceDerivation.Extension
-
 /** Bind exact quadratic objective checks to an original IR source, without inventing an affine objective. */
 fun Problem.quadraticSourceProofContext(
     scope: SourceScope,
@@ -47,7 +44,7 @@ fun Problem.quadraticSourceProofContext(
         ): SourceEvidenceCheck = checkedQuadratic(cancellation) { arithmetic ->
             val checked = witness(sample, scope, cancellation)
             if (checked != SourceEvidenceCheck.Checked) return@checkedQuadratic checked
-            val expected = exactQuadraticValue(value, arithmetic) ?: return@checkedQuadratic unavailableQuadratic(
+            val expected = quadraticValue(value, arithmetic) ?: return@checkedQuadratic unavailableQuadratic(
                 "quadratic source value has no exact algebraic checker",
             )
             val actual = objective.evaluateExact(sample, arithmetic)
@@ -102,7 +99,7 @@ fun Problem.quadraticSourceProofContext(
                 }
                 val bounds = objective.intervalBounds(::range, arithmetic.arithmetic::step)
                     ?: return@checkedQuadratic unavailableQuadratic("quadratic source intervals are open")
-                val value = exactQuadraticValue(claim.value, arithmetic) ?: return@checkedQuadratic unavailableQuadratic(
+                val value = quadraticValue(claim.value, arithmetic) ?: return@checkedQuadratic unavailableQuadratic(
                     "quadratic source bound has no exact algebraic checker",
                 )
                 val bound = if (scope.objective?.sense == ObjectiveSense.MINIMIZE) bounds.first else bounds.second
@@ -117,7 +114,7 @@ fun Problem.quadraticSourceProofContext(
     return SourceProofContext(scope, base.coordinates, base.premises, semanticsChecker = checker)
 }
 
-private fun exactQuadraticValue(value: SourceValue, arithmetic: AlgebraicArithmetic) = when (value) {
+private fun quadraticValue(value: SourceValue, arithmetic: AlgebraicArithmetic) = when (value) {
     is SourceValue.Rational -> arithmetic.rational(value.value)
     is SourceValue.Algebraic -> value.value
     is SourceValue.Extension -> null

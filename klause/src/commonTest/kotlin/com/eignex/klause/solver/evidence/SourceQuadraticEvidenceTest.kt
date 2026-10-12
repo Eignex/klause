@@ -95,9 +95,30 @@ class SourceQuadraticEvidenceTest {
     fun `a scoped quadratic attestation cannot be used for another invocation`() {
         val context = assertNotNull(model.quadraticSourceProofContext(scope, objective))
         val foreign = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
-        val certificate = QuadraticCertificate.attested(ModelIdentity.of(model, objective), foreign, QuadraticClaim.Bound)
+        val identity = ModelIdentity.of(model, objective)
+        val certificate = QuadraticCertificate.attested(identity, foreign, QuadraticClaim.Bound)
 
         assertIs<SourceEvidenceCheck.Rejected>(certificate.verify(SourceClaim.Bound(BigFraction.ZERO), context))
+    }
+
+
+    @Test
+    fun `quadratic capture cannot rebind a conditional completion to a weaker source scope`() {
+        val context = assertNotNull(model.quadraticSourceProofContext(scope, objective))
+        val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val conditional = scope.copy(condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE)))
+        val one = AlgebraicArithmetic().rational(BigFraction.ONE)
+        val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(1)), one)
+        val identity = ModelIdentity.of(model, objective)
+        val boundCertificate = QuadraticCertificate.attested(identity, conditional, QuadraticClaim.Bound)
+        val terminal = QuadraticCertificate.attested(identity, conditional, QuadraticClaim.Optimal)
+        val result = QuadraticOptimizationResult.Optimal(point, QuadraticObjectiveBound(one, false, boundCertificate),
+            terminal, ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+
+        val captured = SourceResultCapture(context).quadratic(result, "fixture-engine")
+
+        assertEquals(result, captured)
+        assertIs<SourceEvidenceCheck.Rejected>(captured.verifySourceEvidence(context))
     }
 
 }
