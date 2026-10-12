@@ -48,6 +48,14 @@ atoms must exist before first-UIP learning. Boolean atom names belong to one imm
 source root; changing root meaning requires a fresh session. Unnameable conflicts remain
 chronological and unexplained.
 
+Exact affine optimization contexts use the same session and chronological frame
+stack. Their model-facing authority component records Boolean and integer coverage
+alongside checked source bounds or refutations. Resolving one optimized node prunes
+that node without issuing a learned clause. Only a complete coverage tree can prove
+a global optimum or limit; a checked source ray can finish existentially. A slice
+pause preserves the current node and pending alternatives. See
+[linear certification](../lp/certification.md#refinement-and-strict-inequalities).
+
 Complete assignments use source-keyed values from each owner. CP-learned Boolean clauses
 remain natively owned by CP while their shared consequences reach theory peers. The
 shared store does not duplicate the CP pin.

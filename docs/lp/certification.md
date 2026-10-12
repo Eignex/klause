@@ -151,6 +151,22 @@ The adapter's bounded numerical owners share one source operation budget through
 closure, feasibility and dual reconstruction. Production traversal and result
 publication retain their separate admission contracts.
 
+`OpenTheoryPipeline.optimizeLinear` executes a complete exact affine context with
+the existing shared search session. Boolean and integer alternatives retain typed
+coverage trees. A branch optimum or limit only becomes a global result after all
+required alternatives have checked bounds or refutations. An improving source ray
+is existential and can finish without covering siblings. An interrupted traversal
+retains its checked incumbent and any independently proved global bound; an isolated
+branch bound cannot fill that global field.
+
+`LinearOptimizationResult` carries the original scope, typed terminal evidence,
+incumbent and global bound separately. Its public derivations retain Boolean
+substitution, source combinations and approach coordinates. The approach base can
+differ from the best incumbent; its Boolean and integer coordinates stay fixed along
+`endpoint + t * (base - endpoint)` for rational `0 < t <= 1`. Accepted callbacks
+carry original-direction rational values and never publish closure endpoints.
+Callback failure retracts and closes the invocation before propagating.
+
 ## Tolerance recovery
 
 MPS finite-leaf tolerance recovery can obtain exact dyadic basis duals to justify
