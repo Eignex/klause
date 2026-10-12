@@ -25,6 +25,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.toLongExact
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.ceil
 import kotlin.random.Random
 
@@ -56,6 +57,7 @@ internal class QuadraticStrategyAdapters(
     private var limitAttained = false
     private val branchProofs = mutableListOf<Any>()
     private var incomplete = false
+    private var interrupted = false
     private var repairPoint: QuadraticIncumbent? = null
     private var rootBound: QuadraticObjectiveBound? = null
     private val repairCompletion = ExactNeighborhoodCompletion { condition, cancellation ->
@@ -79,6 +81,9 @@ internal class QuadraticStrategyAdapters(
             FiniteEngine.FIXED, FiniteEngine.BACKTRACK -> complete()
         }
     } catch (_: PolynomialInterrupted) {
+        partial()
+    } catch (_: CancellationException) {
+        interrupted = true
         partial()
     } finally {
         sink.stop()
@@ -178,7 +183,7 @@ internal class QuadraticStrategyAdapters(
         val worker = if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
             params.strategy.localSearch.cancellation
         } else params.strategy.backtrack.cancellation
-        val reason = if (!native.stopped && worker()) TerminationReason.Cancelled else native.reason()
+        val reason = if (!native.stopped && (interrupted || worker())) TerminationReason.Cancelled else native.reason()
         return incumbent?.let {
             QuadraticOptimizationResult.BestFound(it, rootBound, reason, sense, sink.snapshot())
         } ?: QuadraticOptimizationResult.Unknown(rootBound, reason, sense, sink.snapshot())
