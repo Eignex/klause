@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntBounds
@@ -78,8 +77,7 @@ fun MpsModel.toExactSourceProblem(settings: ProblemSettings = KlauseConfig.curre
             val value = bound.finiteMps()?.fraction ?: return
             if (row.indicator == null && coefficients.all { it.isZero }) {
                 val holds = if (relation == LinearOp.GE) BigFraction.ZERO >= value else BigFraction.ZERO <= value
-                if (!holds) factors += Clause(IntArray(0))
-                return
+                if (holds) return
             }
             val comparison = exactSourceRow(refs, coefficients, relation, value)
             val indicator = row.indicator
