@@ -96,6 +96,7 @@ internal enum class FactorKind {
     COMPARISON_CLAUSE,
     DIFFERENCE_SYSTEM,
     CONTINUOUS_PRODUCT,
+    EXACT_SEARCH_ROW,
 }
 
 // Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a
