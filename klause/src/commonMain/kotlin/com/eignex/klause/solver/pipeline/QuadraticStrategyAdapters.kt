@@ -19,6 +19,7 @@ import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticObjectiveBound
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.PolynomialCondition
@@ -86,11 +87,13 @@ internal class QuadraticStrategyAdapters(
     private fun better(left: AlgebraicReal, right: AlgebraicReal): Boolean =
         completion.algebraic.compare(left, right).let { if (sense == ObjectiveSense.MINIMIZE) it < 0 else it > 0 }
 
-    private fun accept(candidate: QuadraticIncumbent) {
+    private fun accept(candidate: QuadraticIncumbent, heuristic: Boolean = false) {
         if (incumbent == null || better(candidate.value, requireNotNull(incumbent).value)) {
             incumbent = candidate
             val approximate = candidate.value.rational?.toDouble() ?: Double.NaN
             sink.ls.recordIncumbent(approximate, 0.0, sink.elapsedMs())
+            val listener = if (heuristic) params.strategy.localSearch.onEvent else params.strategy.backtrack.onEvent
+            listener?.invoke(SearchEvent.Incumbent(approximate))
         }
     }
 
@@ -259,7 +262,7 @@ internal class QuadraticStrategyAdapters(
             val improved = found?.let { candidate ->
                 incumbent == null || better(candidate.value, requireNotNull(incumbent).value)
             } == true
-            found?.let(::accept)
+            found?.let { accept(it, heuristic = true) }
             sink.ls.recordCompletion(refuted, found == null && !refuted)
             if (improved) radius = BigFraction.ONE else { radius += radius; stalls++ }
             if (adaptive) weights[operator] = weights[operator] * 0.8 + if (improved) 1.0 else 0.2
