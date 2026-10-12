@@ -3310,6 +3310,8 @@ sealed interface com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.e
 sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.klause.solver.result/MinimizeResult|null[0]
     abstract val assignment // com.eignex.klause.solver.result/MinimizeResult.assignment|{}assignment[0]
         abstract fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/MinimizeResult.assignment.<get-assignment>|<get-assignment>(){}[0]
+    abstract val evidence // com.eignex.klause.solver.result/MinimizeResult.evidence|{}evidence[0]
+        abstract fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.evidence.<get-evidence>|<get-evidence>(){}[0]
     abstract val objectiveValue // com.eignex.klause.solver.result/MinimizeResult.objectiveValue|{}objectiveValue[0]
         abstract fun <get-objectiveValue>(): kotlin/Double? // com.eignex.klause.solver.result/MinimizeResult.objectiveValue.<get-objectiveValue>|<get-objectiveValue>(){}[0]
     abstract val stats // com.eignex.klause.solver.result/MinimizeResult.stats|{}stats[0]
@@ -3327,8 +3329,10 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
     }
 
     final class BestFound : com.eignex.klause.solver.result/MinimizeResult.WithSample { // com.eignex.klause.solver.result/MinimizeResult.BestFound|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.solver.result/MinimizeResult.BestFound.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.BestFound.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
 
+        final val evidence // com.eignex.klause.solver.result/MinimizeResult.BestFound.evidence|{}evidence[0]
+            final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.BestFound.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val objective // com.eignex.klause.solver.result/MinimizeResult.BestFound.objective|{}objective[0]
             final fun <get-objective>(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.BestFound.objective.<get-objective>|<get-objective>(){}[0]
         final val reason // com.eignex.klause.solver.result/MinimizeResult.BestFound.reason|{}reason[0]
@@ -3342,19 +3346,22 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
         final fun component2(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.BestFound.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/MinimizeResult.BestFound.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.BestFound.component4|component4(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/MinimizeResult.BestFound // com.eignex.klause.solver.result/MinimizeResult.BestFound.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component5(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.BestFound.component5|component5(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.BestFound // com.eignex.klause.solver.result/MinimizeResult.BestFound.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.BestFound.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.BestFound.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.BestFound.toString|toString(){}[0]
     }
 
     final class Infeasible : com.eignex.klause.solver.result/MinimizeResult { // com.eignex.klause.solver.result/MinimizeResult.Infeasible|null[0]
-        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.solver.result/MinimizeResult.Infeasible.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.Infeasible.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
 
         final val assignment // com.eignex.klause.solver.result/MinimizeResult.Infeasible.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.assignment.<get-assignment>|<get-assignment>(){}[0]
         final val core // com.eignex.klause.solver.result/MinimizeResult.Infeasible.core|{}core[0]
             final fun <get-core>(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.core.<get-core>|<get-core>(){}[0]
+        final val evidence // com.eignex.klause.solver.result/MinimizeResult.Infeasible.evidence|{}evidence[0]
+            final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val objectiveValue // com.eignex.klause.solver.result/MinimizeResult.Infeasible.objectiveValue|{}objectiveValue[0]
             final fun <get-objectiveValue>(): kotlin/Double? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.objectiveValue.<get-objectiveValue>|<get-objectiveValue>(){}[0]
         final val stats // com.eignex.klause.solver.result/MinimizeResult.Infeasible.stats|{}stats[0]
@@ -3362,15 +3369,18 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
 
         final fun component1(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Infeasible.component2|component2(){}[0]
-        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/MinimizeResult.Infeasible // com.eignex.klause.solver.result/MinimizeResult.Infeasible.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component3(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Infeasible.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.Infeasible // com.eignex.klause.solver.result/MinimizeResult.Infeasible.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Infeasible.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Infeasible.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Infeasible.toString|toString(){}[0]
     }
 
     final class Optimal : com.eignex.klause.solver.result/MinimizeResult.WithSample { // com.eignex.klause.solver.result/MinimizeResult.Optimal|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.solver.result/MinimizeResult.Optimal.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.Optimal.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
 
+        final val evidence // com.eignex.klause.solver.result/MinimizeResult.Optimal.evidence|{}evidence[0]
+            final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Optimal.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val objective // com.eignex.klause.solver.result/MinimizeResult.Optimal.objective|{}objective[0]
             final fun <get-objective>(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Optimal.objective.<get-objective>|<get-objective>(){}[0]
         final val sample // com.eignex.klause.solver.result/MinimizeResult.Optimal.sample|{}sample[0]
@@ -3381,17 +3391,20 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
         final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/MinimizeResult.Optimal.component1|component1(){}[0]
         final fun component2(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Optimal.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Optimal.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/MinimizeResult.Optimal // com.eignex.klause.solver.result/MinimizeResult.Optimal.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component4(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Optimal.component4|component4(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.Optimal // com.eignex.klause.solver.result/MinimizeResult.Optimal.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Optimal.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Optimal.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Optimal.toString|toString(){}[0]
     }
 
     final class Unbounded : com.eignex.klause.solver.result/MinimizeResult.WithSample { // com.eignex.klause.solver.result/MinimizeResult.Unbounded|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.solver.result/MinimizeResult.Unbounded.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.Unbounded.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
 
         final val direction // com.eignex.klause.solver.result/MinimizeResult.Unbounded.direction|{}direction[0]
             final fun <get-direction>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.direction.<get-direction>|<get-direction>(){}[0]
+        final val evidence // com.eignex.klause.solver.result/MinimizeResult.Unbounded.evidence|{}evidence[0]
+            final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Unbounded.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val objective // com.eignex.klause.solver.result/MinimizeResult.Unbounded.objective|{}objective[0]
             final fun <get-objective>(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Unbounded.objective.<get-objective>|<get-objective>(){}[0]
         final val sample // com.eignex.klause.solver.result/MinimizeResult.Unbounded.sample|{}sample[0]
@@ -3403,17 +3416,20 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
         final fun component2(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component2|component2(){}[0]
         final fun component3(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component4|component4(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/MinimizeResult.Unbounded // com.eignex.klause.solver.result/MinimizeResult.Unbounded.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component5(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component5|component5(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.Unbounded // com.eignex.klause.solver.result/MinimizeResult.Unbounded.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Unbounded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Unbounded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Unbounded.toString|toString(){}[0]
     }
 
     final class Unknown : com.eignex.klause.solver.result/MinimizeResult { // com.eignex.klause.solver.result/MinimizeResult.Unknown|null[0]
-        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.solver.result/MinimizeResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver.result/MinimizeResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
 
         final val assignment // com.eignex.klause.solver.result/MinimizeResult.Unknown.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/MinimizeResult.Unknown.assignment.<get-assignment>|<get-assignment>(){}[0]
+        final val evidence // com.eignex.klause.solver.result/MinimizeResult.Unknown.evidence|{}evidence[0]
+            final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Unknown.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val objectiveValue // com.eignex.klause.solver.result/MinimizeResult.Unknown.objectiveValue|{}objectiveValue[0]
             final fun <get-objectiveValue>(): kotlin/Double? // com.eignex.klause.solver.result/MinimizeResult.Unknown.objectiveValue.<get-objectiveValue>|<get-objectiveValue>(){}[0]
         final val reason // com.eignex.klause.solver.result/MinimizeResult.Unknown.reason|{}reason[0]
@@ -3423,7 +3439,8 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
 
         final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.result/MinimizeResult.Unknown.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Unknown.component2|component2(){}[0]
-        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.result/MinimizeResult.Unknown // com.eignex.klause.solver.result/MinimizeResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component3(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Unknown.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver.result/MinimizeResult.Unknown // com.eignex.klause.solver.result/MinimizeResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Unknown.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Unknown.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Unknown.toString|toString(){}[0]
@@ -4213,28 +4230,35 @@ sealed interface com.eignex.klause.solver.search/VarRef { // com.eignex.klause.s
 }
 
 sealed interface com.eignex.klause.solver/SolveResult { // com.eignex.klause.solver/SolveResult|null[0]
+    abstract val evidence // com.eignex.klause.solver/SolveResult.evidence|{}evidence[0]
+        abstract fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.evidence.<get-evidence>|<get-evidence>(){}[0]
     abstract val stats // com.eignex.klause.solver/SolveResult.stats|{}stats[0]
         abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.stats.<get-stats>|<get-stats>(){}[0]
 
     final class Sat : com.eignex.klause.solver/SolveResult { // com.eignex.klause.solver/SolveResult.Sat|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.solver/SolveResult.Sat.<init>|<init>(com.eignex.klause.solver.Sample;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver/SolveResult.Sat.<init>|<init>(com.eignex.klause.solver.Sample;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
 
         final val assignment // com.eignex.klause.solver/SolveResult.Sat.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver/SolveResult.Sat.assignment.<get-assignment>|<get-assignment>(){}[0]
+        final val evidence // com.eignex.klause.solver/SolveResult.Sat.evidence|{}evidence[0]
+            final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Sat.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val stats // com.eignex.klause.solver/SolveResult.Sat.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Sat.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver/SolveResult.Sat.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Sat.component2|component2(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver/SolveResult.Sat // com.eignex.klause.solver/SolveResult.Sat.copy|copy(com.eignex.klause.solver.Sample;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component3(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Sat.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver/SolveResult.Sat // com.eignex.klause.solver/SolveResult.Sat.copy|copy(com.eignex.klause.solver.Sample;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/SolveResult.Sat.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver/SolveResult.Sat.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver/SolveResult.Sat.toString|toString(){}[0]
     }
 
     final class Unknown : com.eignex.klause.solver/SolveResult { // com.eignex.klause.solver/SolveResult.Unknown|null[0]
-        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.solver/SolveResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver/SolveResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
 
+        final val evidence // com.eignex.klause.solver/SolveResult.Unknown.evidence|{}evidence[0]
+            final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Unknown.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val reason // com.eignex.klause.solver/SolveResult.Unknown.reason|{}reason[0]
             final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver/SolveResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
         final val stats // com.eignex.klause.solver/SolveResult.Unknown.stats|{}stats[0]
@@ -4242,26 +4266,30 @@ sealed interface com.eignex.klause.solver/SolveResult { // com.eignex.klause.sol
 
         final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver/SolveResult.Unknown.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Unknown.component2|component2(){}[0]
-        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver/SolveResult.Unknown // com.eignex.klause.solver/SolveResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun component3(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Unknown.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver/SolveResult.Unknown // com.eignex.klause.solver/SolveResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/SolveResult.Unknown.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver/SolveResult.Unknown.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver/SolveResult.Unknown.toString|toString(){}[0]
     }
 
     final class Unsat : com.eignex.klause.solver/SolveResult { // com.eignex.klause.solver/SolveResult.Unsat|null[0]
-        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.propagation/Assumptions? = ...) // com.eignex.klause.solver/SolveResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.propagation.Assumptions?){}[0]
+        constructor <init>(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.propagation/Assumptions? = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...) // com.eignex.klause.solver/SolveResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.propagation.Assumptions?;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
 
         final val assumptionCore // com.eignex.klause.solver/SolveResult.Unsat.assumptionCore|{}assumptionCore[0]
             final fun <get-assumptionCore>(): com.eignex.klause.propagation/Assumptions? // com.eignex.klause.solver/SolveResult.Unsat.assumptionCore.<get-assumptionCore>|<get-assumptionCore>(){}[0]
         final val core // com.eignex.klause.solver/SolveResult.Unsat.core|{}core[0]
             final fun <get-core>(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver/SolveResult.Unsat.core.<get-core>|<get-core>(){}[0]
+        final val evidence // com.eignex.klause.solver/SolveResult.Unsat.evidence|{}evidence[0]
+            final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Unsat.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val stats // com.eignex.klause.solver/SolveResult.Unsat.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Unsat.stats.<get-stats>|<get-stats>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.result/UnsatCore? // com.eignex.klause.solver/SolveResult.Unsat.component1|component1(){}[0]
         final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/SolveResult.Unsat.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.propagation/Assumptions? // com.eignex.klause.solver/SolveResult.Unsat.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.propagation/Assumptions? = ...): com.eignex.klause.solver/SolveResult.Unsat // com.eignex.klause.solver/SolveResult.Unsat.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.propagation.Assumptions?){}[0]
+        final fun component4(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver/SolveResult.Unsat.component4|component4(){}[0]
+        final fun copy(com.eignex.klause.solver.result/UnsatCore? = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.propagation/Assumptions? = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ...): com.eignex.klause.solver/SolveResult.Unsat // com.eignex.klause.solver/SolveResult.Unsat.copy|copy(com.eignex.klause.solver.result.UnsatCore?;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.propagation.Assumptions?;com.eignex.klause.solver.evidence.SourceResultEvidence?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/SolveResult.Unsat.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver/SolveResult.Unsat.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver/SolveResult.Unsat.toString|toString(){}[0]
@@ -11388,6 +11416,15 @@ final class com.eignex.klause.solver.evidence/LinearSourceSemanticsChecker : com
     final fun witness(com.eignex.klause.solver/Sample, com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.util/Cancellation): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/LinearSourceSemanticsChecker.witness|witness(com.eignex.klause.solver.Sample;com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.util.Cancellation){}[0]
 }
 
+final class com.eignex.klause.solver.evidence/SourceAffineImage { // com.eignex.klause.solver.evidence/SourceAffineImage|null[0]
+    constructor <init>(kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.solver.evidence/SourceAffineImage.<init>|<init>(kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+
+    final val coefficients // com.eignex.klause.solver.evidence/SourceAffineImage.coefficients|{}coefficients[0]
+        final fun <get-coefficients>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.evidence/SourceAffineImage.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+    final val constant // com.eignex.klause.solver.evidence/SourceAffineImage.constant|{}constant[0]
+        final fun <get-constant>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceAffineImage.constant.<get-constant>|<get-constant>(){}[0]
+}
+
 final class com.eignex.klause.solver.evidence/SourceCondition { // com.eignex.klause.solver.evidence/SourceCondition|null[0]
     constructor <init>(kotlin.collections/Map<kotlin/Int, kotlin/Boolean> = ..., kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> = ...) // com.eignex.klause.solver.evidence/SourceCondition.<init>|<init>(kotlin.collections.Map<kotlin.Int,kotlin.Boolean>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>){}[0]
 
@@ -11525,6 +11562,16 @@ final class com.eignex.klause.solver.evidence/SourceProofContext { // com.eignex
         final fun <get-scope>(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.evidence/SourceProofContext.scope.<get-scope>|<get-scope>(){}[0]
 }
 
+final class com.eignex.klause.solver.evidence/SourceResultCapture { // com.eignex.klause.solver.evidence/SourceResultCapture|null[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceProofContext) // com.eignex.klause.solver.evidence/SourceResultCapture.<init>|<init>(com.eignex.klause.solver.evidence.SourceProofContext){}[0]
+
+    final val context // com.eignex.klause.solver.evidence/SourceResultCapture.context|{}context[0]
+        final fun <get-context>(): com.eignex.klause.solver.evidence/SourceProofContext // com.eignex.klause.solver.evidence/SourceResultCapture.context.<get-context>|<get-context>(){}[0]
+
+    final fun minimize(com.eignex.klause.solver.result/MinimizeResult, com.eignex.klause.solver.objective/LinearObjective, kotlin/String, com.eignex.klause.solver.evidence/SourceDerivation? = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.solver.evidence/SourceResultCapture.minimize|minimize(com.eignex.klause.solver.result.MinimizeResult;com.eignex.klause.solver.objective.LinearObjective;kotlin.String;com.eignex.klause.solver.evidence.SourceDerivation?;com.eignex.klause.util.Cancellation){}[0]
+    final fun solve(com.eignex.klause.solver/SolveResult, kotlin/String, com.eignex.klause.solver.evidence/SourceDerivation? = ...): com.eignex.klause.solver/SolveResult // com.eignex.klause.solver.evidence/SourceResultCapture.solve|solve(com.eignex.klause.solver.SolveResult;kotlin.String;com.eignex.klause.solver.evidence.SourceDerivation?){}[0]
+}
+
 final class com.eignex.klause.solver.evidence/SourceResultEvidence { // com.eignex.klause.solver.evidence/SourceResultEvidence|null[0]
     constructor <init>(com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/List<com.eignex.klause.solver.evidence/SourceEvidence>, kotlin.collections/List<com.eignex.klause.solver.evidence/SourceEngineAttestation> = ...) // com.eignex.klause.solver.evidence/SourceResultEvidence.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.List<com.eignex.klause.solver.evidence.SourceEvidence>;kotlin.collections.List<com.eignex.klause.solver.evidence.SourceEngineAttestation>){}[0]
 
@@ -11571,6 +11618,31 @@ final class com.eignex.klause.solver.evidence/SourceScope { // com.eignex.klause
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.evidence/SourceScope.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.evidence/SourceScope.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.evidence/SourceScope.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.evidence/SourceTransformation { // com.eignex.klause.solver.evidence/SourceTransformation|null[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.solver.evidence/SourceAffineImage>, kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourceDerivation>, com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.solver.evidence/SourceTransformation.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.solver.evidence.SourceAffineImage>;kotlin.collections.Map<kotlin.String,com.eignex.klause.solver.evidence.SourceDerivation>;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.simplex.exact.BigFraction){}[0]
+
+    final val images // com.eignex.klause.solver.evidence/SourceTransformation.images|{}images[0]
+        final fun <get-images>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.solver.evidence/SourceAffineImage> // com.eignex.klause.solver.evidence/SourceTransformation.images.<get-images>|<get-images>(){}[0]
+    final val objectiveOffset // com.eignex.klause.solver.evidence/SourceTransformation.objectiveOffset|{}objectiveOffset[0]
+        final fun <get-objectiveOffset>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceTransformation.objectiveOffset.<get-objectiveOffset>|<get-objectiveOffset>(){}[0]
+    final val objectiveScale // com.eignex.klause.solver.evidence/SourceTransformation.objectiveScale|{}objectiveScale[0]
+        final fun <get-objectiveScale>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceTransformation.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
+    final val premiseDerivations // com.eignex.klause.solver.evidence/SourceTransformation.premiseDerivations|{}premiseDerivations[0]
+        final fun <get-premiseDerivations>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourceDerivation> // com.eignex.klause.solver.evidence/SourceTransformation.premiseDerivations.<get-premiseDerivations>|<get-premiseDerivations>(){}[0]
+    final val source // com.eignex.klause.solver.evidence/SourceTransformation.source|{}source[0]
+        final fun <get-source>(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.evidence/SourceTransformation.source.<get-source>|<get-source>(){}[0]
+    final val target // com.eignex.klause.solver.evidence/SourceTransformation.target|{}target[0]
+        final fun <get-target>(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.evidence/SourceTransformation.target.<get-target>|<get-target>(){}[0]
+}
+
+final class com.eignex.klause.solver.evidence/SourceTransformationVerifier { // com.eignex.klause.solver.evidence/SourceTransformationVerifier|null[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceProofContext, com.eignex.klause.solver.evidence/SourceProofContext, kotlin/Int = ..., kotlin/Int = ...) // com.eignex.klause.solver.evidence/SourceTransformationVerifier.<init>|<init>(com.eignex.klause.solver.evidence.SourceProofContext;com.eignex.klause.solver.evidence.SourceProofContext;kotlin.Int;kotlin.Int){}[0]
+
+    final fun objective(com.eignex.klause.solver.evidence/SourceTransformation, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/SourceTransformationVerifier.objective|objective(com.eignex.klause.solver.evidence.SourceTransformation;com.eignex.klause.util.Cancellation){}[0]
+    final fun refutation(com.eignex.klause.solver.evidence/SourceTransformation, com.eignex.klause.solver.evidence/SourceEvidence, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/SourceTransformationVerifier.refutation|refutation(com.eignex.klause.solver.evidence.SourceTransformation;com.eignex.klause.solver.evidence.SourceEvidence;com.eignex.klause.util.Cancellation){}[0]
+    final fun verify(com.eignex.klause.solver.evidence/SourceTransformation, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/SourceTransformationVerifier.verify|verify(com.eignex.klause.solver.evidence.SourceTransformation;com.eignex.klause.util.Cancellation){}[0]
 }
 
 final class com.eignex.klause.solver.objective/LinearObjective : com.eignex.klause.solver.objective/Objective { // com.eignex.klause.solver.objective/LinearObjective|null[0]
@@ -14816,6 +14888,7 @@ final fun (com.eignex.klause.ir/PolynomialRealProblem).com.eignex.klause.solver.
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.presolve/presolveOpen(com.eignex.klause.presolve/PresolveConfig = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget? = ...): com.eignex.klause.presolve/OpenPresolveResult // com.eignex.klause.presolve/presolveOpen|presolveOpen@com.eignex.klause.ir.Problem(com.eignex.klause.presolve.PresolveConfig;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.propagation/bake|bake@com.eignex.klause.ir.Problem(com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/propagate(com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/propagate|propagate@com.eignex.klause.ir.Problem(com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.evidence/sourceProofContext(com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.solver.objective/LinearObjective? = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceProofContext? // com.eignex.klause.solver.evidence/sourceProofContext|sourceProofContext@com.eignex.klause.ir.Problem(com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/componentPlan(kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/componentPlan|componentPlan@com.eignex.klause.ir.Problem(kotlin.Boolean){}[0]
@@ -14872,6 +14945,7 @@ final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/intersect(c
 final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/ne(com.eignex.klause.model/SetTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/ne|ne@com.eignex.klause.model.SetTerm(com.eignex.klause.model.SetTerm){}[0]
 final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/subsetOf(com.eignex.klause.model/SetTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/subsetOf|subsetOf@com.eignex.klause.model.SetTerm(com.eignex.klause.model.SetTerm){}[0]
 final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/union(com.eignex.klause.model/SetTerm): com.eignex.klause.model/SetExpr // com.eignex.klause.schema/union|union@com.eignex.klause.model.SetTerm(com.eignex.klause.model.SetTerm){}[0]
+final fun (com.eignex.klause.propagation/Assumptions).com.eignex.klause.solver.evidence/sourceCondition(): com.eignex.klause.solver.evidence/SourceCondition // com.eignex.klause.solver.evidence/sourceCondition|sourceCondition@com.eignex.klause.propagation.Assumptions(){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/eq(com.eignex.klause.model/ContinuousRealExpr): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.schema.FloatTerm(com.eignex.klause.model.ContinuousRealExpr){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/eq(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.schema.FloatTerm(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/eq(kotlin/Double): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.schema.FloatTerm(kotlin.Double){}[0]
