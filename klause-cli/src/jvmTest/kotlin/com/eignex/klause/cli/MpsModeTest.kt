@@ -424,4 +424,50 @@ class MpsModeTest {
             assertFalse("s UNBOUNDED" in text.lines(), text)
         }
     }
+
+    @Test
+    fun `constant source objectives retain attained optimum semantics`() {
+        val mps = File.createTempFile("mpsconstantsource", ".mps").apply {
+            writeText("ROWS\n N COST\n E R\nRHS\n RHS R 0 COST 0.3\nENDATA\n")
+            deleteOnExit()
+        }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)))
+        }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o -0.3" in text.lines(), text)
+    }
+
+    @Test
+    fun `retained MPS outputs keep their original source objective scope`() {
+        val files = listOf("1.0000000000000000001", "2").map { coefficient ->
+            File.createTempFile("mpsobjectivescope", ".mps").apply {
+                writeText(
+                    "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -1\n" +
+                        " M1 'MARKER' 'INTEND'\n X COST $coefficient R 1\n" +
+                        "BOUNDS\n LI B I 0\n LO B X 0.1\nENDATA\n",
+                )
+                deleteOnExit()
+            }
+        }
+        val session = MpsMode.newSession()
+        val original = session.load(files[0].absolutePath, CommonOptions()).pipeline as SolvablePipeline.OpenTheory
+        val output = session.output(CommonOptions())
+        val assignment = OpenTheoryAssignment.Sampled(
+            Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0), listOf(BigFraction.ONE)),
+        )
+        val rendered = original.render(assignment)
+        val next = session.load(files[1].absolutePath, CommonOptions()).pipeline as SolvablePipeline.OpenTheory
+        next.render(assignment)
+
+        val text = capture {
+            output.onExactSolution(rendered, BigFraction.ONE)
+            output.onComplete(Verdict.BEST_FOUND)
+        }
+
+        assertTrue("o 1.0000000000000000001" in text.lines(), text)
+        assertFalse("o 2" in text.lines(), text)
+    }
 }
