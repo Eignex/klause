@@ -53,7 +53,8 @@ and nonattainment derivations; a strict bound alone does not establish convergen
 `SourceResultCapture` attaches optional evidence to ordinary completed satisfaction
 and minimization results. It retains source assignments and exact objective values;
 engine completion labels are captured separately. A caller can supply actual bound
-or traversal derivations. Without them, optimum/refutation coverage remains explicitly
+or traversal derivations. Capture preserves a completed result already carrying a
+different source scope; recapture cannot erase its invocation restrictions. Without them, optimum/refutation coverage remains explicitly
 unavailable. Existing workers retain their documented engine admission contract;
 this optional capture does not convert producer identity into a derivation.
 
