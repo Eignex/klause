@@ -17,6 +17,21 @@ import kotlin.test.assertTrue
 
 class NonlinearIntegerTheoryRequestTest {
     @Test
+    fun `nonlinear request retains the prepared source declaration mapping`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
+            "(declare-const x Real) (declare-const n Int) " +
+                "(assert (= (* n n) 4)) (assert (= (* x x) (to_real n)))",
+        )).problem
+
+        val request = source.pipelineRequest()
+
+        assertTrue(request.preparedPlan.belongsTo(source))
+        assertEquals(1, request.preparedPlan.integerCoordinate(0))
+        assertEquals(0, request.preparedPlan.realCoordinate(0))
+        assertEquals(null, request.preparedPlan.finiteIntegerCoordinate(0))
+    }
+
+    @Test
     fun `every engine discovers a checked open integer square witness`() {
         val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
             "(declare-const n Int) (assert (= (* n n) 4))",

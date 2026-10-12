@@ -82,4 +82,12 @@ class PortfolioInvocationResourcesTest {
         assertTrue(resources.slots[1].cancellation())
         assertSame(lifetime, resources.slots[0].cancellation)
     }
+
+    @Test
+    fun `complete slot receives no heuristic allowance even when instructions are unlimited`() {
+        val allowances = heuristicWorkerAllowances(3, Long.MAX_VALUE, setOf(0))
+
+        assertContentEquals(longArrayOf(0, Long.MAX_VALUE, Long.MAX_VALUE), allowances)
+    }
+
 }

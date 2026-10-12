@@ -12276,6 +12276,8 @@ final class com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams { // 
 }
 
 final class com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest { // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest|null[0]
+    final val preparedPlan // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.preparedPlan|{}preparedPlan[0]
+        final fun <get-preparedPlan>(): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.preparedPlan.<get-preparedPlan>|<get-preparedPlan>(){}[0]
     final val problem // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/NonlinearIntegerProblem // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.problem.<get-problem>|<get-problem>(){}[0]
 }
