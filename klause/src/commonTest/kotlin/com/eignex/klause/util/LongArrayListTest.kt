@@ -5,8 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** Coverage for [LongArrayList] — the `Long` sibling of [IntArrayList]; mirrors its semantics
- *  (growth, O(1) swap-remove, truncate) plus the stdlib-backed [LongArrayList.sort]. */
 class LongArrayListTest {
 
     @Test

@@ -12,11 +12,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-/**
- * Collapse of `ite`-on-equality chains into [Element]. Every case checks the collapsed model against
- * the chain's own semantics over the selector's *whole* domain — including the values outside the arm
- * constants' range, where the chain takes its default and the array must still answer.
- */
 class SmtLibIteChainTest {
 
     private companion object {

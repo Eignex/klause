@@ -15,11 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Objective-hot-spot variable selection for [PairSwap]: when enabled, the first endpoint of every
- * int swap is an objective-relevant variable, so feasible-phase descent concentrates its coordinated
- * moves where they can move the objective instead of swapping objective-irrelevant pairs.
- */
 class PairSwapHotSpotTest {
 
     /** Four int vars over one shared domain; the objective weights only vars 1 and 3. */

@@ -14,10 +14,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** Each supported front-end must parse a whole-string source and a one-character-per-chunk source to the
- *  same model — i.e. its incremental consumption is agnostic to where the input is split. Guards the
- *  streaming refactor: a future scanner change that peeks past a chunk or mishandles a split token/line
- *  fails here rather than silently on a large streamed instance. */
 class StreamingParityTest {
     private fun shape(p: Problem) = Triple(p.numBoolVars, p.numIntVars, p.factors.size)
 

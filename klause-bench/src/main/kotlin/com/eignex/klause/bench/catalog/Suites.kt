@@ -19,13 +19,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 
 /**
- * Catalog content: every [Suite] the bench knows about, grouped by where the instances come
- * from.
- *
- *  - [handwrittenCore] — small SAT/CSP instances built directly in Kotlin (`InCode`).
- *  - [dimacsCore]/[opbCore]/[schemaCore] — vendored under `klause-bench/smoke-corpus/`.
- *  - [mznSmoke] — the in-tree `klause-mzn-lib/test-models/` smoke set (referenced, not copied).
- *  - external MiniZinc/SAT collections (fetched on demand) are declared in [ExternalCollections].
+ * Catalog suites: in-code problems, vendored smoke fixtures, MiniZinc test models,
+ * and the on-demand corpora declared in [ExternalCollections].
  */
 internal object Suites {
 
@@ -380,13 +375,10 @@ internal object Suites {
     // Slack all_different (Hall-prone; for explanation / clause-learning A/B).
 
     /**
-     * Golomb-ruler feasibility built directly as a [Problem]: marks 0 = m0 < m1 < ... < m,
-     * with the C(m,2) pairwise differences channeled into aux int vars (domain `1..maxLen`)
-     * and constrained all_different. Because `maxLen` >> C(m,2) the all_different is *slack*
-     * (more values than vars ⇒ strict Hall sub-sets / multiple Régin SCCs), unlike the tight
-     * n-vars/n-values all_differents in latin_square/sudoku. That's exactly the regime where a
-     * responsible-subset (Hall-set) conflict explanation can differ from an all-vars one, so
-     * this suite is the discriminating workload for that sharpening. `maxLen >= optimal` ⇒ SAT.
+     * Golomb-ruler feasibility: ordered marks with pairwise differences in `1..maxLen`,
+     * constrained all-different. The excess values create slack Hall sets and multiple
+     * Regin SCCs, exercising responsible-subset conflict explanations. SAT when
+     * `maxLen` is at least the optimum length.
      */
     private fun golomb(m: Int, maxLen: Int): Problem {
         val pairs = buildList { for (i in 0 until m) for (j in i + 1 until m) add(i to j) }
@@ -785,8 +777,7 @@ internal object Suites {
         vendored("open-rounded-sat", Category.CSP, Expected.Sat)
     }
 
-    /** In-code crafted SAT: pigeonhole PHPₙ (UNSAT, CDCL stress) + random-3SAT at the phase
-     *  transition. No fetch / no license; parametric for performance regression tracking. */
+    /** Parametric pigeonhole and random-3SAT workloads for performance regression tracking. */
     private val satCrafted = suite(
         "sat-crafted",
         "In-code crafted SAT: pigeonhole (UNSAT) + random-3SAT (phase transition)",
@@ -822,17 +813,16 @@ internal object Suites {
 }
 
 /**
- * Non-vendored problem collections, fetched on demand by `source.CorpusFetcher`. Declared
- * here so the "where did this come from / why isn't it in the repo" answer is auditable.
+ * On-demand corpus declarations consumed by `source.CorpusFetcher`, including attribution
+ * and storage rationale.
  */
 internal object ExternalCollections {
-    /** The actively-maintained MiniZinc Challenge archive — one directory per year (2008–present),
-     *  each with the year's family dirs; `mzn-bench` selects across every year via
-     *  [com.eignex.klause.bench.source.CorpusSelection.Layout.MznChallengeAllYears]. Replaces the
-     *  old `minizinc-benchmarks` repo (a flat, GPLv3-mixed aggregate that had fallen behind and only
-     *  covered a curated slice of the mid-2010s challenge years) — problems submitted to recent
-     *  challenge years are required to ship under MIT, and the repo is updated as each year's
-     *  challenge runs. */
+    /**
+     * MiniZinc Challenge archive with year directories containing problem families.
+     * `mzn-bench` selects across years through
+     * [com.eignex.klause.bench.source.CorpusSelection.Layout.MznChallengeAllYears].
+     * Recent submissions carry MIT licensing; each collection retains its attribution.
+     */
     val minizincChallenge = ExternalCollection(
         id = "mzn-challenge",
         url = "https://github.com/MiniZinc/mzn-challenge.git",
@@ -919,9 +909,7 @@ internal object ExternalCollections {
         xcsp3Csp,
     )
 
-    /** Per-logic `.tar.zst` archive base URL from the SMT-LIB non-incremental Zenodo release (record
-     *  15493090, published 2025-05-22 — supersedes the 2024 record 11061097 that these collections
-     *  previously pinned). */
+    /** Per-logic `.tar.zst` archives from SMT-LIB non-incremental Zenodo record 15493090. */
     private fun smtlibLogic(logic: String) = "https://zenodo.org/records/15493090/files/$logic.tar.zst?download=1"
 
     /** SMT-LIB QF_LIA non-incremental benchmark set, extracting to `.smt2` files under
@@ -1077,7 +1065,7 @@ internal object ExternalCollections {
         fetch = FetchMethod.Tar,
     )
     val miplib3 = ExternalCollection(
-        // Not `miplib3`: a copy fetched before the files were named would be taken as present and never renamed.
+        // The versioned cache id distinguishes collections with named files.
         id = "miplib3-mps",
         url = "https://miplib2010.zib.de/miplib3/miplib3.tar.gz",
         license = "MIPLIB 3 (academic; freely available for research)",

@@ -27,7 +27,7 @@ internal sealed interface ShortestPaths {
     /** A negative cycle is reachable from the source. */
     data object Infeasible : ShortestPaths
 
-    /** The budget was spent before the paths settled. */
+    /** The path search is incomplete because its budget is exhausted. */
     data object Abandoned : ShortestPaths
 }
 
@@ -46,11 +46,8 @@ internal class DifferenceGraph(val numVars: Int) {
     }
 
     /**
-     * An edge cycle of negative total weight, or null when none was found.
-     *
-     * A spent [cancelled] budget also reports null. That is the same weakening as a propagation that did
-     * not finish — it claims no conflict, never that there is none — so a caller may treat null as
-     * "nothing deduced" but never as proof of consistency.
+     * An edge cycle of negative total weight, or null when the search finds none or [cancelled] stops it.
+     * Null reports no deduction; it does not prove consistency.
      */
     fun negativeCycle(active: BooleanArray? = null, cancelled: () -> Boolean = { false }): IntArray? {
         val n = numVars
@@ -87,7 +84,7 @@ internal class DifferenceGraph(val numVars: Int) {
         return extractCycle(changed, predEdge)
     }
 
-    /** Vertex potentials witnessing feasibility, or why none were produced. */
+    /** Vertex potentials witnessing feasibility, or an infeasible/abandoned outcome. */
     fun potentials(
         active: BooleanArray? = null,
         cancelled: () -> Boolean = { false },

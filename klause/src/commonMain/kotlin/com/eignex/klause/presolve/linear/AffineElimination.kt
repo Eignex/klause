@@ -287,18 +287,16 @@ internal object AffineSingletons {
     // Cap on how many folds a single linear row may absorb, applied in every model. Folding a pivot into a
     // row rebuilds and re-coalesces the whole row; a row that keeps absorbing folds from successive pivots
     // grows monotonically, so the k-th fold into it costs O(k) — O(folds²) churn that also hands the solver a
-    // denser problem rather than a simpler one (numbrix accumulates one row from 215 to 4560 terms over ~80
-    // folds). Once a row has absorbed this many folds, leave any further pivot that would rewrite it unfolded
+    // denser problem rather than a simpler one. Once a row has absorbed this many folds, leave any
+    // further pivot that would rewrite it unfolded
     // (sound — the variable stays and is solved directly), which bounds each row's growth. Set well above the
     // handful of folds a productively-eliminated variable draws so ordinary models are untouched; only a row
     // that is a fold sink — the pathological accumulator — is capped.
     private const val FOLD_ABSORB_CAP = 16
 
     /** Cumulative substitution-fill-in budget across the whole pass (Σ pivot-degree · substituted-terms).
-     *  [FOLD_ABSORB_CAP] bounds any single row's growth, but a model with *many* moderately-folded rows can
-     *  still spend seconds in aggregate (an SMT-LIB SharedMemory instance runs ~6s under the per-row cap
-     *  alone); this bounds the total work. Once spent, the loop stops and the remaining affine-defined
-     *  variables are solved directly (sound). Set well above what productive models spend. */
+     *  [FOLD_ABSORB_CAP] bounds individual row growth; this bounds aggregate work across all rows.
+     *  Once spent, the loop stops and remaining affine-defined variables are solved directly. */
     private const val AFFINE_FILL_IN_BUDGET = 300_000L
 
     /** Skip the whole affine pass on instances with more than this many factors: the O(factors) candidate
@@ -1292,6 +1290,5 @@ private fun termsFitHalfLong(constTerm: Long, termCoeffs: LongArray): Boolean {
     return true
 }
 
-// Work units per factor scanned, term tested or fill-in entry folded by affine elimination, against one simplex
-// op: fitted section time per unit over 60 MIPLIB 2017, 40 QF_LIA and 40 MiniZinc Challenge models, ~2.9e-5 ms.
+// Work units per scanned factor, tested term or folded fill-in entry, relative to one simplex operation.
 internal const val AFFINE_WORK_WEIGHT = 10L

@@ -6,15 +6,9 @@ import java.io.File
 import java.util.Locale
 
 /**
- * Ranks portfolio arms by mining historic solves: the per-case records a lab experiment keeps
- * (`deploy/lab cases <id>`), each carrying the `arm.<label>` telemetry a `-s` portfolio run prints.
- *
- * Two lenses over the same cases. **Wins** feed [ArmCalibration.scoreWinnerSets]: on an optimisation
- * case the best-holder from the attribution stream wins; on a satisfaction case the arm credited with
- * the first solution does. **Contribution** sums what the scheduler itself credited each arm — work spent,
- * the work-weighted mean reward, and each signal's credit (clauses, cuts, bounds, fixings, …) — so an arm
- * that never holds the incumbent but feeds the pool still shows. The report is for hand-editing the arm
- * catalogs; every quarantine fault is listed by case so a broken arm cannot hide in an average.
+ * Ranks portfolio arms from lab case records carrying `arm.<label>` telemetry.
+ * Wins use [ArmCalibration.scoreWinnerSets]; contribution totals work, weighted reward
+ * and credited signals. Quarantine faults are reported per case.
  */
 internal object ArmMining {
 

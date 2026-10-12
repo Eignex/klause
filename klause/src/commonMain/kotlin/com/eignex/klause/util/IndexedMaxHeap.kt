@@ -1,20 +1,10 @@
 package com.eignex.klause.util
 
 /**
- * Binary max-heap with O(log n) `updateKey` keyed by an integer id in `0..capacity-1`. Lets
- * VSIDS-style variable pickers extract the highest-scoring variable without an O(n) linear
- * scan: bumps go through [updateKey] (sift-up if score grew, sift-down if it shrank), picks
- * go through [extractMax] (single sift-down on the new root) or [peekMax] + selective
- * [restore] when callers need to filter for some external "still alive" predicate
- * (`session.boolValue(v) == null` etc.) without losing the popped entry.
- *
- * Positions are tracked in `pos` so [updateKey] / [remove] are O(log n) — no linear search.
- * `pos[id] = -1` means the id isn't currently in the heap (after [extractMax] or [remove];
- * [restore] reinserts at the previously cached key).
- *
- * Ids and keys are stored separately so the heap doesn't allocate per-entry boxes — same
- * tactic as kumulant's primitive heaps. Capacity is fixed at construction; growing isn't
- * needed because every variable is registered up front.
+ * Fixed-capacity binary max-heap over integer ids, with O(log n) key updates and removal.
+ * A position array tracks membership; `pos(id) = -1` means absent. [restore] reinserts
+ * an id at its cached key, including updates made while absent. Separate primitive
+ * id and key arrays avoid per-entry allocation.
  */
 internal class IndexedMaxHeap(val capacity: Int) {
 

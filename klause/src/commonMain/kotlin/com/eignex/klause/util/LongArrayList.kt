@@ -1,13 +1,8 @@
 package com.eignex.klause.util
 
 /**
- * Primitive growable `Long` list — the `Long` sibling of [IntArrayList], eliminating the
- * per-element boxing a stdlib `ArrayList<Long>` pays. Use it on hot paths that accumulate raw
- * longs (bit masks, packed payloads, weights), e.g. the per-move repair-chain snapshot in
- * `LocalSearchState.buildRepairChain`.
- *
- * Backed by a doubling [LongArray]; [removeAt] / [removeValue] are O(1) swap-removes (order is
- * not preserved). Not thread-safe.
+ * Primitive growable Long list backed by a doubling [LongArray]. [removeAt] and
+ * [removeValue] swap-remove without preserving order. Not thread-safe.
  */
 internal class LongArrayList(initialCapacity: Int = 8) {
     private var data: LongArray = LongArray(initialCapacity.coerceAtLeast(1))

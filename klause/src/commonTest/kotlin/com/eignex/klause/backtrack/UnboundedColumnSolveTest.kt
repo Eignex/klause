@@ -22,10 +22,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * An unbounded `var int` reaches the search with the full `Long` range, which no span can enumerate.
- * The search still has to branch it and hand back a value that satisfies the model.
- */
 class UnboundedColumnSolveTest {
 
     @Test

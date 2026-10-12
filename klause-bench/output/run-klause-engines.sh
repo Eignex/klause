@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
-# 300s klause ENGINE sweep over the agreed subset of the MiniZinc Challenge corpus: every klause engine
-# (mixed | ls | alns | cp) on each selection, so the curated portfolio and its single-family alternatives
-# can be A/B'd head-to-head (feeds the #644 ALNS calibration). Reference-solver baselines live in
-# run-baselines.sh; this file is klause-only. The `solve` metric writes one .out + .json per problem under
-# klause-bench/output/<config>/, so the dir name encodes engine+settings+budget — nothing to copy here.
-#
-# klause runs as a subprocess, so the CLI dist must be current: installJvmDist below (installDist is a
-# no-op that serves a stale binary — see klause-bench/README.md).
+# 300s sweep of each Klause engine over the selected MiniZinc Challenge problems.
+# Outputs: one .out and .json per problem under output/<config>/.
+# Rebuild the subprocess CLI with installJvmDist; see klause-bench/README.md.
 set -u
 cd "$(git rev-parse --show-toplevel)"
 ./gradlew :klause-cli:installJvmDist -q

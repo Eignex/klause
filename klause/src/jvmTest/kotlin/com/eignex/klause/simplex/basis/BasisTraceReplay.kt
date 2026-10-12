@@ -259,21 +259,9 @@ internal object BasisTraceReplay {
             checkFreshBasis(index)
         }
 
-        /**
-         * Measures a from-scratch rebuild of the basis the update chain arrived at.
-         *
-         * This runs only once the arm's own residual has already accepted the basis, and probes the
-         * same right-hand side, so it is a measurement rather than a third correctness oracle: it
-         * cannot find an unsolvable basis the arm's check missed. What it yields is
-         * [BasisReplayReport.freshRelativeResidual], the accuracy a Markowitz build reaches on that
-         * probe and so a drift reference for the Forrest-Tomlin chain, and
-         * [BasisReplayReport.freshDeclines], a conditioning signal.
-         *
-         * A rebuild that declines is not a defect and is counted rather than failed. The rebuild
-         * applies threshold partial pivoting under a bounded Markowitz search while [BasisSolver.update]
-         * accepts on an absolute pivot test alone, so the two disagree on badly scaled bases by
-         * construction, and [LuBuildRejection] is a floating-point decline rather than a rank claim.
-         */
+        // Rebuilding the accepted basis with the same right-hand side measures drift, rather than
+        // providing an independent feasibility oracle. Threshold partial pivoting can decline a basis
+        // accepted by update's absolute pivot test; that decline measures conditioning, not rank.
         private fun checkFreshBasis(index: Int) {
             val basis = headings ?: return
             val columns = IntArray(basis.size) { headingColumn(basis[it], trace.sourceColumns) }

@@ -26,7 +26,7 @@ class KnapsackCoverSeparatorTest {
     fun `separates a violated cover and the cut is valid`() {
         // 3 items, weights [3,3,2], capacity 4. Maximising x0+x1 drives the LP to x0=x1=2/3. The cover
         // {0,1} weighs 6 > 4, and x2 (weight 2 > b - w_x0 = 1) up-lifts with coefficient 1, so the
-        // sequential-lifted cut is x0 + x1 + x2 <= 1, violated at 4/3 (#552).
+        // sequential-lifted cut is x0 + x1 + x2 <= 1, violated at 4/3.
         val p = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -48,7 +48,7 @@ class KnapsackCoverSeparatorTest {
     fun `extended cover folds in a heavy non-cover item and separates a point the bare cover misses`() {
         // 3 items, weights [3,3,3], capacity 4: at most one item fits. Maximising x0+x1+x2 drives the LP
         // to 4/9 each. The bare cover {0,1} (3+3>4) has Σx* = 8/9 < 1 — NOT violated — but extending it
-        // with item 2 (weight 3 >= the cover max 3) gives x0+x1+x2 <= 1, violated at 4/3 (#552).
+        // with item 2 (weight 3 >= the cover max 3) gives x0+x1+x2 <= 1, violated at 4/3.
         val p = Problem(
             numBoolVars = 3,
             numIntVars = 0,

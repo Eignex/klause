@@ -132,9 +132,7 @@ internal fun PropagationState.setIntMinAsDecision(v: Int, lo: Long): Boolean {
 }
 
 internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: IntArray?): Boolean {
-    // Read the packed bits directly rather than through the boxing `boolValues[v]`
-    // accessor — this runs once per pin (≈ once per propagation) and the `Boolean?`
-    // box dominated the BCP CPU profile.
+    // Packed bits avoid boxing a Boolean on each propagation pin.
     if (boolAssigned.get(v)) {
         if (boolValueBits.get(v) == value) return true
         // Conflict — record levels of both contributors, and seed the factor core with

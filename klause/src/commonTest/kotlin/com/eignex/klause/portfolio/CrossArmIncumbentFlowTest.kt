@@ -16,12 +16,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * The cross-arm half of incumbent flow for the two local-search-class arms: both worker adapters wire
- * [SharedPools.solutions] into their engine, so each arm's improvements are offered to the one verified
- * exchange and an arm entering the pool later never reports worse than the incumbent standing when it
- * started.
- */
 class CrossArmIncumbentFlowTest {
 
     // Pick ≥ 4 of 12 weighted booleans; the optimum picks the four cheapest.

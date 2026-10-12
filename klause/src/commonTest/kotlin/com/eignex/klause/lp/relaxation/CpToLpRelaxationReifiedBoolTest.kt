@@ -10,13 +10,6 @@ import com.eignex.klause.propagation.PropagationSession
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/**
- * #655 (Tranche B): the big-M relaxation of [ReifiedPseudoBoolean] / [ReifiedCardinality]. Soundness
- * is checked exhaustively — for every assignment that satisfies the reified semantics, the relaxation
- * (with all Booleans pinned to that assignment) must stay LP-feasible, i.e. no big-M row cuts a valid
- * point. Strength is spot-checked: an assignment that violates the reified semantics in a direction
- * the rows encode must be excluded.
- */
 class CpToLpRelaxationReifiedBoolTest {
 
     /** Whether the integer point [bits] satisfies every emitted relaxation row. Rows are stored in the

@@ -5,11 +5,6 @@ import com.eignex.klause.solver.ProblemClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Coverage for the LS worker-config catalog (#699 schedule-diversity arms): the new schedule-based
- * SA arms build by label and are in the full pool, and the credit-ranked pool covers every [LocalSearchArm]
- * (so adding an arm to the enum without adding it to `ranked` fails here).
- */
 class LocalSearchWorkerConfigTest {
 
     @Test
@@ -28,9 +23,6 @@ class LocalSearchWorkerConfigTest {
 
     @Test
     fun `each arm family declares an explicit feasible-descent mode`() {
-        // On a COP `materialize` optimizes every arm per its declared FeasibleDescent — no arm falls into
-        // a default descent. Pin the mode each family declares so a regression that silently changes how
-        // an arm optimizes (e.g. an SA arm reverting to a plain finder) fails here.
         val byLabel = LocalSearchCatalog.ranked(Kind.COP).associateBy { it.label }
         // CBLS and the SA family both self-own their feasible walk (CBLS descends greedily on its
         // sources, SA anneals); nothing relies on an engine-side descent.

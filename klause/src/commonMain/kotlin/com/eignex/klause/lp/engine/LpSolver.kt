@@ -152,8 +152,7 @@ internal interface LpSolver : AutoCloseable {
     /**
      * Solve the relaxation, optionally warm-started from a prior optimal [warm] basis of the same model
      * structure; null on non-convergence / dual-unbounded / singular basis. The warm basis only changes
-     * the pivot path, never the result. (The warm-start handle is a simplex basis today; a basis-free
-     * engine ignores it.)
+     * the pivot path, never the result. Engines may decline the warm basis and cold-start.
      */
     fun solve(warm: Basis? = null): FloatLpResult?
 

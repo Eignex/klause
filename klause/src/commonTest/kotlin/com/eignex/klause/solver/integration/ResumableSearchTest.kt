@@ -20,14 +20,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Pause/resume for the backtrack engine (#381): [com.eignex.klause.solver.ResumableSearch] must hold
- * the entire search state explicitly so a slice-truncated segment resumes the exact search mid-proof
- * — not restart it — and reach the same verdict a one-shot solve would.
- *
- * The pause is driven by a **decision-counting** token (the engine polls cancellation every
- * `CANCEL_CHECK_INTERVAL` decisions), not wall-clock, so the multi-slice behaviour is deterministic.
- */
 class ResumableSearchTest {
 
     /** Pigeonhole PHP(p, p-1): `p` pigeons each in exactly one of `p-1` holes, at most one pigeon per

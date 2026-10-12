@@ -72,8 +72,7 @@ internal class ComparisonClausePropagator(
         return out.toIntArray()
     }
 
-    /** The falsifiers of every literal except [k]; all are currently-false literals whose being false
-     *  is exactly why literal [k] must now hold. */
+    /** Falsifiers of every literal except [k], explaining why literal [k] must hold. */
     private fun otherFalsifiers(state: PropagationState, k: Int): IntArray {
         val out = IntArrayList()
         for (i in vars.indices) if (i != k) out.add(falsifier(state, i))

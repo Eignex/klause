@@ -26,7 +26,7 @@ private const val DEFAULT_HINT_MIN_SPLITS = 128L
 
 /** Cooperative limits shared by complete open-model theories. */
 data class TheoryParams(
-    /** Legacy maximum theory-check allowance; this is not a complete leaf count. */
+    /** Maximum theory-check allowance; this is not a complete leaf count. */
     val maxLeaves: Long = Long.MAX_VALUE,
     /** Solve-wide deterministic open-theory work allowance, covering the hint draw and the traversal. */
     val openWorkLimit: Long = Long.MAX_VALUE,

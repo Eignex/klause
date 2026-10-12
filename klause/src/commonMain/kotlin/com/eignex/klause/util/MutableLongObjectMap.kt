@@ -1,17 +1,10 @@
 package com.eignex.klause.util
 
 /**
- * Mutable open-addressing `Long → V` hash map specialised to keep the **key** unboxed, unlike a stdlib
- * `HashMap<Long, V>` which boxes the key on every `put`/`get`. The long-keyed sibling of
- * [MutableIntObjectMap]: reach for it when the key is a value that may exceed 32-bit range (a
- * pseudo-Boolean weight, a wide cover value) but the value is a reference type.
- *
- * Linear-probed, capacity a power of two, load factor kept ≤ 0.5. Occupancy is tracked by a parallel
- * `used` bitmap rather than a sentinel key, so **any** `Long` key is storable. Removal uses
- * backward-shift deletion (Knuth 6.4 algorithm R), so the table holds no tombstones.
- *
- * Not thread-safe. Iteration order is unspecified (hash order); callers needing a deterministic order
- * must sort the keys themselves.
+ * Primitive-key Long-to-object map with linear probing, power-of-two capacity and load
+ * factor at most 0.5. A separate occupancy bitmap permits every key value;
+ * backward-shift deletion avoids tombstones. See [MutableIntObjectMap] for related lookup
+ * storage. Not thread-safe; iteration order is unspecified.
  */
 internal class MutableLongObjectMap<V>(initialCapacity: Int = 8) {
     private var keys: LongArray

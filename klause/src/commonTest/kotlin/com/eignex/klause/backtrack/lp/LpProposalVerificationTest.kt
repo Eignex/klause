@@ -20,12 +20,6 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * The LP primal heuristics are untrusted producers, so what they hand back is only a proposal — but a
- * producer whose proposals the composed factor set routinely refuses would silently stop seeding
- * incumbents. Every proposal the three of them make on random covering/packing instances must survive
- * [ComposedSampleVerifier].
- */
 class LpProposalVerificationTest {
 
     private val producers: List<Pair<String, LpEngine.(LinearObjective, Cancellation) -> Sample?>> = listOf(

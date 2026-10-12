@@ -7,11 +7,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * The key builder's capacity handling. Sizing is a memory concern (issue #1415: a key that splices a
- * whole transition table doubled its way up and was then copied again), so what must be proven is that
- * it changes nothing about the key itself — these payloads back factor dedup and symmetry refinement.
- */
 class StructuralKeyBuilderTest {
 
     private fun key(expectedWords: Int): StructuralKey = StructuralKeyBuilder(expectedWords).apply {

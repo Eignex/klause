@@ -22,7 +22,7 @@ internal interface InprocessingPass {
      *  does into [stats] so a work-sliced search is charged for it. */
     fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?)
 
-    /** Drop per-search cursors; the engine was reseeded onto a new fragment. */
+    /** Drop per-search cursors; called when the engine reseeds onto a fragment. */
     fun reset()
 }
 

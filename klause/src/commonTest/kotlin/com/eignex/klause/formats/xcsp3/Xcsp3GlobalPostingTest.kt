@@ -23,11 +23,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * A source that names a global gets that global posted rather than a decomposition of it. Each case
- * also enumerates the model, because posting the wrong global would still parse: the solution set is
- * what says the constraint survived the change.
- */
 class Xcsp3GlobalPostingTest {
 
     private fun parse(constraints: String, vars: String): Xcsp3Problem = Xcsp3.parse(

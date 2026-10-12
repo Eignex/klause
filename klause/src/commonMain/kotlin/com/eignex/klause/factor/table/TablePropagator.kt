@@ -20,7 +20,6 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap
 
-/** CP propagator for [Table]. Constructed by the propagation projection. */
 internal class TablePropagator(
     val boolVars: IntArray,
     val intVars: IntArray,

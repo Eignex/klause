@@ -3,12 +3,6 @@ package com.eignex.klause.lp.bounding
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Who the node LP pivot budget is allowed to bite.
- *
- * Capping a relaxation that prunes costs bound quality outright; capping one that never prunes costs
- * nothing. Everything here is that distinction.
- */
 class LpPivotBudgetTest {
 
     @Test

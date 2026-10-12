@@ -24,10 +24,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
-/**
- * JVM-only because we use [Thread] to flip the cancellation flag concurrently. The
- * cancellation primitive itself is KMP-friendly; this test happens to need a thread.
- */
+// Concurrent cancellation uses JVM threads.
 class CancellationTest {
 
     /** A small problem that's quickly Unsat — the engine should burn through the

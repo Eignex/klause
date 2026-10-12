@@ -25,15 +25,9 @@ internal data class ProfileConfig(
 )
 
 /**
- * In-harness profiler built on Java Flight Recorder. Wraps a block in a JFR recording and
- * prints a flat top-method table on completion, then leaves the raw `.jfr` under `build/` for
- * deeper inspection in JMC / `jfr print`.
- *
- * This is the *baked-in* profiling path selected with the `profile=` bench filter. It differs
- * from the gradle `-PasyncProfiler` agent in two ways: it needs no native library, and it can
- * be scoped to the solve region only ([ProfileScope.SOLVE]) so parsing/setup is excluded from
- * the sample set. Sampling is statistical — short solves yield few samples, so pair `profile=`
- * with a long-running selection (e.g. a fixed-budget search target) for a meaningful table.
+ * Java Flight Recorder profiler for the `profile=` filter. Records the selected region,
+ * prints top methods and writes a `.jfr` under `build/`. [ProfileScope.SOLVE] excludes
+ * parsing and setup. Short runs may yield too few samples for a useful profile.
  */
 internal object Profiler {
     fun summarizeCli(file: File) {

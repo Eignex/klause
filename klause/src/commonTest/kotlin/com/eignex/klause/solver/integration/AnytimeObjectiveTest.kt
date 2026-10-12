@@ -11,12 +11,6 @@ import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Regression tests for the anytime invariant: `LocalSearchSolver.minimize` must return
- * the best feasible solution it has seen so far whenever it stops, regardless of why
- * it stopped (budget exhausted, cancelled, etc.). Returning null means "no feasible
- * was seen at all", never "I forgot the one I found".
- */
 class AnytimeObjectiveTest {
 
     @Test

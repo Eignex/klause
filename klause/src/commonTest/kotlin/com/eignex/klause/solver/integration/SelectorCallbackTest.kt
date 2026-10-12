@@ -20,13 +20,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Lock down the [VariableSelector] / [ValueSelector] notification contract: every
- * propagation conflict fires `onConflict`, every successful pin fires `onCommit`, and
- * every Luby restart fires `onRestart`. Activity-based heuristics (VSIDS, dom/wdeg,
- * last-conflict) hang off these hooks; if they break the next heuristic-driven CP
- * search work goes blind.
- */
 class SelectorCallbackTest {
 
     private class CountingSelectors :

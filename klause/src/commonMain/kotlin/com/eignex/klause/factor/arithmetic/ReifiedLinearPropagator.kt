@@ -17,7 +17,6 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
-/** CP propagator for [ReifiedLinear]: reification propagation and conflict reasons. */
 internal class ReifiedLinearPropagator(
     private val auxBoolVar: Int,
     val boolVars: IntArray,

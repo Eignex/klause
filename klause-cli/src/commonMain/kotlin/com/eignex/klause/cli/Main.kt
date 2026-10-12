@@ -8,18 +8,9 @@ import com.eignex.klause.solver.pipeline.PipelineConfigException
 import com.eignex.klause.solver.result.UnsoundnessException
 
 /*
- * Unified klause CLI entry point. The CLI is a registry of CliMode front-ends
- * (MiniZinc / XCSP3 / SMT-LIB / DIMACS / OPB); adding a competition front-end is a new CliMode + its
- * OutputProtocol, nothing here.
- *
- * Flow: parse the whole argument vector once against the common solver-control flags plus
- * every mode's own flags -> pick the mode (explicit --format, else file extension, else the
- * default MiniZinc) -> load the instance into a mode-neutral Solvable -> hand it to the
- * shared SolveCore with the mode's output protocol.
- *
- * Whole-corpus parse/solve coverage reporting is NOT here — that is klause-bench's
- * `coverage:xcsp3|smtlib` tool command, which is catalog-driven and fetches the external
- * libraries. The CLI solves exactly one instance per invocation.
+ * CLI entry point: parse shared and mode flags, select a mode by --format or extension
+ * (default MiniZinc), load a Solvable, then call SolveCore with the mode's output protocol.
+ * Each invocation solves one instance.
  */
 
 /** Front-end registry. Order matters only for the default fallback (MiniZinc is the default
@@ -39,8 +30,10 @@ private const val EXIT_OK = 0
 private const val EXIT_ERROR = 2
 private const val EXIT_UNSOUND = 3
 
-/** Run the CLI and map a boundary failure to an exit code, printing its diagnostic to stderr. Split out
- *  from [main] so the error boundary is observable without terminating the process. */
+/**
+ * Runs the CLI and reports boundary errors as exit codes and stderr diagnostics.
+ * The error boundary is observable without terminating the process.
+ */
 internal fun runCli(args: Array<String>): Int = try {
     run(args)
     EXIT_OK

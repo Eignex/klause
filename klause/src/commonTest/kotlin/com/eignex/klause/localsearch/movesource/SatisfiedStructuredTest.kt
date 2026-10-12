@@ -10,12 +10,6 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import kotlin.test.Test
 
-/**
- * Move-generation coverage for [SatisfiedStructured] across its scopes. The reference closures encode
- * the expected construction — sampled (draw [sampleCount] factors, propose from the non-violated ones),
- * enumerate-all (every satisfied factor), and elected (sample the elected implicit factors) — and each
- * test pins the matching [SatisfiedStructured] scope to that multiset.
- */
 class SatisfiedStructuredTest {
 
     private val sampleCount = 4

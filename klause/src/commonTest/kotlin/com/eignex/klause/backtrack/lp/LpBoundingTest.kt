@@ -375,7 +375,7 @@ class LpBoundingTest {
     @Test
     fun `lp bounding prunes nodes the separable bound cannot`() {
         val problem = triangle()
-        // Keep this regression independent of evolving global defaults.
+
         val base = BacktrackParams(randomSeed = 1L, variableSelector = RandomVariable)
         val off = BacktrackSolver(problem.bake()).minimize(sumObjective, base)
         val on = BacktrackSolver(problem.bake()).minimize(

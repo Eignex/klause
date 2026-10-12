@@ -12,13 +12,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * #655 (Tranche C): the count-variable [GlobalCardinality] one-hot hull. Each variable picks one
- * value (a simplex `Σ_v z_iv = 1`) and the count rows read `Σ_i z_{i,cover(k)} = counts(k)`; the
- * assignment polytope is a product of simplices, hence integral, so the LP optimum of a linear
- * objective over the `xs` and count variables equals the true integer optimum — checked against
- * brute force — and a count in the objective gets an exact bound the bare propagator domain misses.
- */
 class CpToLpRelaxationGccCountHullTest {
 
     private val eps = 1e-9

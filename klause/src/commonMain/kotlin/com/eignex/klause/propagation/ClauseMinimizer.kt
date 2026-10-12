@@ -67,10 +67,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
      * the engine relies on at the backjump level. Other literals are checked via
      * [isRedundant], which walks antecedents recursively with a per-call cache to keep
      * the cost linear in the implication graph reached.
-     *
-     * Standard CDCL polish. Shrinks learned clauses by 10-30% on typical
-     * SAT-style instances, with knock-on improvements to watcher-list traversal
-     * cost during future propagation.
+
      */
     private fun minimize(learned: IntArrayList, currentLevel: Int): IntArrayList {
         if (learned.size <= 1) return learned

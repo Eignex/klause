@@ -45,16 +45,8 @@ class GlobalCardinalityPropagatorTest {
         }
     }
 
-    /**
-     * Flow-deficiency conflicts must cite the count vars whose search-derived lower bounds
-     * form the unmet demand. Two values each demand one taker (count mins raised at search
-     * levels) while only one var can still serve either — per-value counts stay locally
-     * consistent, so only the Régin flow detects the deficit. The demand-side cover nodes
-     * are not residual-reachable from the cut, and a reach-filtered citation drops exactly
-     * the count premises — the learned clause then claims the var bounds alone are
-     * contradictory and prunes feasible assignments (surfaced as a false UNSAT on
-     * oocsp_racks).
-     */
+    // Count minima demand two takers from one variable. The conflict must cite these search-derived
+    // count bounds even though their nodes are not residual-reachable from the flow cut.
     @Test
     fun `flow deficiency conflict cites the count var demand bounds`() {
         // ints: xs = 0,1 over 0..2; countVars 2 (value 1) and 3 (value 2) over 0..2.

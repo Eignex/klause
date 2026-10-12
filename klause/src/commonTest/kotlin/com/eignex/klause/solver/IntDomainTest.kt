@@ -41,9 +41,7 @@ class IntDomainTest {
 
     @Test
     fun `excludeValues on a non-enumerable wide domain never walks the span`() {
-        // Span > 2^31, so the domain is not enumerable. The old survivor-materialising path walked
-        // min..max one value at a time and grew a LongArrayList past Int.MAX (NegativeArraySizeException);
-        // the fix folds each excluded value as a span-independent run split.
+        // Excluding values splits runs without enumerating the span, which exceeds 2^31 here.
         val wide = IntDomain(0, 3_000_000_000L)
         assertFalse((wide.spanOrNull() != null))
         val holes = longArrayOf(5L, 1_000_000_000L, 2_999_999_999L)

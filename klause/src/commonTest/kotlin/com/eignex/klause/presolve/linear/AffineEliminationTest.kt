@@ -336,7 +336,7 @@ class AffineEliminationTest {
     fun `eliminates a non-unit doubleton via residue-class restriction`() {
         // 2x + 3y = 12 has no unit pivot, but x is contained, so x = (12 - 3y)/2 — an integer only for
         // even y. Eliminate x, restrict y to {0,2,4} (the residue class keeping x in [0,6]), and
-        // reconstruct x with the divisor (#522).
+        // reconstruct x with the divisor.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -351,7 +351,7 @@ class AffineEliminationTest {
     fun `does not divide by a zero pivot coefficient`() {
         // 0*x0 - 2*x1 = 1: a term with a zero coefficient is non-unit, so the pivot loop reaches the
         // divisibility test for x0; the zero coefficient can never be a pivot and must not be used as a
-        // modulus (#872). The equality (-2*x1 = 1) is unsatisfiable, and that verdict is preserved.
+        // modulus. The equality (-2*x1 = 1) is unsatisfiable, and that verdict is preserved.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,

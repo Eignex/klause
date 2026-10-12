@@ -112,10 +112,7 @@ class PresolverTest {
 
     @Test
     fun `the source lane drops a solution-set-altering pass for a sensitive query`() {
-        // Model counting runs through the shared source phase, so the gate that keeps it exact has to
-        // hold on the SOURCE overload too — and until dual fixing was ported, no SOURCE pass altered
-        // the solution set, so nothing exercised it. Every pass the source lane offers a sensitive
-        // query must preserve the set.
+        // Model counting uses source preparation, so source passes must preserve the full solution set.
         val auto = PresolveConfig.AUTO
         val sensitive = PresolveContext(solutionSetSensitive = true)
         val sourcePasses = auto.problemPasses(sensitive, PresolvePass.Capability.SOURCE)
@@ -211,7 +208,7 @@ class PresolverTest {
         // Affine elimination leaves the eliminated variable unconstrained in the reduced problem
         // (its value is rebuilt from its partner on the way back). That is fine for solve/optimize, but
         // a complete enumerator would branch over the freed variable's whole domain and yield each real
-        // solution once per spurious value (#507). So it must NOT run when the caller needs the exact
+        // solution once per spurious value. So it must NOT run when the caller needs the exact
         // solution set / count.
         val auto = PresolveConfig.AUTO
         assertTrue(PresolvePass.ELIMINATE_AFFINE_SINGLETONS in auto.problemPasses(PresolveContext.EMPTY))

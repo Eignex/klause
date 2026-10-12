@@ -10,11 +10,6 @@ import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * Correctness of the native-SAT BCP lane ([com.eignex.klause.propagation.NativeSatState]): it must
- * decide every pure-Boolean CNF exactly as the general LCG path and only ever return satisfying
- * witnesses. The differential cases run the same random instances through both lanes.
- */
 class NativeSatEngineTest {
 
     private fun cnf(numVars: Int, clauses: List<IntArray>): Problem = Problem(

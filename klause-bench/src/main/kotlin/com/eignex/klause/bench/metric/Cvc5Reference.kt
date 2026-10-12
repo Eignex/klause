@@ -6,9 +6,8 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 
 /**
- * The second SMT-LIB reference, beside [Z3Reference]: cvc5 as a native binary on the `.smt2` file, single-threaded by
- * default, its wall-clock capped by `--tlimit`. It answers `sat` / `unsat` / `unknown` as z3 does, so it is read as z3
- * is ([Z3Reference.parse]). Rows are keyed by solver `cvc5`.
+ * SMT-LIB reference adapter for native cvc5, with `--tlimit` and [Z3Reference.parse].
+ * Rows use solver key `cvc5`.
  */
 internal object Cvc5Reference {
     /** The cvc5 executable, from `PATH` by default; override with `-Dklause.bench.cvc5=/path/to/cvc5`. */

@@ -4,14 +4,8 @@ import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.ir.Problem
 
 /*
- * The bench problem catalog — a declarative, in-code registry of problems grouped into
- * named [Suite]s by [Category]. It is the single source of truth for "which problems are
- * in my bench"; nothing else discovers instances by walking arbitrary directories.
- *
- * The four orthogonal axes the bench separates are: **format** ([Format] — how an instance
- * is encoded), **source** ([ProblemSource] — where the bytes come from), **solver**
- * (`com.eignex.klause.bench.solver`), and **runner** (`com.eignex.klause.bench.runner`).
- * A [ProblemRef] binds the first two; targets bind the rest.
+ * The benchmark catalog groups [ProblemRef] entries into named [Suite]s by [Category].
+ * References bind format and source; targets select the solver and runner.
  */
 
 /** Encoding of a problem instance. Drives which parser / pipeline turns it into a [Problem]. */
@@ -32,7 +26,7 @@ enum class Format {
      *  parsed in-process. See `runner.MiniZincRunner`. */
     MINIZINC,
 
-    /** XCSP3 instance. Net-new ingest (phase 3). */
+    /** XCSP3 instance. */
     XCSP3,
 
     /** SMT-LIB source script; catalog membership is independent of Klause frontend support. */
@@ -105,10 +99,7 @@ internal sealed interface FetchMethod {
     ) : FetchMethod
 }
 
-/**
- * A non-vendored problem collection fetched on demand. Recording [license] + [reason] keeps
- * the "why isn't this in the repo" decision auditable rather than implicit in a build script.
- */
+/** A collection fetched on demand, with [license] and the storage rationale in [reason]. */
 internal data class ExternalCollection(
     val id: String,
     val url: String,
@@ -118,9 +109,7 @@ internal data class ExternalCollection(
     /** Extra include directories (relative to the fetched root) added to the `minizinc` search
      *  path via `-I`, for a corpus that keeps shared included files in a common dir. */
     val includeDirs: List<String> = emptyList(),
-    /** When set, extracted files larger than this many MB are dropped before decompressing — for a
-     *  huge archive (e.g. MIPLIB's `collection.zip`) whose giant instances would bloat the cache and
-     *  only ever time out. Filters on the compressed size, so it runs before the `.gz` expansion. */
+    /** Maximum compressed file size in MB. Larger extracted files are dropped before decompression. */
     val maxFileMb: Int? = null,
     /** When set, a fetched file with no extension whose text begins with [extensionless]'s marker gains its
      *  extension, so every reader recognises it: MIPLIB 3 ships its MPS files bare. */
@@ -178,9 +167,8 @@ internal data class ProblemRef(
 internal data class Suite(val id: String, val description: String, val problems: List<ProblemRef>)
 
 /**
- * A suite whose problems are *discovered* on demand (e.g. an external corpus selected from a
- * fetched cache) rather than listed statically. The [provider] is invoked only when the suite
- * is actually resolved — listing shows [id]/[description] without triggering a fetch.
+ * A suite whose [provider] discovers problems on resolution. Listing its [id] and
+ * [description] does not trigger a fetch.
  */
 internal data class DynamicSuite(
     val id: String,
@@ -209,9 +197,10 @@ internal object Catalog {
         error("no such suite: $id (have $suiteIds)")
     }
 
-    /** Every problem of suite [id], without the per-family default a dynamic suite applies when the caller sets no
-     *  cap, so a caller that caps per family itself sees the whole corpus. The `-Dklause.bench.select.*` knobs
-     *  still apply. */
+    /**
+     * All problems of suite [id], without its default per-family cap. Explicit
+     * `-Dklause.bench.select.*` selection settings apply.
+     */
     fun uncapped(id: String): Suite {
         val dynamic = dynamicSuites.firstOrNull { it.id == id } ?: return suite(id)
         return Suite(dynamic.id, dynamic.description, dynamic.provider(CorpusSelection.Selection.fromProps()))

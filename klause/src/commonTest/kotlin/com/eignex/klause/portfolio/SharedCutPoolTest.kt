@@ -20,8 +20,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** [SharedCutPool] + [PoolCutExchange]: a global cut one arm harvests must reach another arm's local
- *  [CutPool] through the pool, mapped onto that arm's relaxation, and the pool must de-duplicate. */
 class SharedCutPoolTest {
 
     private val problem = Problem(

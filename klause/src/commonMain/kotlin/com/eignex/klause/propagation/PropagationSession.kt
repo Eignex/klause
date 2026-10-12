@@ -157,7 +157,7 @@ class PropagationSession private constructor(
 
     /** Set when a value probe saw the deadline fire (see [probeFixpoint] and
      *  [com.eignex.klause.backtrack.selector.probeAndOrder]). The brancher reads and clears it per node and
-     *  asks the run to poll before committing: a decision made now would spend its own multi-second
+     *  asks the run to poll before committing: another decision would spend its own multi-second
      *  fixpoint past the deadline.
      *  Not sticky — a probe leaves no partial state behind, so a paused arm resumes on this session. */
     internal var probeCancelled: Boolean = false

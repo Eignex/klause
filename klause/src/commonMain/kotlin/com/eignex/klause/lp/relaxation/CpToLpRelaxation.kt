@@ -716,7 +716,7 @@ internal class CpToLpRelaxation(
     private fun coneTouches(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean =
         f.extendsLpObjectiveCone() && (f.intVars.any { intIn[it] } || f.boolVars.any { boolIn[it] })
 
-    /** Add every variable of a cone-extending [f] to the cone; true when anything was newly added. */
+    /** Add every variable of a cone-extending [f] to the cone; true when anything joins the cone. */
     private fun coneMark(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean {
         if (!f.extendsLpObjectiveCone()) return false
         var changed = false
@@ -1080,19 +1080,14 @@ internal class CpToLpRelaxation(
         }
 
         /**
-         * Column(s) for LP-only continuous variable [realVar], created on first use with its declared
-         * real bounds and objective coefficient. It has no backing CP variable (`colVarId = -1`) so the
-         * persistent relaxation never re-binds it and reduced-cost fixing never maps it to a domain; its
-         * value is read back onto the real variable at the leaf.
+         * LP-only continuous variable [realVar], created with declared bounds and objective cost.
+         * It has no CP variable (`colVarId = -1`), so persistent rebinding and reduced-cost domain
+         * fixing skip it; its value is read back at a leaf.
          *
-         * A finite lower bound becomes the column's shift as usual. A `−∞` lower bound must NOT become a
-         * probe-magnitude shift: folding `coeff · 2⁶¹` into the rhs doubles annihilates ordinary
-         * right-hand sides (float spacing at that magnitude is 512), which once turned an infeasible
-         * system into a self-consistent — and exactly "certifiable" — corrupted one. Instead the
-         * variable splits as `x = x⁺ − x⁻` with both parts lower-bounded at 0 (upper sides open through
-         * the probe stand-in, which only ever appears as a box bound, never in the rhs); every row and
-         * the objective mirror the negative part with negated coefficients, and a finite upper bound is
-         * enforced by an explicit `x⁺ − x⁻ ≤ hi` row.
+         * Finite lower bounds become column shifts. A lower-open variable splits as `x = x⁺ − x⁻`,
+         * with both parts nonnegative, coefficients and objective costs mirrored, and any finite upper
+         * bound enforced by `x⁺ − x⁻ ≤ hi`. The probe stand-in appears only as a box bound: using
+         * it as a shift would erase small right-hand sides through floating-point cancellation.
          */
         override fun realColumn(realVar: Int): Int {
             var c = if (region == null) realCol[realVar] else sparseRealCol.getOrDefault(realVar, -1)
@@ -1391,7 +1386,7 @@ internal class CpToLpRelaxation(
                 cols[f.vars.size + j] = c
                 coeffs[f.vars.size + j] = f.realCoeffs[j]
             }
-            // Columns (and any lazy split-pair rows) exist now, so each realRow below lands as exactly
+            // Columns (and any lazy split-pair rows) are allocated, so each realRow below lands as exactly
             // the row index recorded before it.
             gatedRowList.add(builder.rowCount)
             gatedAuxList.add(f.aux)

@@ -156,7 +156,7 @@ class LexLessPropagatorTest {
         assertTrue(
             0 in intVarsInClause && 3 in intVarsInClause,
             "learned clause must cite the prefix vars x0(0) and y0(3) — omitting them is the " +
-                "#75 too-weak reason; got int vars $intVarsInClause from ${learned.literals.toList()}",
+                "reason omits prefix variables; got int vars $intVarsInClause from ${learned.literals.toList()}",
         )
     }
 

@@ -1044,11 +1044,8 @@ internal class LocalSearchEngine(
             newState(params, effectiveAssumptions, seed, checkpoint, timing)
         }
         warm?.let { prepareSteps(it.applySteps(state), params, checkpoint) }
-        // A restart policy instance can be reused across solves (a tuning campaign runs one
-        // recipe over many problems); clear its per-solve state so a stale incumbent — possibly
-        // of a different variable arity — can't leak in and be indexed against this problem.
-        // ScheduleBundle leaves restart reset to the engine; reset the underlying policy, not
-        // the `restarts` wrapper (whose reset is the interface no-op).
+        // Reset the underlying policy: an incumbent from another solve may have a different arity.
+        // ScheduleBundle leaves this reset to the engine; the wrapper's reset is a no-op.
         configuredRestart.reset()
         // A caller-supplied starting point stands in for the first random restart; later restarts are the policy's.
         val seeded = seedInitial(state, params, checkpoint, reconcile = false)

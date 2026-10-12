@@ -30,13 +30,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
-/**
- * A `netDelta`/`breakScore` probe of a [Move.Compound] uses apply-then-revert internally, but must
- * leave the state *exactly* as it was — including the cross-epoch [TabuBook.touchCount]
- * activity counters that drive ALNS / WarmState. After a mix of real applies and Compound probes:
- *  - touchCount equals the count of *real* applies only (probes contribute nothing), and
- *  - the break/make vectors and cost match a fresh recompute (probes leave no residue).
- */
 class LocalSearchStateCompoundProbeTest {
 
     @Test

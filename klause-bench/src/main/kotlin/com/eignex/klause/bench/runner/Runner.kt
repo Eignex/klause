@@ -12,13 +12,9 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 
 /**
- * A catalog [ProblemRef] resolved into a concrete, solvable klause [Problem].
- *
- * The model is materialised on first read, not at resolve time. Only the in-process paths — the
- * profiler and the reference adapters — ever ask for it; a `solve` run hands the file to `klause-cli`
- * as a subprocess, which parses it itself. Ingesting eagerly therefore imposed the in-process
- * frontend's limits on runs that never use it, and an open-bounded model was dropped from the
- * selection before any backend saw it.
+ * A resolved catalog [ProblemRef] with a lazily materialized [Problem]. Subprocess solves
+ * pass the file directly to the CLI; only in-process consumers request the model, so
+ * their finite-domain restrictions do not filter subprocess inputs.
  */
 internal data class ResolvedProblem(
     internal val ref: ProblemRef,
@@ -43,8 +39,10 @@ internal data class ResolvedProblem(
 ) {
     internal val name: String get() = ref.name
 
-    /** The in-process model, parsed on first read. Throws for a model the in-process frontend cannot
-     *  build — which a subprocess run never triggers, because it never asks. */
+    /**
+     * Lazily parsed in-process model; throws when the frontend cannot build it.
+     * Subprocess solves do not request it.
+     */
     internal val problem: Problem get() = ingest.value
 }
 

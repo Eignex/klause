@@ -10,12 +10,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Allocating digit columns for a wide quantity. The properties that matter are that the weights and the
- * digit domains reconstruct exactly the values the quantity could take, that each value has only one
- * digit vector (else search revisits values it has already ruled out), and that a coefficient with no
- * usable width is refused rather than silently given one whose products wrap.
- */
 class WideIntColumnsTest {
 
     private fun big(s: String) = parseBigInt(s)

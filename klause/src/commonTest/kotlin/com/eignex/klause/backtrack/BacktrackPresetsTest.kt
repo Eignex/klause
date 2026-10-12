@@ -12,12 +12,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * The SAT-optimized preset bundles the full modern-CDCL stack (adaptive restarts, target
- * phasing, three-tier learned DB, binary-resolution minimization, vivification). Each
- * component is sound, so the preset must produce correct verdicts; these tests pin that on a
- * conflict-heavy UNSAT family and a satisfiable instance.
- */
 class BacktrackPresetsTest {
 
     /** Pigeonhole P(n+1, n) — UNSAT, conflict-heavy. */

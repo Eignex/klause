@@ -14,11 +14,9 @@ import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 
 /**
- * A folded integer linear combination that is either 64-bit ([Narrow], the common fast path) or
- * arbitrary-precision ([Wide]). Integer folds stay [Narrow] until a coefficient or constant overflows
- * `Long`, then promote to [Wide] — an over-Int64 literal lowers to a wide factor instead of being rejected.
- * The narrow arithmetic is unchanged (no per-op `BigInt` allocation), so only the rare wide fold pays
- * for arbitrary precision.
+ * Folded integer linear combination in 64-bit [Narrow] or arbitrary-precision [Wide] form.
+ * A coefficient or constant overflowing `Long` promotes the fold to [Wide]; narrow folds
+ * avoid big-integer allocation.
  */
 internal sealed interface IntComb {
     class Narrow(val lin: LinComb) : IntComb
@@ -50,10 +48,8 @@ internal fun IntComb.isConstant(): Boolean = when (this) {
 }
 
 /**
- * Sum of [combs], with every element after the first negated when [negateTail] (the n-ary `-` fold).
- * One mutable accumulator instead of a per-operand map copy, so a wide sum costs linear work in its
- * operand count — the miplib-style set-covering constraints sum tens of thousands of terms.
- * A `Long` overflow anywhere re-runs the whole sum in arbitrary precision.
+ * Sum [combs], negating all elements after the first when [negateTail]. One mutable
+ * accumulator keeps work linear in operand count. A `Long` overflow retries in arbitrary precision.
  */
 internal fun sumIntCombs(combs: List<IntComb>, negateTail: Boolean = false): IntComb {
     if (combs.all { it is IntComb.Narrow }) {

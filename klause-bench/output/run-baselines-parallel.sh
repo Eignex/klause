@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Parallel baseline sweep: each config runs as its own bench JVM via the installDist binary (NOT
-# gradle — so no daemon contention). Each writes a distinct output/<config>/ dir and distinct cache
-# keys, so concurrent runs never collide; already-solved instances replay from cache.
-# Cores at peak ≈ choco-p8(8) + yuck-p8(8) + 2×choco-p1(2) = 18 of 20.
-# Prereq: ./gradlew :klause-bench:installDist
+# Parallel reference runs use separate bench JVMs and distinct output/cache keys.
+# Prerequisite: ./gradlew :klause-bench:installDist
 set -u
 cd "$(git rev-parse --show-toplevel)/klause-bench"   # so output/ and build/bench-cache resolve here
 BIN=build/install/klause-bench/bin/klause-bench

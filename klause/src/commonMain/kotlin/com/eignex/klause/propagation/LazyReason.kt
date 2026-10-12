@@ -25,7 +25,7 @@ internal fun isLazyReason(reason: IntArray?): Boolean =
     reason != null && reason.isNotEmpty() && reason[0] == LAZY_MARKER
 
 /**
- * A lazy reason for a deduction factor [factorId] (by default the one propagating) makes now, carrying [payload]
+ * A lazy reason for a deduction factor [factorId] (by default the one propagating) makes, carrying [payload]
  * for its [Propagator.explain].
  */
 internal fun PropagationState.lazyReason(payload: IntArray, factorId: Int = currentFactor): IntArray {

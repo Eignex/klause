@@ -26,11 +26,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * [RevisedSimplex.solvePrimal] — the bounded-variable primal phase-2 pass — must reach the same optimum
- * as the dual [RevisedSimplex.solve] (both confirmed by the integer-multiplier bound), and its
- * bound-flipping ratio test must take the long step when an entering variable hits its own bound first.
- */
 class RevisedSimplexPrimalTest {
 
     @Test

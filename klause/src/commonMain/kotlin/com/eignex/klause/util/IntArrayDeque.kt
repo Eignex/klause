@@ -1,16 +1,9 @@
 package com.eignex.klause.util
 
 /**
- * Primitive double-ended queue specialised for `Int` — eliminates the per-element
- * boxing that `ArrayDeque<Int>` pays on the JVM. Used as the propagation worklist in
- * `PropagationState` (where every push/poll on the dirty-var queue would otherwise
- * box) and by any other propagator-internal BFS/DFS that holds dense int ids.
- *
- * Backed by a power-of-two ring buffer. [addFirst] / [addLast] grow the buffer when
- * needed (amortised O(1)); [removeFirst] / [removeLast] return raw `Int`. The empty
- * sentinel for the `*OrSentinel` variants is caller-provided.
- *
- * Not thread-safe. Iteration order is FIFO from [removeFirst] / LIFO from [removeLast].
+ * Primitive Int deque backed by a growing power-of-two ring buffer. End operations
+ * are amortized O(1); `*OrSentinel` variants use caller-provided empty sentinels.
+ * Not thread-safe.
  */
 internal class IntArrayDeque(initialCapacity: Int = 8) {
 

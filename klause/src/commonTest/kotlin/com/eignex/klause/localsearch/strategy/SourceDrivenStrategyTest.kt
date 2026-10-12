@@ -28,12 +28,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Acceptance test for the source-driven driver: a [SourceDrivenStrategy] is built *purely by
- * configuration* over the shared [com.eignex.klause.localsearch.movesource.MoveSource]
- * catalog, with no per-strategy generation code. The same sources [Cbls] draws from are reused here
- * by listing them, so adding a source in one place makes it available to every strategy.
- */
 class SourceDrivenStrategyTest {
 
     @Test
@@ -204,11 +198,7 @@ class SourceDrivenStrategyTest {
 
     @Test
     fun `feasible descent declines an objective-lowering move that breaks feasibility`() {
-        // At the feasible optimum (1,1) of x0 + x1 = 2, minimizing x0 + x1: every objective-lowering move
-        // ObjectiveSeed proposes (e.g. x0 -> 0) breaks the equality, and none preserving it improves the
-        // objective. Under a strong shaping pull the old shaped score ranked the infeasible move best;
-        // GreedyDescent must disqualify any violation-adding move and report the local optimum (null)
-        // instead of a move the engine would only revert.
+        // At (1,1), every objective-lowering move breaks x0 + x1 = 2; shaping must preserve feasibility.
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ObjectiveSeed())),
             scoring = MoveScoring.Weighted,

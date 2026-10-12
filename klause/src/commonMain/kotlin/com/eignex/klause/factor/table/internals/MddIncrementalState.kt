@@ -6,24 +6,16 @@ import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.propagation.lazyReason
 
 /*
- * Reversible, delta-driven layered-MDD GAC — the incremental counterpart to the full forward+backward
- * bitset rebuild Mdd.propagate ran every fire. Per layer a state-bitset records forward-reachability
- * from [initial] and backward-co-reachability to an accepting state, both on the engine undo trail
- * ([RevLongArray], one uniform-width slot per layer). A symbol value at position i survives iff some
- * forward-reachable state has a transition on it to a backward-co-reachable state. Reachability uses
- * the symbol's *bounds* (`sym in min..max`), exactly as the original — Mdd is bounds-sensitive, so it
- * wakes on bound moves only (interior carves cannot change the bitset reachability). A fire recomputes
- * only the layers a changed position propagates through; a backtrack restores the layers in O(changed
- * words). The cost variant re-derives the cost-variable bounds from the (current) forward lattice.
+ * Reversible, delta-driven layered-MDD filtering. Each layer keeps forward reachability from
+ * [initial] and backward reachability to accepting states in [RevLongArray]. A symbol at
+ * position i survives iff a forward-reachable state transitions on it to a backward-reachable
+ * state. Reachability uses symbol bounds, so only bound moves wake the propagator. A fire
+ * recomputes affected layers; backtracking restores changed words. The cost variant derives
+ * cost-variable bounds from the current forward lattice.
  *
- * Each layer's transition records are indexed by source state (a per-layer CSR: [fwdHead] offsets into
- * [fwdPtr]) and by destination state ([bwdHead] into the inline [bwdSrc]/[bwdSym]). The forward, prune,
- * and cost sweeps then visit only the outgoing records of forward-reachable sources, and the backward
- * sweep only the incoming records of co-reachable destinations — O(live out-edges) rather than O(all
- * records per layer). Sparse diagrams (few reachable states per layer) gain the most; a dense diagram
- * does no less work than before.
- *
- * Soundness gated by MddPropagatorTest enumerate-vs-brute under full CDCL across deep backtracking.
+ * Transitions are indexed by source ([fwdHead], [fwdPtr]) and destination ([bwdHead], [bwdSrc],
+ * [bwdSym]). Sweeps visit outgoing edges of reachable sources or incoming edges of reachable
+ * destinations, limiting work to live edges.
  */
 internal class MddIncrementalState(
     state: PropagationState,

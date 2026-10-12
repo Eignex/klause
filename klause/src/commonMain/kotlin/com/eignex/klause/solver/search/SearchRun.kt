@@ -3,9 +3,8 @@ package com.eignex.klause.solver.search
 /**
  * Resumable traversal of a [SearchSession].
  *
- * Frames contain public shared decisions only. Consequently a CP split, an integer-theory split, and a
- * future array/function/quantifier split all follow the identical push, propagation, retraction, restart,
- * and budget path.
+ * Frames contain public shared decisions only, so CP and integer-theory splits share the same
+ * push, propagation, retraction, restart and budget path.
  */
 class SearchRun internal constructor(
     private val session: SearchSession,

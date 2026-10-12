@@ -7,30 +7,21 @@ import com.eignex.klause.util.Int128
 /** A bound the objective cutoff proves on an integer variable: `varId ≤ hi`. */
 internal class CutoffBound(val varId: Int, val hi: Long)
 
-/**
- * Bounds the incumbent puts on the integer columns nothing else bounds.
+/*
+ * Bounds open integer columns using the incumbent cutoff `Σ c·x + constant ≤ incumbent − 1`.
+ * For `c_j > 0`, propagation gives `lo_j + ⌊(incumbent − 1 − L) / c_j⌋`, where `L` is the
+ * objective minimum over declared domains. Every other term is at least its own minimum,
+ * so this bound is sound without an LP relaxation.
  *
- * A column open on the high side is one no row caps: raising it only ever helps satisfy the rows it
- * appears in, so bound tightening leaves the side open and the front-end closes it at an invented
- * search box (`Problem.intBounds` records which sides those are). Cost still caps such a column — but
- * only against an incumbent, which exists neither at load nor in presolve. Once the search holds one,
- * `Σ c·x + constant ≤ incumbent − 1` is a row like any other, and propagating it bounds column `j` with
- * `c_j > 0` at `lo_j + ⌊(incumbent − 1 − L) / c_j⌋`, where `L` is the objective's minimum over the
- * declared domains. Sound because every other term is at least its own minimum, which `L` already
- * charges. This is objective bound propagation, the LP-free half of reduced-cost fixing (Crowder,
- * Johnson, Padberg, "Solving Large-Scale Zero-One Linear Programming Problems", Operations Research
- * 31(5), 1983); an LP dual bound would be tighter than `L`, but the models that carry open columns are
- * exactly the ones whose root LP does not converge inside a search slice, and the reduced-cost fixing
- * the node LP already runs covers the models where it does.
+ * The cutoff retains only strictly better integral objectives. The caller must restrict it
+ * to branch-and-bound optimization, never enumeration.
  *
- * [incumbent] is the objective of a solution already in hand, so only a strictly better one — at most
- * `incumbent − 1`, the objective being integral — has to survive. Cutting the rest is what
- * branch-and-bound proves and what enumeration must not do; the caller owns that gate.
+ * `L` accumulates exactly in 128 bits. An inexact column minimum yields no bound. Columns
+ * with an invented lower endpoint are skipped because the formula would bound the search box
+ * rather than the source model.
  *
- * `L` accumulates exactly in 128 bits, so a coefficient against the invented box wraps nothing; a
- * column whose own minimum does not evaluate exactly yields no bound rather than a guess. A column the
- * box also invented a *lower* side for is skipped: its `lo_j` is the box, so what the cutoff would say
- * about it is a statement about the box rather than about the model.
+ * Crowder, Johnson, Padberg, "Solving Large-Scale Zero-One Linear Programming Problems",
+ * Operations Research 31(5), 1983.
  */
 internal fun objectiveCutoffBounds(
     problem: BakedProblem,

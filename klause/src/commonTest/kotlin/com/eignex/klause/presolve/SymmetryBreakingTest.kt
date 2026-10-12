@@ -154,7 +154,7 @@ class SymmetryBreakingTest {
     @Test
     fun `an ordering linear is not value-anonymous`() {
         // `x - y <= 0` is an ordering, not a disequality — relabeling values breaks it, so value
-        // symmetry must stay off (regression guard for the #501 binary-relation detection).
+        // symmetry must stay off.
         val problem = Problem(
             0,
             2,

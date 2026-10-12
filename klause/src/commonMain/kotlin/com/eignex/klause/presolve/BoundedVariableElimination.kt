@@ -156,6 +156,5 @@ internal object BoundedVariableElimination {
         SourceRebuilds(asReversed().map { RebuildStep.SatisfyClauses(it.v, it.clauses) })
 }
 
-// Work units per occurrence visited, against one simplex op. No model in the calibration sample (60 MIPLIB 2017,
-// 40 QF_LIA and 40 MiniZinc Challenge) ran this pass, so it takes the weight the other per-term passes measured.
+// Work units per occurrence visited, relative to one simplex operation.
 private const val BVE_WORK_WEIGHT = 10L

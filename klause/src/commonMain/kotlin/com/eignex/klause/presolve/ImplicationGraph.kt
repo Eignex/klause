@@ -457,6 +457,5 @@ internal class BoolMerge(val from: Int, val into: Int)
 internal fun List<BoolMerge>.asRebuilds(): SourceRebuilds =
     SourceRebuilds(map { RebuildStep.CopyLiteral(it.from, Lit.make(it.into, true)) })
 
-// Work units per implication edge or graph node visited, against one simplex op. Uncalibrated: no model in
-// the calibration sample ran this pass, so it takes the weight the other per-term passes measured.
+// Work units per implication edge or graph node visited, relative to one simplex operation.
 private const val IMPLICATION_GRAPH_WORK_WEIGHT = 10L

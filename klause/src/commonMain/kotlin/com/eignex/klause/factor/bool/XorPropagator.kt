@@ -7,7 +7,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntHashSet
 
-/** CP propagator for [Xor]: parity propagation over a list of Boolean literals. */
 internal class XorPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,

@@ -17,7 +17,6 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap
 
-/** LS invariant logic for `all_different`. */
 internal class AllDifferentInvariant(
     private val vars: IntArray,
     private val domainMin: Long,

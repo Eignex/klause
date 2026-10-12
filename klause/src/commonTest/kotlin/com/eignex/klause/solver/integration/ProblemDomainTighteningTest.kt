@@ -13,8 +13,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-/** Root-level deductions from the bake are folded into [BakedProblem.intDomains] by [Problem.bake], so
- *  every solver sees the tightened domains rather than the loosely-declared input. */
 class ProblemDomainTighteningTest {
     @Test
     fun `bound tightenings become the baked problem's domains`() {

@@ -3,13 +3,6 @@ package com.eignex.klause.solver.result
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * The work counter accumulates operation *totals*, not sample counts.
- *
- * Every other LP counter records units by repeating a unit update, so a single update carrying a large
- * value is the one place the accumulator's semantics matter — and getting it wrong reads as an LP that
- * costs almost nothing.
- */
 class LpWorkStatTest {
 
     @Test

@@ -12,11 +12,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * #22 Element LP linearization: the one-hot selector model for a constant array. It is the exact
- * convex hull, so the LP bound on `result` equals the true min/max selectable entry, and the index
- * channel ties `idx` to the selected position.
- */
 class CpToLpRelaxationElementHullTest {
 
     private val eps = 1e-7

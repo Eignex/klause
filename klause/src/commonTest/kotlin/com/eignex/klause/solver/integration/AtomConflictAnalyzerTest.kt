@@ -26,29 +26,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * Coverage for the **atom-var** paths of [ConflictAnalyzer] — the `levelOf` / `uipLit` /
- * `antecedentsOf` branches that dispatch on `variable >= numBoolVars`. Every case in
- * [ConflictAnalyzerTest] is pure-bool, so these branches — and the trail-resident atom-level /
- * conflict-level soundness invariants #76 / #77 that lean on them — are covered only here.
- *
- * The bound-consistent propagators (Linear back-clamp, AllDifferent Hall sets) eagerly
- * cap every variable the moment a related bound moves, so a genuine *multi-level* atom
- * conflict can't be reached by a sequence of [PropagationSession] decisions — the second
- * decision always conflicts at decision time (no clause-form seed) or is pre-empted at
- * bake. The realistic source of a lazy atom nogood is a *learned* atom-clause that fires
- * after a backjump. We reproduce exactly that here by hand-building the atom implication
- * graph on a [PropagationState] (same-package `internal` access) and seeding [analyze]
- * with a registered atom-clause — driving the analyzer in isolation, the way a SAT-solver
- * conflict-analysis unit test drives the 1UIP loop directly.
- */
+// A hand-built atom graph isolates multi-level conflicts that eager bound propagation pre-empts.
 class AtomConflictAnalyzerTest {
 
     /**
      * Build a state with one int var per entry of [levels] over `[0, 10]`, each tightened so
      * `v ≥ 5` holds and recorded at the given decision level (the tighten runs with
      * `currentLevel = levels[v]`, so the atom's trail slot — which the analyzer reads for atom
-     * levels, see #76 — stamps the bound at that level). Allocates the `v ≥ 5` atom
+     * levels — stamps the bound at that level). Allocates the `v ≥ 5` atom
      * for each. With `numBoolVars = 0` and allocation in var order, the atom's virtual var id
      * equals its int var index — so atom `i` is var `i` and `Lit.make(i, false)` is `¬(varᵢ ≥ 5)`.
      */
@@ -81,7 +66,7 @@ class AtomConflictAnalyzerTest {
         // Two leaf atoms: ax at level 1, ay at level 2 (the conflict level). The conflict
         // clause forbids both holding. 1UIP keeps ay as the asserting UIP, ax drops to the
         // learned clause as a lower-level literal → backjump to level 1.
-        // #76 regression: the backjump must come from ax's trail-resident establishment level
+        // the backjump must come from ax's trail-resident establishment level
         // (1), not from how the search happened to pop to reach the conflict.
         val state = atomGeState(intArrayOf(1, 2)) // ax @1, ay @2
         state.currentLevel = 2
@@ -98,7 +83,7 @@ class AtomConflictAnalyzerTest {
 
     @Test
     fun `factor conflict level comes from the seed reason not the firing-factor attribution`() {
-        // #77 regression: the conflict's literals are ax @1 and ay @2 (their trail-resident levels),
+        // the conflict's literals are ax @1 and ay @2 (their trail-resident levels),
         // so the conflict level is 2 and ay is the lone level-2 UIP → an asserting clause that
         // backjumps to level 1. But state.currentLevel carries the failing factor's attribution
         // (here a stale-high 5, the coarse maxLevelForVars attribution over all the factor's vars
@@ -213,7 +198,7 @@ class AtomConflictAnalyzerTest {
 
     @Test
     fun `BnB never over-prunes the true optimum with negative coefficients and domain holes`() {
-        // linearLowerBound feeds the objective-bound prune; an unsound backjump (#76/#77) or a
+        // linearLowerBound feeds the objective-bound prune; an unsound backjump or a
         // loose lower bound would let it cut the true optimum. Validate against the brute-force
         // ground truth across instances mixing negative objective coefficients and domain holes.
         val instances = listOf(
@@ -280,7 +265,7 @@ class AtomConflictAnalyzerTest {
 
 /** Re-derives the analyzer's private level lookup for assertions, mirroring
  *  [ConflictAnalyzer]'s `levelOf`: bool vars via [PropagationState.boolLevel], atoms via the
- *  trail-resident [PropagationState.atomLevelForConflict] (#76). */
+ *  trail-resident [PropagationState.atomLevelForConflict]. */
 internal object ConflictAnalyzerTestAccess {
     fun levelOf(state: PropagationState, v: Int): Int = if (v < state.problem.numBoolVars) {
         state.boolLevel[v]

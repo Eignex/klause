@@ -108,16 +108,8 @@ class IncrementalDifferenceGraphTest {
         assertTrue(graph(2, Triple(0, 1, 5L)).usable, "an ordinary system is usable")
     }
 
-    /**
-     * A system built so that the repair reaches the closing vertex over two routes of different slack,
-     * with the vertices on them at different potentials.
-     *
-     * The scan is ordered by the pending decrease γ, and this is where that choice is observable.
-     * Ordering by the resulting potential `π + γ` instead takes the slack route first, because vertex 3
-     * sits 20 below vertex 2; vertex 4 then settles one short of what the tight route gives it and has
-     * to settle a second time. Both orders reach the same cycle — a vertex whose potential must fall
-     * further is simply re-queued — so the difference is the settle count, not the answer.
-     */
+    // Vertex 3 lies 20 below vertex 2, so ordering by resulting potential takes the slack route
+    // first and settles vertex 4 twice. Ordering by pending decrease takes the tight route first.
     private fun divergentRoutes(): Pair<IncrementalDifferenceGraph, Array<Triple<Int, Int, Long>>> {
         val edges = arrayOf(
             Triple(0, 3, -20L), // sinks vertex 3 far below the others

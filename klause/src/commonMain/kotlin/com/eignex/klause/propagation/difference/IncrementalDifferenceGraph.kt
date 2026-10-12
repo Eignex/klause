@@ -29,7 +29,7 @@ internal class IncrementalDifferenceGraph(
      * Edges stating a declared range rather than a row, every one of them incident to the constant node.
      * They stay in the system — the potential has to stay feasible for them, and a cycle through them is
      * a real conflict — but [shortestPathsFrom] does not walk them, because doing so makes that node a
-     * hub and every search spans the graph (#1529). [refreshZeroDistances] is where they are traversed,
+     * hub and every search spans the graph. [refreshZeroDistances] is where they are traversed,
      * twice per sweep instead of once per head.
      */
     private val hub: BooleanArray = BooleanArray(source.size),

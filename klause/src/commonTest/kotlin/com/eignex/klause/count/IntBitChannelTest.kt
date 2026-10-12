@@ -16,7 +16,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/** The native int↔bits channel that replaces bit-blasting for XOR-hash counting over integers. */
 class IntBitChannelTest {
 
     @Test

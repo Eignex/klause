@@ -11,11 +11,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * Bucketed-float FlatZinc lowering: `float_abs` and `array_float_element` map to bucket-index
- * tables, an unrepresentable float shape rejects with a [FlatZincParseException] rather than leaking
- * an internal invariant, and an exact-constant contradiction is a clean UNSAT.
- */
 class FlatZincFloatConstraintsTest {
 
     // Five buckets over an exact grid so declared constants land on bucket boundaries.

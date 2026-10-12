@@ -18,10 +18,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * A factor states its variables once, and the kind carries what it needs from them: bounds, or values
- * it must be able to enumerate.
- */
 class VarListTest {
 
     @Test

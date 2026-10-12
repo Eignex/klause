@@ -5,8 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** #104: coverage for [IntIntMap] across the dense (offset-array) and sparse (open-addressing
- *  hash) backings, including collision probing and key-range overflow. */
 class IntIntMapTest {
 
     @Test

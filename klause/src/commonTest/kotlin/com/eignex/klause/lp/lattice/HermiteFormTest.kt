@@ -14,11 +14,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Column Hermite normal form. The two properties that matter downstream are checked on every case rather
- * than the exact entries: the factorisation `H = A·V` holds, and `V` is unimodular — without the second,
- * `x = Vy` is not a bijection of the integer lattice and the transformed system is not equisatisfiable.
- */
 class HermiteFormTest {
 
     private fun form(vararg rows: LongArray): HermiteForm {

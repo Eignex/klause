@@ -36,10 +36,8 @@ import com.eignex.klause.util.MutableIntIntMap
  * is cheap — one solve under a single-bit assumption. On problems with many cores the
  * amortised cost is lower.
  *
- * **Weighted MaxSAT** is out of scope here; the encoding above only counts selectors
- * uniformly. For weighted, fall back to [CoreGuidedOptimizer] which handles the RC2
- * weight-splitting + stratification — totalizer-with-weights (pseudo-Boolean encoding)
- * is a future extension.
+ * The encoding counts selectors uniformly. Weighted MaxSAT uses [CoreGuidedOptimizer]
+ * with RC2 weight splitting and stratification.
  */
 internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
 

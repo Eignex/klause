@@ -6,11 +6,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * The cut selection ([CutPool.select]) must: drop cuts the point already satisfies
- * (efficacy floor), prefer higher-efficacy cuts, skip near-parallel duplicates (orthogonality), honour
- * the `max` cap, and only ever return cuts that are in the pool (sound — it never invents a cut).
- */
 class CutPoolSelectTest {
 
     @Test

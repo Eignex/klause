@@ -10,7 +10,6 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
-/** CP propagator for [ReifiedPseudoBoolean]: reified pseudo-Boolean propagation. */
 internal class ReifiedPseudoBooleanPropagator(
     private val auxBoolVar: Int,
     private val weights: LongArray,

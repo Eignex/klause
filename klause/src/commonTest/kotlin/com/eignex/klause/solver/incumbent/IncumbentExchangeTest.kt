@@ -8,11 +8,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The generic candidate/verifier/incumbent protocol: an untrusted candidate becomes an incumbent only by
- * passing verification and strictly improving the standing one, and only the caller that installed it is
- * told so.
- */
 class IncumbentExchangeTest {
     @Test
     fun `published samples keep their verified objective after external mutation`() {

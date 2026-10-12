@@ -42,7 +42,7 @@ internal class EmaRestart(
     private var conflicts = 0L
 
     /**
-     * Record one learned conflict and decide whether to restart now. [lbd] is the learned clause's
+     * Record one learned conflict and decide whether to restart. [lbd] is the learned clause's
      * literal-block distance; [trailSize] is the search depth at the conflict. Returns true iff the
      * engine should pop to root and restart.
      */

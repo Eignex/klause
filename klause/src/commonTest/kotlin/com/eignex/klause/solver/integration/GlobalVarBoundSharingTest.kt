@@ -15,11 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Cross-arm sharing of globally-valid level-0 variable bounds: an arm publishes the root tightenings it
- * proves hold at every solution, and importing a shared bound only tightens a domain — never changes the
- * optimum. (`x ∈ [0, 9]` with `x ≥ 3`, minimizing `x`; the proven optimum is 3.)
- */
 class GlobalVarBoundSharingTest {
 
     private fun problem() = Problem(

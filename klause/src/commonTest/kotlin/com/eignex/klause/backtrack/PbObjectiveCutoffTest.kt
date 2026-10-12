@@ -11,13 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-/**
- * A pure-Boolean pseudo-Boolean minimize has no objective variable to bound, so optimality is proven only
- * once the incumbent cutoff `Σ w_b·x_b ≤ best − 1` is posted as a refutable pseudo-Boolean constraint and
- * the cutting-planes engine refutes it. These assert a *proven* optimum (not just a best-found), covering
- * both positive and negative objective weights (the cutoff's sign normalization). The cutoff is off by
- * default (net-negative as a uniform default), so these enable it explicitly.
- */
+// Optimality requires refuting the incumbent cutoff because the objective has no integer column.
 class PbObjectiveCutoffTest {
 
     private fun atLeast(vars: Int, min: Int): Factor =

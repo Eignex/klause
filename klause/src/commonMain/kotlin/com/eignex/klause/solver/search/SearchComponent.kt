@@ -352,7 +352,7 @@ sealed interface SearchRunDisposition {
  * Complete mode-specific wiring for one [SearchRun].
  *
  * The session owns traversal; a policy only selects branching, limits, model continuation, and lifecycle
- * boundary work for one caller. Finite CP, optimization, and future frontends can therefore share the
+ * boundary work for one caller. Finite CP and optimization frontends can therefore share the
  * same decision stack and conflict path without reimplementing the run loop.
  */
 internal interface SearchTraversalPolicy {
@@ -492,7 +492,7 @@ interface SearchContext {
      * Publish a Boolean consequence whose explanation remains owned by the producing component.
      *
      * The fact is visible to peers but cannot enter shared learning until that component exposes a
-     * clause-form reason. This is the bridge for existing CP propagators during migration.
+     * clause-form reason.
      */
     fun publish(literal: Int): ComponentResult
 
@@ -554,7 +554,7 @@ data class SearchBoolValue(
 }
 
 /**
- * Legacy source integer key with producer-specific Long or arbitrary-precision representation.
+ * Untyped source integer key with producer-specific Long or arbitrary-precision representation.
  * Use [SearchExactIntValue] for a typed authoritative coordinate.
  */
 data class SearchIntValue(
@@ -562,7 +562,7 @@ data class SearchIntValue(
     val variable: Int,
 ) : SearchValueKey
 
-/** Legacy real key with producer-specific representation; use [SearchExactRealValue] for exact values. */
+/** Untyped real key with producer-specific representation; use [SearchExactRealValue] for exact values. */
 data class SearchRealValue(
     /** Source real variable id. */
     val variable: Int,
@@ -580,7 +580,7 @@ class AssembledSearchModel internal constructor(values: Map<Any, Any>) {
         return value as V
     }
 
-    /** Legacy unchecked read; opaque legacy values remain borrowed read-only. */
+    /** Unchecked read; opaque values remain borrowed read-only. */
     @Deprecated("Use valueOf with a TypedSearchValueKey")
     @Suppress("UNCHECKED_CAST")
     fun <A : Any> valueOf(key: Any): A? = values[key] as A?

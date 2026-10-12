@@ -37,8 +37,7 @@ sealed interface PropagationResult {
         /** Forced values aligned with [intKeys]. */
         val intValues: LongArray,
         /** Int var ids whose lower bound was tightened (but not yet singleton). Disjoint
-         *  from [intKeys]; ascending. Populated by bound-SAC and any future propagation
-         *  that wants to expose non-singleton deductions. */
+         *  from [intKeys]; ascending. Includes non-singleton bound-SAC deductions. */
         val intMinKeys: IntArray = EmptyIntArray,
         /** Lower-bound values aligned with [intMinKeys]. */
         val intMinValues: LongArray = EmptyLongArray,
@@ -387,7 +386,7 @@ sealed interface PropagationResult {
 
             /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor
              *  normalises to the primitive sorted-array form. Optional bound-tightening
-             *  args support SAC-at-root and any future producer of non-singleton deductions. */
+             *  args carry non-singleton deductions, including SAC-at-root. */
             operator fun invoke(
                 bools: Map<Int, Boolean> = emptyMap(),
                 ints: Map<Int, Long> = emptyMap(),

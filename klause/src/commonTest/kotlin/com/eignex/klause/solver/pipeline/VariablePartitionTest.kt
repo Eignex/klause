@@ -16,11 +16,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Classifying integer columns into the ones the search must branch on and the ones a theory could take.
- * The distinction is what the invented search box rests on, so what matters here is which factor kinds
- * force a column into the search set.
- */
 class VariablePartitionTest {
 
     private fun problemOf(numInts: Int, vararg factors: Factor) = Problem(

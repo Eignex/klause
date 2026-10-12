@@ -98,8 +98,7 @@ internal object CoefficientStrengthening {
         return row.isLongUnconditional && (0 until row.size).all { Term.isBool(row.ref(it)) }
     }
 
-    // Work units per factor-and-term strengthened, against one simplex op: section time per unit over the
-    // 60 MIPLIB 2017, 40 QF_LIA and 40 MiniZinc Challenge models, ~3.5e-5 ms against the simplex's 2.7e-6 ms.
+    // Work units per factor and term strengthened, relative to one simplex operation.
     private const val STRENGTHEN_WORK_WEIGHT = 15L
 
     /** Poll the cancellation once per this many strengthened factors (power-of-two mask for a cheap test). */

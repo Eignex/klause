@@ -6,14 +6,9 @@ import com.eignex.klause.ir.Problem
 import kotlin.random.Random
 
 /**
- * Parametric SAT instance generators for in-code (`InCode`) bench suites — no fetch, no
- * license, fully tunable. Each returns a klause [Problem] via the DIMACS parser, so they
- * exercise the same path as a `.cnf` file.
- *
- *  - [php] — pigeonhole PHPₙ (n+1 pigeons, n holes): **UNSAT**, exponential without effective
- *    clause learning — the canonical CDCL stress test.
- *  - [random3Sat] — uniform random 3-SAT at a clause/var [ratio] (4.26 ≈ the phase transition);
- *    sweep `n` to plot solver scaling.
+ * Parametric SAT generators returning a [Problem] through the DIMACS parser.
+ * [php] generates unsatisfiable pigeonhole instances; [random3Sat] samples uniform
+ * 3-SAT at the requested clause/variable [ratio].
  */
 internal object SatGenerators {
     fun php(n: Int): Problem = Dimacs.parse(phpCnf(n)).toProblem()

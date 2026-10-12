@@ -7,11 +7,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * The right-hand side must take every row operation the coefficients take. A reduced row paired with the
- * bound of whichever input row a swap moved into its slot states a constraint the model never had, and a
- * bound derived from it closes a domain without the clamp flag — so the error surfaces as a false `unsat`.
- */
 class BareissRhsTest {
 
     private fun vec(vararg v: Long) = Array(v.size) { bigIntOf(v[it]) }

@@ -1,4 +1,3 @@
-%-----------------------------------------------------------------------------%
 % Klause solver library.
 %
 % Declares which FlatZinc predicates klause supports natively. Anything not
@@ -8,7 +7,6 @@
 %
 % The pattern is: bare declarations (no body) mean "native, emit straight to
 % FlatZinc". Klause's FlatZincCompiler reads the resulting FZN.
-%-----------------------------------------------------------------------------%
 
 % Boolean primitives.
 predicate bool_clause(array[int] of var bool: as,
@@ -165,7 +163,7 @@ predicate diffn_nonstrict(array[int] of var int: x, array[int] of var int: y,
 % Set variables and predicates. Klause materialises each `var set of E: S` as one
 % indicator bool per universe element; the set predicates below dispatch to bool-level
 % Clause / PseudoBoolean / ReifiedLinear factors over those indicators. set_in supports
-% constant-int elements only today; set_in_reif likewise.
+% constant-int elements only; set_in_reif likewise.
 predicate set_in(var int: x, var set of int: S);
 predicate set_in_reif(var int: x, var set of int: S, var bool: r);
 predicate set_subset(var set of int: S, var set of int: T);
@@ -187,7 +185,7 @@ predicate array_var_set_element(var int: x, array[int] of var set of int: y, var
 predicate all_disjoint(array[int] of var set of int: a);
 predicate set_partition_into(array[int] of var set of int: a, var set of int: u);
 
-% Scheduling / disjunctive (legacy klause coverage; kept native for completeness).
+% Native scheduling and disjunctive predicates.
 predicate circuit(array[int] of var int: x);
 predicate subcircuit(array[int] of var int: x);
 predicate cumulative(array[int] of var int: starts, array[int] of int: durations,
@@ -197,7 +195,6 @@ predicate disjunctive_strict(array[int] of var int: starts, array[int] of int: d
 % Var-arg cumulative / disjunctive[_strict] live in their own override files
 % (fzn_cumulative.mzn etc.) so MiniZinc shadows the std decomposing definitions.
 
-%-----------------------------------------------------------------------------%
 % Implied-constraint markers.
 %
 % MiniZinc's stdlib lowers `redundant_constraint(c)` / `symmetry_breaking_constraint(c)`

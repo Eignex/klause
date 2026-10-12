@@ -58,7 +58,7 @@ class VerifiedIncumbent<out A, out V>(
     val version: Long,
 )
 
-/** The read half of an incumbent exchange: whatever incumbent stands right now, or null before the first. */
+/** The read half of an incumbent exchange: whatever incumbent stands, or null before the first. */
 fun interface IncumbentSource<out A, out V> {
     /** The incumbent standing at this instant, or null before the first one is installed. */
     fun current(): VerifiedIncumbent<A, V>?

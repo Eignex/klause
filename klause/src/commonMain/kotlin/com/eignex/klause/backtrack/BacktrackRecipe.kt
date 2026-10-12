@@ -12,7 +12,7 @@ import com.eignex.klause.solver.result.SearchEvent
  * pure factory and one recipe value is safe to reuse across worker slots.
  */
 class BacktrackRecipe(
-    /** External name (CLI / campaign / telemetry). */
+    /** External name (CLI / telemetry). */
     val label: String,
     /** Fresh params for a worker on the given seed, wired to emit [SearchEvent]s through the sink. */
     val build: (seed: Long, onEvent: ((SearchEvent) -> Unit)?) -> BacktrackParams,

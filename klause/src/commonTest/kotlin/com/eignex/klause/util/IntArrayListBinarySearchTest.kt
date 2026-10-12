@@ -3,12 +3,6 @@ package com.eignex.klause.util
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Coverage for [IntArrayList.lowerBound] / [IntArrayList.lowerBoundDescending] — the O(log n)
- * monotone-history lookups behind [com.eignex.klause.propagation.PropagationState.minLevelForGe] /
- * `maxLevelForLe` (#97). Each is checked against a brute-force linear lower bound so the binary
- * search provably agrees with a scan.
- */
 class IntArrayListBinarySearchTest {
 
     private fun listOfInts(vararg v: Int): IntArrayList = IntArrayList().apply { v.forEach { add(it) } }

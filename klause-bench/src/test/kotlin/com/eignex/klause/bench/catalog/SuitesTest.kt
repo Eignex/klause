@@ -6,8 +6,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/** Declared dynamic-suite metadata. Reads the catalog only; never resolves a provider, so no
- *  corpus is fetched. */
 class SuitesTest {
 
     private val largeCorpusSuites = listOf(

@@ -11,16 +11,9 @@ import kotlin.math.abs
 import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 
 /**
- * The MPS (MIP) reference. cp-sat, clasp and z3 read no MPS, so mixed-integer programs are solved by
- * SCIP (Apache-2.0 since v8) in the [IMAGE] container — a strong branch-and-cut solver that reads MPS
- * natively, proves optima, and reports a primal/dual bound. Its rows are written to their own
- * `reference/scip.csv`, the MIP oracle alongside the cp-sat (MiniZinc/XCSP3), clasp (DIMACS/OPB) and
- * z3 (SMT-LIB) tables.
- *
- * SCIP reads the instance from `/dev/stdin` (so no bind mount is needed): the JVM pipes the `.mps` in
- * and drives SCIP with a batch command line (`read`/`optimize`/`quit`). Everything else mirrors
- * [ClaspReference]: a memory-capped container, a watchdog that `docker kill`s a runaway by name, and
- * label-based reaping.
+ * MPS reference adapter for SCIP in the [IMAGE] container. Streams the model through
+ * `/dev/stdin` and drives `read`/`optimize`/`quit` in batch mode. Containers have
+ * memory limits, a deadline watchdog and label-based cleanup. Rows use `reference/scip.csv`.
  */
 internal object ScipReference {
     const val IMAGE = "klause-scip:latest"

@@ -197,11 +197,7 @@ class CompiledSchema internal constructor(
         return spec.realValue(sample.intValue(id).toInt())
     }
 
-    /**
-     * MiniZinc-style `solve minimize x`: build the [LinearObjective] that points at this
-     * one variable. The symbolic form is less error-prone than hand-building a
-     * coefficient array, especially when the schema mutates and variable ids shift.
-     */
+    /** A [LinearObjective] that minimises [handle], resolving its compiled variable id. */
     fun minimize(handle: IntHandle): LinearObjective {
         val id = integerIds[handle.name]
             ?: error("No integer variable named '${handle.name}'")
@@ -229,12 +225,11 @@ class CompiledSchema internal constructor(
         return problem.maximizeBool(id)
     }
 
-    /** Minimise the real-valued float. Floats are bucketed on the int side post-compile,
-     *  and the real value `min + bucket · (max - min) / (buckets - 1)` is a strictly
-     *  increasing affine map of the bucket index (the scale is positive), so minimising the
-     *  real value is the same search as minimising the integer bucket id. We optimise the
-     *  bucket id directly with an exact integer objective; `decode(handle, sample)` recovers
-     *  the real value for reporting. */
+    /**
+     * Minimise [handle] through its continuous column or integer bucket index. Bucket values
+     * `min + bucket · (max − min) / (buckets − 1)` increase with the index, so the integer objective
+     * preserves their ordering; decoding recovers the real value.
+     */
     fun minimize(handle: FloatHandle): LinearObjective {
         realVarIdByName[handle.name]?.let { return realObjective(it, maximize = false) }
         floatSpecs[handle.name] ?: error("No float variable named '${handle.name}'")

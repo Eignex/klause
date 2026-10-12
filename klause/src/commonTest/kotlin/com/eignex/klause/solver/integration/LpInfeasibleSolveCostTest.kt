@@ -13,13 +13,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/**
- * Whether the LP cost counters cover the same solves the solve counter does.
- *
- * `lpPivotsPerSolve` divides pivots by solves, so the two have to be counted over the same set. A node
- * whose relaxation is infeasible prunes without producing a result, and those are the solves worth
- * costing — a rate that silently omits them reads as a cheap LP that is in fact the expensive one.
- */
+// Pivot and solve counters must include the same solves, including infeasible relaxations.
 class LpInfeasibleSolveCostTest {
 
     /** A minimisation whose rows conflict below the domain ceiling, so nodes go infeasible while branching. */

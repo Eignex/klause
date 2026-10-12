@@ -28,10 +28,6 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.TimeSource
 
-/**
- * The shared tree-search heuristic [lbTreeSearch] proposes propagation-feasible assignments.
- * The randomized corpus is exercised by the explicit JVM integration task.
- */
 class LpBoundingLbTreeSearchTest {
 
     private fun satisfies(f: Linear, x: LongArray): Boolean {

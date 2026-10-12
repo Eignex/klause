@@ -220,7 +220,7 @@ internal class SparseIntColumns(val rows: Int, val cols: Int, source: List<Spars
         }
     }
 
-    /** The rows of the matrix as it now stands, each in ascending column order. */
+    /** The rows of the matrix in their current form, each in ascending column order. */
     fun toRows(): List<SparseIntRow> = List(rows) { i ->
         val cs = rowSupport[i].toIntArray()
         cs.sort()

@@ -5,13 +5,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Stopping a node LP at a pivot budget.
- *
- * The dual simplex is dual-feasible at every basis it passes through, so an iterate it stops on still
- * bounds the optimum from below — that is what makes a budget a throughput knob rather than a refusal.
- * What a stopped solve must not do is pass itself off as an optimum.
- */
 class RevisedSimplexIterationLimitTest {
 
     /** A covering LP whose all-slack start is several dual pivots away from the optimum. */

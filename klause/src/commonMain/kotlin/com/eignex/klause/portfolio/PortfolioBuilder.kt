@@ -90,10 +90,9 @@ object PortfolioBuilder {
     }
 
     /**
-     * Override entry for the per-worker credit campaign: materialise an **explicit** arm mix —
-     * the LS configs named in [lsLabels] (or the whole pool for `["all"]`) plus [backtrackWorkers]
-     * backtrack arms of [kind] — bypassing [PortfolioComposition] so the campaign can attribute
-     * credit to an arbitrary composition. All other wiring matches [build].
+     * Materializes the local-search configs in [lsLabels] (`["all"]` selects the whole pool),
+     * plus [backtrackWorkers] backtrack arms of [kind]. Bypasses [PortfolioComposition] and
+     * cross-arm sharing for per-worker attribution; remaining wiring matches [build].
      */
     fun buildExplicit(
         problem: BakedProblem,
@@ -117,8 +116,7 @@ object PortfolioBuilder {
             addAll(lsConfigs)
             if (backtrackWorkers > 0) addAll(BacktrackWorkerConfig.diverse(kind, backtrackWorkers))
         }
-        // The credit campaign measures per-worker attribution, which cross-arm sharing would confound,
-        // so the explicit path never shares. Every arm here is distinct, so armId == its position.
+        // Sharing would confound per-worker attribution. Distinct arms use their position as armId.
         return materialize(
             problem, arms, List(arms.size) { it }, seed, lsLambda, objective, lsObjective, definitionalSweep,
             onEvent, pools = null,

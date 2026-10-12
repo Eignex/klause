@@ -96,7 +96,6 @@ internal fun PropagationState.cpGateShouldSkip(factorId: Int): Boolean {
     return false
 }
 
-/** Result of walking the predecessor chain from a given node. */
 internal class PredChain(val head: Int, val length: Int, val cycleDetected: Boolean)
 
 /**

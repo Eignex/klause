@@ -96,10 +96,7 @@ internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings
     val boolVarIdByName get() = problemBuilder.boolVarIdByName
     val intVarIdByName get() = problemBuilder.intVarIdByName
 
-    // Reverse indices (id → name), kept in lock-step with the two forward maps via
-    // [bindIntName] / [bindBoolName]. They turn the per-node/per-edge reverse lookups in the
-    // global/set lowering from O(n) entry scans into O(1), keeping that lowering linear rather
-    // than O(n²) in model size.
+    // Reverse indices kept consistent by [bindIntName] / [bindBoolName] avoid linear name scans.
     val idToIntName = MutableIntObjectMap<String>()
     val idToBoolName = MutableIntObjectMap<String>()
     val intDomains get() = problemBuilder.intDomains
@@ -118,12 +115,10 @@ internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings
     var floatRepresentations: Map<String, FloatRepresentation> = emptyMap()
     val realVarIdByName get() = problemBuilder.realVarIdByName
 
-    /** Indicator-bool layout per declared set variable. Mirrors FlatZinc's
-     *  `SetVarLayout`: for set var `S` over universe `[e_0, …, e_{n-1}]`,
-     *  `setLayouts["S"].indicatorBoolIds[i]` is the klause bool var that's `true` iff
-     *  `e_i ∈ S`. Both [SetSpec] (int universe) and
-     *  [MultipleSpec] (nominal universe) populate this — the
-     *  difference is the decoder shape (ints vs label strings). */
+    /**
+     * Indicator layout for each set variable: indicator i is true iff universe element i belongs
+     * to the set. [SetSpec] uses integer elements; [MultipleSpec] uses label indices.
+     */
     val setLayouts = mutableMapOf<String, SetLayout>()
 
     /** Label → universe index for set vars whose universe is a nominal label list.
@@ -393,9 +388,7 @@ internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings
         return Lit.make(aux, positive = true)
     }
 
-    // Lower the children to literals, then emit the shared [CnfLowering] Tseitin gate — the gate itself
-    // is defined once in `formats/CnfLowering.kt` and reused by every front-end. `tseitinIff(l, r)` is
-    // the shared gate directly (same `(Int, Int)` signature), so it needs no wrapper here.
+    // Shared [CnfLowering] gates lower Boolean combinations to literals.
     fun tseitinAnd(children: List<BoolExpr>): Int = tseitinAnd(lowerAllBool(children).asList())
 
     fun tseitinOr(children: List<BoolExpr>): Int = tseitinOr(lowerAllBool(children).asList())
@@ -453,18 +446,14 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
             is IntSpec -> bindIntName(name, newIntVar(IntDomain(entry.min.toLong(), entry.max.toLong())))
 
             is SetSpec -> {
-                // Allocate one indicator bool per universe element. Universe is
-                // already deduplicated and sorted by [setVar]'s declarator.
+                // Set universes are deduplicated and sorted by [setVar].
                 val universe = entry.universe.toIntArray()
                 val indicators = IntArray(universe.size) { newBoolVar() }
                 setLayouts[name] = SetLayout(universe, indicators)
             }
 
             is MultipleSpec -> {
-                // Nominal universe: indicators are typed against labels, but the
-                // encoding is the same — one bool per label. We synthesise a
-                // synthetic int "id" (the label's index) for the universe so the
-                // shared lowering machinery can treat both kinds uniformly.
+                // Label indices let nominal sets share the integer-set lowering.
                 val labels = entry.labels
                 val universe = IntArray(labels.size) { it }
                 val indicators = IntArray(universe.size) { newBoolVar() }
@@ -499,9 +488,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
         if (entry is NamedConstraint) assertExpr(entry.expr)
     }
 
-    // Opt-var pinning: when an optional variable is absent (its `__present` bool is
-    // false), fix its value to a canonical in-domain default so absent vars don't
-    // contribute dead-value symmetry. Gated by config so it can be turned off.
+    // Canonical absent values remove dead-value symmetry.
     if (pinAbsentOptVars) emitOptVarPins(def)
 
     // The compiler builds a plain base-baked `Problem`; the SAC / failed-literal probing tiers, resolved
@@ -521,17 +508,10 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
 }
 
 /**
- * Emit `¬present → value = default` for every optional variable. An opt var is declared
- * (by [com.eignex.klause.schema.VariableSchema.optIntVar] and friends) alongside a
- * presence Boolean carrying a [PresenceSpec] that names the value
- * variable it gates; we detect the pair by that marker — explicit and type-driven, so an
- * unrelated bool can never be misread as a presence flag. Default per kind:
- *  - int     → `0` coerced into `[min, max]` (always representable, so the pin can never
- *              accidentally force `present` true by being unsatisfiable),
- *  - float   → the bucket index nearest the canonical real default `0.0` coerced into
- *              `[min, max]` (the pin lands on the backing `[0, buckets-1]` int var),
- *  - bool    → `false`,
- *  - nominal → the first declared label.
+ * Emit `¬present → value = default` for each optional variable identified by [PresenceSpec].
+ * Defaults are zero clamped to the integer domain, the float bucket nearest clamped real zero,
+ * false for Booleans, and the first nominal label. Each default lies in its value domain, so
+ * the pin cannot force presence.
  */
 private fun Lowering.emitOptVarPins(def: SchemaDef<SchemaEntry>) {
     for ((name, entry) in def.entries) {

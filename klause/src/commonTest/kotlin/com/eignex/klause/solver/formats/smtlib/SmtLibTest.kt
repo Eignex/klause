@@ -58,15 +58,8 @@ class SmtLibTest {
         return assertIs<OpenTheoryAssignment.ExactLra>(sat.assignment).assignment
     }
 
-    /**
-     * The witness of an open solve, read column by column.
-     *
-     * Values come through the interface rather than out of a route's own arrays: source presolve may
-     * eliminate a column, in which case the reconstruction holds its value and the route underneath still
-     * has the one it had before; and a model the passes simplify can take a cheaper route than the one it
-     * declared, so the concrete witness type is not the caller's to assume. A test that means to pin a
-     * route asserts `sourceRoute()` on the parsed model.
-     */
+    // Source reconstruction may eliminate columns or select a different theory route, so witness
+    // values are read through the interface. Route assertions use sourceRoute() on the parsed model.
     private fun liaSat(model: com.eignex.klause.ir.Problem): ExactLiraAssignment {
         val witness = assertIs<OpenTheoryResult.Sat>(openSolve(model)).assignment
         return ExactLiraAssignment(

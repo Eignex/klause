@@ -265,7 +265,7 @@ object LocalSearchCatalog {
 /**
  * Typed identity of every catalog arm — the catalog's keys. [LocalSearchCatalog.ranked] /
  * [LocalSearchCatalog.diverse] order and instantiate these per [Kind] via [LocalSearchCatalog]; [label]
- * is the external name (CLI / campaign / telemetry).
+ * is the external name (CLI / telemetry).
  */
 internal enum class LocalSearchArm(val label: String) {
     CblsFixed("cbls/fixed"),

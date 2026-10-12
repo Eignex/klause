@@ -5,12 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Adaptive restarts (#198): the [GlucoseRestart] policy restarts when recent
- * learned-clause LBD runs hot relative to the long-run average, unless trail-size blocking
- * defers it. These tests pin the trigger and blocking logic directly, then confirm the engine
- * still produces correct verdicts and a complete model set with adaptive restarts enabled.
- */
 class AdaptiveRestartTest {
 
     @Test

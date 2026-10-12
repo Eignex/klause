@@ -8,7 +8,6 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
-/** CP propagator for [Product]: bounds propagation for `a * b = result`. */
 internal class ProductPropagator(
     private val a: Int,
     private val b: Int,

@@ -7,11 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Tests for the acceptance axis [AcceptanceRule]: deterministic rules range over both pools,
- * stochastic rules draw from the noise pool only (never the score-only pool), and all return null on
- * empty input.
- */
 class AcceptanceRuleTest {
 
     private val a = Move.IntSet(0, 1) // noise-eligible, score 2.0

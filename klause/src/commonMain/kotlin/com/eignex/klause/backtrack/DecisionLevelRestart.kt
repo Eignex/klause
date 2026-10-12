@@ -29,7 +29,7 @@ internal class DecisionLevelRestart(private val window: Int = 50, private val ra
     private var globalSum = 0L
     private var conflicts = 0L
 
-    /** Record one conflict at [decisionLevel] and decide whether to restart now. */
+    /** Record one conflict at [decisionLevel] and decide whether to restart. */
     fun recordConflict(decisionLevel: Int): Boolean {
         conflicts++
         globalSum += decisionLevel

@@ -6,7 +6,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** Warm-up start-temperature calibration. Deterministic — no RNG. */
 class StartTemperatureTest {
 
     @Test

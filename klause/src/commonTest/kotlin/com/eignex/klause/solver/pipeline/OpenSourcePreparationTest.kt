@@ -17,7 +17,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
-/** Routing an open source model from what source-safe preparation produced, rather than from the input. */
 class OpenSourcePreparationTest {
 
     /** Probing would close the open columns and drop the rewritten row, so the aggregate runs alone. */

@@ -5,17 +5,9 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.formats.mps.Mps
 
 /**
- * Cheap COP/CSP classifier for the `kind` selection filter. It reads only the **objective
- * directive** from an instance's source — without compiling a MiniZinc model or constructing a
- * klause `Problem` — so `kind` can be applied *before* sampling. (Resolving the whole corpus to
- * classify first would be prohibitive; sampling first and filtering after would under-fill a
- * capped `kind=cop`/`kind=csp` selection.)
- *
- * The directive scanned here is the same one each runner turns into the resolved objective —
- * MiniZinc/FlatZinc `solve minimize|maximize`, OPB `min:`/`max:`, SMT-LIB `(minimize|(maximize`,
- * XCSP3 `<objective>` / `type="COP"`, MPS objective-row coefficients — so the verdict matches the
- * resolved problem for any well-formed instance. Formats with no objective notion (DIMACS, JSON
- * schema) and in-code builders (which never carry an objective) are always CSP.
+ * Classifies CSP/COP from the source objective directive before sampling, without compilation.
+ * This keeps capped kind selections full. Formats and in-code builders without objectives
+ * are CSP; each format uses the same directive as its runner.
  */
 internal object ProblemKind {
     /** True iff [ref] is a constraint *optimization* problem (carries an objective directive). */

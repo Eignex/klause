@@ -8,13 +8,6 @@ import com.eignex.klause.propagation.Assumptions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * The reason-graph ordering contract 1UIP resolution rests on: a reason may cite only facts established
- * before the fact it explains. An order literal materialised after its bound had already crossed carries no
- * trail slot, so its reason is derived from the bound move that first reached its threshold. Once a later move
- * overshoots the threshold, the live endpoint postdates the literal, and explaining it by that move would put a
- * back edge in the reason graph.
- */
 class AtomsOvershotBoundReasonTest {
 
     private fun freshState(numVars: Int, hi: Int): PropagationState {

@@ -12,12 +12,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Lin_max/min tight face (Anderson big-M). The tight face is a *relaxation* added on top of the
- * envelope, so its LP bound must be **sound** — never cut off the true integer optimum (an over-tight
- * extremum hull is the soundness failure). When the selector is forced integral (a single operand) the
- * tight face binds and is exact. Layout: var 0 = result, 1.. = operands.
- */
 class CpToLpRelaxationLinMaxTightFaceTest {
 
     private val eps = 1e-7

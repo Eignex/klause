@@ -12,14 +12,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * #435 NValue LP value hull. On a value "triangle" — x0 ∈ {0,1}, x1 ∈ {1,2}, x2 ∈ {0,2} — every pair
- * of domains overlaps but no single value lies in all three (a hole at 1 in x2 breaks the interval
- * Helly property). NValue's propagator only proves `n ≥ 1` (its greedy pairwise-disjoint-domain bound
- * finds no disjoint pair); but the fractional value cover forces `Σ_v y_v ≥ 1.5`, which the hull
- * captures as a strictly tighter LP bound. It is sound — 1.5 stays below the true integer minimum of
- * 2 distinct values, so no solution is excluded.
- */
 class CpToLpRelaxationNValueHullTest {
     private val eps = 1e-7
 

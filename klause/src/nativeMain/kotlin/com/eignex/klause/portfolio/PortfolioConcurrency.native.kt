@@ -1,5 +1,4 @@
-// Opt into the obsolete Workers API and migrate off kotlin.native.concurrent.Worker once Kotlin/Native
-// ships a stable threads replacement (the API is flagged obsolete but has no drop-in successor yet).
+// Portfolio tasks use the Kotlin/Native Workers API.
 @file:OptIn(ObsoleteWorkersApi::class)
 
 package com.eignex.klause.portfolio
@@ -9,7 +8,7 @@ import kotlin.native.concurrent.TransferMode
 import kotlin.native.concurrent.Worker
 
 /**
- * Native actual: one [Worker] per task (kotlin/native's new memory model lets workers share the
+ * Native actual: one [Worker] per task (Kotlin/Native's memory model lets workers share the
  * `kotlin.concurrent.atomics` state the portfolio coordinates through). The producer runs on the
  * caller and hands the task lambda to the worker; `Future.result` joins. Tasks must not throw:
  * a worker cannot hand an exception back to the caller.

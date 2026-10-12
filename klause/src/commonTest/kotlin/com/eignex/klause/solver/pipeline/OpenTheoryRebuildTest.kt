@@ -15,11 +15,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * The open lane's half of a source reconstruction. The steps are the same records the finite lane
- * evaluates; what is checked here is that a witness answering by accessor can carry them, since that is
- * the difference that kept column-eliminating passes off the source lane.
- */
 class OpenTheoryRebuildTest {
     @Test
     fun `recovered witness coordinates resist external mutation`() {

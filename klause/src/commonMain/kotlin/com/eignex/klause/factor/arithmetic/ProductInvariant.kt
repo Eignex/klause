@@ -9,7 +9,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 
-/** LS invariant for [Product]: violation tracking and repair for `a * b = result`. */
 internal class ProductInvariant(private val a: Int, private val b: Int, private val result: Int) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {

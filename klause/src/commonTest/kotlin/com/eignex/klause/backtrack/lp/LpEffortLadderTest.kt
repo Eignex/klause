@@ -7,13 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * #32: the adaptive per-node LP effort ladder. Verified in isolation (no solver), since the controller
- * is deliberately count-based and therefore deterministic. A `top = BOUND` ladder reduces to the
- * two-rung auto-off (#614) it generalizes, so it must reproduce that behaviour — disable a never-pruning
- * LP, re-probe on backoff, shed a relaxation that goes cold, stay enabled while pruning, and stay
- * bounded over many nodes — and a `top = CUTS` ladder must shed the cut rung before the bound.
- */
 class LpEffortLadderTest {
 
     /** Drive `n` LP-eligible nodes, recording [pruned] for each that actually ran; returns run count. */
@@ -74,7 +67,7 @@ class LpEffortLadderTest {
 
     @Test
     fun `the cut rung is demoted when its prunes do not justify its cost`() {
-        // Reward-driven (#33): one prune per window keeps the bare BOUND rung (cost 1) but not the cut
+        // Reward-driven: one prune per window keeps the bare BOUND rung (cost 1) but not the cut
         // rung (cost 3) — the cuts prune, yet not enough to earn their extra re-solves.
         val cuts = LpEffortLadder(top = LpEffort.CUTS, warmup = 4, window = 4, cutCostWeight = 3)
         repeat(4) {

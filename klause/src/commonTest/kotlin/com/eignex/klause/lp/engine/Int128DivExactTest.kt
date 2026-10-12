@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/** [Int128.divExactByLong] — the exact division the fraction-free (Bareiss) basis solve relies on. */
 class Int128DivExactTest {
 
     private fun product(a: Long, b: Long): Int128 = Int128().apply { addProduct(a, b) }

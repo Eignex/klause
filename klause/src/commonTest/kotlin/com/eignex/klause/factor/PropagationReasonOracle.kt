@@ -16,13 +16,9 @@ import com.eignex.klause.solver.Sample
 import kotlin.test.assertTrue
 
 /**
- * Brute-force oracle for the reasons a propagator records with its deductions. Conflict analysis resolves through
- * these reasons, so each must imply the value it removed on every solution of the problem: a reason that omits a
- * premise lets a learned clause prune solutions once that premise is undone.
- *
- * [narrow] tightens the state at decision level 1 the way a search would, holes included; factor 0 then
- * propagates, and every Boolean it pinned and every bound move and hole it made is checked against its recorded
- * reason; a propagation that fails has its conflict reason checked instead.
+ * Checks that every deduction's recorded reason entails it on all satisfying assignments.
+ * [narrow] tightens at decision level 1, then factor 0 propagates. A failed propagation checks
+ * the conflict clause instead, because an omitted premise can make learning prune solutions.
  */
 object PropagationReasonOracle {
 

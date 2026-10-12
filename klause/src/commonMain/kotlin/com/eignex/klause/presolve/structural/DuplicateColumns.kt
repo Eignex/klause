@@ -88,8 +88,7 @@ internal object DuplicateColumns {
         // into its representative removes only the dropped column's own term — every surviving column stays
         // in the same factors with the same coefficient, so no column's signature or eligibility changes.
         // Eligibility and signatures are therefore computed once over the input rather than re-derived after
-        // each fold: a class of K identical columns collapses in a single O(n) scan instead of K of them,
-        // which is what let numbrix (a ~3950-column class) spend seconds re-scanning 8505 variables per pair.
+        // each fold: a class of K identical columns collapses in a single O(n) scan instead of K scans.
         val domains = problem.rootIntDomains()
         val eligible = eligibleColumns(problem.factors, n, domains, objectiveIntVars)
         val signatures = columnSignatures(problem.factors, n, eligible)

@@ -6,8 +6,6 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 
-/** LS implementation for [Circuit]: violation scoring and move proposal for the optional-cycle
- *  constraint. */
 internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearchState, Int, Long) -> Int) :
     SuccessorCycleInvariant(succ, n, computeCost) {
 

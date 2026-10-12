@@ -7,7 +7,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Narrowing a range table column by column, the form a pass states a bound it proved in. */
 class IntBoundsTest {
 
     /** Two columns: column 0 declared `0..9`, column 1 declared `0..9` but open above. */

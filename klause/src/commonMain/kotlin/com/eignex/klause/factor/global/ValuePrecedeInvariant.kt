@@ -6,7 +6,6 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.forEachCandidate
 
-/** LS invariant logic for `value_precede`. */
 internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, private val xs: IntArray) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {

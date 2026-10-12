@@ -9,14 +9,6 @@ import com.eignex.klause.propagation.Assumptions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Regression for the php8 crash: [PropagationState.forgetLearnedClauses] renumbers and drops
- * learned clauses, but the per-variable reason fields ([PropagationState.boolReason] etc.) can
- * hold a learned-clause id for a level-0 fact that survives a restart's pop-to-root. If those
- * reasons aren't remapped, the next conflict's [PropagationState.extractConflictFactors]
- * dereferences a stale learned id through [PropagationState.factorAt] and indexes past the
- * compacted clause array (`IndexOutOfBoundsException: Index … out of bounds for length …`).
- */
 class PropagationStateForgetReasonRemapTest {
 
     private fun state(): PropagationState {

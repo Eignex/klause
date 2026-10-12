@@ -58,8 +58,7 @@ internal class FamilyPrior(private val successes: DoubleArray, private val failu
          * The prior a model of [profile] starts from. Complete search leads on pseudo-Boolean models, where cutting
          * planes and clause learning carry the proof, and on continuous and open models, where the relaxation or the
          * theory decides. Local search leads on a finite satisfaction model, where its first solution ends the run.
-         * Clausal and mixed-integer models start even: on random 3-SAT and on MIPLIB the local-search arms find the
-         * solutions and improvements, and a lean towards complete search cost them both.
+         * Clausal and mixed-integer models start evenly to balance solution discovery and proof search.
          */
         fun of(profile: ProblemProfile): FamilyPrior = when (profile.problemClass) {
             ProblemClass.Sat, ProblemClass.MixedInteger -> UNIFORM

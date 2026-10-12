@@ -8,11 +8,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Fraction-free echelon reduction. The properties that matter are exactness — every intermediate is an
- * integer, never a rounded rational — and rank, since a dependent equality must not be mistaken for a
- * constraint the transformation has to carry.
- */
 class BareissEchelonTest {
 
     private fun echelon(vararg rows: LongArray): BareissEchelon =

@@ -11,9 +11,6 @@ import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.IntLongMap
 
-/**
- * LS invariant for [ReifiedCardinality]: reified cardinality violation tracking and repair.
- */
 internal class ReifiedCardinalityInvariant(
     private val auxBoolVar: Int,
     private val literals: IntArray,

@@ -24,21 +24,10 @@ import java.io.File
 import java.time.Instant
 
 /**
- * Single-solver solve over a corpus, run entirely as **subprocesses** (see [SolverInvocation]):
- * klause via `klause-cli`, references via `minizinc --solver <id>`.
- *
- * Output is saved **one file per problem**, under `output/<config>/`, where `<config>` encodes the
- * solver + its settings + the time budget (so multiple settings-runs coexist without clobbering —
- * see [configTag]). Each problem yields two files:
- *  - `<problem>.out` — the raw, verbatim solver stdout (the MiniZinc-format stream); this **is** the
- *    run's log.
- *  - `<problem>.json` — a self-describing [SolveRecord]: solver, settings, problem, budget, plus the
- *    parsed result (objective, time-to-best, proof/feasibility, `%%%mzn-stat` statistics, the exact
- *    command, git sha, timestamp).
- *
- * No in-session comparison: to compare two configs, run this once per config (each writes its own
- * `output/<config>/` dir) and diff offline (`output/compare.sh`). One solver's crash never taints
- * another's. When [ProfileConfig] is set, the run instead profiles the klause engine in-process.
+ * Runs corpus solves as subprocesses via [SolverInvocation], or in-process when profiling.
+ * Each problem produces raw stdout (`.out`) and a [SolveRecord] (`.json`) under
+ * `output/<config>/`; [configTag] distinguishes settings and budgets. Saved outputs
+ * are compared offline with `output/compare.sh`.
  */
 internal data class KlauseSearch(
     // fixed | cp | mixed | ls — forwarded verbatim to klause-cli `-e` (the cli owns the
@@ -91,10 +80,11 @@ internal data class SolveRecord(
     /** optimum proved (optimize) or search closed UNSAT/exhausted. */
     val proven: Boolean,
     val stats: Map<String, String> = emptyMap(),
-    /** Per-arm improvement stream from a klause portfolio `-s` run (`%%%klause-arm:` lines), in
-     *  arrival order; empty for references and single-engine klause. Each current record preserves
-     *  the exact discrete objective as decimal text and, when needed, the whole continuous objective.
-     *  The legacy numeric [Attribution.objective] remains readable in persisted records. */
+    /**
+     * Per-arm portfolio improvement records in arrival order; empty for reference and
+     * single-engine solves. Discrete objectives are exact decimal text, with a continuous
+     * objective when needed. Persisted numeric [Attribution.objective] values remain readable.
+     */
     val attribution: List<Attribution> = emptyList(),
     val gitSha: String?,
     val timestamp: String,
@@ -102,9 +92,9 @@ internal data class SolveRecord(
     val buildProvenance: BuildProvenance? = null,
     val buildFingerprint: String? = null,
     val validationPolicy: String = REPORTED_RESULT_POLICY,
-    /** Subprocess duration, separate from incumbent timings; null when unavailable or in legacy records. */
+    /** Subprocess duration, separate from incumbent timings; null when unavailable. */
     val elapsedMs: Long? = null,
-    /** Plain source bytes, independent of cache compression; absent on legacy or failed loads. */
+    /** Plain source bytes, independent of cache compression; null when unavailable. */
     val sourceHashes: Map<String, String> = emptyMap(),
     /** Final rendered candidate, retained for independent checks when the raw stream is not transferred. */
     val finalWitness: String? = null,
@@ -518,16 +508,10 @@ internal object SolveMetric {
     }
 
     /**
-     * Real (first-feasible, best) timings. klause emits its anytime trajectory as `%%%klause-arm:`
-     * lines (parsed into [SolverInvocation.Result.attribution]), but the MiniZinc `----------` stream
-     * is flushed once at termination — so the separator-based timings collapse to ~budget. When the
-     * attribution stream is present, recover the truth from it: the first incumbent is the first
-     * feasible solution and the best-valued incumbent is the time-to-best. The stream is arrival-order,
-     * not improvement order — a concurrent portfolio's shared-bound CAS and its attribution-emit lock
-     * are separate critical sections (see `Portfolio.fold`), so a worse incumbent's line can print after
-     * a better one's under thread scheduling — so this searches every entry by value rather than
-     * trusting the last one. Reference solvers carry no attribution, so fall back to their (correctly
-     * streamed) separator timings.
+     * Recovers first-feasible and best timings from portfolio attribution. MiniZinc solution
+     * separators may be buffered until termination. Attribution is in arrival order: bound
+     * publication and emission use separate critical sections, so every entry is compared
+     * by value. Reference solves use streamed separator timings.
      */
     internal fun timings(r: SolverInvocation.Result, maximize: Boolean): Pair<Long?, Long?> {
         if (r.attribution.isEmpty()) return r.timeToFirstFeasibleMs to r.timeToBestMs

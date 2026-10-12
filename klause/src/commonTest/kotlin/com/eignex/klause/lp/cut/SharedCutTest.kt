@@ -16,12 +16,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * [SharedCut] must round-trip a cut across two relaxations of the same [Problem] preserving the
- * inequality over CP variables (column indices differ per relaxation, CP-variable ids do not), and an
- * imported cut must stay valid — satisfied by every integer-feasible point — since it is folded into
- * another worker's relaxation. Validity is checked by brute force over the integer box.
- */
 class SharedCutTest {
 
     private fun relax(p: Problem, obj: LinearObjective): LpRelaxation =

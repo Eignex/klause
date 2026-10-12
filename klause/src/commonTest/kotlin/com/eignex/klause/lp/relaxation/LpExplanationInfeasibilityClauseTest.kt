@@ -11,12 +11,6 @@ import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * #247/#705: the integer Farkas infeasibility ray ([integerFarkasRay]) and the bound-atom
- * nogood derived from it must be sound — the clause may never exclude a point satisfying the original
- * constraints. The ray's column support uses only the seated box bounds, so `⋁ ¬(seated bound)` has to
- * be implied by the constraints alone, even though the node tightened bounds beyond the declared box.
- */
 class LpExplanationInfeasibilityClauseTest {
 
     private fun rayDotColumnSign(model: LpModel, ray: LongArray, col: Int): Int {

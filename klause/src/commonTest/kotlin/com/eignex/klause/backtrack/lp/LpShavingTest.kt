@@ -16,11 +16,6 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Objective shaving must be SOUND — it may only raise the objective lower bound to a value proven
- * (by propagation + the LP relaxation) to be a true lower bound, never above the optimum. Checked
- * directly (the shaved bound equals the brute-force optimum) and by randomized soundness sweeps.
- */
 class LpShavingTest {
 
     @Test

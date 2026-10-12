@@ -87,10 +87,9 @@ internal fun interface LpReplayValidator {
     fun validate(model: LpModel, step: LpReplayStep): LpIndependentCheck
 }
 
-/** Executes captures through the engine factories and interfaces. Capability and event validation is
- * completed before the single solver is created. Unsupported future state transitions are explicit
- * failures; in particular, gated float candidates cannot be certified until certifiers accept an active
- * row mask. Returned bases are copied discrete warm-start hints, never portable factor snapshots. */
+/** Executes captures through the engine factories and interfaces after capability/event validation.
+ * Unsupported transitions fail explicitly; gated solves return uncertified float candidates.
+ * Returned bases are copied warm-start hints, never portable factor snapshots. */
 internal object LpReplay {
     fun replay(
         capture: LpCapture,

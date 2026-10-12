@@ -8,7 +8,6 @@ import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 
-/** LS invariant for [Regular]. Constructed by the local-search projection. */
 internal class RegularInvariant(
     private val seq: IntArray,
     private val numStates: Int,

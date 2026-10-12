@@ -30,10 +30,9 @@ import com.eignex.klause.util.bigIntOf
 /**
  * The finite-domain participant in a shared search session.
  *
- * [PropagationSession] remains entirely CP-owned. This adapter only aligns its decision levels with
- * the shared trail; it does not expose domains to theory components. Its existing conflict analyzer
- * continues to supply CP's specialised learned constraints while the generic engine migration is in
- * progress.
+ * [PropagationSession] owns CP domains and conflict analysis. This adapter aligns its decision levels
+ * with the shared trail and supplies CP's specialized learned constraints without exposing domains
+ * to theory components.
  */
 class CpSearchComponent(
     /** Native finite-domain propagation state. */

@@ -10,10 +10,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * The boundary between a domain and its values: a domain answers bounds and holes however wide it is,
- * while enumeration is only offered when the values can be indexed and the caller can afford them.
- */
 class IntSpanTest {
 
     @Test

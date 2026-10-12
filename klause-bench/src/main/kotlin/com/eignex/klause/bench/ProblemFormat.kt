@@ -41,12 +41,8 @@ internal class Ingested(
 }
 
 /**
- * Turns a file in some [Format] into an [Ingested] klause [Problem]. Only **in-process**
- * formats implement [ingest] here; formats that need an external compile step (MiniZinc) or
- * a net-new parser (XCSP3, SMT-LIB) are handled by their runner and report [inProcess]=false.
- *
- * Each implementation is a thin wrapper over the format parser already shipped in
- * `com.eignex.klause.formats.*` — this layer exists only to dispatch uniformly by [Format].
+ * Dispatches [Format] to its in-process parser. Formats requiring external compilation
+ * report [inProcess] as false and resolve through their runner.
  */
 internal interface ProblemFormat {
     val format: Format
@@ -90,8 +86,7 @@ internal object MiniZincFormat : ProblemFormat {
     override val inProcess = false
 }
 
-/** XCSP3 ingest (pragmatic integer CSP/COP subset → klause Problem). Parser lives in
- *  `com.eignex.klause.formats.xcsp3`; this wrapper reads bench-level config knobs. */
+/** XCSP3 parsing into a solver problem and minimize-canonical objective. */
 internal object Xcsp3Format : ProblemFormat {
     override val format = Format.XCSP3
     override val inProcess = true
@@ -105,8 +100,7 @@ internal object Xcsp3Format : ProblemFormat {
     }
 }
 
-/** SMT-LIB ingest (pragmatic subset → klause Problem). Parser lives in
- *  `com.eignex.klause.formats.smtlib`; this wrapper reads bench-level config knobs. */
+/** SMT-LIB parsing with the benchmark strict-bounds setting. */
 internal object SmtLibFormat : ProblemFormat {
     override val format = Format.SMTLIB
     override val inProcess = true

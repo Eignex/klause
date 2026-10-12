@@ -212,9 +212,8 @@ data class LpRouteSolveStats(
 }
 
 /**
- * LP-relaxation bounding counters, split out of [SolveStats] so the whole LP diagnostic surface —
- * definition, merge, accumulation, and snapshot — lives in one place. Produced entirely by
- * `backtrack/lp`; zero for backends that never solve a relaxation.
+ * LP-relaxation bounding counters, including merge, accumulation and snapshot support.
+ * Zero for backends that never solve a relaxation.
  */
 data class LpStats(
     /** Search nodes that entered LP bounding. */
@@ -575,7 +574,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (probeRoute == LpRoute.NODE) solves.update(1.0)
     }
 
-    /** Route-specific engine cost. The legacy pivot, work, warm-start and refactor totals are node-only,
+    /** Route-specific engine cost. The pivot, work, warm-start and refactor totals are node-only,
      * so their denominator ([solves]) always names the same route. */
     fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics) {
         val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route

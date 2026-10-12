@@ -7,11 +7,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Negative-cycle detection over difference constraints. Beyond "did it fire", the tests check that a
- * reported cycle really is one — its edges form a closed walk of negative total weight — because the
- * cycle is handed to conflict analysis as the explanation, and a wrong explanation is a wrong nogood.
- */
+// Conflict explanations require a closed cycle with negative total weight.
 class DifferenceGraphTest {
 
     /** `x − y ≤ c` for each triple, in insertion order. */

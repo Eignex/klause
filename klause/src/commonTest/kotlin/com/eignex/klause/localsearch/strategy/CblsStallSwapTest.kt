@@ -14,28 +14,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Mechanics of the opt-in plateau-buster ([Cbls.stallSwapCap]): with the default (`0`) the
- * strategy must never emit a stall swap (default behavior unchanged); enabled, emitted swaps
- * must be legal — two-part same-domain value exchanges that respect frozen assumptions.
- *
- * The driving problem is infeasible by construction (two contradictory linears over the same
- * same-domain vars), so the search stalls permanently and the stall machinery — frontier,
- * hot noise, and (when enabled) swaps — is guaranteed to engage.
- */
 class CblsStallSwapTest {
 
-    /** A minimal exchange ring, infeasible by construction, built from GE/LE only — the sum
-     *  channeling in [LocalSearchState.synthesizeChannelingMove] applies solely to `Linear`
-     *  *EQ* factors, so on this fixture every emitted compound is a stall swap (no other
-     *  compound source exists). The sum sandwich `x0 + x1 ≥ 3` / `x0 + x1 ≤ 3` is preserved
-     *  by swapping the two vars; `x0 − x1 ≥ 3` (wants (3,0)) and `x1 − x0 ≥ 3` (wants (0,3))
-     *  contradict each other, so the search settles on one corner and the *swap* to the other
-     *  is the unique best move (Δ0 — preserves the sandwich, exchanges which difference
-     *  constraint holds) while every single step breaks the sandwich (Δ ≥ +1). The search
-     *  ping-pongs between corners via swaps forever — a deterministic swap-surfacing fixture.
-     *  `x2` (pushed to its max by an unsatisfiable bound) rides along for the frozen-var
-     *  case. */
+    // GE/LE factors exclude EQ channeling, so compounds can only be stall swaps. The sum sandwich
+    // x0 + x1 = 3 makes every single-variable move worse; swapping preserves the sum while exchanging
+    // which contradictory difference row holds. Variable x2 supports the frozen-variable case.
     private fun stallProblem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 3,

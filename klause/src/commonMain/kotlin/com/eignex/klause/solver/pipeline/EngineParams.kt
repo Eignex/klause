@@ -75,8 +75,8 @@ fun pipelineConfigError(message: String): Nothing = throw PipelineConfigExceptio
  *    one arm, one knob moved — where an override alone spreads that knob across the curated pool and
  *    dilutes it with arms that cannot express it; plus the portfolio knobs below
  *  - `ls`: `strategy` (base `auto` (curated pool, default) | `cbls|feasibilityjump|walksat|probsat|sa`
- *    | `bare` | `sweep`, the full recipe cross-product as the arm pool for the recalibration campaign,
- *    which takes no edits), or `arm=<catalog-label>` to run one curated arm in isolation,
+ *    | `bare` | `sweep`, the full recipe cross-product, which takes no edits),
+ *    or `arm=<catalog-label>` to run one curated arm in isolation,
  *    plus per-axis edits applied across the pool — `sources` (bare force-exactly list or
  *    `+`/`-` add/remove), `scoring` (`weighted|raw|break`), `acceptance`
  *    (`greedy|walksat|probsat|skew|sa`), `restart` (`fixed|luby|perturb`); any token may carry an

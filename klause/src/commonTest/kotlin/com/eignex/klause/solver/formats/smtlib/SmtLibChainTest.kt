@@ -15,10 +15,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * SMT-LIB chainable relations: `(op a1 … an)` is `a1 op a2 ∧ … ∧ a(n-1) op an` — consecutive pairs
- * only, with no direct relation between non-adjacent operands.
- */
 class SmtLibChainTest {
 
     private companion object {

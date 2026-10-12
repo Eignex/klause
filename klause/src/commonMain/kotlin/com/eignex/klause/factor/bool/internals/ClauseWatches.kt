@@ -4,11 +4,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
 
-/** True iff `literals[idx]` evaluates to true under [state]'s CP assignment. */
 internal fun litTrueInPropState(state: PropagationState, literals: IntArray, idx: Int): Boolean =
     state.litTrue(literals[idx])
 
-/** True iff `literals[idx]` evaluates to false under [state]'s CP assignment. */
 internal fun litFalseInPropState(state: PropagationState, literals: IntArray, idx: Int): Boolean =
     state.litFalse(literals[idx])
 
@@ -36,7 +34,6 @@ internal fun pinUnitLit(state: PropagationState, literals: IntArray, unitIdx: In
     return state.pinLit(unitLit, antecedents)
 }
 
-/** True iff `literals[idx]` is true under the LS assignment. */
 internal fun litTrueInLsState(state: LocalSearchState, literals: IntArray, idx: Int): Boolean {
     if (idx < 0) return false
     val lit = literals[idx]
@@ -54,7 +51,6 @@ internal fun wasLitTrueInLsState(state: LocalSearchState, literals: IntArray, id
     return Lit.evaluate(lit, pre)
 }
 
-/** True iff some literal at an index other than [excludeIdx] is currently true in [state]. */
 internal fun anyOtherLitTrue(state: LocalSearchState, literals: IntArray, excludeIdx: Int): Boolean {
     for (i in literals.indices) {
         if (i == excludeIdx) continue
@@ -63,7 +59,6 @@ internal fun anyOtherLitTrue(state: LocalSearchState, literals: IntArray, exclud
     return false
 }
 
-/** Find a literal index (other than [exclude1] and [exclude2]) that evaluates true in [state]. */
 internal fun findTrueLitExcept(state: LocalSearchState, literals: IntArray, exclude1: Int, exclude2: Int): Int {
     for (i in literals.indices) {
         if (i == exclude1 || i == exclude2) continue
@@ -72,7 +67,6 @@ internal fun findTrueLitExcept(state: LocalSearchState, literals: IntArray, excl
     return -1
 }
 
-/** Find a literal index other than [excludeIdx] that evaluates true in [state]. */
 internal fun findTrueLitExceptIndex(state: LocalSearchState, literals: IntArray, excludeIdx: Int): Int {
     for (i in literals.indices) {
         if (i == excludeIdx) continue

@@ -11,12 +11,10 @@ import java.nio.file.Files
 import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 
 /**
- * The second MPS reference, beside [ScipReference]: HiGHS as a native binary on the model file, its parallelism off and
- * its wall-clock capped by `--time_limit`, its tolerances set explicitly ([OPTIONS]) so the ones a row records are
- * the ones it ran with. Its solution is written to a file and checked against the model ([MpsWitness]): a finite
- * primal bound alone is not a solution. A run whose claim does not hold up (an infeasibility proof, a solution the
- * model rejects or that cannot be checked) is retried once without presolve, on what is left of the budget, and that
- * retry is checked the same way ([MpsReference]). Rows are keyed by solver `highs`.
+ * MPS reference adapter for the native HiGHS binary, with explicit [OPTIONS], single-threaded
+ * solving and a wall-clock limit. [MpsWitness] validates its solution file. Rejected or
+ * uncheckable claims are retried without presolve within the remaining budget.
+ * Rows use solver key `highs`.
  */
 internal object HighsReference {
     /** The highs executable, from `PATH` by default; override with `-Dklause.bench.highs=/path/to/highs`. */

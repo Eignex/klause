@@ -7,10 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * Bounds the equality structure implies for columns nothing else bounds. The rows below leave every
- * column open individually; only the combination of them pins anything down.
- */
 class StructuralIntBoundsTest {
 
     private fun row(vararg terms: Pair<Int, Long>, op: LinearOp, bound: Long) = Linear(

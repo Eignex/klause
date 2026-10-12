@@ -12,11 +12,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Initial [FactorWeightBook.factorWeights] seeding: with [LocalSearchParams.normalizeWeightsByClass]
- * on, an over-populated factor *kind* is damped so it can't steer the descent by sheer count, while
- * smaller kinds keep weight 1.0.
- */
 class FactorWeightBookNormalizationTest {
 
     private fun linear(): Factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)

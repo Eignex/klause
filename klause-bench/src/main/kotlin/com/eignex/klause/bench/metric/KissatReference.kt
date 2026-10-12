@@ -7,10 +7,8 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 
 /**
- * The second CNF reference, beside [ClaspReference]: kissat as a native binary, which is single-threaded. The instance
- * goes on stdin as clasp reads it ([ClaspReference.ClaspInput]), so SATLIB's `%` end marker is honoured the same way.
- * kissat answers `s SATISFIABLE` / `s UNSATISFIABLE` / `s UNKNOWN`; a decision is a proof. Rows are keyed by solver
- * `kissat`.
+ * Single-threaded native kissat reference. Streams CNF using [ClaspReference.ClaspInput]
+ * and reads SAT/UNSAT/UNKNOWN status lines. Rows use solver key `kissat`.
  */
 internal object KissatReference {
     /** The kissat executable, from `PATH` by default; override with `-Dklause.bench.kissat=/path/to/kissat`. */

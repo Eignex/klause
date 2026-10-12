@@ -1,14 +1,9 @@
 package com.eignex.klause.util
 
 /**
- * The shared arm-catalog ritual behind the two portfolio arm catalogs (`LocalSearchCatalog` / `BacktrackCatalog`).
- * Given the full set of [all] arms, a [label] accessor, and a [make] factory, it owns the string-boundary
- * accessors (`byLabel` / `fromLabel`) and the order-driven pool builders (`labels` / `ranked` / `factories`
- * over a *supplied* ordered arm list). The concrete catalog keeps its own ordering source — a single
- * ranked list, or per-`Kind` orders — and any engine-specific accessors (`diverse` / `auto`); this is a
- * thin shared core, not a full merge.
- *
- * [A] is the typed arm (an enum), [R] the recipe type it maps to.
+ * Shared label lookup and ordered-pool construction for typed arm catalogs.
+ * [A] is the arm type and [R] its recipe; concrete catalogs supply their ordering
+ * and engine-specific accessors.
  */
 internal class ArmCatalog<A, R>(
     private val all: List<A>,

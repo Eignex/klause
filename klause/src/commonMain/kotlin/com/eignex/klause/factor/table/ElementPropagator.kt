@@ -20,7 +20,6 @@ import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
 
-/** CP propagator for [Element]. Constructed by the propagation projection. */
 internal class ElementPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,

@@ -14,16 +14,9 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 
 /**
- * The DIMACS / OPB reference. cp-sat (OR-Tools) has no native SAT/pseudo-Boolean frontend, so these two
- * Boolean formats are solved by clasp (Potassco) in the [IMAGE] container — a strong complete SAT/PB
- * solver that reads DIMACS CNF and OPB directly, decides SAT/UNSAT, and minimises an OPB `min:` objective
- * to proven optimum. Its rows are written to their own `reference/clasp.csv`, the Boolean oracle
- * alongside the cp-sat (MiniZinc/XCSP3) and z3 (SMT-LIB) tables.
- *
- * clasp reads the instance on stdin (so no bind mount is needed). DIMACS is fed verbatim; OPB needs the
- * standard `* #variable= N #constraint= M` problem line, which the vendored instances omit, so it is
- * synthesized from the source before piping. Everything else mirrors [Xcsp3CpSatReference]: a
- * memory-capped container, a watchdog that `docker kill`s a runaway by name, and label-based reaping.
+ * DIMACS and OPB reference adapter for clasp in the [IMAGE] container. Instances stream
+ * on stdin; OPB receives a synthesized problem header when absent. Containers have
+ * memory limits, a deadline watchdog and label-based cleanup.
  */
 internal object ClaspReference {
     const val IMAGE = "klause-clasp:latest"

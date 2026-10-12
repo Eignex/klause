@@ -10,7 +10,6 @@ import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.IntLongMap
 
-/** LS invariant for [Cardinality]: violation scoring and break/make maintenance for `min ≤ count ≤ max`. */
 internal class CardinalityInvariant(
     private val boolVars: IntArray,
     private val literals: IntArray,

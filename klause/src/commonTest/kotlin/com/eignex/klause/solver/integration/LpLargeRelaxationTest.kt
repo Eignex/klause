@@ -19,9 +19,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** #602/#705: LP bounding activates whenever the model fits the single relaxation-size cap, and the
- *  sparse revised-simplex path (the only LP engine) stays sound across minimize / single-objective
- *  propagation / Farkas infeasibility / hull carrying. */
 class LpLargeRelaxationTest {
 
     private fun linearProblem(n: Int): Problem {
@@ -48,7 +45,7 @@ class LpLargeRelaxationTest {
 
     @Test
     fun `a starved root LP budget degrades gracefully without losing the optimum`() {
-        // #31: the pre-search root LP work (cut harvest + root-bound + probe) is time-boxed so a slow
+        // the pre-search root LP work (cut harvest + root-bound + probe) is time-boxed so a slow
         // root relaxation can't starve search. A zero budget cancels every root step immediately; the
         // solve must still reach the true optimum from search alone (graceful, sound degradation).
         val rng = Random(31_31_31)

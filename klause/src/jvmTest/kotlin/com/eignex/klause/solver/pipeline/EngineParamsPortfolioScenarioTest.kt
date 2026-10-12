@@ -13,10 +13,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Core/arm decoupling (#406): `-p N` is the core count (drives sequential-vs-parallel), the arm pool
- * auto-tunes from it, and `--param arms=N` overrides — distinct from the engine mix.
- */
 class EngineParamsPortfolioScenarioTest {
 
     private fun plan(engine: FiniteEngine, params: List<String> = emptyList()): PortfolioPlan =

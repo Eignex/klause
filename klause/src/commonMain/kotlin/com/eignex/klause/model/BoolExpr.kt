@@ -166,15 +166,9 @@ data class IntCompare(
 ) : BoolExpr
 
 /**
- * Schema-layer view of a real-valued linear comparison: `Σ coeffs[k] · varNames[k] ⟨op⟩ bound`.
- * Built by [com.eignex.klause.schema.FloatExpr] / [com.eignex.klause.schema.FloatHandle]
- * comparison operators. The compiler does two things with it:
- *
- * It buckets each float variable to an int variable in the factor system and emits a
- * scaled-integer [com.eignex.klause.factor.arithmetic.Linear] factor — what every backend solves over.
- *
- * The AST node lives in [BoolExpr] so the constraint pipeline can carry it through
- * `And` / `Or` / `Implies` etc. before the compiler intercepts it at lowering time.
+ * Schema representation of a float linear comparison, built by FloatExpr/FloatHandle
+ * operators. The compiler buckets float variables into integers and emits scaled-integer
+ * linear factors. This [BoolExpr] node supports Boolean composition before lowering.
  */
 @Serializable
 @SerialName("floatlin")

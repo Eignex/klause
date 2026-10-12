@@ -6,12 +6,6 @@ import com.eignex.klause.ir.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * The `skipPermanent` gate on [PropagationSession.exportGlueClauses] (#644 soundness): permanent clauses
- * are the search-conditioned assertions (the incumbent objective bound, blocking nogoods), valid only
- * under the current search's incumbent/assumptions; a caller learning under pins (LNS repair) must not
- * share them. Ordinary 1UIP learned clauses (globally-valid resolvents) are still exported.
- */
 class ExportGlueClausesTest {
 
     @Test

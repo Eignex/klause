@@ -304,10 +304,10 @@ internal class CutPool(
          *  be at most `1 − this`, so near-duplicate faces are not piled onto the LP. */
         const val MIN_ORTHOGONALITY: Double = 0.05
 
-        /** CP-SAT's `cut_active_count_decay`, expressed as a bounded decayed activity accumulator. */
+        /** Decay factor for the bounded cut-activity accumulator. */
         const val ACTIVITY_DECAY: Double = 0.8
 
-        /** CP-SAT's default `max_consecutive_inactive_count`. */
+        /** Consecutive inactive LP observations tolerated before cut eviction. */
         const val DEFAULT_MAX_CONSECUTIVE_INACTIVE: Int = 100
 
         const val ACTIVE_TOLERANCE: Double = 1e-6

@@ -1,8 +1,6 @@
-% Override std/fzn_bin_packing_load.mzn. Keeps the load-defining equality and adds, per bin, a
-% redundant `bool_lin_le` — `Σ_i w[i]·(bin[i] = b) ≤ ub(load[b])` over the assignment booleans —
-% which klause maps to a PseudoBoolean, so the knapsack-cover separator can strengthen the LP
-% relaxation (#434). The bound is the load var's declared upper bound, so the row is implied by the
-% equality and stays sound; when a load is effectively unbounded the row is trivially true (no cut).
+% Load equalities imply per-bin bool_lin_le bounds using ub(load(b)).
+% These redundant PseudoBoolean rows expose knapsack-cover cuts; unbounded loads
+% yield trivial rows.
 predicate fzn_bin_packing_load(
   array [int] of var int: load,
   array [int] of var int: bin,

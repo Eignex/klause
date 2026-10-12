@@ -4,17 +4,13 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
 /*
- * Backtrackable mutable state for incremental propagators, riding the same O(changes-since-mark)
- * undo trail the engine uses for bool/int domains (see UndoLog.revTrail). Each write,
- * while PropagationState.undoLogging is on, records the cell's prior value and registers the cell
- * on the reversible trail; PropagationState.undoTo replays the trail top-down so every cell lands
- * back on its mark-time value. This replaces the O(state) SnapshottablePayload.snapshotCopy for
- * factor state that changes incrementally (matching, flow, sparse sets, ...).
+ * Backtrackable mutable state for incremental propagators, using the bool/int domain undo trail.
+ * While PropagationState.undoLogging is on, writes record each cell's prior value on
+ * UndoLog.revTrail. PropagationState.undoTo restores cells in reverse order, costing
+ * O(changes-since-mark).
  *
- * Soundness rests on one rule: every mutation goes through set / the reversible API — a raw write
- * that skips the log will not be undone and silently corrupts state across a backtrack. The trail
- * itself is restore-correct by construction (it replays recorded prior values), so the bug class is
- * confined to "did the propagator route all its mutations through a reversible".
+ * Every mutation must use the reversible API: a raw write bypasses restoration and corrupts
+ * propagator state across backtracking.
  */
 
 /** A cell that can roll back one logged mutation; registered on [UndoLog.revTrail]. */

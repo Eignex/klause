@@ -63,8 +63,7 @@ import kotlin.time.TimeSource
  * sets and lets the bandits learn which destroy/repair combo exposes the most rewarding
  * neighbourhood for this problem. Composes naturally with Session + assumption primitives.
  *
- * Specialised to [LocalSearchParams] so we can override `maxFlips` per iteration; the
- * generic-over-`P` version would need a `SolverParams.withMaxFlips` extension point.
+ * Specialised to [LocalSearchParams] to override `maxFlips` per iteration.
  *
  * [LocalSearchParams.maxInstructions], when set, also bounds the outer destroy/repair loop: each
  * iteration is charged [flipsPerIteration] units — the allowance handed to that iteration's repair —

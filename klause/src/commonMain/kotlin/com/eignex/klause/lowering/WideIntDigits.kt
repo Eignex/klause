@@ -15,18 +15,11 @@ import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
 /**
- * Positional encoding of an integer too large for a [Long] domain, as digits over ordinary `Long`
- * variables: `x = Σᵢ dᵢ·2^(width·i)`, each `dᵢ` in `[0, 2^width)`.
+ * Encode nonnegative integers as ordinary `Long` variables:
+ * `x = Σᵢ dᵢ·2^(width·i)`, with each `dᵢ` in `[0, 2^width)`.
  *
- * This is how arbitrary magnitude reaches the solver without the kernel changing: the digits are
- * ordinary integer variables, so domains, the trail, propagation, the order atoms and the LP relaxation
- * all stay exactly as they are, and the precision lives in the encoding.
- *
- * [widthFor] is the load-bearing part. Decomposing the *variables* is not enough on its own — a row's
- * bound reasoning multiplies a coefficient by a domain bound, and once that product leaves `Long` the
- * ordinary propagator stops deriving the bound, so satisfying assignments are still findable but
- * refutations are lost. Choosing the width against the largest coefficient in the rows a variable
- * appears in keeps every such product in range, which is what keeps refutation working.
+ * [widthFor] chooses width against the largest row coefficient, keeping coefficient-times-digit
+ * bounds inside `Long` so ordinary propagation can derive bounds without overflow.
  */
 internal object WideIntDigits {
 

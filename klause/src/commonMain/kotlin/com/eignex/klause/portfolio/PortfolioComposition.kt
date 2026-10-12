@@ -209,14 +209,12 @@ internal sealed interface WorkerConfig {
 internal class PortfolioArmPlan(val arms: List<WorkerConfig>, val firstSolutionCount: Int)
 
 /**
- * The single generic decision algorithm: given a [PortfolioScenario], pick and order the arms.
- * This is the whole portfolio policy in one place — and the surface issue #9 tunes. Everything
- * scenario-dependent (which arms, how many, in what order, how a mixed pool splits) is decided
- * here; [PortfolioBuilder] only materialises the result, identically for every scenario.
+ * Selects and orders arms from [PortfolioScenario], including mixed-pool allocation.
+ * [PortfolioBuilder] materializes the selected arms.
  */
 internal object PortfolioComposition {
 
-    /** Fraction of a MIXED pool given to local-search arms (the rest go to backtrack). A #9 knob.
+    /** Fraction of a MIXED pool given to local-search arms (the rest go to backtrack).
      *  COP leans LS (it streams good incumbents fast while backtrack tightens the bound); CSP leans
      *  backtrack (only complete search proves UNSAT / reliably reaches a first feasible). */
     fun lsShare(kind: Kind): Double = when (kind) {

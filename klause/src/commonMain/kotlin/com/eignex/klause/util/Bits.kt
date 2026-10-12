@@ -1,20 +1,13 @@
 package com.eignex.klause.util
 
-/**
- * Minimal multiplatform bitset over `[0, size)` ints, backed by a [LongArray]. Carved out
- * because Kotlin's common stdlib has no `BitSet`. Used by `SetDomain` / propagation set
- * arrays — every operation we need (membership, set / clear, cardinality, union, intersect,
- * difference, equality, copy) is a one-liner over the packed words.
- *
- * The representation stays deliberately small: callers use it where a packed mutable bitset is needed.
- */
+/** Multiplatform mutable bitset over `[0, size)`, packed into a [LongArray]. */
 class Bits(size: Int) {
-    /** Number of addressable bits. */
+
     val size: Int = size
 
     @PublishedApi internal val words: LongArray = LongArray((size + 63) ushr 6)
 
-    /** Return whether bit [i] is set. */
+
     fun get(i: Int): Boolean = (words[i ushr 6] ushr (i and 63)) and 1L == 1L
 
     /** Set bit [i]. */

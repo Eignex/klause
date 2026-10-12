@@ -8,7 +8,6 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
-/** LS invariant logic for `sort`. */
 internal class SortInvariant(private val xs: IntArray, private val ys: IntArray) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = mismatches(state, ov = -1, nv = 0L) > 0

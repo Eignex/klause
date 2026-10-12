@@ -23,11 +23,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Behaviour tests for the Feasibility-Jump candidate source [ArgminJump]: a jump must move a
- * hot-spot variable to the value that minimizes its weighted violation, and so must never increase
- * weighted violation.
- */
 class ArgminJumpTest {
 
     /** A single `x0 = 3` constraint over 0..5: from the all-zero start the unique argmin jump is

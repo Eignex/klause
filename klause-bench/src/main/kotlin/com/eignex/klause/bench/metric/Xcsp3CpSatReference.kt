@@ -12,12 +12,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * The XCSP3 cp-sat reference. `minizinc --solver cp-sat` can only read FlatZinc and OR-Tools ships no
- * XCSP3 frontend, so an XCSP3 instance is solved by the [IMAGE] container: CPMpy (the OR-Tools cp-sat
- * modelling lib that won the XCSP3 2024 cp-sat track) reads the `.xml` and solves it with cp-sat
- * directly — the same engine used for MiniZinc, so the reference table stays a single cp-sat oracle.
- * Python lives only in the container; this returns a [SolverInvocation.Result]
- * so the reference sweep caches and scores XCSP3 exactly like the MiniZinc path.
+ * XCSP3 reference adapter for CPMpy and OR-Tools cp-sat in the [IMAGE] container.
+ * Returns [SolverInvocation.Result] for shared caching and scoring with MiniZinc runs.
  */
 internal object Xcsp3CpSatReference {
     const val IMAGE = "klause-xcsp3-cpsat:latest"
@@ -26,9 +22,7 @@ internal object Xcsp3CpSatReference {
     /** Label on every reference container, so stragglers can be reaped (`docker kill --filter label`). */
     const val CONTAINER_LABEL = "klause-xcsp3-ref"
 
-    /** Hard per-container memory ceiling. CPMpy's XCSP3 model build blows up on a few pathological
-     *  instances (one reached 50 GB); this cap makes docker OOM-kill such a container — the instance is
-     *  scored as undecided and skipped — so a runaway can never exhaust the host. */
+    /** Hard container memory ceiling. Oversized CPMpy builds are OOM-killed and scored as undecided. */
     private const val MEMORY_LIMIT = "6g"
     private const val DOCKER_INSPECT_WAIT_MS = 5_000L
 

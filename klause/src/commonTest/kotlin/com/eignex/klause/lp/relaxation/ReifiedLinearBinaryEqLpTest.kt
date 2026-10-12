@@ -12,12 +12,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Exact LP hull for `aux ⇔ (v == bound)` when `v`'s declared domain is binary — the tight replacement
- * for the big-M reification. The reified value is an affine function of the indicator, so the objective
- * `v − k·aux` is *constant* on the LP feasible region; a big-M relaxation would leave it a slack range.
- * Layout: bool var 0 = aux, int var 0 = v.
- */
 class ReifiedLinearBinaryEqLpTest {
 
     private val eps = 1e-7

@@ -3,16 +3,9 @@ package com.eignex.klause.bench.metric
 import java.io.File
 
 /**
- * Credit between N per-run result tables (reference-table-schema CSVs emitted by `solve`), computed by
- * comparison rather than by parsing output dirs. For each instance shared across the files it decides a
- * **winner set** — the run(s) with the best result — then feeds those to [ArmCalibration.scoreWinnerSets]
- * for win-share + a greedy diverse set-cover. Credit
- * is **relative** (who beats whom), so no oracle is needed; a committed `reference/<solver>.csv` can be
- * passed as one more file to include cp-sat as a baseline column. `by` slices the credit within each
- * value of a feature column (`structure` / `format`), so "A wins globals, B wins linear" falls out.
- *
- * This is config-level credit (one file per config/palette). Arm-level credit is the same call over
- * per-arm files — emit each arm's single-solver run as its own result CSV.
+ * Compares per-run result CSVs by instance and passes the best-result winner sets to
+ * [ArmCalibration.scoreWinnerSets] for win-share and diverse set-cover credit.
+ * `by` partitions credit by a feature column; reference tables may participate as runs.
  */
 internal object ResultCredit {
 

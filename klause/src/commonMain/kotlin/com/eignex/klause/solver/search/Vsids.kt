@@ -95,7 +95,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             // assigned" and let it commit an incomplete assignment as a solution. Before that, rescan
             // the live variables and re-offer every still-open one; retry so the max-activity one
             // wins. Runs only when the heap empties (a candidate leaf), so the O(log n) fast path is
-            // untouched — `null` now provably means every variable is determined.
+            // untouched — `null` provably means every variable is determined.
             var refilled = false
             for (v in 0 until numBoolCached) {
                 if (state.boolValue(v) == null && !h.contains(v)) {

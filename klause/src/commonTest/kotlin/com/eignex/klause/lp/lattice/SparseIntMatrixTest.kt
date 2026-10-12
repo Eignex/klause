@@ -18,15 +18,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * The sparse echelon-Hermite chain against a dense reduction of the same matrices.
- *
- * The chain derives bounds that PRUNE search, so a transform that is not unimodular or a triangle paired
- * with the wrong right-hand side does not crash — it returns a wrong verdict. Each property is therefore
- * checked over randomly generated systems rather than on hand-picked shapes: the rank and the pivot
- * columns must agree with the dense reduction, `H = A·V` must hold with `V` unimodular, and a witness of
- * the original system must lie inside every bound the chain derives for it.
- */
 class SparseIntMatrixTest {
 
     private fun matrix(random: Random, rows: Int, cols: Int): List<SparseIntRow> = List(rows) {
@@ -40,7 +31,7 @@ class SparseIntMatrixTest {
     private fun dense(a: List<SparseIntRow>, cols: Int): Array<Array<BigInt>> =
         Array(a.size) { i -> Array(cols) { j -> a[i][j] } }
 
-    /** The reduction the sparse chain replaces: dense fraction-free elimination, pivot columns only. */
+    /** Dense fraction-free elimination over pivot columns, used as an independent oracle. */
     private fun densePivots(a: List<SparseIntRow>, cols: Int): List<Int> {
         val w = dense(a, cols)
         val m = w.size

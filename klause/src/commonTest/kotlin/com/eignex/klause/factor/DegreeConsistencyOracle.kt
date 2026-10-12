@@ -11,29 +11,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Pins the graded-violation contract for a [Factor]: `deltaIf*` and `apply*` must
- * each return exactly `violationDegree(after) - violationDegree(before)`, and the engine's
- * incrementally-maintained [LocalSearchState.cost] (`Σ violationDegree`) must stay in lockstep
- * with a fresh [LocalSearchState.recompute].
- *
- * A factor whose graded delta disagrees with its [Factor.violationDegree] silently
- * desyncs the global cost and corrupts the CBLS gradient; this oracle catches that by random-
- * walking the assignment space and checking, after every move:
- *  - `netDelta(move)` (the summed `deltaIf*`) predicted the actual `cost` change, and
- *  - the maintained `cost` equals the cost a fresh `recompute` of the same assignment produces.
- *
- * Also asserts the degree is non-negative and `(degree > 0) == isViolated` at every step, so
- * a graded factor can't report a positive degree while claiming to be satisfied (or vice versa).
+ * Random-walk oracle for graded violation: applied deltas equal the change in violation degree,
+ * and incremental cost equals a fresh recomputation. Degrees are nonnegative and positive exactly
+ * when the factor is violated.
  */
 object DegreeConsistencyOracle {
 
     /**
-     * `exactProbe`: when true, additionally require `netDelta(move)` (the summed
-     *   `deltaIf*` probe used by the CBLS gradient) to *exactly* predict the cost change —
-     *   i.e. the probe is graded-exact, not a best-effort approximation. Turn this on for
-     *   factors with graded violation (their gradient must be accurate); leave off for
-     *   factors whose probe is approximate by design (cost-tracking via `apply*` is still
-     *   verified for them).
+     * [exactProbe] also requires the probed delta to equal the applied cost change. Disable it for
+     * approximate probes; incremental apply and recomputation must still agree.
      */
     fun assertConsistent(
         problem: Problem,

@@ -7,20 +7,11 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.Bits
 
 /**
- * The bounds a single scan of the conjunctive relations yields: for each integer variable, the tightest
- * `[lo, hi]` implied by the relations that mention it *alone* (`x ≤ 7`, `3·x = 12`, …). A side no such
- * relation pins is left `null` (infinite) — infinity is structural, never a `±Long/4` sentinel — so the
- * result is a [PresolveDomain] (finite or still-open).
- *
- * Deliberately NOT a fixpoint. Deducing a bound from a multi-variable row is feasibility-based bound
- * tightening, and running it here would duplicate what the root bake and the deferred
- * finite CP presolve would do over the lowered rows — except that parsing has no wall-clock budget to
- * bound it with, which is what hung the Petri-net and concurrency QF_LIA instances. This pass is
- * O(Σ row width) once, the same order as reading the document.
- *
- * What stays here is only what the *lowering* needs before it can run: an unbounded operand widens an
- * `ite`/`div`/`mod` auxiliary's range and drops `distinct` from an [com.eignex.klause.factor.global.AllDifferent]
- * to pairwise `≠`. Everything else is left to presolve, which tightens under its budget.
+ * Single-scan integer bounds from conjunctive relations mentioning one variable.
+ * Missing sides remain null (infinite) in [PresolveDomain]. The scan is linear in
+ * row width; multi-variable fixpoint tightening belongs to budgeted presolve.
+ * These bounds guide auxiliary ranges and the choice between AllDifferent and
+ * pairwise disequality lowering.
  */
 internal fun Compiler.Builder.inferBounds() {
     if (intNames.isEmpty()) return

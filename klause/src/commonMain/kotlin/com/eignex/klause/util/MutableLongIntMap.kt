@@ -1,18 +1,10 @@
 package com.eignex.klause.util
 
 /**
- * Mutable open-addressing `Long → Int` hash map — the `Long`-keyed analogue of [MutableIntIntMap],
- * eliminating the key/value autoboxing a stdlib `HashMap<Long, Int>` pays. Used for engine hot-path
- * tables keyed by a packed `Long` (a `(factorId, literal)` or `(intVar, kind, threshold)` tuple),
- * e.g. `PropagationState.boolWatchPos` (queried/mutated on every two-watched-literal watcher move
- * during BCP) and the bound-atom reverse index.
- *
- * Linear-probed, capacity a power of two, load factor kept ≤ 0.5. Occupancy is tracked by a parallel
- * `used` bitmap rather than a sentinel, so any `Long` key (including `0L` and [Long.MIN_VALUE]) is
- * storable. [remove] uses backward-shift deletion (Knuth 6.4 algorithm R), so the table holds no
- * tombstones and stays compact across reuse.
- *
- * Not thread-safe. Iteration order is unspecified.
+ * Primitive-key Long-to-Int map with linear probing, power-of-two capacity and load
+ * factor at most 0.5. A separate occupancy bitmap permits every key value;
+ * backward-shift deletion avoids tombstones. See [MutableIntIntMap] for related lookup
+ * storage. Not thread-safe; iteration order is unspecified.
  */
 internal class MutableLongIntMap(initialCapacity: Int = 8) {
     private var keys: LongArray

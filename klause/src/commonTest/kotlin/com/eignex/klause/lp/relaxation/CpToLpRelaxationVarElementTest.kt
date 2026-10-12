@@ -12,14 +12,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Variable-array Element big-M linearization: `result = arr[idx]` where `arr` holds int-var ids.
- * The hull is a *relaxation*, so its LP bound on a minimized objective must be **sound** — never above
- * the true integer optimum (an over-tight hull cutting off the optimal assignment is the soundness failure).
- * When `idx` is fixed to a single position the single selector is integral, so the hull is exact.
- *
- * Layout: var 0 = idx, 1 = result, 2 = arr[0], 3 = arr[1].
- */
 class CpToLpRelaxationVarElementTest {
 
     private val eps = 1e-7

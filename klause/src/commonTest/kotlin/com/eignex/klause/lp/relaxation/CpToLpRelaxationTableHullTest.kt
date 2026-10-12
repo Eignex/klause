@@ -12,11 +12,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * #22 Table LP linearization: the one selector-per-tuple convex hull. The LP optimum over the table
- * columns equals the best allowed tuple for any linear objective, and shrinking a variable's domain
- * removes the tuples it kills.
- */
 class CpToLpRelaxationTableHullTest {
 
     private val eps = 1e-7

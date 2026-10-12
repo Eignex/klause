@@ -49,20 +49,10 @@ data class BruteForceParams(
 }
 
 /**
- * Ground-truth [Solver] / [Optimizer] for testing. Walks the entire assignment space in a
- * permuted order and yields every assignment that satisfies the problem.
- *
- * Spaces larger than [Long.MAX_VALUE] are supported by splitting variables into "chunks"
- * whose per-chunk product fits in a `Long`. Each chunk gets its own [LongPermutation]; the
- * walker traverses the cartesian product of chunk permutations as a nested loop. Within a
- * chunk the iteration is shuffled (the kpermute output); across chunks it's lexicographic.
- * For problems with many variables but few constraints, the satisfaction density is high
- * enough that a satisfying assignment falls out within a handful of inner iterations
- * regardless.
- *
- * As an [Optimizer] the implementation is the obvious "walk every assignment, return the
- * one with the lowest objective". Trivially correct and useful as a ground-truth oracle
- * for stochastic optimisation backends on small problems.
+ * Exhaustive [Solver] / [Optimizer] for small-problem validation. Walks assignments in a
+ * permuted order, yielding feasible ones or retaining the minimum objective.
+ * Spaces exceeding [Long.MAX_VALUE] are split into chunks whose products fit a `Long`,
+ * each with its own [LongPermutation]; chunk combinations are traversed lexicographically.
  */
 class BruteForceSolver(override val problem: BakedProblem) :
     Solver<BruteForceParams>,

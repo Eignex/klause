@@ -10,12 +10,6 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import kotlin.test.Test
 
-/**
- * Move-generation coverage for [PairSwap]. The reference closure encodes the expected construction —
- * up to [cap] validated bool-pair swaps followed by up to [cap] validated int-pair swaps, each drawn
- * from two RNG ints and kept only when the pair is non-degenerate and domain-legal — and the test pins
- * [PairSwap.generate] to that multiset.
- */
 class PairSwapTest {
 
     private val cap = 8

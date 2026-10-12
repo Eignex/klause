@@ -30,7 +30,7 @@ import com.eignex.klause.model.SetCard
  * [IntMax] / [IntMin], [IntAbs]) is replaced with a fresh aux [IntRef], and auxiliary
  * constraints are emitted that pin the aux to the correct value. After lifting, the
  * top-level assertion path (`CompilerAssertions`) and the reification path
- * (`CompilerLowering`) deal only with linear forms.
+ * (`Compiler.kt`) deal only with linear forms.
  */
 internal fun Lowering.lift(expr: IntExpr): IntExpr = when (expr) {
     is IntRef, is IntLit -> expr
@@ -223,9 +223,7 @@ internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
     else -> error("domainOf called on non-affine expression: $expr")
 }
 
-/** Narrow a `Long` lowering intermediate to `Int`, throwing a clear compile error when it
- *  doesn't fit — mirrors the overflow discipline already enforced in [liftMul] / [liftDivMod]
- *  so an out-of-range scale/sum fails loudly instead of wrapping into a garbage value. */
+/** Narrow a lowering intermediate to `Int`, rejecting overflow with a compile error. */
 internal fun checkedInt(value: Long, what: () -> String): Int {
     require(value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
         "Compiler lowering overflows Int: ${what()} = $value"
@@ -265,8 +263,6 @@ internal fun Lowering.affine(expr: IntExpr): Affine = when (expr) {
     else -> error("affine() called on non-affine expression — caller must lift first: $expr")
 }
 
-/** Drop zero coefficients and narrow each surviving `Long` coefficient back to `Int`,
- *  failing loudly on overflow. */
 private fun narrowCoeffs(coeffs: Map<String, Long>): Map<String, Int> {
     val out = HashMap<String, Int>(coeffs.size)
     for ((k, v) in coeffs) {

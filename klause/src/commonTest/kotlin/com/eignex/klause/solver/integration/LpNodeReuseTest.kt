@@ -15,13 +15,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
-/**
- * What a search actually pays for its node LPs.
- *
- * A child node differs from its parent in column bounds alone, so the parent's factorization is still
- * valid there. Rebuilding it per node is the expensive half of a node solve, and the counter that shows
- * whether it happens is factorizations against solves: one apiece means every node refactorized.
- */
+// Child nodes change only column bounds, so they can reuse the parent factorization.
 class LpNodeReuseTest {
 
     /** An integer-linear minimisation wide enough to branch, so the LP runs at more than one node. */

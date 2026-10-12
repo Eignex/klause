@@ -31,7 +31,7 @@ class ClaspReferenceTest {
 
     @Test
     fun `a decision satisfiable is a proven SAT witness`() {
-        // No `o` lines ⇒ clasp was deciding, not optimising; a complete solver's model proves SAT.
+        // No `o` lines ⇒ clasp is deciding satisfiability; a complete solver's model proves SAT.
         val r = ClaspReference.parse("s SATISFIABLE\n", elapsedMs = 300, cmd = cmd)
         assertEquals(true, r.feasible)
         assertTrue(r.proven)

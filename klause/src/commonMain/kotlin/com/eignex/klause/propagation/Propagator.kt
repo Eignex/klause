@@ -29,9 +29,7 @@ interface Propagator {
      *
      * Used by [com.eignex.klause.factor.bool.Clause] to implement two-watched-literal
      * propagation (Zhang–Stickel): only the two watched literals trigger
-     * wakeups, so a 50-literal clause fires on 2/50 var changes instead of 50/50. The
-     * same scheme generalises to Cardinality with k+1 watched literals — a future
-     * factor can adopt this contract without engine changes.
+     * wakeups, so a 50-literal clause fires on 2/50 var changes instead of 50/50.
      *
      * Default is `null` — preserves the current "wake on any boolVars change" semantics
      * for every factor that hasn't opted in.

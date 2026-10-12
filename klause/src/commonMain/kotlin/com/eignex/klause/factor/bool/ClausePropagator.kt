@@ -9,7 +9,6 @@ import com.eignex.klause.propagation.LearnedPropagator
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.moveBoolWatcher
 
-/** CP propagator for [Clause]: two-watched-literal propagation over a disjunction of literals. */
 internal class ClausePropagator(
     override val boolVars: IntArray,
     override val intVars: IntArray,
@@ -18,7 +17,6 @@ internal class ClausePropagator(
 
     private var pureBoolMemo: Int = -1
 
-    /** True iff every literal is a plain bool var (variable id `< numBoolVars`), memoised. */
     internal fun allLiteralsBool(numBoolVars: Int): Boolean {
         val m = pureBoolMemo
         if (m >= 0) return m == 1
@@ -112,6 +110,6 @@ internal class ClausePropagator(
         }
     }
 
-    /** When [propagate] returns false, every literal was false — the textbook clause-form nogood. */
+    /** When [propagate] returns false, every literal is false, giving a clause-form nogood. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray = literals
 }

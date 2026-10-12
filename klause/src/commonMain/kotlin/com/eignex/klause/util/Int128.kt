@@ -1,21 +1,10 @@
 package com.eignex.klause.util
 
 /**
- * Minimal signed 128-bit integer accumulator for the integer-multiplier LP certification. It is
- * the Kotlin-Multiplatform stand-in for a wider integer: the dual-bound recomputation sums
- * products of two 64-bit integers, where each product fits in 64 bits (the multipliers are scaled to
- * keep them small) but the *running sum* overflows it. A two-`Long` (hi · 2⁶⁴ + lo) value covers that,
- * with no exotic intrinsic — carry detection uses the common-stdlib unsigned compare, and the one
- * 64×64→128 product needed for [addProduct] is a portable 32-bit schoolbook expansion, so a single
- * code path serves both JVM and Native.
- *
- * Represented in two's complement: the true value is `hi * 2⁶⁴ + (lo as unsigned)`. The accumulator is
- * mutable and allocation-light (one instance reused across a bound computation); [overflow] latches if
- * an [addProduct]/[addLong] ever carries out of 128 bits, after which the result is meaningless and the
- * caller must discard it (keeping the node — sound, only a missed prune).
- *
- * Soundness contract: every operation is exact unless [overflow] latches; callers treat a latched
- * accumulator as a failed deduction (no prune / no cut), exactly like a non-finite float bound.
+ * Mutable signed 128-bit accumulator for exact LP certification, represented as
+ * `hi * 2^64 + unsigned(lo)` in two's complement. Carry detection and 32-bit schoolbook
+ * products work on JVM and Native. [overflow] latches on overflow; callers discard
+ * a latched result as a failed deduction, preserving soundness.
  */
 internal class Int128 {
     /** High 64 bits (signed). */

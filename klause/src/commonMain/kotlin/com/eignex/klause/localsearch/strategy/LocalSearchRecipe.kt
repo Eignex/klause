@@ -13,7 +13,7 @@ import com.eignex.klause.localsearch.scoring.MoveScoring
  * single recipe is just a portfolio of one.
  */
 class LocalSearchRecipe(
-    /** External name (CLI / campaign / telemetry). */
+    /** External name (CLI / telemetry). */
     val label: String,
     /** Drives the feasibility fight; its [SourceDrivenStrategy.feasibleDescent] also decides the optimize
      *  phase when there is no separate [optimizeStrategy]. Restart lives in its `schedule.restart`. */

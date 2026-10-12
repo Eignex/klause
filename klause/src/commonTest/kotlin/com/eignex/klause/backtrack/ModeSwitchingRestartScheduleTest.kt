@@ -5,12 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Stable/focused mode-switching schedule: the search starts in the focused mode (its sub-schedule
- * governs restarts), switches to the stable dive mode once the focused segment's conflict budget is
- * spent, and switches back after the stable segment. A stub focused schedule that always asks to
- * restart makes the active mode observable through [ModeSwitchingRestartSchedule.shouldRestart].
- */
 class ModeSwitchingRestartScheduleTest {
 
     /** A focused stub that always wants to restart, so the active mode is visible via shouldRestart. */

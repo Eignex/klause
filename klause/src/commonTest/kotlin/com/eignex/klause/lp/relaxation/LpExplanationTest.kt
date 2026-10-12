@@ -41,10 +41,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * #281/#705: LP objective-bound learning on the sparse revised-simplex path. The reason is built from
- * the exact basis-certificate; every literal it cites is false at the node.
- */
 class LpExplanationTest {
     @Test
     fun `opaque exact literal identifiers require a native Boolean interpretation before citation`() {

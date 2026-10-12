@@ -11,18 +11,12 @@ import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
 /**
- * Open heads a single refutation sweep visits before yielding.
+ * Maximum open heads visited per refutation sweep. Each costs at most one shortest-path search;
+ * changes through the constant node can make every head eligible, so this bounds per-sweep work.
+ * Closed guards need only a bucket scan and consume no allowance.
  *
- * An open head costs at most one shortest-path search, and this window bounds that work — measured, not
- * assumed. On a fully bounded model every sweep offers all 1403 heads and every one of 8000 sweeps
- * exceeded the window, because [DifferenceSystemPropagator.headsToSweep] narrows nothing there: the
- * distances through the constant node move on each sweep, which widens the head set back to all of them.
- * Removing the window costs 2.3-2.7x at an identical 4000 nodes.
- *
- * Closed guards need only a bucket scan, so they do not consume the window. Keeping deferred heads queued
- * still reaches every open head across successive decisions — a refutation is deferred,
- * never dropped, and a deferred one only leaves an edge open that the Boolean layer may still decide, so
- * the verdict is unaffected either way.
+ * Deferred heads stay queued for successive decisions. Delaying a refutation leaves its edge open
+ * for Boolean search to decide, preserving verdict soundness.
  */
 private const val HEAD_SWEEP_BUDGET = 64
 private const val HUB_REFUTATION_FAILED = -1
@@ -43,7 +37,7 @@ private const val HUB_REFUTATION_FAILED = -1
  *
  * **The constant node is measured, not walked.** A bounded column contributes `zero → v` and `v → zero`,
  * so on a model whose columns are all bounded that node has degree `2n`: the graph is strongly connected,
- * every shortest-path search spans it, and no reachability argument narrows a sweep (#1529). Those edges
+ * every shortest-path search spans it, and no reachability argument narrows a sweep. Those edges
  * stay in the system — the potential has to remain feasible for them, and a cycle through one is a real
  * conflict — but a per-head search does not walk them. Instead
  * [IncrementalDifferenceGraph.refreshZeroDistances] measures the distance to and from that node once per

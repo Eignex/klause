@@ -72,8 +72,10 @@ internal fun bracketInts(s: String): IntArray {
     return out.toIntArray()
 }
 
-/** XCSP3 run-length shorthand `vxn` (value `v` repeated `n` times, `n ≥ 0`) as `(v, n)`, or null when
- *  [tok] is not exactly that shape. Replaces a `(-?\d+)x(\d+)` match. */
+/**
+ * XCSP3 run-length shorthand `vxn` as `(v, n)`, for integer v and nonnegative n.
+ * Returns null when [tok] does not match the shorthand.
+ */
 internal fun parseRle(tok: String): Pair<Int, Int>? {
     val xi = tok.indexOf('x')
     if (xi <= 0 || xi == tok.length - 1) return null

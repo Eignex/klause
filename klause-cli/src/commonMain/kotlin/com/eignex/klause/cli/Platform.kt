@@ -19,17 +19,10 @@ internal fun installCliConfig(): KlauseConfig =
     KlauseConfig.fromProps(lookup = ::cliProp).also { KlauseConfig.current = it }
 
 /**
- * A heap reading for the `dry-run-presolve` diagnostics. [retainedBytes] is live heap after a
- * collection — what the phase still holds — and [committedBytes] the heap the JVM has taken from the OS,
- * which it grows under pressure and rarely returns, so at the end of ingest it approximates the
- * high-water demand. [peakBytes] is the largest usage the sampler started by [startHeapPeakSampler]
- * observed, null when none was started. The three diverge when a phase allocates a large transient:
- * peak measures it, retained does not, and committed only records that the JVM grew.
- *
- * Peak counts garbage not yet collected, so it drifts up toward whatever `-Xmx` allows: it bounds
- * demand from above rather than stating the heap a phase requires, and the same ingest reads higher
- * under a larger ceiling. Compare peaks only at equal `-Xmx`, and keep the OOM/no-OOM outcome under a
- * ceiling as the decisive signal.
+ * Heap diagnostics for `dry-run-presolve`: [retainedBytes] measures live heap after collection,
+ * [committedBytes] measures heap reserved from the OS, and [peakBytes] is the sampler
+ * maximum or null without sampling. Peaks include uncollected garbage and depend on
+ * `-Xmx`; compare them only at equal heap ceilings.
  */
 internal class HeapSample(val retainedBytes: Long, val committedBytes: Long, val peakBytes: Long?)
 

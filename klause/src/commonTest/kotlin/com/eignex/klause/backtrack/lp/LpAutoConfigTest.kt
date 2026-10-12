@@ -39,7 +39,7 @@ class LpAutoConfigTest {
 
     @Test
     fun `the configurable relaxation-size ceiling gates auto bounding`() {
-        // LP activation gates on the ceiling cap (#705): within it LP is on (even over the base cap,
+        // LP activation gates on the ceiling cap: within it LP is on (even over the base cap,
         // where only the hull budget shrinks); past it LP is declined. Pure cost guard — sound either way.
         val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
         var config = KlauseConfig.DEFAULT.copy(lpCeilingTableauCells = Long.MAX_VALUE)
@@ -90,7 +90,7 @@ class LpAutoConfigTest {
     fun `size guard sheds an over-budget hull but keeps the base LP`() {
         // NValue over 32 vars × domain 32 = 1024 cells: under its own MAX_NVALUE_CELLS cap (so the
         // builder would build it), but its ~2048 columns + ~1089 rows blow a 2^20 relaxation budget.
-        // The size guard (#484) must shed the hull (lpNValue off) while the base LP still runs.
+        // The size guard must shed the hull (lpNValue off) while the base LP still runs.
         val config = KlauseConfig.DEFAULT.copy(lpMaxTableauCells = 1L shl 20)
         val n = 32
         val domains = Array(n + 1) { if (it < n) IntDomain(0, 31) else IntDomain(0, n.toLong()) }

@@ -1,4 +1,4 @@
-% Auto: keep `increasing_int` native (klause has a factor for it) instead of the std decomposition.
+% Maps `increasing_int` to its native factor.
 predicate klause_increasing_int(array [int] of var int: x);
 
 predicate fzn_increasing_int(array [int] of var int: x) =

@@ -726,17 +726,10 @@ internal class ResumableMinimize(
         return session.assertObjectiveBound(objectiveVar, threshold, atMost = ascending) is PropagationResult.Unsat
     }
 
-    /**
-     * Close the integer columns the front-end could only bound by inventing a box, now that an incumbent
-     * prices them: see [objectiveCutoffBounds]. Fired at the root alongside the objective bound, so the
-     * tightening is level-0 permanent and the branching that follows sees a real range instead of the
-     * box; re-run only once the incumbent improves. Returns true iff it empties the root — nothing beats
-     * the incumbent, so the optimum is proven.
-     *
-     * The bound cuts everything that is not *better* than the incumbent, which is sound for proving an
-     * optimum and wrong for enumeration. This driver is the branch-and-bound optimize path, which only
-     * ever surfaces strictly-improving solutions ([recordIfImproving]); an all-solutions run enumerates
-     * through a different search entirely and never reaches here.
+    /*
+     * Bounds open columns from the incumbent cutoff at level 0; see objectiveCutoffBounds.
+     * Re-runs only after an improvement. An empty root proves the incumbent optimal.
+     * This removes non-improving solutions, so only optimization reaches it, never enumeration.
      */
     private fun tightenOpenColumnsAtRoot(): Boolean {
         if (!bestObj.isFinite()) return false
@@ -951,9 +944,7 @@ internal class ResumableMinimize(
                     ?: lpEngine.lpFeasibilityPump(objective, rootToken)
                 if (seed != null) publishLpProposal(seed)?.let { return it }
             }
-            // Best-bound tree-search primal subsolver: dive best-first for an incumbent. Reached only
-            // when the probe above seeded none — running it behind a successful probe was measured
-            // on MIPLIB as 0.3-1.5s of root time for no objective anywhere.
+            // Best-first incumbent search runs only if rounding and feasibility pumping yield no incumbent.
             if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
                 lpEngine.lbTreeSearch(objective, rootToken, params.assumptions)?.let { seed ->
                     val ray = seed.direction

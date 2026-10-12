@@ -7,17 +7,12 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 
 /*
- * Reversible, delta-driven matching GAC for plain alldifferent (no excepted values) — the incremental
- * counterpart to the full per-fire rebuild in reginFilter. State lives in ReginIncrementalState
- * (declared with ReginCache in ReginMatcher.kt): the maximum matching and the canonical SCC labels
- * ride the engine undo trail, so a backtrack restores them in O(changes) rather than triggering a
- * rebuild, and the next forward fire patches only the SCC components touched by the values that
- * left since the previous fire. Node space is stable across fires (variable i is node i; value-id
- * j is node n + j, ids from the cache's grow-only value universe), and SCC labels are canonical
- * (each component labelled by its minimum node id) so unchanged components cost no reversible write.
+ * Reversible matching GAC for plain alldifferent. ReginIncrementalState keeps the maximum
+ * matching and canonical SCC labels on the undo trail; forward fires patch SCC components
+ * touched by domain removals, and backtracking restores them in O(changes).
  *
- * Soundness is gated by enumerate-vs-brute across deep backtracking plus witness-checked Hall-set
- * conflict reasons (ReginIncrementalTest, AllFactorsOracle, AllDifferentTest, ReginGacTest).
+ * Variable i is node i; value-id j is node n + j in the cache's grow-only value universe.
+ * Each SCC is labelled by its minimum node id, avoiding reversible writes to unchanged components.
  */
 
 /** Incremental matching GAC for [vars] (plain alldifferent). Returns `null` after pruning to the GAC
@@ -73,7 +68,7 @@ private fun reginRebuild(
     // Complete the seed to a maximum matching in one Hopcroft-Karp pass (O(|E|·√n)) rather than a
     // per-variable augmenting search — the dominant cost when the matching is built cold at the root
     // bake with no warm start. On a non-perfect matching, one augmenting search on a still-free variable
-    // recovers the exact Hall violator (its `visited` set), unchanged from the per-variable path.
+    // recovers the Hall violator in its visited set.
     if (!reginHopcroftKarp(n, valuesPerVar, matchVar, matchVal, IntArray(n), IntArray(n))) {
         val visited = BooleanArray(cap)
         for (i in 0 until n) {

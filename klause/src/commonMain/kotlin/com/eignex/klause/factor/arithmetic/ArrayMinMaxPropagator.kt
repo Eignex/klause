@@ -7,7 +7,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 
-/** CP propagator for [ArrayMinMax]: bounds propagation for `result = max/min(xs)`. */
 internal class ArrayMinMaxPropagator(
     private val result: Int,
     private val xs: IntArray,

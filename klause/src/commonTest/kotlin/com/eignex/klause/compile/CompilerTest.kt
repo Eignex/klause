@@ -238,7 +238,7 @@ class CompilerTest {
         val schema = FloatTune()
         val compiled = schema.compile()
         // `rate` appears only in a non-strict linear constraint, so it lowers to an LP-only continuous
-        // column (issue #1232) the simplex resolves; its value rides on the solution's reals.
+        // column the simplex resolves; its value rides on the solution's reals.
         assertEquals(1, compiled.problem.numRealVars)
         val sat = assertIs<SolveResult.Sat>(
             BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 99)),
