@@ -36,6 +36,9 @@ the total includes enclosure and source checks as well as polynomial relaxation.
 It is distinct from a count of polynomial steps alone.
 
 Relaxation points and rational proposals undergo symbolic direct/inverse repairs.
+An exact completion of the retained polynomial rows can also propose algebraic
+coordinates before function repair. That proposal projection supplies no refutation
+authority; its points still require the complete original-source check.
 Each final witness passes original function checks, exact integer integrality and
 every invocation condition. [Exact real coordinates](../arithmetic/real.md) retain
 symbolic exp/log/sin/cos expressions with existing rational/algebraic leaves.
