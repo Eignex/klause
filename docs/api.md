@@ -56,6 +56,10 @@ combines polynomial controls, candidate/move limits and an optional shared node
 budget. Every engine returns the common verdict/witness surface. Rebuilt assignments
 retain arbitrary-width original integers and exact algebraic original reals;
 numeric conditional auxiliaries remain private. See [nonlinear integer semantics](theories/nonlinear-integer.md).
+The quadratic `minimize` overload uses shared exact integer branching and returns
+the same quadratic incumbent/bound result surface for open and arbitrary-width
+integer coordinates. Heuristic engines retain checked incumbents; complete
+traversal must cover every remaining integer branch before a global claim.
 
 
 ## Compatibility and implementation surfaces
