@@ -1,5 +1,7 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.pipeline.symbolicRealValue
+
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.ir.ObjectiveSense
@@ -79,6 +81,18 @@ internal object SmtLibMode : CliMode {
                         { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
                         admissionStart.elapsedNow().inWholeMilliseconds,
                     )
+                }
+
+                is SmtLibInput.Transcendental -> {
+                    common.takeOpenBoundProof()
+                    val source = admitted.problem
+                    val ints = source.intVarNames.mapKeys { smtSourceSymbol(it.key) }
+                    val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
+                    val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
+                    return exactTheorySolvable(source.pipelineRequest(),
+                        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                        admissionStart.elapsedNow().inWholeMilliseconds,
+                        pipelineName = "transcendental-theory", declaredTheoryRoute = "transcendental")
                 }
 
                 is SmtLibInput.Quadratic -> {
@@ -274,7 +288,8 @@ internal fun renderOpenTheoryModel(
     for ((name, id) in ints) append("  (define-fun $name () Int ${smtInteger(assignment.intValue(id))})\n")
     for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.boolValue(id)})\n")
     for ((name, id) in reals) {
-        val value = assignment.algebraicRealValue(id)?.let(::smtAlgebraicValue) ?: smtReal(assignment.realValue(id))
+        val value = assignment.symbolicRealValue(id)?.let(::smtSymbolicValue)
+            ?: assignment.algebraicRealValue(id)?.let(::smtAlgebraicValue) ?: smtReal(assignment.realValue(id))
         append("  (define-fun $name () Real $value)\n")
     }
     append(")")

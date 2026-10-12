@@ -109,7 +109,11 @@ fun OpenTheoryPipeline.execute(
     request: TranscendentalTheoryRequest,
     params: TranscendentalTheoryParams = TranscendentalTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
-): TranscendentalTheoryExecution = TranscendentalInvocation(request.problem, params, engine).execute()
+): TranscendentalTheoryExecution = if (request.problem.hasObjective) {
+    TranscendentalTheoryExecution(
+        OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY), 0, false,
+    )
+} else TranscendentalInvocation(request.problem, params, engine).execute()
 
 private class TranscendentalInvocation(
     private val source: TranscendentalProblem,
