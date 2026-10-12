@@ -1,6 +1,7 @@
 # linear-real: problems with the linear-real theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
 # 2026-10-12: fischer9-mutex-15 replaced by medium problems; no reference had an answer within the sweep's 10 s
+# 2026-10-12: trimmed to 15, keeping the problems whose sweep result varied over the last 30 runs and at most 6 never solved
 # easy: 14
 hakank/contiguity_mip/contiguity_mip2
 hakank/furniture/furniture
@@ -16,26 +17,6 @@ smtlib-qfrdl/check/bignum_rdl1
 smtlib-qfrdl/sal/fischer9-mutex-3
 smtlib-qfrdl/scheduling/orb07_330
 smtlib-qfrdl/skdmxa/skdmxa-3x3-5
-# medium: 21
+# medium: 1
 smtlib-qflra/2017-Heizmann-UltimateInvariantSynthesis/_overflow1.i_3_8_2.bpl_7
-smtlib-qflra/2017-Heizmann-UltimateInvariantSynthesis/_standard_two_index_04.i_3_2_2.bpl_7
-smtlib-qflra/2019-ezsmt/blending/4
-smtlib-qflra/2019-ezsmt/travellingSalesperson/tsp_rand_70_300_1155482584_11.lp
-smtlib-qflra/DTP-Scheduling/constraints-tempo-width-40
-smtlib-qflra/LassoRanker/CooperatingT2/collatz.t2.c_Iteration1_Loop_4-pieceTemplate
-smtlib-qflra/LassoRanker/CooperatingT2/smagillc-fail.t2.c_Iteration1_Loop_7-phaseTemplate
-smtlib-qflra/TM/p7-driverlogNumeric_s8
-smtlib-qflra/clock_synchro/clocksynchro_4clocks.main_invar.induct
-smtlib-qflra/miplib/pp08a-4000
-smtlib-qflra/miplib/pp08a-9000
-smtlib-qflra/sc/sc-22.base.cvc
-smtlib-qflra/tta_startup/simple_startup_14nodes.synchro.induct
-smtlib-qflra/uart/uart-17.base.cvc
-smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/tms-2-3-light-70
-smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/tms-2-3-light-80
-smtlib-qfrdl/sal/fischer6-mutex-20
-smtlib-qfrdl/scheduling/orb04_1005
-smtlib-qfrdl/scheduling/yn2_750
-smtlib-qfrdl/skdmxa/skdmxa-3x3-15
-smtlib-qfrdl/skdmxa2/skdmxa-3x3-18.induction.cvc
 # hard: 0

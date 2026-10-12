@@ -1,26 +1,18 @@
 # routing: problems with the routing theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
 # 2026-10-12: vrp-s2-v2-c7_vrp-v2-c7_det replaced by medium problems; no reference had an answer within the sweep's 10 s
-# easy: 8
-hakank/tsptw/tsptw
+# 2026-10-12: trimmed to 11, keeping the problems whose sweep result varied over the last 30 runs and at most 6 never solved
+# easy: 5
 mzn-bench/2012/tpp/tpp_7_3_20_1
 mzn-bench/2013/mario/mario_n_medium_4
 mzn-bench/2014/mario/mario_n_medium_3
 mzn-bench/2017/mario/mario_medium_3
 mzn-bench/2023/multi-agent-graph-coverage/rnd_n10_p2000_c15_s1
-mzn-bench/2025/tsptw/n20w140.005
-xcsp3-cop/TSPTW2-n040w020-1_c23
-# medium: 11
+# medium: 6
 mzn-bench/2012/tpp/tpp_7_5_30_1
 mzn-bench/2013/mario/mario_t_hard_1
-mzn-bench/2014/mario/mario_t_hard_2
-mzn-bench/2015/cvrp/simple2
-mzn-bench/2017/mario/mario_medium_4
-mzn-bench/2018/vrplc/vrplc9_5_10_s1
 mzn-bench/2020/p1f-pjs/10
 mzn-bench/2023/multi-agent-graph-coverage/rnd_n10_p1500_c15_s1
 mzn-bench/2025/tsptw/n20w160.001
-xcsp3-cop/TSPTW2-n060w020-1_c23
 xcsp3-cop/VRP_LC-09-05-10-s2_c24
-# hard: 1
-mzn-bench/2023/yumi-static/p_4_SG_SG_yumi_grid_setup_3_3
+# hard: 0
