@@ -123,7 +123,7 @@ internal class QuadraticStrategyAdapters(
                                 accept(result.incumbent)
                                 if (stop()) return partial()
                                 return QuadraticOptimizationResult.Unbounded(
-                                    result.incumbent, certificate(result.proof, QuadraticClaim.Unbounded),
+                                    requireNotNull(incumbent), certificate(result.proof, QuadraticClaim.Unbounded),
                                     sense, sink.snapshot(),
                                 )
                             }

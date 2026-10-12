@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticCoefficient
@@ -85,5 +87,36 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
         val result = assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result)
         assertEquals(2L, result.incumbent.sample.intValue(0))
         assertEquals(BigFraction.ofLong(4), result.incumbent.value.rational)
+    }
+
+    @Test
+    fun `quadratic optimization retains finite global constraint semantics`() {
+        val source = Problem(
+            0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(
+                AllDifferent(intArrayOf(0, 1), 0, 3),
+                Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+            ),
+        )
+        val first = QuadraticVariable.Int(SourceIntId(0))
+        val second = QuadraticVariable.Int(SourceIntId(1))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, first, first),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, second, second),
+        ))
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 1000, randomSeed = 17), alnsIterations = 2,
+        ))
+
+        val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, params, engine)
+
+        val result = assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result)
+        val left = result.incumbent.sample.intValue(0)
+        val right = result.incumbent.sample.intValue(1)
+        assertTrue(left != right)
+        assertEquals(BigFraction.ofLong(left * left + right * right), result.incumbent.value.rational)
+        if (engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.MIXED) {
+            assertEquals(BigFraction.ONE, assertIs<QuadraticOptimizationResult.Optimal>(result).bound.value.rational)
+        } else assertIs<QuadraticOptimizationResult.BestFound>(result)
     }
 }
