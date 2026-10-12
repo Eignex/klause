@@ -37,6 +37,11 @@ retaining learned clauses and reawakening units. Native CP clause state remains 
 contains the single traversal loop and owns frames, decisions, restarts, cancellation
 cadence and resumable/terminal state.
 
+A run can retain an asserted condition at `minimumDecisionLevel`. Restarts return
+to that level, and learned backjumps below it fall back to chronological traversal.
+Exhaustion is then conditional. The query owner retracts the condition after the
+run; the source root and its immutable atom meanings stay with the session.
+
 Fractional source integers split at exact floor/ceiling thresholds. CP decisions use
 Long values; open theories use arbitrary-precision thresholds. Stable complementary
 atoms must exist before first-UIP learning. Boolean atom names belong to one immutable

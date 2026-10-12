@@ -547,8 +547,10 @@ class SearchSession(
     }
 
     /** Return to root, notify components, and propagate retained learned clauses. */
-    fun restart(): ComponentResult {
-        popTo(0)
+    fun restart(): ComponentResult = restartAt(0)
+
+    internal fun restartAt(decisionLevel: Int): ComponentResult {
+        popTo(decisionLevel)
         learning.onRestart()
         singleComponent?.onRestart(this) ?: components.forEach { it.onRestart(this) }
         return propagate()
@@ -615,7 +617,12 @@ class SearchSession(
         }
     }
 
-    /** Open a resumable traversal over the shared component set. */
+    /**
+     * Open a resumable traversal over the shared component set.
+     *
+     * [minimumDecisionLevel] retains an already-asserted condition through restarts and learned
+     * backjumps. Exhaustion then refutes only that condition. Its owner retracts it after the run.
+     */
     fun openRun(
         numBoolVars: Int,
         params: SearchSolveParams = SearchSolveParams(),
@@ -627,9 +634,14 @@ class SearchSession(
         nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
         lifecycle: SearchRunLifecycle = SearchRunLifecycle.None,
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
+        minimumDecisionLevel: Int = 0,
     ): SearchRun {
         require(atoms == null || numBoolVars in 0..atoms.sourceBooleanCount) {
             "Boolean traversal must stay within the reserved source namespace"
+        }
+        require(minimumDecisionLevel in 0..decisionLevel) { "run scope must already be asserted" }
+        require(minimumDecisionLevel == 0 || modelContinuation == SearchModelContinuation.Chronological) {
+            "scoped runs require chronological model continuation"
         }
         decisionsExhausted = false
         val listener = booleanBranching as? SearchUnassignListener
@@ -650,6 +662,7 @@ class SearchSession(
             modelPolicy,
             nodePolicy,
             lifecycle,
+            minimumDecisionLevel,
         )
     }
 
