@@ -405,6 +405,13 @@ the heuristic instruction ledger. Exact objective cutoffs require strict source
 improvement. Only checked completions publish witnesses or best-found incumbents.
 Repair refutations and exhausted windows carry no source proof authority.
 
+The quadratic source adapter uses the same condition/completion contract with
+exact algebraic objective ordering. Single-coordinate releases and adaptive block
+releases repair finite assignments and continuous windows together. Native repair
+work also spends heuristic instructions; finite repair decisions retain their
+native decision charges. Checked neighborhood optima remain best-found source
+incumbents. See [quadratic strategy execution](../theories/polynomial-real.md#quadratic-strategy-execution).
+
 ## Restart anchors
 
 Optimization restart policies receive only accepted feasible incumbents. Before an

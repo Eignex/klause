@@ -9,8 +9,9 @@ finite assignments. Real values remain theory-owned; CP remains Bool+Int only.
 
 The complete arithmetic fragment is polynomial real satisfaction with rational
 coefficients and Boolean structure, also called QF_NRA. Shared composition supports
-finite integer domains and finite-column objectives, while open integer domains,
-continuous objectives and transcendental functions remain outside this route.
+finite integer domains and exact quadratic objectives over Boolean, integer and
+real source coordinates. Open integer domains and transcendental functions remain
+outside this route.
 Resource limits can interrupt even a complete procedure.
 
 This theory follows the [shared theory contract](../theories.md). The sections use
@@ -50,8 +51,8 @@ across queries and neighbourhood pins.
 `OpenTheoryPipeline.minimize` supports objectives over the finite columns using the
 same projection, theory and objective in every worker. Complete traversal can prove
 an optimum or infeasibility; local search and ALNS retain exact incumbents without
-proof admission. Continuous objectives and all-solution enumeration remain outside
-this interface. [Search](../solver/search.md), [local search](../solver/local-search.md),
+proof admission. The separate quadratic overload handles continuous quadratic
+objectives; all-solution enumeration remains outside these interfaces. [Search](../solver/search.md), [local search](../solver/local-search.md),
 [portfolio](../solver/portfolio.md) and [sessions](../solver/sessions.md) own their execution lifecycles.
 
 The sequential mixed pool shares one finite projection and immutable polynomial
@@ -80,14 +81,38 @@ Optimization installs additional component factories before its first shared
 check. Finite LP primal proposals and transferred initial candidates remain
 withheld until those components complete their source checks.
 
+### Quadratic strategy execution
+
+The quadratic overload of `OpenTheoryPipeline.minimize` uses the same source
+request, finite projection and polynomial formula. Complete CP traversal visits
+every finite assignment and completes its continuous objective exactly. Branch
+optima and unattained limits combine in source objective order; equal limits
+prefer attainment. An unknown branch withholds global optimality and
+infeasibility. A checked improving unbounded branch is sufficient for source
+unboundedness. Original objective direction is restored before publication.
+
+Local search proposes coordinate releases and expanding exact rational windows.
+ALNS adapts release sizes from checked improvements. Each repair enumerates finite
+assignments inside its neighborhood and uses exact continuous completion; source
+constraints and assumptions remain mandatory. Algebraic coordinates retain their
+isolating enclosures instead of being rounded to points. Neighborhood exhaustion
+is not a source refutation. MIXED runs a bounded adaptive phase before complete
+traversal, sharing checked incumbents and one native ledger. Its workers require
+identical effective assumptions and deductions.
+
+Termwise exact box arithmetic can supply a global bound from source declarations
+and invocation pins before feasibility is known. It preserves a square's repeated
+coordinate correlation, and declines an unbounded referenced coordinate. These
+bounds can survive incomplete search independently of a checked incumbent.
+
 ### Objective optimization adapters
 
 The internal `solvePolynomialObjectiveImage` service uses the same polynomial IR,
 projection kernel and exact witnesses to optimize an objective over a conditioned
 real/Boolean source. Source integer integrality and finite factors remain caller
 obligations; this real service cannot accept a relaxation witness as an integer
-assignment. These mechanisms do not expose a quadratic pipeline entry point by
-themselves.
+assignment. The source pipeline owns integrality, finite constraints and global
+branch coverage around these mechanisms.
 
 `tryConvexPolynomialOptimum` independently admits conjunctions of affine source
 rows and a quadratic objective. It retains exact row direction and strictness,
@@ -172,6 +197,15 @@ check, exact reconstruction and final publication polling. Nested feasibility
 checks forward charges once to that owner; their work, projection and lifting
 counters remain visible. Cancellation and allocation/work exhaustion publish
 unknown with the cause, never a partial global certificate.
+
+The quadratic execution owner counts numerical proposal/certificate work and
+polynomial work in separate counters under one cumulative `maximumWork` cap.
+Finite branches and neighborhood repairs receive the remaining native allowance;
+every charge reaches the containing meter once. Mandatory polynomial allocation
+declines retain their resource cause. The MIXED heuristic phase receives one
+quarter of remaining native work and deadline before complete traversal. Completed
+atomic work can overspend that phase; it cannot renew the containing allowance.
+Private worker cancellation reaches every nested numerical and polynomial query.
 
 ### Invocation ownership
 
