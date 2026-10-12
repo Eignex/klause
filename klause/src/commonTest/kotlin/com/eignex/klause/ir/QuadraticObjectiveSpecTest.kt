@@ -1,6 +1,5 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -9,12 +8,12 @@ class QuadraticObjectiveSpecTest {
     @Test
     fun `source term mutation does not change captured objective`() {
         val x = QuadraticVariable.Real(SourceRealId(0))
-        val term = QuadraticObjectiveTerm(BigFraction.ONE, x, x)
+        val term = QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)
         val terms = mutableListOf(term, term)
         val objective = QuadraticObjectiveSpec(terms)
 
         terms.clear()
-        (objective.terms as MutableList).clear()
+        (objective.terms as MutableList<QuadraticObjectiveTerm>).clear()
 
         assertEquals(listOf(term, term), objective.terms)
     }
@@ -22,9 +21,9 @@ class QuadraticObjectiveSpecTest {
     @Test
     fun `remapping preserves distinct source namespaces`() {
         val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(BigFraction.ONE, QuadraticVariable.Bool(SourceBoolId(0))),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, QuadraticVariable.Bool(SourceBoolId(0))),
             QuadraticObjectiveTerm(
-                BigFraction.ONE, QuadraticVariable.Int(SourceIntId(0)), QuadraticVariable.Real(SourceRealId(0)),
+                QuadraticCoefficient.ONE, QuadraticVariable.Int(SourceIntId(0)), QuadraticVariable.Real(SourceRealId(0)),
             ),
         ))
 
@@ -38,7 +37,7 @@ class QuadraticObjectiveSpecTest {
     @Test
     fun `removed objective coordinates require exact substitution before remapping`() {
         val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(BigFraction.ONE, QuadraticVariable.Int(SourceIntId(0))),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, QuadraticVariable.Int(SourceIntId(0))),
         ))
 
         assertFailsWith<IllegalArgumentException> { objective.remap(VarRemap(intArrayOf(), intArrayOf(-1))) }

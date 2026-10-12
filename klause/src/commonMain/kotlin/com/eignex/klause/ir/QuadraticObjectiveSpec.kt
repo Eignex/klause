@@ -1,23 +1,72 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.unaryMinus
+
+/** A normalized source rational coefficient, independent of numerical engines. */
+class QuadraticCoefficient private constructor(
+    /** Reduced signed numerator. */
+    val numerator: BigInt,
+    /** Reduced positive denominator. */
+    val denominator: BigInt,
+) {
+    override fun equals(other: Any?): Boolean = other is QuadraticCoefficient &&
+        numerator == other.numerator && denominator == other.denominator
+
+    override fun hashCode(): Int = 31 * numerator.hashCode() + denominator.hashCode()
+
+    /** Exact source coefficient factories. */
+    companion object {
+        /** Additive identity. */
+        val ZERO: QuadraticCoefficient = ofLong(0)
+
+        /** Multiplicative identity. */
+        val ONE: QuadraticCoefficient = ofLong(1)
+
+        /** Capture an exact integer coefficient. */
+        fun ofLong(value: Long): QuadraticCoefficient = of(bigIntOf(value))
+
+        /** Capture and normalize an exact fraction, rejecting a zero denominator. */
+        fun of(numerator: BigInt, denominator: BigInt = BIG_ONE): QuadraticCoefficient {
+            require(!denominator.isZero()) { "zero quadratic coefficient denominator" }
+            val divisor = numerator.gcd(denominator)
+            val sign = if (denominator.signum() < 0) -divisor else divisor
+            return QuadraticCoefficient(numerator / sign, denominator / sign)
+        }
+    }
+}
 
 /** A source coordinate appearing in an exact quadratic objective. */
 sealed interface QuadraticVariable {
     /** Boolean coordinates have the numeric values zero and one. */
-    data class Bool(val id: SourceBoolId) : QuadraticVariable
+    data class Bool(
+        /** Location in the source Boolean namespace. */
+        val id: SourceBoolId,
+    ) : QuadraticVariable
 
     /** Integer coordinates retain their exact source value. */
-    data class Int(val id: SourceIntId) : QuadraticVariable
+    data class Int(
+        /** Location in the source integer namespace. */
+        val id: SourceIntId,
+    ) : QuadraticVariable
 
     /** Real coordinates may have rational or algebraic values. */
-    data class Real(val id: SourceRealId) : QuadraticVariable
+    data class Real(
+        /** Location in the source real namespace. */
+        val id: SourceRealId,
+    ) : QuadraticVariable
 }
 
 /** The literal term `coefficient * first`, or `coefficient * first * second`. */
 data class QuadraticObjectiveTerm(
     /** Exact source coefficient, without Hessian scaling. */
-    val coefficient: BigFraction,
+    val coefficient: QuadraticCoefficient,
     /** First source coordinate. */
     val first: QuadraticVariable,
     /** Second source coordinate; repeating [first] expresses a square. */
@@ -28,7 +77,7 @@ data class QuadraticObjectiveTerm(
 class QuadraticObjectiveSpec(
     terms: List<QuadraticObjectiveTerm>,
     /** Exact constant term. */
-    val constant: BigFraction = BigFraction.ZERO,
+    val constant: QuadraticCoefficient = QuadraticCoefficient.ZERO,
 ) {
     private val captured = terms.toList()
 
