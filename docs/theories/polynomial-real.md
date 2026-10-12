@@ -91,6 +91,12 @@ prefer attainment. An unknown branch withholds global optimality and
 infeasibility. A checked improving unbounded branch is sufficient for source
 unboundedness. Original objective direction is restored before publication.
 
+Unconditional variable/constant source equalities are intersected with every
+conditioned objective check and substituted during projection. They also seed
+heuristic centers. Disjunctions and guarded equalities provide no unconditional
+fixing. The neighborhood coordinate set contains original source declarations;
+conditional auxiliaries remain completion-owned after source capture.
+
 Local search proposes coordinate releases and expanding exact rational windows.
 ALNS adapts release sizes from checked improvements. Each repair enumerates finite
 assignments inside its neighborhood and uses exact continuous completion; source

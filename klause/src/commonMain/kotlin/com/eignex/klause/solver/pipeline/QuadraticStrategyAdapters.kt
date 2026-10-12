@@ -52,6 +52,8 @@ internal class QuadraticStrategyAdapters(
     private val sink = SolveStatsSink("quadratic").also { it.start() }
     private val finite = model.finite.bake(native.polynomial)
     private val random = Random(params.strategy.localSearch.randomSeed ?: 0L)
+    private val sourceBoolCount = request.problem.sourceBoolCount
+    private val sourceRealCount = request.problem.sourceRealCount
     private var incumbent: QuadraticIncumbent? = null
     private var bestLimit: AlgebraicReal? = null
     private var limitAttained = false
@@ -214,6 +216,15 @@ internal class QuadraticStrategyAdapters(
         val allowance = params.maximumWork?.let { ((it - start).coerceAtLeast(0) * share).toLong() }
         val slice = Cancellation { allowance?.let { native.work - start >= it } == true }
         val stop = native.polynomial or controls.cancellation.shorten(share) or slice
+        if (stop() || maximum == 0L || instructionLimit == 0L) return partial()
+        val centers = try {
+            completion.pointFixings {
+                if (stop()) throw PolynomialInterrupted()
+                completion.algebraic.arithmetic.step()
+            }
+        } catch (_: PolynomialInterrupted) {
+            return partial()
+        }
         var radius = BigFraction.ONE
         var moves = 0L
         var instructions = 0L
@@ -222,7 +233,7 @@ internal class QuadraticStrategyAdapters(
         while (!stop() && moves < maximum && instructions < instructionLimit &&
             controls.nodeBudget?.exhausted() != true
         ) {
-            val total = model.source.numBoolVars + model.source.numIntVars + model.source.numRealVars
+            val total = sourceBoolCount + model.source.numIntVars + sourceRealCount
             val operator = if (!adaptive) 0 else random.nextInt(weights.size).let { draw ->
                 if (random.nextDouble() < weights[draw] / weights.maxOrNull()!!) draw else 2
             }
@@ -233,13 +244,13 @@ internal class QuadraticStrategyAdapters(
             val pins = mutableMapOf<Int, Boolean>()
             val lower = mutableMapOf<Int, BigFraction>()
             val upper = mutableMapOf<Int, BigFraction>()
-            for (id in 0 until model.source.numBoolVars) {
+            for (id in 0 until sourceBoolCount) {
                 if (id !in released) {
                     pins[id] = assumptions.boolValueOrNull(id) ?: current?.boolValue(id) ?: random.nextBoolean()
                 }
             }
             for (id in 0 until model.source.numIntVars) {
-                if (model.source.numBoolVars + id !in released) {
+                if (sourceBoolCount + id !in released) {
                     val point = assumptions.intValueOrNull(id) ?: current?.intValue(id)
                         ?: model.source.finiteIntDomain(id).randomValue(random)
                     val value = BigFraction.ofLong(point)
@@ -247,10 +258,11 @@ internal class QuadraticStrategyAdapters(
                     upper[id] = value
                 }
             }
-            val realStart = model.source.numBoolVars + model.source.numIntVars
-            for (id in 0 until model.source.numRealVars) {
+            val realStart = sourceBoolCount + model.source.numIntVars
+            for (id in 0 until sourceRealCount) {
                 val value = current?.algebraicReals?.get(id)
-                val center = BigFraction.ofDouble(model.source.realLower[id])?.takeIf { it > BigFraction.ZERO }
+                val center = centers[id]
+                    ?: BigFraction.ofDouble(model.source.realLower[id])?.takeIf { it > BigFraction.ZERO }
                     ?: BigFraction.ofDouble(model.source.realUpper[id])?.takeIf { it < BigFraction.ZERO }
                     ?: BigFraction.ZERO
                 val spread = if (current == null || realStart + id in released) radius else BigFraction.ZERO

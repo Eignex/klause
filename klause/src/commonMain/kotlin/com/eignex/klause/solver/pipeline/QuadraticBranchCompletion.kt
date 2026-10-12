@@ -12,6 +12,7 @@ import com.eignex.klause.arithmetic.quadratic.QuadraticStop
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.polynomialFor
@@ -21,6 +22,7 @@ import com.eignex.klause.theory.qfnra.PolynomialObjectiveResult
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
+import com.eignex.klause.theory.qfnra.polynomialPointFixings
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -59,15 +61,35 @@ internal class QuadraticBranchCompletion(
     private val numerical = token(native.numerical)
     private val arithmetic = PolynomialArithmetic(polynomial, limits)
     val algebraic = AlgebraicArithmetic(arithmetic)
+    private var fixedPoints: Map<Int, BigFraction>? = null
+
+    fun pointFixings(step: () -> Unit = arithmetic::step): Map<Int, BigFraction> =
+        fixedPoints ?: polynomialPointFixings(model.service.formula, step).also { fixedPoints = it }
 
     fun check(
         finite: Sample,
-        condition: PolynomialCondition,
+        proposed: PolynomialCondition,
         cancellation: Cancellation = Cancellation.Never,
     ): QuadraticBranchResult {
         operation = cancellation
         return try {
             arithmetic.step()
+            val lower = proposed.lower.toMutableMap()
+            val upper = proposed.upper.toMutableMap()
+            for ((id, value) in pointFixings()) {
+                arithmetic.step()
+                lower[id] = lower[id]?.let { if (it > value) it else value } ?: value
+                upper[id] = upper[id]?.let { if (it < value) it else value } ?: value
+            }
+            val condition = PolynomialCondition(proposed.bools, lower, upper)
+            if (lower.any { (id, value) ->
+                    arithmetic.step()
+                    upper[id]?.let { value > it } == true
+                }
+            ) {
+                arithmetic.step()
+                return QuadraticBranchResult.Infeasible(condition)
+            }
             val expression = objective.polynomialFor(finite).let {
                 if (sense == ObjectiveSense.MINIMIZE) it else PolynomialExpression.Product(listOf(
                     PolynomialExpression.Constant.of(bigIntOf(-1)), it,

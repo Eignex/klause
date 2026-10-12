@@ -2,6 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticCoefficient
@@ -119,4 +121,56 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
             assertEquals(BigFraction.ONE, assertIs<QuadraticOptimizationResult.Optimal>(result).bound.value.rational)
         } else assertIs<QuadraticOptimizationResult.BestFound>(result)
     }
+
+    @Test
+    fun `source point equalities seed checked quadratic neighborhood incumbents`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const x Real) (declare-const y Real) (assert (and (= x 1) (= y 2))) (check-sat)",
+        )
+        val source = PolynomialRealProblem(
+            parsed.formula, parsed.realCount, parsed.boolCount, parsed.sourceRealCount,
+            parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames,
+        ).pipelineRequest()
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val y = QuadraticVariable.Real(SourceRealId(1))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, y),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, y, y),
+        ))
+        val params = PolynomialTheoryParams(maximumWork = 100000, strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17), alnsIterations = 1,
+        ))
+
+        val execution = OpenTheoryPipeline.minimize(source, objective, params, engine)
+
+        val result = assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result)
+        assertEquals(BigFraction.ofLong(7), result.incumbent.value.rational)
+    }
+
+    @Test
+    fun `quadratic neighborhoods keep conditional auxiliaries private after source capture`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const b Bool) (declare-const x Real) (assert (= x (ite b 0 0))) (check-sat)",
+        )
+        val source = PolynomialRealProblem(
+            parsed.formula, parsed.realCount, parsed.boolCount, parsed.sourceRealCount,
+            parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames,
+        ).pipelineRequest()
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+        val params = PolynomialTheoryParams(maximumWork = 200000, strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 20000, randomSeed = 17), alnsIterations = 2,
+        ))
+
+        val execution = OpenTheoryPipeline.minimize(source, objective, params, engine)
+
+        val result = assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result)
+        assertEquals(1, result.incumbent.sample.numRealVars)
+        assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
+        if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
+            assertTrue(result.stats.ls.moves.sum > 1.0)
+        }
+    }
+
 }
