@@ -123,7 +123,7 @@ internal class LinearAuthorityTraversal(
             if (if (minimizes) value(left) <= value(right) else value(left) >= value(right)) left else right
         }
         val bound = root.proof(strict = false) ?: return null
-        rootBound = checked(SourceClaim.Bound(value(best)), bound)
+        checked(SourceClaim.Bound(value(best)), bound)?.let { rootBound = it }
         val optimum = feasible.firstOrNull { it.claim is SourceClaim.Optimal && value(it) == value(best) }
         return if (optimum != null) {
             val claim = optimum.claim as SourceClaim.Optimal
