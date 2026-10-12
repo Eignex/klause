@@ -1848,6 +1848,25 @@ sealed interface com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.kl
         final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.toString|toString(){}[0]
     }
 
+    final class Quadratic : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic|null[0]
+        constructor <init>(com.eignex.klause.formats.smtlib/SmtLibInput, com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.ir/ObjectiveSense) // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.<init>|<init>(com.eignex.klause.formats.smtlib.SmtLibInput;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.ir.ObjectiveSense){}[0]
+
+        final val objective // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.objective|{}objective[0]
+            final fun <get-objective>(): com.eignex.klause.ir/QuadraticObjectiveSpec // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.objective.<get-objective>|<get-objective>(){}[0]
+        final val sense // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.sense|{}sense[0]
+            final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.sense.<get-sense>|<get-sense>(){}[0]
+        final val source // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.source|{}source[0]
+            final fun <get-source>(): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.source.<get-source>|<get-source>(){}[0]
+
+        final fun component1(): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.ir/QuadraticObjectiveSpec // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.formats.smtlib/SmtLibInput = ..., com.eignex.klause.ir/QuadraticObjectiveSpec = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.copy|copy(com.eignex.klause.formats.smtlib.SmtLibInput;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.ir.ObjectiveSense){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Quadratic.toString|toString(){}[0]
+    }
+
     final object Interrupted : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted|null[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.hashCode|hashCode(){}[0]
