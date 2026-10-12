@@ -475,7 +475,7 @@ class MpsModeTest {
     @Test
     fun `source witness guarantees distinguish exact and tolerance acceptance`() {
         val mps = File.createTempFile("mpswitnessguarantee", ".mps").apply {
-            writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n UP B X 1\nENDATA\n")
+            writeText("OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n UP B X 1\nENDATA\n")
             deleteOnExit()
         }
         for (exact in listOf(false, true)) {
@@ -489,11 +489,26 @@ class MpsModeTest {
 
             val text = capture {
                 output.onSolution(solvable.render(sample), null, sample.approximateRealValue(0))
-                output.onComplete(Verdict.BEST_FOUND)
+                output.onComplete(Verdict.OPTIMAL)
             }
 
             val qualification = if (exact) "exact original MPS source witness" else "MPS source tolerance witness"
             assertTrue(qualification in text, text)
+            val status = if (exact) "attained-optimum" else "tolerance-optimum"
+            assertTrue("c optimizationStatus=$status" in text.lines(), text)
         }
+    }
+
+    @Test
+    fun `a tolerance witness cannot support original source unboundedness`() {
+        val output = MpsOutput(exactSourceWitness = { false })
+
+        val text = capture {
+            output.onSolution("v X=0", objective = 0)
+            output.onComplete(Verdict.UNBOUNDED)
+        }
+
+        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertFalse("s UNBOUNDED" in text.lines(), text)
     }
 }
