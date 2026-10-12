@@ -18,11 +18,16 @@ internal class TranscendentalArithmetic(
     init { require(maximumBits > 0 && (maximumWork == null || maximumWork >= 0)) }
 
     fun step() {
-        if (cancellation()) throw TranscendentalInterrupted()
-        if (maximumWork != null && work >= maximumWork) throw TranscendentalResourceLimit()
-        if (work == Long.MAX_VALUE) throw TranscendentalResourceLimit()
+        poll()
+        if ((maximumWork != null && work >= maximumWork) || work == Long.MAX_VALUE) {
+            throw TranscendentalResourceLimit()
+        }
         work++
         cancellation.charge(1)
+        poll()
+    }
+
+    private fun poll() {
         if (cancellation()) throw TranscendentalInterrupted()
     }
 

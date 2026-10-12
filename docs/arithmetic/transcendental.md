@@ -16,7 +16,7 @@ lower endpoint; a crossing interval needs domain handling by its source owner.
 Sin and cos are real functions with radian arguments and range `[-1, 1]`.
 
 The series are the [exponential definition](https://dlmf.nist.gov/4.2.E19),
-[logarithmic series](https://dlmf.nist.gov/4.6.E6),
+[logarithmic series](https://dlmf.nist.gov/4.6.E4),
 [sine and cosine series](https://dlmf.nist.gov/4.19) and
 [arctangent series](https://dlmf.nist.gov/4.24.E3). Remainders and interval
 operations use rational arithmetic throughout. No floating constant or libm
