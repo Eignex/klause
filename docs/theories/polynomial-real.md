@@ -304,9 +304,31 @@ atom's original left-minus-right sign and relation. Formula evaluation preserves
 Boolean references and arbitrary `Not`, `And` and `Or` structure. Source parsing
 and frontend routing remain caller responsibilities.
 
+Before projection, bounded witness probing checks complete exact points and can
+repair one coordinate at a time using roots of an equality specialized at all other
+coordinates. Repaired points can guide later repairs even when the full check fails.
+Equalities under negation or disjunction are proposal guides, never asserted facts.
+Acceptance still checks every source atom, strict relation, disequality, Boolean
+alternative and query pin with the same complete sample checker. Fixed coordinates
+remain fixed, and unused declarations retain complete coordinates.
+
+This optional phase considers up to 32 real coordinates, 64 Boolean coordinates,
+128 atoms and 2,048 normalized terms with input coefficients up to 4,096 bits.
+Three uniform rational centers seed at most
+64 complete proposals and 32 coordinate root queries across four repair passes per
+center. Root queries admit coordinate degree at most eight. One private slice of
+65,536 native units is debited to the containing query's cumulative work and caller
+meter. Rejected proposals, private exhaustion and optional representation declines
+leave complete CAD available. Parent stops are latched during the phase and withhold
+publication; neither retraction nor a fresh proposal renews the invocation allowance.
+Sparse polynomial getters and atomic exact arithmetic can overrun a cooperative
+checkpoint; these counts do not impose a hard wall-time or all-allocation precharge.
+Kernel dense, matrix and checked-degree limits remain unchanged.
+
 Complete Collins projection followed by exact lifting partitions the real space
-into sign-invariant cells. A witness requires a complete checked sample; refutation
-requires exhaustion of the relevant cells and Boolean alternatives.
+into sign-invariant cells when probing supplies no witness. Refutation requires
+exhaustion of the relevant cells and Boolean alternatives; unsuccessful repairs
+supply no refutation authority. Both witness paths retain the final stop check.
 
 ### Projection families
 
