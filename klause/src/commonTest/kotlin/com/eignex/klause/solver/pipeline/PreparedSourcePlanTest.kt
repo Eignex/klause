@@ -10,6 +10,7 @@ import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
@@ -64,9 +65,11 @@ class PreparedSourcePlanTest {
 
     @Test
     fun `polynomial snapshots preserve declaration identities separately from auxiliary coordinates`() {
-        val source = SmtLibPolynomial.parse(
+        val parsed = SmtLibPolynomial.parse(
             "(declare-const x Real) (declare-const b Bool) (assert (= (* (ite b x 1) x) 2))",
         )
+        val source = PolynomialRealProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.sourceRealCount, parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames)
 
         val request = source.pipelineRequest()
         val plan = request.preparedPlan
