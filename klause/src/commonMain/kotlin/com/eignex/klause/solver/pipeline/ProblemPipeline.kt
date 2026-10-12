@@ -44,7 +44,7 @@ sealed interface SourceProblemRoute {
     data class PolynomialTheory(
         /** Source decomposition and exact continuous constraints. */
         val request: PolynomialTheoryRequest,
-        /** Finite objective, or null for satisfaction. */
+        /** Original affine source objective, or null for satisfaction. */
         val objective: LinearObjective? = null,
         /** Whether [objective] is maximized. */
         val maximize: Boolean = false,
@@ -144,7 +144,8 @@ private fun Problem.pipelineRouteObserved(
     onLpStats: ((LpStats) -> Unit)?,
     routeLinearToTheory: Boolean,
 ): SourceProblemRoute {
-    val initial = prepareExecutionPlan(objective, maximize)
+    val source = prepareExecutionPlan()
+    val initial = objective?.let { source.withObjective(it, maximize) } ?: source
     if (initial.kind == PreparedExecutionKind.POLYNOMIAL) {
         return SourceProblemRoute.PolynomialTheory(initial.polynomialRequest(), objective, maximize)
     }
