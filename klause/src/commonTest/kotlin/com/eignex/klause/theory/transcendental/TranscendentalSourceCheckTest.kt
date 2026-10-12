@@ -50,6 +50,19 @@ class TranscendentalSourceCheckTest {
     }
 
     @Test
+    fun `inactive Boolean conditional branch does not impose a log domain`() {
+        val logarithm = TranscendentalExpression.Function(TranscendentalFunction.LOG, constant(0))
+        val equality = TranscendentalFormula.Atom(logarithm, PolynomialRelation.EQ, constant(1))
+        val source = TranscendentalFormula.Conditional(
+            TranscendentalFormula.BooleanVariable(SourceBoolId(0)), TranscendentalFormula.Constant(true), equality,
+        )
+
+        val result = checker(booleanArrayOf(true)).check(source)
+
+        assertEquals(SourceTruth.TRUE, result)
+    }
+
+    @Test
     fun `strict function inequality is certified by rational separation`() {
         val exponential = TranscendentalExpression.Function(TranscendentalFunction.EXP, constant(1))
         val source = TranscendentalFormula.Atom(exponential, PolynomialRelation.GT, constant(2))

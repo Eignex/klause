@@ -37,6 +37,11 @@ internal sealed interface TranscendentalFormula {
         val right: TranscendentalExpression,
     ) : TranscendentalFormula
     data class Not(val operand: TranscendentalFormula) : TranscendentalFormula
+    data class Conditional(
+        val condition: TranscendentalFormula,
+        val whenTrue: TranscendentalFormula,
+        val whenFalse: TranscendentalFormula,
+    ) : TranscendentalFormula
     class And(operands: List<TranscendentalFormula>) : TranscendentalFormula {
         private val captured = operands.toList()
         val operands: List<TranscendentalFormula> get() = captured.toList()

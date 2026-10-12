@@ -54,6 +54,12 @@ internal class TranscendentalRelaxationModel(
             is TranscendentalFormula.Not -> not(boolean(source.operand, guard))
             is TranscendentalFormula.And -> and(source.operands.map { boolean(it, guard) })
             is TranscendentalFormula.Or -> or(source.operands.map { boolean(it, guard) })
+            is TranscendentalFormula.Conditional -> {
+                val condition = boolean(source.condition, guard)
+                val first = boolean(source.whenTrue, and(listOf(guard, condition)))
+                val second = boolean(source.whenFalse, and(listOf(guard, not(condition))))
+                or(listOf(and(listOf(condition, first)), and(listOf(not(condition), second))))
+            }
         }
     }
 
