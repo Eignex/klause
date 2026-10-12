@@ -18,12 +18,12 @@ import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
 internal fun Compiler.Builder.integerProduct(parts: List<IntComb>): IntComb {
-    if (inferringBounds || macros.isNotEmpty()) smtUnsupported("nonlinear product requires source lowering")
     var result: IntComb = IntComb.Narrow(LinComb(emptyMap(), 1L))
     for (part in parts) {
         result = if (result.isConstant()) scaleByConst(part, result)
         else if (part.isConstant()) scaleByConst(result, part)
         else {
+            if (inferringBounds || macros.isNotEmpty()) smtUnsupported("nonlinear product requires source lowering")
             val left = (result as? IntComb.Narrow)?.lin ?: smtUnsupported("wide nonlinear product")
             val right = (part as? IntComb.Narrow)?.lin ?: smtUnsupported("wide nonlinear product")
             val (leftLo, leftHi) = finiteProductRange(left)
@@ -76,13 +76,13 @@ private fun Compiler.Builder.productIntColumn(term: LinComb): Int {
 }
 
 internal fun Compiler.Builder.realProduct(parts: List<RealComb>): Res.R {
-    if (inferringBounds || macros.isNotEmpty()) smtUnsupported("nonlinear product requires source lowering")
     var result = RealComb(emptyMap(), emptyMap(), BigFraction.ONE)
     for (part in parts) {
         result = when {
             result.isConstant -> part.scaled(result.constant)
             part.isConstant -> result.scaled(part.constant)
             else -> {
+                if (inferringBounds || macros.isNotEmpty()) smtUnsupported("nonlinear product requires source lowering")
                 val leftInt = result.toLinCombOrNull()
                 val rightInt = part.toLinCombOrNull()
                 if (leftInt != null && rightInt != null) {
@@ -143,18 +143,26 @@ private fun exponent(term: IntComb): Int {
 }
 
 internal fun Compiler.Builder.integerPower(base: IntComb, power: IntComb): IntComb {
+    if (macros.isNotEmpty()) smtUnsupported("power helpers require lexical source lowering")
     var remaining = exponent(power)
     var result: IntComb = IntComb.Narrow(LinComb(emptyMap(), 1L))
     var factor = base
     while (remaining > 0) {
-        if (remaining and 1 != 0) result = integerProduct(listOf(result, factor))
+        if (remaining and 1 != 0) {
+            result = integerProduct(listOf(result, factor))
+            if (result is IntComb.Wide) smtUnsupported("constant power requires exact source lowering")
+        }
         remaining = remaining ushr 1
-        if (remaining > 0) factor = integerProduct(listOf(factor, factor))
+        if (remaining > 0) {
+            factor = integerProduct(listOf(factor, factor))
+            if (factor is IntComb.Wide) smtUnsupported("constant power requires exact source lowering")
+        }
     }
     return result
 }
 
 internal fun Compiler.Builder.realPower(base: RealComb, power: IntComb): Res.R {
+    if (macros.isNotEmpty()) smtUnsupported("power helpers require lexical source lowering")
     var remaining = exponent(power)
     var result = RealComb(emptyMap(), emptyMap(), BigFraction.ONE)
     var factor = base

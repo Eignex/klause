@@ -2661,6 +2661,17 @@ public final class com/eignex/klause/formats/smtlib/SmtLibInput$Linear : com/eig
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/formats/smtlib/SmtLibInput$NonlinearInteger : com/eignex/klause/formats/smtlib/SmtLibInput {
+	public fun <init> (Lcom/eignex/klause/ir/NonlinearIntegerProblem;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/NonlinearIntegerProblem;
+	public final fun copy (Lcom/eignex/klause/ir/NonlinearIntegerProblem;)Lcom/eignex/klause/formats/smtlib/SmtLibInput$NonlinearInteger;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtLibInput$NonlinearInteger;Lcom/eignex/klause/ir/NonlinearIntegerProblem;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibInput$NonlinearInteger;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProblem ()Lcom/eignex/klause/ir/NonlinearIntegerProblem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/formats/smtlib/SmtLibInput$Polynomial : com/eignex/klause/formats/smtlib/SmtLibInput {
 	public fun <init> (Lcom/eignex/klause/ir/PolynomialRealProblem;)V
 	public final fun component1 ()Lcom/eignex/klause/ir/PolynomialRealProblem;
@@ -9734,6 +9745,35 @@ public final class com/eignex/klause/solver/pipeline/LsResolution {
 	public fun <init> (Ljava/util/List;Z)V
 	public final fun getDryRunSolver ()Z
 	public final fun getPool ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams {
+	public fun <init> ()V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()Lcom/eignex/klause/backtrack/NodeBudget;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;JJLcom/eignex/klause/backtrack/NodeBudget;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaximumCandidates ()J
+	public final fun getMaximumMoves ()J
+	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
+	public final fun getPolynomial ()Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest {
+	public final fun getProblem ()Lcom/eignex/klause/ir/NonlinearIntegerProblem;
+}
+
+public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequestKt {
+	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public static final fun pipelineRequest (Lcom/eignex/klause/ir/NonlinearIntegerProblem;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenBranching : java/lang/Enum {

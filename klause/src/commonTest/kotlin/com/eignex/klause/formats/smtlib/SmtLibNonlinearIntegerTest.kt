@@ -49,6 +49,21 @@ class SmtLibNonlinearIntegerTest {
     }
 
     @Test
+    fun `wide fixed exponents retain a logarithmic exact source graph`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const n Int) (assert (= (^ n 2147483648) 1))", allowIntegers = true,
+        )
+        var expression = assertIs<PolynomialRealFormula.Atom>(parsed.formula).left
+
+        repeat(31) {
+            val square = assertIs<PolynomialExpression.Power>(expression)
+            assertEquals(2, square.exponent)
+            expression = square.base
+        }
+        assertEquals(PolynomialExpression.Variable(SourceRealId(0)), expression)
+    }
+
+    @Test
     fun `deep nonlinear integer evaluation stays on the heap stack`() {
         var expression = "x"
         repeat(1000) { expression = "(* x $expression)" }

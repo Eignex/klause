@@ -99,3 +99,9 @@ coefficients, matrix cells and degree overflow. No cap truncates a polynomial,
 changes accepted mathematical semantics or supplies a refutation. Kernel callers
 translate declines into an unknown/resource outcome. Exact completed immutable
 values remain valid after an interrupted subsequent operation.
+
+Constant coefficient powers check their numerator/denominator bit-index lower
+bound before native exponentiation. A required index beyond Int representation
+returns the checked degree/dimension resource decline, preserving exact source
+semantics without wrapped dimensions. Unit and zero coefficients retain their
+exact inexpensive power operations.

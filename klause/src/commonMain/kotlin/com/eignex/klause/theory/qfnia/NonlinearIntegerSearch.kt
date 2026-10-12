@@ -59,7 +59,7 @@ internal fun solveNonlinearIntegers(
 private class NonlinearIntegerSearch(
     private val problem: NonlinearIntegerProblem,
     private val params: NonlinearIntegerParams,
-    private val condition: PolynomialCondition,
+    private var condition: PolynomialCondition,
 ) {
     private val work = NonlinearIntegerWork(params.arithmetic)
     private val arithmetic = PolynomialArithmetic(work, params.arithmetic.polynomialLimits)
@@ -76,21 +76,33 @@ private class NonlinearIntegerSearch(
     private var cursor = IntArray(coordinates.size)
     private var radius = BIG_ONE
     private var enumeration = emptyList<BigInt>()
+    private var representationDecline: QfNraResult.Unknown? = null
 
     fun solve(): NonlinearIntegerExecution {
         val result = try {
             invocation.use {
                 arithmetic.step()
                 if (params.maximumCandidates == 0L) return@use unknown()
+                condition = problem.integerBounds(condition, arithmetic)
+                if (condition.lower.any { (id, value) -> condition.upper[id]?.let { it < value } == true }) {
+                    return@use QfNraResult.Unsatisfiable(polynomialStats())
+                }
+                current = current.mapIndexed(::bounded)
                 hints = (sourceIntegerHints(problem.formula, arithmetic) +
                     (condition.lower.values + condition.upper.values).map { it.ceilInteger() }).distinct()
                 enumeration = (listOf(BIG_ZERO, BIG_ONE, -BIG_ONE) + hints).distinct()
+                val fixedIntegers = coordinates.all {
+                    condition.lower[it] != null && condition.lower[it] == condition.upper[it]
+                }
                 if (params.strategy == NonlinearIntegerStrategy.SEARCH ||
-                    params.strategy == NonlinearIntegerStrategy.MIXED
+                    params.strategy == NonlinearIntegerStrategy.MIXED || fixedIntegers
                 ) {
                     when (val relaxed = completion()) {
                         is QfNraResult.Unsatisfiable -> return@use relaxed
-                        is QfNraResult.Unknown -> return@use relaxed
+                        is QfNraResult.Unknown -> {
+                            if (relaxed.reason != QfNraReason.ResourceLimit || work()) return@use relaxed
+                            representationDecline = relaxed
+                        }
                         is QfNraResult.Satisfiable -> {
                             current = coordinates.map { integerNear(relaxed.assignment.realValue(it), arithmetic) }
                             enumeration = (current + enumeration).distinct()
@@ -129,13 +141,22 @@ private class NonlinearIntegerSearch(
         arithmetic.step()
         candidates++
         if (!visited.add(current.toList())) return null
+        if (current.indices.any { index ->
+                val value = BigFraction.of(current[index], BIG_ONE)
+                val id = coordinates[index]
+                condition.lower[id]?.let { value < it } == true || condition.upper[id]?.let { value > it } == true
+            }
+        ) return null
         val fixed = coordinates.indices.associate { coordinates[it] to BigFraction.of(current[it], BIG_ONE) }
         return when (val result = completion(fixed)) {
             is QfNraResult.Satisfiable -> {
                 check(integral(result.assignment)) { "conditioned nonlinear integer witness is fractional" }
                 if (checked(result.assignment)) result else error("nonlinear source witness check failed")
             }
-            is QfNraResult.Unknown -> result
+            is QfNraResult.Unknown -> if (result.reason == QfNraReason.ResourceLimit && !work()) {
+                representationDecline = result
+                null
+            } else result
             is QfNraResult.Unsatisfiable -> null
         }
     }
@@ -152,7 +173,9 @@ private class NonlinearIntegerSearch(
         when (val guide = completion(fixed)) {
             is QfNraResult.Satisfiable -> {
                 current = current.mapIndexed { index, value ->
-                    if (index in released) integerNear(guide.assignment.realValue(coordinates[index]), arithmetic) else value
+                    if (index in released) {
+                        integerNear(guide.assignment.realValue(coordinates[index]), arithmetic)
+                    } else value
                 }
             }
             is QfNraResult.Unsatisfiable -> {
@@ -163,17 +186,33 @@ private class NonlinearIntegerSearch(
                     else value
                 }
             }
-            is QfNraResult.Unknown -> if (work() || guide.reason == QfNraReason.ResourceLimit) {
-                if (guide.reason == QfNraReason.ResourceLimit) {
-                    throw PolynomialResourceLimit(requireNotNull(guide.resource))
+            is QfNraResult.Unknown -> {
+                if (work()) throw PolynomialInterrupted()
+                if (guide.reason == QfNraReason.ResourceLimit) representationDecline = guide
+                current = current.mapIndexed { index, value ->
+                    if (index in released) hints.getOrNull(((candidates - 1) % hints.size.coerceAtLeast(1)).toInt())
+                        ?: (value + radius)
+                    else value
                 }
-                throw PolynomialInterrupted()
             }
         }
+        current = current.mapIndexed(::bounded)
         moves++
         if (visited.contains(current)) {
             current = current.mapIndexed { index, value -> if (index == first) value + radius else value }
+            current = current.mapIndexed(::bounded)
             radius += BIG_ONE
+        }
+    }
+
+    private fun bounded(index: Int, value: BigInt): BigInt {
+        val id = coordinates[index]
+        val lower = condition.lower[id]?.ceilInteger()
+        val upper = condition.upper[id]?.let { -it.negated().ceilInteger() }
+        return when {
+            lower != null && value < lower -> lower
+            upper != null && value > upper -> upper
+            else -> value
         }
     }
 
@@ -216,7 +255,8 @@ private class NonlinearIntegerSearch(
 
     private fun checked(assignment: QfNraAssignment): Boolean =
         checkNonlinearSource(problem.formula, assignment, arithmetic)
-    private fun unknown(): QfNraResult.Unknown = QfNraResult.Unknown(
+    private fun unknown(): QfNraResult.Unknown =
+        representationDecline?.takeIf { !work() }?.copy(stats = polynomialStats()) ?: QfNraResult.Unknown(
         if (work.limitReached || !params.arithmetic.cancellation()) QfNraReason.WorkLimit else QfNraReason.Interrupted,
         polynomialStats(),
     )

@@ -151,7 +151,9 @@ internal class SmtLibPolynomialCompiler(
 
     fun build(): SmtLibPolynomialProblem {
         val lowering = PolynomialRealLowering(numericCount)
-        val evaluator = SmtLibPolynomialEvaluator(lowering, cancellation = cancellation)
+        val evaluator = SmtLibPolynomialEvaluator(
+            lowering, allowWidePowers = allowIntegers, cancellation = cancellation,
+        )
         val formulas = assertions.map { (expression, environment) ->
             evaluator.evaluate(expression, environment).boolean()
         }
@@ -204,7 +206,8 @@ internal class SmtLibPolynomialCompiler(
             else PolynomialValue.Real.variable(index, integer = sorts[index] == Sort.INT)
         }.toMap()
         val value = SmtLibPolynomialEvaluator(
-            PolynomialRealLowering(numericCount + names.size), validateOnly = true, cancellation = cancellation,
+            PolynomialRealLowering(numericCount + names.size), validateOnly = true,
+            allowWidePowers = allowIntegers, cancellation = cancellation,
         ).evaluate(
             macro.body, macro.environment.withValues(parametersForValidation),
         )

@@ -20,6 +20,11 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.sum
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BIG_TWO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.shr
+import com.eignex.klause.util.rem as bigRemainder
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
@@ -120,6 +125,7 @@ private sealed interface PolynomialFrame {
 internal class SmtLibPolynomialEvaluator(
     private val lowering: PolynomialRealLowering,
     private val validateOnly: Boolean = false,
+    private val allowWidePowers: Boolean = false,
     private val cancellation: Cancellation = Cancellation.Never,
 ) {
     var hasNonlinearTerms = false
@@ -274,12 +280,17 @@ internal class SmtLibPolynomialEvaluator(
                     if (validateOnly) return PolynomialValue.Real(base, args[0].integral())
                     smtUnsupported("polynomial power requires a constant exponent")
                 }
-                if (value.den != BIG_ONE || value.num.signum() < 0 || value.num > bigIntOf(Int.MAX_VALUE)) {
-                    smtUnsupported("polynomial power requires a nonnegative Int exponent")
+                if (value.den != BIG_ONE || value.num.signum() < 0) {
+                    smtUnsupported("polynomial power requires a nonnegative integer exponent")
                 }
-                val exponent = value.num.toLong().toInt()
-                if (exponent >= 2 && rational(base) == null) hasNonlinearTerms = true
-                PolynomialValue.Real(power(base, exponent, cancellation), args[0].integral())
+                if (value.num > bigIntOf(Int.MAX_VALUE) && !allowWidePowers) {
+                    smtUnsupported("polynomial power exceeds the direct exponent representation")
+                }
+                if (value.num >= bigIntOf(2) && rational(base) == null) hasNonlinearTerms = true
+                val expression = if (value.num <= bigIntOf(Int.MAX_VALUE)) {
+                    power(base, value.num.toLong().toInt(), cancellation)
+                } else widePower(base, value.num)
+                PolynomialValue.Real(expression, args[0].integral())
             }
             "to_real" -> {
                 if (!args.single().integral()) smtUnsupported("to_real requires an integer operand")
@@ -310,6 +321,19 @@ internal class SmtLibPolynomialEvaluator(
             "=", "distinct", "<", "<=", ">", ">=" -> PolynomialValue.Boolean(comparison(node.polynomialHead(), args))
             else -> smtUnsupported("unsupported polynomial operator '${node.polynomialHead()}'")
         }
+    }
+
+    private fun widePower(base: PolynomialExpression, exponent: BigInt): PolynomialExpression {
+        var remaining = exponent
+        var factor = base
+        val factors = ArrayList<PolynomialExpression>()
+        while (remaining > BIG_ZERO) {
+            cancellation.polynomialSourceCheckpoint(1)
+            if (remaining.bigRemainder(BIG_TWO) == BIG_ONE) factors.add(factor)
+            remaining = remaining shr 1
+            if (remaining > BIG_ZERO) factor = PolynomialExpression.Power(factor, 2)
+        }
+        return if (factors.size == 1) factors.single() else PolynomialExpression.Product(factors)
     }
 
     private fun comparison(head: String, args: List<PolynomialValue>): PolynomialRealFormula {

@@ -19,10 +19,21 @@ Candidate traversal enumerates integer tuples around zero and source constants,
 then widens its candidate set. These are search choices, never source bounds or
 finite CP domains. Its candidate allowance can stop an incomplete traversal.
 
+Mandatory conjunctive unary source bounds are intersected at arbitrary precision,
+including strict integer floor/ceiling semantics. Boolean alternatives and guarded
+bounds do not narrow the source. This arithmetic state remains theory-owned; it
+creates no finite CP domains. Empty proved source/condition intersections can
+refute their actual scope. Candidate proposals stay within these proved sides and
+caller windows, and out-of-window candidates are rejected before completion.
+
 Each candidate fixes every original integer coordinate to an exact rational
 integer and asks the existing [polynomial service](qfnra.md#conditioned-theory-service)
 to complete real coordinates and correlated Booleans. Failure refutes only that
-candidate. Numeric conditional auxiliaries remain private to the formula and are
+candidate. A real-relaxation representation decline permits fixed integer candidates under
+the same work and allocation controls. It supplies no proof. Wide exponents use
+compact squaring DAGs; values such as zero and signed units can remain exactly
+checkable without materializing the unconditioned polynomial degree.
+Numeric conditional auxiliaries remain private to the formula and are
 completed under their guarded source definitions.
 
 The heuristic strategies start with an integer candidate, then release one
@@ -39,7 +50,9 @@ for LS and adaptive ALNS. Centers retain arbitrary-width exact integers. Boolean
 pins and integer windows map to original source coordinates, while real coordinates
 remain completion-owned. Source equalities supply initial proposals, including wide
 values; guarded equalities do not become source bounds. Each callback offers up to
-sixteen integer candidate attempts under its exact windows. A failed real
+sixteen integer candidate attempts under its exact windows. When multiple integer
+coordinates are free it uses coordinate repairs; fixed/single-coordinate windows
+use exact relaxed completion with checked integer candidates. A failed real
 relaxation covers only that neighborhood; integer candidate exhaustion is undecided.
 
 Mixed execution initially offers sixteen whole-source candidate attempts with a
