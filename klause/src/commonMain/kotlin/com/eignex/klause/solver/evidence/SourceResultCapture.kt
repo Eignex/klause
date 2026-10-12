@@ -11,12 +11,28 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
 
 /** Optional claim capture over independently supplied original-source verification data. */
 class SourceResultCapture(
     /** Original-source context used for every captured result. */
     val context: SourceProofContext,
 ) {
+    /** Retain exact quadratic result claims with explicitly optional bound and traversal derivations. */
+    fun quadratic(
+        result: QuadraticOptimizationResult,
+        producer: String,
+        derivation: SourceDerivation? = null,
+        boundDerivation: SourceDerivation? = null,
+        cancellation: Cancellation = Cancellation.Never,
+    ): QuadraticOptimizationResult {
+        require(context.scope.objective?.sense == result.sense) {
+            "quadratic capture requires the source objective direction"
+        }
+        if (cancellation() || result.capturedScopes().any { it != context.scope }) return result
+        return SourceQuadraticResultCapture(context, producer, derivation, boundDerivation).capture(result)
+    }
+
     /** Capture exact source assignments and explicitly classify missing complete-search proof data. */
     fun solve(result: SolveResult, producer: String, derivation: SourceDerivation? = null): SolveResult {
         if (result.evidence?.scope?.let { it != context.scope } == true) return result

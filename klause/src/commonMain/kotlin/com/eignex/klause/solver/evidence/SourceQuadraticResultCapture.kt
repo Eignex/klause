@@ -7,22 +7,7 @@ import com.eignex.klause.solver.result.QuadraticObjectiveBound
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.Cancellation
 
-/** Retain exact quadratic result claims with explicitly optional bound and traversal derivations. */
-fun SourceResultCapture.quadratic(
-    result: QuadraticOptimizationResult,
-    producer: String,
-    derivation: SourceDerivation? = null,
-    boundDerivation: SourceDerivation? = null,
-    cancellation: Cancellation = Cancellation.Never,
-): QuadraticOptimizationResult {
-    require(context.scope.objective?.sense == result.sense) {
-        "quadratic capture requires the source objective direction"
-    }
-    if (cancellation() || result.capturedScopes().any { it != context.scope }) return result
-    return SourceQuadraticResultCapture(context, producer, derivation, boundDerivation).capture(result)
-}
-
-private class SourceQuadraticResultCapture(
+internal class SourceQuadraticResultCapture(
     private val context: SourceProofContext,
     private val producer: String,
     private val derivation: SourceDerivation?,
@@ -138,7 +123,7 @@ fun QuadraticOptimizationResult.verifySourceEvidence(
     return SourceEvidenceCheck.Checked
 }
 
-private fun QuadraticOptimizationResult.capturedScopes(): List<SourceScope> {
+internal fun QuadraticOptimizationResult.capturedScopes(): List<SourceScope> {
     val scopes = ArrayList<SourceScope>()
     capturedEvidence()?.scope?.let { scopes.add(it) }
     when (this) {
