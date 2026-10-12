@@ -57,12 +57,6 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     protected open fun verdictReason(verdict: Verdict): String? =
         if (verdict == Verdict.UNKNOWN) context.softVerdictCause() else null
 
-    override fun begin(optimize: Boolean, maximize: Boolean) {
-        best = null
-        emittedArithmeticWitness = null
-        context = VerdictContext()
-    }
-
     final override fun onVerdictContext(context: VerdictContext) {
         this.context = context
     }
