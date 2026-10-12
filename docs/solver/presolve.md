@@ -170,3 +170,9 @@ without a channel receive a fresh Boolean. Reusing a channel removes its redunda
 equivalence clauses. Integers are pinned during search and reconstructed from their
 value literals, preserving source values and solution counts for either indicator
 polarity.
+
+Optional `SourceMapping.justification` retains typed source-to-target obligations.
+Composition retains each stage's justification in order; declared transformation
+guarantees do not provide independent proof coverage. Original-source witness
+checking remains required after reconstruction. See [derivation checking](evidence.md)
+for verified affine projection and objective-adjustment conditions.

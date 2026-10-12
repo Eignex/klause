@@ -81,21 +81,26 @@ class SourceEvidenceVerifier(
 
     /** Verify scope, premises, imports, branch coverage and the mathematical claim. */
     fun verify(evidence: SourceEvidence, cancellation: Cancellation = Cancellation.Never): SourceEvidenceCheck =
-        try {
-            Run(cancellation).verify(evidence, context.scope, 0)
-        } catch (stop: ProofStop) {
-            stop.verdict
-        } catch (_: PolynomialInterrupted) {
-            SourceEvidenceCheck.Unavailable("original-source arithmetic check cancelled")
-        } catch (_: PolynomialResourceLimit) {
-            SourceEvidenceCheck.Unavailable("original-source arithmetic allowance exhausted")
-        }
+        verify(evidence, cancellation, SourceProofAllowance(maximumSteps, maximumDepth))
 
-    private inner class Run(private val cancellation: Cancellation) {
-        private var steps = 0
+    internal fun verify(
+        evidence: SourceEvidence, cancellation: Cancellation, allowance: SourceProofAllowance,
+    ): SourceEvidenceCheck = try {
+        Run(cancellation, allowance).verify(evidence, context.scope, 0)
+    } catch (stop: ProofStop) {
+        stop.verdict
+    } catch (_: PolynomialInterrupted) {
+        SourceEvidenceCheck.Unavailable("original-source arithmetic check cancelled")
+    } catch (_: PolynomialResourceLimit) {
+        SourceEvidenceCheck.Unavailable("original-source arithmetic allowance exhausted")
+    }
 
+    private inner class Run(
+        private val cancellation: Cancellation,
+        private val allowance: SourceProofAllowance,
+    ) {
         private fun step(depth: Int) {
-            if (cancellation() || ++steps > maximumSteps || depth > maximumDepth) {
+            if (cancellation() || !allowance.consume(depth)) {
                 throw ProofStop(SourceEvidenceCheck.Unavailable("source proof verification allowance exhausted"))
             }
         }
@@ -308,3 +313,9 @@ private inline fun both(first: SourceEvidenceCheck, second: () -> SourceEvidence
 private fun rejectProof(reason: String): Nothing = stopProof(reject(reason))
 
 private fun stopProof(verdict: SourceEvidenceCheck): Nothing = throw ProofStop(verdict)
+
+internal class SourceProofAllowance(private val maximumSteps: Int, private val maximumDepth: Int) {
+    private var steps = 0L
+
+    fun consume(depth: Int): Boolean = ++steps <= maximumSteps && depth <= maximumDepth
+}

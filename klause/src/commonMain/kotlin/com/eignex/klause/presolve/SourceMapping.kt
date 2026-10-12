@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceTransformation
 import com.eignex.klause.solver.objective.LinearObjective
 
 internal class ObjectiveAdjustment(
@@ -26,9 +27,12 @@ internal class SourceMapping(
     val rebuild: SourceRebuilds = SourceRebuilds.NONE,
     val objectiveAdjustment: ObjectiveAdjustment = ObjectiveAdjustment(),
     private val chain: List<SourceMapping> = emptyList(),
+    val justification: SourceTransformation? = null,
     private val lift: (Sample) -> Sample = rebuild.asSampleLift() ?: { it },
 ) {
     val stages: List<SourceMapping> get() = chain.ifEmpty { listOf(this) }
+
+    val capturedJustifications: List<SourceTransformation> get() = stages.mapNotNull { it.justification }
 
     fun reconstructFrom(model: Problem, sample: Sample): Sample {
         require(model === target) { "reconstruction belongs to a different reduced model" }
