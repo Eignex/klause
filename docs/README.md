@@ -10,8 +10,8 @@ separately at [eignex.com/docs/klause](https://eignex.com/docs/klause/).
 1. Read [system architecture](architecture.md) for the source-to-result flow and
    the responsibilities of each layer.
 2. Read [solver vision](vision.md) for the intended model breadth, paired portfolios
-   and independent proof verification. [Current coverage](formats.md#solving-coverage)
-   records the implemented limits separately.
+   and independent proof verification, with [active planned work](vision.md#active-work-toward-the-vision)
+   tracked separately from [current coverage](formats.md#solving-coverage).
 3. Use [development](development.md) to build and contribute, or follow the
    subsystem links below for the contract you are changing.
 

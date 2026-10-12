@@ -9,6 +9,26 @@ not fully implemented. [System architecture](architecture.md) describes the curr
 system; [input semantics and coverage](formats.md) records its supported routes and
 limits. Independently checkable proof export remains a target capability.
 
+## Active work toward the vision
+
+The following refactors are planned work being pursued toward this vision. Their
+target behavior is not an implemented guarantee. Architecture and subsystem pages
+describe the current system; the linked issues track the work and its status.
+
+| Area | Current implementation | Planned work |
+|---|---|---|
+| Source execution planning | Linear/finite ownership and polynomial decomposition use separate plans. | [#2648](https://github.com/Eignex/klause/issues/2648): unify preparation and ownership across complete and heuristic arms. |
+| Source evidence | In-memory certificates attest to engine checks; reconstruction retains source mappings. | [#2649](https://github.com/Eignex/klause/issues/2649): retain typed, scoped derivations and transformation justifications toward independent verification. |
+| Strategy composition | Nonlinear-integer and quadratic mixed execution uses fixed phases. | [#2650](https://github.com/Eignex/klause/issues/2650): move those strategies onto retained shared portfolio workers with exact objective exchange. |
+| Conditioned completion | Open linear repairs rebuild constrained models and theory engines. | [#2651](https://github.com/Eignex/klause/issues/2651): retain prepared completion across candidate queries with scoped retraction and cumulative allowances. |
+| Strategy admission | Factor capabilities inventory direct mechanisms; composed routes select admission separately. | [#2652](https://github.com/Eignex/klause/issues/2652): expose model/operation admission and claim capabilities in the shared plan, with strategy conformance checks. |
+
+These refactors preserve finite propagation's Bool+Int boundary, private mutable
+worker state, numerical dependency boundaries and source publication checks. They
+do not supply new arithmetic decision procedures or proof-file support by
+themselves. [Current coverage](formats.md#solving-coverage) remains the execution
+reference, including the separate transcendental support work.
+
 ## Shared model breadth
 
 Klause's required model surface is shared across search, local search,

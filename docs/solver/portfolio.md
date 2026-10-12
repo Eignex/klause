@@ -307,6 +307,14 @@ saved-result accounting.
 
 ## Exact theory strategy execution
 
+The shared harness runs linear and finite-polynomial portfolios. Nonlinear-integer
+and quadratic `MIXED` execution uses the fixed phases documented in
+[nonlinear integer arithmetic](../theories/nonlinear-integer.md#solving-and-composition)
+and [quadratic strategy execution](../theories/polynomial-real.md#quadratic-strategy-execution).
+Migration to retained shared portfolio workers is planned in
+[#2650](https://github.com/Eignex/klause/issues/2650); the vision's
+[active work](../vision.md#active-work-toward-the-vision) tracks the related refactors.
+
 Supported linear sources pair complete traversal with exact-coordinate local search
 and adaptive block repair, including real-only models and arbitrary-width integers.
 Neighborhood windows restrict proposals rather than source domains. Only checked

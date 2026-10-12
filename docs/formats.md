@@ -26,6 +26,8 @@ constraints through different mechanisms. This is current execution coverage,
 separate from what an individual frontend can parse. [The vision](vision.md)
 requires common model breadth and an available complete-search/local-search pair;
 the specific remaining misalignments are listed below.
+Planned execution and evidence refactors are tracked under
+[active work toward the vision](vision.md#active-work-toward-the-vision).
 
 | Model family | Mechanisms | Boundary |
 |---|---|---|

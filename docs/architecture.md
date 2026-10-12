@@ -10,6 +10,8 @@ reusable mechanisms. Policy chooses when to search or check; mechanisms supply
 propagation, scoring and arithmetic. Dependencies point from policy to mechanism.
 The [solver vision](vision.md) defines the intended common breadth and portfolio
 contract. [Current coverage](formats.md#solving-coverage) describes implemented limits.
+The vision's [active work](vision.md#active-work-toward-the-vision) tracks planned
+refactors; this page describes the implemented architecture.
 
 ## From source to result
 
