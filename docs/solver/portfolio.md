@@ -9,6 +9,13 @@ Execution has three parts: prepare retained workers, give them bounded slices, a
 verify their publications before sharing or returning them. Slices preserve state;
 reseeding or retiring a worker has its own lifetime and accounting rules.
 
+Finite source execution supplies retained recipe factories to `PortfolioInvocation`
+with the routing plan and current executable projection. The invocation owns worker
+slots, seed offsets, parallel node quotas, scheduler controls, result verification
+and cleanup. Composed arm attribution remains distinct from materialized replica
+slots. Recipes retain their source-specific pools and reservations; mutable source
+services registered with a slot close when the invocation releases that slot.
+
 The [solver vision](../vision.md#shared-model-breadth) requires an available
 complete-search/local-search pair for every supported model. Current admission gaps
 remain implementation limits. [Sessions](sessions.md) owns assumptions;

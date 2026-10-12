@@ -7,7 +7,6 @@ import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
-import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
@@ -22,6 +21,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.util.Cancellation
 
 /** Materializes [scenario] over [problem] and schedules it on one lane per core, checking every result an arm
  *  claims against [problem] and reporting each arm quarantined for a refuted claim to [onFault]. */
@@ -33,48 +33,52 @@ fun FinitePipeline.portfolioExecutor(
     definitionalSweep: DefinitionalSweep?,
     onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     onFault: ((ArmFault) -> Unit)? = null,
+): PortfolioExecutor = portfolioExecutor(
+    problem, scenario, objective, lsObjective, definitionalSweep, onEvent, onFault,
+    problem.prepareExecutionPlan(objective = objective, preferFinite = true), Cancellation.Never,
+)
+
+internal fun FinitePipeline.portfolioExecutor(
+    problem: BakedProblem,
+    scenario: PortfolioScenario,
+    objective: LinearObjective?,
+    lsObjective: IncrementalObjective?,
+    definitionalSweep: DefinitionalSweep?,
+    onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+    onFault: ((ArmFault) -> Unit)?,
+    preparedPlan: PreparedSourcePlan,
+    cancellation: Cancellation,
 ): PortfolioExecutor {
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
-    val workers = PortfolioBuilder.build(
-        problem,
-        scenario,
-        objective = objective,
-        lsObjective = lsObjective,
-        definitionalSweep = definitionalSweep,
-        onEvent = onEvent,
-        profile = profile,
-    )
-    val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
-    return Portfolio.thompson(
-        workers,
-        lanes = scenario.cores,
-        baseSliceWork = scenario.sliceWork,
-        maxSliceWork = scenario.maxSliceWork,
-        sliceGrowth = scenario.sliceGrowth,
-        phaseRetention = scenario.phaseRetention,
-        reseedStaleThreshold = scenario.reseedStaleThreshold,
-        profile = profile,
-        minShares = if (proofShares.isEmpty()) {
+    val factories = PortfolioBuilder.factories(problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
+        profile).map { factory ->
+        PortfolioArmFactory(preparedPlan, factory.armId, factory.family) { slot ->
+            factory.materialize(slot.index, slot.baseSeed, slot.nodeBudget)
+        }
+    }
+    return PortfolioInvocation(
+        preparedPlan, factories,
+        PortfolioInvocationControls(
+            parallelism = scenario.cores, workerSeed = scenario.seed, cancellation = cancellation,
+            nodeBudget = scenario.nodeBudget,
+            baseSliceWork = scenario.sliceWork, maxSliceWork = scenario.maxSliceWork,
+            sliceGrowth = scenario.sliceGrowth, phaseRetention = scenario.phaseRetention,
+            reseedStaleThreshold = scenario.reseedStaleThreshold,
+        ),
+        PortfolioEvidence(ModelIdentity.of(problem, objective),
+            finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck)),
+        objective, onFault,
+    ) { workers ->
+        val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
+        val shares = if (proofShares.isEmpty()) {
             continuousLpShares(scenario, profile, workers.map { it.label }, objective,
                 problem.continuousMajority, problem.binaryIntegers)
-        } else {
-            proofShares
-        },
-        onFault = onFault,
-    ).also {
-        it.exactLinearObjective = objective
-        it.reserveBeforeIncumbentOnly = true
-        if (scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
+        } else proofShares
+        val probes = if (scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
             scenario.btPool == null && scenario.lsPool == null
-        ) {
-            it.incumbentProbeArms = workers.indices.filter { arm ->
-                arm >= scenario.arms && workers[arm].label == "bt/lp-default"
-            }.toSet()
-        }
-        it.evidenceVerification = PortfolioEvidence(
-            ModelIdentity.of(problem, objective),
-            finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck),
-        )
+        ) workers.indices.filter { arm -> arm >= scenario.arms && workers[arm].label == "bt/lp-default" }.toSet()
+        else emptySet()
+        PortfolioInvocationPolicy(profile, shares, reserveBeforeIncumbentOnly = true, probes = probes)
     }
 }
 
