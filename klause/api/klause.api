@@ -10088,6 +10088,30 @@ public abstract interface class com/eignex/klause/solver/pipeline/ExactTheorySat
 	public abstract fun execute (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 }
 
+public final class com/eignex/klause/solver/pipeline/ExecutionCapabilities {
+	public final fun admission (Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;Lcom/eignex/klause/solver/pipeline/ExecutionOperation;)Lcom/eignex/klause/solver/pipeline/StrategyAdmission;
+	public static synthetic fun admission$default (Lcom/eignex/klause/solver/pipeline/ExecutionCapabilities;Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;Lcom/eignex/klause/solver/pipeline/ExecutionOperation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/StrategyAdmission;
+	public final fun getSupportedOperations ()Ljava/util/Set;
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionCapabilitiesKt {
+	public static final fun admission (Lcom/eignex/klause/solver/pipeline/ExecutionCapabilities;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/pipeline/ExecutionOperation;)Lcom/eignex/klause/solver/pipeline/StrategyAdmission;
+	public static synthetic fun admission$default (Lcom/eignex/klause/solver/pipeline/ExecutionCapabilities;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/pipeline/ExecutionOperation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/StrategyAdmission;
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionClaimAuthority : java/lang/Enum {
+	public static final field COUNT_ESTIMATE Lcom/eignex/klause/solver/pipeline/ExecutionClaimAuthority;
+	public static final field OBJECTIVE_BOUND Lcom/eignex/klause/solver/pipeline/ExecutionClaimAuthority;
+	public static final field OPTIMALITY Lcom/eignex/klause/solver/pipeline/ExecutionClaimAuthority;
+	public static final field PROJECTED_COUNT_BOUND Lcom/eignex/klause/solver/pipeline/ExecutionClaimAuthority;
+	public static final field REFUTATION Lcom/eignex/klause/solver/pipeline/ExecutionClaimAuthority;
+	public static final field UNBOUNDEDNESS Lcom/eignex/klause/solver/pipeline/ExecutionClaimAuthority;
+	public static final field WITNESS Lcom/eignex/klause/solver/pipeline/ExecutionClaimAuthority;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/ExecutionClaimAuthority;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/ExecutionClaimAuthority;
+}
+
 public final class com/eignex/klause/solver/pipeline/ExecutionComponentDescriptor {
 	public final fun getBooleanCoordinates ()Ljava/util/List;
 	public final fun getFactorIndices ()Ljava/util/List;
@@ -10095,6 +10119,48 @@ public final class com/eignex/klause/solver/pipeline/ExecutionComponentDescripto
 	public final fun getRealCoordinates ()Ljava/util/List;
 	public final fun getResponsibility ()Lcom/eignex/klause/solver/pipeline/ComponentResponsibility;
 	public final fun getSemantics ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionDecline {
+	public final fun getCause ()Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
+	public final fun getComponent ()Ljava/lang/String;
+	public final fun getFactorIndex ()Ljava/lang/Integer;
+	public final fun getPreparation ()Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionDeclineCause : java/lang/Enum {
+	public static final field FINITE_PROJECTION Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
+	public static final field HEURISTIC_PROJECTION Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
+	public static final field OBJECTIVE Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
+	public static final field OPERATION_SURFACE Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
+	public static final field PREPARATION Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
+	public static final field SOURCE_COMPLETION Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionOperation : java/lang/Enum {
+	public static final field APPROXIMATE_COUNT Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public static final field ENUMERATE Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public static final field EXACT_COUNT Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public static final field OPTIMIZE Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public static final field SAMPLE Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public static final field SATISFY Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public static final field UNIFORM_SAMPLE Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+}
+
+public final class com/eignex/klause/solver/pipeline/ExecutionStrategy : java/lang/Enum {
+	public static final field ALNS Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;
+	public static final field COMPLETE Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;
+	public static final field LOCAL_SEARCH Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;
+	public static final field MIXED Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;
 }
 
 public final class com/eignex/klause/solver/pipeline/FactorOwner : java/lang/Enum {
@@ -10807,6 +10873,7 @@ public final class com/eignex/klause/solver/pipeline/PreparedSourcePlan {
 	public final fun belongsTo (Ljava/lang/Object;)Z
 	public final fun booleanCoordinate (I)I
 	public final fun finiteIntegerCoordinate (I)Ljava/lang/Integer;
+	public final fun getCapabilities ()Lcom/eignex/klause/solver/pipeline/ExecutionCapabilities;
 	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public final fun getComponents ()Ljava/util/List;
 	public final fun getDecline ()Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
@@ -10815,6 +10882,8 @@ public final class com/eignex/klause/solver/pipeline/PreparedSourcePlan {
 	public final fun getModel ()Lcom/eignex/klause/ir/Problem;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getOriginalSource ()Ljava/lang/Object;
+	public final fun getQuadraticObjective ()Lcom/eignex/klause/ir/QuadraticObjectiveSpec;
+	public final fun getQuadraticSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun getSourceBoolCount ()I
 	public final fun getSourceIntCount ()I
 	public final fun getSourceRealCount ()I
@@ -10822,6 +10891,10 @@ public final class com/eignex/klause/solver/pipeline/PreparedSourcePlan {
 	public final fun polynomialIntegerCoordinate (I)Ljava/lang/Integer;
 	public final fun prepareConditionedLinearQuery ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public final fun realCoordinate (I)I
+	public final fun withObjective (Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public final fun withObjective (Lcom/eignex/klause/solver/objective/LinearObjective;Z)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public static synthetic fun withObjective$default (Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public static synthetic fun withObjective$default (Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Lcom/eignex/klause/solver/objective/LinearObjective;ZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 }
 
 public final class com/eignex/klause/solver/pipeline/PreparedSourcePlanKt {
@@ -10848,6 +10921,16 @@ public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
 	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ZLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static final fun sourceRoute (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+}
+
+public final class com/eignex/klause/solver/pipeline/ProcedureCompleteness : java/lang/Enum {
+	public static final field DECISION Lcom/eignex/klause/solver/pipeline/ProcedureCompleteness;
+	public static final field EXHAUSTIVE Lcom/eignex/klause/solver/pipeline/ProcedureCompleteness;
+	public static final field UNAVAILABLE Lcom/eignex/klause/solver/pipeline/ProcedureCompleteness;
+	public static final field WITNESS_SEARCH Lcom/eignex/klause/solver/pipeline/ProcedureCompleteness;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/ProcedureCompleteness;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/ProcedureCompleteness;
 }
 
 public final class com/eignex/klause/solver/pipeline/QuadraticIntegerOptimizationKt {
@@ -10949,6 +11032,16 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Unsuppor
 	public final fun getUnplaceable ()Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/StrategyAdmission {
+	public final fun getArms ()Ljava/util/List;
+	public final fun getClaimAuthorities ()Ljava/util/Set;
+	public final fun getCompleteness ()Lcom/eignex/klause/solver/pipeline/ProcedureCompleteness;
+	public final fun getDeclines ()Ljava/util/List;
+	public final fun getOperation ()Lcom/eignex/klause/solver/pipeline/ExecutionOperation;
+	public final fun getRunnable ()Z
+	public final fun getStrategy ()Lcom/eignex/klause/solver/pipeline/ExecutionStrategy;
 }
 
 public final class com/eignex/klause/solver/pipeline/TheoryParams {

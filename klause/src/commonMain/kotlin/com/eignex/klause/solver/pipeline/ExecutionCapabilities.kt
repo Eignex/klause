@@ -157,7 +157,7 @@ class ExecutionCapabilities internal constructor(
         strategy: ExecutionStrategy,
         operation: ExecutionOperation = ExecutionOperation.SATISFY,
     ): StrategyAdmission {
-        if (operation !in surface || operation == ExecutionOperation.OPTIMIZE && !optimizationSupported) {
+        if (operation !in surface || (operation == ExecutionOperation.OPTIMIZE && !optimizationSupported)) {
             val cause = if (operation !in surface) ExecutionDeclineCause.OPERATION_SURFACE
             else ExecutionDeclineCause.OBJECTIVE
             return StrategyAdmission(operation, strategy, false, ProcedureCompleteness.UNAVAILABLE,
