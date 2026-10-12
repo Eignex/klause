@@ -34,6 +34,7 @@ internal class LinearAuthority(private val budget: SourceLpBudget) {
     private val lp = LinearAuthorityLp(budget)
 
     fun check(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
+        if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return LinearAuthorityResult()
         val coordinates = source.numericCoordinates()
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
                 it !in source.coordinates

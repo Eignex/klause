@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.optimization.linearCoordinatesSupported
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -93,6 +94,9 @@ internal class LinearAuthorityInvocation(
         endWork = if (work < 0) Long.MAX_VALUE else this.work + minOf(work, Long.MAX_VALUE - this.work)
         callback = onIncumbent
         try {
+            if (!context.affineObjectiveAvailable || !context.linearCoordinatesSupported()) {
+                return finish(null, TerminationReason.Unsupported)
+            }
             external()?.let(::offer)
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
                 else TerminationReason.Cancelled)
