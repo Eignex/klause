@@ -52,7 +52,8 @@ class PreparedStrategyAdmissionTest(private val model: String, private val engin
             plan = source.prepareExecutionPlan(preferFinite = true)
             var sample: Sample? = null
             val execution = FinitePipeline.solve(FiniteSolveRequest(
-                shape = FiniteSolveShape(source, false, false, null, null, null, null, preparedPlan = plan),
+                shape = FiniteSolveShape(source, false, false, null, null, null, null,
+                    componentPlan = assertNotNull(plan.componentPlan), preparedPlan = plan),
                 engine = engine, presolveConfig = PresolveConfig.NONE, explicitPresolveConfig = true,
                 solutionSetSensitive = false, cancellation = Cancellation.Never, presolveBudget = null,
                 cores = 1, engineParams = emptyList(), randomSeed = 17, defaultArms = 1,
