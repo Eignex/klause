@@ -24,6 +24,17 @@ pure-integer rows are rebuilt from source decimals; oversized objectives can use
 an auxiliary defining row. Integer values and lower-bound shifts keep exact
 authority beyond `2^53`.
 
+`MpsModel.toExactSourceProblem` preserves parsed decimal numbers in the existing
+exact tagged linear rows, clearing denominators by positive scaling. Real column
+bounds are exact rows with open real declaration arrays; integer bounds outside
+`Long` also remain rows. Declared integer columns retain integrality. Conditional
+rows are disjunctions of the indicator's exact complement and the enabled row.
+An auxiliary objective equality retains the original decimal coefficients and
+constant in source units. The returned column mapping omits this auxiliary and
+its source witness check requires exact feasibility, independently of the hybrid
+lowering's tolerance correspondence. This adapter prepares source data; callers
+select execution through the shared pipeline.
+
 ## Tolerance publication
 
 Finite default MPS solves can accept a continuous leaf by source tolerance. Rows use
