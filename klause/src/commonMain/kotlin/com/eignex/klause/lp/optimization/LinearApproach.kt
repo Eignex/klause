@@ -37,8 +37,10 @@ internal class LinearAuthoritySemantics(private val source: SourceProofContext) 
         sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
     ): SourceEvidenceCheck = exact.objectiveEquals(sample, value, scope, cancellation)
 
-    override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
-        exact.ray(claim, scope, cancellation)
+    override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
+        val base = witness(claim.sample, scope, cancellation)
+        return if (base == SourceEvidenceCheck.Checked) exact.ray(claim, scope, cancellation) else base
+    }
 
     override fun derivation(
         claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
