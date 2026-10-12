@@ -18,6 +18,7 @@ ALLOWED = {
     "lp.engine": ("lp.engine", "util", "simplex.exact", "lp.lattice", "simplex.basis"),
     "arithmetic.polynomial": ("arithmetic.polynomial", "simplex.exact", "util"),
     "arithmetic.quadratic": ("arithmetic.quadratic", "simplex.exact", "util"),
+    "arithmetic.transcendental": ("arithmetic.transcendental", "simplex.exact", "util"),
     "arithmetic.difference": ("arithmetic.difference", "ir", "util"),
 }
 FORBIDDEN = {
