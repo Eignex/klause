@@ -47,7 +47,7 @@ internal fun SharedPolynomialModel.request(): PolynomialTheoryRequest = Polynomi
 
 /** Controls for one complete polynomial-real invocation, in native arithmetic units. */
 data class PolynomialTheoryParams(
-    /** Native polynomial work cap; null disables the cap and zero is exhausted before entry. */
+    /** Native arithmetic cap; quadratic execution includes numerical work. Null disables it; zero prevents entry. */
     val maximumWork: Long? = null,
     /** Maximum dense coefficient count; null disables the cap subject to checked dimensions. */
     val maximumDenseCoefficients: Int? = 65536,
