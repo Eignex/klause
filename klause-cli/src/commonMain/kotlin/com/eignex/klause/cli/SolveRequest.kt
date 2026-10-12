@@ -6,6 +6,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExactTheorySatisfactionRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
@@ -150,6 +151,11 @@ private fun sourceRouteName(route: SourceProblemRoute): String = when (route) {
 
 /** A concrete solve pipeline, selected before [SolveCore] starts its finite CP loop. */
 internal sealed interface SolvablePipeline {
+    data class ExactTheorySatisfaction(
+        val request: ExactTheorySatisfactionRequest,
+        val render: (OpenTheoryAssignment) -> String,
+    ) : SolvablePipeline
+
     /** The ordinary finite-domain CP, LP, and search components. */
     data object FiniteCp : SolvablePipeline
 

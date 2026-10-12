@@ -18,6 +18,7 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -277,10 +278,16 @@ class Portfolio(
      * [MinimizeResult.BestFound]. `onImprovement` fires once per strict global improvement, tagged with the arm
      * that produced it, in the order the incumbent installed them.
      */
+    internal var exactLinearObjective: LinearObjective? = null
+
     override fun minimize(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
-    ): MinimizeResult = minimize(cancellation, onImprovement, PortfolioIncumbents.floating())
+    ): MinimizeResult {
+        val exact = exactLinearObjective
+        return if (exact == null) minimize(cancellation, onImprovement, PortfolioIncumbents.floating())
+        else minimize(cancellation, onImprovement, PortfolioIncumbents.exact(exact))
+    }
 
     // A callback failure stays the primary failure.
     @Suppress("TooGenericExceptionCaught")

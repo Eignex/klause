@@ -61,6 +61,9 @@ internal class OpenPortfolio(
     private val searchesContinuousOnly: Boolean = false,
 ) {
     private var descentVerdict: OpenTheoryOptimum? = null
+    private val strategyParams = theoryParams.strategyQuotas(localSearchArms + if (request != null) 1 else 0,
+        complete = request != null)
+    private val completeParams = strategyParams.first()
 
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
     fun solve(cancellation: Cancellation): OpenTheoryResult {
@@ -107,7 +110,8 @@ internal class OpenPortfolio(
         require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
             "the theory's descent minimizes no continuous column"
         }
-        val firstLocalArm = if (minimizer != null) 1 else 0
+        val rational = request != null && minimizer == null
+        val firstLocalArm = if (minimizer != null || rational) 1 else 0
         val localSearch = localSearchWorkers(firstLocalArm, cancellation, objective)
         if (localSearch.isEmpty()) {
             return minimizer?.minimize(theoryParams)
@@ -126,6 +130,12 @@ internal class OpenPortfolio(
                 val worker = descentWorker(it, armId = 0) { incumbents.exchange.integerBound() }
                 add(worker.bindEvidence(ModelIdentity.of(model, objective)))
             }
+            if (rational) add(PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
+                RationalTheoryDescent(model, objective, completeParams) {
+                    incumbents.exchange.current()?.let { it.assignment to it.objective }
+                }
+            }) { _, _, _, _ -> error("the rational descent runs only by slice") }
+                .bindEvidence(ModelIdentity.of(model, objective)))
             addAll(localSearch)
         }
         // A descent rebuilt for making no progress would prepare the model again and lose the round it was proving.
@@ -137,7 +147,7 @@ internal class OpenPortfolio(
             seed = seed,
             reseedStaleThreshold = 0,
             profile = ProblemProfile.of(model, optimizing = true),
-            minShares = DoubleArray(workers.size).also { if (minimizer != null) it[0] = DESCENT_SHARE },
+            minShares = DoubleArray(workers.size).also { if (minimizer != null || rational) it[0] = DESCENT_SHARE },
         )
         portfolio.evidenceVerification = PortfolioEvidence(
             ModelIdentity.of(model, objective), openWitnessVerifier(model, objective),
@@ -191,7 +201,7 @@ internal class OpenPortfolio(
 
     // The theory paused and resumed by slice, so it keeps its search between the segments it is scheduled.
     private fun theorySlices(request: OpenTheoryRequest): ResumableSolve = object : ResumableSolve {
-        private val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), theoryParams)
+        private val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), completeParams)
         override val isDone: Boolean get() = search.isDone
         override val stats: SolveStats get() = search.stats
         override val work: Long get() = search.work
@@ -218,7 +228,7 @@ internal class OpenPortfolio(
     // An integral descent reads the attained value directly, including beyond floating-point and 64-bit ranges.
     private fun descentSlices(minimizer: OpenTheoryMinimizer, readBound: () -> BigInt?): ResumableSearch =
         object : ResumableSearch {
-            private val descent = minimizer.descent(theoryParams, readBound)
+            private val descent = minimizer.descent(completeParams, readBound)
             override val isDone: Boolean get() = descent.isDone
             override val stats: SolveStats get() = descent.stats
             override val work: Long get() = descent.work
@@ -265,9 +275,22 @@ internal class OpenPortfolio(
         cancellation: Cancellation,
         objective: LinearObjective?,
     ): List<PortfolioWorker> {
-        // On a model of continuous columns alone with no Boolean to choose, the completion of any candidate is the
-        // whole LP: local search would only hand the theory the problem it already solves, so it runs there only
-        // when asked for by name.
+        val route = model.componentPlan().theoryPipeline
+        if (route != ProblemPipeline.UNSUPPORTED_OPEN && route != ProblemPipeline.FINITE_CP) {
+            val quotas = if (lanes > 1) theoryParams.nodeBudget?.quotas(localSearchArms) else null
+            return List(localSearchArms) { index ->
+                val local = strategyParams[firstArm + index].copy(
+                    nodeBudget = quotas?.get(index) ?: theoryParams.nodeBudget,
+                )
+                val adapter = OpenExactNeighborhood(model, local, objective)
+                val adaptive = index == localSearchArms - 1 && localSearchArms > 1
+                exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
+                    firstArm + index, objective, local.cancellation or local.timeout, timeout = local.timeout,
+                    exhausted = { adapter.exhausted }, open = { adapter.search(adaptive, seed + index,
+                        maximumImprovementMoves = if (adaptive) local.alnsIterations.toLong() else null) })
+                    .bindEvidence(ModelIdentity.of(model, objective), provesResults = false)
+            }
+        }
         if (!searchesContinuousOnly && model.numIntVars == 0 && model.numBoolVars == 0) return emptyList()
         val searchModel = LocalSearchModel.open(model)
         // An open model's rows can be strict, which only the theory certifies; it decides each candidate's residual.

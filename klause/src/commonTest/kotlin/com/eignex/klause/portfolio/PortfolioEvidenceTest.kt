@@ -78,4 +78,17 @@ class PortfolioEvidenceTest {
         assertIs<MinimizeResult.Unknown>(result)
         assertEquals(0L, result.stats.portfolio.arms.single().faults)
     }
+    @Test
+    fun `outer binding cannot promote a witness-only worker to proof authority`() {
+        val identity = ModelIdentity.of(Any())
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val worker = PortfolioWorker.ofMinimize("witness-only", 0) { _, _, _, _ ->
+            sequenceOf(MinimizeResult.Optimal(sample, 1.0))
+        }.bindEvidence(identity, provesResults = false).bindEvidence(identity)
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.minimize() }
+
+        assertIs<MinimizeResult.BestFound>(result)
+    }
+
 }

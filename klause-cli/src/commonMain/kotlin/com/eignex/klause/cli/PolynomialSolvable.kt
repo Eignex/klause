@@ -3,38 +3,53 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.solver.pipeline.EngineParams
-import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
-import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
-import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
-import com.eignex.klause.solver.pipeline.SourceProblemRoute
-import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.EngineParams
+import com.eignex.klause.solver.pipeline.ExactTheorySatisfactionRequest
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
-import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
 
 internal fun polynomialSolvable(
     request: PolynomialTheoryRequest,
     render: (OpenTheoryAssignment) -> String,
     admissionElapsedMs: Long,
-): Solvable = sourceSolvable(SolvablePipeline.PolynomialTheory(request, render), admissionElapsedMs)
+): Solvable = exactTheorySolvable(ExactTheorySatisfactionRequest { params, engine, _ ->
+    OpenTheoryPipeline.execute(request, params, engine)
+}, render, admissionElapsedMs)
 
 internal fun polynomialSolvable(
     route: SourceProblemRoute.PolynomialTheory,
     render: (OpenTheoryAssignment) -> String,
     routingElapsedMs: Long = 0,
 ): Solvable = sourceSolvable(
-    SolvablePipeline.PolynomialTheory(route.request, render, route.objective, route.maximize), routingElapsedMs,
+    if (route.objective == null) SolvablePipeline.ExactTheorySatisfaction(
+        ExactTheorySatisfactionRequest { params, engine, _ ->
+            OpenTheoryPipeline.execute(route.request, params, engine)
+        }, render,
+    ) else SolvablePipeline.PolynomialTheory(route.request, render, route.objective, route.maximize), routingElapsedMs,
 )
+
+internal fun exactTheorySolvable(
+    request: ExactTheorySatisfactionRequest,
+    render: (OpenTheoryAssignment) -> String,
+    routingElapsedMs: Long = 0,
+): Solvable = sourceSolvable(SolvablePipeline.ExactTheorySatisfaction(request, render), routingElapsedMs)
 
 internal fun interruptedSolvable(reason: TerminationReason, admissionElapsedMs: Long): Solvable =
     sourceSolvable(SolvablePipeline.Interrupted(reason), admissionElapsedMs)

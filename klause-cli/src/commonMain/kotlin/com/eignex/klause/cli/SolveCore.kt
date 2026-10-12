@@ -83,11 +83,6 @@ internal object SolveCore {
         // poll, which burns the whole deadline and overshoots the cap several times over.
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
-        // Linear open routes have no ALNS counterpart.
-        val open = rawSolvable.pipeline.let {
-            it is SolvablePipeline.OpenTheory || it is SolvablePipeline.OpenLocalSearch
-        }
-        if (open && engine == FiniteEngine.ALNS) usageError("engine `${engine.id}` has no open-model route")
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
         val openCores = common.parallel ?: 1
         when (val pipeline = rawSolvable.pipeline) {
@@ -112,13 +107,18 @@ internal object SolveCore {
                     ))
                     return
                 }
+                error("polynomial satisfaction requires the exact source execution request")
+            }
+
+            is SolvablePipeline.ExactTheorySatisfaction -> {
+                if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for this exact source")
+                val polynomialParams = polynomialParams(common, deadlineCancel)
                 output.begin(optimize = false, maximize = false)
-                val execution = OpenTheoryPipeline.execute(
-                    pipeline.request,
-                    polynomialParams,
-                    engine,
-                )
-                val result = execution.result
+                val execution = pipeline.request.execute(polynomialParams, engine, openCores)
+                val result = if ((engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) &&
+                    execution.result is OpenTheoryResult.Unsat
+                ) OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, execution.result.stats)
+                else execution.result
                 output.onVerdictContext(
                     VerdictContext(
                         terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
@@ -202,6 +202,11 @@ internal object SolveCore {
                     cancellation = stop,
                     timeout = deadlineCancel,
                     nodeBudget = nodeBudget,
+                    randomSeed = takeOpenLongParam(common, "seed", nonNegative = true, signed = true)
+                        ?: common.randomSeed,
+                    maxFlips = takeOpenLongParam(common, "max-flips", nonNegative = true) ?: Long.MAX_VALUE,
+                    maxInstructions = takeOpenLongParam(common, "max-instructions", nonNegative = true),
+                    alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
                 )
                 val objective = pipeline.objective
                 if (objective != null) {
@@ -267,6 +272,11 @@ internal object SolveCore {
                         ?: TheoryParams().openHintMinSplits,
                     cancellation = deadlineCancel,
                     timeout = deadlineCancel,
+                    randomSeed = takeOpenLongParam(common, "seed", nonNegative = true, signed = true)
+                        ?: common.randomSeed,
+                    maxFlips = takeOpenLongParam(common, "max-flips", nonNegative = true) ?: Long.MAX_VALUE,
+                    maxInstructions = takeOpenLongParam(common, "max-instructions", nonNegative = true),
+                    alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
                 )
                 val request = pipeline.request.withPresolve(
                     config,
@@ -423,12 +433,14 @@ internal object SolveCore {
             is AllowanceSetting.Remaining -> setting.units
         }
 
-    private fun takeOpenLongParam(common: CommonOptions, key: String, nonNegative: Boolean): Long? {
+    private fun takeOpenLongParam(
+        common: CommonOptions, key: String, nonNegative: Boolean, signed: Boolean = false,
+    ): Long? {
         val entry = common.engineParams.firstOrNull { it.startsWith("$key=") } ?: return null
         common.engineParams.remove(entry)
         val raw = entry.substringAfter('=')
         val value = raw.toLongOrNull() ?: usageError("engine param `$key` expects an integer, got `$raw`")
-        val invalid = if (nonNegative) value < 0 else value <= 0
+        val invalid = !signed && if (nonNegative) value < 0 else value <= 0
         if (invalid) {
             usageError(
                 "engine param `$key` expects a ${if (nonNegative) "non-negative" else "positive"} integer, got $value",

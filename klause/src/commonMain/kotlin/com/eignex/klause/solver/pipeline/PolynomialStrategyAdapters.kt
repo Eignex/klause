@@ -15,6 +15,7 @@ import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -30,8 +31,8 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialSearchComponent
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
-import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraReason
+import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 
@@ -60,6 +61,19 @@ internal class PolynomialStrategyAdapters(
     }
     private val finite: BakedProblem = model.finite.bake(this.cancellation)
     private val identity = ModelIdentity.of(model.source)
+    private val fixed = if (params.assumptions.isEmpty) finite.fixedDiscreteSample() else {
+        finite.conditionedRoot(params.assumptions, this.cancellation).fixedDiscreteSample()
+    }
+
+    private fun neighborhood(adaptive: Boolean, objective: LinearObjective? = null): PortfolioWorker? {
+        val point = fixed ?: return null
+        val adapter = PolynomialExactNeighborhood(model, invocation, finite, point, params.assumptions, objective)
+        return exactNeighborhoodWorker(if (adaptive) "alns+exact-nra-neighborhood" else "ls+exact-nra-neighborhood",
+            if (adaptive) 2 else 1, objective, cancellation,
+            exhausted = { cancellation() }, open = { adapter.search(adaptive, params.localSearch.randomSeed ?: 0, 
+                params.localSearch.maxFlips, params.localSearch.maxInstructions ?: Long.MAX_VALUE,
+                if (adaptive) params.alnsIterations.toLong() else null) }).bindEvidence(identity, provesResults = false)
+    }
 
     private fun certified(sample: Sample): Sample = sample.also {
         it.witnessCertificate = EvidenceCertificate.verified(identity, EvidenceKind.Witness)
@@ -119,8 +133,10 @@ internal class PolynomialStrategyAdapters(
 
     fun solve(engine: FiniteEngine): SolveResult = when (engine) {
         FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> BacktrackSolver(finite).solve(backtrackParams())
-        FiniteEngine.LOCAL_SEARCH -> heuristic(localSearch().solve(localParams()))
-        FiniteEngine.ALNS -> alns(cancellation)
+        FiniteEngine.LOCAL_SEARCH -> neighborhood(false)?.solve(cancellation, params.localSearch.maxInstructions)
+            ?: heuristic(localSearch().solve(localParams()))
+        FiniteEngine.ALNS -> neighborhood(true)?.solve(cancellation, params.localSearch.maxInstructions)
+            ?: alns(cancellation)
         FiniteEngine.MIXED -> portfolio().use { it.solve(cancellation) }
     }
 
@@ -130,8 +146,12 @@ internal class PolynomialStrategyAdapters(
         }
         return when (engine) {
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> BacktrackSolver(finite).minimize(objective, backtrackParams())
-            FiniteEngine.LOCAL_SEARCH -> heuristic(localSearch().minimize(objective, localParams()))
-            FiniteEngine.ALNS -> heuristic(alnsMinimize(objective, cancellation))
+            FiniteEngine.LOCAL_SEARCH -> neighborhood(false, objective)?.improvements(
+                { Double.POSITIVE_INFINITY }, cancellation, null, params.localSearch.maxInstructions,
+            )?.last() ?: heuristic(localSearch().minimize(objective, localParams()))
+            FiniteEngine.ALNS -> neighborhood(true, objective)?.improvements(
+                { Double.POSITIVE_INFINITY }, cancellation, null, params.localSearch.maxInstructions,
+            )?.last() ?: heuristic(alnsMinimize(objective, cancellation))
             FiniteEngine.MIXED -> portfolio(objective).use { it.minimize(cancellation) }
         }
     }
@@ -165,10 +185,11 @@ internal class PolynomialStrategyAdapters(
     private fun portfolio(objective: LinearObjective? = null): Portfolio {
         val bt = PortfolioWorker.of("bt+exact-nra", 0, BacktrackSolver(finite).session(), backtrackParams(), objective)
             .bindEvidence(identity)
-        val ls = PortfolioWorker.of("ls+exact-nra", 1, localSearch().session(), localParams(), objective,
+        val ls = neighborhood(false, objective) ?: PortfolioWorker.of(
+            "ls+exact-nra", 1, localSearch().session(), localParams(), objective,
             withInstructionBudget = { p, units -> p.copy(maxInstructions = minOf(units, p.maxInstructions ?: units)) })
             .bindEvidence(identity, provesResults = false)
-        val alns = if (objective == null) {
+        val alns = neighborhood(true, objective) ?: if (objective == null) {
             PortfolioWorker.ofSolve("alns+exact-nra", 2, countsInstructions = true,
                 solve = { stop, instructions -> alns(stop, instructions) })
         } else {

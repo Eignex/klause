@@ -49,9 +49,11 @@ holds, and decimal tolerance otherwise.
 
 Purely continuous MPS sources use the finite LP lane, including fractional objectives.
 Source-exact open mixed models use a supported complete theory when available.
-Complete theory optimization requires an integral objective without continuous
-or Boolean cost and a bound row remaining inside the supported theory. Other
-objectives use open local search for incumbents without an optimum claim.
+Integral objective descent retains exact bound and recession checks. Supported
+Boolean or continuous linear objectives also admit strict-improvement theory rounds
+beside heuristic repair. Completed refutations and attained optima retain source
+proof authority; terminating optimization is not guaranteed for every admitted
+source. Source-inexact lowerings retain witness-only execution.
 
 Default open models whose lowering differs from the source also use witness search.
 Before publication, their arbitrary-width integer and rational real coordinates are

@@ -40,6 +40,8 @@ internal class ExactNeighborhood(
     seed: Long = 0,
     private val nodeBudget: NodeBudget? = null,
     private val maximumMoves: Long = Long.MAX_VALUE,
+    private val maximumInstructions: Long = Long.MAX_VALUE,
+    private val maximumImprovementMoves: Long? = null,
     private val nativeWork: () -> Long = { 0 },
     private val completionStats: () -> SolveStats = { SolveStats.EMPTY },
 ) {
@@ -53,6 +55,7 @@ internal class ExactNeighborhood(
     private val weights = DoubleArray(3) { 1.0 }
     private val sink = SolveStatsSink(if (adaptive) "exact-alns" else "exact-ls").also { it.start() }
     private var moves = 0L
+    private var improvementMoves = 0L
     private var stalls = 0L
     private var charged = 0L
     val stats: SolveStats get() = sink.snapshot().mergedWith(completionStats())
@@ -75,7 +78,8 @@ internal class ExactNeighborhood(
         onIncumbent: (Sample, BigFraction?) -> Unit = { _, _ -> },
     ): Boolean {
         val end = charged + minOf(allowance.coerceAtLeast(0), Long.MAX_VALUE - charged)
-        while (!cancellation() && charged < end && moves < maximumMoves && nodeBudget?.exhausted() != true) {
+        while (!cancellation() && charged < end && moves < maximumMoves && charged < maximumInstructions &&
+            !improvementAllowanceSpent() && nodeBudget?.exhausted() != true) {
             val total = centers.size + boolCount
             val operator = operator()
             val count = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
@@ -83,6 +87,7 @@ internal class ExactNeighborhood(
             val lower = centers.indices.associateWith { if (it in selected) centers[it] - radius else centers[it] }
             val upper = centers.indices.associateWith { if (it in selected) centers[it] + radius else centers[it] }
             val pins = (0 until boolCount).filter { centers.size + it !in selected }.associateWith { bools[it] }
+            if (incumbent != null) improvementMoves++
             val before = nativeWork()
             val result = completion.check(ExactNeighborhoodCondition(pins, lower, upper, value), cancellation)
             moves++
@@ -111,8 +116,12 @@ internal class ExactNeighborhood(
             sink.ls.recordWork(moves, 0, stalls)
             if (total == 0) return true
         }
-        return moves >= maximumMoves || nodeBudget?.exhausted() == true
+        return moves >= maximumMoves || charged >= maximumInstructions ||
+            improvementAllowanceSpent() || nodeBudget?.exhausted() == true
     }
+
+    private fun improvementAllowanceSpent(): Boolean = incumbent != null &&
+        maximumImprovementMoves?.let { improvementMoves >= it } == true
 
     private fun accept(sample: Sample, onIncumbent: (Sample, BigFraction?) -> Unit): Boolean {
         val candidateValue = objective?.evaluateExact(sample)
@@ -126,10 +135,16 @@ internal class ExactNeighborhood(
         return true
     }
 
-    fun solveResult(reason: TerminationReason): SolveResult = incumbent?.let { SolveResult.Sat(it, stats) }
-        ?: SolveResult.Unknown(reason, stats)
+    fun solveResult(reason: TerminationReason): SolveResult = incumbent?.let {
+        SolveResult.Sat(it, resultStats(reason))
+    }
+        ?: SolveResult.Unknown(reason, resultStats(reason))
 
     fun minimizeResult(reason: TerminationReason): MinimizeResult = incumbent?.let {
-        MinimizeResult.BestFound(it, requireNotNull(value).toDouble(), reason, stats)
-    } ?: MinimizeResult.Unknown(reason, stats)
+        MinimizeResult.BestFound(it, requireNotNull(value).toDouble(), reason, resultStats(reason))
+    } ?: MinimizeResult.Unknown(reason, resultStats(reason))
+}
+
+private fun ExactNeighborhood.resultStats(reason: TerminationReason): SolveStats = stats.let {
+    it.copy(run = it.run.copy(timedOut = reason == TerminationReason.Timeout))
 }

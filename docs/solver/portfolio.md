@@ -27,9 +27,10 @@ coordinates and theory acceptance. Changing coordinates requires a fresh witness
 The exact objective is evaluated from the carried assignment, including integers outside
 `Long`.
 
-A wide exact sample exposes no finite integer array. Local-search warm starts explicitly
-project the integers into their search windows and discard theory acceptance. This
-search seed cannot replace the exact incumbent or justify a bound.
+A wide exact sample exposes no finite integer array. Supported linear workers retain
+arbitrary-width coordinates through exact neighborhood completion. Windowed fallback
+workers project warm starts and discard theory acceptance; their seeds cannot replace
+exact incumbents or justify bounds.
 
 Portfolio evidence names its source model and objective. These are opaque in-memory
 identities: a fresh or transformed model needs its own check, even if structurally
@@ -303,3 +304,23 @@ segment time and live propagation counters; it is not included in opening time.
 [Search statistics](search.md#statistics) and [benchmark
 records](../../klause-bench/README.md#saved-results) define propagation, conflict and
 saved-result accounting.
+
+## Exact theory strategy execution
+
+Supported linear sources pair complete traversal with exact-coordinate local search
+and adaptive block repair, including real-only models and arbitrary-width integers.
+Neighborhood windows restrict proposals rather than source domains. Only checked
+source witnesses enter the pool; neighborhood refutations carry no source proof.
+Boolean or continuous linear objectives use strict-improvement theory rounds when
+the integral descent does not apply. These rounds admit completed source proofs but
+do not guarantee terminating optimization for every admitted source.
+
+Finite real models with fixed discrete coordinates use the same repair driver. Mixed
+products become exact linear rows under those fixed coordinates and are checked
+against their original relation before publication. Their exchanges order exact
+objective values and project scalar cutoffs outward. Witness-only workers retain
+that authority through outer binding.
+
+Exact neighborhood handles retain centers, radii, random state and adaptive weights
+through slices. Their widening policy handles stalls without reopening the native
+allowance. A completed sibling can settle a source before another worker runs.

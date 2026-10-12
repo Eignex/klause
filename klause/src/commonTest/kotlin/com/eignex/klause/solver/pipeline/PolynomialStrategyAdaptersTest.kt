@@ -106,4 +106,21 @@ class PolynomialStrategyAdaptersTest {
             }
         }
     }
+    @Test
+    fun `pure real heuristic arms repair coordinates before publishing algebraic witnesses`() {
+        val request = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))").pipelineRequest()
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 12), alnsIterations = 0,
+        ))
+
+        for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val execution = OpenTheoryPipeline.execute(request, params, engine)
+
+            val result = assertIs<OpenTheoryResult.Sat>(execution.result, "$engine: $execution")
+            assertNotNull(result.assignment.algebraicRealValue(0))
+            kotlin.test.assertTrue(result.stats.ls.completionsRefuted.sum > 0)
+            kotlin.test.assertTrue(result.stats.ls.moves.sum > 1)
+        }
+    }
+
 }

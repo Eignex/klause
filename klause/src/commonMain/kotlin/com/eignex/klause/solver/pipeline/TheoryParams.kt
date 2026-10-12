@@ -72,8 +72,19 @@ data class TheoryParams(
     val cancellation: Cancellation = Cancellation.Never,
     /** Solve-wide node allowance the local-search arms of an open portfolio charge their moves to, or null for none. */
     val nodeBudget: NodeBudget? = null,
+    /** Destroy/repair proposal cap for an explicit open ALNS invocation. */
+    val alnsIterations: Int = 50,
+    /** Seed for exact-coordinate heuristic proposals. */
+    val randomSeed: Long = 0,
+    /** Solve-wide heuristic proposal cap. */
+    val maxFlips: Long = Long.MAX_VALUE,
+    /** Solve-wide heuristic instruction cap, including completion work. */
+    val maxInstructions: Long? = null,
 ) {
     init {
+        require(maxFlips >= 0) { "heuristic proposal cap must not be negative" }
+        require(maxInstructions == null || maxInstructions >= 0) { "heuristic instruction cap must not be negative" }
+        require(alnsIterations >= 0) { "ALNS iteration cap must not be negative" }
         require(maxDecisions >= 0) { "maximum decisions must not be negative" }
         require(sharedRestart == null || sharedRestart > 0) { "shared restart must be positive" }
         require(maxLearnedClauses == null || maxLearnedClauses >= 0) { "learned clause cap must not be negative" }
