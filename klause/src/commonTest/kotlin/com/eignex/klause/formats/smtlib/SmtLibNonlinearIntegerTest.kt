@@ -49,6 +49,19 @@ class SmtLibNonlinearIntegerTest {
     }
 
     @Test
+    fun `deep nonlinear integer evaluation stays on the heap stack`() {
+        var expression = "x"
+        repeat(1000) { expression = "(* x $expression)" }
+
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const x Int) (assert (= $expression 0))", allowIntegers = true,
+        )
+
+        assertEquals(mapOf("x" to 0), parsed.intVarNames)
+        assertTrue(parsed.hasNonlinearTerms)
+    }
+
+    @Test
     fun `integer assumptions retain source Boolean correlation`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Int) (declare-const p Bool) " +

@@ -21,10 +21,13 @@ class NonlinearIntegerSearchTest {
             allowIntegers = true,
         )
         val problem = NonlinearIntegerProblem(
-            source.formula, source.realCount, source.boolCount, source.intVarNames, source.realVarNames, source.boolVarNames,
+            source.formula, source.realCount, source.boolCount,
+            source.intVarNames, source.realVarNames, source.boolVarNames,
         )
 
-        val execution = solveNonlinearIntegers(problem, NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH))
+        val execution = solveNonlinearIntegers(problem, NonlinearIntegerParams(
+            strategy = NonlinearIntegerStrategy.SEARCH,
+        ))
 
         val witness = assertIs<QfNraResult.Satisfiable>(execution.result).assignment
         assertEquals("100000000000000000000", witness.realValue(0).rational.toString())
@@ -34,7 +37,8 @@ class NonlinearIntegerSearchTest {
     fun `unsatisfiable integer candidate exhaustion never refutes an open source`() {
         val source = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) 2))", allowIntegers = true)
         val problem = NonlinearIntegerProblem(
-            source.formula, source.realCount, source.boolCount, source.intVarNames, source.realVarNames, source.boolVarNames,
+            source.formula, source.realCount, source.boolCount,
+            source.intVarNames, source.realVarNames, source.boolVarNames,
         )
 
         val execution = solveNonlinearIntegers(problem, NonlinearIntegerParams(maximumCandidates = 2))
@@ -49,11 +53,14 @@ class NonlinearIntegerSearchTest {
             "(declare-const x Int) (assert (= (* x x) 4))", allowIntegers = true,
         )
         val problem = NonlinearIntegerProblem(
-            source.formula, source.realCount, source.boolCount, source.intVarNames, source.realVarNames, source.boolVarNames,
+            source.formula, source.realCount, source.boolCount,
+            source.intVarNames, source.realVarNames, source.boolVarNames,
         )
 
         for (strategy in listOf(NonlinearIntegerStrategy.LOCAL_SEARCH, NonlinearIntegerStrategy.ALNS)) {
-            val execution = solveNonlinearIntegers(problem, NonlinearIntegerParams(strategy = strategy, maximumCandidates = 4))
+            val execution = solveNonlinearIntegers(problem, NonlinearIntegerParams(
+                strategy = strategy, maximumCandidates = 4,
+            ))
 
             assertIs<QfNraResult.Satisfiable>(execution.result)
             assertTrue(execution.stats.candidates > 0)
@@ -68,10 +75,13 @@ class NonlinearIntegerSearchTest {
                 "(assert (= (* x x) (to_real n)))", allowIntegers = true,
         )
         val problem = NonlinearIntegerProblem(
-            source.formula, source.realCount, source.boolCount, source.intVarNames, source.realVarNames, source.boolVarNames,
+            source.formula, source.realCount, source.boolCount,
+            source.intVarNames, source.realVarNames, source.boolVarNames,
         )
 
-        val execution = solveNonlinearIntegers(problem, NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH))
+        val execution = solveNonlinearIntegers(problem, NonlinearIntegerParams(
+            strategy = NonlinearIntegerStrategy.SEARCH,
+        ))
 
         val witness = assertIs<QfNraResult.Satisfiable>(execution.result).assignment
         assertEquals("2", witness.realValue(0).rational.toString())
@@ -82,7 +92,8 @@ class NonlinearIntegerSearchTest {
     fun `whole real relaxation refutation belongs only to the search strategy`() {
         val source = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) (- 1)))", allowIntegers = true)
         val problem = NonlinearIntegerProblem(
-            source.formula, source.realCount, source.boolCount, source.intVarNames, source.realVarNames, source.boolVarNames,
+            source.formula, source.realCount, source.boolCount,
+            source.intVarNames, source.realVarNames, source.boolVarNames,
         )
 
         val search = solveNonlinearIntegers(problem, NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.SEARCH))
@@ -98,7 +109,8 @@ class NonlinearIntegerSearchTest {
     fun `one work allowance covers candidate completion and original source checking`() {
         val source = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) 2))", allowIntegers = true)
         val problem = NonlinearIntegerProblem(
-            source.formula, source.realCount, source.boolCount, source.intVarNames, source.realVarNames, source.boolVarNames,
+            source.formula, source.realCount, source.boolCount,
+            source.intVarNames, source.realVarNames, source.boolVarNames,
         )
         var charged = 0L
         val cancellation = object : Cancellation {

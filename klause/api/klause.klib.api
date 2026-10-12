@@ -6048,6 +6048,8 @@ final class com.eignex.klause.ir/MixedVars : com.eignex.klause.ir/VarList { // c
         final fun <get-spanInts>(): kotlin/IntArray // com.eignex.klause.ir/MixedVars.spanInts.<get-spanInts>|<get-spanInts>(){}[0]
 }
 
+final class com.eignex.klause.ir/NonlinearIntegerProblem { // com.eignex.klause.ir/NonlinearIntegerProblem|null[0]
+
 final class com.eignex.klause.ir/PolynomialRealProblem { // com.eignex.klause.ir/PolynomialRealProblem|null[0]
     final val boolVarNames // com.eignex.klause.ir/PolynomialRealProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/PolynomialRealProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]

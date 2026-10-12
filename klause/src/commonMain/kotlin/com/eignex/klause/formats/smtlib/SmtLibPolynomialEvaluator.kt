@@ -177,7 +177,9 @@ internal class SmtLibPolynomialEvaluator(
                 val bound = frame.environment.value(polynomialSymbol(node.text))
                 val macro = frame.environment.macro(polynomialSymbol(node.text))
                 when {
-                    literal != null -> values.addLast(PolynomialValue.Real(constant(literal), integer = '.' !in node.text))
+                    literal != null -> values.addLast(
+                        PolynomialValue.Real(constant(literal), integer = '.' !in node.text),
+                    )
                     bound != null -> values.addLast(bound)
                     macro != null && macro.parameters.isEmpty() -> {
                         work.addLast(PolynomialFrame.CheckSort(macro.resultSort))

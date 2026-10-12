@@ -313,7 +313,10 @@ private fun Compiler.Builder.combineReal(head: String, args: List<Res>): Res = w
         Res.R(den.fold(args[0].asReal()) { acc, d -> acc.scaled(d.constant.reciprocal()) })
     }
 
-    "^" -> realPower(args[0].asReal(), (args[1] as? Res.I)?.term ?: smtUnsupported("power requires an integer exponent"))
+    "^" -> realPower(
+        args[0].asReal(),
+        (args[1] as? Res.I)?.term ?: smtUnsupported("power requires an integer exponent"),
+    )
 
     "to_real" -> Res.R(args[0].asReal())
 

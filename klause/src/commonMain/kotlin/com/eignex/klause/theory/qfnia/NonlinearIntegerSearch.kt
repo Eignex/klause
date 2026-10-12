@@ -50,11 +50,13 @@ internal data class NonlinearIntegerExecution(val result: QfNraResult, val stats
 internal fun solveNonlinearIntegers(
     problem: NonlinearIntegerProblem,
     params: NonlinearIntegerParams = NonlinearIntegerParams(),
-): NonlinearIntegerExecution = NonlinearIntegerSearch(problem, params).solve()
+    condition: PolynomialCondition = PolynomialCondition(),
+): NonlinearIntegerExecution = NonlinearIntegerSearch(problem, params, condition).solve()
 
 private class NonlinearIntegerSearch(
     private val problem: NonlinearIntegerProblem,
     private val params: NonlinearIntegerParams,
+    private val condition: PolynomialCondition,
 ) {
     private val work = NonlinearIntegerWork(params.arithmetic)
     private val arithmetic = PolynomialArithmetic(work, params.arithmetic.polynomialLimits)
@@ -77,10 +79,13 @@ private class NonlinearIntegerSearch(
             invocation.use {
                 arithmetic.step()
                 if (params.maximumCandidates == 0L) return@use unknown()
-                hints = sourceIntegerHints(problem.formula, arithmetic)
+                hints = (sourceIntegerHints(problem.formula, arithmetic) +
+                    (condition.lower.values + condition.upper.values).map { it.ceilInteger() }).distinct()
                 enumeration = (listOf(BIG_ZERO, BIG_ONE, -BIG_ONE) + hints).distinct()
-                if (params.strategy == NonlinearIntegerStrategy.SEARCH || params.strategy == NonlinearIntegerStrategy.MIXED) {
-                    when (val relaxed = invocation.check()) {
+                if (params.strategy == NonlinearIntegerStrategy.SEARCH ||
+                    params.strategy == NonlinearIntegerStrategy.MIXED
+                ) {
+                    when (val relaxed = completion()) {
                         is QfNraResult.Unsatisfiable -> return@use relaxed
                         is QfNraResult.Unknown -> return@use relaxed
                         is QfNraResult.Satisfiable -> {
@@ -122,7 +127,7 @@ private class NonlinearIntegerSearch(
         candidates++
         if (!visited.add(current.toList())) return null
         val fixed = coordinates.indices.associate { coordinates[it] to BigFraction.of(current[it], BIG_ONE) }
-        return when (val result = invocation.check(PolynomialCondition(lower = fixed, upper = fixed))) {
+        return when (val result = completion(fixed)) {
             is QfNraResult.Satisfiable -> {
                 check(integral(result.assignment)) { "conditioned nonlinear integer witness is fractional" }
                 if (checked(result.assignment)) result else error("nonlinear source witness check failed")
@@ -141,7 +146,7 @@ private class NonlinearIntegerSearch(
         } else setOf(first)
         val fixed = coordinates.indices.filter { it !in released }
             .associate { coordinates[it] to BigFraction.of(current[it], BIG_ONE) }
-        when (val guide = invocation.check(PolynomialCondition(lower = fixed, upper = fixed))) {
+        when (val guide = completion(fixed)) {
             is QfNraResult.Satisfiable -> {
                 current = current.mapIndexed { index, value ->
                     if (index in released) integerNear(guide.assignment.realValue(coordinates[index])) else value
@@ -156,7 +161,9 @@ private class NonlinearIntegerSearch(
                 }
             }
             is QfNraResult.Unknown -> if (work() || guide.reason == QfNraReason.ResourceLimit) {
-                if (guide.reason == QfNraReason.ResourceLimit) throw PolynomialResourceLimit(requireNotNull(guide.resource))
+                if (guide.reason == QfNraReason.ResourceLimit) {
+                    throw PolynomialResourceLimit(requireNotNull(guide.resource))
+                }
                 throw PolynomialInterrupted()
             }
         }
@@ -184,12 +191,28 @@ private class NonlinearIntegerSearch(
         return value
     }
 
+    private fun completion(fixed: Map<Int, BigFraction> = emptyMap()): QfNraResult {
+        fun intersect(bounds: Map<Int, BigFraction>, lower: Boolean): Map<Int, BigFraction> {
+            val merged = bounds.toMutableMap()
+            for ((id, value) in fixed) {
+                arithmetic.step()
+                val bound = merged[id]
+                merged[id] = if (bound == null || if (lower) value > bound else value < bound) value else bound
+            }
+            return merged
+        }
+        return invocation.check(PolynomialCondition(
+            condition.bools, intersect(condition.lower, true), intersect(condition.upper, false),
+        ))
+    }
+
     private fun integral(assignment: QfNraAssignment): Boolean = coordinates.all {
         arithmetic.step()
         assignment.realValue(it).rational?.den == BIG_ONE
     }
 
-    private fun checked(assignment: QfNraAssignment): Boolean = checkNonlinearSource(problem.formula, assignment, arithmetic)
+    private fun checked(assignment: QfNraAssignment): Boolean =
+        checkNonlinearSource(problem.formula, assignment, arithmetic)
     private fun unknown(): QfNraResult.Unknown = QfNraResult.Unknown(
         if (work.limitReached || !params.arithmetic.cancellation()) QfNraReason.WorkLimit else QfNraReason.Interrupted,
         polynomialStats(),
