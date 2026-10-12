@@ -109,6 +109,8 @@ publication returns; output failure propagates to the caller. Quadratic
 terminal metadata is delivered separately from the incumbent, preserving checked
 bounds and nonattainment status without repeating an emitted model. The adapter
 uses retained scalar metadata and performs no solver work or candidate admission.
+A frontend source-rendering veto emits nothing and does not advance publication
+state; it cannot suppress a later accepted rendering of the same payload.
 [Portfolio admission](solver/portfolio.md) owns acceptance;
 [source values](model.md#published-assignments-and-objectives) own exact payloads.
 

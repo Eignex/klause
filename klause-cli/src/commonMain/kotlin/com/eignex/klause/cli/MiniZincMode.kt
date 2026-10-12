@@ -211,10 +211,11 @@ internal class MiniZincOutput(private val floatApproximation: Boolean = false) :
         print(rendered)
     }
 
-    override fun onArithmeticIncumbent(rendered: String, objective: SourceValue) {
+    override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
         println("% objective=${arithmeticObjectiveText(objective)}")
         print(rendered)
         flushCliOutput()
+        return true
     }
 
     override fun onComplete(verdict: Verdict) {

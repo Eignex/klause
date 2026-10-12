@@ -12,7 +12,7 @@ internal class ArithmeticPublication(private val output: OutputProtocol) {
 
     fun publish(rendered: String, objective: SourceValue) {
         if (rendered == lastRendered && sameObjective(objective, lastObjective)) return
-        output.onArithmeticIncumbent(rendered, objective)
+        if (!output.onArithmeticIncumbent(rendered, objective)) return
         lastRendered = rendered
         lastObjective = objective
         solutions++
