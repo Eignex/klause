@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -72,4 +73,19 @@ class SourceResultCaptureTest {
             SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE)), context,
         ))
     }
+
+    @Test
+    fun `cancelled optional objective capture preserves the completed result`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val scoped = scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val context = assertNotNull(model.sourceProofContext(scoped, objective))
+        val result = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf(1)), 1.0)
+
+        val captured = SourceResultCapture(context).minimize(result, objective, "fixture-engine",
+            cancellation = Cancellation { true })
+
+        assertEquals(result, captured)
+        assertNull(captured.evidence)
+    }
+
 }

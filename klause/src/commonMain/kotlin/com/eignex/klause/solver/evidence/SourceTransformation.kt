@@ -73,11 +73,13 @@ class SourceTransformationVerifier(
             if (image.coefficients.keys.any { it !in source.coordinates }) {
                 return SourceEvidenceCheck.Rejected("transformation reads an undeclared original coordinate")
             }
+            val nonIntegralImage = image.constant.den != BIG_ONE || image.coefficients.any { (id, value) ->
+                id.kind == SourceCoordinate.Kind.Real || value.den != BIG_ONE
+            }
             when (coordinate.kind) {
-                SourceCoordinate.Kind.Integer -> if (image.constant.den != BIG_ONE || image.coefficients.any {
-                        (id, value) -> id.kind == SourceCoordinate.Kind.Real || value.den != BIG_ONE
-                    }
-                ) return SourceEvidenceCheck.Unavailable("target integer image has no integrality derivation")
+                SourceCoordinate.Kind.Integer -> if (nonIntegralImage) {
+                    return SourceEvidenceCheck.Unavailable("target integer image has no integrality derivation")
+                }
                 SourceCoordinate.Kind.Boolean -> if (image.constant != BigFraction.ZERO ||
                     image.coefficients != mapOf(coordinate to BigFraction.ONE)
                 ) return SourceEvidenceCheck.Unavailable("Boolean transformation image is not supported")
