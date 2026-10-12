@@ -66,6 +66,7 @@ internal class OpenPortfolio(
     private val searchesContinuousOnly: Boolean = false,
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
+    private val lifetime = theoryParams.cancellation or theoryParams.timeout
     private val preparedPlan = request?.preparedPlan ?: model.prepareExecutionPlan()
 
     private fun workerParams(slot: PortfolioWorkerSlot): TheoryParams = theoryParams.copy(
@@ -81,7 +82,7 @@ internal class OpenPortfolio(
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
     fun solve(cancellation: Cancellation): OpenTheoryResult {
         val firstLocalArm = if (request != null) 1 else 0
-        val localSearch = localSearchFactories(firstLocalArm, cancellation, objective = null)
+        val localSearch = localSearchFactories(firstLocalArm, lifetime or cancellation, objective = null)
         val factories = buildList {
             request?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
                 theoryWorker(source, slot).bindEvidence(ModelIdentity.of(model))
@@ -90,7 +91,7 @@ internal class OpenPortfolio(
         }
         if (factories.isEmpty()) return OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
         val portfolio = PortfolioInvocation(preparedPlan, factories,
-            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = cancellation,
+            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
                 nodeBudget = theoryParams.nodeBudget),
             PortfolioEvidence(ModelIdentity.of(model), openWitnessVerifier(model, null))) { workers ->
             PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = false),
@@ -114,12 +115,13 @@ internal class OpenPortfolio(
         minimizer: OpenTheoryMinimizer?,
         cancellation: Cancellation,
     ): OpenTheoryOptimum {
+        descentVerdict.store(null)
         require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
             "the theory's descent minimizes no continuous column"
         }
         val rational = request != null && minimizer == null
         val firstLocalArm = if (minimizer != null || rational) 1 else 0
-        val localSearch = localSearchFactories(firstLocalArm, cancellation, objective)
+        val localSearch = localSearchFactories(firstLocalArm, lifetime or cancellation, objective)
         val incumbents = PortfolioIncumbents<BigFraction>(
             valueOf = { candidate ->
                 objective.evaluateExact(candidate.sample)
@@ -146,7 +148,7 @@ internal class OpenPortfolio(
         if (factories.isEmpty()) return OpenTheoryOptimum.Bounded(null, null,
             TerminationReason.Unsupported, SolveStats.EMPTY)
         val portfolio = PortfolioInvocation(preparedPlan, factories,
-            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = cancellation,
+            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
                 nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0),
             PortfolioEvidence(ModelIdentity.of(model, objective), openWitnessVerifier(model, objective))) { workers ->
             PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = true),
