@@ -207,14 +207,24 @@ object OpenTheoryPipeline {
         params: TheoryParams,
         engine: FiniteEngine,
         cores: Int = 1,
-    ): OpenTheoryExecution = when (engine) {
-        FiniteEngine.MIXED -> executePortfolio(request, params, cores)
+    ): OpenTheoryExecution {
+        val operation = if (request.objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE
+        if (!request.preparedPlan.capabilities.admission(engine, operation).runnable) {
+            return unsupportedExecution(request.objective)
+        }
+        return when (engine) {
+            FiniteEngine.MIXED -> executePortfolio(request, params, cores)
+            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
+            FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> linearNeighborhoodInvocation(
+                request.model, params, request.minimizedObjective, engine == FiniteEngine.ALNS, cores,
+            )
+        }
+    }
 
-        FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
-
-        FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> linearNeighborhoodInvocation(
-            request.model, params, request.minimizedObjective, engine == FiniteEngine.ALNS, cores,
-        )
+    private fun unsupportedExecution(objective: LinearObjective?): OpenTheoryExecution = if (objective == null) {
+        OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY))
+    } else {
+        OpenTheoryExecution.Optimize(OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY))
     }
 
     /**
@@ -228,22 +238,17 @@ object OpenTheoryPipeline {
         objective: LinearObjective?,
         engine: FiniteEngine,
         cores: Int = 1,
-    ): OpenTheoryExecution = when (engine) {
-        FiniteEngine.MIXED -> searchWithoutTheory(model, params, objective, cores)
-
-        FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(model, params, objective, cores, searchesContinuousOnly = true)
-
-        FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> {
-            val stats = SolveStats.EMPTY
-            if (objective == null) {
-                OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(TerminationReason.Unsupported, stats))
-            } else {
-                val unsearched = OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, stats)
-                OpenTheoryExecution.Optimize(unsearched)
-            }
+    ): OpenTheoryExecution {
+        val prepared = model.preparedWithComponents(model.componentPlan(), objective = objective)
+        val operation = if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE
+        if (!prepared.capabilities.admission(engine, operation).runnable) return unsupportedExecution(objective)
+        return when (engine) {
+            FiniteEngine.MIXED -> searchWithoutTheory(model, params, objective, cores)
+            FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(model, params, objective, cores,
+                searchesContinuousOnly = true)
+            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> unsupportedExecution(objective)
+            FiniteEngine.ALNS -> linearNeighborhoodInvocation(model, params, objective, adaptive = true, cores)
         }
-
-        FiniteEngine.ALNS -> linearNeighborhoodInvocation(model, params, objective, adaptive = true, cores)
     }
 
     /** Execute [request] through its selected complete theory route. */
@@ -264,16 +269,8 @@ object OpenTheoryPipeline {
      * Whether a source-bound descent can execute [request]'s objective without leaving the admitted theories.
      * Rational strict-improvement descent preserves proof authority but need not terminate at an unattained infimum.
      */
-    fun canMinimize(request: OpenTheoryRequest): Boolean {
-        val objective = request.minimizedObjective ?: return false
-        if (objective.realCoefficientValues.any { !it.isFinite() }) return false
-        if (integralMinimizer(request, objective) != null) return true
-        val bounded = request.model.withFactors(request.model.factors + objective.below(
-            com.eignex.klause.simplex.exact.BigFraction.ZERO), request.model.impliedFactorMask?.let { it + false })
-        return bounded.componentPlan().theoryPipeline.let {
-            it != ProblemPipeline.UNSUPPORTED_OPEN && it != ProblemPipeline.FINITE_CP
-        }
-    }
+    fun canMinimize(request: OpenTheoryRequest): Boolean = request.objective != null &&
+        request.preparedPlan.capabilities.admission(ExecutionStrategy.COMPLETE, ExecutionOperation.OPTIMIZE).runnable
 
     private fun integralMinimizer(request: OpenTheoryRequest, objective: LinearObjective): OpenTheoryMinimizer? {
         if (objective.realCoefficientValues.any { it != 0.0 } ||

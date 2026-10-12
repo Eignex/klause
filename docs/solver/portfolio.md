@@ -305,6 +305,21 @@ segment time and live propagation counters; it is not included in opening time.
 records](../../klause-bench/README.md#saved-results) define propagation, conflict and
 saved-result accounting.
 
+## Prepared strategy admission
+
+Source adapters consume the [prepared plan](../model.md#engine-projections-and-factor-capabilities)
+for strategy and operation admission. A component contract records the direct
+projection and required completion actually selected by preparation. Semantic
+identifiers and worker labels do not establish support. The direct factor inventory
+cannot replace whole-source completion, including continuous products.
+
+Admission is separate from procedure completeness and claim verification. Integer
+traversal can run without a termination guarantee. Heuristic workers have witness
+only authority even when a neighborhood is decided exactly. Independent source
+bounds and proofs require their own checked evidence. Unsupported components and
+operations have explicit decline causes; exhausted caller or representation
+allowances remain invocation stops.
+
 ## Exact theory strategy execution
 
 The shared harness runs linear and finite-polynomial portfolios. Nonlinear-integer

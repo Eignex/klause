@@ -106,7 +106,8 @@ in those packages are implementation APIs. Existing descriptors remain available
 when a supported replacement is introduced, with warning-level deprecations for
 migration rather than an immediate visibility or signature break.
 
-Experimental composition includes `ComponentPlan`, CP projection planning, shared
+Experimental composition includes `PreparedSourcePlan` and its inspectable component,
+operation and strategy admission contracts, `ComponentPlan`, CP projection planning, shared
 search session/runner construction, direct pipeline engines and concrete theory
 adapters. Their source association and proof meaning remain mandatory, but composition
 recipes can evolve. Concrete local-search strategies, move selectors, restart policies,
