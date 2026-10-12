@@ -90,7 +90,8 @@ internal class QuadraticStrategyAdapters(
     private fun accept(candidate: QuadraticIncumbent, heuristic: Boolean = false) {
         if (incumbent == null || better(candidate.value, requireNotNull(incumbent).value)) {
             incumbent = candidate
-            val approximate = candidate.value.rational?.toDouble() ?: Double.NaN
+            val approximate = candidate.value.rational?.toDouble()
+                ?: (candidate.value.lowerBound.toDouble() / 2 + candidate.value.upperBound.toDouble() / 2)
             sink.ls.recordIncumbent(approximate, 0.0, sink.elapsedMs())
             val listener = if (heuristic) params.strategy.localSearch.onEvent else params.strategy.backtrack.onEvent
             listener?.invoke(SearchEvent.Incumbent(approximate))
@@ -259,11 +260,12 @@ internal class QuadraticStrategyAdapters(
             val cost = 1L + ceil((native.work - before).coerceAtLeast(0) * 0.8).toLong()
             instructions += minOf(cost, Long.MAX_VALUE - instructions)
             controls.nodeBudget?.spendMoves(cost)
+            sink.ls.recordCompletion(refuted, found == null && !refuted)
+            sink.ls.recordWork(moves, 0, stalls)
             val improved = found?.let { candidate ->
                 incumbent == null || better(candidate.value, requireNotNull(incumbent).value)
             } == true
             found?.let { accept(it, heuristic = true) }
-            sink.ls.recordCompletion(refuted, found == null && !refuted)
             if (improved) radius = BigFraction.ONE else { radius += radius; stalls++ }
             if (adaptive) weights[operator] = weights[operator] * 0.8 + if (improved) 1.0 else 0.2
             sink.ls.recordWork(moves, 0, stalls)
