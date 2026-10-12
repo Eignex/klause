@@ -34,6 +34,15 @@ internal fun reportQuadraticOptimization(
     statistics: Boolean,
     routingElapsedMs: Long,
     completePool: Boolean,
+) = reportQuadraticOptimization(execution, pipeline.render, output, statistics, routingElapsedMs, completePool)
+
+internal fun reportQuadraticOptimization(
+    execution: QuadraticOptimizationExecution,
+    render: (Sample) -> String,
+    output: OutputProtocol,
+    statistics: Boolean,
+    routingElapsedMs: Long,
+    completePool: Boolean,
 ) {
     val result = execution.result
     val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
@@ -43,7 +52,7 @@ internal fun reportQuadraticOptimization(
         else -> null
     }
     output.onVerdictContext(VerdictContext(terminationReason = reason, completePool = completePool))
-    output.onQuadraticResult(point?.let { pipeline.render(it.sample) }, result)
+    output.onQuadraticResult(point?.let { render(it.sample) }, result)
     val verdict = when (result) {
         is QuadraticOptimizationResult.Optimal -> Verdict.OPTIMAL
         is QuadraticOptimizationResult.UnattainedLimit -> Verdict.SATISFIABLE

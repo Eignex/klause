@@ -29,6 +29,7 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.minimize
+import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.solver.result.LpStats
@@ -118,18 +119,15 @@ internal object SolveCore {
                 val polynomialParams = polynomialParams(common, deadlineCancel)
                 pipeline.objective?.let { sourceObjective ->
                     output.begin(optimize = true, maximize = pipeline.maximize)
-                    val objective = if (pipeline.maximize) sourceObjective.negated() else sourceObjective
-                    val execution = OpenTheoryPipeline.minimize(pipeline.request, objective, polynomialParams, engine)
-                    reportOpenTheoryOptimum(
-                        polynomialOptimum(execution.result, objective), pipeline.maximize, pipeline.render,
-                        common.statistics, output, rawSolvable.routingLpStats, rawSolvable.routingElapsedMs,
+                    val sense = if (pipeline.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
+                    val execution = OpenTheoryPipeline.optimize(
+                        pipeline.request, sourceObjective, polynomialParams, engine, sense,
+                    )
+                    reportQuadraticOptimization(
+                        execution, { pipeline.render(polynomialAssignment(it)) }, output, common.statistics,
+                        rawSolvable.routingElapsedMs,
                         completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
-                    ) { budgetSpent(common, it) }
-                    if (common.statistics) output.onAllowanceStatistics(listOf(
-                        "nraWork" to execution.stats.workSpent.toString(),
-                        "nraProjectedPolynomials" to execution.stats.projectedPolynomials.toString(),
-                        "nraLiftedCells" to execution.stats.liftedCells.toString(),
-                    ))
+                    )
                     return
                 }
                 error("polynomial satisfaction requires the exact source execution request")
