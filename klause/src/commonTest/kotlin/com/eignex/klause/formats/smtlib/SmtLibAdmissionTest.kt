@@ -25,6 +25,96 @@ class SmtLibAdmissionTest {
     }
 
     @Test
+    fun `unused real helpers retain one linear streaming parse`() {
+        for (definition in listOf(
+            "(define-fun f ((x Real)) Real (+ x 1))",
+            "(define-fun f ((x Real)) Real (* x x))",
+            "(define-fun f () Real 3)",
+        )) {
+            var opens = 0
+
+            val input = SmtLibAdmission.parse({
+                opens++
+                StringCharSource("$definition (declare-const x Real) (assert (= (* (+ 1 1) x) 6)) (check-sat)")
+            })
+
+            val source = assertIs<SmtLibInput.Linear>(input).problem
+            assertEquals(mapOf("x" to 0), source.realVarNames)
+            assertEquals(1, opens)
+        }
+    }
+
+    @Test
+    fun `unused helper definitions retain lexical sort validation`() {
+        for (definition in listOf(
+            "(define-fun f ((x Real)) Bool (+ x 1))",
+            "(define-fun f ((x Real)) Real (> x 1))",
+            "(define-fun f () Bool 3)",
+        )) {
+            assertFailsWith<UnsupportedSmtException> {
+                SmtLibAdmission.parse("$definition (declare-const x Real) (assert (= x 1)) (check-sat)")
+            }
+        }
+    }
+
+    @Test
+    fun `nested and zero arity helper references retain lexical fallback`() {
+        for ((definition, assertion) in listOf(
+            "(define-fun f ((y Real)) Real (+ y 1))" to "(= (f x) 2)",
+            "(define-fun f ((y Real)) Real (+ y 1)) (define-fun g ((y Real)) Real (f y))" to
+                "(or false (= (g x) 2))",
+            "(define-fun f () Real 2)" to "(= x f)",
+        )) {
+            var opens = 0
+
+            val input = SmtLibAdmission.parse({
+                opens++
+                StringCharSource("(declare-const x Real) $definition (assert $assertion) (check-sat)")
+            })
+
+            val source = assertIs<SmtLibInput.Polynomial>(input).problem
+            assertEquals(mapOf("x" to 0), source.realVarNames)
+            assertEquals(2, opens)
+        }
+    }
+
+    @Test
+    fun `unused nonlinear helpers preserve nonincremental session rejection`() {
+        for (suffix in listOf("(check-sat) (check-sat)", "(check-sat) (assert (= x 2))")) {
+            assertFailsWith<UnsupportedSmtException> {
+                SmtLibAdmission.parse(
+                    "(define-fun f ((y Real)) Real (* y y)) " +
+                        "(declare-const x Real) (assert (= x 1)) $suffix",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation after source exhaustion withholds unused helper admission`() {
+        var exhausted = false
+        var opens = 0
+        val cancellation = Cancellation { exhausted }
+
+        val input = SmtLibAdmission.parse(
+            {
+                opens++
+                val source = StringCharSource(
+                    "(define-fun f ((y Real)) Real (+ y 1)) " +
+                        "(declare-const x Real) (assert (= x 2)) (check-sat)",
+                )
+                object : CharSource {
+                    override fun next(): String? = source.next().also { if (it == null) exhausted = true }
+                }
+            },
+            cancellation = cancellation,
+        )
+
+        assertEquals(SmtLibInput.Interrupted, input)
+        assertEquals(1, opens)
+    }
+
+    @Test
     fun `polynomial fallback closes its rejected source before reopening`() {
         val text = "(declare-const x Real) (assert (= (* x x) 2)) (check-sat)"
         var opens = 0

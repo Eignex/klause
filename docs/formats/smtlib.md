@@ -111,9 +111,13 @@ satisfaction sources separately from `SmtLib.parse` and its linear factors. It p
 no theory selection and publishes no SAT/UNSAT result. Public `SmtLibAdmission.parse`
 first attempts the established linear facade. Only an explicit unsupported-syntax
 decline reopens the same source through polynomial lowering. Pure Real/Bool
-satisfaction sources with `define-fun` helpers use lexical polynomial lowering
-before legacy expansion can capture caller-local bindings. Other successful linear
-inputs retain their existing routes, including integer/mixed sources and objectives.
+satisfaction sources that reference `define-fun` helpers in assertion syntax use
+lexical polynomial lowering before legacy expansion can capture caller-local bindings.
+The reference scan visits nested applications and zero-arity symbols iteratively under
+caller cancellation. Unused helper declarations retain lexical body and result-sort
+validation without changing an otherwise supported linear route. Nonlinear helper
+admission also checks objective references. Other successful linear inputs retain
+their existing routes, including integer/mixed sources and objectives.
 Helper parameter/return sorts and explicit integer operations preserve integer syntax
 even when there is no declared integer variable.
 Reopenable streamed inputs close each owned closeable source, or drain active
