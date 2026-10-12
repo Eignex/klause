@@ -141,6 +141,7 @@ public final class com/eignex/klause/backtrack/BacktrackRecipe {
 }
 
 public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver, com/eignex/klause/solver/Solver {
+	public static final field Companion Lcom/eignex/klause/backtrack/BacktrackSolver$Companion;
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;)V
 	public fun <init> (Lcom/eignex/klause/schema/VariableSchema;)V
@@ -183,6 +184,12 @@ public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klau
 	public final fun solve ()Lcom/eignex/klause/solver/SolveResult;
 	public fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SolveResult;
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
+}
+
+public final class com/eignex/klause/backtrack/BacktrackSolver$Companion {
+	public final fun source (Lcom/eignex/klause/compile/CompiledSchema;)Lcom/eignex/klause/solver/SourceStrategy;
+	public final fun source (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/SourceStrategy;
+	public final fun source (Lcom/eignex/klause/schema/VariableSchema;)Lcom/eignex/klause/solver/SourceStrategy;
 }
 
 public final class com/eignex/klause/backtrack/NodeBudget {
@@ -4072,6 +4079,7 @@ public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver {
+	public static final field Companion Lcom/eignex/klause/localsearch/LocalSearchSolver$Companion;
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -4124,6 +4132,12 @@ public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/
 	public final fun solve ()Lcom/eignex/klause/solver/SolveResult;
 	public fun solve (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/SolveResult;
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
+}
+
+public final class com/eignex/klause/localsearch/LocalSearchSolver$Companion {
+	public final fun source (Lcom/eignex/klause/compile/CompiledSchema;)Lcom/eignex/klause/solver/SourceStrategy;
+	public final fun source (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/SourceStrategy;
+	public final fun source (Lcom/eignex/klause/schema/VariableSchema;)Lcom/eignex/klause/solver/SourceStrategy;
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchState {
@@ -9275,6 +9289,28 @@ public final class com/eignex/klause/solver/SolverParams$DefaultImpls {
 	public static fun withAssumptions (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolverParams;
 	public static fun withCancellation (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 	public static fun withLifetimeCancellation (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
+}
+
+public final class com/eignex/klause/solver/SourceStrategy {
+	public final fun getCompiledSchema ()Lcom/eignex/klause/compile/CompiledSchema;
+	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public final fun getSource ()Lcom/eignex/klause/ir/Problem;
+	public final fun optimize (Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public final fun optimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public final fun optimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public final fun optimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public final fun optimizeOpen (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public static synthetic fun optimizeOpen$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun solve (Lcom/eignex/klause/localsearch/LocalSearchParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun solve (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/localsearch/LocalSearchParams;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/SourceStrategy;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 }
 
 public class com/eignex/klause/solver/StatelessSession : com/eignex/klause/solver/Session {

@@ -2,12 +2,12 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.count.SampleQuality
 import com.eignex.klause.count.SamplingConfig
 import com.eignex.klause.count.accurateSamples
 import com.eignex.klause.count.countingScope
 import com.eignex.klause.factor.objective.MutableObjectiveBound
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.ProbSat
@@ -24,8 +24,8 @@ import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SourceStrategy
-import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
 
@@ -87,13 +87,14 @@ class LocalSearchSolver(
 ) : ResumableSolver<LocalSearchParams>,
     ResumableOptimizer<LocalSearchParams> {
 
-    /** Source-aware construction and explicit finite compatibility entry points. */
+    /** Source-aware construction retaining the original model. */
     companion object {
         /** Select this strategy with shared source preparation and exact witness completion. */
         fun source(problem: Problem): SourceStrategy = SourceStrategy(problem, FiniteEngine.LOCAL_SEARCH)
 
         /** Select this strategy for the original compiled source, including continuous products. */
-        fun source(compiled: CompiledSchema): SourceStrategy = source(compiled.problem)
+        fun source(compiled: CompiledSchema): SourceStrategy =
+            SourceStrategy(compiled.problem, FiniteEngine.LOCAL_SEARCH, compiled)
 
         /** Compile once and select this strategy for the resulting original source. */
         fun source(schema: VariableSchema): SourceStrategy = source(schema.compile())

@@ -23,11 +23,11 @@ import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SourceStrategy
-import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStats
@@ -75,13 +75,14 @@ class BacktrackSolver internal constructor(
             PropagationProblem(model)
         }
 
-    /** Source-aware construction and explicit finite compatibility entry points. */
+    /** Source-aware construction retaining the original model. */
     companion object {
         /** Select this strategy with shared source preparation and exact witness completion. */
         fun source(problem: Problem): SourceStrategy = SourceStrategy(problem, FiniteEngine.BACKTRACK)
 
         /** Select this strategy for the original compiled source, including continuous products. */
-        fun source(compiled: CompiledSchema): SourceStrategy = source(compiled.problem)
+        fun source(compiled: CompiledSchema): SourceStrategy =
+            SourceStrategy(compiled.problem, FiniteEngine.BACKTRACK, compiled)
 
         /** Compile once and select this strategy for the resulting original source. */
         fun source(schema: VariableSchema): SourceStrategy = source(schema.compile())

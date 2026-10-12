@@ -4723,6 +4723,12 @@ final class com.eignex.klause.backtrack/BacktrackSolver : com.eignex.klause.solv
     final fun samples(com.eignex.klause.backtrack/BacktrackParams): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.backtrack/BacktrackSolver.samples|samples(com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun solve(): com.eignex.klause.solver/SolveResult // com.eignex.klause.backtrack/BacktrackSolver.solve|solve(){}[0]
     final fun solve(com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver/SolveResult // com.eignex.klause.backtrack/BacktrackSolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
+    final object Companion { // com.eignex.klause.backtrack/BacktrackSolver.Companion|null[0]
+        final fun source(com.eignex.klause.compile/CompiledSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.backtrack/BacktrackSolver.Companion.source|source(com.eignex.klause.compile.CompiledSchema){}[0]
+        final fun source(com.eignex.klause.ir/Problem): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.backtrack/BacktrackSolver.Companion.source|source(com.eignex.klause.ir.Problem){}[0]
+        final fun source(com.eignex.klause.schema/VariableSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.backtrack/BacktrackSolver.Companion.source|source(com.eignex.klause.schema.VariableSchema){}[0]
+    }
+
 }
 
 final class com.eignex.klause.backtrack/NodeBudget { // com.eignex.klause.backtrack/NodeBudget|null[0]
@@ -7938,6 +7944,12 @@ final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.
     final fun session(): com.eignex.klause.localsearch/LocalSearchSession // com.eignex.klause.localsearch/LocalSearchSolver.session|session(){}[0]
     final fun solve(): com.eignex.klause.solver/SolveResult // com.eignex.klause.localsearch/LocalSearchSolver.solve|solve(){}[0]
     final fun solve(com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/SolveResult // com.eignex.klause.localsearch/LocalSearchSolver.solve|solve(com.eignex.klause.localsearch.LocalSearchParams){}[0]
+    final object Companion { // com.eignex.klause.localsearch/LocalSearchSolver.Companion|null[0]
+        final fun source(com.eignex.klause.compile/CompiledSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.localsearch/LocalSearchSolver.Companion.source|source(com.eignex.klause.compile.CompiledSchema){}[0]
+        final fun source(com.eignex.klause.ir/Problem): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.localsearch/LocalSearchSolver.Companion.source|source(com.eignex.klause.ir.Problem){}[0]
+        final fun source(com.eignex.klause.schema/VariableSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.localsearch/LocalSearchSolver.Companion.source|source(com.eignex.klause.schema.VariableSchema){}[0]
+    }
+
 }
 
 final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klause.localsearch/LocalSearchState|null[0]
@@ -14143,6 +14155,24 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
     final fun hammingDistanceTo(com.eignex.klause.solver/Sample): kotlin/Int // com.eignex.klause.solver/Sample.hammingDistanceTo|hammingDistanceTo(com.eignex.klause.solver.Sample){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver/Sample.hashCode|hashCode(){}[0]
     final fun intValue(kotlin/Int): kotlin/Long // com.eignex.klause.solver/Sample.intValue|intValue(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.solver/SourceStrategy { // com.eignex.klause.solver/SourceStrategy|null[0]
+    final val compiledSchema // com.eignex.klause.solver/SourceStrategy.compiledSchema|{}compiledSchema[0]
+        final fun <get-compiledSchema>(): com.eignex.klause.compile/CompiledSchema? // com.eignex.klause.solver/SourceStrategy.compiledSchema.<get-compiledSchema>|<get-compiledSchema>(){}[0]
+    final val engine // com.eignex.klause.solver/SourceStrategy.engine|{}engine[0]
+        final fun <get-engine>(): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver/SourceStrategy.engine.<get-engine>|<get-engine>(){}[0]
+    final val source // com.eignex.klause.solver/SourceStrategy.source|{}source[0]
+        final fun <get-source>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver/SourceStrategy.source.<get-source>|<get-source>(){}[0]
+
+    final fun optimize(com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver/SourceStrategy.optimize|optimize(com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun optimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.backtrack/BacktrackParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver/SourceStrategy.optimize|optimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.backtrack.BacktrackParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun optimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.localsearch/LocalSearchParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver/SourceStrategy.optimize|optimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.localsearch.LocalSearchParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun optimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver/SourceStrategy.optimize|optimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun optimizeOpen(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver/SourceStrategy.optimizeOpen|optimizeOpen(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun solve(com.eignex.klause.backtrack/BacktrackParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver/SourceStrategy.solve|solve(com.eignex.klause.backtrack.BacktrackParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
+    final fun solve(com.eignex.klause.localsearch/LocalSearchParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver/SourceStrategy.solve|solve(com.eignex.klause.localsearch.LocalSearchParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
+    final fun solve(com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver/SourceStrategy.solve|solve(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
 }
 
 final class com.eignex.klause.theory.difference/DifferenceSearchComponent : com.eignex.klause.solver.search/TheoryComponent { // com.eignex.klause.theory.difference/DifferenceSearchComponent|null[0]
