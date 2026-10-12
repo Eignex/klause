@@ -6,6 +6,7 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.lp.relaxation.lpSeed
+import com.eignex.klause.lp.closeSourceLpOwners
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioEvidence
@@ -66,13 +67,13 @@ internal class OpenPortfolio(
     private val completeParams = strategyParams.first()
 
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
-    fun solve(cancellation: Cancellation): OpenTheoryResult {
+    fun solve(cancellation: Cancellation): OpenTheoryResult = withCompletions { owners ->
         val firstLocalArm = if (request != null) 1 else 0
-        val localSearch = localSearchWorkers(firstLocalArm, cancellation, objective = null)
+        val localSearch = localSearchWorkers(firstLocalArm, cancellation, objective = null, owners = owners)
         if (localSearch.isEmpty()) {
             // With the theory as the only arm there is nothing to schedule, and slicing it would only rerun it
             // from scratch each segment.
-            return request?.let { decide(it, theoryParams) }
+            return@withCompletions request?.let { decide(it, theoryParams) }
                 ?: OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
         }
         val workers = buildList {
@@ -90,7 +91,7 @@ internal class OpenPortfolio(
         )
         portfolio.evidenceVerification = PortfolioEvidence(ModelIdentity.of(model), openWitnessVerifier(model, null))
         val result = portfolio.use { it.solve(cancellation) }
-        return when (result) {
+        return@withCompletions when (result) {
             is SolveResult.Sat -> OpenTheoryResult.Sat(assignmentOf(result.assignment), result.stats)
             is SolveResult.Unsat -> OpenTheoryResult.Unsat(result.stats)
             is SolveResult.Unknown -> OpenTheoryResult.Unknown(result.reason, result.stats)
@@ -106,15 +107,15 @@ internal class OpenPortfolio(
         objective: LinearObjective,
         minimizer: OpenTheoryMinimizer?,
         cancellation: Cancellation,
-    ): OpenTheoryOptimum {
+    ): OpenTheoryOptimum = withCompletions { owners ->
         require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
             "the theory's descent minimizes no continuous column"
         }
         val rational = request != null && minimizer == null
         val firstLocalArm = if (minimizer != null || rational) 1 else 0
-        val localSearch = localSearchWorkers(firstLocalArm, cancellation, objective)
+        val localSearch = localSearchWorkers(firstLocalArm, cancellation, objective, owners)
         if (localSearch.isEmpty()) {
-            return minimizer?.minimize(theoryParams)
+            return@withCompletions minimizer?.minimize(theoryParams)
                 ?: OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY)
         }
         val incumbents = PortfolioIncumbents<BigFraction>(
@@ -153,7 +154,7 @@ internal class OpenPortfolio(
             ModelIdentity.of(model, objective), openWitnessVerifier(model, objective),
         )
         val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents) }
-        return optimumOf(result, incumbents)
+        return@withCompletions optimumOf(result, incumbents)
     }
 
     private fun optimumOf(result: MinimizeResult, incumbents: PortfolioIncumbents<BigFraction>): OpenTheoryOptimum =
@@ -270,19 +271,30 @@ internal class OpenPortfolio(
             override fun close() = descent.close()
         }
 
+    private fun <T> withCompletions(action: (MutableList<AutoCloseable>) -> T): T {
+        val owners = ArrayList<AutoCloseable>()
+        return try {
+            action(owners)
+        } finally {
+            closeSourceLpOwners(owners)
+        }
+    }
+
     private fun localSearchWorkers(
         firstArm: Int,
         cancellation: Cancellation,
         objective: LinearObjective?,
+        owners: MutableList<AutoCloseable>,
     ): List<PortfolioWorker> {
-        val route = model.componentPlan().theoryPipeline
+        val prepared = model.prepareExecutionPlan(objective)
+        val route = prepared.componentPlan?.theoryPipeline ?: ProblemPipeline.UNSUPPORTED_OPEN
         if (route != ProblemPipeline.UNSUPPORTED_OPEN && route != ProblemPipeline.FINITE_CP) {
             val quotas = if (lanes > 1) theoryParams.nodeBudget?.quotas(localSearchArms) else null
             return List(localSearchArms) { index ->
                 val local = strategyParams[firstArm + index].copy(
                     nodeBudget = quotas?.get(index) ?: theoryParams.nodeBudget,
                 )
-                val adapter = OpenExactNeighborhood(model, local, objective)
+                val adapter = OpenExactNeighborhood(model, local, objective, prepared).also(owners::add)
                 val adaptive = index == localSearchArms - 1 && localSearchArms > 1
                 exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
                     firstArm + index, objective, local.cancellation or local.timeout, timeout = local.timeout,
@@ -295,23 +307,23 @@ internal class OpenPortfolio(
         val searchModel = LocalSearchModel.open(model)
         // An open model's rows can be strict, which only the theory certifies; it decides each candidate's residual.
         // An objective over continuous columns is minimized over that residual first.
-        val completion = if (model.numRealVars > 0) {
-            val theory = TheoryCompletion(model, theoryParams)
-            if (objective != null && objective.realCoefficientValues.any { it != 0.0 }) {
-                OptimizingCompletion(model, objective, theory)
-            } else {
-                theory
-            }
-        } else {
-            null
-        }
-        if (!localSearchSupports(searchModel, completes = completion != null)) return emptyList()
+        if (!localSearchSupports(searchModel, completes = model.numRealVars > 0)) return emptyList()
         // Every arm starts from the relaxation's optimum inside the search windows rather than near zero; an LP
         // that finds no point in its slice of the budget leaves the arms to their own random starts.
         val start = model.lpSeed(searchModel.domains, cancellation or Cancellation.after(SEED_BUDGET))
         val profile = ProblemProfile.of(model, optimizing = objective != null)
         val quotas = if (lanes > 1) theoryParams.nodeBudget?.quotas(localSearchArms) else null
         return LocalSearchCatalog.diverse(profile.kind, localSearchArms, profile.problemClass).mapIndexed { i, recipe ->
+            val completion = if (model.numRealVars > 0) {
+                val theory = TheoryCompletion(model, strategyParams[firstArm + i], prepared).also(owners::add)
+                if (objective != null && objective.realCoefficientValues.any { it != 0.0 }) {
+                    OptimizingCompletion(model, objective, theory)
+                } else {
+                    theory
+                }
+            } else {
+                null
+            }
             val engine = LocalSearchEngine(
                 searchModel,
                 strategy = recipe.strategy,

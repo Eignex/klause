@@ -44,7 +44,8 @@ internal class ExactNeighborhood(
     private val maximumImprovementMoves: Long? = null,
     private val nativeWork: () -> Long = { 0 },
     private val completionStats: () -> SolveStats = { SolveStats.EMPTY },
-) {
+    private val onClose: () -> Unit = {},
+) : AutoCloseable {
     private val random = Random(seed)
     private var centers = centers.toList()
     private var bools = BooleanArray(boolCount)
@@ -58,6 +59,7 @@ internal class ExactNeighborhood(
     private var improvementMoves = 0L
     private var stalls = 0L
     private var charged = 0L
+    private var closed = false
     val stats: SolveStats get() = sink.snapshot().mergedWith(completionStats())
     val work: Long get() = charged
 
@@ -77,6 +79,7 @@ internal class ExactNeighborhood(
         allowance: Long,
         onIncumbent: (Sample, BigFraction?) -> Unit = { _, _ -> },
     ): Boolean {
+        check(!closed) { "neighborhood owner is closed" }
         val end = charged + minOf(allowance.coerceAtLeast(0), Long.MAX_VALUE - charged)
         while (!cancellation() && charged < end && moves < maximumMoves && charged < maximumInstructions &&
             !improvementAllowanceSpent() && nodeBudget?.exhausted() != true) {
@@ -143,6 +146,12 @@ internal class ExactNeighborhood(
     fun minimizeResult(reason: TerminationReason): MinimizeResult = incumbent?.let {
         MinimizeResult.BestFound(it, requireNotNull(value).toDouble(), reason, resultStats(reason))
     } ?: MinimizeResult.Unknown(reason, resultStats(reason))
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        onClose()
+    }
 }
 
 private fun ExactNeighborhood.resultStats(reason: TerminationReason): SolveStats = stats.let {

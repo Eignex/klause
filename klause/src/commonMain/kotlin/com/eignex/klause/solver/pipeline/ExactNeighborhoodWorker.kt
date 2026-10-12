@@ -29,7 +29,8 @@ internal fun exactNeighborhoodWorker(
         else TerminationReason.BudgetExhausted
     if (objective == null) return PortfolioWorker.ofSolve(label, armId, countsInstructions = true,
         resumable = {
-            object : InstructionSlicedSolve {
+            object : InstructionSlicedSolve, ReseedGuard {
+                override val canReseed: Boolean get() = false
                 private val search = open()
                 private var closed = false
                 private var result: SolveResult? = null
@@ -48,12 +49,17 @@ internal fun exactNeighborhoodWorker(
                     if (done || stop(global)()) result = search.solveResult(reason(global))
                     return result
                 }
-                override fun close() { closed = true }
+                override fun close() {
+                    if (closed) return
+                    closed = true
+                    search.close()
+                }
             }
         }, solve = { global, budget ->
-            val search = open()
-            search.advance(stop(global), budget ?: Long.MAX_VALUE)
-            search.solveResult(reason(global))
+            open().use { search ->
+                search.advance(stop(global), budget ?: Long.MAX_VALUE)
+                search.solveResult(reason(global))
+            }
         }).also { if (label.startsWith("alns")) it.family = ArmFamily.Lns }
     return PortfolioWorker.ofMinimize(label, armId, countsInstructions = true,
         resumable = {
@@ -81,11 +87,16 @@ internal fun exactNeighborhoodWorker(
                     if (done || stop(global)()) result = search.minimizeResult(reason(global))
                     return result
                 }
-                override fun close() { closed = true }
+                override fun close() {
+                    if (closed) return
+                    closed = true
+                    search.close()
+                }
             }
         }, improvements = { _, _, global, budget ->
-            val search = open()
-            search.advance(stop(global), budget ?: Long.MAX_VALUE)
-            sequenceOf(search.minimizeResult(reason(global)))
+            open().use { search ->
+                search.advance(stop(global), budget ?: Long.MAX_VALUE)
+                sequenceOf(search.minimizeResult(reason(global)))
+            }
         }).also { if (label.startsWith("alns")) it.family = ArmFamily.Lns }
 }

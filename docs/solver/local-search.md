@@ -386,6 +386,13 @@ against those constraints before publication; a rejected or indeterminate candid
 cannot refute the source model. Completed samples retain authoritative coordinates
 and source scope rather than substituting the local-search score for a witness check.
 
+Linear completion retains a worker-private conditioned query owner. Boolean pins
+and arbitrary-width integer equalities use the prepared source plan's arithmetic
+route; continuous coordinates remain theory-owned. Native work charges each
+candidate's delta against the same containing ledger. Workers share immutable
+planning data, and each worker owns its mutable completion. Operation and handle
+closure dispose the private arithmetic state.
+
 [Theory contracts](../theories.md) define the supported graph, linear and polynomial
 checks. Their source semantics and resource ledgers remain authoritative across
 candidate retries. Completion coordinates are distinct from the finite factors
@@ -406,8 +413,12 @@ block sizes by accepted improvements. Centers, window radii, random state, weigh
 and incumbents survive slices. A rejected repair widens search windows without
 changing the source domain or establishing infeasibility.
 
-The linear adapter adds exact rational rows, retains arbitrary-width integers and
-checks the conditioned source through its selected theory. Native work, decisions
+The linear adapter prepares source decomposition once and asserts registered exact
+rational bounds and strict objective cutoffs into a private retained theory search.
+It retains arbitrary-width integers and checks source witnesses before publication.
+Query assertions retract after every verdict or interruption; sibling and nested
+conditions cannot inherit a witness, bound or refutation from another scope.
+Native work, decisions
 and legacy checks share one allowance across repairs; completion work also charges
 the heuristic instruction ledger. Exact objective cutoffs require strict source
 improvement. Only checked completions publish witnesses or best-found incumbents.
