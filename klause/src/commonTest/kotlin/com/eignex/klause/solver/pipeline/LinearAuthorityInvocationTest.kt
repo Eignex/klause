@@ -137,4 +137,22 @@ class LinearAuthorityInvocationTest {
         assertEquals(sample, result?.incumbent)
         assertEquals(listOf(sample), callbacks)
     }
+
+    @Test
+    fun `cancellation after acceptance retains a checked global bound`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf("lower" to SourcePremise(
+            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))),
+            mapOf(real to BigFraction.ONE))
+        var stop = false
+        val invocation = LinearAuthorityInvocation(source, TheoryParams())
+
+        val result = invocation.use {
+            it.runSlice(Cancellation { stop }, Long.MAX_VALUE, -1) { _, _ -> stop = true }
+        }
+
+        assertNull(result?.terminal)
+        assertNotNull(result?.incumbent)
+        val bound = assertIs<SourceClaim.Bound>(assertNotNull(result?.bound).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ONE), bound.value)
+    }
 }
