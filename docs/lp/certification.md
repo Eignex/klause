@@ -124,6 +124,24 @@ proves strict feasibility. An exact bound `t <= 0` or auxiliary infeasibility
 refutes it; other outcomes decline. Strict premises survive elimination of
 auxiliary variables. A strict infimum need not be attained.
 
+The model-facing `lp.optimization` adapter accepts consumer-owned exact affine
+source premises, objective identity/direction and invocation restrictions. It
+projects their closure to the existing LP owner, reconstructs nonnegative source
+row combinations for bounds, and checks source witnesses and recession directions.
+Boolean substitution is checked under complete invocation pins. A limit requires
+a checked strict global bound and a closure endpoint with that exact objective;
+the feasible base and endpoint have identical Boolean and integer coordinates.
+Positive rational mixtures then approach the endpoint while satisfying every strict
+source row. Fractional or differing integer coordinates request an exhaustive
+integer split rather than inheriting the continuous limit. Missing packages retain
+separately checked bounds and witnesses without issuing a global result.
+
+These adapters do not confer original-source semantics on a rounded or tolerance
+model. Consumers supply the authoritative source context and its correspondence.
+The adapter's bounded numerical owners share one source operation budget through
+closure, feasibility and dual reconstruction. Production traversal and result
+publication retain their separate admission contracts.
+
 ## Tolerance recovery
 
 MPS finite-leaf tolerance recovery can obtain exact dyadic basis duals to justify
