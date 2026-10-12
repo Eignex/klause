@@ -9,10 +9,16 @@ internal class PortfolioWorkerSlot(
     val baseSeed: Long,
     val cancellation: Cancellation,
     val nodeBudget: NodeBudget?,
+    private val count: Int,
+    completeSlots: Set<Int>,
 ) : AutoCloseable {
+    private val complete = completeSlots.toSet()
     val seed: Long get() = baseSeed + index
     private var closed = false
     private val owned = ArrayList<AutoCloseable>()
+
+    fun nativeAllowance(limit: Long): Long = nativeWorkerAllowances(count, limit, complete)[index]
+    fun heuristicAllowance(limit: Long): Long = heuristicWorkerAllowances(count, limit, complete)[index]
 
     fun <T : AutoCloseable> own(resource: T): T {
         check(!closed) { "portfolio worker slot is closed" }
@@ -40,13 +46,14 @@ internal class PortfolioInvocationResources(
     seed: Long,
     cancellation: Cancellation,
     nodeBudget: NodeBudget?,
+    completeSlots: Set<Int> = emptySet(),
 ) : AutoCloseable {
     init { require(count > 0 && parallelism > 0) }
     val lanes: Int = minOf(count, parallelism)
     val concurrency: Concurrency = if (lanes > 1) Concurrency.Strict else Concurrency.None
     private val quotas = if (lanes > 1) nodeBudget?.quotas(count) else null
     private val workerSlots: List<PortfolioWorkerSlot> = List(count) { index ->
-        PortfolioWorkerSlot(index, seed, cancellation, quotas?.get(index) ?: nodeBudget)
+        PortfolioWorkerSlot(index, seed, cancellation, quotas?.get(index) ?: nodeBudget, count, completeSlots)
     }
 
     val slots: List<PortfolioWorkerSlot> get() = workerSlots.toList()

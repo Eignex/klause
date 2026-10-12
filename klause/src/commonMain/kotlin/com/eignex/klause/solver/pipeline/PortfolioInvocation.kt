@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.Portfolio
@@ -57,6 +58,9 @@ internal class PortfolioInvocation(
     val resources = PortfolioInvocationResources(
         maxOf(factories.size, controls.parallelism), controls.parallelism,
         controls.workerSeed, controls.cancellation, controls.nodeBudget,
+        (0 until maxOf(factories.size, controls.parallelism)).filter {
+            factories[it % factories.size].family == ArmFamily.Backtrack
+        }.toSet(),
     )
     private val workers = ArrayList<PortfolioWorker>()
     private val portfolio: Portfolio = try {

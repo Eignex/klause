@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
@@ -6,8 +8,8 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.lp.relaxation.lpSeed
-import com.eignex.klause.lp.closeSourceLpOwners
 import com.eignex.klause.portfolio.LocalSearchCatalog
+import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
@@ -35,6 +37,8 @@ import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.toDouble
 import com.eignex.klause.util.toLongExact
 import kotlin.math.abs
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -61,37 +65,39 @@ internal class OpenPortfolio(
     private val lanes: Int = 1,
     private val searchesContinuousOnly: Boolean = false,
 ) {
-    private var descentVerdict: OpenTheoryOptimum? = null
-    private val strategyParams = theoryParams.strategyQuotas(localSearchArms + if (request != null) 1 else 0,
-        complete = request != null)
-    private val completeParams = strategyParams.first()
+    private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
+    private val preparedPlan = request?.preparedPlan ?: model.prepareExecutionPlan()
+
+    private fun workerParams(slot: PortfolioWorkerSlot): TheoryParams = theoryParams.copy(
+        openWorkLimit = slot.nativeAllowance(theoryParams.openWorkLimit),
+        maxLeaves = slot.nativeAllowance(theoryParams.maxLeaves),
+        maxDecisions = slot.nativeAllowance(theoryParams.maxDecisions),
+        maxFlips = slot.heuristicAllowance(theoryParams.maxFlips),
+        maxInstructions = theoryParams.maxInstructions?.let(slot::heuristicAllowance),
+        cancellation = theoryParams.cancellation or slot.cancellation,
+        nodeBudget = slot.nodeBudget,
+    )
 
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
-    fun solve(cancellation: Cancellation): OpenTheoryResult = withCompletions { owners ->
+    fun solve(cancellation: Cancellation): OpenTheoryResult {
         val firstLocalArm = if (request != null) 1 else 0
-        val localSearch = localSearchWorkers(firstLocalArm, cancellation, objective = null, owners = owners)
-        if (localSearch.isEmpty()) {
-            // With the theory as the only arm there is nothing to schedule, and slicing it would only rerun it
-            // from scratch each segment.
-            return@withCompletions request?.let { decide(it, theoryParams) }
-                ?: OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
-        }
-        val workers = buildList {
-            request?.let { add(theoryWorker(it, armId = 0).bindEvidence(ModelIdentity.of(model))) }
+        val localSearch = localSearchFactories(firstLocalArm, cancellation, objective = null)
+        val factories = buildList {
+            request?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
+                theoryWorker(source, slot).bindEvidence(ModelIdentity.of(model))
+            }) }
             addAll(localSearch)
         }
-        // A refutation earns the theory nothing until it lands, and one that needs most of the budget is lost if
-        // local search's early finds talk the policy out of it, so the theory is owed most of the time outright.
-        val portfolio = Portfolio.thompson(
-            workers,
-            lanes = lanes.coerceIn(1, workers.size),
-            seed = seed,
-            profile = ProblemProfile.of(model, optimizing = false),
-            minShares = DoubleArray(workers.size).also { if (request != null) it[0] = THEORY_SHARE },
-        )
-        portfolio.evidenceVerification = PortfolioEvidence(ModelIdentity.of(model), openWitnessVerifier(model, null))
+        if (factories.isEmpty()) return OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
+        val portfolio = PortfolioInvocation(preparedPlan, factories,
+            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = cancellation,
+                nodeBudget = theoryParams.nodeBudget),
+            PortfolioEvidence(ModelIdentity.of(model), openWitnessVerifier(model, null))) { workers ->
+            PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = false),
+                reservedShares(workers, if (request != null) THEORY_SHARE else 0.0))
+        }
         val result = portfolio.use { it.solve(cancellation) }
-        return@withCompletions when (result) {
+        return when (result) {
             is SolveResult.Sat -> OpenTheoryResult.Sat(assignmentOf(result.assignment), result.stats)
             is SolveResult.Unsat -> OpenTheoryResult.Unsat(result.stats)
             is SolveResult.Unknown -> OpenTheoryResult.Unknown(result.reason, result.stats)
@@ -107,17 +113,13 @@ internal class OpenPortfolio(
         objective: LinearObjective,
         minimizer: OpenTheoryMinimizer?,
         cancellation: Cancellation,
-    ): OpenTheoryOptimum = withCompletions { owners ->
+    ): OpenTheoryOptimum {
         require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
             "the theory's descent minimizes no continuous column"
         }
         val rational = request != null && minimizer == null
         val firstLocalArm = if (minimizer != null || rational) 1 else 0
-        val localSearch = localSearchWorkers(firstLocalArm, cancellation, objective, owners)
-        if (localSearch.isEmpty()) {
-            return@withCompletions minimizer?.minimize(theoryParams)
-                ?: OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY)
-        }
+        val localSearch = localSearchFactories(firstLocalArm, cancellation, objective)
         val incumbents = PortfolioIncumbents<BigFraction>(
             valueOf = { candidate ->
                 objective.evaluateExact(candidate.sample)
@@ -126,35 +128,32 @@ internal class OpenPortfolio(
             approximateValue = { it.toDouble() },
             gain = { standing, candidate -> (standing - candidate).toDouble() },
         )
-        val workers = buildList {
-            minimizer?.let {
-                val worker = descentWorker(it, armId = 0) { incumbents.exchange.integerBound() }
-                add(worker.bindEvidence(ModelIdentity.of(model, objective)))
-            }
-            if (rational) add(PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
-                RationalTheoryDescent(model, objective, completeParams) {
-                    incumbents.exchange.current()?.let { it.assignment to it.objective }
-                }
-            }) { _, _, _, _ -> error("the rational descent runs only by slice") }
-                .bindEvidence(ModelIdentity.of(model, objective)))
+        val factories = buildList {
+            minimizer?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
+                descentWorker(source, slot) { incumbents.exchange.integerBound() }
+                    .bindEvidence(ModelIdentity.of(model, objective))
+            }) }
+            if (rational) add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
+                PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
+                    RationalTheoryDescent(model, objective, workerParams(slot)) {
+                        incumbents.exchange.current()?.let { it.assignment to it.objective }
+                    }
+                }) { _, _, _, _ -> error("the rational descent runs only by slice") }
+                    .bindEvidence(ModelIdentity.of(model, objective))
+            })
             addAll(localSearch)
         }
-        // A descent rebuilt for making no progress would prepare the model again and lose the round it was proving.
-        // Its rounds earn credit only when they land, so it is owed its share outright rather than left to the
-        // policy, which local search's frequent improvements would otherwise talk out of scheduling it.
-        val portfolio = Portfolio.thompson(
-            workers,
-            lanes = lanes.coerceIn(1, workers.size),
-            seed = seed,
-            reseedStaleThreshold = 0,
-            profile = ProblemProfile.of(model, optimizing = true),
-            minShares = DoubleArray(workers.size).also { if (minimizer != null || rational) it[0] = DESCENT_SHARE },
-        )
-        portfolio.evidenceVerification = PortfolioEvidence(
-            ModelIdentity.of(model, objective), openWitnessVerifier(model, objective),
-        )
+        if (factories.isEmpty()) return OpenTheoryOptimum.Bounded(null, null,
+            TerminationReason.Unsupported, SolveStats.EMPTY)
+        val portfolio = PortfolioInvocation(preparedPlan, factories,
+            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = cancellation,
+                nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0),
+            PortfolioEvidence(ModelIdentity.of(model, objective), openWitnessVerifier(model, objective))) { workers ->
+            PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = true),
+                reservedShares(workers, if (minimizer != null || rational) DESCENT_SHARE else 0.0))
+        }
         val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents) }
-        return@withCompletions optimumOf(result, incumbents)
+        return optimumOf(result, incumbents)
     }
 
     private fun optimumOf(result: MinimizeResult, incumbents: PortfolioIncumbents<BigFraction>): OpenTheoryOptimum =
@@ -175,7 +174,7 @@ internal class OpenPortfolio(
             }
 
             // Only the descent finds a ray.
-            is MinimizeResult.Unbounded -> checkNotNull(descentVerdict as? OpenTheoryOptimum.Unbounded) {
+            is MinimizeResult.Unbounded -> checkNotNull(descentVerdict.load()) {
                 "an unbounded verdict no descent reached"
             }.copy(stats = result.stats)
 
@@ -190,28 +189,28 @@ internal class OpenPortfolio(
     private fun decide(request: OpenTheoryRequest, params: TheoryParams): OpenTheoryResult =
         (OpenTheoryPipeline.execute(request, params) as OpenTheoryExecution.Satisfy).result
 
-    private fun theoryWorker(request: OpenTheoryRequest, armId: Int): PortfolioWorker = PortfolioWorker.ofSolve(
-        "theory/${request.route.name.lowercase()}",
-        armId,
-        resumable = { theorySlices(request) },
-    ) { slice, _ ->
-        toSolveResult(
-            decide(request, theoryParams.copy(cancellation = theoryParams.cancellation or slice)),
-        )
-    }
+    private fun theoryWorker(request: OpenTheoryRequest, slot: PortfolioWorkerSlot): PortfolioWorker =
+        PortfolioWorker.ofSolve(
+            "theory/${request.route.name.lowercase()}", 0,
+            resumable = { theorySlices(request, workerParams(slot)) },
+        ) { slice, _ ->
+            toSolveResult(decide(request, workerParams(slot).copy(
+                cancellation = theoryParams.cancellation or slot.cancellation or slice,
+            )))
+        }
 
-    // The theory paused and resumed by slice, so it keeps its search between the segments it is scheduled.
-    private fun theorySlices(request: OpenTheoryRequest): ResumableSolve = object : ResumableSolve {
-        private val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), completeParams)
-        override val isDone: Boolean get() = search.isDone
-        override val stats: SolveStats get() = search.stats
-        override val work: Long get() = search.work
+    private fun theorySlices(request: OpenTheoryRequest, params: TheoryParams): ResumableSolve =
+        object : ResumableSolve {
+            private val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), params)
+            override val isDone: Boolean get() = search.isDone
+            override val stats: SolveStats get() = search.stats
+            override val work: Long get() = search.work
 
-        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
-            search.runSlice(global, sliceMillis, sliceNodes)?.let(::toSolveResult)
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+                search.runSlice(global, sliceMillis, sliceNodes)?.let(::toSolveResult)
 
-        override fun close() = search.close()
-    }
+            override fun close() = search.close()
+        }
 
     private fun toSolveResult(result: OpenTheoryResult): SolveResult = when (result) {
         is OpenTheoryResult.Sat -> SolveResult.Sat(result.assignment.toSample(model), result.stats)
@@ -219,17 +218,19 @@ internal class OpenPortfolio(
         is OpenTheoryResult.Unknown -> SolveResult.Unknown(result.reason, result.stats)
     }
 
-    private fun descentWorker(minimizer: OpenTheoryMinimizer, armId: Int, readBound: () -> BigInt?): PortfolioWorker =
+    private fun descentWorker(minimizer: OpenTheoryMinimizer, slot: PortfolioWorkerSlot,
+        readBound: () -> BigInt?): PortfolioWorker =
         PortfolioWorker.ofMinimize(
             "theory/${minimizer.theoryPipeline.name.lowercase()}",
-            armId,
-            resumable = { descentSlices(minimizer, readBound) },
+            0,
+            resumable = { descentSlices(minimizer, workerParams(slot), readBound) },
         ) { _, _, _, _ -> error("the descent runs only by slice") }
 
     // An integral descent reads the attained value directly, including beyond floating-point and 64-bit ranges.
-    private fun descentSlices(minimizer: OpenTheoryMinimizer, readBound: () -> BigInt?): ResumableSearch =
+    private fun descentSlices(minimizer: OpenTheoryMinimizer, params: TheoryParams,
+        readBound: () -> BigInt?): ResumableSearch =
         object : ResumableSearch {
-            private val descent = minimizer.descent(completeParams, readBound)
+            private val descent = minimizer.descent(params, readBound)
             override val isDone: Boolean get() = descent.isDone
             override val stats: SolveStats get() = descent.stats
             override val work: Long get() = descent.work
@@ -245,7 +246,7 @@ internal class OpenPortfolio(
                     val objective = value.toDouble()
                     onIncumbent(MinimizeResult.BestFound(sample, objective, TerminationReason.BudgetExhausted))
                 } ?: return null
-                descentVerdict = verdict
+                if (verdict is OpenTheoryOptimum.Unbounded) descentVerdict.compareAndSet(null, verdict)
                 return when (verdict) {
                     is OpenTheoryOptimum.Optimal -> MinimizeResult.Optimal(
                         verdict.assignment.toSample(model),
@@ -271,86 +272,73 @@ internal class OpenPortfolio(
             override fun close() = descent.close()
         }
 
-    private fun <T> withCompletions(action: (MutableList<AutoCloseable>) -> T): T {
-        val owners = ArrayList<AutoCloseable>()
-        return try {
-            action(owners)
-        } finally {
-            closeSourceLpOwners(owners)
-        }
+    private fun reservedShares(workers: List<PortfolioWorker>, share: Double): DoubleArray {
+        val complete = workers.indices.filter { workers[it].family == ArmFamily.Backtrack }
+        return DoubleArray(workers.size) { if (it in complete) share / complete.size else 0.0 }
     }
 
-    private fun localSearchWorkers(
+    private fun localSearchFactories(
         firstArm: Int,
         cancellation: Cancellation,
         objective: LinearObjective?,
-        owners: MutableList<AutoCloseable>,
-    ): List<PortfolioWorker> {
-        val prepared = model.prepareExecutionPlan(objective)
-        val route = prepared.componentPlan?.theoryPipeline ?: ProblemPipeline.UNSUPPORTED_OPEN
+    ): List<PortfolioArmFactory> {
+        val route = preparedPlan.componentPlan?.theoryPipeline ?: ProblemPipeline.UNSUPPORTED_OPEN
         if (route != ProblemPipeline.UNSUPPORTED_OPEN && route != ProblemPipeline.FINITE_CP) {
-            val quotas = if (lanes > 1) theoryParams.nodeBudget?.quotas(localSearchArms) else null
             return List(localSearchArms) { index ->
-                val local = strategyParams[firstArm + index].copy(
-                    nodeBudget = quotas?.get(index) ?: theoryParams.nodeBudget,
-                )
-                val adapter = OpenExactNeighborhood(model, local, objective, prepared).also(owners::add)
                 val adaptive = index == localSearchArms - 1 && localSearchArms > 1
-                exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
-                    firstArm + index, objective, local.cancellation or local.timeout, timeout = local.timeout,
-                    exhausted = { adapter.exhausted }, open = { adapter.search(adaptive, seed + index,
-                        maximumImprovementMoves = if (adaptive) local.alnsIterations.toLong() else null) })
-                    .bindEvidence(ModelIdentity.of(model, objective), provesResults = false)
+                PortfolioArmFactory(preparedPlan, firstArm + index,
+                    if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch) { slot ->
+                    val local = workerParams(slot)
+                    val adapter = slot.own(OpenExactNeighborhood(model, local, objective, preparedPlan))
+                    exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
+                        firstArm + index, objective, local.cancellation or local.timeout, timeout = local.timeout,
+                        exhausted = { adapter.exhausted }, open = { adapter.search(adaptive,
+                            slot.baseSeed + slot.index - firstArm,
+                            maximumImprovementMoves = if (adaptive) local.alnsIterations.toLong() else null) })
+                        .bindEvidence(ModelIdentity.of(model, objective), provesResults = false)
+                }
             }
         }
         if (!searchesContinuousOnly && model.numIntVars == 0 && model.numBoolVars == 0) return emptyList()
         val searchModel = LocalSearchModel.open(model)
-        // An open model's rows can be strict, which only the theory certifies; it decides each candidate's residual.
-        // An objective over continuous columns is minimized over that residual first.
         if (!localSearchSupports(searchModel, completes = model.numRealVars > 0)) return emptyList()
-        // Every arm starts from the relaxation's optimum inside the search windows rather than near zero; an LP
-        // that finds no point in its slice of the budget leaves the arms to their own random starts.
         val start = model.lpSeed(searchModel.domains, cancellation or Cancellation.after(SEED_BUDGET))
         val profile = ProblemProfile.of(model, optimizing = objective != null)
-        val quotas = if (lanes > 1) theoryParams.nodeBudget?.quotas(localSearchArms) else null
         return LocalSearchCatalog.diverse(profile.kind, localSearchArms, profile.problemClass).mapIndexed { i, recipe ->
-            val completion = if (model.numRealVars > 0) {
-                val theory = TheoryCompletion(model, strategyParams[firstArm + i], prepared).also(owners::add)
-                if (objective != null && objective.realCoefficientValues.any { it != 0.0 }) {
-                    OptimizingCompletion(model, objective, theory)
+            PortfolioArmFactory(preparedPlan, firstArm + i, ArmFamily.LocalSearch) { slot ->
+                val local = workerParams(slot)
+                val completion = if (model.numRealVars > 0) {
+                    val theory = slot.own(TheoryCompletion(model, local, preparedPlan))
+                    if (objective != null && objective.realCoefficientValues.any { it != 0.0 }) {
+                        OptimizingCompletion(model, objective, theory)
+                    } else theory
+                } else null
+                val engine = LocalSearchEngine(searchModel, strategy = recipe.strategy,
+                    optimizeStrategy = recipe.optimizeStrategy, seedImplicitOnRestart = recipe.seedImplicitOnRestart,
+                    completion = completion)
+                val params = LocalSearchParams(randomSeed = slot.baseSeed + slot.index - firstArm,
+                    maxFlips = local.maxFlips, maxInstructions = local.maxInstructions,
+                    cancellation = local.cancellation or local.timeout, initialAssignment = start,
+                    nodeBudget = slot.nodeBudget)
+                val label = "ls/${recipe.label}"
+                val worker = if (objective == null) {
+                    PortfolioWorker.ofSolve(label, firstArm + i, countsInstructions = true,
+                        resumable = { engine.resumableSolve(params) }) { stop, budget ->
+                        engine.solve(params.copy(cancellation = params.cancellation or stop,
+                            maxInstructions = budget?.let { minOf(it, params.maxInstructions ?: it) }), warm = null)
+                    }
                 } else {
-                    theory
+                    PortfolioWorker.ofMinimize(label, firstArm + i, countsInstructions = true,
+                        resumable = { engine.resumable(objective, params) }) { _, warm, stop, budget ->
+                        val from = warm?.let { inWindows(it, searchModel) } ?: start
+                        engine.improvements(objective, params.copy(cancellation = params.cancellation or stop,
+                            initialAssignment = from,
+                            maxInstructions = budget?.let { minOf(it, params.maxInstructions ?: it) }), warm = null)
+                    }
                 }
-            } else {
-                null
+                worker.bindEvidence(ModelIdentity.of(model, objective), provesResults = false)
             }
-            val engine = LocalSearchEngine(
-                searchModel,
-                strategy = recipe.strategy,
-                optimizeStrategy = recipe.optimizeStrategy,
-                seedImplicitOnRestart = recipe.seedImplicitOnRestart,
-                completion = completion,
-            )
-            fun params(slice: Cancellation, budget: Long?, from: Sample?) = LocalSearchParams(
-                randomSeed = seed + i,
-                maxInstructions = budget,
-                cancellation = slice,
-                initialAssignment = from,
-                nodeBudget = quotas?.get(i) ?: theoryParams.nodeBudget,
-            )
-            val label = "ls/${recipe.label}"
-            if (objective == null) {
-                PortfolioWorker.ofSolve(label, firstArm + i, countsInstructions = true) { slice, budget ->
-                    engine.solve(params(slice, budget, start), warm = null)
-                }
-            } else {
-                PortfolioWorker.ofMinimize(label, firstArm + i, countsInstructions = true) { _, warm, slice, budget ->
-                    // The pool's incumbent can lie outside the search windows, which the invariants are sized for.
-                    val from = warm?.let { inWindows(it, searchModel) } ?: start
-                    engine.improvements(objective, params(slice, budget, from), warm = null)
-                }
-            }
-        }.onEach { it.bindEvidence(ModelIdentity.of(model, objective), provesResults = false) }
+        }
     }
 
     private companion object {
