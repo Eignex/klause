@@ -12,7 +12,8 @@ import kotlin.test.assertIs
 class SourceEvidenceVerifierTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val revision = SourceRevision("original-source-sha256", "exact-affine-v1")
-    private val scope = SourceScope(revision, objective = SourceObjective("source-objective-sha256", ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(revision, objective = SourceObjective("source-objective-sha256",
+        ObjectiveSense.MINIMIZE))
     private val lower = SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)
     private val premises = mapOf("lower" to SourcePremise(lower))
     private val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
@@ -42,14 +43,16 @@ class SourceEvidenceVerifierTest {
 
     @Test
     fun `an unrelated source row cannot establish a bound`() {
-        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ofLong(2)), SourceDerivation.Premise("lower"))
+        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ofLong(2)),
+            SourceDerivation.Premise("lower"))
 
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
     fun `an engine result without a derivation withholds proof coverage`() {
-        val evidence = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Unavailable("CAD coverage not captured"))
+        val evidence = SourceEvidence(scope, SourceClaim.Refutation,
+            SourceDerivation.Unavailable("CAD coverage not captured"))
 
         assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(evidence))
     }
@@ -100,7 +103,8 @@ class SourceEvidenceVerifierTest {
             "false" to SourcePremise(impossible, mapOf(0 to false)),
             "true" to SourcePremise(impossible, mapOf(0 to true)),
         ))
-        val proof = SourceDerivation.BooleanSplit(0, SourceDerivation.Premise("false"), SourceDerivation.Premise("true"))
+        val proof = SourceDerivation.BooleanSplit(0, SourceDerivation.Premise("false"),
+            SourceDerivation.Premise("true"))
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
             SourceEvidence(scope, SourceClaim.Refutation, proof),
@@ -200,7 +204,8 @@ class SourceEvidenceVerifierTest {
     fun `cancelled verification cannot publish checked proof coverage`() {
         val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("lower"))
 
-        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(evidence, Cancellation { true }))
+        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(evidence,
+            Cancellation { true }))
     }
 
     @Test
@@ -214,29 +219,36 @@ class SourceEvidenceVerifierTest {
 
     @Test
     fun `optimality requires the witness objective to equal the checked bound`() {
-        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0), exactReals = listOf(BigFraction.ofLong(2)))
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
+            exactReals = listOf(BigFraction.ofLong(2)))
         val checker = LinearSourceSemanticsChecker(setOf(x), premises.values.toList(), mapOf(x to BigFraction.ONE))
-        val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE), semanticsChecker = checker)
+        val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE),
+            semanticsChecker = checker)
         val claim = SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE))
         val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("lower"))
 
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(SourceEvidence(scope, claim, proof)))
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, claim, proof),
+        ))
     }
 
     @Test
     fun `an attained original source bound certifies optimality`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val checker = LinearSourceSemanticsChecker(setOf(x), premises.values.toList(), mapOf(x to BigFraction.ONE))
-        val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE), semanticsChecker = checker)
+        val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE),
+            semanticsChecker = checker)
         val claim = SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE))
         val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("lower"))
 
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(SourceEvidence(scope, claim, proof)))
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context).verify(SourceEvidence(scope, claim, proof)))
     }
 
     @Test
     fun `an unattained limit requires approach and nonattainment derivations`() {
-        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0), exactReals = listOf(BigFraction.ofLong(2)))
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
+            exactReals = listOf(BigFraction.ofLong(2)))
         val claim = SourceClaim.Limit(sample, SourceValue.Rational(BigFraction.ONE))
 
         assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(
@@ -246,7 +258,8 @@ class SourceEvidenceVerifierTest {
 
     @Test
     fun `a malformed Boolean coverage coordinate is rejected`() {
-        val proof = SourceDerivation.BooleanSplit(-1, SourceDerivation.Premise("lower"), SourceDerivation.Premise("lower"))
+        val proof = SourceDerivation.BooleanSplit(-1, SourceDerivation.Premise("lower"),
+            SourceDerivation.Premise("lower"))
 
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
             SourceEvidence(scope, SourceClaim.Refutation, proof),

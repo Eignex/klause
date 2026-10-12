@@ -4,15 +4,32 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 
 /** Original source coordinate, independent of engine column numbering. */
-data class SourceCoordinate(val kind: Kind, val id: Int) {
+data class SourceCoordinate(
     /** Source declaration namespace. */
-    enum class Kind { Boolean, Integer, Real }
+    val kind: Kind,
+    /** Zero-based index in that namespace. */
+    val id: Int,
+) {
+    /** Source declaration namespace. */
+    enum class Kind {
+        /** Boolean declaration. */
+        Boolean,
+        /** Integer declaration. */
+        Integer,
+        /** Real declaration. */
+        Real,
+    }
 
     init { require(id >= 0) }
 }
 
 /** Declared semantics and revision identity of the original source. */
-data class SourceRevision(val identity: String, val semantics: String) {
+data class SourceRevision(
+    /** Original-source revision identifier, such as its content hash. */
+    val identity: String,
+    /** Declared source semantics identifier. */
+    val semantics: String,
+) {
     init { require(identity.isNotBlank() && semantics.isNotBlank()) }
 }
 
@@ -52,20 +69,30 @@ class SourceCondition(
             (capturedLower[id]?.let { if (it > value) it else value } ?: value)), capturedUpper)
 
     override fun equals(other: Any?): Boolean = other is SourceCondition &&
-        capturedBools == other.capturedBools && capturedLower == other.capturedLower && capturedUpper == other.capturedUpper
+        capturedBools == other.capturedBools && capturedLower == other.capturedLower &&
+            capturedUpper == other.capturedUpper
 
-    override fun hashCode(): Int = 31 * (31 * capturedBools.hashCode() + capturedLower.hashCode()) + capturedUpper.hashCode()
+    override fun hashCode(): Int =
+        31 * (31 * capturedBools.hashCode() + capturedLower.hashCode()) + capturedUpper.hashCode()
 }
 
 
 /** Source objective identity and invocation direction. */
-data class SourceObjective(val identity: String, val sense: ObjectiveSense) {
+data class SourceObjective(
+    /** Original source objective identifier. */
+    val identity: String,
+    /** Invocation optimization direction. */
+    val sense: ObjectiveSense,
+) {
     init { require(identity.isNotBlank()) }
 }
 
 /** Complete scope required for every retained source claim. */
 data class SourceScope(
+    /** Original source revision and declared semantics. */
     val revision: SourceRevision,
+    /** Exact invocation restrictions in original coordinates. */
     val condition: SourceCondition = SourceCondition(),
+    /** Original source objective and invocation direction, when optimizing. */
     val objective: SourceObjective? = null,
 )
