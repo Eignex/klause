@@ -88,6 +88,11 @@ retaining the LP route for other states and conflict explanations. Its admission
 strict-edge encoding and lifecycle belong to the
 [search contract](../theories/difference.md#real-graph-admission-and-checks).
 
+Actual helper arguments and simultaneous `let` bindings retain their real log
+domains even when their values are unused by the expanded body. These checks stay
+inside their containing conditional branch; an unselected branch does not acquire
+a domain obligation.
+
 ## Results and objectives
 
 Closed transcendental coordinates use `((_ klause-real exp) value)`,

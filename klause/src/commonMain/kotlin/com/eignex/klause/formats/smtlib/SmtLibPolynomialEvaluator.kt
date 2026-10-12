@@ -122,6 +122,7 @@ private sealed interface PolynomialFrame {
     ) : PolynomialFrame
     data class Call(val macro: PolynomialMacro) : PolynomialFrame
     data class CheckSort(val sort: Sort) : PolynomialFrame
+    data class DefinedArguments(val arguments: List<PolynomialValue>) : PolynomialFrame
 }
 
 internal class SmtLibPolynomialEvaluator(
@@ -144,7 +145,9 @@ internal class SmtLibPolynomialEvaluator(
                 is PolynomialFrame.Evaluate -> schedule(frame, work, values)
                 is PolynomialFrame.Combine -> values.addLast(combine(frame.expression, pop(values, frame.count)))
                 is PolynomialFrame.Let -> {
-                    val bindings = frame.bindings.zip(pop(values, frame.bindings.size)).toMap()
+                    val arguments = pop(values, frame.bindings.size)
+                    val bindings = frame.bindings.zip(arguments).toMap()
+                    if (functions != null) work.addLast(PolynomialFrame.DefinedArguments(arguments))
                     work.addLast(
                         PolynomialFrame.Evaluate(
                             frame.body, frame.environment.withValues(bindings),
@@ -158,6 +161,7 @@ internal class SmtLibPolynomialEvaluator(
                         frame.macro.parameters[index] to coerceSort(args[index], frame.macro.parameterSorts[index])
                     }
                     work.addLast(PolynomialFrame.CheckSort(frame.macro.resultSort))
+                    if (functions != null) work.addLast(PolynomialFrame.DefinedArguments(args))
                     work.addLast(
                         PolynomialFrame.Evaluate(
                             frame.macro.body,
@@ -165,6 +169,9 @@ internal class SmtLibPolynomialEvaluator(
                         ),
                     )
                 }
+                is PolynomialFrame.DefinedArguments -> values.addLast(
+                    retainDomains(values.removeLast(), frame.arguments),
+                )
                 is PolynomialFrame.CheckSort -> {
                     val value = values.removeLast()
                     checkSort(value, frame.sort)
@@ -173,6 +180,27 @@ internal class SmtLibPolynomialEvaluator(
             }
         }
         return values.single()
+    }
+
+    private fun retainDomains(value: PolynomialValue, arguments: List<PolynomialValue>): PolynomialValue {
+        val capture = functions ?: return value
+        val domains = arguments.mapNotNull { argument ->
+            val source = when (argument) {
+                is PolynomialValue.Real -> argument.expression
+                is PolynomialValue.Boolean -> argument.formula
+            }
+            if (!capture.requiresDomainCheck(source)) null else when (argument) {
+                is PolynomialValue.Real -> relation(argument.expression, PolynomialRelation.EQ, argument.expression)
+                is PolynomialValue.Boolean -> disjunction(listOf(argument.formula, not(argument.formula)))
+            }
+        }
+        if (domains.isEmpty()) return value
+        return when (value) {
+            is PolynomialValue.Boolean -> PolynomialValue.Boolean(conjunction(listOf(value.formula) + domains))
+            is PolynomialValue.Real -> PolynomialValue.Real(
+                lowering.conditional(conjunction(domains), value.expression, value.expression), value.integer,
+            )
+        }
     }
 
     private fun schedule(
