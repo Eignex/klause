@@ -26,9 +26,9 @@ data class SmtLibProblem(
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
 )
 
-/** SMT-LIB linear-arithmetic format facade. */
+/** SMT-LIB factor facade for linear arithmetic and representable bounded polynomial products. */
 object SmtLib {
-    /** Decode and lower SMT-LIB linear-arithmetic [text]. */
+    /** Decode and lower SMT-LIB factor-representable [text]. */
     fun parse(
         text: String,
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,

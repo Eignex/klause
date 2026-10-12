@@ -3128,18 +3128,19 @@ public final class com/eignex/klause/ir/NoVars : com/eignex/klause/ir/VarList {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/ir/NonlinearIntegerProblem {
+	public final fun getBoolVarNames ()Ljava/util/Map;
+	public final fun getIntVarNames ()Ljava/util/Map;
+	public final fun getRealVarNames ()Ljava/util/Map;
+}
+
+
 public final class com/eignex/klause/ir/ObjectiveSense : java/lang/Enum {
 	public static final field MAXIMIZE Lcom/eignex/klause/ir/ObjectiveSense;
 	public static final field MINIMIZE Lcom/eignex/klause/ir/ObjectiveSense;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/ir/ObjectiveSense;
 	public static fun values ()[Lcom/eignex/klause/ir/ObjectiveSense;
-}
-
-public final class com/eignex/klause/ir/NonlinearIntegerProblem {
-	public final fun getBoolVarNames ()Ljava/util/Map;
-	public final fun getIntVarNames ()Ljava/util/Map;
-	public final fun getRealVarNames ()Ljava/util/Map;
 }
 
 public final class com/eignex/klause/ir/PolynomialRealProblem {
