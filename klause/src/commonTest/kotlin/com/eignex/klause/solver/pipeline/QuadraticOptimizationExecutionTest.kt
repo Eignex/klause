@@ -208,4 +208,22 @@ class QuadraticOptimizationExecutionTest {
         assertEquals(TerminationReason.Cancelled, result.reason)
         assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
     }
+
+    @Test
+    fun `alternative source equalities cannot become unconditional objective fixings`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const x Real) (assert (or (= x 1) (= x 2))) (check-sat)",
+        )
+        val source = PolynomialRealProblem(
+            parsed.formula, parsed.realCount, parsed.boolCount, parsed.sourceRealCount,
+            parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames,
+        ).pipelineRequest()
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+
+        val execution = OpenTheoryPipeline.minimize(source, objective, engine = FiniteEngine.BACKTRACK)
+
+        val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
+        assertEquals(BigFraction.ONE, result.incumbent.value.rational)
+    }
 }
