@@ -73,15 +73,20 @@ internal class TranscendentalSourceCheck(
         pending.addLast(formula to false)
         while (pending.isNotEmpty()) {
             arithmetic.transcendental.step()
-            val (node, combine) = pending.removeLast()
+            val (node, _) = pending.removeLast()
             if (node in formulas) continue
             val children = when (node) {
                 is TranscendentalFormula.Not -> listOf(node.operand)
                 is TranscendentalFormula.And -> node.operands
                 is TranscendentalFormula.Or -> node.operands
+                is TranscendentalFormula.Conditional -> when (formulas[node.condition]) {
+                    SourceTruth.TRUE -> listOf(node.condition, node.whenTrue)
+                    SourceTruth.FALSE -> listOf(node.condition, node.whenFalse)
+                    else -> listOf(node.condition)
+                }
                 else -> emptyList()
             }
-            if (!combine && children.isNotEmpty()) {
+            if (children.any { it !in formulas }) {
                 pending.addLast(node to true)
                 children.asReversed().forEach { pending.addLast(it to false) }
                 continue
@@ -98,6 +103,11 @@ internal class TranscendentalSourceCheck(
                     SourceTruth.UNKNOWN -> SourceTruth.UNKNOWN
                     SourceTruth.DOMAIN_INVALID -> SourceTruth.DOMAIN_INVALID
                     SourceTruth.DOMAIN_UNKNOWN -> SourceTruth.DOMAIN_UNKNOWN
+                }
+                is TranscendentalFormula.Conditional -> when (val selected = formulas.getValue(node.condition)) {
+                    SourceTruth.TRUE -> formulas.getValue(node.whenTrue)
+                    SourceTruth.FALSE -> formulas.getValue(node.whenFalse)
+                    else -> selected
                 }
                 is TranscendentalFormula.And, is TranscendentalFormula.Or -> {
                     val truth = children.map(formulas::getValue)

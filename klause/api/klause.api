@@ -9163,12 +9163,12 @@ public final class com/eignex/klause/solver/ResumableSolver$DefaultImpls {
 }
 
 public final class com/eignex/klause/solver/Sample {
-	public fun <init> ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;)V
-	public synthetic fun <init> ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun approximateRealValue (I)D
 	public final fun boolValue (I)Z
-	public final fun copy ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/solver/Sample;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/Sample;[Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/solver/Sample;
+	public final fun copy ([Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/solver/Sample;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/Sample;[Z[J[DLjava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/solver/Sample;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun exactIntValue (I)Ljava/math/BigInteger;
 	public final fun getAlgebraicReals ()Ljava/util/List;
@@ -9180,6 +9180,7 @@ public final class com/eignex/klause/solver/Sample {
 	public final fun getNumIntVars ()I
 	public final fun getNumRealVars ()I
 	public final fun getReals ()[D
+	public final fun getSymbolicReals ()Ljava/util/List;
 	public final fun hammingDistanceTo (Lcom/eignex/klause/solver/Sample;)I
 	public fun hashCode ()I
 	public final fun intValue (I)J
@@ -11017,6 +11018,80 @@ public final class com/eignex/klause/solver/pipeline/TheoryParams {
 	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalAssignment : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
+	public fun boolValue (I)Z
+	public final fun exactRealValue (I)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun intValue (I)Ljava/lang/String;
+	public fun realValue (I)Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalAssignmentKt {
+	public static final fun symbolicRealValue (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;I)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryExecution {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;JZ)V
+	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun component2 ()J
+	public final fun component3 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;JZ)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;JZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRepresentationDeclined ()Z
+	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun getWorkSpent ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryParams {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Long;IILjava/lang/Integer;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;)V
+	public synthetic fun <init> (Ljava/lang/Long;IILjava/lang/Integer;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Long;
+	public final fun component10 ()Ljava/util/Map;
+	public final fun component11 ()Ljava/util/Map;
+	public final fun component12 ()Ljava/util/Set;
+	public final fun component13 ()Ljava/util/Set;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()Ljava/lang/Long;
+	public final fun component6 ()Lcom/eignex/klause/util/Cancellation;
+	public final fun component7 ()Lcom/eignex/klause/util/Cancellation;
+	public final fun component8 ()Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;
+	public final fun component9 ()Lcom/eignex/klause/backtrack/NodeBudget;
+	public final fun copy (Ljava/lang/Long;IILjava/lang/Integer;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Ljava/lang/Long;IILjava/lang/Integer;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/util/Map;Ljava/util/Map;Ljava/util/Set;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getMaximumBits ()I
+	public final fun getMaximumDenseCoefficients ()Ljava/lang/Integer;
+	public final fun getMaximumDepth ()I
+	public final fun getMaximumMatrixCells ()Ljava/lang/Long;
+	public final fun getMaximumWork ()Ljava/lang/Long;
+	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
+	public final fun getRealLower ()Ljava/util/Map;
+	public final fun getRealUpper ()Ljava/util/Map;
+	public final fun getStrategy ()Lcom/eignex/klause/solver/pipeline/PolynomialStrategyParams;
+	public final fun getStrictRealLower ()Ljava/util/Set;
+	public final fun getStrictRealUpper ()Ljava/util/Set;
+	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryRequest {
+	public final fun getProblem ()Lcom/eignex/klause/ir/TranscendentalProblem;
+}
+
+public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryRequestKt {
+	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static final fun pipelineRequest (Lcom/eignex/klause/ir/TranscendentalProblem;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;
 }
 
 public final class com/eignex/klause/solver/pipeline/UnplaceableColumn {

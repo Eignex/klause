@@ -16,7 +16,7 @@ values; continuous coordinates never become finite CP domains.
 
 Every arithmetic atom must have defined terms. Invalid log arguments remain
 invalid under negation, conjunction and disjunction. Boolean formula truth cannot
-turn an undefined arithmetic term into a witness. Numeric conditionals evaluate
+turn an undefined arithmetic term into a witness. Numeric and Boolean conditionals evaluate
 the selected branch. Unsupported domain certification retains unknown separately
 from unknown atom truth. No delta or tolerance mode alters these semantics.
 
