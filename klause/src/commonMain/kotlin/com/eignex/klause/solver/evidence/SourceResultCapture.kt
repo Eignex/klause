@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.simplex.exact.BigFraction
@@ -42,9 +44,18 @@ class SourceResultCapture(
         cancellation: Cancellation = Cancellation.Never,
     ): MinimizeResult {
         require(context.scope.objective != null) { "objective result capture requires an objective scope" }
+        if (cancellation() || result is MinimizeResult.Unknown) return result
         val sample = result.assignment
         val witness = sample?.let { SourceClaim.Witness(it) }
-        val value = sample?.let { exactValue(objective, it, cancellation) }
+        val value = if (result is MinimizeResult.Optimal) {
+            try {
+                exactValue(objective, result.sample, cancellation)
+            } catch (_: PolynomialInterrupted) {
+                return result
+            } catch (_: PolynomialResourceLimit) {
+                return result
+            }
+        } else null
         val claim: SourceClaim = when (result) {
             is MinimizeResult.Optimal -> SourceClaim.Optimal(result.sample, checkNotNull(value))
             is MinimizeResult.Infeasible -> SourceClaim.Refutation
