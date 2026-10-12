@@ -2,12 +2,11 @@ package com.eignex.klause.util
 
 /** Multiplatform mutable bitset over `[0, size)`, packed into a [LongArray]. */
 class Bits(size: Int) {
-
+    /** Number of addressable bits. */
     val size: Int = size
 
     @PublishedApi internal val words: LongArray = LongArray((size + 63) ushr 6)
-
-
+    /** Whether bit [i] is set. */
     fun get(i: Int): Boolean = (words[i ushr 6] ushr (i and 63)) and 1L == 1L
 
     /** Set bit [i]. */
