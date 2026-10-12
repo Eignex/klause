@@ -41,7 +41,8 @@ class MpsExactSourceTest {
     @Test
     fun `exact source checking rejects a tolerance only witness`() {
         val source = Mps.parse(
-            "ROWS\n N COST\n E ROW\nCOLUMNS\n X ROW 0.1\nRHS\n R ROW 0.3\nENDATA",
+            "ROWS\n N COST\n E ROW\nCOLUMNS\n X ROW 0.1\nRHS\n R ROW 0.3\n" +
+                "BOUNDS\n LO B X 0.1\nENDATA",
         )
         val value = BigFraction.of(bigIntOf(30000001), bigIntOf(10000000))
         val tolerance = source.toProblem()

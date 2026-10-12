@@ -1,14 +1,14 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
+import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.TheoryParams
-import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.parseBigInt

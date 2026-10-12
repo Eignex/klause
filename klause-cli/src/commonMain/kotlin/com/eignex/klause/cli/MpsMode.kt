@@ -4,6 +4,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
 import com.eignex.klause.formats.mps.MpsLoweringException
 import com.eignex.klause.formats.mps.MpsSourceWitness
+import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -47,7 +48,11 @@ internal object MpsMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val compiled = Mps.parse(openFileSource(path)).toProblem(common.config.problemSettings())
+            val source = Mps.parse(openFileSource(path))
+            val settings = common.config.problemSettings()
+            val lowered = source.toProblem(settings)
+            val usesExactSource = !lowered.sourceExact && (common.exact || lowered.model.numIntVars > 0)
+            val compiled = if (usesExactSource) source.toExactSourceProblem(settings) else lowered
             if (common.exact) requireExactMpsSource(compiled)
             objectiveScale = compiled.objectiveScale
             toleranceDifference = compiled.toleranceDifference
@@ -73,22 +78,20 @@ internal object MpsMode : CliMode {
                 }
             }
             val renderOpen: (OpenTheoryAssignment) -> String = { assignment ->
-                if (witnessOnly) {
-                    val witness = try {
-                        compiled.sourceWitness(compiled.columns.map { column ->
-                            val value = if (column.real) {
-                                assignment.realValue(column.id)
-                            } else {
-                                assignment.intValue(column.id)
-                            }
-                            parseOpenMpsNumber(value)
-                        })
-                    } catch (_: MpsLoweringException) {
-                        null
-                    }
-                    sourceWitnessAccepted = witness != null
-                    latestSourceObjective = witness?.objective
+                val witness = try {
+                    compiled.sourceWitness(compiled.columns.map { column ->
+                        val value = if (column.real) {
+                            assignment.realValue(column.id)
+                        } else {
+                            assignment.intValue(column.id)
+                        }
+                        parseOpenMpsNumber(value)
+                    })
+                } catch (_: IllegalArgumentException) {
+                    null
                 }
+                sourceWitnessAccepted = witness != null
+                latestSourceObjective = witness?.objective
                 renderMpsOpenModel(compiled, assignment)
             }
             val objective = compiled.objective?.toLinearObjective()
@@ -97,7 +100,9 @@ internal object MpsMode : CliMode {
             val route = compiled.model.pipelineRoute(
                 objective,
                 compiled.maximize,
+                routePureRealToTheory = usesExactSource,
                 boundCancellation = common.routingCancellation(),
+                routeLinearToTheory = usesExactSource,
                 onLpStats = { routingLpStats = it },
             )
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
@@ -261,14 +266,14 @@ internal class MpsOutput(
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
             if (best == null) {
                 "s UNKNOWN"
-            } else if (verdict == Verdict.OPTIMAL && sourceExact) {
+            } else if (verdict == Verdict.OPTIMAL && sourceExact && sourceWitnessAccepted()) {
                 "s OPTIMUM FOUND"
             } else {
                 "s SATISFIABLE"
             }
 
         Verdict.UNBOUNDED -> when {
-            proofExact -> "s UNBOUNDED"
+            proofExact && sourceWitnessAccepted() -> "s UNBOUNDED"
             best != null -> "s SATISFIABLE"
             else -> "s UNKNOWN"
         }
