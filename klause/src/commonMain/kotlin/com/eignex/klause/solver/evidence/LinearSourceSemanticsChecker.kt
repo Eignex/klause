@@ -16,6 +16,7 @@ class LinearSourceSemanticsChecker(
     coordinates: Set<SourceCoordinate>,
     premises: List<SourcePremise>,
     objective: Map<SourceCoordinate, BigFraction> = emptyMap(),
+    private val objectiveConstant: BigFraction = BigFraction.ZERO,
 ) : SourceSemanticsChecker {
     private val coordinates = coordinates.toSet()
     private val premises = premises.toList()
@@ -35,6 +36,24 @@ class LinearSourceSemanticsChecker(
 
     override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
         checked(cancellation) { algebraic -> point(sample, scope, algebraic) }
+
+    override fun objectiveEquals(
+        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
+    ): SourceEvidenceCheck = checked(cancellation) { algebraic ->
+        val pointCheck = point(sample, scope, algebraic)
+        if (pointCheck != SourceEvidenceCheck.Checked) return@checked pointCheck
+        val expected = when (value) {
+            is SourceValue.Rational -> algebraic.rational(value.value)
+            is SourceValue.Algebraic -> value.value
+            is SourceValue.Extension -> return@checked SourceEvidenceCheck.Unavailable("symbolic objective checker unavailable")
+        }
+        var evaluated = algebraic.rational(objectiveConstant)
+        for ((id, coefficient) in objective) {
+            evaluated = algebraic.add(evaluated, algebraic.multiply(at(sample, id, algebraic), algebraic.rational(coefficient)))
+        }
+        if (algebraic.compare(evaluated, expected) == 0) SourceEvidenceCheck.Checked
+        else SourceEvidenceCheck.Rejected("witness objective disagrees with the claimed bound")
+    }
 
     override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
         checked(cancellation) { algebraic ->

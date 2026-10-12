@@ -6,6 +6,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -21,7 +22,7 @@ class LinearSourceSemanticsCheckerTest {
 
     @Test
     fun `an exact rational point satisfies original source rows`() {
-        val value = BigFraction.ofLong(3) / BigFraction.ofLong(2)
+        val value = BigFraction.of(bigIntOf(3), bigIntOf(2))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble()), exactReals = listOf(value))
 
         assertEquals(SourceEvidenceCheck.Checked, checker.witness(sample, scope, Cancellation.Never))

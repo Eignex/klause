@@ -1,5 +1,9 @@
 package com.eignex.klause.solver.evidence
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -17,6 +21,16 @@ class SourcePremise(val inequality: SourceInequality, guards: Map<Int, Boolean> 
 interface SourceSemanticsChecker {
     /** Check all declarations, constraints and invocation restrictions using exact coordinates. */
     fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck
+
+    /** Check an exact objective value using the original source objective. */
+    fun objectiveEquals(
+        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
+    ): SourceEvidenceCheck = SourceEvidenceCheck.Unavailable("original-source objective checker unavailable")
+
+    /** Check typed source-specific derivation data against original semantics. */
+    fun derivation(
+        claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
+    ): SourceEvidenceCheck = SourceEvidenceCheck.Unavailable("source-specific derivation checker unavailable")
 
     /** Check a feasible base, all recession conditions and exact objective improvement. */
     fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck
@@ -65,6 +79,10 @@ class SourceEvidenceVerifier(
             Run(cancellation).verify(evidence, context.scope, 0)
         } catch (stop: ProofStop) {
             stop.verdict
+        } catch (_: PolynomialInterrupted) {
+            SourceEvidenceCheck.Unavailable("original-source arithmetic check cancelled")
+        } catch (_: PolynomialResourceLimit) {
+            SourceEvidenceCheck.Unavailable("original-source arithmetic allowance exhausted")
         }
 
     private inner class Run(private val cancellation: Cancellation) {
@@ -93,17 +111,21 @@ class SourceEvidenceVerifier(
             step(depth)
             when (derivation) {
                 is SourceDerivation.Unavailable -> return SourceEvidenceCheck.Unavailable(derivation.reason)
+                is SourceDerivation.Extension -> return context.semanticsChecker?.derivation(claim, derivation, scope, cancellation)
+                    ?: SourceEvidenceCheck.Unavailable("source-specific derivation checker unavailable")
                 is SourceDerivation.Import -> {
                     val imported = derivation.evidence
                     if (imported.scope.revision != scope.revision || imported.scope.objective != scope.objective ||
                         !scope.condition.implies(imported.scope.condition)
                     ) return reject("import has a foreign source, objective or stronger assumptions")
-                    if (claim != imported.claim || claim is SourceClaim.Witness || claim is SourceClaim.Ray) {
+                    if (claim != imported.claim || claim is SourceClaim.Witness || claim is SourceClaim.Ray ||
+                        claim is SourceClaim.Optimal || claim is SourceClaim.Limit || claim is SourceClaim.Extension) {
                         return reject("import does not establish the requested claim")
                     }
                     return verify(imported, imported.scope, depth + 1)
                 }
                 is SourceDerivation.BooleanSplit -> {
+                    if (derivation.id < 0) return reject("Boolean coverage references an invalid coordinate")
                     val coordinate = SourceCoordinate(SourceCoordinate.Kind.Boolean, derivation.id)
                     if (coordinate !in context.coordinates || derivation.id in scope.condition.bools) {
                         return reject("Boolean coverage must split an unpinned declared coordinate")
@@ -141,14 +163,35 @@ class SourceEvidenceVerifier(
                 is SourceClaim.Bound -> {
                     val objective = scope.objective ?: return reject("objective bound has no objective scope")
                     val sign = if (objective.sense == ObjectiveSense.MINIMIZE) BigFraction.ofLong(-1) else BigFraction.ONE
-                    val row = SourceInequality(
-                        context.objective.mapValues { (_, value) -> sign * value },
-                        sign * (claim.value - context.objectiveConstant), claim.strict,
-                    )
                     val derived = inequality(derivation, scope, depth + 1)
-                    if (derived.entails(row) || derived.contradicts()) SourceEvidenceCheck.Checked
+                    if (derived.contradicts()) return SourceEvidenceCheck.Checked
+                    if (derived.coefficients != context.objective.mapValues { (_, value) -> sign * value }) {
+                        return reject("derivation does not establish the source objective coefficients")
+                    }
+                    val algebraic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
+                    val exact = when (val value = claim.value) {
+                        is SourceValue.Rational -> algebraic.rational(value.value)
+                        is SourceValue.Algebraic -> value.value
+                        is SourceValue.Extension -> return SourceEvidenceCheck.Unavailable("symbolic objective checker unavailable")
+                    }
+                    val rhs = algebraic.multiply(algebraic.rational(sign),
+                        algebraic.subtract(exact, algebraic.rational(context.objectiveConstant)))
+                    val comparison = algebraic.compare(algebraic.rational(derived.rhs), rhs)
+                    if (comparison < 0 || comparison == 0 && (derived.strict || !claim.strict)) SourceEvidenceCheck.Checked
                     else reject("derivation does not establish the objective bound")
                 }
+                is SourceClaim.Optimal -> {
+                    val pair = derivation as? SourceDerivation.Optimum
+                        ?: return reject("optimality requires a witness and matching global bound")
+                    both(claim(SourceClaim.Witness(claim.sample), pair.witness, scope, depth + 1)) {
+                        both(claim(SourceClaim.Bound(claim.value), pair.bound, scope, depth + 1)) {
+                            context.semanticsChecker?.objectiveEquals(claim.sample, claim.value, scope, cancellation)
+                                ?: SourceEvidenceCheck.Unavailable("original-source objective checker unavailable")
+                        }
+                    }
+                }
+                is SourceClaim.Limit, is SourceClaim.Extension ->
+                    SourceEvidenceCheck.Unavailable("source-specific claim requires a supported derivation")
                 SourceClaim.Refutation -> if (inequality(derivation, scope, depth + 1).contradicts()) {
                     SourceEvidenceCheck.Checked
                 } else reject("derivation is not a contradiction")
