@@ -80,6 +80,23 @@ Optimization installs additional component factories before its first shared
 check. Finite LP primal proposals and transferred initial candidates remain
 withheld until those components complete their source checks.
 
+### Objective optimization adapters
+
+The internal `solvePolynomialObjectiveImage` service uses the same polynomial IR,
+projection kernel and exact witnesses to optimize an objective over a conditioned
+real/Boolean source. Source integer integrality and finite factors remain caller
+obligations; this real service cannot accept a relaxation witness as an integer
+assignment. These mechanisms do not expose a quadratic pipeline entry point by
+themselves.
+
+`tryConvexPolynomialOptimum` independently admits conjunctions of affine source
+rows and a quadratic objective. It retains exact row direction and strictness,
+uses the [numerical candidate and certificate kernel](../arithmetic/quadratic.md),
+then checks the original source formula and objective again. Candidate selection
+is bounded and incomplete; a declined convex candidate leaves the image service
+available. Nonlinear constraints, disjunctions and nonconvex objectives cannot
+receive a convex certificate from this adapter.
+
 ## Results and proof authority
 
 ### Pipeline and frontend publication
@@ -94,6 +111,23 @@ retain distinct common termination reasons. Exact source scalars survive invocat
 cleanup. [Input semantics](../formats/smtlib.md#polynomial-source-lowering) owns admission
 and model rendering; [resources](../solver/resources.md) owns containing allowances. Native
 controls and units are defined below.
+
+### Objective certificates
+
+Objective-image checks visit projected sections/sectors in ascending order.
+Every earlier cell must be refuted before a global objective claim is made; an
+undecided earlier cell stops that claim. The first feasible section supplies an
+attained optimum and an exact source witness. The first feasible sector with a
+finite lower endpoint supplies an unattained infimum: its lower section was
+refuted, while the entire open sector belongs to the objective image. A feasible
+negative-unbounded sector establishes unboundedness by image invariance.
+Exhausting every cell establishes infeasibility. Isolated threshold queries supply
+none of this authority.
+
+Capture removes only the objective coordinate and rechecks the original
+conditioned formula and objective at the reconstructed source assignment.
+In-memory image evidence retains source scope/counts, objective, projected roots
+and exhausted prefix; it does not implement exported CAD proofs.
 
 ### Witness ownership
 
@@ -130,6 +164,14 @@ matrix or checked-degree declines return `Unknown(ResourceLimit)` with the resou
 kind. Caps do not truncate accepted polynomials or restrict their mathematical
 semantics. See [kernel resources](../arithmetic/polynomial.md#invocation-resources)
 and [scope composition](../solver/resources.md).
+
+### Objective invocation resources
+
+One native image allowance spans scope construction, projection, every fiber
+check, exact reconstruction and final publication polling. Nested feasibility
+checks forward charges once to that owner; their work, projection and lifting
+counters remain visible. Cancellation and allocation/work exhaustion publish
+unknown with the cause, never a partial global certificate.
 
 ### Invocation ownership
 
@@ -184,6 +226,17 @@ assembles the source decomposition.
 owns exact conditioned checks.
 [PolynomialSearchComponent](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialSearchComponent.kt)
 consumes shared facts. The pipeline uses `SourceProblemRoute.PolynomialTheory`.
+
+### Objective-image traversal
+
+The service adds an objective coordinate `t = f(source)` below all source
+coordinates in the CAD order. Full Collins projection decomposes the objective
+line into sections and sectors with invariant existential source feasibility.
+Complete checks decide the fiber at each sample. Rational samples use exact
+coordinate fixings. Algebraic section samples retain their defining polynomial
+and unique isolating interval; no rational endpoint or floating score replaces a
+root. The projected decomposition and completed fiber checks jointly justify
+objective-image claims.
 
 ## Decision procedure
 
