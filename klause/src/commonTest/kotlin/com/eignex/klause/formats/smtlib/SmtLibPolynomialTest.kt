@@ -419,7 +419,7 @@ class SmtLibPolynomialTest {
             "(declare-const x Real) (assert (= (sin x) 0))",
             "(assert (forall ((x Real)) (= x x)))",
             "(declare-const x Real) (assert (= (to_int x) 1))",
-            "(declare-const x Real) (minimize x)",
+            "(declare-const x Real) (minimize (* x x x))",
             "(push 1)", "(get-value (x))", "(check-sat) (check-sat)", "(exit) (assert false)",
             "(check-sat) (assert true)",
             "(declare-const x Real) (check-sat-assuming ((> x 0)))",
