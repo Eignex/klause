@@ -69,7 +69,8 @@ exported transcendental proof checker.
 Each pipeline call captures its source conditions and creates fresh mutable theory
 and strategy state. One cumulative native meter covers enclosure, algebraic,
 relaxation and source-check work. Queries, repairs, branches and retractions do not
-renew it. Native work is reported separately from strategy nodes and moves, and
+renew it. Traversal uses the smaller CP decision/instruction allowance. Native work is
+reported separately from strategy nodes and moves, and
 each arithmetic charge reaches the containing caller meter once.
 
 Strategy cancellation reaches active native completion through the shared search

@@ -202,7 +202,9 @@ private class TranscendentalInvocation(
         val component = TranscendentalSearchComponent(source, service, root, params.maximumDepth)
         val searchStop = stop or params.strategy.backtrack.cancellation
         val session = SearchSession(listOf(component), cancellation = searchStop, branchers = listOf(component))
-        val run = session.openRun(source.boolCount, SearchSolveParams(params.strategy.backtrack.maxDecisions),
+        val decisionLimit = minOf(params.strategy.backtrack.maxDecisions,
+            params.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE)
+        val run = session.openRun(source.boolCount, SearchSolveParams(decisionLimit),
             decisionBudget = SearchDecisionBudget {
                 if (nodeBudget?.exhausted() == true) false else {
                     nodeBudget?.spend()
