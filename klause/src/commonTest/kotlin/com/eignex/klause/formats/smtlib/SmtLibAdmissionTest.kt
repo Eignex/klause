@@ -193,11 +193,27 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `nonlinear mixed integer sources decline rather than entering polynomial theory`() {
-        assertFailsWith<UnsupportedSmtException> {
-            SmtLibAdmission.parse(
-                "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n))) (check-sat)",
-            )
+    fun `nonlinear mixed integer sources retain their integer coordinate semantics`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n))) (check-sat)",
+        )
+
+        val source = assertIs<SmtLibInput.NonlinearInteger>(input).problem
+        assertEquals(mapOf("n" to 0), source.intVarNames)
+        assertEquals(mapOf("x" to 0), source.realVarNames)
+    }
+    @Test
+    fun `nonlinear finite sessions reject source changes after a satisfaction query`() {
+        val declaration = "(declare-const n Int) (assert (<= 1 n 3)) "
+        val suffixes = listOf(
+            "(assert (= (* n n) 4)) (check-sat) (assert (= n 3))",
+            "(assert (= (* n n) 4)) (check-sat) (check-sat)",
+            "(assert (= (^ n 0) 1)) (exit) (assert false)",
+        )
+
+        for (suffix in suffixes) {
+            assertFailsWith<UnsupportedSmtException> { SmtLibAdmission.parse(declaration + suffix) }
         }
     }
+
 }

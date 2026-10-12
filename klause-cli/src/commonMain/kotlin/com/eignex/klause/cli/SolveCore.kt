@@ -151,6 +151,41 @@ internal object SolveCore {
                 return
             }
 
+            is SolvablePipeline.NonlinearIntegerTheory -> {
+                if (solutionSetSensitive) {
+                    usageError("all-solution enumeration is unavailable for nonlinear integer sources")
+                }
+                val nonlinearBudget = takeNodeBudget(common).also { common.nodeBudget = it }
+                val nonlinearParams = nonlinearIntegerParams(common, deadlineCancel, nonlinearBudget)
+                output.begin(optimize = false, maximize = false)
+                val execution = OpenTheoryPipeline.execute(pipeline.request, nonlinearParams, engine)
+                val result = execution.result
+                output.onVerdictContext(VerdictContext(
+                    terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
+                    completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
+                ))
+                when (result) {
+                    is OpenTheoryResult.Sat -> {
+                        output.onSolution(pipeline.render(result.assignment), null)
+                        output.onComplete(Verdict.SATISFIABLE)
+                    }
+                    is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+                    is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+                }
+                if (common.statistics) {
+                    output.onStatistics(
+                        result.stats, result.stats.run.wallMs + rawSolvable.routingElapsedMs,
+                        if (result is OpenTheoryResult.Sat) 1L else 0L,
+                    )
+                    output.onAllowanceStatistics(listOf(
+                        "nraWork" to execution.stats.workSpent.toString(),
+                        "nraProjectedPolynomials" to execution.stats.projectedPolynomials.toString(),
+                        "nraLiftedCells" to execution.stats.liftedCells.toString(),
+                    ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty())
+                }
+                return
+            }
+
             is SolvablePipeline.Interrupted -> {
                 output.begin(optimize = false, maximize = false)
                 output.onVerdictContext(VerdictContext(terminationReason = pipeline.reason))

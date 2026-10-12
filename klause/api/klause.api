@@ -3134,7 +3134,6 @@ public final class com/eignex/klause/ir/NonlinearIntegerProblem {
 	public final fun getRealVarNames ()Ljava/util/Map;
 }
 
-
 public final class com/eignex/klause/ir/ObjectiveSense : java/lang/Enum {
 	public static final field MAXIMIZE Lcom/eignex/klause/ir/ObjectiveSense;
 	public static final field MINIMIZE Lcom/eignex/klause/ir/ObjectiveSense;

@@ -10,6 +10,7 @@ import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
+import com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
@@ -164,6 +165,11 @@ internal sealed interface SolvablePipeline {
         val render: (OpenTheoryAssignment) -> String,
         val objective: LinearObjective? = null,
         val maximize: Boolean = false,
+    ) : SolvablePipeline
+
+    data class NonlinearIntegerTheory(
+        val request: NonlinearIntegerTheoryRequest,
+        val render: (OpenTheoryAssignment) -> String,
     ) : SolvablePipeline
 
     data class Interrupted(val reason: TerminationReason) : SolvablePipeline

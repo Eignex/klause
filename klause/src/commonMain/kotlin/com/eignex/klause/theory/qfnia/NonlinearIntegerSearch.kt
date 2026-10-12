@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qfnia
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
@@ -16,12 +17,14 @@ import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.minus
+import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.unaryMinus
 import kotlin.random.Random
@@ -89,7 +92,7 @@ private class NonlinearIntegerSearch(
                         is QfNraResult.Unsatisfiable -> return@use relaxed
                         is QfNraResult.Unknown -> return@use relaxed
                         is QfNraResult.Satisfiable -> {
-                            current = coordinates.map { integerNear(relaxed.assignment.realValue(it)) }
+                            current = coordinates.map { integerNear(relaxed.assignment.realValue(it), arithmetic) }
                             enumeration = (current + enumeration).distinct()
                             if (integral(relaxed.assignment) && checked(relaxed.assignment)) return@use relaxed
                         }
@@ -149,7 +152,7 @@ private class NonlinearIntegerSearch(
         when (val guide = completion(fixed)) {
             is QfNraResult.Satisfiable -> {
                 current = current.mapIndexed { index, value ->
-                    if (index in released) integerNear(guide.assignment.realValue(coordinates[index])) else value
+                    if (index in released) integerNear(guide.assignment.realValue(coordinates[index]), arithmetic) else value
                 }
             }
             is QfNraResult.Unsatisfiable -> {
@@ -242,7 +245,19 @@ private class NonlinearIntegerWork(private val params: QfNraParams) : Cancellati
     }
 }
 
-private fun integerNear(value: AlgebraicReal): BigInt = value.rational?.ceilInteger() ?: value.lowerBound.ceilInteger()
+private fun integerNear(value: AlgebraicReal, arithmetic: PolynomialArithmetic): BigInt {
+    value.rational?.let { return it.ceilInteger() }
+    val algebraic = AlgebraicArithmetic(arithmetic)
+    var lower = value.lowerBound.ceilInteger()
+    var upper = value.upperBound.ceilInteger()
+    while (lower < upper) {
+        arithmetic.step()
+        val middle = -BigFraction.of(-(lower + upper), BIG_TWO).ceilInteger()
+        if (algebraic.compare(value, algebraic.rational(BigFraction.of(middle, BIG_ONE))) <= 0) upper = middle
+        else lower = middle + BIG_ONE
+    }
+    return lower
+}
 
 private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: PolynomialArithmetic): List<BigInt> {
     val hints = linkedSetOf<BigInt>()
