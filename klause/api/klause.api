@@ -9433,6 +9433,11 @@ public final class com/eignex/klause/solver/incumbent/VerifiedIncumbent {
 	public final fun getVersion ()J
 }
 
+public final class com/eignex/klause/solver/objective/AffineQuadraticObjectiveKt {
+	public static final fun toQuadraticObjectiveSpec (Lcom/eignex/klause/ir/LinearObjectiveSpec;)Lcom/eignex/klause/ir/QuadraticObjectiveSpec;
+	public static final fun toQuadraticObjectiveSpec (Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/ir/QuadraticObjectiveSpec;
+}
+
 public abstract interface class com/eignex/klause/solver/objective/IncrementalObjective : com/eignex/klause/solver/objective/Objective {
 	public abstract fun deltaIfApplied (Lcom/eignex/klause/solver/Assignment;Lcom/eignex/klause/localsearch/Move;)D
 }
@@ -9496,6 +9501,11 @@ public final class com/eignex/klause/solver/objective/SingleIntObjective {
 	public final fun getVarId ()I
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/AffineOptimizationExecutionKt {
+	public static final fun optimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 }
 
 public final class com/eignex/klause/solver/pipeline/BtResolution {
