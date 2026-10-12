@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-class ConvexPolynomialObjectiveTest {
+class ConvexPolynomialOptimumTest {
     @Test
     fun `exact source affine boundary is retained by numerical reconstruction`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (>= x 2)) (check-sat)")
@@ -54,7 +54,7 @@ class ConvexPolynomialObjectiveTest {
 
     @Test
     fun `nonconvex source objective cannot receive a convex certificate`() {
-        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (and (>= x -1) (<= x 1))) (check-sat)")
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (and (>= x (- 1)) (<= x 1))) (check-sat)")
         val objective = PolynomialExpression.Product(listOf(
             PolynomialExpression.Constant.of(BigFraction.MINUS_ONE.num),
             PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2),
