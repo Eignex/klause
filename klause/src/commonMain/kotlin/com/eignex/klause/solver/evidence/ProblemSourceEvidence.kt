@@ -110,7 +110,7 @@ fun Problem.sourceProofContext(
         coefficients[SourceCoordinate(SourceCoordinate.Kind.Real, id)] = BigFraction.ofDouble(value) ?: return null
     }
     if (coefficients.keys.any { it !in coordinates }) return null
-    val restrictionChecker = LinearSourceSemanticsChecker(coordinates, emptyList(), coefficients,
+    val restrictionChecker = LinearSourceSemanticsChecker(coordinates, premises.values.toList(), coefficients,
         BigFraction.ofLong(objective?.constant ?: 0L))
     val source = this
     val checker = object : SourceSemanticsChecker {
