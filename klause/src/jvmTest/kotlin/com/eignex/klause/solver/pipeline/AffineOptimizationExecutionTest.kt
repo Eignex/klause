@@ -45,7 +45,8 @@ class AffineOptimizationExecutionTest(
         ))
 
         val execution = if (affine) OpenTheoryPipeline.optimize(
-            source.pipelineRequest(), LinearObjective(constant = 7, realCoefficients = doubleArrayOf(0.0, sign.toDouble())),
+            source.pipelineRequest(),
+            LinearObjective(constant = 7, realCoefficients = doubleArrayOf(0.0, sign.toDouble())),
             params, engine, sense,
         ) else OpenTheoryPipeline.minimize(
             source.pipelineRequest(), QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(

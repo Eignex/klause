@@ -52,7 +52,7 @@ class AffineQuadraticObjectiveTest {
     fun `normalized evaluation agrees with affine evaluation on exact rational coordinates`() {
         val source = LinearObjective(longArrayOf(-3), longArrayOf(7), 11, doubleArrayOf(0.1))
         val sample = Sample(booleanArrayOf(true), longArrayOf(-2), doubleArrayOf(0.5),
-            exactReals = listOf(BigFraction.ONE / BigFraction.ofLong(2)))
+            exactReals = listOf(BigFraction.ofLong(2).reciprocal()))
 
         val exact = source.toQuadraticObjectiveSpec().evaluateExact(sample, AlgebraicArithmetic())
 
