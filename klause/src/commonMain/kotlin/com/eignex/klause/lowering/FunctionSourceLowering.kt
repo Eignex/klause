@@ -60,6 +60,23 @@ internal class FunctionSourceLowering(
         return PolynomialRealFormula.BooleanVariable(SourceBoolId(id))
     }
 
+    fun requiresDomainCheck(source: Any): Boolean {
+        val pending = ArrayDeque<Any>()
+        val visited = HashSet<Any>()
+        pending.addLast(source)
+        while (pending.isNotEmpty()) {
+            cancellation.polynomialSourceCheckpoint(1)
+            val node = pending.removeLast()
+            if (!visited.add(node)) continue
+            if (node is PolynomialExpression.Variable) {
+                val definition = definitions[node.id.index]
+                if (definition is Definition.Function && definition.function == TranscendentalFunction.LOG) return true
+            }
+            pending.addAll(children(node))
+        }
+        return false
+    }
+
     fun formula(source: PolynomialRealFormula): TranscendentalFormula {
         val expressions = HashMap<PolynomialExpression, TranscendentalExpression>()
         val formulas = HashMap<PolynomialRealFormula, TranscendentalFormula>()

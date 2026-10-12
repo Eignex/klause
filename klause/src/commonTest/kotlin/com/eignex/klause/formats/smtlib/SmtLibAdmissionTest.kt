@@ -18,6 +18,40 @@ import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
     @Test
+    fun `unused helper arguments retain their log domains`() {
+        val input = SmtLibAdmission.parse(
+            "(define-fun f ((x Real)) Real 1) (assert (= (f (log 0)) 1)) (check-sat)",
+        )
+
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        assertIs<OpenTheoryResult.Unsat>(execution.result)
+    }
+
+    @Test
+    fun `unused let bindings retain their log domains`() {
+        val input = SmtLibAdmission.parse("(assert (let ((x (log 0))) true)) (check-sat)")
+
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        assertIs<OpenTheoryResult.Unsat>(execution.result)
+    }
+
+    @Test
+    fun `inactive conditional branches do not require unused binding domains`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const b Bool) (assert b) (assert (ite b true (let ((x (log 0))) true))) (check-sat)",
+        )
+
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        assertIs<OpenTheoryResult.Sat>(execution.result)
+    }
+
+    @Test
     fun `linear sources retain one streaming parse`() {
         var opens = 0
 
