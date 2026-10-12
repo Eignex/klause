@@ -88,6 +88,38 @@ class CliModeTest {
     }
 
     @Test
+    fun `SMT nonlinear integer source witnesses retain wide exact values on local search`() {
+        val source = File.createTempFile("nia-wide", ".smt2").apply {
+            writeText(
+                "(declare-const |source n| Int) (assert (= |source n| 100000000000000000000)) " +
+                    "(assert (= (* |source n| |source n|) 10000000000000000000000000000000000000000))",
+            )
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "ls", "-s", source.absolutePath))) }
+
+        assertTrue(output.startsWith("sat\n"), output)
+        assertTrue("(define-fun |source n| () Int 100000000000000000000)" in output, output)
+        assertTrue("; lsMoves=" in output, output)
+        assertTrue("; solvePipeline=nonlinear-integer-theory" in output, output)
+    }
+
+    @Test
+    fun `SMT incomplete integer candidate exhaustion publishes unknown`() {
+        val source = File.createTempFile("nia-budget", ".smt2").apply {
+            writeText("(declare-const n Int) (assert (= (* n n) 2))")
+            deleteOnExit()
+        }
+
+        val output = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "--param", "nia-candidates=2", source.absolutePath)))
+        }
+
+        assertEquals("unknown", output.trim())
+    }
+
+    @Test
     fun `compressed polynomial sources reopen after rejected linear admission`() {
         val source = File.createTempFile("nra-compressed", ".smt2.gz").apply {
             GZIPOutputStream(outputStream()).writer().use {

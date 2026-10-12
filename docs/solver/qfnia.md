@@ -5,8 +5,10 @@ snapshot with separate original integer, real and Boolean identities. Integer
 coordinates embed into the polynomial coordinate space exactly. The snapshot
 retains the source expression DAG; products and fixed powers are not expanded by
 the input format. Source integer arithmetic remains arbitrary precision.
-The internal typed SMT polynomial parser accepts this metadata; public source
-fallback still exposes the pure-real polynomial route.
+Typed SMT fallback exposes this snapshot through `SmtLibInput.NonlinearInteger`.
+Its `pipelineRequest()` uses the common exact verdict and witness surface. Bounded
+representable factors compose through the shared polynomial model rather than a
+separate constraint API.
 
 ## Candidate search and completion
 
@@ -31,6 +33,22 @@ proposal is checked with all integers fixed. Mixed execution alternates candidat
 traversal, single-coordinate repairs and block repairs. All strategies retain the
 same formula. Heuristic failure and finite candidate exhaustion produce UNKNOWN.
 Only search can publish a whole-source real-relaxation refutation.
+
+The public pipeline uses the [shared exact neighborhood hook](local-search.md)
+for LS and adaptive ALNS. Centers retain arbitrary-width exact integers. Boolean
+pins and integer windows map to original source coordinates, while real coordinates
+remain completion-owned. Source equalities supply initial proposals, including wide
+values; guarded equalities do not become source bounds. Each callback offers up to
+sixteen integer candidate attempts under its exact windows. A failed real
+relaxation covers only that neighborhood; integer candidate exhaustion is undecided.
+
+Mixed execution initially offers sixteen whole-source candidate attempts with a
+4,096-unit native arithmetic slice, then up to 32 LS moves and the configured
+adaptive ALNS moves, before remaining whole-source candidate search. These slices
+share the source, node allowance and cumulative native work. A slice's incomplete
+stop permits another arm; containing allowance exhaustion stops the invocation.
+Default whole-source candidates are 1,024, heuristic moves 256 and ALNS iterations
+50. Every definitive result receives the containing scope's final stop check.
 
 ## Witnesses and resources
 

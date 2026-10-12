@@ -4,7 +4,10 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.PolynomialRealProblem
+import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.util.Cancellation
@@ -23,6 +26,12 @@ sealed interface SmtLibInput {
     data class Polynomial(
         /** Engine-neutral source snapshot, including declarations omitted from the formula. */
         val problem: PolynomialRealProblem,
+    ) : SmtLibInput
+
+    /** Exact polynomial source with original integer and mixed real declaration semantics. */
+    data class NonlinearInteger(
+        /** Neutral source formula and separate original coordinate identities. */
+        val problem: NonlinearIntegerProblem,
     ) : SmtLibInput
 
     /** Admission stopped before a complete source snapshot could be published. */
@@ -68,9 +77,14 @@ object SmtLibAdmission {
             } catch (_: UnsupportedSmtException) {
                 if (cancellation()) throw PolynomialSourceInterrupted()
                 val polynomial = withSource(openSource, cancellation) { source ->
-                    SmtLibPolynomial.parse(source, cancellation)
+                    SmtLibPolynomial.parse(source, cancellation, allowIntegers = true)
                 }
-                SmtLibInput.Polynomial(
+                if (polynomial.intVarNames.isNotEmpty()) {
+                    SmtLibInput.NonlinearInteger(NonlinearIntegerProblem(
+                        polynomial.formula, polynomial.realCount, polynomial.boolCount,
+                        polynomial.intVarNames, polynomial.realVarNames, polynomial.boolVarNames,
+                    ))
+                } else SmtLibInput.Polynomial(
                     PolynomialRealProblem(
                         polynomial.formula,
                         polynomial.realCount,
@@ -107,10 +121,20 @@ private fun parseLinearAdmission(
     val reader = SExprReader(source)
     var integerHelpers = false
     var logic: String? = null
+    var querySeen = false
+    var exited = false
+    var invalidNonlinearSession = false
+    var nonlinearSyntax = false
     while (true) {
         val command = reader.readCommandOrNull() ?: break
         builder.command(command)
+        nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
         val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
+        if (exited || (querySeen && head !in setOf("get-model", "exit", "set-info", "set-option"))) {
+            invalidNonlinearSession = true
+        }
+        if (head == "check-sat" || head == "check-sat-assuming") querySeen = true
+        if (head == "exit") exited = true
         if (head == "define-fun") integerHelpers = integerHelpers || hasIntegerSyntax(command, cancellation)
         if (head == "set-logic") logic = ((command as SExpr.SList).items.getOrNull(1) as? SExpr.Atom)?.text
     }
@@ -123,13 +147,35 @@ private fun parseLinearAdmission(
         smtUnsupported("pure real/Boolean helpers require lexical polynomial lowering")
     }
     val problem = builder.build()
-    if (problem.model.factors.any { it is ContinuousProduct } &&
+    if (invalidNonlinearSession && (nonlinearSyntax || problem.model.factors.any {
+            it is Product || it is RealProduct || it is ContinuousProduct
+        })
+    ) smtUnsupported("nonlinear source requires one nonincremental satisfaction query")
+    if (problem.model.factors.any { it is ContinuousProduct || it is RealProduct } &&
         (builder.intNames.isEmpty() || (0 until problem.model.numIntVars).any { id ->
             problem.model.intBounds.isOpenLower(id) || problem.model.intBounds.isOpenUpper(id)
         })) {
         smtUnsupported("pure real nonlinear source requires polynomial lowering")
     }
     return problem
+}
+
+private fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): Boolean {
+    val work = ArrayDeque<SExpr>()
+    work.addLast(expression)
+    while (work.isNotEmpty()) {
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        val node = work.removeLast() as? SExpr.SList ?: continue
+        val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
+        if (head == "^") return true
+        if (head == "*" && node.items.drop(1).count { argument ->
+                val text = (argument as? SExpr.Atom)?.text
+                text == null || text.isEmpty() || text.any { it !in '0'..'9' && it != '.' }
+            } > 1
+        ) return true
+        work.addAll(node.items)
+    }
+    return false
 }
 
 private val INTEGER_SOURCE_OPERATORS = setOf("to_real", "to_int", "is_int", "div", "mod")

@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
@@ -135,7 +136,7 @@ private fun Problem.pipelineRouteObserved(
     onLpStats: ((LpStats) -> Unit)?,
     routeLinearToTheory: Boolean,
 ): SourceProblemRoute {
-    if (factors.any { it is ContinuousProduct }) {
+    if (factors.any { it is ContinuousProduct || it is RealProduct }) {
         val shared = SharedPolynomialModel.assemble(this)
         return if (shared != null && objective?.realCoefficientValues?.any { it != 0.0 } != true) {
             SourceProblemRoute.PolynomialTheory(shared.request(), objective, maximize)

@@ -65,6 +65,19 @@ internal object SmtLibMode : CliMode {
                     )
                 }
 
+                is SmtLibInput.NonlinearInteger -> {
+                    common.takeOpenBoundProof()
+                    val source = admitted.problem
+                    val ints = source.intVarNames.mapKeys { smtSourceSymbol(it.key) }
+                    val bools = source.boolVarNames.mapKeys { smtSourceSymbol(it.key) }
+                    val reals = source.realVarNames.mapKeys { smtSourceSymbol(it.key) }
+                    return nonlinearIntegerSolvable(
+                        source.pipelineRequest(),
+                        { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                        admissionStart.elapsedNow().inWholeMilliseconds,
+                    )
+                }
+
                 SmtLibInput.Interrupted -> return interruptedSolvable(
                     if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,
                     admissionStart.elapsedNow().inWholeMilliseconds,
@@ -276,6 +289,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     private companion object {
         private val SMT_SEARCH_KEYS = setOf(
+            "lsMoves", "lsCompletions", "lsCompletionsRefuted", "lsCompletionsUndecided",
             "nodes", "failures", "propagations", "learned", "learnedMeanSize", "learnedMeanLbd", "relearned",
             "openBoolDecisions", "openIntDecisions", "openTheoryDecisions", "openTheoryChecks",
             "openWork", "openLearned", "openRelearned",

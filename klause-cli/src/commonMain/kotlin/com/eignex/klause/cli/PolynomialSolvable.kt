@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
@@ -75,6 +76,10 @@ private fun sourceSolvable(pipeline: SolvablePipeline, admissionElapsedMs: Long)
 )
 
 internal fun polynomialParams(common: CommonOptions, timeout: Cancellation): PolynomialTheoryParams {
+    val nodeBudget = common.nodeBudget ?: when (val setting = takeAllowanceSetting(common.engineParams, "node-limit")) {
+        AllowanceSetting.Automatic, AllowanceSetting.Unlimited -> null
+        is AllowanceSetting.Remaining -> NodeBudget(setting.units)
+    }.also { common.nodeBudget = it }
     val work = polynomialAllowance(common, "nra-work-limit", default = null)
     val dense = polynomialAllowance(common, "nra-dense-coefficients", default = 65536)
     if (dense != null && dense !in 1..Int.MAX_VALUE.toLong()) {
@@ -97,8 +102,12 @@ internal fun polynomialParams(common: CommonOptions, timeout: Cancellation): Pol
     )
     return PolynomialTheoryParams(work, dense?.toInt(), matrix, timeout = timeout,
         strategy = PolynomialStrategyParams(
-            backtrack = BacktrackParams(randomSeed = seed, maxDecisions = decisions, maxInstructions = instructions),
-            localSearch = LocalSearchParams(randomSeed = seed, maxFlips = flips, maxInstructions = instructions),
+            backtrack = BacktrackParams(
+                randomSeed = seed, maxDecisions = decisions, maxInstructions = instructions, nodeBudget = nodeBudget,
+            ),
+            localSearch = LocalSearchParams(
+                randomSeed = seed, maxFlips = flips, maxInstructions = instructions, nodeBudget = nodeBudget,
+            ),
             alnsIterations = iterations,
         ))
 }
