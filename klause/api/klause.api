@@ -9299,6 +9299,464 @@ public class com/eignex/klause/solver/StatelessSession : com/eignex/klause/solve
 	public fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 }
 
+public final class com/eignex/klause/solver/evidence/LinearSourceSemanticsChecker : com/eignex/klause/solver/evidence/SourceSemanticsChecker {
+	public fun <init> (Ljava/util/Set;Ljava/util/List;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public synthetic fun <init> (Ljava/util/Set;Ljava/util/List;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun derivation (Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceDerivation$Extension;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public fun objectiveEquals (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public fun ray (Lcom/eignex/klause/solver/evidence/SourceClaim$Ray;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public fun witness (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+}
+
+public abstract interface class com/eignex/klause/solver/evidence/SourceClaim {
+}
+
+public final class com/eignex/klause/solver/evidence/SourceClaim$Bound : com/eignex/klause/solver/evidence/SourceClaim {
+	public fun <init> (Lcom/eignex/klause/simplex/exact/BigFraction;Z)V
+	public synthetic fun <init> (Lcom/eignex/klause/simplex/exact/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceValue;Z)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceValue;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceValue;
+	public final fun component2 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceValue;Z)Lcom/eignex/klause/solver/evidence/SourceClaim$Bound;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceClaim$Bound;Lcom/eignex/klause/solver/evidence/SourceValue;ZILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceClaim$Bound;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStrict ()Z
+	public final fun getValue ()Lcom/eignex/klause/solver/evidence/SourceValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceClaim$Clause : com/eignex/klause/solver/evidence/SourceClaim {
+	public fun <init> (Ljava/util/Map;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLiterals ()Ljava/util/Map;
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/solver/evidence/SourceClaim$Consequence : com/eignex/klause/solver/evidence/SourceClaim {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceInequality;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceInequality;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceInequality;)Lcom/eignex/klause/solver/evidence/SourceClaim$Consequence;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceClaim$Consequence;Lcom/eignex/klause/solver/evidence/SourceInequality;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceClaim$Consequence;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInequality ()Lcom/eignex/klause/solver/evidence/SourceInequality;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/evidence/SourceClaim$Extension : com/eignex/klause/solver/evidence/SourceClaim {
+}
+
+public final class com/eignex/klause/solver/evidence/SourceClaim$Limit : com/eignex/klause/solver/evidence/SourceClaim {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
+	public final fun component2 ()Lcom/eignex/klause/solver/evidence/SourceValue;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;)Lcom/eignex/klause/solver/evidence/SourceClaim$Limit;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceClaim$Limit;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceClaim$Limit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public final fun getValue ()Lcom/eignex/klause/solver/evidence/SourceValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceClaim$Optimal : com/eignex/klause/solver/evidence/SourceClaim {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
+	public final fun component2 ()Lcom/eignex/klause/solver/evidence/SourceValue;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;)Lcom/eignex/klause/solver/evidence/SourceClaim$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceClaim$Optimal;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceClaim$Optimal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public final fun getValue ()Lcom/eignex/klause/solver/evidence/SourceValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceClaim$Ray : com/eignex/klause/solver/evidence/SourceClaim {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Ljava/util/Map;)V
+	public final fun getDirection ()Ljava/util/Map;
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceClaim$Refutation : com/eignex/klause/solver/evidence/SourceClaim {
+	public static final field INSTANCE Lcom/eignex/klause/solver/evidence/SourceClaim$Refutation;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceClaim$Witness : com/eignex/klause/solver/evidence/SourceClaim {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/solver/evidence/SourceClaim$Witness;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceClaim$Witness;Lcom/eignex/klause/solver/Sample;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceClaim$Witness;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceCondition {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBools ()Ljava/util/Map;
+	public final fun getLower ()Ljava/util/Map;
+	public final fun getUpper ()Ljava/util/Map;
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/solver/evidence/SourceCoordinate {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;I)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;
+	public final fun component2 ()I
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;I)Lcom/eignex/klause/solver/evidence/SourceCoordinate;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;IILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceCoordinate;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()I
+	public final fun getKind ()Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceCoordinate$Kind : java/lang/Enum {
+	public static final field Boolean Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;
+	public static final field Integer Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;
+	public static final field Real Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;
+	public static fun values ()[Lcom/eignex/klause/solver/evidence/SourceCoordinate$Kind;
+}
+
+public abstract interface class com/eignex/klause/solver/evidence/SourceDerivation {
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$Assumption : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Z)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceCoordinate;
+	public final fun component2 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Z)Lcom/eignex/klause/solver/evidence/SourceDerivation$Assumption;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$Assumption;Lcom/eignex/klause/solver/evidence/SourceCoordinate;ZILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Assumption;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoordinate ()Lcom/eignex/klause/solver/evidence/SourceCoordinate;
+	public final fun getUpper ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$BooleanSplit : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (ILcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public final fun component1 ()I
+	public final fun component2 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun copy (ILcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceDerivation$BooleanSplit;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$BooleanSplit;ILcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$BooleanSplit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()I
+	public final fun getWhenFalse ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun getWhenTrue ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$Combination : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (Ljava/util/List;)V
+	public final fun getTerms ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$Combination$Term {
+	public fun <init> (Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public final fun component1 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun component2 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun copy (Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Combination$Term;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$Combination$Term;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Combination$Term;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDerivation ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun getWeight ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$Discharge : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceEvidence;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceEvidence;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Discharge;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$Discharge;Lcom/eignex/klause/solver/evidence/SourceEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Discharge;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRefutation ()Lcom/eignex/klause/solver/evidence/SourceEvidence;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/evidence/SourceDerivation$Extension : com/eignex/klause/solver/evidence/SourceDerivation {
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$Import : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceEvidence;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceEvidence;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceEvidence;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Import;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$Import;Lcom/eignex/klause/solver/evidence/SourceEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Import;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceEvidence;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceCoordinate;
+	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun component4 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit;Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAbove ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun getBelow ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun getCoordinate ()Lcom/eignex/klause/solver/evidence/SourceCoordinate;
+	public final fun getThreshold ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$Optimum : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun component2 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Optimum;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$Optimum;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Optimum;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBound ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun getWitness ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$Premise : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Premise;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$Premise;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Premise;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$SourceRay : com/eignex/klause/solver/evidence/SourceDerivation {
+	public static final field INSTANCE Lcom/eignex/klause/solver/evidence/SourceDerivation$SourceRay;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$SourceWitness : com/eignex/klause/solver/evidence/SourceDerivation {
+	public static final field INSTANCE Lcom/eignex/klause/solver/evidence/SourceDerivation$SourceWitness;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceDerivation$Unavailable : com/eignex/klause/solver/evidence/SourceDerivation {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Unavailable;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$Unavailable;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceEngineAttestation {
+	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/solver/evidence/SourceClaim;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/eignex/klause/solver/evidence/SourceClaim;
+	public final fun copy (Ljava/lang/String;Lcom/eignex/klause/solver/evidence/SourceClaim;)Lcom/eignex/klause/solver/evidence/SourceEngineAttestation;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceEngineAttestation;Ljava/lang/String;Lcom/eignex/klause/solver/evidence/SourceClaim;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceEngineAttestation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClaim ()Lcom/eignex/klause/solver/evidence/SourceClaim;
+	public final fun getProducer ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceEvidence {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceScope;
+	public final fun component2 ()Lcom/eignex/klause/solver/evidence/SourceClaim;
+	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceEvidence;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceEvidence;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceEvidence;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClaim ()Lcom/eignex/klause/solver/evidence/SourceClaim;
+	public final fun getDerivation ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/evidence/SourceEvidenceCheck {
+}
+
+public final class com/eignex/klause/solver/evidence/SourceEvidenceCheck$Checked : com/eignex/klause/solver/evidence/SourceEvidenceCheck {
+	public static final field INSTANCE Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck$Checked;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceEvidenceCheck$Rejected : com/eignex/klause/solver/evidence/SourceEvidenceCheck {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck$Rejected;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck$Rejected;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck$Rejected;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceEvidenceCheck$Unavailable : com/eignex/klause/solver/evidence/SourceEvidenceCheck {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck$Unavailable;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck$Unavailable;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceEvidenceVerifier {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceProofContext;II)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceProofContext;IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun verify (Lcom/eignex/klause/solver/evidence/SourceEvidence;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public static synthetic fun verify$default (Lcom/eignex/klause/solver/evidence/SourceEvidenceVerifier;Lcom/eignex/klause/solver/evidence/SourceEvidence;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceInequality {
+	public fun <init> (Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Z)V
+	public synthetic fun <init> (Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoefficients ()Ljava/util/Map;
+	public final fun getRhs ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getStrict ()Z
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/solver/evidence/SourceObjective {
+	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun copy (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/evidence/SourceObjective;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceObjective;Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceObjective;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIdentity ()Ljava/lang/String;
+	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourcePremise {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceInequality;Ljava/util/Map;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceInequality;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getGuards ()Ljava/util/Map;
+	public final fun getInequality ()Lcom/eignex/klause/solver/evidence/SourceInequality;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceProofContext {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCoordinates ()Ljava/util/Set;
+	public final fun getObjective ()Ljava/util/Map;
+	public final fun getObjectiveConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getPremises ()Ljava/util/Map;
+	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceResultEvidence {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAttestations ()Ljava/util/List;
+	public final fun getDerivations ()Ljava/util/List;
+	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
+	public final fun verify (Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceProofContext;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public static synthetic fun verify$default (Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceProofContext;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceRevision {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/eignex/klause/solver/evidence/SourceRevision;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceRevision;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceRevision;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIdentity ()Ljava/lang/String;
+	public final fun getSemantics ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceScope {
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceRevision;Lcom/eignex/klause/solver/evidence/SourceCondition;Lcom/eignex/klause/solver/evidence/SourceObjective;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceRevision;Lcom/eignex/klause/solver/evidence/SourceCondition;Lcom/eignex/klause/solver/evidence/SourceObjective;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceRevision;
+	public final fun component2 ()Lcom/eignex/klause/solver/evidence/SourceCondition;
+	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceObjective;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceRevision;Lcom/eignex/klause/solver/evidence/SourceCondition;Lcom/eignex/klause/solver/evidence/SourceObjective;)Lcom/eignex/klause/solver/evidence/SourceScope;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceRevision;Lcom/eignex/klause/solver/evidence/SourceCondition;Lcom/eignex/klause/solver/evidence/SourceObjective;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceScope;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCondition ()Lcom/eignex/klause/solver/evidence/SourceCondition;
+	public final fun getObjective ()Lcom/eignex/klause/solver/evidence/SourceObjective;
+	public final fun getRevision ()Lcom/eignex/klause/solver/evidence/SourceRevision;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/evidence/SourceSemanticsChecker {
+	public fun derivation (Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceDerivation$Extension;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public fun objectiveEquals (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public abstract fun ray (Lcom/eignex/klause/solver/evidence/SourceClaim$Ray;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public abstract fun witness (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+}
+
+public final class com/eignex/klause/solver/evidence/SourceSemanticsChecker$DefaultImpls {
+	public static fun derivation (Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceDerivation$Extension;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+	public static fun objectiveEquals (Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
+}
+
+public abstract interface class com/eignex/klause/solver/evidence/SourceValue {
+}
+
+public final class com/eignex/klause/solver/evidence/SourceValue$Algebraic : com/eignex/klause/solver/evidence/SourceValue {
+	public fun <init> (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)V
+	public final fun component1 ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public final fun copy (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/solver/evidence/SourceValue$Algebraic;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceValue$Algebraic;Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceValue$Algebraic;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/evidence/SourceValue$Extension : com/eignex/klause/solver/evidence/SourceValue {
+}
+
+public final class com/eignex/klause/solver/evidence/SourceValue$Rational : com/eignex/klause/solver/evidence/SourceValue {
+	public fun <init> (Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public final fun component1 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun copy (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/solver/evidence/SourceValue$Rational;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceValue$Rational;Lcom/eignex/klause/simplex/exact/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceValue$Rational;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/incumbent/Candidate {
 	public fun <init> (Ljava/lang/Object;Ljava/lang/Object;)V
 	public final fun component1 ()Ljava/lang/Object;
