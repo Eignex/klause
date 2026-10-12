@@ -68,10 +68,12 @@ class PortfolioWorker private constructor(
     internal var evidenceModel: ModelIdentity? = null
         private set
     private var certificates: (EvidenceKind) -> EvidenceCertificate? = { null }
+    private var provesSourceResults = true
 
     internal fun bindEvidence(model: ModelIdentity, provesResults: Boolean = true): PortfolioWorker = also {
         evidenceModel = model
-        certificates = { kind -> if (provesResults) EvidenceCertificate.verified(model, kind) else null }
+        provesSourceResults = provesSourceResults && provesResults
+        certificates = { kind -> if (provesSourceResults) EvidenceCertificate.verified(model, kind) else null }
     }
 
     internal fun certificateFor(kind: EvidenceKind): EvidenceCertificate? = certificates(kind)

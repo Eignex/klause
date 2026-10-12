@@ -129,3 +129,12 @@ telemetry, [portfolio scheduling](portfolio.md) for coverage and
 shares cumulative polynomial work across search and all neighborhood callbacks.
 Integer candidate decisions and shared heuristic instructions retain their distinct
 strategy/node currency; arithmetic units are not charged again as decisions.
+
+Supported linear portfolios reserve persistent native work, check and decision
+quotas for their workers. A complete worker receives three quarters of a finite
+allowance; heuristic workers divide the remainder. Heuristic-only pools divide it
+equally. Unlimited controls stay unlimited, and unused quota is not transferred.
+Proposal and instruction caps divide among heuristic workers; completion work also
+charges their instruction ledger. Zero proposal, instruction or native work
+allowance prevents a heuristic completion. Timeout and external cancellation retain
+their separate reasons.

@@ -307,3 +307,10 @@ result requires a complete exact witness; an unsatisfiable result requires exhau
 of every unpruned cell and its Boolean alternatives. Root indices in returned
 `AlgebraicReal` values identify their rational defining polynomial's distinct roots,
 not the position in a specialized lifting family.
+
+Coordinate neighborhoods first check a pinned proposal, then relax coordinate or
+block windows while preserving every source constraint. Rational centers derived
+from isolating intervals guide proposals; published coordinates retain their exact
+algebraic scalars. Native work stays on the containing invocation across repairs.
+ALNS bootstraps within the heuristic allowance before spending its configured
+improving-iteration cap.

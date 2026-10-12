@@ -15,6 +15,8 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.finiteExactNeighborhoodWorker
+import com.eignex.klause.solver.pipeline.fixedDiscreteSample
 import com.eignex.klause.solver.result.SearchEvent
 import kotlin.math.abs
 import kotlin.math.ln
@@ -62,6 +64,9 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?,
     ): PortfolioWorker {
+        if (problem.numRealVars > 0) problem.fixedDiscreteSample()?.let { fixed ->
+            return finiteExactNeighborhoodWorker(problem, fixed, objective, nodeBudget, true, seed + index, armId)
+        }
         val evidenceModel = ModelIdentity.of(problem, objective)
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
         val workerLabel = "alns/${profile.label}"

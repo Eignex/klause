@@ -14,6 +14,8 @@ import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.finiteExactNeighborhoodWorker
+import com.eignex.klause.solver.pipeline.fixedDiscreteSample
 import com.eignex.klause.solver.result.SearchEvent
 
 /**
@@ -58,6 +60,9 @@ internal class LocalSearchWorkerConfig(
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?, // solutions only: local search neither learns nor consumes clauses or cuts
     ): PortfolioWorker {
+        if (problem.numRealVars > 0) problem.fixedDiscreteSample()?.let { fixed ->
+            return finiteExactNeighborhoodWorker(problem, fixed, objective, nodeBudget, false, seed + index, armId)
+        }
         val evidenceModel = ModelIdentity.of(problem, objective)
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
         // On a COP, every arm optimizes. A recipe that drives objective descent itself (CBLS, SA) needs

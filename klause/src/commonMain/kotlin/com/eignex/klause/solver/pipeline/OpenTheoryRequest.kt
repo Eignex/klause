@@ -156,10 +156,10 @@ object OpenTheoryPipeline {
         params: TheoryParams = TheoryParams(),
         cores: Int = 1,
     ): OpenTheoryExecution {
-        val portfolio = OpenPortfolio(request.model, request, params, lanes = cores)
+        val portfolio = OpenPortfolio(request.model, request, params, seed = params.randomSeed, lanes = cores)
         val stop = params.cancellation or params.timeout
         val objective = request.minimizedObjective ?: return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
-        return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizerFor(request, objective), stop))
+        return OpenTheoryExecution.Optimize(portfolio.minimize(objective, integralMinimizer(request, objective), stop))
     }
 
     /**
@@ -194,8 +194,8 @@ object OpenTheoryPipeline {
     /**
      * Execute [request] the way [engine] asks: [FiniteEngine.MIXED] on the open portfolio, the theory beside local
      * search; [FiniteEngine.BACKTRACK] and [FiniteEngine.FIXED] through the theory alone; [FiniteEngine.LOCAL_SEARCH]
-     * with local search alone, which never refutes the model or proves an optimum. [FiniteEngine.ALNS] has no open
-     * route. A portfolio runs on up to [cores] lanes.
+     * with exact-coordinate repair alone, which never refutes the model or proves an optimum. [FiniteEngine.ALNS]
+     * adaptively selects repair block sizes. A portfolio runs on up to [cores] lanes.
      */
     fun execute(
         request: OpenTheoryRequest,
@@ -207,15 +207,9 @@ object OpenTheoryPipeline {
 
         FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
 
-        FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(
-            request.model,
-            params,
-            request.minimizedObjective,
-            cores,
-            searchesContinuousOnly = true,
+        FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> linearNeighborhoodInvocation(
+            request.model, params, request.minimizedObjective, engine == FiniteEngine.ALNS, cores,
         )
-
-        FiniteEngine.ALNS -> throw IllegalArgumentException("engine `${engine.id}` has no open-model route")
     }
 
     /**
@@ -244,26 +238,43 @@ object OpenTheoryPipeline {
             }
         }
 
-        FiniteEngine.ALNS -> throw IllegalArgumentException("engine `${engine.id}` has no open-model route")
+        FiniteEngine.ALNS -> linearNeighborhoodInvocation(model, params, objective, adaptive = true, cores)
     }
 
     /** Execute [request] through its selected complete theory route. */
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
         val objective = request.minimizedObjective
         if (objective == null) return OpenTheoryExecution.Satisfy(engineFor(request).solve(params))
-        return OpenTheoryExecution.Optimize(minimizerFor(request, objective).minimize(params))
+        val integral = integralMinimizer(request, objective)
+        if (integral != null) return OpenTheoryExecution.Optimize(integral.minimize(params))
+        return RationalTheoryDescent(request.model, objective, params).use { descent ->
+            val result = requireNotNull(descent.runSlice(
+                params.cancellation or params.timeout, Long.MAX_VALUE, -1,
+            ) { _ -> })
+            OpenTheoryExecution.Optimize(result.openOptimum(objective))
+        }
     }
 
     /**
-     * Whether the descent can minimize [request]'s objective: an integral one weighting no Boolean, whose bound row
-     * leaves the model inside a complete open theory. A request it cannot minimize is left to local search.
+     * Whether a source-bound descent can execute [request]'s objective without leaving the admitted theories.
+     * Rational strict-improvement descent preserves proof authority but need not terminate at an unattained infimum.
      */
     fun canMinimize(request: OpenTheoryRequest): Boolean {
         val objective = request.minimizedObjective ?: return false
-        if (objective.realCoefficientValues.any { it != 0.0 } || objective.boolWeightValues.any { it != 0L }) {
-            return false
+        if (objective.realCoefficientValues.any { !it.isFinite() }) return false
+        if (integralMinimizer(request, objective) != null) return true
+        val bounded = request.model.withFactors(request.model.factors + objective.below(
+            com.eignex.klause.simplex.exact.BigFraction.ZERO), request.model.impliedFactorMask?.let { it + false })
+        return bounded.componentPlan().theoryPipeline.let {
+            it != ProblemPipeline.UNSUPPORTED_OPEN && it != ProblemPipeline.FINITE_CP
         }
-        return minimizerFor(request, objective).decidesEveryRound
+    }
+
+    private fun integralMinimizer(request: OpenTheoryRequest, objective: LinearObjective): OpenTheoryMinimizer? {
+        if (objective.realCoefficientValues.any { it != 0.0 } ||
+            objective.boolWeightValues.any { it != 0L }
+        ) return null
+        return minimizerFor(request, objective).takeIf { it.decidesEveryRound }
     }
 
     // The descent minimizing [objective], the request's own in minimized form.

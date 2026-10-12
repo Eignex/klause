@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegralConstants
@@ -8,14 +9,23 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.fitsLong
+import kotlin.coroutines.cancellation.CancellationException
 
 internal class OpenExactNeighborhood(
     private val model: Problem,
@@ -32,6 +42,29 @@ internal class OpenExactNeighborhood(
         cancellation: Cancellation,
     ): ExactNeighborhoodResult {
         if (cancellation() || exhausted) return ExactNeighborhoodResult.Undecided
+        if (model.numBoolVars + model.numIntVars + model.numRealVars == 0) {
+            if (condition.cutoff != null && objective != null &&
+                objective.evaluateExact(Sample(booleanArrayOf(), longArrayOf())) >= condition.cutoff
+            ) return ExactNeighborhoodResult.Refuted
+            if (!state.work.theoryCheck()) return ExactNeighborhoodResult.Undecided
+            nativeStats = nativeStats.copy(openTheory = state.work.snapshot())
+            val sample = Sample(booleanArrayOf(), longArrayOf())
+            val checked = try {
+                composedFixpoint(model.bake(cancellation), Candidate(sample, Unit), cancellation)
+            } catch (_: CancellationException) {
+                return ExactNeighborhoodResult.Undecided
+            }
+            return when (checked) {
+                is Verification.Accepted -> {
+                    sample.witnessCertificate = EvidenceCertificate.verified(
+                        ModelIdentity.of(model), EvidenceKind.Witness,
+                    )
+                    ExactNeighborhoodResult.Witness(sample)
+                }
+                is Verification.Rejected -> ExactNeighborhoodResult.Refuted
+                is Verification.Indeterminate -> ExactNeighborhoodResult.Undecided
+            }
+        }
         val additions = ArrayList<Factor>()
         for ((id, value) in condition.bools) additions += Clause(intArrayOf(Lit.make(id, value)))
         fun bounds(values: Map<Int, BigFraction>, relation: LinearOp) {
@@ -58,16 +91,36 @@ internal class OpenExactNeighborhood(
             maxLeaves = (params.maxLeaves - state.work.snapshot().openTheoryChecks).coerceAtLeast(0)), state)
         nativeStats = result.stats.copy(lp = nativeStats.lp.mergedWith(result.stats.lp))
         return when (result) {
-            is OpenTheoryResult.Sat -> ExactNeighborhoodResult.Witness(result.assignment.toSample(model))
+            is OpenTheoryResult.Sat -> {
+                val sample = result.assignment.toSample(model)
+                val checked = if (sample.exactInts?.any { !it.fitsLong() } == true ||
+                    model.factors.any { it is ExactSearchRow }
+                ) {
+                    verifyRealCoordinates(model, sample)
+                } else verifyOpenWitness(model, sample)
+                when (checked) {
+                    is Verification.Accepted -> ExactNeighborhoodResult.Witness(sample)
+                    is Verification.Rejected -> ExactNeighborhoodResult.Refuted
+                    is Verification.Indeterminate -> ExactNeighborhoodResult.Undecided
+                }
+            }
             is OpenTheoryResult.Unsat -> ExactNeighborhoodResult.Refuted
             is OpenTheoryResult.Unknown -> ExactNeighborhoodResult.Undecided
         }
     }
 
-    fun search(adaptive: Boolean, seed: Long = 0, maximumMoves: Long = Long.MAX_VALUE): ExactNeighborhood =
-        ExactNeighborhood(model.numBoolVars, centers(), this, objective,
+    fun search(
+        adaptive: Boolean,
+        seed: Long = 0,
+        maximumMoves: Long = Long.MAX_VALUE,
+        completion: ExactNeighborhoodCompletion = this,
+        maximumImprovementMoves: Long? = null,
+    ): ExactNeighborhood =
+        ExactNeighborhood(model.numBoolVars, centers(), completion, objective,
             coordinateValues = { sample -> coordinates(sample) }, adaptive = adaptive, seed = seed,
-            nodeBudget = params.nodeBudget, maximumMoves = maximumMoves, nativeWork = { state.work.spent },
+            nodeBudget = params.nodeBudget, maximumMoves = minOf(maximumMoves, params.maxFlips),
+            maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
+            maximumImprovementMoves = maximumImprovementMoves, nativeWork = { state.work.spent },
             completionStats = { nativeStats })
 
     private fun coordinates(sample: Sample): List<BigFraction> =

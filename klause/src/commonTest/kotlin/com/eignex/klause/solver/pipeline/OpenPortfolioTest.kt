@@ -64,8 +64,7 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `a model with no local-search arm runs the theory without a portfolio`() {
-        // x + y ≥ 3 over open continuous columns and nothing else: no Boolean, no integer, so no local-search arm.
+    fun `real-only models materialize exact neighborhood workers beside the theory`() {
         val model = Problem(
             numBoolVars = 0,
             numIntVars = 0,
@@ -81,7 +80,7 @@ class OpenPortfolioTest {
 
         val result = assertIs<OpenTheoryResult.Sat>(satisfied(OpenTheoryPipeline.executePortfolio(request, params())))
 
-        assertTrue(result.stats.portfolio.arms.isEmpty())
+        assertTrue(result.stats.portfolio.arms.any { it.label.startsWith("ls/exact-neighborhood") })
     }
 
     @Test
