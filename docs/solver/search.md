@@ -146,6 +146,10 @@ backjumps and restarts.
 
 Boolean-only models journal each pin's variable id and tag without integer-state padding.
 Mixed finite models retain aligned integer-state columns for domain retraction.
+Integer undo replays complete saved domains and interior carves through a typed
+restoration phase, borrowing captured callback references. Boolean retraction and
+reverse log traversal belong to the caller. Callback order, bound/hole histories
+and restored literals follow the same trail lifetime.
 
 Native learned unit clauses watch their asserting literal and the deepest false premise.
 An immediately conflicting learned clause watches its two deepest premises. Retraction
