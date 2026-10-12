@@ -98,7 +98,7 @@ class CliModeTest {
         }
 
         assertTrue("; objective=10000000000000000000000000000000000000000.0" in output.lines(), output)
-        assertTrue("(define-fun i () Int 100000000000000000000)" in output, output)
+        assertTrue("(define-fun |i| () Int 100000000000000000000)" in output, output)
         assertTrue("; optimizationStatus=best-found" in output.lines(), output)
         assertTrue("; lsMoves=1" in output.lines(), output)
     }
