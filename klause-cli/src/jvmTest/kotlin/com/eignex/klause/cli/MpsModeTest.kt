@@ -307,7 +307,7 @@ class MpsModeTest {
 
             assertTrue("s OPTIMUM FOUND" in text.lines(), text)
             assertTrue("o 0.10000000000000000001" in text.lines(), text)
-            assertTrue("v I=0 X=0.1" in text.lines(), text)
+            assertTrue("v I=0 X=1/10" in text.lines(), text)
         }
     }
 
@@ -383,7 +383,7 @@ class MpsModeTest {
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("o 0.1" in text.lines(), text)
-        assertTrue("v X=0.1" in text.lines(), text)
+        assertTrue("v X=1/10" in text.lines(), text)
     }
 
     @Test
@@ -403,7 +403,7 @@ class MpsModeTest {
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("o 0.02" in text.lines(), text)
-        assertTrue("v I=0 X=0.2" in text.lines(), text)
+        assertTrue("v I=0 X=1/5" in text.lines(), text)
     }
 
     @Test
