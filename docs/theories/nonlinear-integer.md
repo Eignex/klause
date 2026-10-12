@@ -97,9 +97,11 @@ direction coordinates are scaled to exact integers. An integral source base and
 nonnegative integer ray parameters then give unlimited source improvement.
 Unproved recession proposals supply no global claim.
 
-LS and ALNS optimize exact bounded integer neighborhoods through the same shared
-traversal and real completion. Single-coordinate, block and whole-tuple moves
-retain wide exact centers; adaptive operator weights reward incumbent improvement.
+LS and ALNS optimize exact source neighborhoods through the same shared traversal
+and real completion. Initial integer proposals use unrestricted real completion;
+later real windows retain exact incumbent isolating intervals. Boolean pins and
+single-coordinate, block and whole-tuple moves preserve typed source identities
+and wide integer centers. Adaptive operator weights reward incumbent improvement.
 Neighborhood proof does not become a whole-source proof. MIXED offers a bounded
 adaptive phase before complete traversal. Every branch and repair shares cumulative
 numerical/polynomial work and the containing decision/move allowance. Optional real

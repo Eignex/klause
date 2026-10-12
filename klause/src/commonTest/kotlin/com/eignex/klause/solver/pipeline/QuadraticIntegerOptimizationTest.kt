@@ -14,6 +14,7 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.parseBigInt
@@ -151,6 +152,28 @@ class QuadraticIntegerOptimizationTest {
         val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
         assertEquals(BigFraction.ofLong(5), result.incumbent.value.rational)
         assertEquals(BigFraction.ofLong(5), result.bound.value.rational)
+    }
+
+    @Test
+    fun `local real-coordinate repair improves an open mixed incumbent without proving unboundedness`() {
+        val source = NonlinearIntegerProblem(
+            PolynomialRealFormula.Atom(PolynomialExpression.Variable(SourceRealId(0)), PolynomialRelation.EQ,
+                PolynomialExpression.Constant.of(parseBigInt("0"))),
+            2, 0, mapOf("i" to 0), mapOf("x" to 1), emptyMap(),
+        )
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x, x),
+        ))
+        val params = NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(localSearch = LocalSearchParams(maxFlips = 100000, randomSeed = 17)),
+        ), maximumMoves = 2)
+
+        val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, params, FiniteEngine.LOCAL_SEARCH)
+
+        val result = assertIs<QuadraticOptimizationResult.BestFound>(execution.result)
+        assertTrue(requireNotNull(result.incumbent.value.rational) <= BigFraction.ofLong(-4))
+        assertEquals(2.0, result.stats.ls.moves.sum)
     }
 
     @Test
