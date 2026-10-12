@@ -183,7 +183,9 @@ internal fun Problem.prepareExecutionPlan(
     preferFinite: Boolean,
 ): PreparedSourcePlan {
     val continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true
-    if (factors.any { it is ContinuousProduct } || (!preferFinite && !continuousObjective && factors.any { it is RealProduct })) {
+    if (factors.any { it is ContinuousProduct } ||
+        (!preferFinite && !continuousObjective && factors.any { it is RealProduct })
+    ) {
         return preparePolynomialExecutionPlan(original = original, objective = objective, maximize = maximize)
     }
     return preparedWithComponents(componentPlan(preferFinite), original, objective, maximize)
@@ -210,7 +212,9 @@ internal fun Problem.preparedWithComponents(
         it.integerCoordinates.isNotEmpty() || it.realCoordinates.isNotEmpty() }
     return PreparedSourcePlan(original, this, PreparedExecutionKind.FINITE_LINEAR, ownership, null, descriptors,
         original.numBoolVars, original.numIntVars, original.numRealVars, objective, maximize,
-        PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT.takeIf { ownership.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN })
+        PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT.takeIf {
+            ownership.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN
+        })
 }
 
 internal fun Problem.preparePolynomialExecutionPlan(
@@ -236,7 +240,8 @@ internal fun Problem.preparePolynomialExecutionPlan(
         ExecutionComponentDescriptor("polynomial-real", ComponentResponsibility.COMPLETION,
             factors.indices.filter { it !in finiteFactors }, emptyList(), (0 until numRealVars).toList()),
     ) + if (openInteger) listOf(ExecutionComponentDescriptor("unplaced-polynomial-integer",
-        ComponentResponsibility.UNPLACED, emptyList(), (0 until numIntVars).filter { it !in boundedIntegers }, emptyList()))
+        ComponentResponsibility.UNPLACED, emptyList(),
+        (0 until numIntVars).filter { it !in boundedIntegers }, emptyList()))
     else emptyList()
     val sourceBools = (original as? PolynomialRealProblem)?.sourceBoolCount ?: numBoolVars
     val sourceReals = (original as? PolynomialRealProblem)?.sourceRealCount ?: numRealVars

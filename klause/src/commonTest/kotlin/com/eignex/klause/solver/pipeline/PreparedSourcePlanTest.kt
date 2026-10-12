@@ -38,7 +38,9 @@ class PreparedSourcePlanTest {
 
         assertSame(source, plan.originalSource)
         assertSame(plan, route.request.preparedPlan)
-        assertEquals(listOf(1), plan.components.single { it.responsibility == ComponentResponsibility.FINITE }.factorIndices)
+        assertEquals(listOf(1), plan.components.single {
+            it.responsibility == ComponentResponsibility.FINITE
+        }.factorIndices)
         assertEquals(listOf(0, 2), plan.components.single {
             it.responsibility == ComponentResponsibility.COMPLETION
         }.factorIndices)
