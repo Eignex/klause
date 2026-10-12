@@ -1,0 +1,188 @@
+package com.eignex.klause.solver
+
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.portfolio.LeafRealCompletion
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.OpenTheoryExecution
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
+
+/**
+ * Source-aware strategy selected by [BacktrackSolver.source] or [LocalSearchSolver.source].
+ * Each operation arranges shared preparation and exact completion over [source], with private invocation state.
+ * Published coordinates retain the source namespaces, including exact continuous and wide integer values.
+ * The source arrays and factor payloads are borrowed read-only for this strategy's lifetime.
+ * Finite sessions, enumeration and resumable tuning remain on the finite solver facades.
+ */
+class SourceStrategy internal constructor(
+    /** Original model, before strategy projections or source-safe bound preparation. */
+    val source: Problem,
+    /** Complete traversal or heuristic execution, without changing source constraints. */
+    val engine: FiniteEngine,
+) {
+    /**
+     * Solve through the shared source route. [polynomial] retains finite strategy controls and arithmetic limits;
+     * [theory] supplies open-linear controls. Open-source assumption pins and extra CP components explicitly decline
+     * until that invocation service supports them. A heuristic rejection never refutes the source.
+     */
+    fun solve(
+        polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
+        theory: TheoryParams = TheoryParams(),
+    ): OpenTheoryResult {
+        val scope = scope(polynomial, theory)
+        if (scope.stop()) return scope.unknown()
+        val route = source.pipelineRoute(
+            routePureRealToTheory = true,
+            boundCancellation = scope.stop,
+        )
+        if (scope.stop()) return scope.unknown()
+        val result = when (route) {
+            is SourceProblemRoute.PolynomialTheory ->
+                OpenTheoryPipeline.execute(route.request, scope.polynomial, engine).result
+            is SourceProblemRoute.Finite -> finiteSolve(route, scope)
+            is SourceProblemRoute.OpenTheory -> {
+                if (!scope.supportsOpen(engine)) {
+                    return scope.unsupported()
+                }
+                (OpenTheoryPipeline.execute(route.request, scope.theory, engine) as OpenTheoryExecution.Satisfy).result
+            }
+            is SourceProblemRoute.UnsupportedOpen -> {
+                if (!scope.supportsOpen(engine)) {
+                    return scope.unsupported()
+                }
+                (OpenTheoryPipeline.searchWithoutTheory(
+                    route.problem, scope.theory, null, engine,
+                ) as OpenTheoryExecution.Satisfy).result
+            }
+            SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
+        }
+        return if (scope.stop()) scope.unknown(result.stats) else result
+    }
+
+    /** Solve with complete finite controls, retaining [polynomial]'s arithmetic limits and common assumptions. */
+    fun solve(
+        params: BacktrackParams,
+        polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
+        theory: TheoryParams = TheoryParams(),
+    ): OpenTheoryResult {
+        require(engine == FiniteEngine.BACKTRACK) { "BacktrackParams require a backtracking source strategy" }
+        return solve(polynomial.copy(strategy = polynomial.strategy.copy(backtrack = params)), theory)
+    }
+
+    /** Solve with finite heuristic controls, retaining [polynomial]'s arithmetic limits and common assumptions. */
+    fun solve(
+        params: LocalSearchParams,
+        polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
+        theory: TheoryParams = TheoryParams(),
+    ): OpenTheoryResult {
+        require(engine == FiniteEngine.LOCAL_SEARCH) { "LocalSearchParams require a local-search source strategy" }
+        return solve(polynomial.copy(strategy = polynomial.strategy.copy(localSearch = params)), theory)
+    }
+
+    private fun finiteSolve(route: SourceProblemRoute.Finite, scope: SourceInvocation): OpenTheoryResult {
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(
+            problem = route.problem, engine = engine, preparedPlan = route.preparedPlan,
+            presolveConfig = PresolveConfig.NONE, explicitPresolveConfig = true, solutionSetSensitive = true,
+            cancellation = scope.stop,
+        ))
+        if (scope.stop()) return scope.unknown()
+        if (preparation.presolve?.infeasible == true) return OpenTheoryResult.Unsat(SolveStats.EMPTY)
+        val model = preparation.executableProblem()
+        val solved = when (engine) {
+            FiniteEngine.BACKTRACK -> BacktrackSolver(model).solve(scope.backtrack)
+            FiniteEngine.LOCAL_SEARCH -> LocalSearchSolver(
+                model, completion = if (model.numRealVars > 0) LeafRealCompletion(model, null) else null,
+            ).solve(scope.localSearch)
+            else -> error("unsupported source strategy $engine")
+        }
+        return when (solved) {
+            is SolveResult.Sat -> OpenTheoryResult.Sat(
+                OpenTheoryAssignment.Sampled(preparation.reconstruct(solved.assignment)), solved.stats,
+            )
+            is SolveResult.Unsat -> OpenTheoryResult.Unsat(solved.stats)
+            is SolveResult.Unknown -> OpenTheoryResult.Unknown(solved.reason, solved.stats)
+        }
+    }
+
+    private fun scope(polynomial: PolynomialTheoryParams, theory: TheoryParams): SourceInvocation {
+        val selected = if (engine == FiniteEngine.BACKTRACK) polynomial.strategy.backtrack.assumptions
+        else polynomial.strategy.localSearch.assumptions
+        val assumptions = polynomial.strategy.assumptions.mergedWith(selected)
+        val selectedStop = if (engine == FiniteEngine.BACKTRACK) polynomial.strategy.backtrack.cancellation
+        else polynomial.strategy.localSearch.cancellation
+        val stop = polynomial.timeout or polynomial.cancellation or
+            theory.timeout or theory.cancellation or selectedStop
+        val backtrack = polynomial.strategy.backtrack.withAssumptions(assumptions).withCancellation(stop)
+        val localSearch = polynomial.strategy.localSearch.withAssumptions(assumptions).withCancellation(stop)
+        val selectedBudget = if (engine == FiniteEngine.BACKTRACK) backtrack.nodeBudget else localSearch.nodeBudget
+        require(theory.nodeBudget == null || selectedBudget == null || theory.nodeBudget === selectedBudget) {
+            "source execution requires one shared node allowance"
+        }
+        val open = when (engine) {
+            FiniteEngine.BACKTRACK -> theory.copy(
+                cancellation = stop,
+                maxDecisions = minOf(
+                    theory.maxDecisions, backtrack.maxDecisions, backtrack.maxInstructions ?: Long.MAX_VALUE,
+                ),
+                nodeBudget = selectedBudget ?: theory.nodeBudget,
+                randomSeed = backtrack.randomSeed ?: theory.randomSeed,
+            )
+            FiniteEngine.LOCAL_SEARCH -> theory.copy(
+                cancellation = stop,
+                maxFlips = minOf(theory.maxFlips, localSearch.maxFlips),
+                maxInstructions = minOf(
+                    theory.maxInstructions ?: Long.MAX_VALUE, localSearch.maxInstructions ?: Long.MAX_VALUE,
+                ).takeIf { it != Long.MAX_VALUE },
+                nodeBudget = selectedBudget ?: theory.nodeBudget,
+                randomSeed = localSearch.randomSeed ?: theory.randomSeed,
+            )
+            else -> error("unsupported source strategy $engine")
+        }
+        return SourceInvocation(
+            assumptions, stop, polynomial.timeout or theory.timeout, backtrack, localSearch, open,
+            polynomial.copy(cancellation = stop, strategy = polynomial.strategy.copy(
+                backtrack = backtrack, localSearch = localSearch, assumptions = assumptions,
+            )),
+        )
+    }
+
+    private class SourceInvocation(
+        val assumptions: Assumptions,
+        val stop: Cancellation,
+        val timeout: Cancellation,
+        val backtrack: BacktrackParams,
+        val localSearch: LocalSearchParams,
+        val theory: TheoryParams,
+        val polynomial: PolynomialTheoryParams,
+    ) {
+        fun unknown(stats: SolveStats = SolveStats.EMPTY): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(
+            if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout else TerminationReason.Cancelled, stats,
+        )
+        fun supportsOpen(engine: FiniteEngine): Boolean = assumptions.isEmpty && when (engine) {
+            FiniteEngine.BACKTRACK -> backtrack.componentFactory == null && backtrack.nodeBudget == null &&
+                backtrack.onEvent == null
+            FiniteEngine.LOCAL_SEARCH -> localSearch.initialAssignment == null &&
+                localSearch.pooledIncumbents == null && localSearch.lsObjective == null && localSearch.onEvent == null
+            else -> false
+        }
+        fun unsupported(): OpenTheoryResult.Unknown =
+            OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
+    }
+}

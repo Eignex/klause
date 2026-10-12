@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.count.SampleQuality
 import com.eignex.klause.count.SamplingConfig
 import com.eignex.klause.count.accurateSamples
@@ -22,6 +23,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.SourceStrategy
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
@@ -84,10 +87,24 @@ class LocalSearchSolver(
 ) : ResumableSolver<LocalSearchParams>,
     ResumableOptimizer<LocalSearchParams> {
 
-    /** Solve a [CompiledSchema]'s problem with the default local-search configuration. */
+    /** Source-aware construction and explicit finite compatibility entry points. */
+    companion object {
+        /** Select this strategy with shared source preparation and exact witness completion. */
+        fun source(problem: Problem): SourceStrategy = SourceStrategy(problem, FiniteEngine.LOCAL_SEARCH)
+
+        /** Select this strategy for the original compiled source, including continuous products. */
+        fun source(compiled: CompiledSchema): SourceStrategy = source(compiled.problem)
+
+        /** Compile once and select this strategy for the resulting original source. */
+        fun source(schema: VariableSchema): SourceStrategy = source(schema.compile())
+    }
+
+    /** Finite-only facade over a [CompiledSchema]; use [source] for shared model breadth. */
+    @Deprecated("Finite-only facade; use LocalSearchSolver.source(compiled) for shared source execution.")
     constructor(compiled: CompiledSchema) : this(compiled.problem.bake())
 
-    /** Compile [schema] with the default config and solve the resulting problem. */
+    /** Compile [schema] into this finite-only facade; use [source] for shared model breadth. */
+    @Deprecated("Finite-only facade; use LocalSearchSolver.source(schema) for shared source execution.")
     constructor(schema: VariableSchema) : this(schema.compile().problem.bake())
 
     internal val engine: LocalSearchEngine = LocalSearchEngine(
