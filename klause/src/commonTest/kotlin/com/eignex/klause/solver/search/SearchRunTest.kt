@@ -19,7 +19,7 @@ class SearchRunTest {
         session.initialize()
         session.push(SearchDecision.Bool(Lit.make(0, true)))
         session.push(SearchDecision.Bool(Lit.make(2, true)))
-        val run = session.openRun(3, minimumDecisionLevel = session.decisionLevel)
+        val run = session.openConditionedRun(3)
 
         val result = assertIs<SearchRunEvent.Satisfied>(run.next())
 
@@ -39,8 +39,7 @@ class SearchRunTest {
         }))
         session.initialize()
         session.push(SearchDecision.Bool(Lit.make(0, true)))
-        val run = session.openRun(2, SearchSolveParams(maxDecisions = 4, restart = SearchRestart.Every(1)),
-            minimumDecisionLevel = session.decisionLevel)
+        val run = session.openConditionedRun(2, SearchSolveParams(maxDecisions = 4, restart = SearchRestart.Every(1)))
 
         val result = assertIs<SearchRunEvent.Satisfied>(run.next())
 

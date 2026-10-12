@@ -617,12 +617,7 @@ class SearchSession(
         }
     }
 
-    /**
-     * Open a resumable traversal over the shared component set.
-     *
-     * [minimumDecisionLevel] retains an already-asserted condition through restarts and learned
-     * backjumps. Exhaustion then refutes only that condition. Its owner retracts it after the run.
-     */
+    /** Open a resumable traversal over the shared component set. */
     fun openRun(
         numBoolVars: Int,
         params: SearchSolveParams = SearchSolveParams(),
@@ -634,7 +629,31 @@ class SearchSession(
         nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
         lifecycle: SearchRunLifecycle = SearchRunLifecycle.None,
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
-        minimumDecisionLevel: Int = 0,
+    ): SearchRun = openRunAt(numBoolVars, params, booleanBranching, decisionBudget, observer,
+        modelContinuation, modelPolicy, nodePolicy, lifecycle, candidateHints, 0)
+
+    internal fun openConditionedRun(
+        numBoolVars: Int,
+        params: SearchSolveParams = SearchSolveParams(),
+        nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
+        booleanBranching: BooleanBranching = BooleanBranching.SourceOrder(numBoolVars),
+        candidateHints: SearchCandidateHints = SearchCandidateHints.None,
+    ): SearchRun = openRunAt(numBoolVars, params, booleanBranching, SearchDecisionBudget.Unlimited,
+        SearchRunObserver.None, SearchModelContinuation.Chronological, SearchModelPolicy.SurfaceAll,
+        nodePolicy, SearchRunLifecycle.None, candidateHints, decisionLevel)
+
+    private fun openRunAt(
+        numBoolVars: Int,
+        params: SearchSolveParams,
+        booleanBranching: BooleanBranching,
+        decisionBudget: SearchDecisionBudget,
+        observer: SearchRunObserver,
+        modelContinuation: SearchModelContinuation,
+        modelPolicy: SearchModelPolicy,
+        nodePolicy: SearchNodePolicy,
+        lifecycle: SearchRunLifecycle,
+        candidateHints: SearchCandidateHints,
+        minimumDecisionLevel: Int,
     ): SearchRun {
         require(atoms == null || numBoolVars in 0..atoms.sourceBooleanCount) {
             "Boolean traversal must stay within the reserved source namespace"
