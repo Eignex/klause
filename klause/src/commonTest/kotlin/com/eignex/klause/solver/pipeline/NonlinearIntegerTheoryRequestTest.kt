@@ -135,6 +135,18 @@ class NonlinearIntegerTheoryRequestTest {
     }
 
     @Test
+    fun `constant helper arguments do not capture caller local nonlinear bindings`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
+            "(declare-const n Int) (define-fun product ((x Int)) Int (* n x)) " +
+                "(assert (let ((n 99)) (= (product 2) 6)))",
+        )).problem
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        assertEquals("3", assertIs<OpenTheoryResult.Sat>(execution.result).assignment.intValue(0))
+    }
+
+    @Test
     fun `native work charges remain cumulative across heuristic callbacks`() {
         val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
             "(declare-const n Int) (assert (= (* n n) 2))",
