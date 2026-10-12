@@ -29,6 +29,12 @@ The service weakens original functions into exact polynomial domain, range and
 applicable domain-bound affine constraints. A completed exact refutation of that
 relaxation refutes its source scope. Incomplete relaxation work does not refute it.
 
+`TranscendentalTheoryRequest` implements the shared source-bound
+`ExactTheorySatisfactionRequest` callback. Frontends can consume that dispatcher
+without selecting a concrete theory. Its native work scope is `transcendental`;
+the total includes enclosure and source checks as well as polynomial relaxation.
+It is distinct from a count of polynomial steps alone.
+
 Relaxation points and rational proposals undergo symbolic direct/inverse repairs.
 Each final witness passes original function checks, exact integer integrality and
 every invocation condition. [Exact real coordinates](../arithmetic/real.md) retain
