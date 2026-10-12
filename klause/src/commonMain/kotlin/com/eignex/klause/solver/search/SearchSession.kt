@@ -638,8 +638,9 @@ class SearchSession(
         nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
         booleanBranching: BooleanBranching = BooleanBranching.SourceOrder(numBoolVars),
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
+        observer: SearchRunObserver = SearchRunObserver.None,
     ): SearchRun = openRunAt(numBoolVars, params, booleanBranching, SearchDecisionBudget.Unlimited,
-        SearchRunObserver.None, SearchModelContinuation.Chronological, SearchModelPolicy.SurfaceAll,
+        observer, SearchModelContinuation.Chronological, SearchModelPolicy.SurfaceAll,
         nodePolicy, SearchRunLifecycle.None, candidateHints, decisionLevel)
 
     private fun openRunAt(
