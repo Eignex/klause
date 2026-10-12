@@ -16,12 +16,14 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Assignment
+import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.asSearchStream
+import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.LocalSearchStatsSink
@@ -102,6 +104,7 @@ internal class LocalSearchEngine(
 
     // A finite projection may require theory-owned completion before publication.
     private val completion: CandidateCompletion? = completion
+    private val unscoredCandidateCheck = UnscoredCandidateCheck(problem).takeIf { it.required }
 
     /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
      *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each
@@ -1053,7 +1056,7 @@ internal class LocalSearchEngine(
         state
     }
 
-    // Zero violation over continuous columns needs completion; refuting rows gain weight to steer the search.
+    // Unscored constraints and continuous columns need candidate checks before publication.
     private fun decide(
         state: LocalSearchState,
         candidate: Sample,
@@ -1061,8 +1064,12 @@ internal class LocalSearchEngine(
         stats: LocalSearchStatsSink?,
         charge: (Long) -> Unit,
     ): Completion {
-        val completion = completion ?: return Completion.Witness(candidate)
-        val decided = completion.complete(candidate, cancellation)
+        if (unscoredCandidateCheck == null && completion == null) return Completion.Witness(candidate)
+        val checked = unscoredCandidateCheck?.check(candidate, state.assumptions, cancellation)
+            ?: Completion.Witness(candidate)
+        val decided = if (checked is Completion.Witness) {
+            completion?.complete(candidate, cancellation) ?: checked
+        } else checked
         charge(decided.work)
         stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided)
         if (decided is Completion.Refuted) {
@@ -1252,6 +1259,11 @@ internal class LocalSearchEngine(
 internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = false): Boolean {
     val problem = model.problem
     if (problem.numRealVars != 0 && !completes) return false
+    if (problem.factors.any {
+            it.executionCapabilities().assignmentCheck == AssignmentCheckCapability.UNSUPPORTED &&
+                it.variables.reals.isNotEmpty()
+        }
+    ) return false
     val domains = model.domains
     if (domains.all(::isNarrow)) return true
     return problem.factors.none { factor -> factor is Cumulative && factor.intVars.any { !isNarrow(domains[it]) } }

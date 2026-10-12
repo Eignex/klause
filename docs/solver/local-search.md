@@ -9,6 +9,8 @@ A run prepares its model projection, initializes an assignment, generates and sc
 moves, accepts selected changes, and restarts when needed. Candidate publication
 checks every required source constraint, including arithmetic completion. A low
 score guides the walk; it does not prove feasibility, optimality or infeasibility.
+Propagation-only custom factors receive a private full-coordinate check before
+caller completion or publication; see [custom factor checks](search.md#custom-factor-publication-checks).
 
 The sections follow preparation, move mechanics and run lifetime, then diagnostics.
 [Search](search.md) owns complete traversal; [sessions](sessions.md) owns caller
