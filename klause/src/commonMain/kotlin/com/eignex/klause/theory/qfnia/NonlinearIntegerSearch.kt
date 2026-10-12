@@ -32,7 +32,7 @@ internal data class NonlinearIntegerParams(
     val arithmetic: QfNraParams = QfNraParams(),
     val maximumCandidates: Long = 1024,
     val strategy: NonlinearIntegerStrategy = NonlinearIntegerStrategy.MIXED,
-    val seed: Int = 1,
+    val seed: Long = 1,
 ) {
     init { require(maximumCandidates >= 0) }
 }
@@ -198,7 +198,10 @@ private class NonlinearIntegerSearch(
     private fun withStats(result: QfNraResult): QfNraResult = when (result) {
         is QfNraResult.Satisfiable -> result.copy(stats = polynomialStats())
         is QfNraResult.Unsatisfiable -> result.copy(stats = polynomialStats())
-        is QfNraResult.Unknown -> result.copy(stats = polynomialStats())
+        is QfNraResult.Unknown -> result.copy(
+            stats = polynomialStats(),
+            reason = if (work.limitReached) QfNraReason.WorkLimit else result.reason,
+        )
     }
 }
 

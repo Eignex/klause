@@ -1,0 +1,12 @@
+smtlib-nonlinear-integer-v1/bounded-product-sat
+smtlib-nonlinear-integer-v1/bounded-product-unsat
+smtlib-nonlinear-integer-v1/bounded-power-chain
+smtlib-nonlinear-integer-v1/mixed-finite-product
+smtlib-nonlinear-integer-v1/mixed-product-power
+smtlib-nonlinear-integer-v1/boolean-product-conditional
+smtlib-nonlinear-integer-v1/lexical-integer-helper
+smtlib-nonlinear-integer-v1/wide-integer-square
+smtlib-nonlinear-integer-v1/overflow-cancellation
+smtlib-nonlinear-integer-v1/open-integer-product
+smtlib-nonlinear-integer-v1/open-no-integer-root
+smtlib-nonlinear-integer-v1/whole-real-refutation
