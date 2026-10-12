@@ -34,19 +34,18 @@ fun FinitePipeline.portfolioExecutor(
     onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     onFault: ((ArmFault) -> Unit)? = null,
 ): PortfolioExecutor {
-    val searchObjective = objective?.searchObjective()
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val workers = PortfolioBuilder.build(
         problem,
         scenario,
-        objective = searchObjective,
+        objective = objective,
         lsObjective = lsObjective,
         definitionalSweep = definitionalSweep,
         onEvent = onEvent,
         profile = profile,
     )
     val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
-    val portfolio = Portfolio.thompson(
+    return Portfolio.thompson(
         workers,
         lanes = scenario.cores,
         baseSliceWork = scenario.sliceWork,
@@ -56,16 +55,16 @@ fun FinitePipeline.portfolioExecutor(
         reseedStaleThreshold = scenario.reseedStaleThreshold,
         profile = profile,
         minShares = if (proofShares.isEmpty()) {
-            continuousLpShares(scenario, profile, workers.map { it.label }, searchObjective,
+            continuousLpShares(scenario, profile, workers.map { it.label }, objective,
                 problem.continuousMajority, problem.binaryIntegers)
         } else {
             proofShares
         },
         onFault = onFault,
     ).also {
-        if (searchObjective != null && (searchObjective.realCoefficientValues.none { value -> value != 0.0 } ||
+        if (objective != null && (objective.realCoefficientValues.none { value -> value != 0.0 } ||
             problem.fixedDiscreteSample() != null)
-        ) it.exactLinearObjective = searchObjective
+        ) it.exactLinearObjective = objective
         it.reserveBeforeIncumbentOnly = true
         if (scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
             scenario.btPool == null && scenario.lsPool == null
@@ -75,12 +74,10 @@ fun FinitePipeline.portfolioExecutor(
             }.toSet()
         }
         it.evidenceVerification = PortfolioEvidence(
-            ModelIdentity.of(problem, searchObjective),
-            finiteWitnessVerifier(problem, searchObjective, toleranceCheck = scenario.toleranceCheck),
+            ModelIdentity.of(problem, objective),
+            finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck),
         )
     }
-    return if (objective != null && searchObjective !== objective) portfolio.sourceValues(objective) else portfolio
-
 }
 
 /** Creates the fixed finite-domain solver over [problem]. */

@@ -600,8 +600,7 @@ private fun executeFixedOptimize(
     var solutions = 0L
     var stats = SolveStats.EMPTY
     var bestSample: Sample? = null
-    for (searched in solver.improvements(objective.searchObjective(), params)) {
-        val step = searched.sourceValue(objective)
+    for (step in solver.improvements(objective, params)) {
         stats = step.stats
         when (step) {
             is MinimizeResult.WithSample -> {
