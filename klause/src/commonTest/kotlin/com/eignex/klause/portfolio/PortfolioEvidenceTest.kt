@@ -6,6 +6,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import kotlin.test.Test
@@ -89,6 +90,28 @@ class PortfolioEvidenceTest {
         val result = Portfolio.thompson(listOf(worker)).use { it.minimize() }
 
         assertIs<MinimizeResult.BestFound>(result)
+    }
+
+    @Test
+    fun `exact objective ordering preserves improvements hidden by floating projection`() {
+        val objective = LinearObjective(constant = 1L shl 62, realCoefficients = doubleArrayOf(-1.0))
+        val first = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), listOf(BigFraction.ONE))
+        val optimum = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0), listOf(BigFraction.ofLong(2)))
+        val identity = ModelIdentity.of(Any(), objective)
+        val heuristic = PortfolioWorker.ofMinimize("ls/exact", 0) { _, _, _, _ ->
+            sequenceOf(MinimizeResult.BestFound(first, objective.evaluateExact(first).toDouble(),
+                TerminationReason.BudgetExhausted))
+        }.bindEvidence(identity, provesResults = false)
+        val complete = PortfolioWorker.ofMinimize("bt/exact", 1) { _, _, _, _ ->
+            sequenceOf(MinimizeResult.Optimal(optimum, objective.evaluateExact(optimum).toDouble()))
+        }.bindEvidence(identity)
+        val portfolio = Portfolio.thompson(listOf(heuristic, complete))
+        portfolio.exactLinearObjective = objective
+        portfolio.evidenceVerification = PortfolioEvidence(identity, CandidateVerifier.trusting())
+
+        val result = portfolio.use { it.minimize() }
+
+        assertEquals(BigFraction.ofLong(2), assertIs<MinimizeResult.Optimal>(result).sample.exactReals?.single())
     }
 
 }
