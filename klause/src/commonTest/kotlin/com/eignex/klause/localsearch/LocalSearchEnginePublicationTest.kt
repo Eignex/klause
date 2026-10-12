@@ -22,7 +22,9 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LocalSearchEnginePublicationTest {
@@ -153,6 +155,31 @@ class LocalSearchEnginePublicationTest {
 
         assertTrue(cancelled)
         assertIs<SolveResult.Unknown>(result)
+    }
+
+    @Test
+    fun `a cancelled candidate check resumes without publishing partial state`() {
+        var cancelled = false
+        var interrupt = true
+        val interrupting = object : Factor by factor, Propagator {
+            override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                if (interrupt && state.boolValues[0] != null && state.boolValues[1] != null) cancelled = true
+                return true
+            }
+        }
+        val solver = LocalSearchSolver(source.withFactors(arrayOf(interrupting)).bake(), greedyRepairOnRestart = false)
+        val scoped = params.copy(initialAssignment = valid)
+        solver.resumableSolve(scoped).use { handle ->
+            assertNull(handle.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L))
+            assertTrue(cancelled)
+            assertFalse(handle.isDone)
+            interrupt = false
+            cancelled = false
+
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+
+            assertEquals(valid, assertIs<SolveResult.Sat>(result).assignment)
+        }
     }
 
     @Test
