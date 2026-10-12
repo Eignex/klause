@@ -5,7 +5,7 @@ Boolean choices or arithmetic decisions; the theory checks their consequences an
 contributes authoritative coordinates or conflicts. Frontends select no concrete
 theory, and finite propagation retains Bool+Int state only.
 
-Difference, linear integer, linear real, linear mixed and polynomial real arithmetic
+Difference, linear integer, linear real, linear mixed, nonlinear integer and polynomial real arithmetic
 are peer contracts. Each page describes its scope, composition, result authority,
 state/resources and implementation. Shared mechanisms can serve several theories;
 a separate semantic contract does not require a separate implementation package.
@@ -18,6 +18,7 @@ a separate semantic contract does not require a separate implementation package.
 | [Linear integer arithmetic](theories/linear-integer.md) | Linear integer constraints with Boolean structure | Exact linear checks, integer reductions and branching |
 | [Linear real arithmetic](theories/linear-real.md) | Linear real constraints with Boolean structure | Exact rational linear checks; a graph for admitted difference fragments |
 | [Linear mixed arithmetic](theories/linear-mixed.md) | Linear integer/real constraints with Boolean structure | Exact linear checks with integrality-preserving search |
+| [Nonlinear integer arithmetic](theories/nonlinear-integer.md) | Polynomial Int/Real/Bool satisfaction | Incomplete integer search and repairs with exact real completion |
 | [Polynomial real arithmetic](theories/polynomial-real.md) | Polynomial real constraints with Boolean structure, optionally beside finite factors | Exact algebraic completion and CAD |
 
 These are implemented fragments, not a requirement that every source or operation

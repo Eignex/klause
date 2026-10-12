@@ -186,6 +186,12 @@ The route does not support enumeration or optimization. Its parameters are
 `nra-matrix-cells=auto|unlimited|N`: defaults are unlimited work, 65,536 coefficients
 and 262,144 matrix cells. Work/matrix zero exhausts the allowance; a dense cap must
 be positive. These native units are separate from `node-limit` and linear open work.
+Nonlinear integer/mixed satisfaction accepts `nia-candidates=auto|unlimited|N`
+and `nia-moves=auto|unlimited|N`, with defaults 1,024 and 256. The selected engine
+executes integer search, LS, ALNS or their mixed schedule through the shared pipeline.
+`node-limit` is consumed once for search/heuristic strategy effort; `nra-work-limit`
+remains cumulative exact arithmetic work. `lsMoves` and `lsCompletions` record
+heuristic activity. Candidate exhaustion yields UNKNOWN. See [nonlinear integer execution](theories/nonlinear-integer.md).
 The library result retains backend `exact-nra`. `-s` reports `nraWork`, `nraProjectedPolynomials`,
 `nraLiftedCells` and, on a resource stop, `nraResource`. Legacy open counters remain
 zero. The whole-run deadline includes source admission. `open-bound-proof=false`

@@ -100,3 +100,8 @@ its operation finishes.
 [Polynomial invocation ownership](../theories/polynomial-real.md#invocation-ownership) defines that adapter's
 fresh-call and conditioned-query lifetimes. [Resource allowances](resources.md)
 owns cumulative scope composition.
+
+[Nonlinear integer requests](../theories/nonlinear-integer.md) retain immutable
+source formulas and create fresh execution state for each call. Original Boolean
+pins and exact integer windows are captured without changing that source. Refutations
+cover the actual supplied scope; a neighborhood failure cannot refute its parent.

@@ -50,6 +50,7 @@ bootstrap slices retain the containing lifetime scope and rearm their invocation
 | LP work and iteration limits | Native LP work proxy and pivots, individual solve or split component | Legacy zero delegates to the engine / an exhausted caller token prevents entry | Incomplete solve may retain certified bounds; no optimum proof |
 | Open-theory limits | Open policy work, leaves and decisions, retained complete theory scope | `Long.MAX_VALUE` / exhausted scope | Unknown budget exhaustion; completed proofs only |
 | `QfNraParams.maximumWork` | Native normalization, CAD and Boolean work, one invocation | Null / zero prevents entry | Unknown before verdict publication |
+| Nonlinear integer candidate/move controls | Exact candidate attempts and heuristic moves, one pipeline invocation | Long maximum / zero prevents that stage | UNKNOWN; candidate exhaustion supplies no proof |
 | Neutral kernel controls | Caller-owned native work, optional maximum and cancellation | Missing maximum / zero maximum is exhausted | Kernel interruption without solver result semantics |
 
 Local-search initial preparation retains its progress between cancelled invocations.
@@ -123,3 +124,8 @@ reconstruct arithmetic charges.
 See [sessions](sessions.md) for handle ownership, [presolve](presolve.md) for phase
 telemetry, [portfolio scheduling](portfolio.md) for coverage and
 [LP certification](../lp/certification.md) for partial numerical evidence.
+
+[Nonlinear integer execution](../theories/nonlinear-integer.md#state-and-resources)
+shares cumulative polynomial work across search and all neighborhood callbacks.
+Integer candidate decisions and shared heuristic instructions retain their distinct
+strategy/node currency; arithmetic units are not charged again as decisions.

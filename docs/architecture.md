@@ -48,7 +48,7 @@ objective units must survive preparation and reconstruction.
 [portfolios](solver/portfolio.md) define scheduling and result admission.
 [Presolve](solver/presolve.md) defines source reconstruction and phase accounting.
 [Theory services](theories.md) defines peer difference, linear integer, linear real,
-linear mixed and polynomial real contracts and their common composition boundary.
+linear mixed, nonlinear integer and polynomial real contracts and their common composition boundary.
 [LP architecture](lp/architecture.md) defines numerical ownership and consumers.
 
 ## Repository modules

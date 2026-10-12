@@ -45,6 +45,13 @@ algebraic incumbents and native work counters. Only complete traversal admits an
 optimality or infeasibility proof. See [polynomial composition](theories/polynomial-real.md#shared-model-composition)
 for that route's limits.
 
+`NonlinearIntegerProblem.pipelineRequest()` exposes exact polynomial integer/mixed
+sources through `NonlinearIntegerTheoryRequest`. `NonlinearIntegerTheoryParams`
+combines polynomial controls, candidate/move limits and an optional shared node
+budget. Every engine returns the common verdict/witness surface. Rebuilt assignments
+retain arbitrary-width original integers and exact algebraic original reals;
+numeric conditional auxiliaries remain private. See [nonlinear integer semantics](theories/nonlinear-integer.md).
+
 The [quadratic objective representation](model.md#quadratic-objective-representation)
 preserves exact source terms and remapping. Its certificate primitives do not alone
 expose quadratic optimization through the pipeline.
