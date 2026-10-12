@@ -149,8 +149,11 @@ lexical polynomial lowering before legacy expansion can capture caller-local bin
 The reference scan visits nested applications and zero-arity symbols iteratively under
 caller cancellation. Unused helper declarations retain lexical body and result-sort
 validation without changing an otherwise supported linear route. Nonlinear helper
-admission also checks objective references. Other successful linear inputs retain
-their existing routes, including integer/mixed sources and objectives.
+admission also checks objective references. Objectives over `ContinuousProduct` or
+`RealProduct` constraints use exact source capture, including affine objectives
+whose coefficients fit the linear representation. Equivalent affine and degree-two
+syntax retain the same source route, exact rational coefficients and direction.
+Other successful linear inputs retain their existing routes.
 Helper parameter/return sorts and explicit integer operations preserve integer syntax
 even when there is no declared integer variable.
 Reopenable streamed inputs close each owned closeable source, or drain active
@@ -183,8 +186,8 @@ original Bool/Int/Real identities. Numeric selections controlled by original
 Boolean coordinates expand into their exact Boolean polynomial terms; their
 guarded auxiliary definitions remain private to the formula. Hidden nonpolynomial
 coordinates and objectives above degree two decline. Nonlinear objective syntax
-cannot be published as a finite proxy objective. Ordinary successful linear
-objectives retain linear admission.
+cannot be published as a finite proxy objective. Affine objectives over linear
+constraints retain linear admission.
 
 ### Source representation
 

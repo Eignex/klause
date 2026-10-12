@@ -24,8 +24,7 @@ representation and publication contracts live with their source format. The
 The solver supports finite constraints, linear arithmetic and polynomial real
 constraints through different mechanisms. This is current execution coverage,
 separate from what an individual frontend can parse. [The vision](vision.md)
-requires common model breadth and an available complete-search/local-search pair;
-the specific remaining misalignments are listed below.
+requires common model breadth and an available complete-search/local-search pair.
 Planned execution and evidence refactors are tracked under
 [active work toward the vision](vision.md#active-work-toward-the-vision).
 
@@ -47,15 +46,6 @@ A relaxation supplies deductions, not support for omitted source constraints.
 describe implemented engine roles. Format-specific admission and result rules are
 linked below; [theory contracts](theories.md) define the fragment-specific checks
 and composition boundaries.
-
-### Identified vision misalignments
-
-These restrictions and publication risks conflict with the support contract; they
-are work to close, not permanent exceptions to shared breadth or source checking.
-
-| Gap | Current behavior | Tracking |
-|---|---|---|
-| Real linear objectives on polynomial models | Linear objective admission rejects costs accepted by an equivalent quadratic objective specification | [#2655](https://github.com/Eignex/klause/issues/2655) |
 
 ## Finite and open models
 
