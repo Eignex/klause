@@ -47,9 +47,9 @@ class SourceCondition(
 
     internal fun bound(id: SourceCoordinate, value: BigFraction, upper: Boolean): SourceCondition =
         if (upper) SourceCondition(capturedBools, capturedLower, capturedUpper + (id to
-            (capturedUpper[id]?.let { minOf(it, value) } ?: value)))
+            (capturedUpper[id]?.let { if (it < value) it else value } ?: value)))
         else SourceCondition(capturedBools, capturedLower + (id to
-            (capturedLower[id]?.let { maxOf(it, value) } ?: value)), capturedUpper)
+            (capturedLower[id]?.let { if (it > value) it else value } ?: value)), capturedUpper)
 
     override fun equals(other: Any?): Boolean = other is SourceCondition &&
         capturedBools == other.capturedBools && capturedLower == other.capturedLower && capturedUpper == other.capturedUpper
