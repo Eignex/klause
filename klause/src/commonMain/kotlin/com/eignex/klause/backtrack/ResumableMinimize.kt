@@ -791,12 +791,12 @@ internal class ResumableMinimize(
      *  to surface when this call installed it, else null. Admission — a finite score, and the certified
      *  continuous values only a leaf's residual LP can attach — is [sampleAdmission]'s to decide. */
     private fun recordIfImproving(sample: Sample, o: Double): MinimizeResult.WithSample? {
-        val exact = if (rebindable) {
+        val exact = if (rebindable || discreteObjective) {
             exactSourceObjective(objective, sample, params.toleranceCheck) ?: return null
         } else {
             null
         }
-        if (exact != null && !beatsExternalCutoff(exact, externalCutoff())) return null
+        if (rebindable && exact != null && !beatsExternalCutoff(exact, externalCutoff())) return null
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
         brancher.onSolution(sample)
