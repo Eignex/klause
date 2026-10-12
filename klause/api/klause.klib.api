@@ -750,6 +750,10 @@ abstract fun interface com.eignex.klause.propagation/CpBranching { // com.eignex
     }
 }
 
+abstract fun interface com.eignex.klause.solver.pipeline/ExactTheorySatisfactionRequest { // com.eignex.klause.solver.pipeline/ExactTheorySatisfactionRequest|null[0]
+    abstract fun execute(com.eignex.klause.solver.pipeline/PolynomialTheoryParams, com.eignex.klause.solver.pipeline/FiniteEngine, kotlin/Int): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/ExactTheorySatisfactionRequest.execute|execute(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;kotlin.Int){}[0]
+}
+
 abstract fun interface com.eignex.klause.solver.search/BooleanBranching { // com.eignex.klause.solver.search/BooleanBranching|null[0]
     abstract fun alternatives(com.eignex.klause.solver.search/SearchContext): kotlin.collections/List<com.eignex.klause.solver.search/SearchDecision>? // com.eignex.klause.solver.search/BooleanBranching.alternatives|alternatives(com.eignex.klause.solver.search.SearchContext){}[0]
 
@@ -11506,14 +11510,20 @@ final class com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution { /
 }
 
 final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klause.solver.pipeline/TheoryParams|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.backtrack/NodeBudget? = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.backtrack.NodeBudget?){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.backtrack.NodeBudget?;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.Long?){}[0]
 
+    final val alnsIterations // com.eignex.klause.solver.pipeline/TheoryParams.alnsIterations|{}alnsIterations[0]
+        final fun <get-alnsIterations>(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.alnsIterations.<get-alnsIterations>|<get-alnsIterations>(){}[0]
     final val cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation|{}cancellation[0]
         final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
     final val lbdGlue // com.eignex.klause.solver.pipeline/TheoryParams.lbdGlue|{}lbdGlue[0]
         final fun <get-lbdGlue>(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.lbdGlue.<get-lbdGlue>|<get-lbdGlue>(){}[0]
     final val maxDecisions // com.eignex.klause.solver.pipeline/TheoryParams.maxDecisions|{}maxDecisions[0]
         final fun <get-maxDecisions>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.maxDecisions.<get-maxDecisions>|<get-maxDecisions>(){}[0]
+    final val maxFlips // com.eignex.klause.solver.pipeline/TheoryParams.maxFlips|{}maxFlips[0]
+        final fun <get-maxFlips>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.maxFlips.<get-maxFlips>|<get-maxFlips>(){}[0]
+    final val maxInstructions // com.eignex.klause.solver.pipeline/TheoryParams.maxInstructions|{}maxInstructions[0]
+        final fun <get-maxInstructions>(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.maxInstructions.<get-maxInstructions>|<get-maxInstructions>(){}[0]
     final val maxLearnedClauses // com.eignex.klause.solver.pipeline/TheoryParams.maxLearnedClauses|{}maxLearnedClauses[0]
         final fun <get-maxLearnedClauses>(): kotlin/Int? // com.eignex.klause.solver.pipeline/TheoryParams.maxLearnedClauses.<get-maxLearnedClauses>|<get-maxLearnedClauses>(){}[0]
     final val maxLeaves // com.eignex.klause.solver.pipeline/TheoryParams.maxLeaves|{}maxLeaves[0]
@@ -11528,6 +11538,8 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
         final fun <get-openHintMinSplits>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.openHintMinSplits.<get-openHintMinSplits>|<get-openHintMinSplits>(){}[0]
     final val openWorkLimit // com.eignex.klause.solver.pipeline/TheoryParams.openWorkLimit|{}openWorkLimit[0]
         final fun <get-openWorkLimit>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.openWorkLimit.<get-openWorkLimit>|<get-openWorkLimit>(){}[0]
+    final val randomSeed // com.eignex.klause.solver.pipeline/TheoryParams.randomSeed|{}randomSeed[0]
+        final fun <get-randomSeed>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.randomSeed.<get-randomSeed>|<get-randomSeed>(){}[0]
     final val sharedRestart // com.eignex.klause.solver.pipeline/TheoryParams.sharedRestart|{}sharedRestart[0]
         final fun <get-sharedRestart>(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.sharedRestart.<get-sharedRestart>|<get-sharedRestart>(){}[0]
     final val timeout // com.eignex.klause.solver.pipeline/TheoryParams.timeout|{}timeout[0]
@@ -11537,6 +11549,10 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
     final fun component10(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component10|component10(){}[0]
     final fun component11(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component11|component11(){}[0]
     final fun component12(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/TheoryParams.component12|component12(){}[0]
+    final fun component13(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.component13|component13(){}[0]
+    final fun component14(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component14|component14(){}[0]
+    final fun component15(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component15|component15(){}[0]
+    final fun component16(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.component16|component16(){}[0]
     final fun component2(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component3|component3(){}[0]
     final fun component4(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.component4|component4(){}[0]
@@ -11545,7 +11561,7 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
     final fun component7(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.component7|component7(){}[0]
     final fun component8(): com.eignex.klause.solver.pipeline/OpenBranching // com.eignex.klause.solver.pipeline/TheoryParams.component8|component8(){}[0]
     final fun component9(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component9|component9(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.backtrack/NodeBudget? = ...): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.backtrack.NodeBudget?){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ...): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.backtrack.NodeBudget?;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.Long?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/TheoryParams.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TheoryParams.toString|toString(){}[0]

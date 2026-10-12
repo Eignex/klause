@@ -34,16 +34,22 @@ internal fun linearNeighborhoodInvocation(
     portfolio.evidenceVerification = PortfolioEvidence(identity, openWitnessVerifier(model, objective))
     val stop = params.cancellation or params.timeout
     return portfolio.use {
-        if (objective == null) OpenTheoryExecution.Satisfy(when (val result = it.solve(stop)) {
-            is SolveResult.Sat -> OpenTheoryResult.Sat(OpenTheoryAssignment.Sampled(result.assignment), result.stats)
-            is SolveResult.Unsat -> error("a heuristic neighborhood cannot refute the source")
-            is SolveResult.Unknown -> OpenTheoryResult.Unknown(result.reason, result.stats)
-        }) else OpenTheoryExecution.Optimize(when (val result =
-            it.minimize(stop, null, PortfolioIncumbents.exact(objective))
-        ) {
-            is MinimizeResult.WithSample -> OpenTheoryOptimum.Bounded(OpenTheoryAssignment.Sampled(result.sample),
-                objective.evaluateExact(result.sample), (result as? MinimizeResult.BestFound)?.reason
-                    ?: TerminationReason.BudgetExhausted, result.stats)
+        if (objective == null) {
+            val result = it.solve(stop)
+            return@use OpenTheoryExecution.Satisfy(when (result) {
+                is SolveResult.Sat -> OpenTheoryResult.Sat(
+                    OpenTheoryAssignment.Sampled(result.assignment), result.stats,
+                )
+                is SolveResult.Unsat -> error("a heuristic neighborhood cannot refute the source")
+                is SolveResult.Unknown -> OpenTheoryResult.Unknown(result.reason, result.stats)
+            })
+        }
+        val result = it.minimize(stop, null, PortfolioIncumbents.exact(objective))
+        OpenTheoryExecution.Optimize(when (result) {
+            is MinimizeResult.WithSample -> OpenTheoryOptimum.Bounded(
+                OpenTheoryAssignment.Sampled(result.sample), objective.evaluateExact(result.sample),
+                (result as? MinimizeResult.BestFound)?.reason ?: TerminationReason.BudgetExhausted, result.stats,
+            )
             is MinimizeResult.Infeasible -> error("a heuristic neighborhood cannot refute the source")
             is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
         })
