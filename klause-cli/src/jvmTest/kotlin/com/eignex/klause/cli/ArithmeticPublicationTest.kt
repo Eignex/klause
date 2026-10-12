@@ -42,8 +42,8 @@ class ArithmeticPublicationTest {
             }
         }
         val publication = ArithmeticPublication(output)
-        val first = SourceValue.Rational(BigFraction.ofLong(3))
-        val second = SourceValue.Rational(BigFraction.ofLong(2))
+        val first: SourceValue = SourceValue.Rational(BigFraction.ofLong(3))
+        val second: SourceValue = SourceValue.Rational(BigFraction.ofLong(2))
 
         publication.publish("x=3", first)
         assertEquals(listOf("x=3" to first), received)
