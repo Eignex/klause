@@ -15,8 +15,8 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class OpenExactNeighborhoodTest {
@@ -151,6 +151,24 @@ class OpenExactNeighborhoodTest {
         assertIs<ExactNeighborhoodResult.Undecided>(interrupted)
         val siblingSample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
         assertEquals(BigFraction.ZERO, siblingSample.exactReals?.single())
+        adapter.close()
+    }
+
+    @Test
+    fun `an interrupted native initialization leaves a later source query available`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val adapter = OpenExactNeighborhood(model, TheoryParams())
+        val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        var polls = 0
+
+        val interrupted = adapter.check(free, Cancellation { ++polls >= 3 })
+        val zero = mapOf(0 to BigFraction.ZERO)
+        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+
+        assertIs<ExactNeighborhoodResult.Undecided>(interrupted)
+        val sample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
+        assertEquals(BigFraction.ZERO, sample.exactReals?.single())
         adapter.close()
     }
 
