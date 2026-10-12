@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
@@ -125,6 +126,27 @@ class PolynomialStrategyAdaptersTest {
             assertNotNull(result.assignment.algebraicRealValue(0))
             kotlin.test.assertTrue(result.stats.ls.completionsRefuted.sum > 0)
             kotlin.test.assertTrue(result.stats.ls.moves.sum > 1)
+        }
+    }
+
+    @Test
+    fun `pure real heuristic arms respect caller cancellation and exhausted node allowances`() {
+        val input = assertIs<SmtLibInput.Polynomial>(SmtLibAdmission.parse(
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ))
+        val request = input.problem.pipelineRequest()
+        val controls = listOf(
+            LocalSearchParams(cancellation = Cancellation { true }),
+            LocalSearchParams(nodeBudget = NodeBudget(0)),
+        )
+
+        for (local in controls) for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val execution = OpenTheoryPipeline.execute(request,
+                PolynomialTheoryParams(strategy = PolynomialStrategyParams(localSearch = local)), engine)
+
+            assertIs<OpenTheoryResult.Unknown>(execution.result)
+            assertEquals(0.0, execution.result.stats.ls.completions.sum)
+            assertEquals(0L, execution.stats.workSpent)
         }
     }
 

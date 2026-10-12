@@ -39,13 +39,20 @@ continuous objectives decline this route; they are not boxed or discretized.
 Backtracking checks interval relaxations and fixed finite branches. Local search
 generates candidates from finite factors, rechecks their pinned finite fixpoint, then
 pins their complete finite values in a theory query before publication. ALNS uses that same completion in bootstrap,
-finite CP repair and its inner local search. Pure-real sources use an empty finite
-projection, so the local-search arm still runs and obtains an exact completion.
+finite CP repair and its inner local search. Pure-real sources and fixed finite
+projections use exact coordinate neighborhoods with the same source witness authority.
 Rejected heuristic candidates never establish a global refutation.
 The finite projection can request `CandidateCompletion` even without a continuous
 assignment buffer. Rejected or indeterminate completions take the ordinary restart
 path, while finite factor degrees guide the walk. Native theory allowance persists
 across queries and neighbourhood pins.
+
+Coordinate neighborhoods first check a pinned proposal, then relax coordinate or
+block windows while preserving every source constraint. Rational centers derived
+from isolating intervals guide proposals; published coordinates retain their exact
+algebraic scalars. Native work stays on the containing invocation across repairs.
+ALNS bootstraps within the heuristic allowance before spending its configured
+improving-iteration cap.
 
 `OpenTheoryPipeline.minimize` supports objectives over the finite columns using the
 same projection, theory and objective in every worker. Complete traversal can prove
@@ -307,10 +314,3 @@ result requires a complete exact witness; an unsatisfiable result requires exhau
 of every unpruned cell and its Boolean alternatives. Root indices in returned
 `AlgebraicReal` values identify their rational defining polynomial's distinct roots,
 not the position in a specialized lifting family.
-
-Coordinate neighborhoods first check a pinned proposal, then relax coordinate or
-block windows while preserving every source constraint. Rational centers derived
-from isolating intervals guide proposals; published coordinates retain their exact
-algebraic scalars. Native work stays on the containing invocation across repairs.
-ALNS bootstraps within the heuristic allowance before spending its configured
-improving-iteration cap.

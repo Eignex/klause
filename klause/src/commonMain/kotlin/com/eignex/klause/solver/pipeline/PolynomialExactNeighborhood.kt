@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
@@ -60,9 +61,9 @@ internal class PolynomialExactNeighborhood(
     }
 
     fun search(adaptive: Boolean, seed: Long, maximumMoves: Long, maximumInstructions: Long,
-        maximumImprovementMoves: Long?): ExactNeighborhood = ExactNeighborhood(
+        maximumImprovementMoves: Long?, nodeBudget: NodeBudget?): ExactNeighborhood = ExactNeighborhood(
         0, List(coordinates.size) { BigFraction.ZERO }, this, objective,
-        coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = seed,
+        coordinateValues = { sample -> centers(sample) }, adaptive = adaptive, seed = seed, nodeBudget = nodeBudget,
         maximumMoves = maximumMoves, maximumInstructions = maximumInstructions,
         maximumImprovementMoves = maximumImprovementMoves, nativeWork = { invocation.stats.workSpent },
     )
