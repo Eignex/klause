@@ -474,7 +474,8 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
             conflictSupport = support
             meter.raySuccesses++
         } else {
-            val proof = CertifiedLpBound(checked.value, support = support)
+            meter.storage(candidate.size.toLong() * 8L)
+            val proof = CertifiedLpBound(checked.value, support = support, dualMultipliers = candidate)
             meter.step()
             meter.dualSuccesses++
             if (bound == null || proof.value > requireNotNull(bound).value) {

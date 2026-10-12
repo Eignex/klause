@@ -311,4 +311,23 @@ class SourceEvidenceVerifierTest {
             SourceEvidence(scope, clause, SourceDerivation.Import(imported)),
         ))
     }
+
+    @Test
+    fun `an absent affine objective cannot be interpreted as a constant objective`() {
+        val context = SourceProofContext(scope, setOf(x), emptyMap())
+        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ZERO),
+            SourceDerivation.Combination(emptyList()))
+
+        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(evidence))
+    }
+
+    @Test
+    fun `an explicitly declared constant affine objective admits its constant bound`() {
+        val context = SourceProofContext(scope, setOf(x), emptyMap(), objective = emptyMap())
+        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ZERO),
+            SourceDerivation.Combination(emptyList()))
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
+    }
+
 }

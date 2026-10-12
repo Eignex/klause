@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.div
@@ -152,6 +153,8 @@ internal class IntegerCertificate(
 
     /** A copy of `N = 2ᵏ · objective` (the exact scaled objective numerator); see [objectiveScaleBits]. */
     fun objectiveNumerator(): Int128 = numerator.copy()
+
+    fun exactMultipliers(): List<BigFraction> = mult.map { BigFraction.of(bigIntOf(it), bigIntOf(scale)) }
 
     /** Whether row [row] carries nonzero dual weight (for non-global-row premise citation). */
     fun dualNonzeroRow(row: Int): Boolean = mult[row] != 0L
