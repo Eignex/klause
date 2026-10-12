@@ -62,10 +62,12 @@ internal object MpsMode : CliMode {
                 if (sample.exactReals == null && compiled.model.numRealVars > 0) {
                     // A float leaf under tolerance semantics: its values are the doubles themselves.
                     state.latestSourceObjective = compiled.sourceObjective(sample.ints, sample.reals)
+                    state.exactSourceWitness = false
                     renderMpsFloat(compiled, sample)
                 } else {
                     val witness = compiled.sourceWitness(sample.ints, sample.exactReals)
                     state.latestSourceObjective = witness.objective
+                    state.exactSourceWitness = compiled.sourceExact
                     renderMpsWitness(compiled, witness)
                 }
             }
@@ -84,6 +86,7 @@ internal object MpsMode : CliMode {
                 }
                 state.sourceWitnessAccepted = witness != null
                 state.latestSourceObjective = witness?.objective
+                if (witness != null) state.exactSourceWitness = compiled.sourceExact
                 renderMpsOpenModel(compiled, assignment)
             }
             val objective = compiled.objective?.toLinearObjective()
@@ -168,6 +171,7 @@ internal object MpsMode : CliMode {
                 { state.latestSourceObjective },
                 state.sourceExact && !state.witnessOnly,
                 { state.sourceWitnessAccepted },
+                { state.exactSourceWitness },
             )
         }
     }
@@ -182,6 +186,7 @@ private class MpsOutputState(
     var latestSourceObjective: BigFraction? = null
     var sourceWitnessAccepted = true
     var witnessOnly = false
+    var exactSourceWitness: Boolean? = null
 }
 
 private fun parseOpenMpsNumber(value: String): BigFraction {
@@ -246,6 +251,7 @@ internal class MpsOutput(
     // An infeasibility or unboundedness proof covers the lowered model only, so it needs the source exactly.
     private val proofExact: Boolean = sourceExact,
     private val sourceWitnessAccepted: () -> Boolean = { true },
+    private val exactSourceWitness: () -> Boolean? = { null },
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
@@ -294,7 +300,12 @@ internal class MpsOutput(
     override fun verdictReason(verdict: Verdict): String? {
         val cause = super.verdictReason(verdict)
         val sourceQualification = sourceDifference?.let { "lowered model differs from MPS source at $it" }
-        return listOfNotNull(sourceQualification, cause)
+        val witnessQualification = when (exactSourceWitness()) {
+            true -> "exact original MPS source witness"
+            false -> "MPS source tolerance witness"
+            null -> null
+        }
+        return listOfNotNull(sourceQualification, witnessQualification, cause)
             .joinToString("; ").ifEmpty { null }
     }
 }
