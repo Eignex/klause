@@ -32,9 +32,10 @@ class QuadraticCertificate private constructor(
     val claim: QuadraticClaim,
     /** Original-source evidence when capture was requested. */
     val evidence: SourceResultEvidence?,
+    private val attestedScope: SourceScope? = evidence?.scope,
 ) {
     /** Captured original revision, invocation restrictions and objective direction. */
-    val scope: SourceScope? get() = evidence?.scope
+    val scope: SourceScope? get() = attestedScope
 
     /** Check the actual expected claim against independently supplied original-source semantics. */
     fun verify(
@@ -45,6 +46,9 @@ class QuadraticCertificate private constructor(
         ?: SourceEvidenceCheck.Unavailable("quadratic original-source derivation capture unavailable")
 
     internal companion object {
+        fun attested(model: ModelIdentity, scope: SourceScope, claim: QuadraticClaim): QuadraticCertificate =
+            QuadraticCertificate(model, claim, null, scope)
+
         fun captured(
             model: ModelIdentity, claim: QuadraticClaim, evidence: SourceResultEvidence,
         ): QuadraticCertificate =

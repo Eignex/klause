@@ -64,8 +64,8 @@ class SourceQuadraticEvidenceTest {
         val zero = AlgebraicArithmetic(PolynomialArithmetic()).rational(BigFraction.ZERO)
         val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(0)), zero)
         val identity = ModelIdentity.of(model, objective)
-        val boundCertificate = QuadraticCertificate.verified(identity, scope, "uncaptured", QuadraticClaim.Bound)
-        val terminal = QuadraticCertificate.verified(identity, scope, "uncaptured", QuadraticClaim.Optimal)
+        val boundCertificate = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Bound)
+        val terminal = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Optimal)
         val result = QuadraticOptimizationResult.Optimal(point, QuadraticObjectiveBound(zero, false, boundCertificate),
             terminal, ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
 
@@ -81,8 +81,8 @@ class SourceQuadraticEvidenceTest {
         val zero = AlgebraicArithmetic(PolynomialArithmetic()).rational(BigFraction.ZERO)
         val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(0)), zero)
         val identity = ModelIdentity.of(model, objective)
-        val boundCertificate = QuadraticCertificate.verified(identity, scope, "uncaptured", QuadraticClaim.Bound)
-        val terminal = QuadraticCertificate.verified(identity, scope, "uncaptured", QuadraticClaim.Optimal)
+        val boundCertificate = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Bound)
+        val terminal = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Optimal)
         val result = QuadraticOptimizationResult.Optimal(point, QuadraticObjectiveBound(zero, false, boundCertificate),
             terminal, ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
 
