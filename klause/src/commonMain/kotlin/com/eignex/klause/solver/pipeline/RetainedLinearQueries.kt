@@ -40,7 +40,9 @@ internal class RetainedLinearQueries(
     private val model: Problem,
     private val params: TheoryParams,
     private val objective: LinearObjective?,
-    private val hints: (Cancellation, OpenTheorySolveState) -> SearchCandidateHints = { _, _ -> SearchCandidateHints.None },
+    private val hints: (Cancellation, OpenTheorySolveState) -> SearchCandidateHints = { _, _ ->
+        SearchCandidateHints.None
+    },
     private val open: (Cancellation, OpenTheorySolveState) -> PlannedSearch?,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val state = OpenTheorySolveState(params)
@@ -57,6 +59,7 @@ internal class RetainedLinearQueries(
         state.work.snapshot().openTheoryChecks >= params.maxLeaves
 
     fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T {
+        check(!closed) { "conditioned query owner is closed" }
         validate(condition)
         return scope.withCondition(condition, cancellation) { action() }
     }
@@ -207,14 +210,17 @@ internal class RetainedLinearQueries(
     private fun AssembledSearchModel.sample(): Sample {
         val integers = List(model.numIntVars) { requireNotNull(valueOf(SearchExactIntValue(SourceIntId(it)))) }
         val reals = List(model.numRealVars) { requireNotNull(valueOf(SearchExactRealValue(SourceRealId(it)))) }
+        val finite = if (integers.all { it.fitsLong() }) LongArray(integers.size) { integers[it].toLongExact() }
+            else LongArray(0)
         return Sample(BooleanArray(model.numBoolVars) { requireNotNull(valueOf(SearchBoolValue(it))) },
-            if (integers.all { it.fitsLong() }) LongArray(integers.size) { integers[it].toLongExact() } else LongArray(0),
+            finite,
             DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals, exactInts = integers)
     }
 
     private fun validate(condition: ExactNeighborhoodCondition) {
         require(condition.bools.keys.all { it in 0 until model.numBoolVars })
-        require((condition.lower.keys + condition.upper.keys).all { it in 0 until model.numIntVars + model.numRealVars })
+        val coordinates = condition.lower.keys + condition.upper.keys
+        require(coordinates.all { it in 0 until model.numIntVars + model.numRealVars })
         require(condition.cutoff == null || objective != null) { "a cutoff requires the source objective" }
     }
 

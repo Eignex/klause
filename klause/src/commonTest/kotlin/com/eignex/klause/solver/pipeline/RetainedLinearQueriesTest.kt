@@ -27,7 +27,8 @@ class RetainedLinearQueriesTest {
                 ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)), Cancellation.Never))
             val result = it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
 
-            assertEquals("1/3", assertIs<ExactNeighborhoodResult.Witness>(result).sample.exactReals?.single().toString())
+            val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+            assertEquals("1/3", sample.exactReals?.single().toString())
         }
     }
 
@@ -44,13 +45,15 @@ class RetainedLinearQueriesTest {
         queries.use {
             for ((condition, stop) in listOf(
                 ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to huge)) to Cancellation.Never,
-                ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()) to Cancellation { true },
+                ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()) to
+                    Cancellation { true },
             )) {
                 assertIs<ExactNeighborhoodResult.Undecided>(it.check(condition, stop))
                 val zero = mapOf(0 to BigFraction.ZERO)
                 val result = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
 
-                assertEquals(BigFraction.ZERO, assertIs<ExactNeighborhoodResult.Witness>(result).sample.exactReals?.single())
+                val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+                assertEquals(BigFraction.ZERO, sample.exactReals?.single())
             }
         }
     }
