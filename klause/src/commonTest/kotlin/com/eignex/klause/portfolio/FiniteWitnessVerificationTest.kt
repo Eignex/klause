@@ -55,8 +55,10 @@ class FiniteWitnessVerificationTest {
             numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 2.0)).bake()
         val third = BigFraction.ofLong(3).reciprocal()
         val samples = listOf(
-            Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.0, 0.0), listOf(third, third + third)),
-            Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.0, 0.0), listOf(third, BigFraction.ONE)),
+            Sample(booleanArrayOf(), longArrayOf(2),
+                doubleArrayOf(third.toDouble(), (third + third).toDouble()), listOf(third, third + third)),
+            Sample(booleanArrayOf(), longArrayOf(2),
+                doubleArrayOf(third.toDouble(), 1.0), listOf(third, BigFraction.ONE)),
         )
 
         val accepted = finiteWitnessVerifier(source, null).verify(Candidate<Sample, Double?>(samples[0], null))

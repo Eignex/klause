@@ -10,7 +10,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -57,10 +56,14 @@ class OpenTheoryPipelineTest {
     }
 
     @Test
-    fun `an objective weighting a Boolean is left to local search`() {
+    fun `a Boolean objective admits source-bound complete descent`() {
         val objective = LinearObjective(boolWeights = longArrayOf(1L), intCoefficients = longArrayOf(-1L))
 
-        assertFalse(OpenTheoryPipeline.canMinimize(OpenTheoryRequest(openBelow(), objective)))
+        val request = OpenTheoryRequest(openBelow(), objective)
+
+        val result = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(request)).result
+
+        assertEquals("-7", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
     }
 
     @Test
