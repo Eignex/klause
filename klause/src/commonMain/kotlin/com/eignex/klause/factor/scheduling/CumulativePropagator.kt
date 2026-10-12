@@ -356,7 +356,22 @@ internal class CumulativePropagator(
             }
         }
 
+        return scanEdgeWindows(state, effDur, effCap, reverse, taskIds, ests, lcts, energies, cs)
+    }
 
+    @Suppress("LongParameterList")
+    private fun scanEdgeWindows(
+        state: PropagationState,
+        effDur: LongArray,
+        effCap: Long,
+        reverse: Boolean,
+        taskIds: IntArray,
+        ests: LongArray,
+        lcts: LongArray,
+        energies: LongArray,
+        cs: LongArray,
+    ): Boolean {
+        val m = taskIds.size
         val estOrder = argsortBy(m) { a, b -> ests[a].compareTo(ests[b]) }
         val leafPos = IntArray(m)
         for (leafIdx in 0 until m) leafPos[estOrder[leafIdx]] = leafIdx
