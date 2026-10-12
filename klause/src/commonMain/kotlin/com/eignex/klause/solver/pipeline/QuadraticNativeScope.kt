@@ -44,9 +44,9 @@ internal class QuadraticNativeScope private constructor(
 
     init { require(maximumWorkerWork == null || maximumWorkerWork >= 0) }
 
-    fun worker(armId: Int, maximumWork: Long? = null): QuadraticNativeScope = ledger.lock.withLock {
-        require(root == null && armId >= 0) { "native workers belong to their containing scope" }
-        val worker = workers.getOrPut(armId) { QuadraticNativeScope(params, ledger, this, maximumWork) }
+    fun worker(slotId: Int, maximumWork: Long? = null): QuadraticNativeScope = ledger.lock.withLock {
+        require(root == null && slotId >= 0) { "native workers belong to their containing scope" }
+        val worker = workers.getOrPut(slotId) { QuadraticNativeScope(params, ledger, this, maximumWork) }
         require(worker.maximumWorkerWork == maximumWork) { "worker native quota cannot change" }
         worker
     }
