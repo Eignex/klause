@@ -115,6 +115,11 @@ internal class LinearAuthority(private val budget: SourceLpBudget) {
             }
         }
         if (feasible == null) return LinearAuthorityResult(bound = bound)
+        if (bound != null) {
+            val proof = checked(SourceClaim.Optimal(feasible, (bound.claim as SourceClaim.Bound).value),
+                SourceDerivation.Optimum(SourceDerivation.SourceWitness, bound.derivation))
+            if (proof != null) return LinearAuthorityResult(proof, bound, feasible)
+        }
         closure.unboundedness?.let { unbounded ->
             var scale = BIG_ONE
             for (id in coordinates.indices) {
