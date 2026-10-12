@@ -61,6 +61,13 @@ class FinitePipelineRequest(
     val componentPlan: ComponentPlan = requireNotNull(preparedPlan.componentPlan) {
         "finite preparation requires a finite/linear source plan"
     }
+
+    init {
+        require(preparedPlan.model === problem) { "finite request and plan must retain the same canonical model" }
+        require(componentPlan == null || componentPlan === this.componentPlan) {
+            "finite request and plan must retain the same component ownership"
+        }
+    }
 }
 
 /** The finite model handed from policy to a concrete search engine. */
