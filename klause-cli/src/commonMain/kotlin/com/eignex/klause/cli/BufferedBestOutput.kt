@@ -5,12 +5,10 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.SolveStats
 
 /**
- * Shared plumbing for the competition [OutputProtocol]s that buffer the best solution and emit it
- * with a final status line (SMT-LIB, XCSP3) — as opposed to MiniZinc, which streams each solution.
- * The buffered model is printed only on a feasible verdict; statistics render as `<prefix> key=value`
- * comment lines. Subclasses supply the comment [commentPrefix], the per-verdict [statusLine], and the
- * [keepStat] filter selecting which search counters that format reports; [streamObjective] opts into
- * printing an objective line per incumbent.
+ * Shared competition output plumbing. Finite assignments buffer until a feasible terminal verdict;
+ * accepted arithmetic assignments stream with their exact objectives. Terminal status and proof
+ * metadata remain separate from incumbent output. Subclasses supply comment and objective formatting,
+ * status lines and the statistics filter.
  */
 internal abstract class BufferedBestOutput : OutputProtocol {
     protected var best: String? = null
