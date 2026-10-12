@@ -57,6 +57,8 @@ point is not an exact witness. Optimum publication requires no
 the source is replaced by the exact source adapter for arithmetic execution.
 Exact adapter witnesses require original decimal feasibility. Working-model
 witnesses on the default finite LP lane retain the separate tolerance guarantee.
+Output comments identify an exact original-source witness or a source-tolerance
+witness independently of the optimization status.
 
 ## Routing and result strength
 

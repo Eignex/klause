@@ -113,13 +113,14 @@ class MpsModeTest {
             writeText(
                 "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n" +
                     " M0 'MARKER' 'INTORG'\n I R -1\n M1 'MARKER' 'INTEND'\n" +
-                    " X COST 0.5 R 1\nBOUNDS\n LI B I 3\nENDATA\n",
+                    " X COST 0.5 R 1\nBOUNDS\n LI B I 3\n LO B X 3\nENDATA\n",
             )
             deleteOnExit()
         }
 
         val text = capture {
-            assertEquals(0, runCli(arrayOf("-e", "ls", "--param", "node-limit=100", mps.absolutePath)))
+            assertEquals(0, runCli(arrayOf("-e", "ls", "--param", "node-limit=100",
+                "--param", "max-flips=1", mps.absolutePath)))
         }
 
         val values = text.lines().single { it.startsWith("v ") }.removePrefix("v ").split(' ')
@@ -469,5 +470,30 @@ class MpsModeTest {
 
         assertTrue("o 1.0000000000000000001" in text.lines(), text)
         assertFalse("o 2" in text.lines(), text)
+    }
+
+    @Test
+    fun `source witness guarantees distinguish exact and tolerance acceptance`() {
+        val mps = File.createTempFile("mpswitnessguarantee", ".mps").apply {
+            writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n UP B X 1\nENDATA\n")
+            deleteOnExit()
+        }
+        for (exact in listOf(false, true)) {
+            val common = CommonOptions().apply { this.exact = exact }
+            val session = MpsMode.newSession()
+            val solvable = session.load(mps.absolutePath, common)
+            val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(if (exact) 1.0 else 1.00000001),
+                if (exact) listOf(BigFraction.ONE) else null)
+            if (!exact) assertTrue(assertNotNull(solvable.toleranceCheck)(sample))
+            val output = session.output(common)
+
+            val text = capture {
+                output.onSolution(solvable.render(sample), null, sample.approximateRealValue(0))
+                output.onComplete(Verdict.BEST_FOUND)
+            }
+
+            val qualification = if (exact) "exact original MPS source witness" else "MPS source tolerance witness"
+            assertTrue(qualification in text, text)
+        }
     }
 }
