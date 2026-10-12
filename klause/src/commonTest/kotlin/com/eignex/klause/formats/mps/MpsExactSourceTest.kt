@@ -8,6 +8,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.magnitudeBitLength
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -107,5 +108,20 @@ class MpsExactSourceTest {
         val witness = compiled.sourceWitness(listOf(BigFraction.ofLong(3)))
 
         assertEquals(listOf(BigFraction.ofLong(3)), witness.values)
+    }
+
+    @Test
+    fun `shared decimal denominators admit an ordinary dense source row`() {
+        val text = "ROWS\n E R\nCOLUMNS\n" +
+            (0 until 100).joinToString("\n") { " X$it R 0.0000000000000000001" } +
+            "\nRHS\n RHS R 0.00000000000000001\nENDATA"
+        val compiled = Mps.parse(text).toExactSourceProblem()
+
+        compiled.sourceWitness(List(100) { BigFraction.ONE })
+
+        val row = compiled.model.factors.last().linearRows.single()
+        val constants = row.constants as IntegralConstants
+        assertTrue(constants.exactBound.magnitudeBitLength() < 4096)
+        assertTrue((0 until row.size).all { constants.exactCoeff(it).magnitudeBitLength() < 4096 })
     }
 }
