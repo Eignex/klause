@@ -1,5 +1,11 @@
 # Local-search state and moves
 
+Transcendental sources use the shared exact-neighborhood move owner with
+original-source function completion. Rational windows and approximate centers
+guide proposals; checked symbolic real expressions carry coordinate authority.
+Neighborhood failures cannot refute an unrestricted source. See
+[transcendental real arithmetic](../theories/transcendental.md).
+
 Local search searches for feasible or improving assignments by changing values and
 measuring constraint violations. It keeps incremental scores so a candidate move
 can be evaluated without rebuilding the whole model. Defined outputs and coordinated

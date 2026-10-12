@@ -82,6 +82,7 @@ Packages below are under `com.eignex.klause` in
 | `arithmetic.quadratic` | Exact convex quadratic bounds, attainment, approach paths and improving rays | Only `arithmetic.quadratic`, `simplex.exact` and `util`; source/result scope belongs to adapters |
 | `arithmetic.transcendental` | Certified rational exp/log/sin/cos enclosures and domain-bound affine relaxations | Only `arithmetic.transcendental`, `simplex.exact` and `util`; no source or solver verdict ownership |
 | `arithmetic.transcendental` | Certified rational function enclosures and affine relaxations | Only `arithmetic.transcendental`, `simplex.exact` and `util`; source truth belongs to adapters |
+| `arithmetic.real` | Exact symbolic real values with algebraic leaves and certified comparison | Only numerical kernels and neutral controls; no source model or solver state |
 | `arithmetic.difference` | Difference constraints, extraction and non-incremental graph operations | No propagation or search state |
 | `simplex.exact` | Rational arithmetic and exact feasibility primitives | Reusable numerical mechanism |
 | `simplex.basis` | Sparse floating and rational basis operations | Numerical types, `util` and koblas; no search policy |
@@ -97,6 +98,7 @@ Packages below are under `com.eignex.klause` in
 | `theory.qflra` | Linear integer, real and mixed checks, including real difference graphs | Reads source models and arithmetic services; no finite-domain materialization |
 | `theory.qfnia` | Sound incomplete nonlinear integer candidate search and source checking | Uses neutral polynomial metadata and exact real completion; never finite CP domains |
 | `theory.qfnra` | Complete polynomial-real decision with exact CAD and Boolean search | Reads neutral polynomial formulas and the exact kernel; no finite domains or linear-engine state |
+| `theory.transcendental` | Sound incomplete real function source checks and relaxations | Reads neutral function formulas and numerical kernels; no finite domain state |
 | `solver.pipeline` | Source routing and one verdict surface | Selects theory once; frontends render assignments |
 | `solver.search` | Component protocol, decisions, traversal, retraction, learning and complete checks | Owns shared lifecycle across CP and theory components |
 

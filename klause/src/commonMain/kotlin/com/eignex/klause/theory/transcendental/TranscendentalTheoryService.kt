@@ -161,7 +161,10 @@ internal class TranscendentalTheoryService(
                 val upper = pins.upper[id]
                 var point = BigFraction.ofLong(hints[attempt])
                 if (lower != null && upper != null) {
-                    point = transcendental.divide(transcendental.add(lower, upper), BigFraction.ofLong(2))
+                    val part = BigFraction.ofLong(when (attempt % 4) { 0 -> 4; 1 -> 6; 2 -> 2; else -> 7 })
+                    val width = transcendental.add(upper, lower.negated())
+                    point = transcendental.add(lower,
+                        transcendental.divide(transcendental.multiply(width, part), BigFraction.ofLong(8)))
                 }
                 else if (lower != null && point <= lower) point = lower + BigFraction.ONE
                 else if (upper != null && point >= upper) point = upper - BigFraction.ONE

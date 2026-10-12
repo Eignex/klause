@@ -196,6 +196,14 @@ publication and repeated incumbent reads without copying in the search loop.
 
 ## Exact assignment values
 
+`TranscendentalAssignment.exactRealValue(id)` and `symbolicRealValue(id)` expose
+immutable exact expression metadata for transcendental witnesses, including through
+reconstruction wrappers. Rational and algebraic leaves retain their existing exact
+metadata. `Sample.symbolicReals` captures the same authority. An expression describes
+a coordinate; its publication still requires an original-source check. See
+[exact analytic real coordinates](arithmetic/real.md) and the
+[transcendental service contract](theories/transcendental.md).
+
 An assignment can carry finite values, arbitrary-precision integers, rational reals
 or algebraic reals. Read the authoritative payload for checks and exact rendering;
 an approximate coordinate is display or heuristic data.
