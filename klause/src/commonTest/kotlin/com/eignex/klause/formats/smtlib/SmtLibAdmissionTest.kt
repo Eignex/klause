@@ -224,4 +224,20 @@ class SmtLibAdmissionTest {
         assertFailsWith<UnsupportedSmtException> { SmtLibAdmission.parse(source) }
     }
 
+    @Test
+    fun `nonlinear assertion scope excludes later source declarations`() {
+        val source = "(assert (= (* x y) 6)) (declare-const x Int) (declare-const y Int) " +
+            "(assert (and (<= 1 x 3) (<= 1 y 3)))"
+
+        assertFailsWith<UnsupportedSmtException> { SmtLibAdmission.parse(source) }
+    }
+
+    @Test
+    fun `nonlinear declarations preserve canonical quoted name identity`() {
+        val source = "(declare-const x Int) (declare-const |x| Int) " +
+            "(assert (and (<= 1 x 3) (<= 1 |x| 3) (= (* x |x|) 6)))"
+
+        assertFailsWith<UnsupportedSmtException> { SmtLibAdmission.parse(source) }
+    }
+
 }

@@ -119,6 +119,7 @@ private fun parseLinearAdmission(
 ): SmtLibProblem {
     val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings)
     val reader = SExprReader(source)
+    val scope = SmtLibScope(cancellation)
     var integerHelpers = false
     var logic: String? = null
     var querySeen = false
@@ -128,6 +129,7 @@ private fun parseLinearAdmission(
     var signedSymbols = false
     while (true) {
         val command = reader.readCommandOrNull() ?: break
+        if (!scope.command(command)) smtUnsupported("source symbol is outside its lexical scope")
         builder.command(command)
         nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
         signedSymbols = signedSymbols || hasSignedNumberSymbol(command, cancellation)
@@ -147,6 +149,9 @@ private fun parseLinearAdmission(
         builder.asserts.none { hasIntegerSyntax(it, cancellation) }
     ) {
         smtUnsupported("pure real/Boolean helpers require lexical polynomial lowering")
+    }
+    if (nonlinearSyntax && builder.macros.isNotEmpty()) {
+        smtUnsupported("nonlinear helpers require lexical source lowering")
     }
     val problem = builder.build()
     val products = problem.model.factors.any { it is Product || it is RealProduct || it is ContinuousProduct }
