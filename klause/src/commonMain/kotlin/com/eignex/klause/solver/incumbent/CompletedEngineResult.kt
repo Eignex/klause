@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.incumbent
 
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.result.MinimizeResult
@@ -20,7 +21,11 @@ internal sealed interface CompletedEngineResult {
         }
     }
 
-    data class Minimize(override val scope: SourceScope, val result: MinimizeResult) : CompletedEngineResult {
+    data class Minimize(
+        override val scope: SourceScope,
+        val result: MinimizeResult,
+        val cutoff: SourceClaim.Bound? = null,
+    ) : CompletedEngineResult {
         override val evidence: SourceResultEvidence? get() = result.evidence
         override fun attests(kind: EvidenceKind): Boolean = when (kind) {
             EvidenceKind.Witness -> result is MinimizeResult.WithSample
@@ -28,8 +33,8 @@ internal sealed interface CompletedEngineResult {
             EvidenceKind.Unbounded -> result is MinimizeResult.Unbounded
             EvidenceKind.Bound -> when (result) {
                 is MinimizeResult.Optimal -> true
-                is MinimizeResult.BestFound -> result.reason == TerminationReason.SearchExhausted
-                is MinimizeResult.Unknown -> result.reason == TerminationReason.SearchExhausted
+                is MinimizeResult.BestFound -> cutoff != null && result.reason == TerminationReason.SearchExhausted
+                is MinimizeResult.Unknown -> cutoff != null && result.reason == TerminationReason.SearchExhausted
                 else -> false
             }
         }
