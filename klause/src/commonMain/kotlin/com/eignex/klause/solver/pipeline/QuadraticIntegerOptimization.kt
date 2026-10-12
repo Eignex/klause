@@ -442,31 +442,50 @@ internal class QuadraticIntegerOptimization(
         val weights = DoubleArray(3) { 1.0 }
         val completion = ExactNeighborhoodCompletion { neighborhood, cancellation ->
             neighborhoodPoint = null
-            val lower = neighborhood.lower.mapKeys { source.integerCoordinates[it.key] }
-            val upper = neighborhood.upper.mapKeys { source.integerCoordinates[it.key] }
-            val condition = intersect(root, lower, upper)
+            fun coordinate(id: Int): Int = if (id < source.integerCoordinates.size) source.integerCoordinates[id]
+                else source.realCoordinates[id - source.integerCoordinates.size]
+            val lower = neighborhood.lower.mapKeys { coordinate(it.key) }
+            val upper = neighborhood.upper.mapKeys { coordinate(it.key) }
+            if (neighborhood.bools.any { (id, value) -> root.bools[id]?.let { it != value } == true }) {
+                return@ExactNeighborhoodCompletion ExactNeighborhoodResult.Refuted
+            }
+            val numeric = intersect(root, lower, upper)
+            val condition = PolynomialCondition(root.bools + neighborhood.bools, numeric.lower, numeric.upper)
             traverse(condition, cancellation, global = false)
             neighborhoodPoint?.let { ExactNeighborhoodResult.Witness(it.sample) } ?: ExactNeighborhoodResult.Undecided
         }
         while (!stop() && moves < maximum && instructions < instructionLimit) {
             val before = native.work
             val previous = incumbent
-            val total = source.integerCoordinates.size
+            val intCount = source.integerCoordinates.size
+            val total = source.boolCount + intCount + source.realCoordinates.size
             val operator = if (!adaptive) 0 else random.nextInt(weights.size).let { draw ->
                 if (random.nextDouble() < weights[draw] / weights.maxOrNull()!!) draw else 2
             }
             val amount = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
-            val released = (0 until total).shuffled(random).take(amount).toSet()
+            val released = if (!adaptive) setOf((moves % total).toInt())
+                else (0 until total).shuffled(random).take(amount).toSet()
             val lower = mutableMapOf<Int, BigFraction>()
             val upper = mutableMapOf<Int, BigFraction>()
-            for (id in 0 until total) {
+            val bools = mutableMapOf<Int, Boolean>()
+            for (id in 0 until source.boolCount) {
+                if (id !in released) {
+                    bools[id] = root.bools[id] ?: incumbent?.sample?.boolValue(id) ?: random.nextBoolean()
+                }
+            }
+            for (id in 0 until intCount) {
                 val center = incumbent?.sample?.exactIntValue(id)?.let { BigFraction.of(it, BIG_ONE) } ?: seeds[id]
-                val spread = if (id in released) radius else BigFraction.ZERO
+                val spread = if (source.boolCount + id in released) radius else BigFraction.ZERO
                 lower[id] = center - spread
                 upper[id] = center + spread
             }
+            incumbent?.sample?.algebraicReals?.forEachIndexed { id, value ->
+                val spread = if (source.boolCount + intCount + id in released) radius else BigFraction.ZERO
+                lower[intCount + id] = value.lowerBound - spread
+                upper[intCount + id] = value.upperBound + spread
+            }
             try {
-                completion.check(ExactNeighborhoodCondition(root.bools, lower, upper), stop)
+                completion.check(ExactNeighborhoodCondition(bools, lower, upper), stop)
             } finally {
                 moves++
                 val cost = 1L + ceil((native.work - before).coerceAtLeast(0) * 0.8).toLong()
