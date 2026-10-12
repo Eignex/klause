@@ -224,7 +224,8 @@ object OpenTheoryPipeline {
     private fun unsupportedExecution(objective: LinearObjective?): OpenTheoryExecution = if (objective == null) {
         OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY))
     } else {
-        OpenTheoryExecution.Optimize(OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY))
+        OpenTheoryExecution.Optimize(OpenTheoryOptimum.Bounded(
+            null, null, TerminationReason.Unsupported, SolveStats.EMPTY))
     }
 
     /**
