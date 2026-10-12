@@ -130,7 +130,9 @@ fun OpenTheoryPipeline.minimize(
 ): PolynomialOptimizationExecution {
     val stop = params.timeout or params.cancellation
     val operation = request.preparedPlan.withObjective(objective)
-    if (!operation.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable) {
+    if (objective.realCoefficientValues.any { it != 0.0 } ||
+        !operation.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
+    ) {
         return PolynomialOptimizationExecution(MinimizeResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
             PolynomialTheoryStats())
     }
