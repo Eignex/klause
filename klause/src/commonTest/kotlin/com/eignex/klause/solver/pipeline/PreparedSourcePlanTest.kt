@@ -5,6 +5,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.formats.smtlib.SmtLibAdmission
+import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -119,6 +121,23 @@ class PreparedSourcePlanTest {
         assertEquals(FactorOwner.CP, ownership.factorOwner(0))
         assertEquals(FactorOwner.THEORY, ownership.factorOwner(1))
         assertEquals(ProblemPipeline.EXACT_LIRA, ownership.theoryPipeline)
+    }
+
+    @Test
+    fun `nonlinear source declarations retain interleaved exact numeric coordinates`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
+            "(declare-const x Int) (declare-const r Real) (declare-const z Int) (assert (= (* x z) r))",
+        )).problem
+
+        val plan = source.prepareExecutionPlan()
+
+        assertSame(source, plan.originalSource)
+        assertEquals(PreparedExecutionKind.NONLINEAR_INTEGER, plan.kind)
+        kotlin.test.assertNull(plan.model)
+        assertEquals(0, plan.integerCoordinate(0))
+        assertEquals(2, plan.integerCoordinate(1))
+        assertEquals(1, plan.realCoordinate(0))
+        kotlin.test.assertNull(plan.finiteIntegerCoordinate(1))
     }
 
 }
