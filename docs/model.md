@@ -32,6 +32,12 @@ scalar reads retain exact integer/rational authority without copying arrays.
 unchanged sample copy can share its private immutable buffers and certificate;
 replacement coordinates are captured and require a fresh witness check.
 
+`Sample.symbolicReals` retains exact analytic expressions with rational/algebraic
+leaves for transcendental coordinates. Its approximate view supplies heuristic or
+display data. Exact source checks retain domain validity and function identities;
+replacing the approximate coordinates discards symbolic authority unless replacement
+metadata is explicitly supplied. See [exact analytic real coordinates](arithmetic/real.md).
+
 Lowered and solver linear objectives capture their coefficient arrays at construction.
 Their getters, copies and destructuring cannot mutate the captured objective. Solver
 consumers borrow those private coefficients read-only inside the module. Generic

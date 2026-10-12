@@ -6,6 +6,76 @@ public final class com/eignex/klause/arithmetic/polynomial/AlgebraicReal {
 	public final fun getUpperBound ()Lcom/eignex/klause/simplex/exact/BigFraction;
 }
 
+public abstract interface class com/eignex/klause/arithmetic/real/ExactRealExpression {
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Algebraic : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public fun <init> (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)V
+	public final fun component1 ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public final fun copy (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Algebraic;
+	public static synthetic fun copy$default (Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Algebraic;Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;ILjava/lang/Object;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Algebraic;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Function : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public fun <init> (Lcom/eignex/klause/arithmetic/real/ExactRealFunction;Lcom/eignex/klause/arithmetic/real/ExactRealExpression;)V
+	public final fun component1 ()Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public final fun component2 ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun copy (Lcom/eignex/klause/arithmetic/real/ExactRealFunction;Lcom/eignex/klause/arithmetic/real/ExactRealExpression;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Function;
+	public static synthetic fun copy$default (Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Function;Lcom/eignex/klause/arithmetic/real/ExactRealFunction;Lcom/eignex/klause/arithmetic/real/ExactRealExpression;ILjava/lang/Object;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Function;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArgument ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun getFunction ()Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Pi : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public static final field INSTANCE Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Pi;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Power : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public final fun component1 ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun component2 ()I
+	public final fun copy (Lcom/eignex/klause/arithmetic/real/ExactRealExpression;I)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Power;
+	public static synthetic fun copy$default (Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Power;Lcom/eignex/klause/arithmetic/real/ExactRealExpression;IILjava/lang/Object;)Lcom/eignex/klause/arithmetic/real/ExactRealExpression$Power;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBase ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun getExponent ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Product : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public final fun getOperands ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealExpression$Sum : com/eignex/klause/arithmetic/real/ExactRealExpression {
+	public final fun getOperands ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealFunction : java/lang/Enum {
+	public static final field COS Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static final field EXP Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static final field LOG Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static final field SIN Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+	public static fun values ()[Lcom/eignex/klause/arithmetic/real/ExactRealFunction;
+}
+
+public final class com/eignex/klause/arithmetic/real/ExactRealValue {
+	public final fun getAlgebraic ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public final fun getExpression ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
+	public final fun getRational ()Lcom/eignex/klause/simplex/exact/BigFraction;
+}
+
 public final class com/eignex/klause/backtrack/BacktrackParams : com/eignex/klause/solver/SolverParams {
 	public fun <init> ()V
 	public fun <init> (Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;IZIZIZIILkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZ)V
@@ -3465,6 +3535,12 @@ public final class com/eignex/klause/ir/Term {
 	public final fun ofLit (I)I
 	public final fun ofRealVar (I)I
 	public final fun realVar (I)I
+}
+
+public final class com/eignex/klause/ir/TranscendentalProblem {
+	public final fun getBoolVarNames ()Ljava/util/Map;
+	public final fun getIntVarNames ()Ljava/util/Map;
+	public final fun getRealVarNames ()Ljava/util/Map;
 }
 
 public final class com/eignex/klause/ir/UnitConsts : com/eignex/klause/ir/LongConstList {

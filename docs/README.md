@@ -51,6 +51,7 @@ composition, result authority, state/resources and implementation.
 | [Linear mixed arithmetic](theories/linear-mixed.md) | Coupled integer/real constraints, integrality and reconstruction |
 | [Nonlinear integer arithmetic](theories/nonlinear-integer.md) | Exact integer candidate search, real completion and source witness validation |
 | [Polynomial real arithmetic](theories/polynomial-real.md) | Exact nonlinear completion, finite composition and algebraic witnesses |
+| [Transcendental real arithmetic](theories/transcendental.md) | Sound incomplete function constraints, symbolic witnesses and paired execution |
 
 ## Numerical mechanisms
 
@@ -65,6 +66,7 @@ does not change the relative place of each theory in the model or support contra
 | [Exact polynomial arithmetic](arithmetic/polynomial.md) | Polynomial operations, algebraic scalars, root isolation and arithmetic limits |
 | [Certified transcendental enclosures](arithmetic/transcendental.md) | Rational enclosures and affine relaxations; source/theory integration remains planned |
 | [Certified transcendental enclosures](arithmetic/transcendental.md) | Rational function enclosures, range reduction and affine relaxations |
+| [Exact analytic real coordinates](arithmetic/real.md) | Authoritative symbolic function expressions with rational and algebraic leaves |
 | [Numerical dependencies](lp/dependencies.md) | Kernel provenance, integration contracts and runtime support |
 
 ## Validation and diagnostics
