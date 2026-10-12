@@ -391,11 +391,11 @@ checks. Their source semantics and resource ledgers remain authoritative across
 candidate retries. Completion coordinates are distinct from the finite factors
 that guide the walk.
 
-Without a completion adapter, standalone LS publication relies on its invariant
-checks. A custom propagation-only factor mapped to `NoInvariant` is omitted from
-those checks. The [custom factor publication gap](search.md#custom-factor-publication-gap)
-is tracked in [#2653](https://github.com/Eignex/klause/issues/2653); zero score must
-not be treated as a complete check of that factor's source semantics.
+Standalone LS checks covered constraints through their invariants. A propagation-only
+custom factor mapped to `NoInvariant` instead receives a private
+[full-coordinate finite check](search.md#custom-factor-publication-checks) before
+caller completion. Zero score alone cannot publish its candidate. An uncovered
+continuous constraint explicitly declines finite local-search execution.
 
 ## Exact coordinate neighborhoods
 

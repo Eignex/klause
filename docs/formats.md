@@ -54,7 +54,6 @@ are work to close, not permanent exceptions to shared breadth or source checking
 
 | Gap | Current behavior | Tracking |
 |---|---|---|
-| Custom factors with only a propagation role | LS omits their violations and standalone publication can bypass a complete source check | [#2653](https://github.com/Eignex/klause/issues/2653) |
 | Source-inexact open MPS models | Witness-only fallback has no runnable complete arm; BACKTRACK/FIXED return Unsupported | [#2654](https://github.com/Eignex/klause/issues/2654) |
 | Real linear objectives on polynomial models | Linear objective admission rejects costs accepted by an equivalent quadratic objective specification | [#2655](https://github.com/Eignex/klause/issues/2655) |
 | Public solver facades | Direct finite baking bypasses source services used by the shared pipeline | [#2656](https://github.com/Eignex/klause/issues/2656) |
