@@ -53,39 +53,42 @@ coefficients at the returned point.
 `TOLERANCE_OPTIMUM` differs from `ATTAINED_OPTIMUM`. A tolerance-accepted float
 point is not an exact witness. Optimum publication requires no
 `toleranceDifference`; infeasibility and unboundedness require `sourceExact`.
-`--exact` requires exact certificates and declines a lowering that differs from
-the source. Exact source witnesses use exact decimal checks when correspondence
-holds, and decimal tolerance otherwise.
+`--exact` requires exact source certificates. A hybrid lowering that differs from
+the source is replaced by the exact source adapter for arithmetic execution.
+Exact adapter witnesses require original decimal feasibility. Working-model
+witnesses on the default finite LP lane retain the separate tolerance guarantee.
 
 ## Routing and result strength
 
-Purely continuous MPS sources use the finite LP lane, including fractional objectives.
-Source-exact open mixed models use a supported complete theory when available.
+Default purely continuous MPS sources use the finite LP lane, including fractional
+objectives and its tolerance guarantee. When hybrid lowering differs from a source
+with integer columns, or an explicit exact request, the frontend prepares original
+decimal source rows before routing or bound closure. The shared exact linear route
+owns those rows for both bounded and open mixed models. A rounded-model routing
+refutation cannot establish original-source infeasibility.
+
+BACKTRACK and FIXED run the admitted complete arithmetic traversal. LS and ALNS
+search exact-coordinate neighborhoods with source-checked incumbent authority;
+their conditional refutations cannot refute the original source. MIXED combines
+that complete arm and the heuristic arms under the existing shared portfolio.
+Continuous coordinates remain arithmetic-owned, and heuristic integer windows
+do not restrict original source proof scope.
+
 Integral objective descent retains exact bound and recession checks. Supported
 Boolean or continuous linear objectives also admit strict-improvement theory rounds
 beside heuristic repair. Completed refutations and attained optima retain source
 proof authority; terminating optimization is not guaranteed for every admitted
-source. Source-inexact lowerings retain witness-only execution.
+source. Rational feasibility descent has no recession certificate and can return
+an incumbent with an incomplete reason on an unbounded objective. Numerical or
+arithmetic representation declines withhold terminal claims.
 
-Default open models whose lowering differs from the source also use witness search.
-Before publication, their arbitrary-width integer and rational real coordinates are
-checked against original decimal rows, indicators and bounds with the source tolerance;
-integer integrality remains exact. Their objective is recomputed from source decimals.
-Rejected points are withheld and establish no refutation. These routes publish no
-optimum, infeasibility or unboundedness claim, even when the lowered model was decided.
-The source difference is reported beside the result. `--exact` retains its source
-correspondence requirement. Check routing and source qualifications before attributing
-a missing result to the simplex.
-
-### Paired strategy coverage gap
-
-The source-inexact open fallback executes witness search under MIXED or LS, while
-BACKTRACK/FIXED return Unsupported without traversing the source. This does not
-provide the complete-search/local-search pair required by the
-[vision](../vision.md#shared-model-breadth). The missing source-preserving arm is
-tracked in [#2654](https://github.com/Eignex/klause/issues/2654). Withholding claims
-proved only about a rounded lowering remains required; it does not make this
-strategy exception part of the intended support contract.
+Every open candidate is checked against original rows, bounds, indicators and
+integrality before publication. Its objective is recomputed from original numbers,
+including the constant and source sense. An auxiliary objective coordinate is a
+source-derived definition and is omitted from rendered original columns. Rejected
+final witnesses cannot promote a buffered earlier point to an optimum or supply
+the point required by an unboundedness claim. A source-inexact numerical proposal
+alone supplies no original-source refutation, bound or optimum authority.
 
 See [MpsCompiler](../../klause/src/commonMain/kotlin/com/eignex/klause/formats/mps/MpsCompiler.kt)
 and [MpsMode](../../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/MpsMode.kt).
