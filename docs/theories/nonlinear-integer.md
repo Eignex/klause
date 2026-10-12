@@ -1,4 +1,4 @@
-# Nonlinear integer mechanism
+# Nonlinear integer arithmetic
 
 `theory.qfnia` searches `ir.NonlinearIntegerProblem`, a neutral polynomial source
 snapshot with separate original integer, real and Boolean identities. Integer
@@ -10,7 +10,7 @@ Its `pipelineRequest()` uses the common exact verdict and witness surface. Bound
 representable factors compose through the shared polynomial model rather than a
 separate constraint API.
 
-## Candidate search and completion
+## Solving and composition
 
 Search checks the whole real relaxation first. A completed real refutation also
 refutes the integer source. An integral relaxation point is a candidate requiring
@@ -27,7 +27,7 @@ refute their actual scope. Candidate proposals stay within these proved sides an
 caller windows, and out-of-window candidates are rejected before completion.
 
 Each candidate fixes every original integer coordinate to an exact rational
-integer and asks the existing [polynomial service](qfnra.md#conditioned-theory-service)
+integer and asks the existing [polynomial service](polynomial-real.md#conditioned-theory-service)
 to complete real coordinates and correlated Booleans. Failure refutes only that
 candidate. A real-relaxation representation decline permits fixed integer candidates under
 the same work and allocation controls. It supplies no proof. Wide exponents use
@@ -45,7 +45,7 @@ traversal, single-coordinate repairs and block repairs. All strategies retain th
 same formula. Heuristic failure and finite candidate exhaustion produce UNKNOWN.
 Only search can publish a whole-source real-relaxation refutation.
 
-The public pipeline uses the [shared exact neighborhood hook](local-search.md)
+The public pipeline uses the [shared exact neighborhood hook](../solver/local-search.md)
 for LS and adaptive ALNS. Centers retain arbitrary-width exact integers. Boolean
 pins and integer windows map to original source coordinates, while real coordinates
 remain completion-owned. Source equalities supply initial proposals, including wide
@@ -63,7 +63,7 @@ stop permits another arm; containing allowance exhaustion stops the invocation.
 Default whole-source candidates are 1,024, heuristic moves 256 and ALNS iterations
 50. Every definitive result receives the containing scope's final stop check.
 
-## Witnesses and resources
+## Results and proof authority
 
 Witness publication requires integral original integer coordinates and exact
 completion of the entire formula. A separate iterative evaluator checks the
@@ -71,6 +71,8 @@ original expression DAG using exact rational/algebraic arithmetic, including bot
 sides of every relation and the retained Boolean correlation. An arithmetic stop
 or representation decline during this check withholds the witness.
 Rounding selects proposals; it cannot replace an exact witness coordinate.
+
+## State and resources
 
 One cancellation and work scope spans hint collection, candidate generation,
 condition assembly, all real completion queries and the final source check.
@@ -86,3 +88,9 @@ Conditioned calls retain original Boolean pins and exact numeric windows. Candid
 fixings intersect these bounds; they cannot replace or widen them. A real
 refutation from a conditioned call covers only that call's scope. Fresh calls
 capture independent conditions and retain the source snapshot unchanged.
+
+## Implementation
+
+`theory.qfnia` owns integer proposals, exact bounds and source checking.
+`solver.pipeline.NonlinearIntegerTheoryRequest` adapts them to the shared
+strategy and verdict surface; frontends render that surface.

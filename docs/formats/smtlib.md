@@ -11,22 +11,19 @@ This page defines admission, lowering and source model rendering.
 ## Supported models
 
 The frontend supports quantifier-free linear integer and real arithmetic, including
-difference fragments, Boolean structure and supported minimize/maximize objectives.
-The theory packages cover difference arithmetic, LIA, LRA/LIRA and complete pure
-polynomial real satisfaction. Bitvectors, arrays, strings, quantifiers and mixed
-nonlinear integer/real arithmetic remain outside the supported theory surface.
+Boolean structure and supported minimize/maximize objectives, and polynomial
+Int/Real/Bool satisfaction. Products and fixed nonnegative integral powers retain
+exact source arithmetic. Bitvectors, arrays, strings and quantifiers decline.
 
-Native factor coverage is broader than SMT source admission. `Product` represents
-finite Int × Int multiplication and `RealProduct` represents finite Int × Real
-multiplication, but the linear SMT facade rejects products of multiple nonconstant
-operands. Polynomial fallback accepts pure Real/Bool satisfaction only; it does
-not admit nonlinear integer sources even when their integers have finite bounds.
-`ContinuousProduct` represents Real × Real multiplication in shared models and
-[schema constraints](schema.md#schema-continuous-products). The [shared polynomial service](../theories/polynomial-real.md#shared-model-composition)
-composes it with finite factors across backtracking, local search, ALNS and mixed
-portfolios. Nonlinear integer SMT admission is tracked separately in
-[#2625](https://github.com/Eignex/klause/issues/2625). See the
-[implemented arithmetic routes](../formats.md#solving-coverage).
+Bounded representable Int × Int products use `Product`; Int × Real products use
+`RealProduct`, and Real × Real products use `ContinuousProduct`. Compound integer
+operands receive exact defining equalities. Every intermediate range must fit the
+native integer representation, and mixed coefficients must preserve exact values.
+Open or overflowing integers retain typed arbitrary-precision source coordinates
+through [nonlinear integer execution](../theories/nonlinear-integer.md). Native
+finite mixed products compose through [exact polynomial completion](../theories/polynomial-real.md#shared-model-composition).
+Fixed powers use repeated squaring. Wide exponents retain compact squaring DAGs;
+representation limits produce explicit UNKNOWN without truncating the source.
 
 ## Linear and conditional lowering
 
@@ -91,6 +88,14 @@ not an unlimited completeness guarantee for every integer model.
 
 ## Polynomial source lowering
 
+Integer-aware fallback publishes `ir.NonlinearIntegerProblem` through
+`SmtLibInput.NonlinearInteger`, retaining original Int/Real/Bool identities and an
+exact `to_real` embedding. Its `pipelineRequest()` selects sound incomplete integer
+execution. Native admission validates declaration visibility and canonical names.
+Syntactically nonlinear helpers use lexical fallback even when a constant argument
+makes the expanded expression linear; caller-local bindings cannot alter definition
+scope. Nonlinear sessions accept one nonincremental satisfaction query.
+
 The internal `SmtLibPolynomial.parse` entry point preserves pure Real/Bool polynomial
 satisfaction sources separately from `SmtLib.parse` and its linear factors. It performs
 no theory selection and publishes no SAT/UNSAT result. Public `SmtLibAdmission.parse`
@@ -105,7 +110,7 @@ Reopenable streamed inputs close each owned closeable source, or drain active
 sources without a close contract before retrying. Cancellation stops that drain,
 prevents reopening, and returns `SmtLibInput.Interrupted` without publishing partial metadata.
 
-The polynomial admission publishes `ir.PolynomialRealProblem`, an opaque neutral
+Pure-real polynomial admission publishes `ir.PolynomialRealProblem`, an opaque neutral
 snapshot of formula, original declaration identities and auxiliary counts. Its
 `pipelineRequest()` selects the complete polynomial theory. The CLI renders the
 common `OpenTheoryResult`; parsing and frontend code do not invoke the engine.
@@ -162,7 +167,7 @@ and are discarded after lowering; published source IR retains neither.
 Unsupported syntax is rejected even inside a constant Boolean
 branch. One `check-sat` or `check-sat-assuming` query is accepted; Boolean literal
 assumptions are conjoined with the assertions. `get-model` is accepted as a request.
-Mixed integer sorts, symbolic or zero division, negative/noninteger/oversized powers,
+Symbolic or zero division, negative/noninteger powers, nonlinear integer div/mod/to_int,
 uninterpreted functions, nonpolynomial operations, quantifiers, objectives, incremental
 commands, multiple queries and `get-value` decline explicitly.
 
@@ -178,8 +183,8 @@ Polynomial expansion and decision work remain owned by the nonlinear kernel/theo
 
 ### Admission API
 
-`SmtLibAdmission.parse` returns a linear model, opaque `PolynomialRealProblem`, or
-interrupted admission. The polynomial snapshot owns its source-name maps and returns
+`SmtLibAdmission.parse` returns a linear model, opaque `PolynomialRealProblem`,
+opaque `NonlinearIntegerProblem`, or interrupted admission. The polynomial snapshot owns its source-name maps and returns
 independent metadata views. Its `pipelineRequest()` and `OpenTheoryPipeline.execute`
 extension provide complete polynomial satisfaction through the existing
 `OpenTheoryResult`. `PolynomialTheoryExecution` retains native counters/resource
