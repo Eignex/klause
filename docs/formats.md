@@ -34,9 +34,9 @@ remaining route gaps are tracked in [#2624](https://github.com/Eignex/klause/iss
 | [Linear integer arithmetic](theories/linear-integer.md) | Shared search, exact linear checks, integer reductions and branching | Open integer state remains theory-owned; optimization has separate admission |
 | [Linear real arithmetic](theories/linear-real.md) | Exact real theory or certified LP completion | Source bounds, strictness and Boolean structure remain authoritative |
 | [Linear mixed arithmetic](theories/linear-mixed.md) | Shared search and exact linear checks with integer branching | Relaxation feasibility alone does not establish integrality; strategy coverage has route-specific gaps |
-| [Polynomial real arithmetic](theories/polynomial-real.md) | Exact conditioned completion with backtracking, local search, ALNS and mixed portfolios | Finite integer domains and finite-column objectives compose; open integer domains and continuous objectives decline this route |
-| [Nonlinear integer arithmetic](theories/nonlinear-integer.md) | Exact integer candidates and repairs with conditioned real completion across CP, LS, ALNS and mixed execution | Open integer traversal is incomplete; candidate exhaustion yields UNKNOWN |
-| Continuous quadratic optimization | No built-in certified quadratic optimization route | [#2626](https://github.com/Eignex/klause/issues/2626) tracks this gap |
+| [Polynomial real arithmetic](theories/polynomial-real.md) | Exact conditioned completion with backtracking, local search, ALNS and mixed portfolios | Finite factors and exact quadratic objectives compose; open integer coordinates retain separate integer ownership |
+| [Nonlinear integer arithmetic](theories/nonlinear-integer.md) | Exact integer candidates and repairs; quadratic optimization through shared wide integer branching | Unresolved open integer traversal remains incomplete; candidate or branch allowance exhaustion yields UNKNOWN |
+| [Continuous and mixed quadratic optimization](theories/nonlinear-integer.md#quadratic-objectives) | Checked convex bounds and witnesses, objective-image completion, finite traversal and exact open integer splits | Local neighborhoods supply incumbents only; undecided nonconvex or infinite integer branches withhold global claims |
 | Transcendental constraints such as `exp`, `log` and `sin` | No built-in source/theory route | [#2627](https://github.com/Eignex/klause/issues/2627) tracks this gap |
 
 A relaxation supplies deductions, not support for omitted source constraints.
