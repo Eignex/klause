@@ -6,6 +6,9 @@ class TranscendentalProblem internal constructor(
     intVarNames: Map<String, Int>,
     realVarNames: Map<String, Int>,
     boolVarNames: Map<String, Int>,
+    internal val objective: TranscendentalExpression? = null,
+    /** Original objective direction, when an objective was captured. */
+    val objectiveSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
 ) {
     private val integers = intVarNames.toMap()
     private val reals = realVarNames.toMap()
@@ -28,4 +31,7 @@ class TranscendentalProblem internal constructor(
 
     /** Independent original Boolean declaration identities. */
     val boolVarNames: Map<String, Int> get() = booleans.toMap()
+
+    /** Whether the source includes an objective whose exact optimization is unsupported by this route. */
+    val hasObjective: Boolean get() = objective != null
 }

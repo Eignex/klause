@@ -1,11 +1,13 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.ir.TranscendentalFunction
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialRealLowering
+import com.eignex.klause.lowering.FunctionSourceLowering
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.and
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.constant
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.equivalent
@@ -127,6 +129,7 @@ internal class SmtLibPolynomialEvaluator(
     private val validateOnly: Boolean = false,
     private val allowWidePowers: Boolean = false,
     private val cancellation: Cancellation = Cancellation.Never,
+    private val functions: FunctionSourceLowering? = null,
 ) {
     var hasNonlinearTerms = false
         private set
@@ -194,6 +197,7 @@ internal class SmtLibPolynomialEvaluator(
                     node.text == "true" || node.text == "false" -> values.addLast(
                         PolynomialValue.Boolean(PolynomialRealFormula.Constant(node.text == "true")),
                     )
+                    node.text == "pi" && functions != null -> values.addLast(PolynomialValue.Real(functions.pi()))
                     else -> smtUnsupported("unknown polynomial symbol '${node.text}'")
                 }
             }
@@ -212,6 +216,9 @@ internal class SmtLibPolynomialEvaluator(
                         }
                     }
                     else -> {
+                        if (head in setOf("exp", "log", "sin", "cos", "pi") && frame.environment.value(head) != null) {
+                            smtUnsupported("a numeric binding cannot be invoked as a function")
+                        }
                         validateOperator(node)
                         val args = node.items.drop(1)
                         work.addLast(PolynomialFrame.Combine(node, args.size))
@@ -288,28 +295,38 @@ internal class SmtLibPolynomialEvaluator(
                 }
                 if (value.num >= bigIntOf(2) && rational(base) == null) hasNonlinearTerms = true
                 val expression = if (value.num <= bigIntOf(Int.MAX_VALUE)) {
-                    power(base, value.num.toLong().toInt(), cancellation)
+                    if (functions == null) power(base, value.num.toLong().toInt(), cancellation)
+                    else PolynomialExpression.Power(base, value.num.toLong().toInt())
                 } else widePower(base, value.num)
                 PolynomialValue.Real(expression, args[0].integral())
             }
+            "exp", "log", "sin", "cos" -> {
+                val capture = functions ?: smtUnsupported("real functions require source-preserving admission")
+                val function = TranscendentalFunction.valueOf(node.polynomialHead().uppercase())
+                PolynomialValue.Real(capture.function(function, args.single().real()))
+            }
+            "pi" -> PolynomialValue.Real(
+                (functions ?: smtUnsupported("pi requires source-preserving admission")).pi(),
+            )
             "to_real" -> {
                 if (!args.single().integral()) smtUnsupported("to_real requires an integer operand")
                 PolynomialValue.Real(args.single().real())
             }
-            "and" -> PolynomialValue.Boolean(and(args.map { it.boolean() }))
-            "or" -> PolynomialValue.Boolean(or(args.map { it.boolean() }))
+            "and" -> PolynomialValue.Boolean(conjunction(args.map { it.boolean() }))
+            "or" -> PolynomialValue.Boolean(disjunction(args.map { it.boolean() }))
             "not" -> PolynomialValue.Boolean(not(args.single().boolean()))
             "xor" -> PolynomialValue.Boolean(
-                args.map { it.boolean() }.reduce { left, right -> not(equivalent(left, right)) },
+                args.map { it.boolean() }.reduce { left, right -> not(equivalence(left, right)) },
             )
             "=>" -> PolynomialValue.Boolean(
-                args.map { it.boolean() }.reduceRight { left, right -> or(listOf(not(left), right)) },
+                args.map { it.boolean() }.reduceRight { left, right -> disjunction(listOf(not(left), right)) },
             )
             "ite" -> {
                 val condition = args[0].boolean()
                 if (args[1] is PolynomialValue.Boolean) {
                     PolynomialValue.Boolean(
-                        PolynomialRealLowering.conditional(condition, args[1].boolean(), args[2].boolean()),
+                        functions?.conditional(condition, args[1].boolean(), args[2].boolean())
+                            ?: PolynomialRealLowering.conditional(condition, args[1].boolean(), args[2].boolean()),
                     )
                 } else {
                     PolynomialValue.Real(
@@ -349,9 +366,9 @@ internal class SmtLibPolynomialEvaluator(
             ">=" -> PolynomialRelation.GE
             else -> error("unreachable")
         }
-        return and(pairs.map { (left, right) ->
+        return conjunction(pairs.map { (left, right) ->
             if (args[left] is PolynomialValue.Boolean) {
-                val equality = equivalent(args[left].boolean(), args[right].boolean())
+                val equality = equivalence(args[left].boolean(), args[right].boolean())
                 when (op) {
                     PolynomialRelation.EQ -> equality
                     PolynomialRelation.NE -> not(equality)
@@ -364,6 +381,14 @@ internal class SmtLibPolynomialEvaluator(
     private fun validateOperator(node: SExpr.SList) {
         when (val head = node.polynomialHead()) {
             "not", "to_real" -> node.polynomialSize(2)
+            "exp", "log", "sin", "cos" -> {
+                if (functions == null) smtUnsupported("real functions require source-preserving admission")
+                node.polynomialSize(2)
+            }
+            "pi" -> {
+                if (functions == null) smtUnsupported("pi requires source-preserving admission")
+                node.polynomialSize(1)
+            }
             "ite" -> node.polynomialSize(4)
             "^" -> node.polynomialSize(3)
             "+", "*", "and", "or" -> Unit
@@ -374,6 +399,17 @@ internal class SmtLibPolynomialEvaluator(
             else -> smtUnsupported("unsupported polynomial operator '$head'")
         }
     }
+
+    private fun conjunction(values: List<PolynomialRealFormula>): PolynomialRealFormula =
+        if (functions == null) and(values) else PolynomialRealFormula.And(values)
+
+    private fun disjunction(values: List<PolynomialRealFormula>): PolynomialRealFormula =
+        if (functions == null) or(values) else PolynomialRealFormula.Or(values)
+
+    private fun equivalence(left: PolynomialRealFormula, right: PolynomialRealFormula): PolynomialRealFormula =
+        if (functions == null) equivalent(left, right) else conjunction(listOf(
+            disjunction(listOf(not(left), right)), disjunction(listOf(left, not(right))),
+        ))
 
     private fun pop(values: ArrayDeque<PolynomialValue>, count: Int): List<PolynomialValue> =
         List(count) { values.removeLast() }.reversed()

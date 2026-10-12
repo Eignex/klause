@@ -1,5 +1,11 @@
 # Command-line interface
 
+SMT-LIB real-function sources use the shared exact-satisfaction dispatcher with
+`solvePipeline=transcendental-theory` and `declaredTheoryRoute=transcendental`.
+`transcendentalWork` counts their combined native arithmetic; representation
+declines use `transcendentalResource`. The exact-mode result and closed witness
+constructors are defined by [SMT-LIB source semantics](formats/smtlib.md).
+
 The CLI reads one input instance, admits its source model, runs the selected solve
 route and renders assignments or a terminal verdict. All formats share the
 solve-control flags and driver; each frontend owns parsing and output semantics.

@@ -43,7 +43,7 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
             val name = polynomialSymbol(text)
             if (scope?.contains(name) == true) return true
             if (name == hidden) return false
-            return name in globals || text in setOf("true", "false") ||
+            return name in globals || text in setOf("true", "false", "pi") ||
                 text.toLongOrNull() != null || text.all { it in '0'..'9' || it == '.' }
         }
         val work = ArrayDeque<Frame>()
@@ -83,6 +83,7 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
         val OPERATORS = setOf(
             "+", "-", "*", "/", "^", "and", "or", "not", "xor", "=>", "ite",
             "=", "distinct", "<", "<=", ">", ">=", "to_real", "to_int", "abs", "div", "mod", "is_int",
+            "exp", "log", "sin", "cos", "pi",
         )
     }
 }

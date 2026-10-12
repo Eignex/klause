@@ -15,6 +15,27 @@ Boolean structure and supported minimize/maximize objectives, and polynomial
 Int/Real/Bool satisfaction. Products and fixed nonnegative integral powers retain
 exact source arithmetic. Bitvectors, arrays, strings and quantifiers decline.
 
+The real-function extension admits unary `exp`, `log`, `sin` and `cos`, and the
+zero-argument `pi` constant, in quantifier-free numeric sources. Function arguments
+retain exact rational, polynomial and nested function expressions. Original
+Boolean, integer and real declarations remain in the same source snapshot.
+Lexical helpers and simultaneous `let` bindings preserve their definition scope;
+a user-defined helper with a function name retains its own meaning.
+
+Exp is the real exponential, log is the natural logarithm on strictly positive
+arguments, and sine/cosine use radians. Every arithmetic atom must have defined
+terms. Negation and ordinary Boolean connectives cannot make an invalid log term
+satisfiable. Numeric and Boolean `ite` evaluate the selected branch. Simplifying
+a zero power or Boolean result cannot erase a required domain. This extension
+uses exact source semantics and supplies no delta/tolerance mode.
+
+The shared source-bound dispatcher executes these constraints through traversal,
+LS, ALNS and MIXED with original-source checks. Refutations require a completed
+whole-source check; finite depth and neighborhood exhaustion retain UNKNOWN.
+Transcendental objectives are captured and return UNKNOWN/Unsupported because
+this route does not implement exact function optimization. See the
+[transcendental theory contract](../theories/transcendental.md).
+
 Bounded representable Int × Int products use `Product`; Int × Real products use
 `RealProduct`, and Real × Real products use `ContinuousProduct`. Compound integer
 operands receive exact defining equalities. Every intermediate range must fit the
@@ -68,6 +89,13 @@ strict-edge encoding and lifecycle belong to the
 [search contract](../theories/difference.md#real-graph-admission-and-checks).
 
 ## Results and objectives
+
+Closed transcendental coordinates use `((_ klause-real exp) value)`,
+`((_ klause-real log) value)`, `((_ klause-real sin) value)` and
+`((_ klause-real cos) value)`. Pi uses `((_ klause-real pi))`.
+These model-value constructors have fixed mathematical meanings independent of
+input helper names. They compose with exact rational arithmetic and the existing
+algebraic `root-obj` values. A decimal approximation never replaces their authority.
 
 Optimization emits `; objective=<value>` for each published incumbent in the source
 objective's direction and `; optimizationStatus=<status>` at completion, including `optimal`,

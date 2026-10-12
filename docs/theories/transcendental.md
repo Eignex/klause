@@ -82,6 +82,11 @@ The source route rejects unsupported assumption deductions explicitly; Boolean
 and integer pins and rational/strict real bounds belong to the call scope. The
 source snapshot remains unchanged and can serve independent later invocations.
 
+SMT-LIB admission captures lexical function source terms in this neutral model and
+renders closed exact values. Function objectives remain captured and return
+UNKNOWN/Unsupported rather than entering a satisfaction or polynomial-objective
+route. [SMT-LIB semantics](../formats/smtlib.md) defines the extension syntax.
+
 ## Implementation
 
 `TranscendentalTheoryService` owns conditioned weakening, proposal checks and

@@ -18,13 +18,18 @@ internal class PolynomialRealLowering(
 
     fun formula(assertions: List<PolynomialRealFormula>): PolynomialRealFormula = and(assertions + definitions)
 
+    fun opaqueReal(): PolynomialExpression.Variable {
+        if (realCount == Int.MAX_VALUE) throw PolynomialSourceInterrupted()
+        return PolynomialExpression.Variable(SourceRealId(realCount++))
+    }
+
     fun conditional(
         condition: PolynomialRealFormula,
         whenTrue: PolynomialExpression,
         whenFalse: PolynomialExpression,
     ): PolynomialExpression {
         if (condition is PolynomialRealFormula.Constant) return if (condition.value) whenTrue else whenFalse
-        val value = PolynomialExpression.Variable(SourceRealId(realCount++))
+        val value = opaqueReal()
         definitions.add(or(listOf(not(condition), relation(value, PolynomialRelation.EQ, whenTrue))))
         definitions.add(or(listOf(condition, relation(value, PolynomialRelation.EQ, whenFalse))))
         captureConditional?.invoke(PolynomialConditional(value.id.index, condition, whenTrue, whenFalse))

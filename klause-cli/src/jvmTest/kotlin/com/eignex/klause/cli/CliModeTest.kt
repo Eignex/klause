@@ -138,6 +138,76 @@ class CliModeTest {
     }
 
     @Test
+    fun `SMT function witness uses exact closed value constructors`() {
+        val source = File.createTempFile("function-exp", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (exp x) 2)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
+
+        assertTrue("sat" in output.lines(), output)
+        assertTrue("(define-fun |x| () Real ((_ klause-real log) 2.0))" in output, output)
+        assertTrue("; solvePipeline=transcendental-theory" in output.lines(), output)
+        assertTrue("; declaredTheoryRoute=transcendental" in output.lines(), output)
+    }
+
+    @Test
+    fun `SMT local search publishes checked symbolic function witnesses`() {
+        val source = File.createTempFile("function-sine", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (sin x) 1)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "ls", source.absolutePath))) }
+
+        assertTrue("sat" in output.lines(), output)
+        assertTrue("((_ klause-real pi))" in output, output)
+    }
+
+    @Test
+    fun `SMT invalid log domains remain invalid under negation`() {
+        val source = File.createTempFile("function-domain", ".smt2").apply {
+            writeText("(assert (not (= (log 0) 1))) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+
+        assertTrue("unsat" in output.lines(), output)
+    }
+
+    @Test
+    fun `SMT zero function work allowance reports unknown without a model`() {
+        val source = File.createTempFile("function-zero", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (exp x) 2)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nra-work-limit=0", source.absolutePath)))
+        }
+
+        assertTrue("unknown" in output.lines(), output)
+        assertFalse("define-fun" in output, output)
+        assertTrue("; transcendentalWork=0" in output.lines(), output)
+    }
+
+    @Test
+    fun `SMT function objectives cannot acquire a satisfaction verdict`() {
+        val source = File.createTempFile("function-objective", ".smt2").apply {
+            writeText("(declare-const x Real) (minimize (exp x)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+
+        assertTrue("unknown" in output.lines(), output)
+        assertFalse("sat" in output.lines(), output)
+        assertFalse("optimizationStatus=optimal" in output, output)
+    }
+
+    @Test
     fun `SMT quadratic optimum reports an exact incumbent and certified bound`() {
         val source = File.createTempFile("quad-optimum", ".smt2").apply {
             writeText("(declare-const x Real) (minimize (* x x)) (check-sat)")
