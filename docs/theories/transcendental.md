@@ -69,7 +69,8 @@ exported transcendental proof checker.
 Each pipeline call captures its source conditions and creates fresh mutable theory
 and strategy state. One cumulative native meter covers enclosure, algebraic,
 relaxation and source-check work. Queries, repairs, branches and retractions do not
-renew it. Native work is reported separately from strategy nodes and moves, and
+renew it. Traversal uses the smaller CP decision/instruction allowance. Native work is
+reported separately from strategy nodes and moves, and
 each arithmetic charge reaches the containing caller meter once.
 
 Strategy cancellation reaches active native completion through the shared search
@@ -78,9 +79,19 @@ cannot produce partial certificates. Required representation declines remain
 visible. Zero native work prevents entry. A checked witness remains valid after
 subsequent interruption. Published immutable values retain no invocation owner.
 
-The source route rejects unsupported assumption deductions explicitly; Boolean
-and integer pins and rational/strict real bounds belong to the call scope. The
+The source route returns UNKNOWN/Unsupported for deduction scopes, extra CP
+components, finite tolerance acceptance and active finite event/seeding/scoring or
+incumbent-exchange hooks. Boolean and integer backend pins belong to the selected
+single strategy; common pins take precedence under the assumption merge contract.
+MIXED requires pins in the common invocation scope and explicitly declines nested
+backend pins. Rational/strict real bounds belong to the call scope. Every supplied
+node allowance must reference the same shared budget; competing ledgers decline. The
 source snapshot remains unchanged and can serve independent later invocations.
+
+SMT-LIB admission captures lexical function source terms in this neutral model and
+renders closed exact values. Function objectives remain captured and return
+UNKNOWN/Unsupported rather than entering a satisfaction or polynomial-objective
+route. [SMT-LIB semantics](../formats/smtlib.md) defines the extension syntax.
 
 ## Implementation
 

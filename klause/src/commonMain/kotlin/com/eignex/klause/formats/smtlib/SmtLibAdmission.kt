@@ -6,6 +6,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ProblemSettings
@@ -34,6 +35,12 @@ sealed interface SmtLibInput {
     data class NonlinearInteger(
         /** Neutral source formula and separate original coordinate identities. */
         val problem: NonlinearIntegerProblem,
+    ) : SmtLibInput
+
+    /** Exact real functions, their domains and original Boolean/integer/real declarations. */
+    data class Transcendental(
+        /** Original exact source, including any unsupported optimization objective. */
+        val problem: TranscendentalProblem,
     ) : SmtLibInput
 
     /** A captured quadratic objective on an existing exact source snapshot. */
@@ -91,8 +98,10 @@ object SmtLibAdmission {
             } catch (_: UnsupportedSmtException) {
                 if (cancellation()) throw PolynomialSourceInterrupted()
                 val polynomial = withSource(openSource, cancellation) { source ->
-                    SmtLibPolynomial.parse(source, cancellation, allowIntegers = true)
+                    SmtLibPolynomial.parse(source, cancellation, allowIntegers = true, allowFunctions = true)
                 }
+                if (polynomial.transcendental != null) SmtLibInput.Transcendental(polynomial.transcendental)
+                else {
                 val source = if (polynomial.intVarNames.isNotEmpty()) {
                     SmtLibInput.NonlinearInteger(NonlinearIntegerProblem(
                         polynomial.formula, polynomial.realCount, polynomial.boolCount,
@@ -110,6 +119,7 @@ object SmtLibAdmission {
                     ),
                 )
                 polynomial.objective?.let { SmtLibInput.Quadratic(source, it, polynomial.objectiveSense) } ?: source
+                }
             }
             if (cancellation()) SmtLibInput.Interrupted else result
         } catch (_: PolynomialSourceInterrupted) {
@@ -142,6 +152,7 @@ private fun parseLinearAdmission(
     var exited = false
     var invalidNonlinearSession = false
     var nonlinearSyntax = false
+    var functionSyntax = false
     var signedSymbols = false
     var quadraticObjective = false
     while (true) {
@@ -149,6 +160,7 @@ private fun parseLinearAdmission(
         if (!scope.command(command)) smtUnsupported("source symbol is outside its lexical scope")
         builder.command(command)
         nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
+        functionSyntax = functionSyntax || hasFunctionSource(listOf(command), cancellation)
         signedSymbols = signedSymbols || hasSignedNumberSymbol(command, cancellation)
         val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
         if (head == "minimize" || head == "maximize") {
@@ -177,6 +189,9 @@ private fun parseLinearAdmission(
         // Unused definitions still have to satisfy lexical body and return-sort validation.
         val validation = SmtLibPolynomialCompiler(cancellation, allowIntegers = true)
         for (declaration in declarations) validation.command(declaration)
+    }
+    if (functionSyntax) {
+        smtUnsupported("real function source requires exact function lowering")
     }
     val problem = builder.build()
     val products = problem.model.factors.any { it is Product || it is RealProduct || it is ContinuousProduct }
@@ -234,7 +249,7 @@ private fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): B
         if (cancellation()) throw PolynomialSourceInterrupted()
         val node = work.removeLast() as? SExpr.SList ?: continue
         val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
-        if (head == "^") return true
+        if (head in setOf("^", "exp", "log", "sin", "cos", "pi")) return true
         if (head == "*" && node.items.drop(1).count { argument ->
                 val text = (argument as? SExpr.Atom)?.text
                 text == null || text.isEmpty() || text.any { it !in '0'..'9' && it != '.' }
@@ -289,4 +304,21 @@ private fun <T> withSource(
     }
     if (interrupted) throw PolynomialSourceInterrupted()
     return outcome.getOrThrow()
+}
+
+private fun hasFunctionSource(assertions: List<SExpr>, cancellation: Cancellation): Boolean {
+    val pending = ArrayDeque<SExpr>()
+    pending.addAll(assertions)
+    while (pending.isNotEmpty()) {
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        when (val node = pending.removeLast()) {
+            is SExpr.Atom -> if (node.text == "pi") return true
+            is SExpr.SList -> {
+                val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
+                if (head in setOf("exp", "log", "sin", "cos", "pi")) return true
+                pending.addAll(node.items)
+            }
+        }
+    }
+    return false
 }

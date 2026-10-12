@@ -164,7 +164,10 @@ internal object SolveCore {
                         if (result is OpenTheoryResult.Sat) 1L else 0L,
                     )
                     val native = execution.stats
-                    val pairs = listOf(
+                    val pairs = if (execution.nativeWorkScope == "transcendental") {
+                        listOf("transcendentalWork" to native.workSpent.toString()) +
+                            execution.nativeResource?.let { listOf("transcendentalResource" to it) }.orEmpty()
+                    } else listOf(
                         "nraWork" to native.workSpent.toString(),
                         "nraProjectedPolynomials" to native.projectedPolynomials.toString(),
                         "nraLiftedCells" to native.liftedCells.toString(),

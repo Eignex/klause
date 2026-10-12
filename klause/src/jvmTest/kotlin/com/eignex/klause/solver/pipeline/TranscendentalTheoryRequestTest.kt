@@ -8,9 +8,12 @@ import com.eignex.klause.ir.TranscendentalFormula
 import com.eignex.klause.ir.TranscendentalFunction
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.solver.result.TerminationReason
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -111,6 +114,78 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
         assertIs<OpenTheoryResult.Unknown>(execution.result)
         assertTrue(execution.workSpent in 1L..8L)
         assertEquals(execution.workSpent, charged)
+    }
+
+    @Test
+    fun `unbound component factories decline without executing user code`() {
+        val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
+        var calls = 0
+        val controls = params()
+        val params = controls.copy(strategy = controls.strategy.copy(
+            backtrack = controls.strategy.backtrack.copy(componentFactory = { calls++; emptyList() }),
+        ))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
+
+        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
+        assertEquals(0L, execution.workSpent)
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `finite tolerance hooks cannot change exact function semantics`() {
+        val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
+        var calls = 0
+        val controls = params()
+        val params = controls.copy(strategy = controls.strategy.copy(
+            backtrack = controls.strategy.backtrack.copy(toleranceCheck = { calls++; true }),
+        ))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
+
+        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
+        assertEquals(0L, execution.workSpent)
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `backend pins are retained or explicitly declined by mixed execution`() {
+        val x = TranscendentalExpression.Variable(SourceRealId(0))
+        val source = TranscendentalProblem(TranscendentalFormula.And(listOf(
+            TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
+            TranscendentalFormula.Atom(TranscendentalExpression.Function(TranscendentalFunction.EXP, x),
+                PolynomialRelation.EQ, constant(2)),
+        )), emptyMap(), mapOf("x" to 0), mapOf("b" to 0))
+        val pins = Assumptions.None.withBool(0, false)
+        val controls = params()
+        val params = controls.copy(strategy = controls.strategy.copy(
+            backtrack = controls.strategy.backtrack.copy(assumptions = pins),
+            localSearch = controls.strategy.localSearch.copy(assumptions = pins),
+        ))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
+
+        assertTrue(execution.result !is OpenTheoryResult.Sat)
+        if (engine == FiniteEngine.MIXED) {
+            assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
+        }
+    }
+
+    @Test
+    fun `active finite event hooks explicitly decline source execution`() {
+        val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
+        var calls = 0
+        val controls = params()
+        val params = controls.copy(strategy = controls.strategy.copy(
+            backtrack = controls.strategy.backtrack.copy(onEvent = { calls++ }),
+            localSearch = controls.strategy.localSearch.copy(onEvent = { calls++ }),
+        ))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
+
+        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
+        assertEquals(0L, execution.workSpent)
+        assertEquals(0, calls)
     }
 
     private fun params(): TranscendentalTheoryParams = TranscendentalTheoryParams(

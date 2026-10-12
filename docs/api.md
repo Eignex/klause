@@ -102,11 +102,12 @@ of the declared binary64 coefficient. Nonfinite weights reject. Exact source rat
 or decimal objectives use `QuadraticObjectiveSpec` directly without a binary64 conversion.
 
 The polynomial finite-result `minimize(LinearObjective)` overload rejects nonzero real
-costs; callers requiring continuous optimization use `optimize`. Ordinary
-`Problem.pipelineRoute(objective=...)` also declines continuous products with those
-linear costs. This representation-dependent admission is a vision misalignment
-tracked in [#2655](https://github.com/Eignex/klause/issues/2655); it is not a different
-mathematical objective fragment.
+costs; callers requiring continuous optimization use `optimize`. Source routing
+prepares ownership independently of the objective, then binds the original affine
+objective and direction to the captured plan. Continuous products and mixed finite/real
+products use their existing polynomial completion for affine and quadratic objectives.
+Each affine operation retains its original source snapshot and caller objective on
+its bound request; changing the objective does not rebind an earlier request.
 
 ### Nonlinear integer sources
 

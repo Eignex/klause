@@ -17,13 +17,30 @@ import com.eignex.klause.solver.evidence.SourceSemanticsChecker
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
 
-internal class LinearApproach(val endpoint: Sample, val strictBound: SourceDerivation) : SourceDerivation.Extension
+/** A checked affine path `endpoint + t * (base - endpoint)` for rational `0 < t <= 1`. */
+class LinearApproach(
+    /** Closure point with the exact limiting objective. */
+    val endpoint: Sample,
+    /** Strict global bound proving nonattainment. */
+    val strictBound: SourceDerivation,
+    /** Feasible approach base, or the limit claim's feasible point when absent. */
+    val base: Sample? = null,
+) : SourceDerivation.Extension
 
-internal class LinearPinnedObjective(val bound: SourceDerivation) : SourceDerivation.Extension
+/** An affine objective bound checked after substituting the invocation's complete Boolean pins. */
+class LinearPinnedObjective(
+    /** Original-source combination, checked under the fixed Boolean substitution. */
+    val bound: SourceDerivation,
+) : SourceDerivation.Extension
 
-internal class LinearPinnedRefutation(val conflict: SourceDerivation) : SourceDerivation.Extension
+/** A contradiction checked after substituting the invocation's complete Boolean pins. */
+class LinearPinnedRefutation(
+    /** Original-source contradiction combination. */
+    val conflict: SourceDerivation,
+) : SourceDerivation.Extension
 
-internal class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceSemanticsChecker {
+/** Checks linear optimization evidence against complete, consumer-owned exact affine source semantics. */
+class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceSemanticsChecker {
     private val exact = LinearSourceSemanticsChecker(source.coordinates, source.premises.values.toList(),
         source.objective, source.objectiveConstant)
 
@@ -35,7 +52,9 @@ internal class LinearAuthoritySemantics(private val source: SourceProofContext) 
 
     override fun objectiveEquals(
         sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
-    ): SourceEvidenceCheck = exact.objectiveEquals(sample, value, scope, cancellation)
+    ): SourceEvidenceCheck = if (source.affineObjectiveAvailable) {
+        exact.objectiveEquals(sample, value, scope, cancellation)
+    } else SourceEvidenceCheck.Unavailable("exact affine objective unavailable")
 
     override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
         val base = witness(claim.sample, scope, cancellation)
@@ -45,6 +64,9 @@ internal class LinearAuthoritySemantics(private val source: SourceProofContext) 
     override fun derivation(
         claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
     ): SourceEvidenceCheck {
+        if (claim != SourceClaim.Refutation && !source.affineObjectiveAvailable) {
+            return SourceEvidenceCheck.Unavailable("exact affine objective unavailable")
+        }
         if ((claim == SourceClaim.Refutation || claim is SourceClaim.Bound) &&
             derivation is LinearPinnedRefutation
         ) {
@@ -67,24 +89,27 @@ internal class LinearAuthoritySemantics(private val source: SourceProofContext) 
             return SourceEvidenceCheck.Unavailable("unsupported linear authority derivation")
         }
         if (!compatible(scope)) return SourceEvidenceCheck.Rejected("linear approach has a foreign scope")
-        val base = witness(claim.sample, scope, cancellation)
-        if (base != SourceEvidenceCheck.Checked) return base
+        val incumbent = witness(claim.sample, scope, cancellation)
+        if (incumbent != SourceEvidenceCheck.Checked) return incumbent
+        val base = derivation.base ?: claim.sample
+        val feasible = witness(base, scope, cancellation)
+        if (feasible != SourceEvidenceCheck.Checked) return feasible
         val bound = SourceEvidenceVerifier(source.atScope(scope).withLinearAuthority()).verify(SourceEvidence(scope,
             SourceClaim.Bound(claim.value, strict = true), derivation.strictBound), cancellation)
         if (bound != SourceEvidenceCheck.Checked) return bound
         val endpoint = derivation.endpoint
-        if (endpoint.numBoolVars != claim.sample.numBoolVars || endpoint.numIntVars != claim.sample.numIntVars ||
-            endpoint.numRealVars != claim.sample.numRealVars
+        if (endpoint.numBoolVars != base.numBoolVars || endpoint.numIntVars != base.numIntVars ||
+            endpoint.numRealVars != base.numRealVars
         ) return SourceEvidenceCheck.Rejected("linear approach coordinates are incomplete")
         for (id in 0 until endpoint.numBoolVars) {
             if (cancellation()) return SourceEvidenceCheck.Unavailable("linear approach check cancelled")
-            if (endpoint.boolValue(id) != claim.sample.boolValue(id)) {
+            if (endpoint.boolValue(id) != base.boolValue(id)) {
                 return SourceEvidenceCheck.Rejected("linear approach changes a Boolean coordinate")
             }
         }
         for (id in 0 until endpoint.numIntVars) {
             if (cancellation()) return SourceEvidenceCheck.Unavailable("linear approach check cancelled")
-            if (endpoint.exactIntValue(id) != claim.sample.exactIntValue(id)) {
+            if (endpoint.exactIntValue(id) != base.exactIntValue(id)) {
                 return SourceEvidenceCheck.Rejected("linear approach changes an integer coordinate")
             }
         }
@@ -99,13 +124,23 @@ internal class LinearAuthoritySemantics(private val source: SourceProofContext) 
         scope.objective == source.scope.objective && scope.condition.implies(source.scope.condition)
 }
 
-internal fun SourceProofContext.withLinearAuthority(): SourceProofContext = SourceProofContext(
-    scope, coordinates, premises, objective, objectiveConstant, LinearAuthoritySemantics(this),
+/**
+ * Enable inspectable affine optimization derivations for a complete exact affine source context.
+ * Every numeric source constraint and the exact affine objective must be represented by this context;
+ * omitted nonlinear constraints or rounded source correspondence do not acquire authority here.
+ */
+fun SourceProofContext.withLinearAuthority(): SourceProofContext = SourceProofContext(
+    scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant,
+    LinearAuthoritySemantics(this),
 )
 
 internal fun SourceProofContext.atScope(scope: SourceScope): SourceProofContext = SourceProofContext(
-    scope, coordinates, premises, objective, objectiveConstant, semanticsChecker,
+    scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant, semanticsChecker,
 )
+
+internal fun SourceProofContext.linearCoordinatesSupported(): Boolean = coordinates.groupBy { it.kind }.values.all {
+    it.map { coordinate -> coordinate.id }.sorted() == it.indices.toList()
+}
 
 internal fun SourceProofContext.numericCoordinates(): List<SourceCoordinate> = coordinates
     .filter { it.kind != SourceCoordinate.Kind.Boolean }.sortedWith(compareBy({ it.kind.ordinal }, { it.id }))

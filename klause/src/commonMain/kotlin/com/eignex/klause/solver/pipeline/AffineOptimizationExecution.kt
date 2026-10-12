@@ -15,4 +15,6 @@ fun OpenTheoryPipeline.optimize(
     params: PolynomialTheoryParams = PolynomialTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
     sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-): QuadraticOptimizationExecution = minimize(request, objective.toQuadraticObjectiveSpec(), params, engine, sense)
+): QuadraticOptimizationExecution = minimize(
+    request.affineOperation(objective, sense), objective.toQuadraticObjectiveSpec(), params, engine, sense,
+)

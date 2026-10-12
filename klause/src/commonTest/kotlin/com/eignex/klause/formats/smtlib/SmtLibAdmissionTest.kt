@@ -1,5 +1,11 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.pipelineRequest
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
@@ -11,6 +17,40 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
+    @Test
+    fun `unused helper arguments retain their log domains`() {
+        val input = SmtLibAdmission.parse(
+            "(define-fun f ((x Real)) Real 1) (assert (= (f (log 0)) 1)) (check-sat)",
+        )
+
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        assertIs<OpenTheoryResult.Unsat>(execution.result)
+    }
+
+    @Test
+    fun `unused let bindings retain their log domains`() {
+        val input = SmtLibAdmission.parse("(assert (let ((x (log 0))) true)) (check-sat)")
+
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        assertIs<OpenTheoryResult.Unsat>(execution.result)
+    }
+
+    @Test
+    fun `inactive conditional branches do not require unused binding domains`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const b Bool) (assert b) (assert (ite b true (let ((x (log 0))) true))) (check-sat)",
+        )
+
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        assertIs<OpenTheoryResult.Sat>(execution.result)
+    }
+
     @Test
     fun `linear sources retain one streaming parse`() {
         var opens = 0
@@ -328,6 +368,108 @@ class SmtLibAdmissionTest {
             "(assert (and (<= 1 x 3) (<= 1 |x| 3) (= (* x |x|) 6)))"
 
         assertFailsWith<UnsupportedSmtException> { SmtLibAdmission.parse(source) }
+    }
+
+    @Test
+    fun `function admission preserves original declaration identities`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const i Int) (declare-const y Real) (assert (= y (exp (to_real i)))) (check-sat)",
+        )
+
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+
+        assertEquals(mapOf("i" to 0), source.intVarNames)
+        assertEquals(mapOf("y" to 0), source.realVarNames)
+    }
+
+    @Test
+    fun `lexical helpers preserve original function equations`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const x Real) (define-fun f ((t Real)) Real (exp t)) (assert (= (f x) 2)) (check-sat)",
+        )
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+
+        assertEquals("log(2)", assertIs<OpenTheoryResult.Sat>(result).assignment.realValue(0))
+    }
+
+    @Test
+    fun `numeric conditionals keep inactive log branches outside the source domain`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const b Bool) (assert b) (assert (= (ite b 1 (log 0)) 1)) (check-sat)",
+        )
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+
+        assertTrue(assertIs<OpenTheoryResult.Sat>(result).assignment.boolValue(0))
+    }
+
+    @Test
+    fun `Boolean conditionals preserve selected branch domain semantics`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const b Bool) (assert b) (assert (ite b true (= (log 0) 1))) (check-sat)",
+        )
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+
+        assertTrue(assertIs<OpenTheoryResult.Sat>(result).assignment.boolValue(0))
+    }
+
+    @Test
+    fun `Boolean simplification cannot erase a required function domain`() {
+        val input = SmtLibAdmission.parse("(assert (or true (= (log 0) 1))) (check-sat)")
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `zero powers retain their original function domain`() {
+        val input = SmtLibAdmission.parse("(assert (= (^ (log 0) 0) 1)) (check-sat)")
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `function names shadowed by polynomial helpers keep polynomial source authority`() {
+        val input = SmtLibAdmission.parse(
+            "(define-fun exp ((t Real)) Real (* t t)) (declare-const x Real) (assert (= (exp x) 2)) (check-sat)",
+        )
+
+        assertIs<SmtLibInput.Polynomial>(input)
+    }
+
+    @Test
+    fun `source objectives are retained when exact function optimization is unavailable`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const x Real) (assert (> (exp x) 0)) (minimize (* x x)) (check-sat)",
+        )
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest()).result
+
+        assertTrue(source.hasObjective)
+        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(result).reason)
+    }
+
+    @Test
+    fun `function source assumptions retain original Boolean correlation`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const b Bool) (declare-const x Real) (assert (= (exp x) 2)) (check-sat-assuming (b))",
+        )
+        val source = assertIs<SmtLibInput.Transcendental>(input).problem
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
+
+        assertTrue(assertIs<OpenTheoryResult.Sat>(result).assignment.boolValue(0))
     }
 
 }
