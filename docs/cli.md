@@ -206,7 +206,7 @@ executes integer search, LS, ALNS or their mixed schedule through the shared pip
 `node-limit` is consumed once for search/heuristic strategy effort; `nra-work-limit`
 remains cumulative exact arithmetic work. `lsMoves` and `lsCompletions` record
 heuristic activity. Candidate exhaustion yields UNKNOWN. See [nonlinear integer execution](theories/nonlinear-integer.md).
-Polynomial results retain backend `exact-nra`; nonlinear integer results use
+Polynomial satisfaction results retain backend `exact-nra`; nonlinear integer satisfaction results use
 `nonlinear-integer-<engine>`. `-s` reports `nraWork`, `nraProjectedPolynomials`,
 `nraLiftedCells` and, on a resource stop, `nraResource`. Legacy open counters remain
 zero. The whole-run deadline includes source admission. `open-bound-proof=false`
@@ -214,6 +214,10 @@ does not disable admission or polynomial solving because this route has no finit
 bound proof. [Polynomial source semantics](formats/smtlib.md#polynomial-source-lowering)
 defines exact root rendering and supported syntax.
 
+Polynomial affine optimization uses the quadratic source executor, native
+allowance and exact result publisher. Affine coefficients retain their source namespaces and declared
+binary64 authority; maximization passes the original objective and explicit direction.
+The publisher retains exact costs and bounds, unattained limits and incomplete reasons.
 Quadratic optimization uses the same source request and native controls. Its
 `nra-work-limit` caps combined numerical and polynomial work; `nraWork` retains
 the polynomial subset, while `quadraticNumericalWork` and `quadraticNativeWork`
