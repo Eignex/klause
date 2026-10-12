@@ -104,7 +104,9 @@ private class NonlinearIntegerSearch(
                             representationDecline = relaxed
                         }
                         is QfNraResult.Satisfiable -> {
-                            current = coordinates.map { integerNear(relaxed.assignment.realValue(it), arithmetic) }
+                            current = coordinates.map {
+                                integerNear(relaxed.assignment.realValue(it), arithmetic)
+                            }
                             enumeration = (current + enumeration).distinct()
                             if (integral(relaxed.assignment) && checked(relaxed.assignment)) return@use relaxed
                         }
@@ -133,7 +135,8 @@ private class NonlinearIntegerSearch(
             QfNraResult.Unknown(QfNraReason.ResourceLimit, polynomialStats(), stop.resource)
         }
         return NonlinearIntegerExecution(
-            withStats(result), NonlinearIntegerStats(candidates, moves, repairs, invocation.queries, polynomialStats()),
+            withStats(result),
+            NonlinearIntegerStats(candidates, moves, repairs, invocation.queries, polynomialStats()),
         )
     }
 
@@ -190,9 +193,10 @@ private class NonlinearIntegerSearch(
                 if (work()) throw PolynomialInterrupted()
                 if (guide.reason == QfNraReason.ResourceLimit) representationDecline = guide
                 current = current.mapIndexed { index, value ->
-                    if (index in released) hints.getOrNull(((candidates - 1) % hints.size.coerceAtLeast(1)).toInt())
-                        ?: (value + radius)
-                    else value
+                    if (index in released) {
+                        val hint = ((candidates - 1) % hints.size.coerceAtLeast(1)).toInt()
+                        hints.getOrNull(hint) ?: (value + radius)
+                    } else value
                 }
             }
         }
@@ -257,7 +261,8 @@ private class NonlinearIntegerSearch(
         checkNonlinearSource(problem.formula, assignment, arithmetic)
     private fun unknown(): QfNraResult.Unknown =
         representationDecline?.takeIf { !work() }?.copy(stats = polynomialStats()) ?: QfNraResult.Unknown(
-        if (work.limitReached || !params.arithmetic.cancellation()) QfNraReason.WorkLimit else QfNraReason.Interrupted,
+        if (work.limitReached || !params.arithmetic.cancellation()) QfNraReason.WorkLimit
+        else QfNraReason.Interrupted,
         polynomialStats(),
     )
     private fun polynomialStats(): QfNraStats = invocation.stats.copy(workSpent = work.spent)
@@ -293,8 +298,8 @@ private fun integerNear(value: AlgebraicReal, arithmetic: PolynomialArithmetic):
     while (lower < upper) {
         arithmetic.step()
         val middle = -BigFraction.of(-(lower + upper), BIG_TWO).ceilInteger()
-        if (algebraic.compare(value, algebraic.rational(BigFraction.of(middle, BIG_ONE))) <= 0) upper = middle
-        else lower = middle + BIG_ONE
+        val comparison = algebraic.compare(value, algebraic.rational(BigFraction.of(middle, BIG_ONE)))
+        if (comparison <= 0) upper = middle else lower = middle + BIG_ONE
     }
     return lower
 }
