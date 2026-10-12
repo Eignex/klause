@@ -48,7 +48,7 @@ class CliModeTest {
             output.onComplete(Verdict.OPTIMAL)
         }
 
-        assertEquals("; objective=1/3\n$model\n", progress)
+        assertEquals("; objective=1/3\nsat\n$model\n", progress)
         assertEquals("sat\n; optimizationStatus=optimal\n", terminal)
     }
 
@@ -64,7 +64,7 @@ class CliModeTest {
             publication.publish(model, SourceValue.Rational(value))
         }
 
-        assertEquals("; objective=$value\n$model\n", progress)
+        assertEquals("; objective=$value\nsat\n$model\n", progress)
     }
 
     @Test
@@ -110,6 +110,8 @@ class CliModeTest {
         }
 
         assertTrue("; objective=(root-obj (+ (- 2) (* 1 (^ x 2))) 2)" in progress.lines(), progress)
+        assertTrue("sat" in progress.lines(), progress)
+        assertTrue(progress.indexOf("sat\n") < progress.indexOf(model), progress)
         assertTrue(model in progress, progress)
         assertFalse("optimizationStatus" in progress, progress)
         assertFalse("; objective=" in terminal, terminal)
