@@ -3,6 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
@@ -121,7 +122,14 @@ private fun parseLinearAdmission(
     ) {
         smtUnsupported("pure real/Boolean helpers require lexical polynomial lowering")
     }
-    return builder.build()
+    val problem = builder.build()
+    if (problem.model.factors.any { it is ContinuousProduct } &&
+        (builder.intNames.isEmpty() || (0 until problem.model.numIntVars).any { id ->
+            problem.model.intBounds.isOpenLower(id) || problem.model.intBounds.isOpenUpper(id)
+        })) {
+        smtUnsupported("pure real nonlinear source requires polynomial lowering")
+    }
+    return problem
 }
 
 private val INTEGER_SOURCE_OPERATORS = setOf("to_real", "to_int", "is_int", "div", "mod")

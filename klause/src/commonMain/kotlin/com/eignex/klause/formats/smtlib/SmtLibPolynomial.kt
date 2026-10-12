@@ -15,6 +15,7 @@ internal class SmtLibPolynomialProblem(
     val sourceRealCount: Int,
     val sourceBoolCount: Int,
     val hasNonlinearTerms: Boolean,
+    intVarNames: Map<String, Int> = emptyMap(),
     realVarNames: Map<String, Int>,
     boolVarNames: Map<String, Int>,
     checkpoint: () -> Unit = {},
@@ -23,7 +24,7 @@ internal class SmtLibPolynomialProblem(
         require(sourceRealCount in 0..realCount && sourceBoolCount in 0..boolCount) {
             "invalid polynomial source count"
         }
-        require(realVarNames.values.toSet() == (0 until sourceRealCount).toSet()) {
+        require((realVarNames.values + intVarNames.values).toSet() == (0 until sourceRealCount).toSet()) {
             "invalid polynomial real source map"
         }
         require(boolVarNames.values.toSet() == (0 until sourceBoolCount).toSet()) {
@@ -32,6 +33,8 @@ internal class SmtLibPolynomialProblem(
         formula.requireVariableCounts(boolCount, realCount, checkpoint)
     }
 
+    private val integers = intVarNames.toMap()
+    val intVarNames: Map<String, Int> get() = integers.toMap()
     private val reals = realVarNames.toMap()
     private val bools = boolVarNames.toMap()
     val realVarNames: Map<String, Int> get() = reals.toMap()
@@ -39,13 +42,13 @@ internal class SmtLibPolynomialProblem(
 }
 
 internal object SmtLibPolynomial {
-    fun parse(text: String, cancellation: Cancellation = Cancellation.Never): SmtLibPolynomialProblem =
-        parse(StringCharSource(text), cancellation)
+    fun parse(text: String, cancellation: Cancellation = Cancellation.Never, allowIntegers: Boolean = false): SmtLibPolynomialProblem =
+        parse(StringCharSource(text), cancellation, allowIntegers)
 
-    fun parse(source: CharSource, cancellation: Cancellation = Cancellation.Never): SmtLibPolynomialProblem {
+    fun parse(source: CharSource, cancellation: Cancellation = Cancellation.Never, allowIntegers: Boolean = false): SmtLibPolynomialProblem {
         cancellation.polynomialSourceCheckpoint()
         val reader = SExprReader(PolynomialSourceInput(source, cancellation))
-        val compiler = SmtLibPolynomialCompiler(cancellation)
+        val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers)
         while (true) {
             cancellation.polynomialSourceCheckpoint()
             compiler.command(reader.readCommandOrNull() ?: break)
@@ -54,9 +57,14 @@ internal object SmtLibPolynomial {
     }
 }
 
-internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation = Cancellation.Never) {
+internal class SmtLibPolynomialCompiler(
+    private val cancellation: Cancellation = Cancellation.Never,
+    private val allowIntegers: Boolean = false,
+) {
     private val bindings = PolynomialBindings()
     private var environment = bindings.environment()
+    private val intNames = LinkedHashMap<String, Int>()
+    private val numericCount: Int get() = realNames.size + intNames.size
     private val realNames = LinkedHashMap<String, Int>()
     private val boolNames = LinkedHashMap<String, Int>()
     private val assertions = ArrayList<Pair<SExpr, PolynomialEnvironment>>()
@@ -91,7 +99,9 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
             }
             "set-logic" -> {
                 command.polynomialSize(2)
-                if (command.polynomialAtom(1) !in setOf("QF_NRA", "QF_LRA", "QF_RDL", "ALL")) {
+                if (command.polynomialAtom(1) !in setOf("QF_NRA", "QF_LRA", "QF_RDL", "ALL") &&
+                    !(allowIntegers && command.polynomialAtom(1) in setOf("QF_NIA", "QF_NIRA", "QF_LIA", "QF_LIRA"))
+                ) {
                     smtUnsupported("unsupported polynomial logic '${command.polynomialAtom(1)}'")
                 }
             }
@@ -132,21 +142,25 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
     }
 
     fun build(): SmtLibPolynomialProblem {
-        val lowering = PolynomialRealLowering(realNames.size)
+        val lowering = PolynomialRealLowering(numericCount)
         val evaluator = SmtLibPolynomialEvaluator(lowering, cancellation = cancellation)
         val formulas = assertions.map { (expression, environment) ->
             evaluator.evaluate(expression, environment).boolean()
         }
         return SmtLibPolynomialProblem(
-            lowering.formula(formulas), lowering.realCount, boolNames.size, realNames.size, boolNames.size,
-            evaluator.hasNonlinearTerms, realNames, boolNames, { cancellation.polynomialSourceCheckpoint() },
+            lowering.formula(formulas), lowering.realCount, boolNames.size, numericCount, boolNames.size,
+            evaluator.hasNonlinearTerms, intNames, realNames, boolNames, { cancellation.polynomialSourceCheckpoint() },
         )
     }
 
     private fun declare(name: String, sort: String) {
         unusedName(name)
         val value = when (sort) {
-            "Real" -> PolynomialValue.Real.variable(realNames.size).also { realNames[name] = realNames.size }
+            "Real" -> PolynomialValue.Real.variable(numericCount).also { realNames[name] = numericCount }
+            "Int" -> {
+                if (!allowIntegers) smtUnsupported("unsupported polynomial sort 'Int'")
+                PolynomialValue.Real.variable(numericCount, integer = true).also { intNames[name] = numericCount }
+            }
             "Bool" -> PolynomialValue.Boolean.variable(boolNames.size).also { boolNames[name] = boolNames.size }
             else -> smtUnsupported("unsupported polynomial sort '$sort'")
         }
@@ -160,29 +174,35 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
         unusedName(name)
         val parameters = command.items[2] as? SExpr.SList ?: smtUnsupported("malformed define-fun parameters")
         val names = ArrayList<String>()
-        val sorts = ArrayList<Boolean>()
+        val sorts = ArrayList<Sort>()
         for (parameter in parameters.items) {
             val pair = parameter as? SExpr.SList ?: smtUnsupported("malformed polynomial parameter")
             if (pair.items.size != 2) smtUnsupported("malformed polynomial parameter")
             val parameterName = pair.polynomialName(0)
             if (parameterName in names) smtUnsupported("duplicate polynomial parameter '$parameterName'")
             names.add(parameterName)
-            sorts.add(polynomialBooleanSort(pair.polynomialAtom(1)))
+            val sort = polynomialSort(pair.polynomialAtom(1))
+            if (sort == Sort.INT && !allowIntegers) smtUnsupported("unsupported polynomial sort 'Int'")
+            sorts.add(sort)
         }
+        val resultSort = polynomialSort(command.polynomialAtom(3))
+        if (resultSort == Sort.INT && !allowIntegers) smtUnsupported("unsupported polynomial sort 'Int'")
         val macro = PolynomialMacro(
-            names, sorts, polynomialBooleanSort(command.polynomialAtom(3)), command.items[4],
+            names, sorts, resultSort, command.items[4],
             environment,
         )
         val parametersForValidation = names.mapIndexed { index, parameter ->
-            parameter to if (sorts[index]) PolynomialValue.Boolean.variable(index)
-            else PolynomialValue.Real.variable(index)
+            parameter to if (sorts[index] == Sort.BOOL) PolynomialValue.Boolean.variable(index)
+            else PolynomialValue.Real.variable(index, integer = sorts[index] == Sort.INT)
         }.toMap()
         val value = SmtLibPolynomialEvaluator(
-            PolynomialRealLowering(realNames.size + names.size), validateOnly = true, cancellation = cancellation,
+            PolynomialRealLowering(numericCount + names.size), validateOnly = true, cancellation = cancellation,
         ).evaluate(
             macro.body, macro.environment.withValues(parametersForValidation),
         )
-        if (macro.booleanResult) value.boolean() else if (value !is PolynomialValue.Real) {
+        if (macro.resultSort == Sort.BOOL) value.boolean() else if (value !is PolynomialValue.Real ||
+            macro.resultSort == Sort.INT && !value.integer
+        ) {
             smtUnsupported("polynomial macro result must be Real")
         }
         bindings.define(name, macro)
@@ -196,9 +216,10 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
     }
 }
 
-internal fun polynomialBooleanSort(sort: String): Boolean = when (sort) {
-    "Bool" -> true
-    "Real" -> false
+internal fun polynomialSort(sort: String): Sort = when (sort) {
+    "Bool" -> Sort.BOOL
+    "Real" -> Sort.REAL
+    "Int" -> Sort.INT
     else -> smtUnsupported("unsupported polynomial sort '$sort'")
 }
 

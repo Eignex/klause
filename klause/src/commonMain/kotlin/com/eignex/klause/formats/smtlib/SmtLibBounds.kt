@@ -19,7 +19,12 @@ internal fun Compiler.Builder.inferBounds() {
     val lo = arrayOfNulls<Long>(nextInt)
     val hi = arrayOfNulls<Long>(nextInt)
     val relations = ArrayList<Rel>()
-    for (a in asserts) collectConjunctiveRelations(a, relations)
+    inferringBounds = true
+    try {
+        for (a in asserts) collectConjunctiveRelations(a, relations)
+    } finally {
+        inferringBounds = false
+    }
 
     for (r in relations) {
         if (r.op == LinearOp.NE) continue

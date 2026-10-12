@@ -33,15 +33,18 @@ internal sealed interface PolynomialValue {
             fun variable(index: Int): Boolean = Boolean(PolynomialRealFormula.BooleanVariable(SourceBoolId(index)))
         }
     }
-    data class Real(val expression: PolynomialExpression) : PolynomialValue {
+    data class Real(val expression: PolynomialExpression, val integer: kotlin.Boolean = false) : PolynomialValue {
         companion object {
-            fun variable(index: Int): Real = Real(PolynomialExpression.Variable(SourceRealId(index)))
+            fun variable(index: Int, integer: kotlin.Boolean = false): Real =
+                Real(PolynomialExpression.Variable(SourceRealId(index)), integer)
         }
     }
 }
 
 internal fun PolynomialValue.boolean(): PolynomialRealFormula =
     (this as? PolynomialValue.Boolean)?.formula ?: smtUnsupported("polynomial Boolean operand expected")
+
+private fun PolynomialValue.integral(): Boolean = (this as? PolynomialValue.Real)?.integer == true
 
 private fun PolynomialValue.real(): PolynomialExpression =
     (this as? PolynomialValue.Real)?.expression ?: smtUnsupported("polynomial real operand expected")
@@ -96,8 +99,8 @@ internal class PolynomialEnvironment(
 
 internal data class PolynomialMacro(
     val parameters: List<String>,
-    val booleanParameters: List<Boolean>,
-    val booleanResult: Boolean,
+    val parameterSorts: List<Sort>,
+    val resultSort: Sort,
     val body: SExpr,
     val environment: PolynomialEnvironment,
 )
@@ -111,7 +114,7 @@ private sealed interface PolynomialFrame {
         val environment: PolynomialEnvironment,
     ) : PolynomialFrame
     data class Call(val macro: PolynomialMacro) : PolynomialFrame
-    data class CheckSort(val boolean: Boolean) : PolynomialFrame
+    data class CheckSort(val sort: Sort) : PolynomialFrame
 }
 
 internal class SmtLibPolynomialEvaluator(
@@ -141,9 +144,11 @@ internal class SmtLibPolynomialEvaluator(
                 }
                 is PolynomialFrame.Call -> {
                     val args = pop(values, frame.macro.parameters.size)
-                    for (index in args.indices) checkSort(args[index], frame.macro.booleanParameters[index])
-                    val bindings = frame.macro.parameters.zip(args).toMap()
-                    work.addLast(PolynomialFrame.CheckSort(frame.macro.booleanResult))
+                    for (index in args.indices) checkSort(args[index], frame.macro.parameterSorts[index])
+                    val bindings = frame.macro.parameters.indices.associate { index ->
+                        frame.macro.parameters[index] to coerceSort(args[index], frame.macro.parameterSorts[index])
+                    }
+                    work.addLast(PolynomialFrame.CheckSort(frame.macro.resultSort))
                     work.addLast(
                         PolynomialFrame.Evaluate(
                             frame.macro.body,
@@ -151,7 +156,11 @@ internal class SmtLibPolynomialEvaluator(
                         ),
                     )
                 }
-                is PolynomialFrame.CheckSort -> checkSort(values.last(), frame.boolean)
+                is PolynomialFrame.CheckSort -> {
+                    val value = values.removeLast()
+                    checkSort(value, frame.sort)
+                    values.addLast(coerceSort(value, frame.sort))
+                }
             }
         }
         return values.single()
@@ -168,10 +177,10 @@ internal class SmtLibPolynomialEvaluator(
                 val bound = frame.environment.value(polynomialSymbol(node.text))
                 val macro = frame.environment.macro(polynomialSymbol(node.text))
                 when {
-                    literal != null -> values.addLast(PolynomialValue.Real(constant(literal)))
+                    literal != null -> values.addLast(PolynomialValue.Real(constant(literal), integer = '.' !in node.text))
                     bound != null -> values.addLast(bound)
                     macro != null && macro.parameters.isEmpty() -> {
-                        work.addLast(PolynomialFrame.CheckSort(macro.booleanResult))
+                        work.addLast(PolynomialFrame.CheckSort(macro.resultSort))
                         work.addLast(PolynomialFrame.Evaluate(macro.body, macro.environment))
                     }
                     node.text == "true" || node.text == "false" -> values.addLast(
@@ -230,17 +239,18 @@ internal class SmtLibPolynomialEvaluator(
 
     private fun combine(node: SExpr.SList, args: List<PolynomialValue>): PolynomialValue {
         return when (node.polynomialHead()) {
-            "+" -> PolynomialValue.Real(sum(args.map { it.real() }, cancellation))
+            "+" -> PolynomialValue.Real(sum(args.map { it.real() }, cancellation), args.all { it.integral() })
             "-" -> PolynomialValue.Real(
                 if (args.size == 1) negate(args.single().real(), cancellation)
                 else sum(
                     listOf(args.first().real()) + args.drop(1).map { negate(it.real(), cancellation) }, cancellation,
                 ),
+                args.all { it.integral() },
             )
             "*" -> {
                 val terms = args.map { it.real() }
                 if (terms.count { rational(it) == null } >= 2) hasNonlinearTerms = true
-                PolynomialValue.Real(product(terms, cancellation))
+                PolynomialValue.Real(product(terms, cancellation), args.all { it.integral() })
             }
             "/" -> {
                 var value = args.first().real()
@@ -259,7 +269,7 @@ internal class SmtLibPolynomialEvaluator(
                 val base = args[0].real()
                 val value = rational(args[1].real())
                 if (value == null) {
-                    if (validateOnly) return PolynomialValue.Real(base)
+                    if (validateOnly) return PolynomialValue.Real(base, args[0].integral())
                     smtUnsupported("polynomial power requires a constant exponent")
                 }
                 if (value.den != BIG_ONE || value.num.signum() < 0 || value.num > bigIntOf(Int.MAX_VALUE)) {
@@ -267,7 +277,11 @@ internal class SmtLibPolynomialEvaluator(
                 }
                 val exponent = value.num.toLong().toInt()
                 if (exponent >= 2 && rational(base) == null) hasNonlinearTerms = true
-                PolynomialValue.Real(power(base, exponent, cancellation))
+                PolynomialValue.Real(power(base, exponent, cancellation), args[0].integral())
+            }
+            "to_real" -> {
+                if (!args.single().integral()) smtUnsupported("to_real requires an integer operand")
+                PolynomialValue.Real(args.single().real())
             }
             "and" -> PolynomialValue.Boolean(and(args.map { it.boolean() }))
             "or" -> PolynomialValue.Boolean(or(args.map { it.boolean() }))
@@ -285,7 +299,10 @@ internal class SmtLibPolynomialEvaluator(
                         PolynomialRealLowering.conditional(condition, args[1].boolean(), args[2].boolean()),
                     )
                 } else {
-                    PolynomialValue.Real(lowering.conditional(condition, args[1].real(), args[2].real()))
+                    PolynomialValue.Real(
+                        lowering.conditional(condition, args[1].real(), args[2].real()),
+                        args[1].integral() && args[2].integral(),
+                    )
                 }
             }
             "=", "distinct", "<", "<=", ">", ">=" -> PolynomialValue.Boolean(comparison(node.polynomialHead(), args))
@@ -320,7 +337,7 @@ internal class SmtLibPolynomialEvaluator(
 
     private fun validateOperator(node: SExpr.SList) {
         when (val head = node.polynomialHead()) {
-            "not" -> node.polynomialSize(2)
+            "not", "to_real" -> node.polynomialSize(2)
             "ite" -> node.polynomialSize(4)
             "^" -> node.polynomialSize(3)
             "+", "*", "and", "or" -> Unit
@@ -335,8 +352,15 @@ internal class SmtLibPolynomialEvaluator(
     private fun pop(values: ArrayDeque<PolynomialValue>, count: Int): List<PolynomialValue> =
         List(count) { values.removeLast() }.reversed()
 
-    private fun checkSort(value: PolynomialValue, boolean: Boolean) {
-        if (boolean) value.boolean() else value.real()
+    private fun coerceSort(value: PolynomialValue, sort: Sort): PolynomialValue =
+        if (sort == Sort.REAL) PolynomialValue.Real(value.real()) else value
+
+    private fun checkSort(value: PolynomialValue, sort: Sort) {
+        when (sort) {
+            Sort.BOOL -> value.boolean()
+            Sort.REAL -> value.real()
+            Sort.INT -> if (!value.integral()) smtUnsupported("polynomial integer operand expected")
+        }
     }
 }
 

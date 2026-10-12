@@ -82,7 +82,7 @@ internal fun Compiler.Builder.isRealExpr(t: SExpr): Boolean {
 
                 "to_int" -> Unit
 
-                "+", "-", "*" -> for (i in 1 until node.items.size) work.addLast(node.items[i])
+                "+", "-", "*", "^" -> for (i in 1 until node.items.size) work.addLast(node.items[i])
 
                 // Either branch decides the ite's sort: a real may hide in the else-branch alone.
                 "ite" -> {

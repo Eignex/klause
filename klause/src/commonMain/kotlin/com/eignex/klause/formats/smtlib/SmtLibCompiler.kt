@@ -38,6 +38,7 @@ internal object Compiler {
         internal var nextBool = 0
         internal var nextInt = 0
         internal var nextReal = 0
+        internal var inferringBounds = false
 
         /** Chain variables of the wide-coefficient row encoding, keyed `(varId shl 3) or (k shl 1) or isInt`:
          *  chain k stands for `B^k · var` (see [wideRealRow]). */
