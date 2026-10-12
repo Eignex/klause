@@ -135,6 +135,7 @@ private fun parseLinearAdmission(
     val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings)
     val reader = SExprReader(source)
     val scope = SmtLibScope(cancellation)
+    val declarations = ArrayList<SExpr>()
     var integerHelpers = false
     var logic: String? = null
     var querySeen = false
@@ -158,20 +159,24 @@ private fun parseLinearAdmission(
         }
         if (head == "check-sat" || head == "check-sat-assuming") querySeen = true
         if (head == "exit") exited = true
+        if (head in setOf("declare-const", "declare-fun", "define-fun")) declarations.add(command)
         if (head == "define-fun") integerHelpers = integerHelpers || hasIntegerSyntax(command, cancellation)
         if (head == "set-logic") logic = ((command as SExpr.SList).items.getOrNull(1) as? SExpr.Atom)?.text
     }
     if (quadraticObjective) smtUnsupported("quadratic objectives require exact source capture")
     // Definition scopes exclude caller-local bindings in pure satisfaction helpers.
     val polynomialLogic = logic == null || logic in setOf("QF_NRA", "QF_LRA", "QF_RDL", "ALL")
-    if (polynomialLogic && !integerHelpers && builder.intNames.isEmpty() &&
+    val pureRealHelpers = polynomialLogic && !integerHelpers && builder.intNames.isEmpty() &&
         builder.objectiveSpec == null && builder.macros.isNotEmpty() &&
         builder.asserts.none { hasIntegerSyntax(it, cancellation) }
-    ) {
-        smtUnsupported("pure real/Boolean helpers require lexical polynomial lowering")
-    }
-    if (nonlinearSyntax && builder.macros.isNotEmpty()) {
-        smtUnsupported("nonlinear helpers require lexical source lowering")
+    val nonlinearHelpers = nonlinearSyntax && builder.macros.isNotEmpty()
+    if (pureRealHelpers || nonlinearHelpers) {
+        val referenced = builder.asserts.any { referencesHelper(it, builder.macros.keys, cancellation) } ||
+            builder.objectiveSpec?.first?.let { referencesHelper(it, builder.macros.keys, cancellation) } == true
+        if (referenced) smtUnsupported("referenced helpers require lexical source lowering")
+        // Unused definitions still have to satisfy lexical body and return-sort validation.
+        val validation = SmtLibPolynomialCompiler(cancellation, allowIntegers = true)
+        for (declaration in declarations) validation.command(declaration)
     }
     val problem = builder.build()
     val products = problem.model.factors.any { it is Product || it is RealProduct || it is ContinuousProduct }
@@ -192,6 +197,19 @@ private fun parseLinearAdmission(
         smtUnsupported("pure real nonlinear source requires polynomial lowering")
     }
     return problem
+}
+
+private fun referencesHelper(expression: SExpr, helpers: Set<String>, cancellation: Cancellation): Boolean {
+    val pending = ArrayDeque<SExpr>()
+    pending.addLast(expression)
+    while (pending.isNotEmpty()) {
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        when (val node = pending.removeLast()) {
+            is SExpr.Atom -> if (node.text in helpers) return true
+            is SExpr.SList -> pending.addAll(node.items)
+        }
+    }
+    return false
 }
 
 private fun hasSignedNumberSymbol(expression: SExpr, cancellation: Cancellation): Boolean {
