@@ -45,12 +45,14 @@ semantics; multiplying a continuous expression by a constant retains a product n
 [Source lowering](formats.md#schema-continuous-products) defines exact constants,
 auxiliary columns and refused contexts.
 
-Continuous products have no finite propagator, local-search score or assignment
-checker. Finite execution projections explicitly reject them. An LP completion
-cannot certify their nonlinear equalities. Exact execution through the model solver
-entry points is unsupported; the separate [polynomial theory](solver/qfnra.md)
-retains authority over exact rational/algebraic witnesses for admitted polynomial
-source formulas.
+Continuous products have no finite propagator, local-search score or finite
+assignment checker. Direct finite execution projections reject them, and an LP
+completion cannot certify their nonlinear equalities. Model solver entry points
+route them through [shared polynomial completion](solver/qfnra.md#shared-model-composition)
+beside finite factors across backtracking, local search, ALNS and mixed portfolios.
+Exact rational/algebraic witnesses retain their source coordinates. This route
+supports finite integer domains and finite-column objectives; open integer domains
+and continuous objectives remain unsupported.
 
 ## Experimental and implementation surfaces
 
