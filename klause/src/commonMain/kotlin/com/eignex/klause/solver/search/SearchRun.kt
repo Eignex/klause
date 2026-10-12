@@ -16,6 +16,7 @@ class SearchRun internal constructor(
     private val modelPolicy: SearchModelPolicy,
     private val nodePolicy: SearchNodePolicy,
     private val lifecycle: SearchRunLifecycle,
+    private val minimumDecisionLevel: Int,
 ) {
     private val frames = ArrayList<Frame>()
     private var decisions = 0L
@@ -404,7 +405,7 @@ class SearchRun internal constructor(
         var conflict = initial
         learnedApplied = false
         repeat(MAX_NODE_BACKJUMPS) {
-            if (conflict.decisionLevel !in 0..session.decisionLevel) {
+            if (conflict.decisionLevel !in minimumDecisionLevel..session.decisionLevel) {
                 return SearchLearnedConflictResult.Chronological
             }
             learnedApplied = true
@@ -451,7 +452,7 @@ class SearchRun internal constructor(
         }
     }
 
-    private fun restart(): SearchRunEvent? = when (session.restart()) {
+    private fun restart(): SearchRunEvent? = when (session.restartAt(minimumDecisionLevel)) {
         ComponentResult.Consistent -> {
             frames.clear()
             params.restart.onRestart()
@@ -479,7 +480,7 @@ class SearchRun internal constructor(
 
     /** Reset traversal state after its components have been reseeded at root. */
     fun reset() {
-        check(session.decisionLevel == 0) { "a search run may only reset at its root" }
+        check(session.decisionLevel == minimumDecisionLevel) { "a search run may only reset at its root" }
         frames.clear()
         decisions = 0L
         decisionsSinceRestart = 0L
