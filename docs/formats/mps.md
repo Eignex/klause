@@ -89,6 +89,8 @@ source-derived definition and is omitted from rendered original columns. Rejecte
 final witnesses cannot promote a buffered earlier point to an optimum or supply
 the point required by an unboundedness claim. A source-inexact numerical proposal
 alone supplies no original-source refutation, bound or optimum authority.
+Rendering and acceptance state belongs to one load; retained outputs do not read
+the source objective or witness acceptance of a later load.
 
 See [MpsCompiler](../../klause/src/commonMain/kotlin/com/eignex/klause/formats/mps/MpsCompiler.kt)
 and [MpsMode](../../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/MpsMode.kt).

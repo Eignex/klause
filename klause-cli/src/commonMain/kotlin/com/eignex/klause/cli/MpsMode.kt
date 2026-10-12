@@ -37,13 +37,7 @@ internal object MpsMode : CliMode {
     override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        private var objectiveScale = 1L
-        private var toleranceDifference: String? = null
-        private var sourceExact = true
-        private var sourceDifference: String? = null
-        private var latestSourceObjective: BigFraction? = null
-        private var sourceWitnessAccepted = true
-        private var witnessOnly = false
+        private var outputState = MpsOutputState()
 
         override fun flags(): List<FlagSpec> = emptyList()
 
@@ -51,16 +45,14 @@ internal object MpsMode : CliMode {
             val source = Mps.parse(openFileSource(path))
             val settings = common.config.problemSettings()
             val lowered = source.toProblem(settings)
-            val usesExactSource = !lowered.sourceExact && (common.exact || lowered.model.numIntVars > 0)
+            val hasConstantObjective = lowered.objective == null && source.objective.name.isNotEmpty()
+            val usesExactSource = hasConstantObjective ||
+                (!lowered.sourceExact && (common.exact || lowered.model.numIntVars > 0))
             val compiled = if (usesExactSource) source.toExactSourceProblem(settings) else lowered
             if (common.exact) requireExactMpsSource(compiled)
-            objectiveScale = compiled.objectiveScale
-            toleranceDifference = compiled.toleranceDifference
-            sourceExact = compiled.sourceExact
-            sourceDifference = compiled.sourceDifference
-            latestSourceObjective = null
-            sourceWitnessAccepted = true
-            witnessOnly = false
+            val state = MpsOutputState(compiled.objectiveScale, compiled.toleranceDifference,
+                compiled.sourceExact, compiled.sourceDifference)
+            outputState = state
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
@@ -69,11 +61,11 @@ internal object MpsMode : CliMode {
             val render: (Sample) -> String = { sample ->
                 if (sample.exactReals == null && compiled.model.numRealVars > 0) {
                     // A float leaf under tolerance semantics: its values are the doubles themselves.
-                    latestSourceObjective = compiled.sourceObjective(sample.ints, sample.reals)
+                    state.latestSourceObjective = compiled.sourceObjective(sample.ints, sample.reals)
                     renderMpsFloat(compiled, sample)
                 } else {
                     val witness = compiled.sourceWitness(sample.ints, sample.exactReals)
-                    latestSourceObjective = witness.objective
+                    state.latestSourceObjective = witness.objective
                     renderMpsWitness(compiled, witness)
                 }
             }
@@ -90,8 +82,8 @@ internal object MpsMode : CliMode {
                 } catch (_: IllegalArgumentException) {
                     null
                 }
-                sourceWitnessAccepted = witness != null
-                latestSourceObjective = witness?.objective
+                state.sourceWitnessAccepted = witness != null
+                state.latestSourceObjective = witness?.objective
                 renderMpsOpenModel(compiled, assignment)
             }
             val objective = compiled.objective?.toLinearObjective()
@@ -124,10 +116,10 @@ internal object MpsMode : CliMode {
                 )
 
                 is SourceProblemRoute.OpenTheory -> {
-                    witnessOnly = !compiled.sourceExact
+                    state.witnessOnly = !compiled.sourceExact
                     // Refuting a lowered objective bound does not refute the corresponding decimal source bound.
                     val canDecide = when {
-                        witnessOnly -> false
+                        state.witnessOnly -> false
                         route.request.objective == null -> true
                         else -> OpenTheoryPipeline.canMinimize(route.request)
                     }
@@ -152,7 +144,7 @@ internal object MpsMode : CliMode {
 
                 // No theory decides it, so local search looks for incumbents alone.
                 is SourceProblemRoute.UnsupportedOpen -> {
-                    witnessOnly = !compiled.sourceExact
+                    state.witnessOnly = !compiled.sourceExact
                     openLocalSearchSolvable(
                         route.problem,
                         renderOpen,
@@ -167,15 +159,29 @@ internal object MpsMode : CliMode {
             }
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(
-            objectiveScale,
-            toleranceDifference == null && !witnessOnly,
-            toleranceDifference ?: sourceDifference,
-            { latestSourceObjective },
-            sourceExact && !witnessOnly,
-            { sourceWitnessAccepted },
-        )
+        override fun output(common: CommonOptions): OutputProtocol {
+            val state = outputState
+            return MpsOutput(
+                state.objectiveScale,
+                state.toleranceDifference == null && !state.witnessOnly,
+                state.toleranceDifference ?: state.sourceDifference,
+                { state.latestSourceObjective },
+                state.sourceExact && !state.witnessOnly,
+                { state.sourceWitnessAccepted },
+            )
+        }
     }
+}
+
+private class MpsOutputState(
+    val objectiveScale: Long = 1L,
+    val toleranceDifference: String? = null,
+    val sourceExact: Boolean = true,
+    val sourceDifference: String? = null,
+) {
+    var latestSourceObjective: BigFraction? = null
+    var sourceWitnessAccepted = true
+    var witnessOnly = false
 }
 
 private fun parseOpenMpsNumber(value: String): BigFraction {
