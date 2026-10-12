@@ -78,14 +78,21 @@ internal fun interface DestroyOperator {
             if (totalVars == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
             val freed = BooleanArray(totalVars)
+            val queued = BooleanArray(totalVars)
+            val visitedFactors = BooleanArray(problem.numFactors)
             var freedCount = 0
             val queue = IntArrayDeque()
+            fun enqueue(variable: Int) {
+                if (queued[variable]) return
+                queued[variable] = true
+                queue.addLast(variable)
+            }
             while (freedCount < k) {
                 if (queue.isEmpty()) {
                     val startCandidates = (0 until totalVars).filter { !freed[it] }
                     if (startCandidates.isEmpty()) break
                     val seed = startCandidates[rng.nextInt(startCandidates.size)]
-                    queue.addLast(seed)
+                    enqueue(seed)
                 }
                 val v = queue.removeFirst()
                 if (freed[v]) continue
@@ -98,11 +105,13 @@ internal fun interface DestroyOperator {
                     projection.intOccurrences[v - problem.numBoolVars]
                 }
                 for (fid in factorIds) {
+                    if (visitedFactors[fid]) continue
+                    visitedFactors[fid] = true
                     val f = problem.factors[fid]
-                    for (b in f.boolVars) if (!freed[b]) queue.addLast(b)
+                    for (b in f.boolVars) enqueue(b)
                     for (i in f.intVars) {
                         val idx = problem.numBoolVars + i
-                        if (!freed[idx]) queue.addLast(idx)
+                        enqueue(idx)
                     }
                 }
             }

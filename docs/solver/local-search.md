@@ -94,6 +94,12 @@ construction and reseeding. These observations do not alter scheduler work or so
 budgets; an allowance alone does not establish useful inner search. Direct construction
 and custom repair operators report engine work only when they supply observations.
 
+ALNS adjacency destruction follows first-discovery breadth-first order through active
+factor occurrences. Each finite variable enters the frontier once and each encountered
+factor expands once. Frontier storage is bounded by the finite variable count, with
+variable and factor visit masks owned by the destruction call. Overlapping factors retain
+the same selected neighborhood and disconnected components retain random reseeding.
+
 ## Definitions and repairs
 
 Hinted min/max expression outputs, their materialized affine operands and output aliases
