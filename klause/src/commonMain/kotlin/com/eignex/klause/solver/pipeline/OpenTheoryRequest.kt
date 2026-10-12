@@ -54,7 +54,9 @@ class OpenTheoryRequest internal constructor(
     /** Optional preparation allowance shared with source passes. */
     internal val presolveBudget: PresolveBudget? = null,
     /** Shared ownership preparation, retaining source identity through routing. */
-    val preparedPlan: PreparedSourcePlan = model.preparedWithComponents(componentPlan, objective = objective, maximize = maximize),
+    val preparedPlan: PreparedSourcePlan = model.preparedWithComponents(
+        componentPlan, objective = objective, maximize = maximize,
+    ),
 ) {
     /** Build a request and select its source decomposition. */
     constructor(
