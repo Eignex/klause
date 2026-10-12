@@ -89,4 +89,16 @@ class PreparedSourcePlanTest {
         assertEquals(listOf(0, 1), plan.components.single().integerCoordinates)
         assertEquals(IntVariableOwner.CP, request.componentPlan.intOwner(1))
     }
+    @Test
+    fun `direct finite mixed product preparation preserves linear completion ownership`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)),
+            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+
+        val request = FinitePipelineRequest(source, FiniteEngine.LOCAL_SEARCH)
+
+        assertEquals(PreparedExecutionKind.FINITE_LINEAR, request.preparedPlan.kind)
+        assertEquals(0, request.preparedPlan.finiteIntegerCoordinate(0))
+        assertSame(source, request.preparedPlan.originalSource)
+    }
+
 }

@@ -26,6 +26,10 @@ class FiniteSolveShape(
     val searchHints: SearchHints? = null,
     /** Component ownership selected from the canonical source model. */
     val componentPlan: ComponentPlan = problem.componentPlan(preferFinite = true),
+    /** Original source identity and completion requirements selected by routing. */
+    val preparedPlan: PreparedSourcePlan = problem.preparedWithComponents(
+        componentPlan, objective = linearObjective, maximize = maximize,
+    ),
 ) {
     /** Canonical bounded problem consumed by finite orchestration. */
     val finiteProblem: Problem get() = problem
