@@ -216,4 +216,12 @@ class SmtLibAdmissionTest {
         }
     }
 
+    @Test
+    fun `bounded nonlinear sources do not reinterpret signed numeral symbols`() {
+        val source = "(declare-const x Int) (declare-const y Int) " +
+            "(assert (and (<= 1 x 3) (<= 1 y 3) (= (* x y) -2)))"
+
+        assertFailsWith<UnsupportedSmtException> { SmtLibAdmission.parse(source) }
+    }
+
 }

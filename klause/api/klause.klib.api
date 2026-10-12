@@ -1804,6 +1804,19 @@ sealed interface com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.kl
         final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.toString|toString(){}[0]
     }
 
+    final class NonlinearInteger : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger|null[0]
+        constructor <init>(com.eignex.klause.ir/NonlinearIntegerProblem) // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.<init>|<init>(com.eignex.klause.ir.NonlinearIntegerProblem){}[0]
+
+        final val problem // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.problem|{}problem[0]
+            final fun <get-problem>(): com.eignex.klause.ir/NonlinearIntegerProblem // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.problem.<get-problem>|<get-problem>(){}[0]
+
+        final fun component1(): com.eignex.klause.ir/NonlinearIntegerProblem // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.ir/NonlinearIntegerProblem = ...): com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.copy|copy(com.eignex.klause.ir.NonlinearIntegerProblem){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.NonlinearInteger.toString|toString(){}[0]
+    }
+
     final class Polynomial : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial|null[0]
         constructor <init>(com.eignex.klause.ir/PolynomialRealProblem) // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.<init>|<init>(com.eignex.klause.ir.PolynomialRealProblem){}[0]
 
@@ -11084,6 +11097,33 @@ final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klaus
         final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? // com.eignex.klause.solver.pipeline/LsResolution.pool.<get-pool>|<get-pool>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams { // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams|null[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.backtrack/NodeBudget? = ...) // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.<init>|<init>(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;kotlin.Long;kotlin.Long;com.eignex.klause.backtrack.NodeBudget?){}[0]
+
+    final val maximumCandidates // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.maximumCandidates|{}maximumCandidates[0]
+        final fun <get-maximumCandidates>(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.maximumCandidates.<get-maximumCandidates>|<get-maximumCandidates>(){}[0]
+    final val maximumMoves // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.maximumMoves|{}maximumMoves[0]
+        final fun <get-maximumMoves>(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.maximumMoves.<get-maximumMoves>|<get-maximumMoves>(){}[0]
+    final val nodeBudget // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.nodeBudget|{}nodeBudget[0]
+        final fun <get-nodeBudget>(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.nodeBudget.<get-nodeBudget>|<get-nodeBudget>(){}[0]
+    final val polynomial // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.polynomial|{}polynomial[0]
+        final fun <get-polynomial>(): com.eignex.klause.solver.pipeline/PolynomialTheoryParams // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.polynomial.<get-polynomial>|<get-polynomial>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver.pipeline/PolynomialTheoryParams // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.component2|component2(){}[0]
+    final fun component3(): kotlin/Long // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.component3|component3(){}[0]
+    final fun component4(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.component4|component4(){}[0]
+    final fun copy(com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.backtrack/NodeBudget? = ...): com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.copy|copy(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;kotlin.Long;kotlin.Long;com.eignex.klause.backtrack.NodeBudget?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest { // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest|null[0]
+    final val problem // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.ir/NonlinearIntegerProblem // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.problem.<get-problem>|<get-problem>(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/OpenPreparation { // com.eignex.klause.solver.pipeline/OpenPreparation|null[0]
     final val closedSides // com.eignex.klause.solver.pipeline/OpenPreparation.closedSides|{}closedSides[0]
         final fun <get-closedSides>(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenPreparation.closedSides.<get-closedSides>|<get-closedSides>(){}[0]
@@ -13868,6 +13908,7 @@ final fun (com.eignex.klause.ir/ConstList).com.eignex.klause.ir/longsOrNull(): c
 final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.ir/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.ir/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.ir/LinearObjectiveSpec).com.eignex.klause.solver.objective/toLinearObjective(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/toLinearObjective|toLinearObjective@com.eignex.klause.ir.LinearObjectiveSpec(){}[0]
 final fun (com.eignex.klause.ir/LinearOp).com.eignex.klause.ir/complemented(): com.eignex.klause.ir/LinearOp // com.eignex.klause.ir/complemented|complemented@com.eignex.klause.ir.LinearOp(){}[0]
+final fun (com.eignex.klause.ir/NonlinearIntegerProblem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.NonlinearIntegerProblem(){}[0]
 final fun (com.eignex.klause.ir/PolynomialRealProblem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.PolynomialRealProblem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.presolve/presolveOpen(com.eignex.klause.presolve/PresolveConfig = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget? = ...): com.eignex.klause.presolve/OpenPresolveResult // com.eignex.klause.presolve/presolveOpen|presolveOpen@com.eignex.klause.ir.Problem(com.eignex.klause.presolve.PresolveConfig;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.propagation/bake|bake@com.eignex.klause.ir.Problem(com.eignex.klause.util.Cancellation){}[0]
@@ -13959,6 +14000,7 @@ final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.s
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Function1<com.eignex.klause.portfolio/ArmFault, kotlin/Unit>? = ...): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Function1<com.eignex.klause.portfolio.ArmFault,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/solve(com.eignex.klause.solver.pipeline/FiniteSolveRequest, com.eignex.klause.solver.pipeline/FiniteSolveCallbacks): com.eignex.klause.solver.pipeline/FiniteSolveResult // com.eignex.klause.solver.pipeline/solve|solve@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteSolveRequest;com.eignex.klause.solver.pipeline.FiniteSolveCallbacks){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryAssignment).com.eignex.klause.solver.pipeline/algebraicRealValue(kotlin/Int): com.eignex.klause.arithmetic.polynomial/AlgebraicReal? // com.eignex.klause.solver.pipeline/algebraicRealValue|algebraicRealValue@com.eignex.klause.solver.pipeline.OpenTheoryAssignment(kotlin.Int){}[0]
+final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest, com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryRequest;com.eignex.klause.solver.pipeline.NonlinearIntegerTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/minimize(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialOptimizationExecution // com.eignex.klause.solver.pipeline/minimize|minimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 final fun (com.eignex.klause.solver.search/SearchContext).com.eignex.klause.solver.search/explainAtoms(com.eignex.klause.solver.search/SearchAtomPremise, com.eignex.klause.solver.search/SearchDecision? = ..., kotlin/Int = ...): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/explainAtoms|explainAtoms@com.eignex.klause.solver.search.SearchContext(com.eignex.klause.solver.search.SearchAtomPremise;com.eignex.klause.solver.search.SearchDecision?;kotlin.Int){}[0]

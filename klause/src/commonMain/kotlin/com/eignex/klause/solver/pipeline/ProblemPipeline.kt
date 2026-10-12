@@ -136,7 +136,8 @@ private fun Problem.pipelineRouteObserved(
     onLpStats: ((LpStats) -> Unit)?,
     routeLinearToTheory: Boolean,
 ): SourceProblemRoute {
-    if (factors.any { it is ContinuousProduct || it is RealProduct }) {
+    val continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true
+    if (factors.any { it is ContinuousProduct } || (!continuousObjective && factors.any { it is RealProduct })) {
         val shared = SharedPolynomialModel.assemble(this)
         return if (shared != null && objective?.realCoefficientValues?.any { it != 0.0 } != true) {
             SourceProblemRoute.PolynomialTheory(shared.request(), objective, maximize)

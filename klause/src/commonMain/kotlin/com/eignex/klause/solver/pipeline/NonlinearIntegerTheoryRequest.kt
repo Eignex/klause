@@ -66,6 +66,8 @@ private class NonlinearIntegerInvocation(
     private val engine: FiniteEngine,
 ) : ExactNeighborhoodCompletion {
     private val polynomial = params.polynomial
+    private val nodeBudget = params.nodeBudget ?: polynomial.strategy.backtrack.nodeBudget
+        ?: polynomial.strategy.localSearch.nodeBudget
     private val started = TimeSource.Monotonic.markNow()
     private var native = QfNraStats(0, 0, 0)
     private var resource: PolynomialTheoryResource? = null
@@ -73,7 +75,7 @@ private class NonlinearIntegerInvocation(
     private val external = polynomial.timeout or polynomial.cancellation
     private val stop = external or Cancellation {
         polynomial.maximumWork?.let { native.workSpent >= it } == true || resource != null ||
-            params.nodeBudget?.exhausted() == true
+            nodeBudget?.exhausted() == true
     }
     private val pins: PolynomialCondition = assumptions()
 
@@ -88,14 +90,20 @@ private class NonlinearIntegerInvocation(
     }
 
     fun execute(): PolynomialTheoryExecution {
-        val candidates = minOf(params.maximumCandidates, polynomial.strategy.backtrack.maxDecisions)
-        val moves = minOf(params.maximumMoves, polynomial.strategy.localSearch.maxFlips)
+        val candidates = minOf(
+            params.maximumCandidates, polynomial.strategy.backtrack.maxDecisions,
+            polynomial.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE,
+        )
+        val moves = minOf(
+            params.maximumMoves, polynomial.strategy.localSearch.maxFlips,
+            polynomial.strategy.localSearch.maxInstructions ?: Long.MAX_VALUE,
+        )
         val reason = { incompleteReason() }
         var result: OpenTheoryResult? = null
         var heuristicStats = SolveStats.EMPTY
         fun search(cap: Long, nativeCap: Long? = null) {
             if (result != null || stop()) return
-            val allowed = minOf(cap, params.nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE)
+            val allowed = minOf(cap, nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE)
             when (val checked = query(pins, allowed, nativeCap = nativeCap)) {
                 is QfNraResult.Satisfiable -> result = OpenTheoryResult.Sat(capture(checked.assignment), searchStats)
                 is QfNraResult.Unsatisfiable -> result = OpenTheoryResult.Unsat(searchStats)
@@ -116,7 +124,7 @@ private class NonlinearIntegerInvocation(
                     List(sample.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) }
                 },
                 adaptive = adaptive, seed = polynomial.strategy.localSearch.randomSeed ?: 1L,
-                nodeBudget = params.nodeBudget, maximumMoves = cap, nativeWork = { native.workSpent },
+                nodeBudget = nodeBudget, maximumMoves = cap, nativeWork = { native.workSpent },
             )
             neighborhood.advance(stop, Long.MAX_VALUE)
             val solved = neighborhood.solveResult(reason())
@@ -196,7 +204,9 @@ private class NonlinearIntegerInvocation(
         val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(
             arithmetic = QfNraParams(stop or cancellation, remaining, PolynomialLimits(
                 polynomial.maximumDenseCoefficients, polynomial.maximumMatrixCells,
-            )), maximumCandidates = cap, strategy = NonlinearIntegerStrategy.SEARCH,
+            )), maximumCandidates = cap, strategy = if (heuristic && source.integerCoordinates.count {
+                condition.lower[it] == null || condition.lower[it] != condition.upper[it]
+            } > 1) NonlinearIntegerStrategy.LOCAL_SEARCH else NonlinearIntegerStrategy.SEARCH,
             seed = polynomial.strategy.backtrack.randomSeed ?: 1L,
         ), condition)
         val observed = execution.stats.polynomial
@@ -219,8 +229,12 @@ private class NonlinearIntegerInvocation(
             searchStats = searchStats.copy(search = SearchStats(nodes = SumResult(
                 searchStats.search.nodes.sum + execution.stats.candidates,
             )))
-            repeat(execution.stats.candidates.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()) {
-                params.nodeBudget?.spend()
+            if (nodeBudget != null) {
+                var decisions = execution.stats.candidates
+                while (decisions > 0) {
+                    nodeBudget.spend()
+                    decisions--
+                }
             }
         }
         return execution.result

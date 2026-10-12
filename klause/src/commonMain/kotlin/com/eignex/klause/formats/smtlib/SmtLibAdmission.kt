@@ -125,10 +125,12 @@ private fun parseLinearAdmission(
     var exited = false
     var invalidNonlinearSession = false
     var nonlinearSyntax = false
+    var signedSymbols = false
     while (true) {
         val command = reader.readCommandOrNull() ?: break
         builder.command(command)
         nonlinearSyntax = nonlinearSyntax || hasNonlinearSyntax(command, cancellation)
+        signedSymbols = signedSymbols || hasSignedNumberSymbol(command, cancellation)
         val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
         if (exited || (querySeen && head !in setOf("get-model", "exit", "set-info", "set-option"))) {
             invalidNonlinearSession = true
@@ -147,6 +149,13 @@ private fun parseLinearAdmission(
         smtUnsupported("pure real/Boolean helpers require lexical polynomial lowering")
     }
     val problem = builder.build()
+    val products = problem.model.factors.any { it is Product || it is RealProduct || it is ContinuousProduct }
+    val signedDeclarations = (builder.intNames.keys + builder.realNames.keys + builder.boolNames.keys).any {
+        it.length > 1 && it[0] == '-' && it.drop(1).all { digit -> digit in '0'..'9' || digit == '.' }
+    }
+    if (signedSymbols && (products || (nonlinearSyntax && signedDeclarations))) {
+        smtUnsupported("nonlinear source requires exact numeral and symbol distinction")
+    }
     if (invalidNonlinearSession && (nonlinearSyntax || problem.model.factors.any {
             it is Product || it is RealProduct || it is ContinuousProduct
         })
@@ -158,6 +167,21 @@ private fun parseLinearAdmission(
         smtUnsupported("pure real nonlinear source requires polynomial lowering")
     }
     return problem
+}
+
+private fun hasSignedNumberSymbol(expression: SExpr, cancellation: Cancellation): Boolean {
+    val work = ArrayDeque<SExpr>()
+    work.addLast(expression)
+    while (work.isNotEmpty()) {
+        if (cancellation()) throw PolynomialSourceInterrupted()
+        when (val node = work.removeLast()) {
+            is SExpr.SList -> work.addAll(node.items)
+            is SExpr.Atom -> if (node.text.length > 1 && node.text[0] == '-' &&
+                node.text.drop(1).all { it in '0'..'9' || it == '.' }
+            ) return true
+        }
+    }
+    return false
 }
 
 private fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): Boolean {

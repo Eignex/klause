@@ -2,6 +2,7 @@ package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 internal class PolynomialInterrupted : RuntimeException()
 
@@ -66,6 +67,13 @@ internal class PolynomialArithmetic(
     fun power(value: Polynomial, exponent: Int): Polynomial {
         require(exponent >= 0)
         step()
+        if (value.variables.isEmpty()) {
+            val coefficient = value.coefficient(Monomial.ONE)
+            val minimumBits = maxOf(coefficient.num.magnitudeBitLength(), coefficient.den.magnitudeBitLength()) - 1L
+            if (minimumBits * exponent + 1 > Int.MAX_VALUE) {
+                throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+            }
+        }
         var result = Polynomial.ONE
         var base = value
         var remaining = exponent

@@ -6,6 +6,7 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
     var realCount = firstAuxiliaryReal
@@ -78,6 +79,10 @@ internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
                 1 -> base
                 else -> {
                     val coefficient = rational(base) ?: return PolynomialExpression.Power(base, exponent)
+                    val minimumBits = maxOf(
+                        coefficient.num.magnitudeBitLength(), coefficient.den.magnitudeBitLength(),
+                    ) - 1L
+                    if (minimumBits * exponent + 1 > Int.MAX_VALUE) return PolynomialExpression.Power(base, exponent)
                     var value = BigFraction.ONE
                     var factor = coefficient
                     var remaining = exponent

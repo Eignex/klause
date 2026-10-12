@@ -109,6 +109,32 @@ class NonlinearIntegerTheoryRequestTest {
     }
 
     @Test
+    fun `wide exponent source witnesses remain available after relaxation degree decline`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
+            "(declare-const n Int) (assert (= n (- 1))) " +
+                "(assert (= (^ n 18446744073709551617) (- 1)))",
+        )).problem
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        assertEquals("-1", assertIs<OpenTheoryResult.Sat>(execution.result).assignment.intValue(0))
+    }
+
+    @Test
+    fun `signed numeral declarations retain variable semantics in nonlinear admission`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
+            "(declare-const -1 Int) (declare-const x Int) " +
+                "(assert (= -1 2)) (assert (<= 1 x 3)) (assert (= (* -1 x) 6))",
+        )).problem
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+        assertEquals("2", witness.intValue(source.intVarNames.getValue("-1")))
+        assertEquals("3", witness.intValue(source.intVarNames.getValue("x")))
+    }
+
+    @Test
     fun `native work charges remain cumulative across heuristic callbacks`() {
         val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
             "(declare-const n Int) (assert (= (* n n) 2))",
