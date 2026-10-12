@@ -32,6 +32,8 @@ The type system does not certify any of those semantic obligations.
 
 `ir.QuadraticObjectiveSpec` captures an exact rational constant and an ordered list
 of `QuadraticObjectiveTerm` values over typed Boolean, integer and real source IDs.
+`QuadraticCoefficient` owns reduced source numerator/denominator values with a
+positive denominator, independently of numerical engine types.
 An affine term denotes `coefficient * first`; a product denotes
 `coefficient * first * second`. Repeating the coordinate expresses a square.
 Cross coefficients are literal source coefficients, without Hessian scaling.

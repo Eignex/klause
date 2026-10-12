@@ -1,10 +1,23 @@
 package com.eignex.klause.ir
 
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class QuadraticObjectiveSpecTest {
+    @Test
+    fun `source rational coefficients normalize sign and common factors`() {
+        val coefficient = QuadraticCoefficient.of(bigIntOf(-6), bigIntOf(-8))
+
+        assertEquals(QuadraticCoefficient.of(bigIntOf(3), bigIntOf(4)), coefficient)
+    }
+
+    @Test
+    fun `zero source denominator is rejected`() {
+        assertFailsWith<IllegalArgumentException> { QuadraticCoefficient.of(bigIntOf(1), bigIntOf(0)) }
+    }
+
     @Test
     fun `source term mutation does not change captured objective`() {
         val x = QuadraticVariable.Real(SourceRealId(0))
