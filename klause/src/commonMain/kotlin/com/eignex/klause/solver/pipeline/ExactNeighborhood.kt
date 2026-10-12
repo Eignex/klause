@@ -89,7 +89,9 @@ internal class ExactNeighborhood(
             val cost = 1 + ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong()
             charged += minOf(cost, Long.MAX_VALUE - charged)
             nodeBudget?.spendMoves(cost)
-            sink.ls.recordCompletion(result is ExactNeighborhoodResult.Refuted, result is ExactNeighborhoodResult.Undecided)
+            sink.ls.recordCompletion(
+                result is ExactNeighborhoodResult.Refuted, result is ExactNeighborhoodResult.Undecided,
+            )
             val improved = result is ExactNeighborhoodResult.Witness && accept(result.sample, onIncumbent)
             if (adaptive) weights[operator] = weights[operator] * 0.8 + if (improved) 1.0 else 0.2
             if (improved) {

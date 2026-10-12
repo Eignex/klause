@@ -47,7 +47,9 @@ internal class OpenExactNeighborhood(
         val constrained = model.withFactors(model.factors + additions,
             model.impliedFactorMask?.let { it + BooleanArray(additions.size) })
         val plan = constrained.componentPlan()
-        if (plan.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN || plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
+        if (plan.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN ||
+            plan.theoryPipeline == ProblemPipeline.FINITE_CP
+        ) {
             return ExactNeighborhoodResult.Undecided
         }
         val engine = OpenTheoryEngine(constrained, plan.theoryPipeline, PresolveConfig.NONE, true,
