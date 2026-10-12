@@ -109,7 +109,11 @@ trajectory or approach mechanisms retain unavailable coverage.
 scope for the completion-taking worker issuance hook. Matching worker identity alone
 cannot issue through that hook. Its engine admission and independent derivation check
 are separate: the latter requires actual retained evidence and an expected source
-claim. Legacy kind-only worker issuance and opaque quadratic producer arguments remain
+claim. Search exhaustion must retain its actual source cutoff to attest a bound;
+an exhausted reason without that value supplies no bound claim. Derivation checks
+match the completed coordinates and ray direction, and an attained optimum is
+checked at its actual assignment. A scoped non-witness import requires the same
+consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance and opaque quadratic producer arguments remain
 until their consumers migrate; these hooks do not assert that migration is complete.
 
 Capture does not implement proof file export. [Portfolio publication](portfolio.md)

@@ -3,10 +3,10 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.solver.incumbent.CompletedEngineResult
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
@@ -86,7 +86,7 @@ internal class PortfolioEvidence(
             )
             EvidenceKind.Witness -> error("a witness is checked separately")
         }
-        return when (val verdict = verifier.verify(evidence)) {
+        return when (val verdict = verifier.verify(evidence, sourceScope)) {
             is Verification.Accepted -> Verification.Accepted(Candidate(Unit, Unit))
             is Verification.Rejected -> verdict
             is Verification.Indeterminate -> verdict
