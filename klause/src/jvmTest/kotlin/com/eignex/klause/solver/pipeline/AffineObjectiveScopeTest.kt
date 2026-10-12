@@ -40,11 +40,11 @@ class AffineObjectiveScopeTest(private val engine: FiniteEngine, private val aff
             realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
         val request = source.pipelineRequest()
         val firstScope = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            assumptions = Assumptions.None.withBool(0, true).withInt(0, 1),
+            assumptions = Assumptions.None.withBool(0, true).withInt(0, 1).withInt(1, 0),
             localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17), alnsIterations = 1,
         ))
         val nextScope = firstScope.copy(strategy = firstScope.strategy.copy(
-            assumptions = Assumptions.None.withBool(0, false).withInt(0, 0),
+            assumptions = Assumptions.None.withBool(0, false).withInt(0, 0).withInt(1, 1),
         ))
         val linear = LinearObjective(longArrayOf(-3), longArrayOf(7, 0), 11, doubleArrayOf(0.5, 0.0))
         val quadratic = QuadraticObjectiveSpec(listOf(

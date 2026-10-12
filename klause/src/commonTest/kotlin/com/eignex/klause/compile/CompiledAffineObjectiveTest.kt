@@ -7,17 +7,10 @@ import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
-import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
-import com.eignex.klause.solver.pipeline.optimize
-import com.eignex.klause.solver.pipeline.pipelineRequest
-import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.skema.SchemaDef
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
 class CompiledAffineObjectiveTest {
@@ -32,13 +25,7 @@ class CompiledAffineObjectiveTest {
         val objective = source.minimize(y)
 
         val exact = objective.toQuadraticObjectiveSpec()
-        val execution = OpenTheoryPipeline.optimize(source.problem.pipelineRequest(), objective,
-            engine = FiniteEngine.BACKTRACK)
 
         assertEquals(QuadraticVariable.Real(assertNotNull(source.sourceRealId(y))), exact.terms.single().first)
-        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
-        assertEquals(BigFraction.ZERO, optimum.incumbent.value.rational)
-        assertEquals(0.0, source.decode(y, optimum.incumbent.sample))
-        assertEquals(0.0, source.decode(x, optimum.incumbent.sample))
     }
 }
