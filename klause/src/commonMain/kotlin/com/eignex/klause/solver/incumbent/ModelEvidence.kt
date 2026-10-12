@@ -1,5 +1,10 @@
 package com.eignex.klause.solver.incumbent
 
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.util.Cancellation
+
 internal class ModelIdentity private constructor(private val source: Any, private val objective: Any?) {
     fun matches(other: ModelIdentity): Boolean = source === other.source && objective === other.objective
 
@@ -15,8 +20,34 @@ internal class ModelIdentity private constructor(private val source: Any, privat
 internal enum class EvidenceKind { Witness, Bound, Infeasible, Unbounded }
 
 // Issued only at an adapter whose engine has completed the corresponding source check or proof.
-internal class EvidenceCertificate private constructor(val model: ModelIdentity, val kind: EvidenceKind) {
+internal class EvidenceCertificate private constructor(
+    val model: ModelIdentity,
+    val kind: EvidenceKind,
+    val completion: CompletedEngineResult? = null,
+) {
+    fun verifyDerivation(
+        claim: SourceClaim, context: SourceProofContext, cancellation: Cancellation = Cancellation.Never,
+    ): SourceEvidenceCheck {
+        val completed = completion ?: return SourceEvidenceCheck.Unavailable("completed derivation capture unavailable")
+        if (completed.scope != context.scope) {
+            return SourceEvidenceCheck.Rejected("engine completion has a different original-source invocation")
+        }
+        return completed.evidence?.verify(claim, context, cancellation)
+            ?: SourceEvidenceCheck.Unavailable("engine completion retains no original-source derivation")
+    }
+
     companion object {
+        fun completed(
+            model: ModelIdentity, kind: EvidenceKind, completion: CompletedEngineResult,
+        ): EvidenceCertificate? {
+            val foreignCapture = completion.evidence?.scope?.let { it != completion.scope } == true
+            if (!completion.attests(kind) || foreignCapture) return null
+            if ((kind == EvidenceKind.Bound || kind == EvidenceKind.Unbounded) && completion.scope.objective == null) {
+                return null
+            }
+            return EvidenceCertificate(model, kind, completion)
+        }
+
         fun verified(model: ModelIdentity, kind: EvidenceKind): EvidenceCertificate = EvidenceCertificate(model, kind)
     }
 }

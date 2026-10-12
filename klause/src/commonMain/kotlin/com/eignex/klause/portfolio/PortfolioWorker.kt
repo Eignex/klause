@@ -3,9 +3,11 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.incumbent.CompletedEngineResult
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -69,6 +71,19 @@ class PortfolioWorker private constructor(
         private set
     private var certificates: (EvidenceKind) -> EvidenceCertificate? = { null }
     private var provesSourceResults = true
+    internal var evidenceScope: SourceScope? = null
+        private set
+
+    internal fun bindSourceScope(scope: SourceScope): PortfolioWorker = also {
+        require(evidenceScope == null || evidenceScope == scope) { "worker cannot change its source invocation" }
+        evidenceScope = scope
+    }
+
+    internal fun certificateFor(kind: EvidenceKind, completion: CompletedEngineResult): EvidenceCertificate? {
+        val model = evidenceModel ?: return null
+        if (!provesSourceResults || evidenceScope != completion.scope) return null
+        return EvidenceCertificate.completed(model, kind, completion)
+    }
 
     internal fun bindEvidence(model: ModelIdentity, provesResults: Boolean = true): PortfolioWorker = also {
         evidenceModel = model

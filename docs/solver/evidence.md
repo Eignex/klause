@@ -29,7 +29,10 @@ or numerical engine identity supplies no derivation authority.
 declared source language. Unsupported semantics decline explicitly.
 `LinearSourceSemanticsChecker` checks a source consisting entirely of affine
 premises and declared coordinates, including rational and algebraic real values.
-Its premises must include all declaration bounds and source constraints. It checks
+Its premises must include all declaration bounds and source constraints. The original
+IR binder uses this complete checker for plain affine conjunctions, including wide
+integer and algebraic real witnesses. Declared integer value sets are checked as well;
+an open column acquires no invented finite value set. It checks
 invocation restrictions, strict rows, feasible bases, recession signs and objective
 improvement. Integer directions must have integral steps. Source-specific symbolic
 witness semantics belong to their source checker.
@@ -82,6 +85,26 @@ positive scale, matching direction and checked source equalities. A verified aff
 projection transfers only a proof using its covered premises; source-specific target
 semantic extensions remain unavailable without their own projection justification.
 Projection obligations and terminal checks share one containing verification allowance.
+
+`SourceResultCapture.quadratic` retains exact incumbent, bound, limit and unboundedness
+claims on quadratic results. General unboundedness requires a source-specific
+trajectory derivation; an affine `Ray` retains its explicit direction. Completed
+quadratic verification checks actual exact incumbent/bound equality, strictness and
+source objective direction. An optimum label or a strict bound alone cannot establish
+an attained optimum or approach to an unattained limit.
+
+`Problem.quadraticSourceProofContext` reuses original constraints and exact quadratic
+objective evaluation. The typed quadratic interval rule derives bounds from original
+declarations and invocation intervals through the shared exact interval arithmetic.
+Absent affine data does not become a constant objective. Unsupported traversal,
+trajectory or approach mechanisms retain unavailable coverage.
+
+`CompletedEngineResult` retains an actual ordinary completed result and its source
+scope for the completion-taking worker issuance hook. Matching worker identity alone
+cannot issue through that hook. Its engine admission and independent derivation check
+are separate: the latter requires actual retained evidence and an expected source
+claim. Legacy kind-only worker issuance and opaque quadratic producer arguments remain
+until their consumers migrate; these hooks do not assert that migration is complete.
 
 Capture does not implement proof file export. [Portfolio publication](portfolio.md)
 owns admission and transport; [LP certification](../lp/certification.md) owns numerical

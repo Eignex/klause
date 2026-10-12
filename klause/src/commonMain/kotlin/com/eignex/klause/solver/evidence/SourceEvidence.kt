@@ -57,6 +57,11 @@ sealed interface SourceClaim {
         /** Exact unattained objective limit. */
         val value: SourceValue,
     ) : SourceClaim
+    /** Unlimited objective improvement, requiring a source-specific trajectory derivation. */
+    data class Unbounded(
+        /** A complete feasible original-source point. */
+        val sample: Sample,
+    ) : SourceClaim
     /** A disjunction of original-source Boolean literals. */
     class Clause(literals: Map<Int, Boolean>) : SourceClaim {
         private val captured = literals.toMap()
