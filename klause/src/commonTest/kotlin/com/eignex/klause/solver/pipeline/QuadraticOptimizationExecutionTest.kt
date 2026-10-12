@@ -18,6 +18,7 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -174,6 +175,29 @@ class QuadraticOptimizationExecutionTest {
                 cancellation = Cancellation { cancelled },
                 onEvent = { if (it is SearchEvent.Incumbent) cancelled = true },
             ),
+        ))
+
+        val execution = OpenTheoryPipeline.minimize(
+            source.pipelineRequest(), objective, params, FiniteEngine.BACKTRACK,
+        )
+
+        val result = assertIs<QuadraticOptimizationResult.BestFound>(execution.result)
+        assertEquals(TerminationReason.Cancelled, result.reason)
+        assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
+    }
+
+    @Test
+    fun `a cancellation exception retains an incumbent checked before interruption`() {
+        val source = Problem(
+            0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+        )
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(onEvent = {
+                if (it is SearchEvent.Incumbent) throw CancellationException()
+            }),
         ))
 
         val execution = OpenTheoryPipeline.minimize(
