@@ -1,5 +1,6 @@
 # linear-real: problems with the linear-real theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
+# 2026-10-12: fischer9-mutex-15 replaced by medium problems; no reference had an answer within the sweep's 10 s
 # easy: 14
 hakank/contiguity_mip/contiguity_mip2
 hakank/furniture/furniture
@@ -15,7 +16,8 @@ smtlib-qfrdl/check/bignum_rdl1
 smtlib-qfrdl/sal/fischer9-mutex-3
 smtlib-qfrdl/scheduling/orb07_330
 smtlib-qfrdl/skdmxa/skdmxa-3x3-5
-# medium: 20
+# medium: 21
+smtlib-qflra/2017-Heizmann-UltimateInvariantSynthesis/_overflow1.i_3_8_2.bpl_7
 smtlib-qflra/2017-Heizmann-UltimateInvariantSynthesis/_standard_two_index_04.i_3_2_2.bpl_7
 smtlib-qflra/2019-ezsmt/blending/4
 smtlib-qflra/2019-ezsmt/travellingSalesperson/tsp_rand_70_300_1155482584_11.lp
@@ -36,5 +38,4 @@ smtlib-qfrdl/scheduling/orb04_1005
 smtlib-qfrdl/scheduling/yn2_750
 smtlib-qfrdl/skdmxa/skdmxa-3x3-15
 smtlib-qfrdl/skdmxa2/skdmxa-3x3-18.induction.cvc
-# hard: 1
-smtlib-qfrdl/sal/fischer9-mutex-15
+# hard: 0
