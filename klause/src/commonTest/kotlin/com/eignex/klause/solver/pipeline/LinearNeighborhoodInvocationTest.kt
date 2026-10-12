@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
@@ -87,7 +88,8 @@ class LinearNeighborhoodInvocationTest {
     @Test
     fun `empty and constant linear ALNS models execute without proof promotion`() {
         val sources = listOf(Problem(0, 0, emptyArray(), emptyArray()),
-            Problem(0, 0, emptyArray(), arrayOf(Linear(longArrayOf(), intArrayOf(), LinearOp.EQ, 1))))
+            Problem(0, 0, emptyArray(), arrayOf(ExactSearchRow.of(intArrayOf(), emptyList(),
+                LinearOp.LE, BigFraction.ofLong(-1)))))
 
         for (source in sources) {
             val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(OpenTheoryRequest(source),

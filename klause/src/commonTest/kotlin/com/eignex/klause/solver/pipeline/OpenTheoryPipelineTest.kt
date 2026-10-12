@@ -43,7 +43,7 @@ class OpenTheoryPipelineTest {
         val openLower = Bits(1).also { it.set(0) }
         return Problem(
             numBoolVars = 1,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), openLower, null),
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(7), openLower, null),
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
         )
     }

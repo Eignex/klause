@@ -618,12 +618,14 @@ class CliModeTest {
     }
 
     @Test
-    fun `alns is refused on an open model`() {
+    fun `alns searches an open model with exact source completion`() {
         var code = -1
-        val err = captureErr { code = runCli(arrayOf("-e", "alns", openSmt().absolutePath)) }
+        val out = capture { code = runCli(arrayOf("-e", "alns", "--param", "max-flips=30", openSmt().absolutePath)) }
 
-        assertTrue(code != 0, err)
-        assertTrue("no open-model route" in err, err)
+        assertEquals(0, code, out)
+        assertEquals("sat", out.lines().first(), out)
+        assertTrue("(define-fun x () Int" in out, out)
+        assertTrue("(define-fun y () Int" in out, out)
     }
 
     @Test
