@@ -80,6 +80,7 @@ Packages below are under `com.eignex.klause` in
 | `propagation` | Finite domains, explanations and incremental propagators | May use immutable arithmetic representations |
 | `arithmetic.polynomial` | Exact sparse polynomials, elimination determinants and rational real-root isolation | Only `arithmetic.polynomial`, `simplex.exact` and `util`; no model or solver state |
 | `arithmetic.quadratic` | Exact convex quadratic bounds, attainment, approach paths and improving rays | Only `arithmetic.quadratic`, `simplex.exact` and `util`; source/result scope belongs to adapters |
+| `arithmetic.transcendental` | Certified rational exp/log/sin/cos enclosures and domain-bound affine relaxations | Only `arithmetic.transcendental`, `simplex.exact` and `util`; no source or solver verdict ownership |
 | `arithmetic.transcendental` | Certified rational function enclosures and affine relaxations | Only `arithmetic.transcendental`, `simplex.exact` and `util`; source truth belongs to adapters |
 | `arithmetic.difference` | Difference constraints, extraction and non-incremental graph operations | No propagation or search state |
 | `simplex.exact` | Rational arithmetic and exact feasibility primitives | Reusable numerical mechanism |

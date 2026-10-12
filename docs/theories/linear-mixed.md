@@ -43,10 +43,15 @@ structure. Bounds, conflicts and unboundedness require the corresponding exact
 numerical and source packages. Mixed unboundedness requires an integer-feasible
 point and an integrality-preserving improving ray.
 
-The open minimizer admits only supported integral objectives without Boolean or
-continuous cost whose cutoff rows remain in the theory. Continuous objectives may
-use an applicable finite/LP-backed route or witness-only search according to source
-policy. Feasibility coverage does not establish optimization coverage.
+Specialized integral descent handles integer objectives without Boolean or
+continuous cost when its cutoff rows remain admitted. Other supported linear
+objectives use exact strict-improvement theory rounds, including Boolean and real
+costs. A completed cutoff refutation can prove a checked incumbent optimal, but
+rational descent supplies neither a recession certificate nor an unattained-limit
+result. Unbounded objectives and unattained infima can continue until interrupted.
+Objective admission checks that the cutoff remains in a supported theory; source
+correspondence requirements still govern frontend publication. Feasibility coverage
+alone does not establish optimization coverage.
 
 ## State and resources
 

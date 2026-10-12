@@ -40,9 +40,13 @@ Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
 Strict infeasibility requires a completed strict-feasibility check, not failure to
 find a positive margin within a budget.
 
-Continuous objective optimization has its own LP-backed admission and publication
-conditions. The open integer-objective descent does not cover arbitrary real
-objectives. An unattained infimum cannot be presented as an attained optimum.
+Open real objectives use exact strict-improvement theory rounds when the objective
+cutoff remains admitted. `RationalTheoryDescent` retains checked incumbents and can
+prove an attained optimum by refuting a strict improvement. It supplies neither
+a recession certificate nor an unattained-limit result; unbounded objectives and
+unattained infima can continue until interrupted. Finite/LP-backed optimization
+retains its separate admission and certificate checks. An unattained infimum cannot
+be presented as an attained optimum.
 [Input semantics](../formats.md) defines each frontend's exact or tolerance policy.
 
 ## State and resources

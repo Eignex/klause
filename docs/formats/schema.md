@@ -54,7 +54,7 @@ auxiliary columns and refused contexts.
 
 Continuous products have no finite propagator, local-search score or finite
 assignment checker. Direct finite execution projections reject them, and an LP
-completion cannot certify their nonlinear equalities. Model solver entry points
+completion cannot certify their nonlinear equalities. Shared pipeline entry points
 route them through [shared polynomial completion](../theories/polynomial-real.md#shared-model-composition)
 beside finite factors across backtracking, local search, ALNS and mixed portfolios.
 Exact rational/algebraic witnesses retain their source coordinates. This route
@@ -62,7 +62,9 @@ supports finite integer domains and finite-column linear objectives. Continuous
 quadratic objectives use the separate exact objective overload. Rejecting an
 equivalent real linear objective is an admission misalignment tracked in
 [#2655](https://github.com/Eignex/klause/issues/2655). Open integer domains require
-their separate theory route rather than this finite projection.
+their separate theory route rather than this finite projection. Direct solver
+facades bake finite projections without arranging that source composition; their
+coverage gap is tracked in [#2656](https://github.com/Eignex/klause/issues/2656).
 
 ### Schema continuous products
 

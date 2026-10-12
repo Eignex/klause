@@ -69,10 +69,12 @@ strict-edge encoding and lifecycle belong to the
 
 ## Results and objectives
 
-Optimization emits `; objective=<value>` for each incumbent in the source objective's
-direction and `; optimizationStatus=<status>` at completion, including `optimal`,
+Optimization emits `; objective=<value>` for each published incumbent in the source
+objective's direction and `; optimizationStatus=<status>` at completion, including `optimal`,
 `best-found` and `unbounded`. These comments appear without `-s`; `sat` alone
-does not establish optimality.
+does not establish optimality. Finite optimization streams improvements; open-theory,
+polynomial and quadratic optimization publish the returned incumbent after the
+invocation completes.
 Exact theory objectives use arbitrary-precision integer or reduced `numerator/denominator`
 text, including values outside `Long` and non-terminating rational values.
 Finite witnesses report objectives from certified real values and exact integer
@@ -204,8 +206,10 @@ Polynomial expansion and decision work remain owned by the nonlinear kernel/theo
 
 ### Admission API
 
-`SmtLibAdmission.parse` returns a linear model, opaque `PolynomialRealProblem`,
-opaque `NonlinearIntegerProblem`, or interrupted admission. The polynomial snapshot owns its source-name maps and returns
+`SmtLibAdmission.parse` returns `SmtLibInput.Linear`, `Polynomial`,
+`NonlinearInteger`, `Quadratic` or `Interrupted`. A quadratic input wraps a
+polynomial or nonlinear integer source snapshot with its exact objective and sense.
+The polynomial snapshot owns its source-name maps and returns
 independent metadata views. Its `pipelineRequest()` and `OpenTheoryPipeline.execute`
 extension provide complete polynomial satisfaction through the existing
 `OpenTheoryResult`. `PolynomialTheoryExecution` retains native counters/resource

@@ -57,5 +57,6 @@ nonconvex stationarity cannot certify a global bound.
 Each check polls cancellation and charges its containing native control. Work and
 matrix limits interrupt without evidence. Certificates retain their captured
 model; numerical evidence cannot establish a source result until its adapter
-checks source semantics and scope. These mechanisms do not expose quadratic
-optimization through the pipeline.
+checks source semantics and scope. The [quadratic source pipeline](../theories/polynomial-real.md#quadratic-strategy-execution)
+uses these mechanisms for admitted subproblems and owns optimization traversal,
+source reconstruction and result publication.

@@ -62,6 +62,7 @@ does not change the relative place of each theory in the model or support contra
 | [LP certification](lp/certification.md) | Exact checks for witnesses, bounds, conflicts and rays |
 | [Exact quadratic certificates](arithmetic/quadratic.md) | Rational quadratic bounds, attainment, approach paths and rays |
 | [Exact polynomial arithmetic](arithmetic/polynomial.md) | Polynomial operations, algebraic scalars, root isolation and arithmetic limits |
+| [Certified transcendental enclosures](arithmetic/transcendental.md) | Rational enclosures and affine relaxations; source/theory integration remains planned |
 | [Certified transcendental enclosures](arithmetic/transcendental.md) | Rational function enclosures, range reduction and affine relaxations |
 | [Numerical dependencies](lp/dependencies.md) | Kernel provenance, integration contracts and runtime support |
 

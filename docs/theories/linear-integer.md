@@ -41,11 +41,15 @@ values beyond `Long`. Publication checks source rows and integrality. A rational
 relaxation point or a failed witness check establishes neither feasibility nor
 infeasibility.
 
-The open minimizer admits integral objectives without Boolean or continuous cost
-only when its improving rows remain in the supported fragment. Exact objective
-units and source reconstruction survive each round. Other objectives retain their
-route-specific limits; mathematical decidability of linear integer arithmetic does
-not remove invocation limits or establish a verdict for an interrupted traversal.
+The pipeline selects specialized integral descent for integer objectives without
+Boolean or continuous cost when every improving row remains in its supported
+fragment. Other admitted linear objectives, including Boolean costs, use exact
+strict-improvement rounds through `RationalTheoryDescent`. A completed refutation
+of a strict cutoff proves the checked incumbent optimal; a refutation before any
+incumbent proves infeasibility. Exact objective units survive each round. Rational
+descent supplies no recession certificate and need not terminate on an unbounded
+objective. Mathematical decidability of linear integer arithmetic does not remove
+invocation limits or establish a verdict for an interrupted traversal.
 
 ## State and resources
 

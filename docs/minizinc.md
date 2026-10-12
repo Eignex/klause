@@ -29,9 +29,11 @@ adjust those paths to the installed locations before registering it with MiniZin
 | [redefinitions.mzn](../klause-mzn-lib/share/minizinc/klause/redefinitions.mzn) | Predicates advertised as native |
 | [test-models](../klause-mzn-lib/test-models/) | Small smoke models |
 
-The CLI defaults to fixed search, following supported FlatZinc annotations.
-`-f` or `-e cp` selects the free backtrack portfolio; `-e mixed` selects mixed
-search. The LS configuration selects local search through its wrapper.
+The CLI defaults to mixed search unless `klause.engine` / `KLAUSE_ENGINE` selects
+another default. The standard wrapper forwards flags without selecting an engine.
+`-e fixed` follows supported FlatZinc annotations; `-f` or `-e cp` selects the free
+backtrack portfolio. The LS wrapper prepends `-e ls`; a later explicit `-e` takes
+precedence.
 
 ## Native coverage
 

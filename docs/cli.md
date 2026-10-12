@@ -81,9 +81,11 @@ The registry in [Main.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/
 and the flag declarations in [CliMode.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/CliMode.kt)
 are the implementation source for supported names, aliases and help text.
 
-SMT-LIB optimization streams `; objective=<value>` for each incumbent in the source
-objective's direction and emits `; optimizationStatus=<status>` at completion.
+SMT-LIB optimization emits `; objective=<value>` for each published incumbent in
+the source objective's direction and `; optimizationStatus=<status>` at completion.
 These comments appear without `-s`; `sat` alone does not establish optimality.
+Finite optimization streams improvements. Open-theory, polynomial and quadratic
+optimization report the returned incumbent after their invocation completes.
 Quadratic results additionally separate the exact incumbent objective from its
 certified `objectiveBound`, direction and strictness. Unattained boundaries report
 `unattained-infimum` or `unattained-supremum` with a feasible model distinct from
@@ -97,14 +99,19 @@ the interpretation of interrupted incumbents and unbounded witness objectives.
 Solver-control flags are common to **every** mode:
 
 - `-a` / `--all-solutions`, `-n <count>` — enumeration controls (satisfy).
-- `-i` — accepted as a no-op (improving incumbents already stream on the optimize path).
+- `-i` — accepted as a no-op; finite optimization streams improvements independently
+  of this flag, while open-theory, polynomial and quadratic routes report their
+  returned incumbent.
 - `-f` / `--free-search` — ignore the model's search annotations. Alias for `-e cp` (the free
-  backtrack portfolio); with no `-f` and no `-e`, the default engine is `mixed`.
+  backtrack portfolio); with no `-f` and no `-e`, the built-in default is `mixed`,
+  overridable through `klause.engine` / `KLAUSE_ENGINE`.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
-- `-p <n>` — MiniZinc-standard parallelism (core count). The portfolio engines (`backtrack`/`mixed`/`localsearch`)
-  run sequentially at `n=1` and as an `n`-worker parallel pool at `n>1`; the naked engine
-  (`fixed`) is single-core. Pool size auto-tunes from `n`, overridable with
-  `--param arms=N` (or the `ls=N`/`bt=N` split).
+- `-p <n>` — MiniZinc-standard parallelism (core count). Finite portfolio engines
+  run sequentially at `n=1` and use up to `n` lanes at `n>1`; finite `fixed` rejects
+  `n>1`. Finite pool size auto-tunes from `n`, overridable with `--param arms=N`
+  (or the `ls=N`/`bt=N` split). Open linear MIXED/LS/ALNS execution uses up to `n`
+  lanes; its BACKTRACK/FIXED routes run one traversal. Polynomial, nonlinear-integer
+  and quadratic source adapters accept the flag but do not allocate extra lanes.
 - `-e <engine>` / `--engine <engine>` — the engine enum (also via the `klause.engine` property):
   - `fixed` — a single naked backtrack. It follows a FlatZinc `int_search` annotation;
     for a finite model with no annotation (DIMACS, OPB, and unannotated FlatZinc/XCSP3/MPS), it uses
@@ -125,7 +132,7 @@ Solver-control flags are common to **every** mode:
   `+/-<pass>` deltas to toggle individual passes.
 - `--lp <ceiling>` — relaxation ceiling `off`, `conservative`, `default`, or `aggressive`,
   with `+/-<technique>` deltas. Portfolio arms choose intensity below this ceiling.
-  `fixed` uses no LP relaxation and accepts only `off` when this flag is supplied.
+  Finite `fixed` uses no LP relaxation and accepts only `off` when this flag is supplied.
 - Backtrack overrides `--param lp-variable-shaving=true` and `lp-prune-hulls=true`
   enable objective-independent root work on satisfaction and optimization models.
   `lp-root-cuts=false` disables root cut harvesting independently of node separation.
@@ -190,15 +197,17 @@ Finite-column and exact quadratic objectives are supported; all-solution
 enumeration remains outside this route. Its native parameters are
 `nra-work-limit=auto|unlimited|N`, `nra-dense-coefficients=auto|unlimited|N` and
 `nra-matrix-cells=auto|unlimited|N`: defaults are unlimited work, 65,536 coefficients
-and 262,144 matrix cells. Work/matrix zero exhausts the allowance; a dense cap must
-be positive. These native units are separate from `node-limit` and linear open work.
+and 262,144 matrix cells. Zero work prevents solve entry; zero matrix cells declines
+any requested nonempty elimination matrix. A dense cap must be positive. These
+native units are separate from `node-limit` and linear open work.
 Nonlinear integer/mixed satisfaction accepts `nia-candidates=auto|unlimited|N`
 and `nia-moves=auto|unlimited|N`, with defaults 1,024 and 256. The selected engine
 executes integer search, LS, ALNS or their mixed schedule through the shared pipeline.
 `node-limit` is consumed once for search/heuristic strategy effort; `nra-work-limit`
 remains cumulative exact arithmetic work. `lsMoves` and `lsCompletions` record
 heuristic activity. Candidate exhaustion yields UNKNOWN. See [nonlinear integer execution](theories/nonlinear-integer.md).
-The library result retains backend `exact-nra`. `-s` reports `nraWork`, `nraProjectedPolynomials`,
+Polynomial results retain backend `exact-nra`; nonlinear integer results use
+`nonlinear-integer-<engine>`. `-s` reports `nraWork`, `nraProjectedPolynomials`,
 `nraLiftedCells` and, on a resource stop, `nraResource`. Legacy open counters remain
 zero. The whole-run deadline includes source admission. `open-bound-proof=false`
 does not disable admission or polynomial solving because this route has no finite
@@ -232,22 +241,23 @@ local-search flips, once per request, on an unverified first-branch order over t
 clauses; it is off unless asked for, changes only which side of a Boolean split is tried first, and
 reports under `-s` (`openHint*`) what it drew and how many splits it went on to order. The flips come
 out of the same `node-limit` budget the search spends — the draw gets what is left of it and is
-charged for what it uses — so a hinted run and an unhinted one at the same limit do the same total
-work. Without a `node-limit` there is nothing to divide and the draw gets the N it asked for; ask
+charged for what it uses — so hinted and unhinted runs share the same total
+allowance. Without a `node-limit` there is nothing to divide and the draw gets the N it asked for; ask
 for more flips than the limit holds and the draw takes the whole remainder, leaving the traversal
 none. The allowance is not spent until `--param open-hint-min-splits=N` splits have asked for a
 hint (default 128), so a model the theory dominates — which reaches almost no split — never pays
 for one.
 `--param open-branching=activity|source-order` chooses which Boolean the traversal splits:
 `source-order` (the default) walks the variables in model order, `activity` follows conflict activity
-over the shared session. Only the Boolean skeleton is branched either way — the theory decides the
-arithmetic residual at each leaf. Activity order is opt-in.
+over the shared session. This setting controls Boolean variable order; theory
+components can also request exact integer-bound or other arithmetic decisions.
+Activity order is opt-in.
 `-s` reports `openAssertingConflicts`, `openNonAssertingConflicts` and
 `openReductionNs`. The [search statistics contract](solver/search.md#statistics)
 defines their scopes and the distinction from native CP analysis.
 
 Every format's `-s` output includes `solvePipeline`: `finite-cp`, `open-theory`,
-`polynomial-theory`, `quadratic-polynomial`, `quadratic-integer`,
+`polynomial-theory`, `nonlinear-integer-theory`, `quadratic-polynomial`, `quadratic-integer`,
 `open-local-search`, `interrupted` or `refuted`, the frontend's
 selected solve entry point or terminal admission outcome.
 `declaredTheoryRoute` is the open request's theory classification before source-safe
@@ -255,8 +265,10 @@ preparation. `reportedBackend` is the final statistics snapshot's backend identi
 it can be `mixed`, or retain the declared theory when preparation stops before a
 theory runs. These labels describe different stages and do not independently prove
 that a theory check executed. Polynomial requests declare `exact_nra`, distinct from
-their reported `exact-nra` backend. A routing refutation or interrupted source
-admission has no solve backend to report.
+their reported `exact-nra` backend. Nonlinear integer requests declare `incomplete_nia`;
+quadratic requests declare `quadratic_optimization`. The generic exact-satisfaction
+adapter can supply its own pipeline and declared-route labels. A routing refutation
+or interrupted source admission has no solve backend to report.
 
 `frontendLoadMs` covers the driver's inclusive `session.load`: parsing, lowering,
 routing and solvable construction. It excludes process startup and does not isolate
@@ -315,7 +327,12 @@ twice.
   `klause.unbounded.int.lo` / `.hi` (the default int range for unbounded FlatZinc declarations), `klause.unbounded.float.lo` / `.hi`, `klause.float.buckets`, `klause.float.scale`, `klause.lp.max.tableau.cells`,
   `klause.lp.ceiling.tableau.cells`, `klause.bitset.threshold`.
 
-Presolve is *not* an env knob — set it per run with `--presolve`.
+Presolve pass selection uses `--presolve`, with no environment override. Preparation
+budget defaults use `klause.presolve.budget.ms` and
+`klause.presolve.budget.fraction`; an explicit millisecond value overrides the derived
+fraction policy. A nonpositive millisecond value disables the derived phase work
+cap and clock. An explicit `presolve-work-limit` still controls work independently.
+See [resource allowances](solver/resources.md#configuration-and-lifetime).
 
 ## Dependencies
 
