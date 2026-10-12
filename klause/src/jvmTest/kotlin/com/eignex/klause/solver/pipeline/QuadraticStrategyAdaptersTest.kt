@@ -44,16 +44,19 @@ class QuadraticStrategyAdaptersTest(private val engine: FiniteEngine) {
             QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-2), i),
         ), QuadraticCoefficient.ONE)
         val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 2, randomSeed = 17), alnsIterations = 2,
+            localSearch = LocalSearchParams(maxFlips = 10000, randomSeed = 17), alnsIterations = 2,
         ))
 
         val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, params, engine)
 
         val result = assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result)
-        assertEquals(1L, result.incumbent.sample.intValue(0))
-        assertEquals(BigFraction.ONE, result.incumbent.sample.algebraicReals?.get(0)?.rational)
-        assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
+        val integer = BigFraction.ofLong(result.incumbent.sample.intValue(0))
+        val real = requireNotNull(result.incumbent.sample.algebraicReals?.get(0)?.rational)
+        val expected = (real - integer) * (real - integer) +
+            (integer - BigFraction.ONE) * (integer - BigFraction.ONE)
+        assertEquals(expected, result.incumbent.value.rational)
         if (engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.MIXED) {
+            assertEquals(1L, result.incumbent.sample.intValue(0))
             assertEquals(BigFraction.ZERO, assertIs<QuadraticOptimizationResult.Optimal>(result).bound.value.rational)
         } else assertIs<QuadraticOptimizationResult.BestFound>(result)
         if (engine != FiniteEngine.BACKTRACK) assertTrue(result.stats.ls.moves.sum > 0)

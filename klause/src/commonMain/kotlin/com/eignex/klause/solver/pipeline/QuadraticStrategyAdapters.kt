@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.CpSatisfactionTraversal
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.DeducedRestrictions
@@ -198,48 +199,54 @@ internal class QuadraticStrategyAdapters(
         share: Double = 1.0,
     ): QuadraticOptimizationResult {
         val controls = params.strategy.localSearch
-        val maximum = minOf(rounds, controls.maxFlips, controls.maxInstructions ?: Long.MAX_VALUE,
-            if (adaptive) params.strategy.alnsIterations.toLong() else Long.MAX_VALUE)
+        val maximum = minOf(rounds, if (adaptive) params.strategy.alnsIterations.toLong() else Long.MAX_VALUE)
+        val instructionLimit = minOf(controls.maxFlips, controls.maxInstructions ?: Long.MAX_VALUE)
         val start = native.work
         val allowance = params.maximumWork?.let { ((it - start).coerceAtLeast(0) * share).toLong() }
         val slice = Cancellation { allowance?.let { native.work - start >= it } == true }
         val stop = native.polynomial or controls.cancellation.shorten(share) or slice
         var radius = BigFraction.ONE
         var moves = 0L
+        var instructions = 0L
         var stalls = 0L
         val weights = DoubleArray(3) { 1.0 }
-        while (!stop() && moves < maximum && controls.nodeBudget?.exhausted() != true) {
+        while (!stop() && moves < maximum && instructions < instructionLimit &&
+            controls.nodeBudget?.exhausted() != true
+        ) {
             val total = model.source.numBoolVars + model.source.numIntVars + model.source.numRealVars
             val operator = if (!adaptive) 0 else random.nextInt(weights.size).let { draw ->
                 if (random.nextDouble() < weights[draw] / weights.maxOrNull()!!) draw else 2
             }
             val amount = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
-            val released = if (incumbent == null) (0 until total).toSet()
+            val released = if (moves == 0L) emptySet()
                 else (0 until total).shuffled(random).take(amount).toSet()
             val current = incumbent?.sample
             val pins = mutableMapOf<Int, Boolean>()
             val lower = mutableMapOf<Int, BigFraction>()
             val upper = mutableMapOf<Int, BigFraction>()
-            if (current != null) {
-                for (id in 0 until model.source.numBoolVars) {
-                    if (id !in released) pins[id] = current.boolValue(id)
+            for (id in 0 until model.source.numBoolVars) {
+                if (id !in released) {
+                    pins[id] = assumptions.boolValueOrNull(id) ?: current?.boolValue(id) ?: random.nextBoolean()
                 }
-                for (id in 0 until model.source.numIntVars) {
-                    if (model.source.numBoolVars + id !in released) {
-                        val value = BigFraction.ofLong(current.intValue(id))
-                        lower[id] = value
-                        upper[id] = value
-                    }
+            }
+            for (id in 0 until model.source.numIntVars) {
+                if (model.source.numBoolVars + id !in released) {
+                    val point = assumptions.intValueOrNull(id) ?: current?.intValue(id)
+                        ?: model.source.declaredIntDomains[id].randomValue(random)
+                    val value = BigFraction.ofLong(point)
+                    lower[id] = value
+                    upper[id] = value
                 }
             }
             val realStart = model.source.numBoolVars + model.source.numIntVars
             for (id in 0 until model.source.numRealVars) {
                 val value = current?.algebraicReals?.get(id)
-                if (value != null) {
-                    val spread = if (realStart + id in released) radius else BigFraction.ZERO
-                    lower[model.source.numIntVars + id] = value.lowerBound - spread
-                    upper[model.source.numIntVars + id] = value.upperBound + spread
-                }
+                val center = BigFraction.ofDouble(model.source.realLower[id])?.takeIf { it > BigFraction.ZERO }
+                    ?: BigFraction.ofDouble(model.source.realUpper[id])?.takeIf { it < BigFraction.ZERO }
+                    ?: BigFraction.ZERO
+                val spread = if (current == null || realStart + id in released) radius else BigFraction.ZERO
+                lower[model.source.numIntVars + id] = (value?.lowerBound ?: center) - spread
+                upper[model.source.numIntVars + id] = (value?.upperBound ?: center) + spread
             }
             val before = native.work
             val repaired = repairCompletion.check(ExactNeighborhoodCondition(pins, lower, upper), stop)
@@ -247,6 +254,7 @@ internal class QuadraticStrategyAdapters(
             val refuted = repaired is ExactNeighborhoodResult.Refuted
             moves++
             val cost = 1L + ceil((native.work - before).coerceAtLeast(0) * 0.8).toLong()
+            instructions += minOf(cost, Long.MAX_VALUE - instructions)
             controls.nodeBudget?.spendMoves(cost)
             val improved = found?.let { candidate ->
                 incumbent == null || better(candidate.value, requireNotNull(incumbent).value)
