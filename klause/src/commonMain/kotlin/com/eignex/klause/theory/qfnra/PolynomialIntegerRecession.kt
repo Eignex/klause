@@ -1,6 +1,8 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.exactInteger
 import com.eignex.klause.arithmetic.quadratic.CheckedQuadraticUnbounded
 import com.eignex.klause.arithmetic.quadratic.QuadraticCandidates
 import com.eignex.klause.arithmetic.quadratic.QuadraticCertification
@@ -29,7 +31,12 @@ internal fun tryPolynomialIntegerRecession(
     arithmetic: PolynomialArithmetic,
     control: QuadraticControl,
 ): PolynomialIntegerRecession? {
-    val base = assignment.reals.map { it.rational ?: return null }
+    val algebraic = AlgebraicArithmetic(arithmetic)
+    val base = assignment.reals.map { value ->
+        value.rational ?: if (value.definingCoefficients.size == 2) {
+            value.definingCoefficients[0].negated() * value.definingCoefficients[1].reciprocal()
+        } else algebraic.exactInteger(value)?.let { BigFraction.of(it, BIG_ONE) } ?: return null
+    }
     if (integers.any { base[it].den != BIG_ONE }) return null
     val bools = (0 until assignment.boolCount).associateWith(assignment::boolValue)
     val model = polynomialQuadraticModel(formula, objective, base.size, bools, arithmetic, control) ?: return null
