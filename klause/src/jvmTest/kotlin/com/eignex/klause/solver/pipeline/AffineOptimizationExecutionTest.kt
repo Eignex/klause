@@ -39,18 +39,18 @@ class AffineOptimizationExecutionTest(
         val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
             realLower = doubleArrayOf(-1.0, Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(1.0, Double.POSITIVE_INFINITY))
-        val sign = if (sense == ObjectiveSense.MINIMIZE) 1L else -1L
+        val expected = BigFraction.ofLong(if (sense == ObjectiveSense.MINIMIZE) 7 else 8)
         val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
             localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17), alnsIterations = 1,
         ))
 
         val execution = if (affine) OpenTheoryPipeline.optimize(
             source.pipelineRequest(),
-            LinearObjective(constant = 7, realCoefficients = doubleArrayOf(0.0, sign.toDouble())),
+            LinearObjective(constant = 7, realCoefficients = doubleArrayOf(0.0, 1.0)),
             params, engine, sense,
         ) else OpenTheoryPipeline.minimize(
             source.pipelineRequest(), QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(
-                QuadraticCoefficient.ofLong(sign), QuadraticVariable.Real(SourceRealId(1)),
+                QuadraticCoefficient.ONE, QuadraticVariable.Real(SourceRealId(1)),
             )), QuadraticCoefficient.ofLong(7)), params, engine, sense,
         )
 
@@ -59,13 +59,13 @@ class AffineOptimizationExecutionTest(
         val arithmetic = AlgebraicArithmetic()
         val values = requireNotNull(sample.algebraicReals)
         assertEquals(0, arithmetic.compare(arithmetic.multiply(values[0], values[0]), values[1]))
-        assertEquals(BigFraction.ofLong(7), result.incumbent.value.rational)
+        assertEquals(expected, result.incumbent.value.rational)
         assertEquals(sense, result.sense)
         if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
             assertIs<QuadraticOptimizationResult.BestFound>(result)
         } else {
             val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result)
-            assertEquals(BigFraction.ofLong(7), optimum.bound.value.rational)
+            assertEquals(expected, optimum.bound.value.rational)
         }
         if (engine != FiniteEngine.BACKTRACK && engine != FiniteEngine.FIXED) {
             assertTrue(result.stats.ls.moves.sum > 0)
