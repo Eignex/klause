@@ -47,7 +47,8 @@ internal class PortfolioIncumbents<V>(
                 valueOf = { lock.withLock { valueOf(it) } },
                 improves = { candidate, standing -> lock.withLock { arithmetic.compare(candidate, standing) < 0 } },
                 approximateValue = { value ->
-                    value.rational?.toDouble() ?: value.lowerBound.toDouble() / 2 + value.upperBound.toDouble() / 2
+                    value.rational?.toDouble() ?: ((value.lowerBound + value.upperBound) *
+                        BigFraction.ofLong(2).reciprocal()).toDouble()
                 },
                 gain = { standing, candidate ->
                     (standing.lowerBound - candidate.upperBound).toDouble().coerceAtLeast(0.0)
