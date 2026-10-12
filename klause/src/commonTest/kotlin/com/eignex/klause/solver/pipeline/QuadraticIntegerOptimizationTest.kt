@@ -169,7 +169,9 @@ class QuadraticIntegerOptimizationTest {
             strategy = PolynomialStrategyParams(localSearch = LocalSearchParams(maxFlips = 100000, randomSeed = 17)),
         ), maximumMoves = 2)
 
-        val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, params, FiniteEngine.LOCAL_SEARCH)
+        val execution = OpenTheoryPipeline.minimize(
+            source.pipelineRequest(), objective, params, FiniteEngine.LOCAL_SEARCH,
+        )
 
         val result = assertIs<QuadraticOptimizationResult.BestFound>(execution.result)
         assertTrue(requireNotNull(result.incumbent.value.rational) <= BigFraction.ofLong(-4))
