@@ -94,7 +94,8 @@ class LocalSearchEnginePublicationTest {
         val invalidScope = params.copy(assumptions = Assumptions(bools = mapOf(1 to true)))
         assertIs<SolveResult.Unknown>(solver.solve(invalidScope))
 
-        val result = solver.solve(params.copy(initialAssignment = valid, assumptions = Assumptions(bools = mapOf(0 to true))))
+        val scoped = params.copy(initialAssignment = valid, assumptions = Assumptions(bools = mapOf(0 to true)))
+        val result = solver.solve(scoped)
 
         assertEquals(valid, assertIs<SolveResult.Sat>(result).assignment)
     }
@@ -102,10 +103,13 @@ class LocalSearchEnginePublicationTest {
     @Test
     fun `uncovered constraints are checked before caller completion`() {
         var calls = 0
-        val solver = LocalSearchSolver(source.bake(), greedyRepairOnRestart = false, completion = CandidateCompletion { point, _ ->
-            calls++
-            Completion.Witness(point)
-        })
+        val solver = LocalSearchSolver(
+            source.bake(), greedyRepairOnRestart = false,
+            completion = CandidateCompletion { point, _ ->
+                calls++
+                Completion.Witness(point)
+            },
+        )
 
         assertIs<SolveResult.Unknown>(solver.solve(params))
         assertEquals(0, calls)
@@ -120,10 +124,13 @@ class LocalSearchEnginePublicationTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
         ).bake()
         val exact = BigFraction.of(bigIntOf(1), bigIntOf(3))
-        val completed = Sample(booleanArrayOf(true, true), LongArray(0), doubleArrayOf(exact.toDouble()), exactReals = listOf(exact))
-        val solver = LocalSearchSolver(problem, greedyRepairOnRestart = false, completion = CandidateCompletion { _, _ ->
-            Completion.Witness(completed)
-        })
+        val completed = Sample(
+            booleanArrayOf(true, true), LongArray(0), doubleArrayOf(exact.toDouble()), exactReals = listOf(exact),
+        )
+        val solver = LocalSearchSolver(
+            problem, greedyRepairOnRestart = false,
+            completion = CandidateCompletion { _, _ -> Completion.Witness(completed) },
+        )
 
         val result = solver.solve(params.copy(initialAssignment = completed))
 
@@ -155,7 +162,9 @@ class LocalSearchEnginePublicationTest {
         val worker = PortfolioWorker.of("ls", 0, solver.session(), params.copy(initialAssignment = valid))
 
         val standalone = assertIs<SolveResult.Sat>(solver.solve(params.copy(initialAssignment = valid))).assignment
-        val paired = Portfolio.thompson(listOf(worker)).use { assertIs<SolveResult.Sat>(it.solve(Cancellation.Never)).assignment }
+        val paired = Portfolio.thompson(listOf(worker)).use {
+            assertIs<SolveResult.Sat>(it.solve(Cancellation.Never)).assignment
+        }
         val complete = assertIs<SolveResult.Sat>(BacktrackSolver(problem).solve(BacktrackParams())).assignment
 
         for (sample in listOf(standalone, paired, complete)) assertEquals(sample.boolValue(0), sample.boolValue(1))
