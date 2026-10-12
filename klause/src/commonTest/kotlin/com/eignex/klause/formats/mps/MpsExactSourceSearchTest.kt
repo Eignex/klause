@@ -107,4 +107,17 @@ class MpsExactSourceSearchTest {
         }
         assertEquals(source.sourceWitness(values).objective, unbounded.value)
     }
+
+    @Test
+    fun `a declared constant source objective retains its optimum`() {
+        val source = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n X R 0.1\nRHS\n RHS R 0.3 COST 3\nENDATA",
+        ).toExactSourceProblem()
+
+        val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(source.model,
+            source.objective?.toLinearObjective()), TheoryParams(openWorkLimit = 10000))
+
+        val optimal = assertIs<OpenTheoryOptimum.Optimal>(assertIs<OpenTheoryExecution.Optimize>(execution).result)
+        assertEquals(source.sourceWitness(listOf(BigFraction.ofLong(3))).objective, optimal.value)
+    }
 }
