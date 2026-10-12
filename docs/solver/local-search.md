@@ -471,3 +471,19 @@ the source model. Finite factor degrees guide the walk, while native polynomial
 work has its own cumulative allowance. Completed samples own exact algebraic
 coordinates and a source witness certificate. ALNS bootstrap and CP repairs use
 the same shared polynomial component; neighbourhood pins do not renew its allowance.
+
+## Exact coordinate neighborhoods
+
+The retained exact-coordinate driver proposes rational coordinate windows and
+Boolean pins to a source-bound completion adapter. A coordinate repair relaxes one
+pin; compound repairs relax a block. Adaptive neighborhood search weights the
+block sizes by accepted improvements. Centers, window radii, random state, weights
+and incumbents survive slices. A rejected repair widens search windows without
+changing the source domain or establishing infeasibility.
+
+The linear adapter adds exact rational rows, retains arbitrary-width integers and
+checks the conditioned source through its selected theory. Native work, decisions
+and legacy checks share one allowance across repairs; completion work also charges
+the heuristic instruction ledger. Exact objective cutoffs require strict source
+improvement. Only checked completions publish witnesses or best-found incumbents.
+Repair refutations and exhausted windows carry no source proof authority.
