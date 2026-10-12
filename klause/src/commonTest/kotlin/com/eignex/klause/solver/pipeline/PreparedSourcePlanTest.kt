@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.global.AllDifferent
@@ -99,6 +101,24 @@ class PreparedSourcePlanTest {
         assertEquals(PreparedExecutionKind.FINITE_LINEAR, request.preparedPlan.kind)
         assertEquals(0, request.preparedPlan.finiteIntegerCoordinate(0))
         assertSame(source, request.preparedPlan.originalSource)
+    }
+
+    @Test
+    fun `conditioned linear preparation preserves finite owners beside exact real completion`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf(
+            AllDifferent(intArrayOf(0, 1), 0, 3),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val initial = source.prepareExecutionPlan(preferFinite = true)
+
+        val prepared = assertNotNull(initial.prepareConditionedLinearQuery())
+        val ownership = assertNotNull(prepared.componentPlan)
+
+        assertSame(source, prepared.originalSource)
+        assertEquals(IntVariableOwner.CP, ownership.intOwner(0))
+        assertEquals(FactorOwner.CP, ownership.factorOwner(0))
+        assertEquals(FactorOwner.THEORY, ownership.factorOwner(1))
+        assertEquals(ProblemPipeline.EXACT_LIRA, ownership.theoryPipeline)
     }
 
 }

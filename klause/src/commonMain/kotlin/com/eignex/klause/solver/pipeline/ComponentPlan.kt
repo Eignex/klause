@@ -219,6 +219,27 @@ class ComponentPlan internal constructor(
         }
     }
 
+    internal fun forLinearConditions(spec: Problem): ComponentPlan? {
+        requireBelongsTo(spec)
+        if (unplaceable != null) return null
+        val owners = Array(factorOwners.size) { index ->
+            val factor = spec.factors[index]
+            if (factorOwners[index] == FactorOwner.CP && factor.variables.reals.isNotEmpty()) {
+                if (!factor.exactTheoryOwnable) return null
+                FactorOwner.THEORY
+            } else factorOwners[index]
+        }
+        val kept = owners.indices.filter { owners[it] != FactorOwner.CP }
+        val fragment = spec.withFactors(Array(kept.size) { spec.factors[kept[it]] },
+            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
+        val route = when {
+            fragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
+            fragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
+            else -> return null
+        }
+        return ComponentPlan(spec, intOwners, owners, route)
+    }
+
     internal fun requireSource(spec: Problem) = requireBelongsTo(spec)
 
     private fun requireBelongsTo(spec: Problem) {
