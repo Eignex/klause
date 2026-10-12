@@ -65,5 +65,15 @@ The source difference is reported beside the result. `--exact` retains its sourc
 correspondence requirement. Check routing and source qualifications before attributing
 a missing result to the simplex.
 
+### Paired strategy coverage gap
+
+The source-inexact open fallback executes witness search under MIXED or LS, while
+BACKTRACK/FIXED return Unsupported without traversing the source. This does not
+provide the complete-search/local-search pair required by the
+[vision](../vision.md#shared-model-breadth). The missing source-preserving arm is
+tracked in [#2654](https://github.com/Eignex/klause/issues/2654). Withholding claims
+proved only about a rounded lowering remains required; it does not make this
+strategy exception part of the intended support contract.
+
 See [MpsCompiler](../../klause/src/commonMain/kotlin/com/eignex/klause/formats/mps/MpsCompiler.kt)
 and [MpsMode](../../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/MpsMode.kt).

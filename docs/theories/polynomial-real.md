@@ -62,6 +62,11 @@ proof admission. The separate quadratic overload handles continuous quadratic
 objectives; all-solution enumeration remains outside these interfaces. [Search](../solver/search.md), [local search](../solver/local-search.md),
 [portfolio](../solver/portfolio.md) and [sessions](../solver/sessions.md) own their execution lifecycles.
 
+The real-cost restriction on `LinearObjective` also rejects objectives that the
+quadratic overload accepts as affine terms. This admission mismatch is tracked in
+[#2655](https://github.com/Eignex/klause/issues/2655), rather than defining a permanent
+objective boundary between search strategies.
+
 The sequential mixed pool shares one finite projection and immutable polynomial
 source scope across complete backtracking, finite local search and ALNS
 bootstrap/repair workers. Only the complete worker receives proof admission.

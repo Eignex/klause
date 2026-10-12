@@ -16,7 +16,7 @@ rules remain in their subsystem pages.
 | `model`, `schema`, `compile` | Model expressions, schema handles, compilation, captured source-name metadata, typed source locations and decoding |
 | `config`, `ir` model declarations | Configuration capture, source bounds/value sets, `Problem`, literals and structural factor descriptions |
 | `solver` entry points and results | `Solver`, `Optimizer`, `SolverParams`, `Session`, `SearchStream`, their result/value types and resumable operation contracts |
-| Built-in solver facades | Backtrack, local-search, brute-force and portfolio construction, documented parameters, presets and counting/sampling entry points |
+| Built-in solver facades | Engine construction, parameters, presets and counting/sampling entry points; source coverage differs from the shared pipeline as described below |
 | `solver.objective` | Linear objective construction/evaluation; `Objective` and `IncrementalObjective` scoring extensions |
 | `ir.Factor`, factor data and remapping | Stable membership/structural keys, affine/remapping refusal contracts and immutable borrowed factor payloads |
 | `solver.search` component protocols | Decisions, explanations, context, component/brancher/blocker interfaces, contributed model keys and immutable assembled reads |
@@ -29,6 +29,9 @@ Supported extensions supply the behavior their interfaces document. A custom fac
 keeps borrowed arrays and structural keys stable; a custom component supplies complete
 checks and sound explanations; a custom objective agrees at feasible assignments.
 The type system does not certify any of those semantic obligations.
+Engine-specific custom factor roles do not establish portable constraint coverage.
+The [custom factor publication gap](solver/search.md#custom-factor-publication-gap)
+must be considered when a propagation-only factor has no local checker.
 
 ## Model construction and solving
 
@@ -37,6 +40,18 @@ solver entry points return assignments or optimization results for decoding. Dir
 model construction uses the same source declarations and factor semantics.
 [Schema lowering](formats/schema.md) defines representation choices and refused
 contexts; [input semantics](formats.md) defines route coverage.
+
+### Source-aware strategy entry points
+
+Shared pipeline entry points compose finite search and arithmetic completion.
+`BacktrackSolver(compiled)` and `LocalSearchSolver(compiled)` instead bake directly;
+their constructors do not arrange the polynomial source decomposition. Continuous
+products supported by the pipeline can consequently fail those finite projections.
+These advertised facade restrictions are a coverage misalignment tracked in
+[#2656](https://github.com/Eignex/klause/issues/2656), not a requirement to move real
+domains into finite propagation.
+
+### Objective admission
 
 `Problem.pipelineRequest()` composes shared finite factors with exact continuous
 completion where supported. `OpenTheoryPipeline.minimize` accepts a finite
@@ -49,6 +64,15 @@ neighborhood verdicts do not establish global claims.
 See [polynomial composition](theories/polynomial-real.md#shared-model-composition)
 for source coverage and [quadratic representation](model.md#quadratic-objective-representation)
 for exact coefficient and coordinate ownership.
+
+The polynomial `LinearObjective` overload rejects nonzero real costs, while the
+quadratic overload accepts equivalent affine real terms. Ordinary
+`Problem.pipelineRoute(objective=...)` also declines continuous products with those
+linear costs. This representation-dependent admission is a vision misalignment
+tracked in [#2655](https://github.com/Eignex/klause/issues/2655); it is not a different
+mathematical objective fragment.
+
+### Nonlinear integer sources
 
 `NonlinearIntegerProblem.pipelineRequest()` exposes exact polynomial integer/mixed
 sources through `NonlinearIntegerTheoryRequest`. `NonlinearIntegerTheoryParams`

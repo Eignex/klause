@@ -25,7 +25,7 @@ The solver supports finite constraints, linear arithmetic and polynomial real
 constraints through different mechanisms. This is current execution coverage,
 separate from what an individual frontend can parse. [The vision](vision.md)
 requires common model breadth and an available complete-search/local-search pair;
-remaining route gaps are tracked in [#2624](https://github.com/Eignex/klause/issues/2624).
+the specific remaining misalignments are listed below.
 
 | Model family | Mechanisms | Boundary |
 |---|---|---|
@@ -44,6 +44,18 @@ A relaxation supplies deductions, not support for omitted source constraints.
 describe implemented engine roles. Format-specific admission and result rules are
 linked below; [theory contracts](theories.md) define the fragment-specific checks
 and composition boundaries.
+
+### Identified vision misalignments
+
+These restrictions and publication risks conflict with the support contract; they
+are work to close, not permanent exceptions to shared breadth or source checking.
+
+| Gap | Current behavior | Tracking |
+|---|---|---|
+| Custom factors with only a propagation role | LS omits their violations and standalone publication can bypass a complete source check | [#2653](https://github.com/Eignex/klause/issues/2653) |
+| Source-inexact open MPS models | Witness-only fallback has no runnable complete arm; BACKTRACK/FIXED return Unsupported | [#2654](https://github.com/Eignex/klause/issues/2654) |
+| Real linear objectives on polynomial models | Linear objective admission rejects costs accepted by an equivalent quadratic objective specification | [#2655](https://github.com/Eignex/klause/issues/2655) |
+| Public solver facades | Direct finite baking bypasses source services used by the shared pipeline | [#2656](https://github.com/Eignex/klause/issues/2656) |
 
 ## Finite and open models
 
