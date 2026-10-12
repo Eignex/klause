@@ -26,7 +26,7 @@ class OpenExactNeighborhoodTest {
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val search = OpenExactNeighborhood(model, TheoryParams()).search(false, maximumMoves = 4)
 
-        search.advance(Cancellation.Never, 4)
+        search.advance(Cancellation.Never, Long.MAX_VALUE)
 
         val result = assertIs<SolveResult.Sat>(search.solveResult(TerminationReason.BudgetExhausted))
         assertEquals("1/3", result.assignment.exactReals?.single().toString())
@@ -41,7 +41,7 @@ class OpenExactNeighborhoodTest {
             factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, wide)))
         val search = OpenExactNeighborhood(model, TheoryParams()).search(true, maximumMoves = 3)
 
-        search.advance(Cancellation.Never, 3)
+        search.advance(Cancellation.Never, Long.MAX_VALUE)
 
         val result = assertIs<SolveResult.Sat>(search.solveResult(TerminationReason.BudgetExhausted))
         assertEquals(wide, result.assignment.exactIntValue(0))
@@ -55,7 +55,7 @@ class OpenExactNeighborhoodTest {
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
         val search = OpenExactNeighborhood(model, TheoryParams(), objective).search(false, maximumMoves = 5)
 
-        search.advance(Cancellation.Never, 5)
+        search.advance(Cancellation.Never, Long.MAX_VALUE)
 
         val result = assertIs<MinimizeResult.BestFound>(search.minimizeResult(TerminationReason.BudgetExhausted))
         assertTrue(objective.evaluateExact(result.sample) < BigFraction.ZERO)

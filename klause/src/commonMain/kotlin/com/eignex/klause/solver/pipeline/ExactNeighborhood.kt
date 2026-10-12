@@ -10,6 +10,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import kotlin.math.ceil
 import kotlin.random.Random
 
 internal data class ExactNeighborhoodCondition(
@@ -39,6 +40,8 @@ internal class ExactNeighborhood(
     seed: Long = 0,
     private val nodeBudget: NodeBudget? = null,
     private val maximumMoves: Long = Long.MAX_VALUE,
+    private val nativeWork: () -> Long = { 0 },
+    private val completionStats: () -> SolveStats = { SolveStats.EMPTY },
 ) {
     private val random = Random(seed)
     private var centers = centers.toList()
@@ -51,8 +54,9 @@ internal class ExactNeighborhood(
     private val sink = SolveStatsSink(if (adaptive) "exact-alns" else "exact-ls").also { it.start() }
     private var moves = 0L
     private var stalls = 0L
-    val stats: SolveStats get() = sink.snapshot()
-    val work: Long get() = moves
+    private var charged = 0L
+    val stats: SolveStats get() = sink.snapshot().mergedWith(completionStats())
+    val work: Long get() = charged
 
     private fun operator(): Int {
         if (!adaptive) return if (round % (centers.size + boolCount + 1) == 0L) 2 else 0
@@ -70,8 +74,8 @@ internal class ExactNeighborhood(
         allowance: Long,
         onIncumbent: (Sample, BigFraction?) -> Unit = { _, _ -> },
     ): Boolean {
-        val end = moves + minOf(allowance.coerceAtLeast(0), Long.MAX_VALUE - moves)
-        while (!cancellation() && moves < end && moves < maximumMoves && nodeBudget?.exhausted() != true) {
+        val end = charged + minOf(allowance.coerceAtLeast(0), Long.MAX_VALUE - charged)
+        while (!cancellation() && charged < end && moves < maximumMoves && nodeBudget?.exhausted() != true) {
             val total = centers.size + boolCount
             val operator = operator()
             val count = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
@@ -79,9 +83,12 @@ internal class ExactNeighborhood(
             val lower = centers.indices.associateWith { if (it in selected) centers[it] - radius else centers[it] }
             val upper = centers.indices.associateWith { if (it in selected) centers[it] + radius else centers[it] }
             val pins = (0 until boolCount).filter { centers.size + it !in selected }.associateWith { bools[it] }
+            val before = nativeWork()
             val result = completion.check(ExactNeighborhoodCondition(pins, lower, upper, value), cancellation)
             moves++
-            nodeBudget?.spendMoves(1)
+            val cost = 1 + ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong()
+            charged += minOf(cost, Long.MAX_VALUE - charged)
+            nodeBudget?.spendMoves(cost)
             sink.ls.recordCompletion(result is ExactNeighborhoodResult.Refuted, result is ExactNeighborhoodResult.Undecided)
             val improved = result is ExactNeighborhoodResult.Witness && accept(result.sample, onIncumbent)
             if (adaptive) weights[operator] = weights[operator] * 0.8 + if (improved) 1.0 else 0.2
