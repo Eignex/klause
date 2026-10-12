@@ -50,3 +50,8 @@ guarantee is made for nonlinear integer arithmetic. Published telemetry separate
 candidates, heuristic moves, block repairs, completion queries and native
 polynomial work. The mechanism reads no finite-domain state or linear theory
 internals.
+
+Conditioned calls retain original Boolean pins and exact numeric windows. Candidate
+fixings intersect these bounds; they cannot replace or widen them. A real
+refutation from a conditioned call covers only that call's scope. Fresh calls
+capture independent conditions and retain the source snapshot unchanged.

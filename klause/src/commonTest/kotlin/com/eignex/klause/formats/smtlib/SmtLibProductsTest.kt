@@ -40,6 +40,20 @@ class SmtLibProductsTest {
     }
 
     @Test
+    fun `bounded product lowering preserves the complete source solution set`() {
+        val parsed = SmtLib.parse(
+            "(declare-const x Int) (declare-const y Int) " +
+                "(assert (and (<= 1 x 3) (<= 1 y 3) (= (* x y) 6)))",
+        )
+
+        val values = BacktrackSolver(parsed.model.bake()).enumerate(BacktrackParams(maxDecisions = 100)).map { sample ->
+            sample.intValue(parsed.intVarNames.getValue("x")) to sample.intValue(parsed.intVarNames.getValue("y"))
+        }.toSet()
+
+        assertEquals(setOf(2L to 3L, 3L to 2L), values)
+    }
+
+    @Test
     fun `bounded integer product exhaustion proves source infeasibility`() {
         val parsed = SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) " +
