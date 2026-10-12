@@ -45,7 +45,9 @@ internal class LinearAuthoritySemantics(private val source: SourceProofContext) 
     override fun derivation(
         claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
     ): SourceEvidenceCheck {
-        if (claim == SourceClaim.Refutation && derivation is LinearPinnedRefutation) {
+        if ((claim == SourceClaim.Refutation || claim is SourceClaim.Bound) &&
+            derivation is LinearPinnedRefutation
+        ) {
             if (!compatible(scope) || source.coordinates.any {
                     it.kind == SourceCoordinate.Kind.Boolean && it.id !in scope.condition.bools
                 }

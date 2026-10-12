@@ -15,7 +15,9 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -113,5 +115,62 @@ class LinearAuthorityTest {
 
         assertNull(result.evidence)
         assertNull(result.bound)
+    }
+
+    @Test
+    fun `a checked source bound survives an incomplete strict feasibility check`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf("positive" to SourcePremise(
+            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true))),
+            mapOf(real to BigFraction.ONE))
+
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 2)).check(source, Cancellation.Never)
+
+        assertNull(result.evidence)
+        assertNotNull(result.bound)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.bound))
+    }
+
+    @Test
+    fun `wide rational coordinates preserve source attainment beyond floating precision`() {
+        val value = BigFraction.of(bigIntOf(27021597764222980L), BIG_ONE) * BigFraction.ofLong(3).reciprocal()
+        val source = SourceProofContext(scope, setOf(real), mapOf("lower" to SourcePremise(
+            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), value.negated()))), mapOf(real to BigFraction.ONE))
+
+        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+
+        val optimum = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
+        assertEquals(SourceValue.Rational(value), optimum.value)
+        assertEquals(value, assertNotNull(optimum.sample.exactReals).single())
+    }
+
+    @Test
+    fun `Boolean objective substitution retains the complete assumed source objective`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val branch = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
+        val source = SourceProofContext(branch, setOf(bool, real), mapOf("lower" to SourcePremise(
+            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE), mapOf(0 to true))),
+            mapOf(bool to BigFraction.ofLong(2), real to BigFraction.ONE))
+
+        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+
+        val optimum = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(3)), optimum.value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence))
+    }
+
+    @Test
+    fun `a source objective identity change invalidates retained linear evidence`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf("lower" to SourcePremise(
+            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))),
+            mapOf(real to BigFraction.ONE))
+        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val changed = SourceProofContext(scope.copy(objective = SourceObjective("replacement", ObjectiveSense.MINIMIZE)),
+            source.coordinates, source.premises, source.objective).withLinearAuthority()
+
+        val checked = SourceEvidenceVerifier(changed).verify(assertNotNull(result.evidence))
+
+        assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
 }
