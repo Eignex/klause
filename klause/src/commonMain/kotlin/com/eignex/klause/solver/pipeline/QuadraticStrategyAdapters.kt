@@ -215,7 +215,7 @@ internal class QuadraticStrategyAdapters(
         val start = native.work
         val allowance = params.maximumWork?.let { ((it - start).coerceAtLeast(0) * share).toLong() }
         val slice = Cancellation { allowance?.let { native.work - start >= it } == true }
-        val stop = native.polynomial or controls.cancellation.shorten(share) or slice
+        val stop = native.phaseCancellation(controls.cancellation, share) or slice
         if (stop() || maximum == 0L || instructionLimit == 0L) return partial()
         val centers = try {
             completion.pointFixings {

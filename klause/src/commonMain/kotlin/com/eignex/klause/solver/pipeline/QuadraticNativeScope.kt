@@ -23,6 +23,8 @@ internal class QuadraticNativeScope(private val params: PolynomialTheoryParams) 
     val polynomial: Cancellation = Token(quadratic = false)
     val numerical: Cancellation = Token(quadratic = true)
 
+    fun phaseCancellation(worker: Cancellation, share: Double): Cancellation = (polynomial or worker).shorten(share)
+
     fun observe(stats: QfNraStats) {
         projected = sum(projected, stats.projectedPolynomials)
         lifted = sum(lifted, stats.liftedCells)
