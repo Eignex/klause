@@ -116,4 +116,26 @@ class LinearNeighborhoodInvocationTest {
             assertEquals(0.0, result.stats.ls.completions.sum)
         }
     }
+    @Test
+    fun `mixed repairs retain wide integers beside fractional real coordinates`() {
+        val value = parseBigInt("9223372036854775808")
+        val open = Bits(1).also { it.set(0) }
+        val source = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)),
+            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val request = OpenTheoryRequest(source)
+
+        for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request,
+                TheoryParams(maxFlips = 20, openWorkLimit = 1000, randomSeed = 17), engine)).result
+
+            val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+            assertEquals(value.toString(), witness.intValue(0))
+            assertEquals("1/3", witness.realValue(0))
+            assertTrue(result.stats.ls.moves.sum > 1)
+        }
+    }
+
 }
