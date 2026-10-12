@@ -19,7 +19,7 @@ describe the current system; the linked issues track the work and its status.
 |---|---|---|
 | Source execution planning | Linear/finite ownership and polynomial decomposition use separate plans. | [#2648](https://github.com/Eignex/klause/issues/2648): unify preparation and ownership across complete and heuristic arms. |
 | Source evidence | In-memory certificates attest to engine checks; reconstruction retains source mappings. | [#2649](https://github.com/Eignex/klause/issues/2649): retain typed, scoped derivations and transformation justifications toward independent verification. |
-| Strategy composition | Nonlinear-integer and quadratic mixed execution uses fixed phases. | [#2650](https://github.com/Eignex/klause/issues/2650): move those strategies onto retained shared portfolio workers with exact objective exchange. |
+| Strategy composition | Finite, open and polynomial routes construct the shared scheduler separately; nonlinear-integer and quadratic mixed execution uses fixed phases. | [#2650](https://github.com/Eignex/klause/issues/2650): construct one portfolio per invocation through a common path, with theory-specific arms and exact objective/evidence contracts. |
 | Conditioned completion | Open linear repairs rebuild constrained models and theory engines. | [#2651](https://github.com/Eignex/klause/issues/2651): retain prepared completion across candidate queries with scoped retraction and cumulative allowances. |
 | Strategy admission | Factor capabilities inventory direct mechanisms; composed routes select admission separately. | [#2652](https://github.com/Eignex/klause/issues/2652): expose model/operation admission and claim capabilities in the shared plan, with strategy conformance checks. |
 

@@ -311,8 +311,10 @@ The shared harness runs linear and finite-polynomial portfolios. Nonlinear-integ
 and quadratic `MIXED` execution uses the fixed phases documented in
 [nonlinear integer arithmetic](../theories/nonlinear-integer.md#solving-and-composition)
 and [quadratic strategy execution](../theories/polynomial-real.md#quadratic-strategy-execution).
-Migration to retained shared portfolio workers is planned in
-[#2650](https://github.com/Eignex/klause/issues/2650); the vision's
+One common portfolio construction path per invocation, with theory adapters
+supplying arms and source verification/objective contracts, is planned in
+[#2650](https://github.com/Eignex/klause/issues/2650). That work also moves fixed
+phases onto retained workers and centralizes lane and resource wiring. The vision's
 [active work](../vision.md#active-work-toward-the-vision) tracks the related refactors.
 
 Supported linear sources pair complete traversal with exact-coordinate local search
