@@ -2388,6 +2388,11 @@ public final class com/eignex/klause/formats/mps/MpsConstraint {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/formats/mps/MpsExactSourceKt {
+	public static final fun toExactSourceProblem (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static synthetic fun toExactSourceProblem$default (Lcom/eignex/klause/formats/mps/MpsModel;Lcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+}
+
 public final class com/eignex/klause/formats/mps/MpsFormatException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;)V
 }
@@ -13459,4 +13464,3 @@ public final class com/eignex/klause/util/StringCharSource : com/eignex/klause/u
 public abstract interface class com/eignex/klause/util/WorkMeter {
 	public abstract fun charge (J)V
 }
-
