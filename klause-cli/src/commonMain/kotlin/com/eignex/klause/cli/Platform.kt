@@ -35,6 +35,8 @@ internal expect fun startHeapPeakSampler()
  *  for diagnostics only and must never be called on a solve path. */
 internal expect fun sampleHeap(): HeapSample?
 
+internal expect fun flushCliOutput()
+
 internal expect fun errPrintln(message: String)
 
 internal expect fun exitCli(code: Int): Nothing

@@ -104,7 +104,8 @@ separators. SMT renders algebraic objectives with exact root terms.
 
 `ArithmeticPublication` belongs to one CLI invocation. It suppresses repeated
 rendered witnesses with the same retained exact objective representation and
-counts successful emissions. Output failure propagates to the caller. Quadratic
+counts successful emissions. Each arithmetic witness is flushed to stdout before
+publication returns; output failure propagates to the caller. Quadratic
 terminal metadata is delivered separately from the incumbent, preserving checked
 bounds and nonattainment status without repeating an emitted model. The adapter
 uses retained scalar metadata and performs no solver work or candidate admission.

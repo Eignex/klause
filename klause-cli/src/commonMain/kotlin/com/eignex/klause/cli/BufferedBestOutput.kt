@@ -95,6 +95,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         best = rendered
         if (streamObjective) println("$objectivePrefix$value")
         println(rendered)
+        flushCliOutput()
         emittedArithmeticWitness = rendered
     }
 
