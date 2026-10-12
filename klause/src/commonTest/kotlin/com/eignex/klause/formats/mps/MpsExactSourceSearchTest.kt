@@ -6,7 +6,9 @@ import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.parseBigInt
@@ -81,5 +83,24 @@ class MpsExactSourceSearchTest {
             val unknown = assertIs<OpenTheoryResult.Unknown>(assertIs<OpenTheoryExecution.Satisfy>(execution).result)
             assertEquals(TerminationReason.Cancelled, unknown.reason)
         }
+    }
+
+    @Test
+    fun `integral objectives retain exact source recession checks`() {
+        val source = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST -1 R -0.1\n" +
+                " M1 'MARKER' 'INTEND'\n X R 1\nBOUNDS\n LI B I 0\nENDATA",
+        ).toExactSourceProblem()
+
+        val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(source.model,
+            source.objective?.toLinearObjective()), TheoryParams(openWorkLimit = 10000))
+
+        val unbounded = assertIs<OpenTheoryOptimum.Unbounded>(assertIs<OpenTheoryExecution.Optimize>(execution).result)
+        val values = source.columns.map { column ->
+            val text = if (column.real) unbounded.witness.realValue(column.id) else unbounded.witness.intValue(column.id)
+            val parts = text.split('/')
+            BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
+        }
+        assertEquals(source.sourceWitness(values).objective, unbounded.value)
     }
 }

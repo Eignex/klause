@@ -28,7 +28,7 @@ import com.eignex.klause.util.unaryMinus
 /**
  * Preserve original MPS numbers in exact linear source rows for the shared arithmetic search.
  * Real declarations remain open; their decimal bounds are rows rather than binary64 endpoints.
- * An auxiliary objective equality preserves decimal coefficients, constant and original units.
+ * An auxiliary equality preserves fractional objective coefficients, constant and original units.
  */
 fun MpsModel.toExactSourceProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): MpsCompiled {
     val source = exactAdapterSnapshot()
@@ -92,14 +92,19 @@ fun MpsModel.toExactSourceProblem(settings: ProblemSettings = KlauseConfig.curre
         add(lo, LinearOp.GE)
         add(hi, LinearOp.LE)
     }
-    val objective = if (source.objective.indices.isEmpty()) null else {
-        val objectiveColumn = realCount++
-        val refs = source.objective.indices.map(::ref) + Term.ofRealVar(objectiveColumn)
-        val coefficients = numbers.objectiveCoefficients.map { it.fraction } + BigFraction.MINUS_ONE
-        factors += exactSourceRow(refs.toIntArray(), coefficients, LinearOp.EQ,
-            numbers.objectiveConstant.fraction.negated())
-        LinearObjectiveSpec(LongArray(0), LongArray(intCount), 0,
-            DoubleArray(realCount) { if (it == objectiveColumn) 1.0 else 0.0 })
+    val integralObjective = source.integralSourceObjective(columns, numbers, intCount)
+    val objective = when {
+        source.objective.indices.isEmpty() -> null
+        integralObjective != null -> integralObjective
+        else -> {
+            val objectiveColumn = realCount++
+            val refs = source.objective.indices.map(::ref) + Term.ofRealVar(objectiveColumn)
+            val coefficients = numbers.objectiveCoefficients.map { it.fraction } + BigFraction.MINUS_ONE
+            factors += exactSourceRow(refs.toIntArray(), coefficients, LinearOp.EQ,
+                numbers.objectiveConstant.fraction.negated())
+            LinearObjectiveSpec(LongArray(0), LongArray(intCount), 0,
+                DoubleArray(realCount) { if (it == objectiveColumn) 1.0 else 0.0 })
+        }
     }
     val model = Problem(
         settings = settings,
@@ -112,6 +117,24 @@ fun MpsModel.toExactSourceProblem(settings: ProblemSettings = KlauseConfig.curre
     )
     return MpsCompiled(model, objective, source.sense == ObjectiveSense.MAXIMIZE, columns, 1,
         source.variables.count { !it.integer }).withSourceModel(source, null, null)
+}
+
+private fun MpsModel.integralSourceObjective(
+    columns: List<MpsColumn>,
+    numbers: MpsSourceNumbers,
+    intCount: Int,
+): LinearObjectiveSpec? {
+    val constant = numbers.objectiveConstant.fraction
+    if (constant.den != BIG_ONE || !constant.num.fitsLong() || constant.num.toLongExact() == Long.MIN_VALUE) return null
+    val coefficients = MutableList(intCount) { BigFraction.ZERO }
+    for (entry in objective.indices.indices) {
+        val column = columns[objective.indices[entry]]
+        if (column.real) return null
+        coefficients[column.id] += numbers.objectiveCoefficients[entry].fraction
+    }
+    if (coefficients.any { it.den != BIG_ONE || !it.num.fitsLong() || it.num.toLongExact() == Long.MIN_VALUE }) return null
+    return LinearObjectiveSpec(intCoefficients = LongArray(intCount) { coefficients[it].num.toLongExact() },
+        constant = constant.num.toLongExact())
 }
 
 private fun exactSourceRow(
