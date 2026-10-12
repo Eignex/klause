@@ -1067,9 +1067,14 @@ internal class LocalSearchEngine(
         if (unscoredCandidateCheck == null && completion == null) return Completion.Witness(candidate)
         val checked = unscoredCandidateCheck?.check(candidate, state.assumptions, cancellation)
             ?: Completion.Witness(candidate)
-        val decided = if (checked is Completion.Witness) {
+        val completed = if (checked is Completion.Witness) {
             completion?.complete(candidate, cancellation) ?: checked
         } else checked
+        val decided = if (completed is Completion.Witness &&
+            (cancellation() || completed.sample.numBoolVars != candidate.numBoolVars ||
+                completed.sample.numIntVars != candidate.numIntVars ||
+                candidate.hammingDistanceTo(completed.sample) != 0)
+        ) Completion.Undecided(completed.work) else completed
         charge(decided.work)
         stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided)
         if (decided is Completion.Refuted) {

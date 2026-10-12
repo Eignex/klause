@@ -101,6 +101,8 @@ explicitly decline finite local-search execution.
 Rejection applies only to the candidate. Interrupted checking withholds publication
 without refuting the source or its assumptions. Caller completion runs after the
 uncovered finite checks and retains responsibility for exact arithmetic completion.
+Completion preserves the verified discrete coordinates; replacement or cancellation
+withholds the witness.
 Covered invariants and deliberately redundant built-in factors do not require this
 extra propagation check. A custom `Invariant` supplies local checking and scoring
 through its interface contract but does not supply a CP propagator.
