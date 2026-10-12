@@ -78,8 +78,13 @@ cannot produce partial certificates. Required representation declines remain
 visible. Zero native work prevents entry. A checked witness remains valid after
 subsequent interruption. Published immutable values retain no invocation owner.
 
-The source route rejects unsupported assumption deductions explicitly; Boolean
-and integer pins and rational/strict real bounds belong to the call scope. The
+The source route returns UNKNOWN/Unsupported for deduction scopes, extra CP
+components, finite tolerance acceptance and active finite event/seeding/scoring or
+incumbent-exchange hooks. Boolean and integer backend pins belong to the selected
+single strategy; common pins take precedence under the assumption merge contract.
+MIXED requires pins in the common invocation scope and explicitly declines nested
+backend pins. Rational/strict real bounds belong to the call scope. Every supplied
+node allowance must reference the same shared budget; competing ledgers decline. The
 source snapshot remains unchanged and can serve independent later invocations.
 
 SMT-LIB admission captures lexical function source terms in this neutral model and

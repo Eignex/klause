@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
@@ -109,11 +110,27 @@ fun OpenTheoryPipeline.execute(
     request: TranscendentalTheoryRequest,
     params: TranscendentalTheoryParams = TranscendentalTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
-): TranscendentalTheoryExecution = if (request.problem.hasObjective) {
+): TranscendentalTheoryExecution = if (request.problem.hasObjective || !params.supportsInvocation(engine)) {
     TranscendentalTheoryExecution(
         OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY), 0, false,
     )
 } else TranscendentalInvocation(request.problem, params, engine).execute()
+
+private fun TranscendentalTheoryParams.supportsInvocation(engine: FiniteEngine): Boolean {
+    val complete = strategy.backtrack
+    val local = strategy.localSearch
+    val traversal = engine in setOf(FiniteEngine.BACKTRACK, FiniteEngine.FIXED, FiniteEngine.MIXED)
+    val heuristic = engine in setOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS, FiniteEngine.MIXED)
+    if (complete.componentFactory != null || complete.toleranceCheck != null) return false
+    if (traversal && complete.onEvent != null) return false
+    if (heuristic && (local.onEvent != null || local.initialAssignment != null ||
+        local.pooledIncumbents != null || local.lsObjective != null)) return false
+    val scopes = listOf(strategy.assumptions, complete.assumptions, local.assumptions)
+    if (scopes.any { !it.deductions.isEmpty }) return false
+    if (engine == FiniteEngine.MIXED && (!complete.assumptions.isEmpty || !local.assumptions.isEmpty)) return false
+    val budgets = listOfNotNull(nodeBudget, complete.nodeBudget, local.nodeBudget)
+    return budgets.all { it === budgets.first() }
+}
 
 private class TranscendentalInvocation(
     private val source: TranscendentalProblem,
@@ -132,8 +149,12 @@ private class TranscendentalInvocation(
     private var decisions = 0L
 
     private fun assumptions(): TranscendentalCondition {
-        val pins = params.strategy.assumptions
-        require(pins.deductions.isEmpty) { "transcendental source assumptions require explicit pins" }
+        val backend = when (engine) {
+            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> params.strategy.backtrack.assumptions
+            FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> params.strategy.localSearch.assumptions
+            FiniteEngine.MIXED -> Assumptions.None
+        }
+        val pins = backend.mergedWith(params.strategy.assumptions)
         val integers = pins.ints.map { (id, value) ->
             require(id in source.integerCoordinates.indices) { "integer assumption id out of range" }
             source.integerCoordinates[id] to BigFraction.ofLong(value)
