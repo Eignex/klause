@@ -154,6 +154,8 @@ internal sealed interface SolvablePipeline {
     data class ExactTheorySatisfaction(
         val request: ExactTheorySatisfactionRequest,
         val render: (OpenTheoryAssignment) -> String,
+        val pipelineName: String = "exact-theory-satisfaction",
+        val declaredTheoryRoute: String? = null,
     ) : SolvablePipeline
 
     /** The ordinary finite-domain CP, LP, and search components. */

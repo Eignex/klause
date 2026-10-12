@@ -270,6 +270,8 @@ class Portfolio(
         }
     }
 
+    internal var exactLinearObjective: LinearObjective? = null
+
     /**
      * Branch-and-bound: run arms in scheduled segments, carrying one shared incumbent. Each segment streams
      * against its arm's own objective representation, sees the shared bound (backtrack prunes on it) and the
@@ -278,8 +280,6 @@ class Portfolio(
      * [MinimizeResult.BestFound]. `onImprovement` fires once per strict global improvement, tagged with the arm
      * that produced it, in the order the incumbent installed them.
      */
-    internal var exactLinearObjective: LinearObjective? = null
-
     override fun minimize(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,

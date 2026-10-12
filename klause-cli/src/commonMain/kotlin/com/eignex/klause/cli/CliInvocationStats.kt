@@ -38,6 +38,7 @@ internal fun cliInvocationStats(common: CommonOptions, pipeline: SolvablePipelin
             is SolvablePipeline.OpenTheory -> "open-theory"
             is SolvablePipeline.PolynomialTheory -> "polynomial-theory"
             is SolvablePipeline.NonlinearIntegerTheory -> "nonlinear-integer-theory"
+            is SolvablePipeline.ExactTheorySatisfaction -> pipeline.pipelineName
             is SolvablePipeline.Interrupted -> "interrupted"
             is SolvablePipeline.OpenLocalSearch -> "open-local-search"
             SolvablePipeline.Refuted -> "refuted"
@@ -46,6 +47,7 @@ internal fun cliInvocationStats(common: CommonOptions, pipeline: SolvablePipelin
             is SolvablePipeline.OpenTheory -> pipeline.request.route.name.lowercase()
             is SolvablePipeline.PolynomialTheory -> "exact_nra"
             is SolvablePipeline.NonlinearIntegerTheory -> "incomplete_nia"
+            is SolvablePipeline.ExactTheorySatisfaction -> pipeline.declaredTheoryRoute
             else -> null
         },
     )

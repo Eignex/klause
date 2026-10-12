@@ -2,6 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.formats.smtlib.SmtLibAdmission
+import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -108,7 +110,10 @@ class PolynomialStrategyAdaptersTest {
     }
     @Test
     fun `pure real heuristic arms repair coordinates before publishing algebraic witnesses`() {
-        val request = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))").pipelineRequest()
+        val input = assertIs<SmtLibInput.Polynomial>(SmtLibAdmission.parse(
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ))
+        val request = input.problem.pipelineRequest()
         val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
             localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 12), alnsIterations = 0,
         ))

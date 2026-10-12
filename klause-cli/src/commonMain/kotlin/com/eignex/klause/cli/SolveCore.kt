@@ -34,6 +34,7 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -203,7 +204,7 @@ internal object SolveCore {
                     timeout = deadlineCancel,
                     nodeBudget = nodeBudget,
                     randomSeed = takeOpenLongParam(common, "seed", nonNegative = true, signed = true)
-                        ?: common.randomSeed,
+                        ?: common.randomSeed ?: 0,
                     maxFlips = takeOpenLongParam(common, "max-flips", nonNegative = true) ?: Long.MAX_VALUE,
                     maxInstructions = takeOpenLongParam(common, "max-instructions", nonNegative = true),
                     alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
@@ -273,7 +274,7 @@ internal object SolveCore {
                     cancellation = deadlineCancel,
                     timeout = deadlineCancel,
                     randomSeed = takeOpenLongParam(common, "seed", nonNegative = true, signed = true)
-                        ?: common.randomSeed,
+                        ?: common.randomSeed ?: 0,
                     maxFlips = takeOpenLongParam(common, "max-flips", nonNegative = true) ?: Long.MAX_VALUE,
                     maxInstructions = takeOpenLongParam(common, "max-instructions", nonNegative = true),
                     alnsIterations = takeOpenIntParam(common, "alns-iterations", nonNegative = true) ?: 50,
