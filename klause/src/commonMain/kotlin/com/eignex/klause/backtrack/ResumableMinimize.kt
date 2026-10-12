@@ -28,7 +28,6 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -37,8 +36,9 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.objective.SingleIntObjective
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.SingleIntObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
@@ -48,9 +48,7 @@ import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
-import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.search.SearchComponentSet
-import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchLearnedConflict
@@ -64,9 +62,11 @@ import com.eignex.klause.solver.search.SearchRun
 import com.eignex.klause.solver.search.SearchRunDisposition
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunLifecycle
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
 import kotlin.coroutines.cancellation.CancellationException
@@ -791,11 +791,8 @@ internal class ResumableMinimize(
      *  to surface when this call installed it, else null. Admission — a finite score, and the certified
      *  continuous values only a leaf's residual LP can attach — is [sampleAdmission]'s to decide. */
     private fun recordIfImproving(sample: Sample, o: Double): MinimizeResult.WithSample? {
-        val exact = if (rebindable || discreteObjective) {
-            exactSourceObjective(objective, sample, params.toleranceCheck) ?: return null
-        } else {
-            null
-        }
+        val exact = exactSourceObjective(objective, sample, params.toleranceCheck)
+        if (rebindable && exact == null) return null
         if (rebindable && exact != null && !beatsExternalCutoff(exact, externalCutoff())) return null
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null

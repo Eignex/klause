@@ -62,9 +62,7 @@ fun FinitePipeline.portfolioExecutor(
         },
         onFault = onFault,
     ).also {
-        if (objective != null && (objective.realCoefficientValues.none { value -> value != 0.0 } ||
-            problem.fixedDiscreteSample() != null)
-        ) it.exactLinearObjective = objective
+        it.exactLinearObjective = objective
         it.reserveBeforeIncumbentOnly = true
         if (scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
             scenario.btPool == null && scenario.lsPool == null

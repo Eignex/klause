@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -242,4 +243,18 @@ class LpOnlyContinuousLeafTest {
         val r = assertIs<SolveResult.Unknown>(LocalSearchSolver(p.bake()).solve())
         assertEquals(TerminationReason.Unsupported, r.reason)
     }
+    @Test
+    fun `fractional leaf improvements retain exact ordering below floating precision`() {
+        val row = Linear(longArrayOf(-1), intArrayOf(0), doubleArrayOf(3.0), intArrayOf(0), LinearOp.EQ, 0)
+        val source = problem(1, arrayOf(IntDomain(0, 2)), 0.0, 1.0, row).bake()
+        val objective = LinearObjective(constant = 1L shl 62, realCoefficients = doubleArrayOf(-1.0))
+
+        val result = BacktrackSolver(source).minimize(objective,
+            BacktrackParams(randomSeed = 17, valueSelector = IndomainMin))
+
+        val sample = assertIs<MinimizeResult.Optimal>(result).sample
+        assertEquals(2L, sample.intValue(0))
+        assertEquals("2/3", sample.exactReals?.single().toString())
+    }
+
 }
