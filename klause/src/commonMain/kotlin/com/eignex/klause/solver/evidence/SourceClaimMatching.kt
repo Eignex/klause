@@ -14,6 +14,7 @@ internal fun sameSourceClaimKind(first: SourceClaim, second: SourceClaim): Boole
     is SourceClaim.Optimal -> second is SourceClaim.Optimal
     is SourceClaim.Limit -> second is SourceClaim.Limit
     is SourceClaim.Clause -> second is SourceClaim.Clause
+    is SourceClaim.Unbounded -> second is SourceClaim.Unbounded
     is SourceClaim.Ray -> second is SourceClaim.Ray
     is SourceClaim.Consequence -> second is SourceClaim.Consequence
     is SourceClaim.Extension -> second is SourceClaim.Extension
@@ -34,8 +35,11 @@ internal fun matchSourceClaims(
             matchValue(first.value, second.value, algebraic)
         is SourceClaim.Limit -> second is SourceClaim.Limit && matchSample(first.sample, second.sample, algebraic) &&
             matchValue(first.value, second.value, algebraic)
+        is SourceClaim.Unbounded -> second is SourceClaim.Unbounded &&
+            matchSample(first.sample, second.sample, algebraic)
         is SourceClaim.Clause -> second is SourceClaim.Clause && first.literals == second.literals
-        is SourceClaim.Ray -> second is SourceClaim.Ray && first.direction == second.direction &&
+        is SourceClaim.Unbounded -> second is SourceClaim.Unbounded
+    is SourceClaim.Ray -> second is SourceClaim.Ray && first.direction == second.direction &&
             matchSample(first.sample, second.sample, algebraic)
         is SourceClaim.Consequence -> second is SourceClaim.Consequence && first.inequality == second.inequality
         SourceClaim.Refutation -> second == SourceClaim.Refutation

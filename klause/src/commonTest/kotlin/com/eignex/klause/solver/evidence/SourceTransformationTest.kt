@@ -106,4 +106,16 @@ class SourceTransformationTest {
         assertIs<SourceEvidenceCheck.Unavailable>(SourceTransformationVerifier(source,
             target).refutation(transformation, evidence))
     }
+
+    @Test
+    fun `a transformation cannot accept an undeclared original invocation coordinate`() {
+        val scope = sourceScope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
+        val original = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
+        val reduced = SourceProofContext(targetScope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
+        val mapping = SourceTransformation(scope, targetScope,
+            mapOf(x to SourceAffineImage(mapOf(x to BigFraction.ONE))), emptyMap())
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceTransformationVerifier(original, reduced).verify(mapping))
+    }
+
 }
