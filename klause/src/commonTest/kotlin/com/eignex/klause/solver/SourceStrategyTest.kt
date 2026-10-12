@@ -21,6 +21,7 @@ import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.schema.FloatHandle
+import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
 import com.eignex.klause.simplex.exact.BigFraction
@@ -89,16 +90,15 @@ class SourceStrategyTest {
 
     @Test
     fun `schema chains preserve their shared exact product coordinates`() {
-        val x = FloatHandle("x", -2.0, 2.0)
-        val schema = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(-2.0, 2.0, 5),
-            "cube" to NamedConstraint((x * x * x) eq x),
-        ))
+        val schema = object : VariableSchema() {
+            val x by floatVar(-2.0, 2.0, 5)
+            val cube by constraint { (x * x * x) eq x }
+        }
 
         for (strategy in listOf(BacktrackSolver.source(schema), LocalSearchSolver.source(schema))) {
             val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve()).assignment
             val compiled = assertNotNull(strategy.compiledSchema)
-            val id = assertNotNull(compiled.sourceRealId(x))
+            val id = assertNotNull(compiled.sourceRealId(schema.x))
             val exact = assertNotNull(witness.algebraicRealValue(id.index))
 
             assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(0, -1, 0, 1), exact))
@@ -216,16 +216,76 @@ class SourceStrategyTest {
     }
 
     @Test
-    fun `integer only floating rows do not publish an unchecked finite witness`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 4)), arrayOf<Factor>(
-            Linear(intArrayOf(0), doubleArrayOf(0.1), intArrayOf(), doubleArrayOf(), LinearOp.EQ, 0.3),
-        ))
+    fun `deduction scopes explicitly decline on every source route`() {
+        val finite = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val open = Problem(0, 1, arrayOf(IntDomain(-3, 3)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
+        ), openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
+        val polynomial = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2, realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 0.0))
+        val assumptions = Assumptions.None.withTightenedMin(0, 1)
+        for (source in listOf(finite, open, polynomial)) {
+            for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
+                val common = PolynomialTheoryParams(strategy = PolynomialStrategyParams(assumptions = assumptions))
+                val native = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+                    backtrack = BacktrackParams(assumptions = assumptions),
+                    localSearch = LocalSearchParams(assumptions = assumptions),
+                ))
+                for (params in listOf(common, native)) {
+                    val result = strategy.solve(params)
 
-        for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
-            val result = strategy.solve()
-
-            assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(result).reason)
+                    assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(result).reason)
+                }
+            }
         }
+    }
+
+    @Test
+    fun `source optimization explicitly declines deduction scopes`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(-3, 3)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 42),
+        ), openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            assumptions = Assumptions.None.withIntHole(0, 0),
+        ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
+            val open = assertIs<OpenTheoryExecution.Optimize>(strategy.optimizeOpen(objective, params)).result
+            val polynomial = strategy.optimize(objective, params).result
+
+            assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryOptimum.Bounded>(open).reason)
+            assertEquals(TerminationReason.Unsupported,
+                assertIs<QuadraticOptimizationResult.Unknown>(polynomial).reason)
+        }
+    }
+
+    @Test
+    fun `source satisfaction declines tolerance acceptance before invoking the hook`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.3),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        var calls = 0
+
+        val result = BacktrackSolver.source(source).solve(BacktrackParams(toleranceCheck = { calls++; true }))
+
+        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `exact polynomial local search explicitly declines finite event hooks`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 0.0))
+        var calls = 0
+        val params = LocalSearchParams(onEvent = { calls++ })
+        val strategy = LocalSearchSolver.source(source)
+
+        val solve = strategy.solve(params)
+        val optimize = strategy.optimize(LinearObjective(realCoefficients = doubleArrayOf(0.0, 1.0)), params).result
+
+        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(solve).reason)
+        assertEquals(TerminationReason.Unsupported, assertIs<QuadraticOptimizationResult.Unknown>(optimize).reason)
+        assertEquals(0, calls)
     }
 
     @Test

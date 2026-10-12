@@ -55,8 +55,11 @@ Typed `BacktrackParams` and `LocalSearchParams` overloads retain their finite an
 polynomial controls. `PolynomialTheoryParams` supplies native polynomial limits and
 common pins; `TheoryParams` supplies open-linear limits. These are distinct work
 currencies. A source operation owns fresh private state; shared node allowances retain
-their identity. Unsupported open pins, extra CP components and finite-only hooks return
-`Unknown(Unsupported)` rather than losing their constraints or controls.
+their identity. Deduction scopes and CP tolerance acceptance explicitly decline because
+source execution requires exact coordinates and cannot discard restrictions. Open pins,
+extra open CP components and finite-only open hooks return `Unknown(Unsupported)`.
+Exact polynomial LS also declines finite seeding, incumbent exchange, custom scoring
+and event hooks that its native neighborhood cannot consume.
 
 `optimize` preserves the existing `QuadraticOptimizationExecution` surface through
 the shared exact affine or quadratic entry point. It supports bounded integer

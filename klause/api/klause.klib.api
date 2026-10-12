@@ -4723,12 +4723,12 @@ final class com.eignex.klause.backtrack/BacktrackSolver : com.eignex.klause.solv
     final fun samples(com.eignex.klause.backtrack/BacktrackParams): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.backtrack/BacktrackSolver.samples|samples(com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun solve(): com.eignex.klause.solver/SolveResult // com.eignex.klause.backtrack/BacktrackSolver.solve|solve(){}[0]
     final fun solve(com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver/SolveResult // com.eignex.klause.backtrack/BacktrackSolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
+
     final object Companion { // com.eignex.klause.backtrack/BacktrackSolver.Companion|null[0]
         final fun source(com.eignex.klause.compile/CompiledSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.backtrack/BacktrackSolver.Companion.source|source(com.eignex.klause.compile.CompiledSchema){}[0]
         final fun source(com.eignex.klause.ir/Problem): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.backtrack/BacktrackSolver.Companion.source|source(com.eignex.klause.ir.Problem){}[0]
         final fun source(com.eignex.klause.schema/VariableSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.backtrack/BacktrackSolver.Companion.source|source(com.eignex.klause.schema.VariableSchema){}[0]
     }
-
 }
 
 final class com.eignex.klause.backtrack/NodeBudget { // com.eignex.klause.backtrack/NodeBudget|null[0]
@@ -7944,12 +7944,12 @@ final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.
     final fun session(): com.eignex.klause.localsearch/LocalSearchSession // com.eignex.klause.localsearch/LocalSearchSolver.session|session(){}[0]
     final fun solve(): com.eignex.klause.solver/SolveResult // com.eignex.klause.localsearch/LocalSearchSolver.solve|solve(){}[0]
     final fun solve(com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/SolveResult // com.eignex.klause.localsearch/LocalSearchSolver.solve|solve(com.eignex.klause.localsearch.LocalSearchParams){}[0]
+
     final object Companion { // com.eignex.klause.localsearch/LocalSearchSolver.Companion|null[0]
         final fun source(com.eignex.klause.compile/CompiledSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.localsearch/LocalSearchSolver.Companion.source|source(com.eignex.klause.compile.CompiledSchema){}[0]
         final fun source(com.eignex.klause.ir/Problem): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.localsearch/LocalSearchSolver.Companion.source|source(com.eignex.klause.ir.Problem){}[0]
         final fun source(com.eignex.klause.schema/VariableSchema): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.localsearch/LocalSearchSolver.Companion.source|source(com.eignex.klause.schema.VariableSchema){}[0]
     }
-
 }
 
 final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klause.localsearch/LocalSearchState|null[0]

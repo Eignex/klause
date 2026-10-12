@@ -56,7 +56,6 @@ are work to close, not permanent exceptions to shared breadth or source checking
 |---|---|---|
 | Source-inexact open MPS models | Witness-only fallback has no runnable complete arm; BACKTRACK/FIXED return Unsupported | [#2654](https://github.com/Eignex/klause/issues/2654) |
 | Real linear objectives on polynomial models | Linear objective admission rejects costs accepted by an equivalent quadratic objective specification | [#2655](https://github.com/Eignex/klause/issues/2655) |
-| Public solver facades | Direct finite baking bypasses source services used by the shared pipeline | [#2656](https://github.com/Eignex/klause/issues/2656) |
 
 ## Finite and open models
 
