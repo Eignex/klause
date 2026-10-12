@@ -9,8 +9,11 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.AssembledSearchModel
+import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchBoolValue
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
@@ -20,9 +23,11 @@ import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchRestart
 import com.eignex.klause.solver.search.SearchRunEvent
+import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTheoryDecision
+import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.qflra.SourceBoundAtom
 import com.eignex.klause.theory.qflra.SourceBoundTerm
 import com.eignex.klause.util.Cancellation
@@ -35,6 +40,7 @@ internal class RetainedLinearQueries(
     private val model: Problem,
     private val params: TheoryParams,
     private val objective: LinearObjective?,
+    private val hints: (Cancellation, OpenTheorySolveState) -> SearchCandidateHints = { _, _ -> SearchCandidateHints.None },
     private val open: (Cancellation, OpenTheorySolveState) -> PlannedSearch?,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val state = OpenTheorySolveState(params)
@@ -46,7 +52,7 @@ internal class RetainedLinearQueries(
     private val marker = object : SearchTheoryDecision {}
     val work: Long get() = state.work.spent
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot(),
-        openTheoryClauses = planned?.session?.learnedClauseStats() ?: state.clauses)
+        openTheoryClauses = planned?.session?.learnedClauseStats() ?: state.clauses, openHints = state.hints)
     val exhausted: Boolean get() = !state.work.hasAllowance() ||
         state.work.snapshot().openTheoryChecks >= params.maxLeaves
 
@@ -89,10 +95,15 @@ internal class RetainedLinearQueries(
                 if (applied !is ComponentResult.Consistent) return applied.result()
             }
             val policy = cutoffPolicy(session, conditions.mapNotNull { it.cutoff }.minOrNull())
+            val branching = when (params.openBranching) {
+                OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
+                OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
+            }
             val run = session.openConditionedRun(model.numBoolVars,
                 SearchSolveParams(maxDecisions = state.remainingDecisions().coerceAtLeast(0),
                     restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never),
-                nodePolicy = policy)
+                nodePolicy = policy, booleanBranching = branching, candidateHints = hints(scope.stop, state),
+                observer = branching as? SearchRunObserver ?: SearchRunObserver.None)
             when (val event = run.next()) {
                 is SearchRunEvent.Satisfied -> {
                     val sample = event.model.sample()

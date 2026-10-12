@@ -32,7 +32,7 @@ class RetainedLinearQueriesTest {
     }
 
     @Test
-    fun `representation decline and cancellation leave no sibling bounds`() {
+    fun `an incomplete query leaves no sibling bounds`() {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val plan = model.componentPlan()
@@ -42,14 +42,16 @@ class RetainedLinearQueriesTest {
         val huge = BigFraction.of(parseBigInt("1" + "0".repeat(1300)), BIG_ONE)
 
         queries.use {
-            assertIs<ExactNeighborhoodResult.Undecided>(it.check(
-                ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to huge)), Cancellation.Never))
-            assertIs<ExactNeighborhoodResult.Undecided>(it.check(
-                ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()), Cancellation { true }))
-            val zero = mapOf(0 to BigFraction.ZERO)
-            val result = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+            for ((condition, stop) in listOf(
+                ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to huge)) to Cancellation.Never,
+                ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()) to Cancellation { true },
+            )) {
+                assertIs<ExactNeighborhoodResult.Undecided>(it.check(condition, stop))
+                val zero = mapOf(0 to BigFraction.ZERO)
+                val result = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
 
-            assertEquals(BigFraction.ZERO, assertIs<ExactNeighborhoodResult.Witness>(result).sample.exactReals?.single())
+                assertEquals(BigFraction.ZERO, assertIs<ExactNeighborhoodResult.Witness>(result).sample.exactReals?.single())
+            }
         }
     }
 
