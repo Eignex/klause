@@ -100,7 +100,9 @@ the interpretation of interrupted incumbents and unbounded witness objectives.
 and a `SourceValue` in original source objective units and direction. It carries
 no terminal optimization claim. Buffered competition protocols emit the witness
 alongside its exact objective through this adapter; MiniZinc retains its solution
-separators. SMT renders algebraic objectives with exact root terms.
+separators. SMT precedes each arithmetic model with `sat`, asserting feasibility
+without an optimization conclusion, and renders algebraic objectives with exact
+root terms. `optimizationStatus` and checked bound metadata remain terminal.
 
 `ArithmeticPublication` belongs to one CLI invocation. It suppresses repeated
 rendered witnesses with the same retained exact objective representation and

@@ -337,6 +337,8 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
         }
     }
 
+    override fun arithmeticWitnessStatus(): String = "sat"
+
     override fun formatArithmeticObjective(objective: SourceValue): String =
         when (objective) {
             is SourceValue.Algebraic -> smtAlgebraicValue(objective.value)
