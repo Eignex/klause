@@ -74,8 +74,15 @@ internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
     if (!isLazyReason(reason)) return reason
     val marker = requireNotNull(reason)
     if (lazyReasonMemo.containsKey(marker)) return lazyReasonMemo[marker]
+    val built = buildLazyReason(marker)
+    check(!isLazyReason(built)) { "a lazy reason must explain itself in literals" }
+    lazyReasonMemo[marker] = built
+    return built
+}
+
+private fun PropagationState.buildLazyReason(marker: IntArray): IntArray {
     val fid = marker[1]
-    val built = if (fid == EXTENDED) {
+    return if (fid == EXTENDED) {
         val count = marker[HEADER]
         val extra = marker.copyOfRange(HEADER + 1, HEADER + 1 + count)
         val base = reasonOf(marker.copyOfRange(HEADER + 1 + count, marker.size))
@@ -85,9 +92,6 @@ internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
         // fact) is an empty clause body, not the null that marks a decision.
         factorAt(fid).explain(this, fid, marker.copyOfRange(HEADER, marker.size), marker[2], marker[3]) ?: IntArray(0)
     }
-    check(!isLazyReason(built)) { "a lazy reason must explain itself in literals" }
-    lazyReasonMemo[marker] = built
-    return built
 }
 
 /**
