@@ -77,7 +77,9 @@ internal class QuadraticNeighborhoodCursor(
                 allowance.charge((nativeWork() - before).coerceAtLeast(0))
             }
             val improved = result is ExactNeighborhoodResult.Witness && accept(result.sample)
-            sink.ls.recordCompletion(result is ExactNeighborhoodResult.Refuted, result is ExactNeighborhoodResult.Undecided)
+            sink.ls.recordCompletion(
+                result is ExactNeighborhoodResult.Refuted, result is ExactNeighborhoodResult.Undecided,
+            )
             if (improved) radius = BigFraction.ONE else { radius += radius; stalls++ }
             if (adaptive) weights[operator] = weights[operator] * 0.8 + if (improved) 1.0 else 0.2
             sink.ls.recordWork(allowance.moves - initialMoves, 0, stalls)

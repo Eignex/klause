@@ -67,4 +67,21 @@ class PortfolioIncumbentsTest {
 
         assertTrue(requireNotNull(BigFraction.ofDouble(incumbents.bound())) >= value.rational!!)
     }
+
+    @Test
+    fun `algebraic telemetry retains a finite midpoint across wide isolating bounds`() {
+        val arithmetic = AlgebraicArithmetic()
+        val magnitude = BigFraction.of(parseBigInt("1" + "0".repeat(400)), bigIntOf(1))
+        val value = arithmetic.roots(RationalPolynomial(listOf(
+            magnitude.negated(), BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE,
+        ))).single()
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), algebraicReals = listOf(value))
+        val incumbents = PortfolioIncumbents.algebraic({ value }, arithmetic)
+
+        assertIs<Publication.Installed<Sample, AlgebraicReal>>(incumbents.exchange.offer(sample, value))
+
+        assertEquals(value, incumbents.exchange.current()?.objective)
+        assertTrue(requireNotNull(incumbents.projected()).objective.isFinite())
+    }
+
 }
