@@ -52,7 +52,9 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
 
     override fun objectiveEquals(
         sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
-    ): SourceEvidenceCheck = exact.objectiveEquals(sample, value, scope, cancellation)
+    ): SourceEvidenceCheck = if (source.affineObjectiveAvailable) {
+        exact.objectiveEquals(sample, value, scope, cancellation)
+    } else SourceEvidenceCheck.Unavailable("exact affine objective unavailable")
 
     override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
         val base = witness(claim.sample, scope, cancellation)
@@ -62,6 +64,9 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
     override fun derivation(
         claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
     ): SourceEvidenceCheck {
+        if (claim != SourceClaim.Refutation && !source.affineObjectiveAvailable) {
+            return SourceEvidenceCheck.Unavailable("exact affine objective unavailable")
+        }
         if ((claim == SourceClaim.Refutation || claim is SourceClaim.Bound) &&
             derivation is LinearPinnedRefutation
         ) {
@@ -125,12 +130,17 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
  * omitted nonlinear constraints or rounded source correspondence do not acquire authority here.
  */
 fun SourceProofContext.withLinearAuthority(): SourceProofContext = SourceProofContext(
-    scope, coordinates, premises, objective, objectiveConstant, LinearAuthoritySemantics(this),
+    scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant,
+    LinearAuthoritySemantics(this),
 )
 
 internal fun SourceProofContext.atScope(scope: SourceScope): SourceProofContext = SourceProofContext(
-    scope, coordinates, premises, objective, objectiveConstant, semanticsChecker,
+    scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant, semanticsChecker,
 )
+
+internal fun SourceProofContext.linearCoordinatesSupported(): Boolean = coordinates.groupBy { it.kind }.values.all {
+    it.map { coordinate -> coordinate.id }.sorted() == it.indices.toList()
+}
 
 internal fun SourceProofContext.numericCoordinates(): List<SourceCoordinate> = coordinates
     .filter { it.kind != SourceCoordinate.Kind.Boolean }.sortedWith(compareBy({ it.kind.ordinal }, { it.id }))
