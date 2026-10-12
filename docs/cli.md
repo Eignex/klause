@@ -94,6 +94,23 @@ See [SMT-LIB result semantics](formats/smtlib.md) for the status contract and
 [saved benchmark results](../klause-bench/README.md#saved-results) for proof credit and
 the interpretation of interrupted incumbents and unbounded witness objectives.
 
+## Arithmetic publication adapter
+
+`OutputProtocol.onArithmeticIncumbent` accepts an already checked source witness
+and a `SourceValue` in original source objective units and direction. It carries
+no terminal optimization claim. Buffered competition protocols emit the witness
+alongside its exact objective through this adapter; MiniZinc retains its solution
+separators. SMT renders algebraic objectives with exact root terms.
+
+`ArithmeticPublication` belongs to one CLI invocation. It suppresses repeated
+rendered witnesses with the same retained exact objective representation and
+counts successful emissions. Output failure propagates to the caller. Quadratic
+terminal metadata is delivered separately from the incumbent, preserving checked
+bounds and nonattainment status without repeating an emitted model. The adapter
+uses retained scalar metadata and performs no solver work or candidate admission.
+[Portfolio admission](solver/portfolio.md) owns acceptance;
+[source values](model.md#published-assignments-and-objectives) own exact payloads.
+
 ## Flags
 
 Solver-control flags are common to **every** mode:

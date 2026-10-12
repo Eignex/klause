@@ -8,11 +8,17 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.ValSelectorKind
 import com.eignex.klause.solver.pipeline.VarSelectorKind
 import com.eignex.klause.solver.pipeline.ineffectiveNumerics
+import com.eignex.klause.solver.pipeline.minimize
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.parseBigInt
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -21,10 +27,113 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModeTest {
+
+    @Test
+    fun `arithmetic SMT witnesses stream before terminal proof status`() {
+        val output = SmtLibOutput()
+        val publication = ArithmeticPublication(output)
+        val model = "(\n  (define-fun x () Real (/ 1.0 3.0))\n)"
+
+        val progress = capture {
+            output.begin(optimize = true, maximize = false)
+            publication.publish(model, SourceValue.Rational(BigFraction.ONE * BigFraction.ofLong(3).reciprocal()))
+        }
+        val terminal = capture {
+            publication.publish(model, SourceValue.Rational(BigFraction.ONE * BigFraction.ofLong(3).reciprocal()))
+            output.onComplete(Verdict.OPTIMAL)
+        }
+
+        assertEquals("; objective=1/3\n$model\n", progress)
+        assertEquals("sat\n; optimizationStatus=optimal\n", terminal)
+    }
+
+    @Test
+    fun `arithmetic wide integer objectives retain original maximize units`() {
+        val output = SmtLibOutput()
+        val publication = ArithmeticPublication(output)
+        val value = BigFraction.of(parseBigInt("123456789012345678901234567890"), BIG_ONE)
+        val model = "(\n  (define-fun x () Int $value)\n)"
+
+        val progress = capture {
+            output.begin(optimize = true, maximize = true)
+            publication.publish(model, SourceValue.Rational(value))
+        }
+
+        assertEquals("; objective=$value\n$model\n", progress)
+    }
+
+    @Test
+    fun `arithmetic interrupted output retains its emitted witness`() {
+        val output = SmtLibOutput()
+        val publication = ArithmeticPublication(output)
+        val model = "(\n  (define-fun x () Int 2)\n)"
+
+        val progress = capture {
+            output.begin(optimize = true, maximize = false)
+            publication.publish(model, SourceValue.Rational(BigFraction.ofLong(2)))
+        }
+        val terminal = capture { output.onComplete(Verdict.BEST_FOUND) }
+
+        assertTrue(model in progress, progress)
+        assertEquals("sat\n; optimizationStatus=best-found\n", terminal)
+    }
+
+    @Test
+    fun `arithmetic algebraic publication separates an actual source optimum from its witness`() {
+        val source = File.createTempFile("stream-root", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (minimize x)")
+            deleteOnExit()
+        }
+        val pipeline = assertIs<SolvablePipeline.QuadraticTheory>(
+            SmtLibMode.newSession().load(source.absolutePath, CommonOptions()).pipeline,
+        )
+        val request = assertIs<QuadraticRequest.Polynomial>(pipeline.request)
+        val result = OpenTheoryPipeline.minimize(request.request, pipeline.objective, engine = FiniteEngine.BACKTRACK)
+            .result
+        val point = assertIs<QuadraticOptimizationResult.Optimal>(result).incumbent
+        val model = pipeline.render(point.sample)
+        val output = SmtLibOutput()
+        val publication = ArithmeticPublication(output)
+
+        val progress = capture {
+            output.begin(optimize = true, maximize = false)
+            publication.publish(model, SourceValue.Algebraic(point.value))
+        }
+        val terminal = capture {
+            publication.quadratic(model, result)
+            output.onComplete(Verdict.OPTIMAL)
+        }
+
+        assertTrue("; objective=(root-obj (+ (- 2) (* 1 (^ x 2))) 2)" in progress.lines(), progress)
+        assertTrue(model in progress, progress)
+        assertFalse("optimizationStatus" in progress, progress)
+        assertFalse("; objective=" in terminal, terminal)
+        assertFalse("define-fun" in terminal, terminal)
+        assertTrue("; objectiveBound=(root-obj (+ (- 2) (* 1 (^ x 2))) 2)" in terminal.lines(), terminal)
+        assertTrue("; optimizationStatus=optimal" in terminal.lines(), terminal)
+    }
+
+    @Test
+    fun `arithmetic FlatZinc publication keeps its solution and terminal separators`() {
+        val output = MiniZincOutput()
+        val publication = ArithmeticPublication(output)
+
+        val progress = capture {
+            publication.publish("x = 1;\n----------\n", SourceValue.Rational(BigFraction.ONE))
+        }
+        val terminal = capture {
+            publication.publish("x = 1;\n----------\n", SourceValue.Rational(BigFraction.ONE))
+            output.onComplete(Verdict.OPTIMAL)
+        }
+
+        assertEquals("% objective=1\nx = 1;\n----------\n", progress)
+        assertEquals("==========\n", terminal)
+    }
 
     @Test
     fun `SMT quadratic optimum reports an exact incumbent and certified bound`() {

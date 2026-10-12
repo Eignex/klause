@@ -14,6 +14,7 @@ import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -22,9 +23,9 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -562,6 +563,8 @@ internal interface OutputProtocol {
     fun onSolution(rendered: String, objective: Long?, continuousObjective: Double? = null)
 
     fun onExactSolution(rendered: String, objective: BigFraction)
+
+    fun onArithmeticIncumbent(rendered: String, objective: SourceValue)
     fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
         rendered?.let { onSolution(it, null) }
     }
