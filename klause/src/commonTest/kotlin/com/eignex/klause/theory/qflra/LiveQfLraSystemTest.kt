@@ -1,7 +1,5 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.solver.search.SourceBoundTerm
-import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
@@ -25,6 +23,8 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
 import kotlin.test.Test
 import kotlin.test.assertEquals

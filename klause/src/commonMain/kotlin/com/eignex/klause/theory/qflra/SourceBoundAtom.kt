@@ -7,9 +7,9 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchTheoryAtom
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SearchValueKey
+import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundAtom as SharedSourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundLimits as SharedSourceBoundLimits
-import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm as SharedSourceBoundTerm
 
 /** Compatibility coefficient over a source integer or real variable id. */

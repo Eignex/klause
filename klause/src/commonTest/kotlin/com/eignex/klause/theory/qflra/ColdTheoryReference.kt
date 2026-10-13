@@ -1,6 +1,5 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -32,6 +31,7 @@ import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
+import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext

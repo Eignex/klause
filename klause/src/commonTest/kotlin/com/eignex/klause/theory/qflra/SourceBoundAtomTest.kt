@@ -6,18 +6,18 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
-import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.solver.search.SourceBoundAtom as SharedSourceBoundAtom
-import com.eignex.klause.solver.search.SourceBoundTerm as SharedSourceBoundTerm
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
+import com.eignex.klause.solver.search.SourceBoundAtom as SharedSourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundTerm as SharedSourceBoundTerm
 
 class SourceBoundAtomTest {
     @Test
