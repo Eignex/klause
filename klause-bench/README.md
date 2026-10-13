@@ -827,8 +827,8 @@ the containing allowance. Neither control may publish a terminal proof after dec
 Vendored inputs are retrieved at the recorded revision; original MIPLIB3 inputs
 are retrieved separately. All source hashes must match. `--source-root` instead
 reads original uncompressed inputs named `<sourceHashes.model>.txt` from a supplied
-directory, allowing the same checks without network retrieval. MIPLIB 2003, 2010
-and 2017 records require this hash-matched source directory and use the same exact
+directory, allowing the same checks without network retrieval. MIPLIB 2003, 2010,
+2017 and OR-Library MPS records require this hash-matched source directory and use the same exact
 row, integrality, objective and source-tolerance checks.
 The five SMT corpus suites require this directory and their hash-matched original
 bytes; they do not fetch a source by corpus path. Other suites are declined.

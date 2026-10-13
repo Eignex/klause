@@ -16,7 +16,7 @@ import z3
 
 SMT_CORPUS_SUITES = frozenset(("smtlib-qfidl", "smtlib-qflia", "smtlib-qflira", "smtlib-qflra", "smtlib-qfrdl"))
 SMT_SUITES = SMT_CORPUS_SUITES | {"smtlib-core"}
-MPS_CORPUS_SUITES = frozenset(("miplib2003", "miplib2010", "miplib2017"))
+MPS_CORPUS_SUITES = frozenset(("miplib2003", "miplib2010", "miplib2017", "orlib"))
 SOURCE_SUITES = SMT_SUITES | MPS_CORPUS_SUITES | {"mps-core", "miplib3"}
 
 
