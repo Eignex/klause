@@ -623,6 +623,15 @@ python3 klause-bench/tools/verify_source_results.py /path/to/cases.json \
   --output /path/to/source-checks.json
 ```
 
+`bench.profile.SourceRecordCheck` runs this verifier on saved records through an
+AWS lab profile without rerunning the solver. Pass `bundle=<https URL>` and
+`sha256=<compressed SHA-256>` for a gzip JSON object containing `cases` (the case
+array) and `sources` (original source SHA-256 keys with base64 original bytes).
+It checks bundle/source identities, provisions the pinned checker dependencies,
+and retains checker logs, versions and a checked prefix on failure under `$OUT`.
+Original unknown records retain their no-claim outcome; reference agreement does
+not independently verify an exported proof.
+
 Inputs can be JSON, gzip or xz; `--records-root` selects `cases/<index>/record.json`
 instead of embedded records. SMT models must cover source sorts and satisfy all
 original constraints. MPS points must cover every column with integral integer
