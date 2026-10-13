@@ -32,6 +32,23 @@ import kotlin.test.assertIs
 class PortfolioEvidenceTest {
 
     @Test
+    fun `a native witness without a publication still satisfies its producer restrictions`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray())
+        val model = ModelIdentity.of(source)
+        val plan = source.prepareExecutionPlan()
+        val containing = EngineInvocation(plan, model)
+        val producer = EngineInvocation(plan, model, executionAssumptions = Assumptions(bools = mapOf(0 to true)))
+        val point = Sample(booleanArrayOf(false), longArrayOf())
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
+            .bindEvidence(model).bindInvocation(producer)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
+
+        val checked = verifier.witness(worker, point, null)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
     fun `portfolio admission consumes a restricted native witness publication`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))

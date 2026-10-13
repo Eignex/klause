@@ -202,6 +202,9 @@ valid cutoff; metadata alone cannot replace that check.
 verifier with the containing runtime, capture scope and cancellation. Producer
 conditions and point/value matching therefore remain part of witness admission.
 Legacy witness tags supply no additional authority to its installed source checker.
+Witness admission checks the worker's actual restrictions even when the native
+sample carries no publication certificate, alongside the containing query and
+installed source checker.
 
 `CompletedEngineResult` retains an actual ordinary completed result and its source
 binding for the completion-taking worker issuance hook. `EngineInvocation` retains
