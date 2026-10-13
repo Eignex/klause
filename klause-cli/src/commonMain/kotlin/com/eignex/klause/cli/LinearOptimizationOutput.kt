@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
+import com.eignex.klause.solver.result.LpStats
 
 internal fun reportLinearOptimization(
     result: LinearOptimizationResult,
@@ -13,7 +14,10 @@ internal fun reportLinearOptimization(
     statistics: Boolean,
     routingElapsedMs: Long,
     completePool: Boolean,
+    routingLpStats: LpStats = LpStats(),
+    budgetExhausted: (Boolean) -> Boolean = { it },
 ) {
+    val stats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
     val accepted = result.incumbent?.let { point ->
         result.value?.let { publication.publish(render(point), SourceValue.Rational(it)) } ?: false
     } ?: true
@@ -26,10 +30,11 @@ internal fun reportLinearOptimization(
         SourceClaim.Refutation -> Verdict.UNSATISFIABLE
         else -> if (result.incumbent != null) Verdict.BEST_FOUND else Verdict.UNKNOWN
     }
-    output.onVerdictContext(VerdictContext(terminationReason = result.reason, completePool = completePool))
+    output.onVerdictContext(VerdictContext(budgetExhausted = budgetExhausted(stats.run.timedOut),
+        terminationReason = result.reason, completePool = completePool))
     if (accepted) output.onLinearResult(result)
     output.onComplete(verdict)
     if (statistics) {
-        output.onStatistics(result.stats, result.stats.run.wallMs + routingElapsedMs, publication.solutions)
+        output.onStatistics(stats, stats.run.wallMs + routingElapsedMs, publication.solutions)
     }
 }

@@ -22,6 +22,7 @@ import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OpenBranching
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -1027,7 +1028,7 @@ private const val MIB = 1024L * 1024L
 private fun reportOpenTheoryOptimum(
     result: OpenTheoryOptimum,
     maximize: Boolean,
-    render: (com.eignex.klause.solver.pipeline.OpenTheoryAssignment) -> String,
+    render: (OpenTheoryAssignment) -> String,
     statistics: Boolean,
     output: OutputProtocol,
     routingLpStats: LpStats,
@@ -1036,6 +1037,11 @@ private fun reportOpenTheoryOptimum(
     publication: ArithmeticPublication,
     budgetExhausted: (Boolean) -> Boolean,
 ) {
+    result.linearResult?.let { linear ->
+        reportLinearOptimization(linear, { render(OpenTheoryAssignment.Sampled(it)) }, output, publication,
+            statistics, routingElapsedMs, completePool, routingLpStats, budgetExhausted)
+        return
+    }
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
 
     fun solution(rendered: String, value: BigFraction?): Boolean {
