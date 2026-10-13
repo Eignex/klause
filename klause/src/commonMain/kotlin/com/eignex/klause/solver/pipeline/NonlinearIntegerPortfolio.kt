@@ -47,12 +47,12 @@ internal class NonlinearIntegerPortfolio(
                     maximumCandidates = slot.nativeAllowance(params.maximumCandidates),
                     maximumMoves = slot.heuristicAllowance(params.maximumMoves), nodeBudget = slot.nodeBudget,
                 )
-                val engine = when (arm) {
+                val selected = when (arm) {
                     0 -> FiniteEngine.BACKTRACK
                     1 -> FiniteEngine.LOCAL_SEARCH
                     else -> FiniteEngine.ALNS
                 }
-                val worker = NonlinearIntegerInvocation(request, controls, engine, binding)
+                val worker = NonlinearIntegerInvocation(request, controls, selected, binding)
                 workers += worker
                 slot.own(AutoCloseable { native.observe(worker.nativeStats) })
                 worker.worker(arm, slot).bindInvocation(binding)
