@@ -69,6 +69,20 @@ class QuadraticCertificateTest {
     }
 
     @Test
+    fun `a native quadratic certificate cannot bind another model objective`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray())
+        val objective = QuadraticObjectiveSpec(emptyList())
+        val invocation = QuadraticEngineInvocation(QuadraticEngineSource.ExactIr(model), objective,
+            ObjectiveSense.MINIMIZE, SourceCondition())
+        val foreign = ModelIdentity.of(model, QuadraticObjectiveSpec(emptyList()))
+
+        assertFailsWith<IllegalArgumentException> {
+            QuadraticCertificate.engine(foreign, invocation, QuadraticClaim.Infeasible,
+                SourceDerivation.Unavailable("source traversal capture unavailable"))
+        }
+    }
+
+    @Test
     fun `a native quadratic certificate matches another binding of the same invocation`() {
         val model = Problem(0, 0, emptyArray(), emptyArray())
         val objective = QuadraticObjectiveSpec(emptyList())

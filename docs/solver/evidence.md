@@ -134,7 +134,7 @@ separate from an optional original-source revision. `Problem.quadraticSourceResu
 binds capture to that actual original object and objective; an unrelated equal-shaped
 model or weaker invocation cannot replace it. Recapture preserves the native payload.
 Native certificate construction requires its engine identity to name the same source
-object. Invocation matching compares that object, objective, direction and explicit
+object and objective. Invocation matching compares that object, objective, direction and explicit
 conditions; it supplies no independent derivation coverage. An affine prepared operation
 also retains its actual immutable `LinearObjective` when the executed quadratic
 view equals its lossless normalization and preserves its original direction.
@@ -175,6 +175,16 @@ source checker. A more restricted worker can supply a feasible point to the cont
 query after those checks; its point supplies no global bound. Cancellation or
 unavailable source validation withholds admission. Uncaptured publications cannot
 gain independent source derivation coverage from their native type.
+
+`QuadraticWitnessPublication` retains the actual native quadratic invocation,
+original source point and exact objective value during search. Its checker compares
+the source object, objective and direction, matches the published point and value,
+checks both producer and consumer conditions, invokes the installed original-source
+witness checker, and evaluates the original objective exactly. A restricted point
+can satisfy a containing query after both condition checks. Generic model admission
+withholds this publication because it lacks the quadratic source checker. The native
+carrier has no independent derivation capture or invented revision; its producer and
+consumer migration remains separate from its typed transport contract.
 
 `PortfolioWorker.bindSharingInvocation` binds the containing pool query separately
 from the worker's actual runtime. A restricted worker cannot select the containing
