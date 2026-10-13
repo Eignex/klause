@@ -67,6 +67,19 @@ object DiffnNeighborhoodProbe {
         val execution = parseFlatZincExecution(fzn.readText())
         val program = execution.program
         require(program.problem.numRealVars == 0 && program.floatVarsByName.isEmpty())
+        out.resolve("variable-map.json").writeText(buildJsonObject {
+            put("integers", buildJsonObject { for ((name, v) in program.intVarsByName) put(name, v) })
+            put("booleans", buildJsonObject { for ((name, v) in program.boolVarsByName) put(name, v) })
+            put("arrays", buildJsonObject {
+                for ((name, array) in program.arraysByName) {
+                    if (array !is FlatZincArray.Vars) continue
+                    put(name, buildJsonObject {
+                        put("kind", array.elementKind.name)
+                        put("variables", buildJsonArray { for (v in array.varIds) add(kotlinx.serialization.json.JsonPrimitive(v)) })
+                    })
+                }
+            })
+        }.toString() + "\n")
         val directive = program.solve
         val objectiveName = when (directive) {
             is SolveDirective.Minimize -> directive.objVar.also { require(directive.kind == SolveDirective.ObjKind.Int) }
