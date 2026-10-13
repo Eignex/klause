@@ -197,3 +197,11 @@ Proposal and instruction caps divide among heuristic workers; completion work al
 charges their instruction ledger. Zero proposal, instruction or native work
 allowance prevents a heuristic completion. Timeout and external cancellation retain
 their separate reasons.
+
+[Transcendental execution](../theories/transcendental.md#state-and-resources) retains
+private source services in shared invocation slots. Slot native reservations and the
+containing synchronized meter cover enclosure, algebraic, relaxation and original-source
+checking cumulatively. Complete segment work includes native charges and decisions;
+heuristic completion retains the exact-neighborhood instruction conversion. Complete
+native queries can overrun slices while retaining whole-invocation cancellation. A
+neighborhood slice interruption has no source-refutation authority.

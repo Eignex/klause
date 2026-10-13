@@ -45,10 +45,12 @@ symbolic exp/log/sin/cos expressions with existing rational/algebraic leaves.
 
 LS and ALNS consume `ExactNeighborhoodCompletion` and the shared exact-neighborhood
 move owner. Their rational centers and windows are candidate restrictions. Their
-completion failures have neighborhood authority only. MIXED reserves one quarter
-of remaining native work and wall time for adaptive neighborhoods, then permits
-traversal under the containing remainder. Checked witnesses can be published by
-any strategy. Heuristic failure cannot publish whole-source UNSAT.
+completion failures have neighborhood authority only. MIXED supplies retained complete,
+LS and ALNS recipes to `PortfolioInvocation`. Explicit cores materialize private
+replicas and use its shared lanes, slot seeds, quotas, admission and cleanup.
+Single-arm execution at one core and FIXED keep their standalone behavior; FIXED
+does not replicate. Checked witnesses can be published by any strategy.
+Heuristic failure cannot publish whole-source UNSAT.
 
 ## Results and limits
 
@@ -67,14 +69,33 @@ exported transcendental proof checker.
 ## State and resources
 
 Each pipeline call captures its source conditions and creates fresh mutable theory
-and strategy state. One cumulative native meter covers enclosure, algebraic,
+and strategy state. A shared invocation plan owns its source coordinate mapping and
+satisfaction-only capabilities. Every materialized slot owns its service and retained
+traversal or neighborhood; no native workspace crosses workers. Checked publication
+envelopes retain that actual invocation and immutable symbolic coordinates. A fresh
+invocation plan prevents a point checked under another call's strict real restrictions
+from being admitted by identity alone.
+
+One cumulative native meter covers enclosure, algebraic,
 relaxation and source-check work. Queries, repairs, branches and retractions do not
-renew it. Traversal uses the smaller CP decision/instruction allowance. Native work is
+renew it. Parallel aggregation serializes charges to the containing caller meter.
+The complete family reserves three quarters of a finite native allowance, and LS/ALNS
+split the remainder. Complete-only and heuristic-only invocations divide the whole
+allowance among their materialized slots; unused reservations are not transferred.
+Slots also divide complete decision/instruction caps and heuristic move/instruction
+caps. Explicit parallel lanes retain persistent solve-wide node quotas.
+Traversal uses the smaller CP decision/instruction allowance. Native work is
 reported separately from strategy nodes and moves, and
 each arithmetic charge reaches the containing caller meter once.
 
-Strategy cancellation reaches active native completion through the shared search
-context or neighborhood token. Cancellation, timeout, work allowance, bit limits and polynomial allocation limits
+Complete slices pause at traversal checkpoints, retaining the pending alternative,
+component conditions and cumulative arithmetic charges. Complete native queries are
+atomic with respect to slices; the counted segment includes native work and decisions,
+and a query can overrun the segment. Neighborhood slices retain centers, random state,
+radius and weights; an interrupted neighborhood check remains undecided.
+Whole-invocation and backend cancellation reach active native completion through the
+shared search context or neighborhood token. Closing releases retained traversal and
+neighborhood state; completed immutable samples remain readable. Cancellation, timeout, work allowance, bit limits and polynomial allocation limits
 cannot produce partial certificates. Required representation declines remain
 visible. Zero native work prevents entry. A checked witness remains valid after
 subsequent interruption. Published immutable values retain no invocation owner.
