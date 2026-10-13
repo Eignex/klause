@@ -122,6 +122,48 @@ class BooleanSourceCheckTest(unittest.TestCase):
 
         self.assertIn('error', result[0])
 
+    def test_wbo_objective_charges_only_violated_soft_relations(self):
+        sources = [
+            'soft: 9; [5] +1 x1 >= 1; [3] +1 ~x1 <= 0; +1 x2 >= 1;',
+            'soft:; [5] +1 x1 = 1; [3] +1 ~x1 >= 1; +1 x2 = 1;',
+        ]
+        for source in sources:
+            with self.subTest(source=source):
+                case = copy.deepcopy(self.case)
+                case['problem']['format'] = 'OPB'
+                case['record'].update(finalWitness='v -x1 x2', exactObjective='5' if 'soft:;' in source else '8')
+                with mock.patch.object(proof_check, 'source', return_value=source):
+                    result = proof_check.check(case, Path('.'))
+                self.assertEqual(result['objective'], int(case['record']['exactObjective']))
+                self.assertEqual(result['witness'], 'source feasible')
+
+    def test_wbo_soft_top_is_a_strict_hard_cost_ceiling(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(finalWitness='v -x1 x2', exactObjective='5')
+        source = 'soft: 5; [5] +1 x1 >= 1; +1 x2 >= 1;'
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check_cases([case], Path('.'))
+        self.assertIn('WBO soft top exceeded', result[0]['error'])
+
+    def test_wbo_proof_excludes_better_original_weighted_violations(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(proven=True, finalWitness='v x1 -x2', exactObjective='3')
+        source = 'soft: 9; [5] +1 x1 >= 1; [3] +1 x2 >= 1; +1 x1 +1 x2 <= 1;'
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check(case, Path('.'))
+        self.assertEqual(result['proof'], 'strictly better source objective excluded')
+
+    def test_suboptimal_wbo_witness_cannot_certify_optimum(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(proven=True, finalWitness='v -x1 x2', exactObjective='5')
+        source = 'soft: 9; [5] +1 x1 >= 1; [3] +1 x2 >= 1; +1 x1 +1 x2 <= 1;'
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check_cases([case], Path('.'))
+        self.assertIn('source counterexample', result[0]['error'])
+
     def test_nonlinear_opb_source_is_declined(self):
         case = copy.deepcopy(self.case)
         case['problem']['format'] = 'OPB'

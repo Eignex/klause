@@ -917,10 +917,12 @@ function/sort declarations are rejected rather than guessed. The verifier is
 independent of paired timing analysis and Klause's internal certificates.
 
 [verify_boolean_source_results.py](tools/verify_boolean_source_results.py) checks
-`DIMACS`, `WCNF` and linear `OPB` records against original source bytes in that same
+`DIMACS`, `WCNF` and linear `OPB`/WBO records against original source bytes in that same
 hash-named directory. It accepts complete signed-literal assignments, OPB variable
 names and WCNF bitstrings. Clauses, hard weights, Boolean integrality and integer
-objectives use exact arithmetic. UTF-8 comments preserve original byte hashes.
+objectives use exact arithmetic. WBO checks evaluate weighted soft-relation
+violations and enforce the strict soft-top ceiling on that violation cost. UTF-8
+comments preserve original byte hashes.
 Linear OPB bodies can omit the variable-count comment; their range is inferred
 from referenced indices. Nonlinear or unsupported syntax is declined.
 

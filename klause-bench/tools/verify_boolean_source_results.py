@@ -120,11 +120,24 @@ def opb(text):
     parts = ' '.join((line for line in text.splitlines() if not line.lstrip().startswith('*'))).split(';')
     objective = None
     rows = []
+    soft_rows = []
+    top = None
     for part in parts:
         part = part.strip()
         if not part:
             continue
+        if part.startswith('soft:'):
+            match = re.fullmatch(r'soft:\s*([+-]?\d+)?\s*', part)
+            assert match, 'unsupported WBO soft header'
+            top = int(match[1]) if match[1] is not None else None
+            continue
+        soft_weight = None
+        if part.startswith('['):
+            match = re.fullmatch(r'\[([+]?\d+)\]\s*(.*)', part)
+            assert match, 'unsupported WBO weight'
+            soft_weight, part = int(match[1]), match[2]
         if part.startswith('min:'):
+            assert soft_weight is None, 'weighted objective declaration'
             assert objective is None
             expression = part[4:]
             rhs = None
@@ -140,12 +153,19 @@ def opb(text):
         assert all((size is None or 1 <= index <= size for _, index, _ in terms))
         if relation == 'min':
             objective = terms
-        else:
+        elif soft_weight is None:
             rows.append((terms, relation, rhs))
+        else:
+            soft_rows.append((soft_weight, terms, relation, rhs))
     if size is None:
         terms = (objective or []) + [term for row, _, _ in rows for term in row]
+        terms += [term for _, row, _, _ in soft_rows for term in row]
         size = max((index for _, index, _ in terms), default=0)
-    return (size, objective, rows)
+    return (size, objective, rows, soft_rows, top)
+
+
+def relation_holds(value, relation, bound):
+    return value >= bound if relation == ">=" else value <= bound if relation == "<=" else value == bound
 
 
 def integer_objective(record):
@@ -171,7 +191,7 @@ def check(case, source_root):
     if weighted or is_opb:
         assert not r.get('maximize', False), 'source objective orientation differs'
     if is_opb:
-        size, objective, rows = opb(text)
+        size, objective, rows, soft_rows, top = opb(text)
 
         def value(terms, values):
             return sum((c * (not values[i] if neg else values[i]) for c, i, neg in terms))
@@ -183,7 +203,11 @@ def check(case, source_root):
             for terms, rel, rhs in rows:
                 n = value(terms, values)
                 assert n >= rhs if rel == '>=' else n <= rhs if rel == '<=' else n == rhs
-            cost = value(objective, values) if objective is not None else None
+            soft_cost = sum(weight for weight, terms, rel, rhs in soft_rows
+                            if not relation_holds(value(terms, values), rel, rhs))
+            if top is not None and soft_rows:
+                assert soft_cost < top, 'WBO soft top exceeded'
+            cost = (value(objective or [], values) + soft_cost) if objective is not None or soft_rows else None
         else:
             cost = 0
             for weight, literals in clauses:
@@ -218,10 +242,13 @@ def check(case, source_root):
         def expression(terms):
             return z3.Sum([z3.If(z3.Not(variables[i]) if neg else variables[i], c, 0) for c, i, neg in terms])
         for terms, rel, rhs in rows:
-            e = expression(terms)
-            solver.add(e >= rhs if rel == '>=' else e <= rhs if rel == '<=' else e == rhs)
+            solver.add(relation_holds(expression(terms), rel, rhs))
+        soft_cost = z3.Sum([z3.If(relation_holds(expression(terms), rel, rhs), 0, weight)
+                            for weight, terms, rel, rhs in soft_rows])
+        if top is not None and soft_rows:
+            solver.add(soft_cost < top)
         if r['feasible'] is True:
-            solver.add(expression(objective) < integer_objective(r))
+            solver.add(expression(objective or []) + soft_cost < integer_objective(r))
     else:
         soft = []
         for weight, literals in clauses:
