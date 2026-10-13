@@ -24,13 +24,20 @@ object SourceRecordCheck {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val bundleOptions = options.keys - setOf("witnessOnly", "catalog")
+        val bundleOptions = options.keys - setOf("checker", "witnessOnly", "catalog")
         require(bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256")) {
-            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest>"
+            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest> and checker=source|boolean"
         }
         require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
         val witnessOnly = options["witnessOnly"] == "true"
         require(options["catalog"] == null || options["catalog"] == "true")
+        val checker = when (options["checker"] ?: "source") {
+            "source" -> "verify_source_results.py"
+            "boolean" -> "verify_boolean_source_results.py"
+            else -> error("checker must be source or boolean")
+        }
+        require(!witnessOnly || checker == "verify_source_results.py") { "witnessOnly requires the source checker" }
+
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val root = File(System.getProperty("klause.workspace.root", "."))
         val bytes = options["input64"]?.let { encoded ->
@@ -80,16 +87,21 @@ object SourceRecordCheck {
         execute(log, python, "-m", "pip", "install", "-r", tools.resolve("requirements-source-checks.txt").absolutePath)
         execute(out.resolve("checker-dependencies.txt"), python, "-m", "pip", "freeze")
         out.resolve("checker-tool-hashes.json").writeText(buildJsonObject {
-            for (name in listOf("verify_source_results.py", "requirements-source-checks.txt")) {
+            for (name in listOf(checker, "requirements-source-checks.txt")) {
                 put(name, sha(tools.resolve(name).readBytes()))
             }
         }.toString() + "\n")
         execute(out.resolve("checker-runtime.txt"), python, "--version")
-        execute(out.resolve("checker.log"), python, tools.resolve("verify_source_results.py").absolutePath,
-            cases.absolutePath, "--source-root", sources.absolutePath,
-            "--progress", out.resolve("checked-prefix.jsonl").absolutePath,
-            "--output", out.resolve("source-checks.json").absolutePath,
-            extraArguments = if (witnessOnly) listOf("--witness-only") else emptyList())
+        val extraArguments = buildList {
+            if (checker == "verify_source_results.py") {
+                addAll(listOf("--progress", out.resolve("checked-prefix.jsonl").absolutePath))
+                if (witnessOnly) add("--witness-only")
+            }
+            addAll(listOf("--output", out.resolve("source-checks.json").absolutePath))
+        }
+        execute(out.resolve("checker.log"), python, tools.resolve(checker).absolutePath,
+            cases.absolutePath, "--source-root", sources.absolutePath, extraArguments = extraArguments)
+
         check(environment.deleteRecursively())
         println(out.resolve("source-checks.json").readText())
     }
