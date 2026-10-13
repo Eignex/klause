@@ -21,5 +21,7 @@ internal class OpenTheoryExecutionAccounting(private val work: OpenTheoryWorkSin
 }
 
 internal fun SearchSession.bindOpenTheoryWork(work: OpenTheoryWorkSink) {
-    attachExecutionControls(SearchExecutionControlAdapter(executionControls.cancellation, OpenTheoryExecutionAccounting(work)))
+    attachExecutionControls(
+        SearchExecutionControlAdapter(executionControls.cancellation, OpenTheoryExecutionAccounting(work)),
+    )
 }

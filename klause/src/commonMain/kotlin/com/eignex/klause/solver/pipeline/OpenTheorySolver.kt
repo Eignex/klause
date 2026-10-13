@@ -33,7 +33,6 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
-import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.BigInt
@@ -480,11 +479,15 @@ class OpenTheoryEngine internal constructor(
         return OpenTheoryResult.Unknown(
             when {
                 timedOut || cause == SearchStopCause.Timeout -> TerminationReason.Timeout
+
                 cause == SearchStopCause.Cancelled -> TerminationReason.Cancelled
+
                 budgetExhausted || state.work.exhausted || cause == SearchStopCause.WorkAllowance ||
                     cause == SearchStopCause.CheckAllowance || cause == SearchStopCause.DecisionAllowance ||
                     cause == SearchStopCause.OperationAllowance -> TerminationReason.BudgetExhausted
+
                 cause == SearchStopCause.RepresentationDecline -> TerminationReason.Unsupported
+
                 else -> TerminationReason.Cancelled
             },
             stats.finish(state, session),
