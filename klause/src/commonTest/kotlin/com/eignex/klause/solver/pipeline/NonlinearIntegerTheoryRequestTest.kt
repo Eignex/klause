@@ -97,8 +97,9 @@ class NonlinearIntegerTheoryRequestTest {
         val binding = EngineInvocation(request.preparedPlan, ModelIdentity.of(source),
             sourceAssumptions = params.polynomial.strategy.assumptions)
         val invocation = NonlinearIntegerInvocation(request, params, FiniteEngine.LOCAL_SEARCH, binding)
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
-        val result = invocation.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+        val result = invocation.check(condition, Cancellation.Never)
 
         val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
         val publication = assertIs<CompletedEnginePublication.Witness>(sample.witnessCertificate?.publication)
