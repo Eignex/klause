@@ -70,13 +70,12 @@ sealed interface OpenTheoryOptimum {
      * The model is feasible and its objective descends without limit, so it has no optimum.
      *
      * [witness] proves the model feasible and [value] is what the objective takes on it. Neither is a
-     * bound: the certificate is a ray of the model along which the objective strictly decreases, so every
-     * value below [value] is attained too.
+     * bound: a feasible ray supplies arbitrarily low objective values while preserving source integrality.
      */
     data class Unbounded(
         /** An assignment proving the model feasible. */
         val witness: OpenTheoryAssignment,
-        /** The objective value at [witness]; every value below it is attained as well. */
+        /** The objective value at [witness], distinct from the arbitrarily improving ray values. */
         val value: BigFraction,
         override val stats: SolveStats,
         override val linearResult: LinearOptimizationResult? = null,
