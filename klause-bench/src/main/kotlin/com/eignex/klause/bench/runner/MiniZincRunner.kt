@@ -55,13 +55,14 @@ internal class MiniZincRunner(
      *  The cache binds model/data and solver-library contents to paired FlatZinc and DZN output
      *  mappings. Each compile publishes the output mapping before the FlatZinc commit marker;
      *  concurrent compiles use unique temporary files and atomic replacement. */
-    fun compileFzn(ref: ProblemRef): File {
+    fun compileFzn(ref: ProblemRef, fresh: Boolean = false): File {
         require(supports(ref)) { "${ref.name}: MiniZincRunner only resolves MINIZINC problems" }
         val root = CorpusFetcher.workspaceRoot()
         val mzn = CorpusFetcher.resolve(ref.source)
         val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
-        val workDir = File(root, "klause-bench/build/mzn-fzn-output-v2-seed$MZN_RANDOM_SEED").apply { mkdirs() }
+        val workDir = File(root, "klause-bench/build/mzn-fzn-output-v3-seed$MZN_RANDOM_SEED").apply { mkdirs() }
         val digest = MessageDigest.getInstance("SHA-256")
+        digest.update(MiniZincCompatibility.compiler.toString().toByteArray())
         for (
         source in listOfNotNull(mzn, dzn) +
             File(root, "klause-mzn-lib/share/minizinc").walkTopDown().filter { it.isFile }.sortedBy { it.path }.toList()
@@ -74,7 +75,7 @@ internal class MiniZincRunner(
         val upToDate = fzn.exists() && outputFile(fzn).exists() &&
             fzn.lastModified() >= mzn.lastModified() &&
             (dzn == null || fzn.lastModified() >= dzn.lastModified())
-        if (!upToDate) compile(root, mzn, dzn, fzn)
+        if (fresh || !upToDate) compile(root, mzn, dzn, fzn)
         return fzn
     }
 
@@ -90,7 +91,7 @@ internal class MiniZincRunner(
         val tmp = File.createTempFile("${out.nameWithoutExtension}-", ".fzn.tmp", out.parentFile)
         val tmpOzn = File.createTempFile("${out.nameWithoutExtension}-", ".ozn.tmp", out.parentFile)
         val cmd = buildList {
-            add("minizinc")
+            add(MiniZincCompatibility.compiler.executable)
             add("--solver")
             add(msc.absolutePath)
             add("-c")
@@ -118,9 +119,8 @@ internal class MiniZincRunner(
                 error("minizinc compile timed out after ${timeoutSec}s for ${mzn.name}")
             }
             val output = log.readText()
-            require(proc.exitValue() == 0) {
-                tmp.delete()
-                "minizinc compile failed (exit ${proc.exitValue()}) for ${mzn.name}: ${output.take(500)}"
+            if (proc.exitValue() != 0) {
+                throw MiniZincCompileFailure(proc.exitValue(), output, MiniZincCompatibility.compiler)
             }
             require(tmp.exists()) { "minizinc compile produced no .fzn for ${mzn.name}" }
             require(tmpOzn.length() > 0) { "minizinc compile produced no output mapping" }

@@ -62,10 +62,10 @@ class CorpusSelectionTest {
         try {
             File(root, "2011/bacp").mkdirs()
             File(root, "2011/bacp/bacp-9.mzn").writeText("int: n = 9;")
-            val original = Layout.MznChallengeAllYears.discover(root).single()
+            val original = Layout.MznChallengeAllYears().discover(root).single()
 
             File(root, "2011/bacp/bacp-19.mzn").writeText("int: n = 19;")
-            val selected = Layout.MznChallengeAllYears.discover(root).single()
+            val selected = Layout.MznChallengeAllYears().discover(root).single()
 
             assertEquals("2011/bacp/bacp-9", original.name)
             assertEquals("2011/bacp/bacp-19", selected.name)
@@ -145,7 +145,7 @@ class CorpusSelectionTest {
             // A non-year directory (the archive's README/.gitignore live alongside the year dirs)
             // is not mistaken for a challenge year.
             File(root, "not-a-year").mkdirs()
-            val found = Layout.MznChallengeAllYears.discover(root).sortedBy { it.name }
+            val found = Layout.MznChallengeAllYears().discover(root).sortedBy { it.name }
             assertEquals(listOf("2013/black-hole/black-hole", "2025/black-hole/black-hole"), found.map { it.name })
             assertEquals(listOf("2013/black-hole", "2025/black-hole"), found.map { it.family })
         } finally {
@@ -162,7 +162,7 @@ class CorpusSelectionTest {
             File(root, "2020/bnn-planner").mkdirs()
             File(root, "2020/bnn-planner/model.mzn").writeText("int: n = 1;")
 
-            val found = Layout.MznChallengeAllYears.discover(root)
+            val found = Layout.MznChallengeAllYears().discover(root)
             val selected = CorpusSelection.applySelection(found, Selection(maxInstances = 1))
 
             assertEquals(listOf("2020/bnn-planner/model"), selected.map { it.name })
@@ -203,6 +203,22 @@ class CorpusSelectionTest {
             val found = Layout.MznChallenge("2010").discover(root)
 
             assertEquals(listOf("alpha/i1"), found.map { it.name })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `compatibility discovery retains depot identities for compiler classification`() {
+        val root = Files.createTempDirectory("mzncompat").toFile()
+        try {
+            File(root, "2010/depot_placement").mkdirs()
+            File(root, "2010/depot_placement/depot_placement.mzn").writeText("% model")
+            File(root, "2010/depot_placement/st70_5.dzn").writeText("n=5;")
+
+            val found = Layout.MznChallengeAllYears(legacyExclusions = false).discover(root)
+
+            assertEquals(listOf("2010/depot_placement/st70_5"), found.map { it.name })
         } finally {
             root.deleteRecursively()
         }

@@ -61,3 +61,13 @@ binary64 literal semantics. Integer campaigns opt in with
 `param=source-validation=true`. Unsupported or incomplete checks remain unknown.
 Checking feasibility does not certify source optimality.
 See [benchmark result validation](../klause-bench/README.md#source-validation).
+
+## Corpus compatibility
+
+The benchmark harness owns compiler admission and source quarantine. Its versioned
+MiniZinc Challenge compatibility suite compiles original model/data before counting
+sampling caps, with compiler/library identity and source hashes attached to excluded
+identities. Compiler admission supplies no solver verdict or proof. Legacy discovery
+and frozen named sets retain their membership and historical results. See
+[corpus compatibility](../klause-bench/README.md#catalog-and-corpus) for selection,
+failure classes and provenance.

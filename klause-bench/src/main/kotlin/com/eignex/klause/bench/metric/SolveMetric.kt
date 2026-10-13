@@ -6,6 +6,8 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.MiniZincCompileFailure
+import com.eignex.klause.bench.runner.MiniZincCompilerIdentity
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.ProblemKind
@@ -103,6 +105,7 @@ internal data class SolveRecord(
     val processTimeToFirstFeasibleMs: Long? = null,
     val processTimeToBestMs: Long? = null,
     val exactObjective: String? = null,
+    val compilerIdentity: MiniZincCompilerIdentity? = null,
 )
 
 internal object SolveMetric {
@@ -299,7 +302,15 @@ internal object SolveMetric {
             objective = null,
             timeToBestMs = null,
             proven = false,
-            stats = mapOf((if (declined(failure)) "unsupported" else "loadError") to reason),
+            stats = buildMap {
+                put((if (declined(failure)) "unsupported" else "loadError"), reason)
+                if (failure is MiniZincCompileFailure) {
+                    put("compilerExit", failure.exitCode.toString())
+                    failure.incompatibility?.let { put("sourceCompilerIncompatible", it) }
+                }
+            },
+            sourceHashes = runCatching { SolveEvidence.sourceHashes(ref) }.getOrDefault(emptyMap()),
+            compilerIdentity = (failure as? MiniZincCompileFailure)?.compiler,
             gitSha = sha,
             timestamp = timestamp,
             command = "LOAD",
@@ -355,6 +366,11 @@ internal object SolveMetric {
             val reported = record(entry, solverId, settings, budget, kind, timestamp, sha, r)
                 .copy(
                     validationPolicy = policy,
+                    compilerIdentity = if (entry.ref.format == Format.MINIZINC) {
+                        com.eignex.klause.bench.runner.MiniZincCompatibility.compiler
+                    } else {
+                        null
+                    },
                     sourceHashes = sourceHashes,
                     finalWitness = if (r.feasible == true) {
                         SolveEvidence.finalWitness(entry.ref.format, r.rawOutput)
