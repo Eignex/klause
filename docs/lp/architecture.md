@@ -88,6 +88,11 @@ Cut scheduling follows active LP bounding, the requested cost tier and the
 relaxation size guard, including ordinary linear models without global factors.
 Tableau emission checks the assembled LP's actual integral structural columns,
 exact integer row data and supported lower endpoints; continuous columns decline.
+Ordinary-row separation checks actual column integrality and source-map availability
+before a root solve or node separation. Existing structural, circuit and explicitly
+requested cut paths retain their applicability. Auxiliary cut techniques keep their
+factor-based scheduling. Admission scans charge the containing work allowance and
+LP effort ledger and poll cancellation.
 Source mapping must discharge each rounding premise and retain inherited parent
 guards before root sharing. Root and node separation keep their existing round,
 depth, pool and work allowances.

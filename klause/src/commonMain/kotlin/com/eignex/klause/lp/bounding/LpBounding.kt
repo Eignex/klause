@@ -534,7 +534,7 @@ internal fun LpEngine.sparseSafePrune(
     var boundRel = cutSolved.relaxation
     var boundRes = cutSolved.result
     if (cutsAllowed && session.decisionLevel in 1..params.lpPlan.cutSearchMaxDepth &&
-        lpSeparators.isNotEmpty()
+        lpSeparators.isNotEmpty() && cutSeparationSupported(boundRel, cancellation, root = false)
     ) {
         val localCuts = ArrayList<SourceCut>()
         var rounds = 0
@@ -1072,6 +1072,7 @@ internal fun LpEngine.harvestRootCuts(
     try {
         var relaxation = relaxer.build(session, cancellation = cancellation)
         if (relaxation.model.n == 0) return emptyList()
+        if (!cutSeparationSupported(relaxation, cancellation, root = true)) return emptyList()
         var simplex = dualSimplex(relaxation.model, cancellation)
         var ownedSimplex: TableauCutSolver? = simplex
         var primaryFailure: Throwable? = null

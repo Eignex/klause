@@ -21,6 +21,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -29,8 +30,11 @@ import kotlin.test.assertTrue
 
 class LpAutoConfigTest {
 
-    private fun problem(vararg factors: Factor, intVars: Int = 3): Problem =
-        Problem(0, intVars, Array(intVars) { IntDomain(0, 5) }, arrayOf(*factors))
+    private fun problem(vararg factors: Factor, intVars: Int = 3, realVars: Int = 0): Problem =
+        Problem(
+            0, intVars, Array(intVars) { IntDomain(0, 5) }, arrayOf(*factors),
+            numRealVars = realVars, realLower = DoubleArray(realVars), realUpper = DoubleArray(realVars) { 1.0 },
+        )
 
     @Test
     fun `linear structure enables the bounding stack and permitted cuts`() {
@@ -41,6 +45,8 @@ class LpAutoConfigTest {
         assertTrue(r.learn)
         assertTrue(r.probe)
         assertTrue(r.cuts)
+        assertFalse(r.booleanRlt)
+        assertFalse(r.flowCoverCuts)
         assertFalse(r.lagrangian)
         assertFalse(r.energeticReasoning)
     }
@@ -62,12 +68,14 @@ class LpAutoConfigTest {
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            realVars = 1,
         )
-        val plan = LpAutoConfig.resolve(p, LpConfig.parse("default,+cuts"))
+        val config = LpConfig.parse("default,+cuts")
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val relaxer = CpToLpRelaxation(p, objective)
         val session = PropagationSession(p)
-        val cuts = LpEngine(p, objective, LpParams(lpPlan = plan), SolveStatsSink("cuts")).use {
+        val cuts = LpEngine(p, objective, LpParams(lpConfig = config), SolveStatsSink("cuts")).use {
+            val plan = it.params.lpPlan
             it.harvestRootCuts(relaxer, session, emptyList(), plan.gomoryEnabled, plan.mirEnabled)
         }
 
@@ -83,6 +91,45 @@ class LpAutoConfigTest {
             }
         }
         assertTrue(cuts.any { cut -> cut.coeffs.sum() * 0.5 < cut.rhs })
+    }
+
+    @Test
+    fun `ordinary mixed root separation spends no simplex work across objective changes`() {
+        val p = problem(
+            Linear(longArrayOf(2), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.LE, 3),
+            intVars = 1,
+            realVars = 1,
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1))
+        val relaxer = CpToLpRelaxation(p, objective)
+        val session = PropagationSession(p)
+        val sink = SolveStatsSink("cuts")
+        LpEngine(p, objective, LpParams(lpConfig = LpConfig.parse("default,+cuts")), sink).use { engine ->
+            assertTrue(engine.harvestRootCuts(relaxer, session, emptyList(), true, true).isEmpty())
+            engine.forObjective(objective, Cancellation.Never).use {
+                assertTrue(it.harvestRootCuts(relaxer, session, emptyList(), true, true).isEmpty())
+            }
+        }
+
+        assertEquals(0.0, sink.snapshot().lp.rootPasses.sum)
+    }
+
+    @Test
+    fun `explicit cut plans preserve mixed root separation`() {
+        val p = problem(
+            Linear(longArrayOf(2), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.LE, 3),
+            intVars = 1,
+            realVars = 1,
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1))
+        val relaxer = CpToLpRelaxation(p, objective)
+        val session = PropagationSession(p)
+        val sink = SolveStatsSink("cuts")
+        LpEngine(p, objective, LpParams(lpPlan = LpPlan(bounding = true, cuts = true)), sink).use {
+            it.harvestRootCuts(relaxer, session, emptyList(), true, true)
+        }
+
+        assertTrue(sink.snapshot().lp.rootPasses.sum > 0.0)
     }
 
     @Test
