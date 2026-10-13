@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.backtrack.CpSatisfactionTraversal
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.ir.ObjectiveSense
@@ -105,6 +106,9 @@ internal class QuadraticWorkerAdapter(
         }
     } catch (_: PolynomialInterrupted) {
         partial()
+    } catch (stop: PolynomialResourceLimit) {
+        native.decline(stop.resource)
+        partial()
     } catch (_: CancellationException) {
         interrupted = true
         partial()
@@ -178,6 +182,9 @@ internal class QuadraticWorkerAdapter(
         try {
             advance()
         } catch (_: PolynomialInterrupted) {
+            terminal = partial()
+        } catch (stop: PolynomialResourceLimit) {
+            native.decline(stop.resource)
             terminal = partial()
         } catch (_: CancellationException) {
             interrupted = true

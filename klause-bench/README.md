@@ -428,6 +428,34 @@ Preserve every planned identity and unsuccessful outcome in external evidence.
 
 ## Source validation
 
+### Exact source probes
+
+`com.eignex.klause.bench.profile.QuadraticSourceProbe` runs exact real box sources
+through the public quadratic API. Pass `source=<JSON>` with `semantics=klause-ir-exact-v1`,
+`reals` containing rational `lower`/`upper` declarations, and `objective` containing
+`sense`, rational `constant` and `terms` (`coefficient`, `first`, optional `second`).
+Declarations must have an exact binary64 IR projection. `controls=BACKTRACK:1,MIXED:1,MIXED:4`
+selects engine/lane pairs; `maximumWork` bounds each invocation. The probe saves
+original bytes, actual witnesses/results, source capture outcomes and hashes under
+`out` or `$OUT`, then runs `tools/verify_quadratic_box_results.py` with `python=python3`.
+That independent fractions checker evaluates original coordinates and objective,
+checks supported interval bounds and attainment, and withholds unsupported algebraic
+or stronger bound claims. This does not verify general quadratic rays or proof exports.
+
+`com.eignex.klause.bench.profile.NraSourceCheck` checks actual saved SMT records through
+`tools/verify_nra_source_results.py`. Pass `input=<base64 UTF-8 JSON array>`; each entry
+retains `source`, its SHA-256 `hash`, `feasible`, actual `witness` and producer metadata.
+The bundle checker rejects changed source bytes, ground-checks complete exact witnesses,
+compares refutations with separate queries and leaves incomplete verdicts without claims.
+Its `python` interpreter must have the pinned `tools/requirements-source-checks.txt`
+dependencies. Checking outputs remain outside the repository; retain interpreter and
+dependency identities alongside the original inputs, producer revisions and reports.
+
+Both entry points can run as committed-code lab profiles with explicit AWS host,
+one machine and one parallel command. Use the lab client with
+`LAB_URL=https://lab.eignex.com` for submission, status, remote access and retrieval.
+Build/test/lint gates remain in GitHub CI.
+
 MiniZinc float runs independently check the final complete witness; integer runs
 opt in with `param=source-validation=true`. The cache retains paired FlatZinc/DZN
 `.ozn` mappings keyed by source/data and solver-library contents. Compiler outputs

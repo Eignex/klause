@@ -129,15 +129,18 @@ internal class QuadraticPortfolioInvocation(
             else QuadraticOptimizationResult.BestFound(best, sharedBound, reason, sense, scalar.stats)
     }
 
-    private fun check(worker: PortfolioWorker, result: QuadraticOptimizationResult): Verification<Unit, Unit>? = try {
+    private fun check(
+        worker: PortfolioWorker, result: QuadraticOptimizationResult,
+    ): Verification<Unit, Unit>? = try {
         when (result) {
             is QuadraticOptimizationResult.Optimal -> common(worker, result.sense, result.incumbent)
                 ?: certificate(result.certificate, QuadraticClaim.Optimal)
                 ?: certificate(result.bound.certificate, QuadraticClaim.Bound)
                 ?: if (result.bound.strict ||
                     terminalArithmetic.compare(result.incumbent.value, result.bound.value) != 0
-                ) Verification.Rejected("quadratic optimum does not attain its bound")
-                else bound(result.bound.value, false)
+                ) {
+                    Verification.Rejected("quadratic optimum does not attain its bound")
+                } else bound(result.bound.value, false)
             is QuadraticOptimizationResult.UnattainedLimit -> common(worker, result.sense, result.incumbent)
                 ?: certificate(result.certificate, QuadraticClaim.UnattainedLimit)
                 ?: certificate(result.bound.certificate, QuadraticClaim.Bound)
@@ -147,12 +150,13 @@ internal class QuadraticPortfolioInvocation(
             is QuadraticOptimizationResult.Unbounded -> common(worker, result.sense, result.incumbent)
                 ?: certificate(result.certificate, QuadraticClaim.Unbounded)
                 ?: Verification.Accepted(Candidate(Unit, Unit))
-            is QuadraticOptimizationResult.Infeasible -> common(worker, result.sense, null)
-                ?: certificate(result.certificate, QuadraticClaim.Infeasible)
-                ?: if (incumbents.exchange.current() != null) {
-                    Verification.Rejected("source refutation contradicts a witness")
-                }
-                else Verification.Accepted(Candidate(Unit, Unit))
+            is QuadraticOptimizationResult.Infeasible -> {
+                common(worker, result.sense, null)
+                    ?: certificate(result.certificate, QuadraticClaim.Infeasible)
+                    ?: if (incumbents.exchange.current() != null) {
+                        Verification.Rejected("source refutation contradicts a witness")
+                    } else Verification.Accepted(Candidate(Unit, Unit))
+            }
             is QuadraticOptimizationResult.BestFound -> partialBound(worker, result.bound)
             is QuadraticOptimizationResult.Unknown -> partialBound(worker, result.bound)
         }
@@ -163,7 +167,9 @@ internal class QuadraticPortfolioInvocation(
         Verification.Indeterminate("quadratic terminal checking exceeded representation limits")
     }
 
-    private fun partialBound(worker: PortfolioWorker, candidate: QuadraticObjectiveBound?): Verification<Unit, Unit>? {
+    private fun partialBound(
+        worker: PortfolioWorker, candidate: QuadraticObjectiveBound?,
+    ): Verification<Unit, Unit>? {
         if (candidate == null || !worker.permitsSourceProofs) return null
         certificate(candidate.certificate, QuadraticClaim.Bound)?.let { return it }
         val checked = bound(candidate.value, candidate.strict)
