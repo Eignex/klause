@@ -187,10 +187,9 @@ internal class OpenPortfolio(
             val shares = reservedShares(arms, share)
             PortfolioInvocationPolicy(profile, shares)
         }
-        val accepted = { point: AcceptedPortfolioIncumbent<OpenIncumbentValue> ->
+        val accepted: (AcceptedPortfolioIncumbent<OpenIncumbentValue>) -> Unit = { point ->
             val value = SourceValue.Rational(point.objective.source)
             publication?.accepted(point.assignment, value, point.version)
-            Unit
         }
         val result = portfolio.use { it.minimize(cancellation, null, incumbents, linear, accepted) }
         return linear?.fold(result) ?: optimumOf(result, incumbents)
