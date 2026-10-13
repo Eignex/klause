@@ -345,8 +345,8 @@ def require_verdict(solver, expected, problem, purpose):
 def source_query_solver(constraints, variables, is_smt):
     bounds = {z3.simplify(constraint).sexpr() for constraint in constraints} if not is_smt else set()
     binary = not is_smt and bool(variables) and all(
-        z3.is_int(variable) and z3.simplify(variable >= 0).sexpr() in bounds and
-        z3.simplify(variable <= 1).sexpr() in bounds for variable in variables.values())
+        z3.is_int(variable) and z3.simplify(variable >= rational(0)).sexpr() in bounds and
+        z3.simplify(variable <= rational(1)).sexpr() in bounds for variable in variables.values())
     solver = z3.SolverFor('QF_FD') if binary else z3.Solver()
     solver.set(timeout=120000)
     solver.add(*constraints)
