@@ -10,6 +10,39 @@ from verify_objective_probe import check_record
 
 
 class ObjectiveSourceResultsTest(unittest.TestCase):
+    def test_boolean_integer_and_real_coordinates_keep_their_original_sorts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            raw = ('(declare-const b Bool) (declare-const i Int) (declare-const x Real) '
+                   '(assert b) (assert (= i 1)) (assert (= x (/ 1 2))) '
+                   '(minimize (+ (ite b 1 0) i x)) (check-sat)')
+            identity = hashlib.sha256(raw.encode()).hexdigest()
+            (root / (identity + '.smt2')).write_text(raw)
+            path = root / (identity + '.BACKTRACK.linear.json')
+            path.write_text(json.dumps(dict(sourceSha256=identity, engine='BACKTRACK', encoding='linear',
+                                            result=dict(status='Optimal', sense='MINIMIZE',
+                                                        witness={'b': 'true', 'i': '1', 'x': '(/ 1 2)'},
+                                                        objective='(/ 5 2)', bound='(/ 5 2)', strict=False))))
+
+            checked, _ = check_record(root, path, True)
+
+            self.assertEqual('checked', checked['witness'])
+            self.assertEqual('checked', checked['bound'])
+
+    def test_fractional_integer_coordinate_is_rejected_before_substitution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            raw = '(declare-const i Int) (assert (= i 1)) (minimize i) (check-sat)'
+            identity = hashlib.sha256(raw.encode()).hexdigest()
+            (root / (identity + '.smt2')).write_text(raw)
+            path = root / (identity + '.BACKTRACK.linear.json')
+            path.write_text(json.dumps(dict(sourceSha256=identity, engine='BACKTRACK', encoding='linear',
+                                            result=dict(status='BestFound', sense='MINIMIZE',
+                                                        witness={'i': '(/ 3 2)'}, objective='(/ 3 2)'))))
+
+            with self.assertRaisesRegex(AssertionError, 'integer coordinate is not exact and integral'):
+                check_record(root, path, True)
+
     def test_adjacent_large_exact_costs_remain_distinct(self):
         for direction, x, expected in (('minimize', '0', '9223372036854775807'),
                                        ('maximize', '1', '9223372036854775808')):

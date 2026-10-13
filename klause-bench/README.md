@@ -747,7 +747,8 @@ parent recording covers the wrapper. Settings record the actual execution JVM.
 `schema=<JSON SchemaDef>` selects the compiled/schema path for the same original
 polynomial real sources. Declaration names must agree; real coordinates use public
 compiled source IDs and float objective handles. Finite-grid floats, integer schema
-declarations and aliased named real coordinates decline. The captured schema bytes
+declarations absent from the original source and aliased named real coordinates
+decline. The captured schema bytes
 and hash accompany exact named original-source results; compiler auxiliaries are
 excluded from the original witness map.
 The source objective must be affine, with integer Boolean weights/constant fitting
@@ -757,6 +758,19 @@ the original direction and the same controls. Encoding order alternates across e
 Source bytes, exact rational/algebraic results, native work, heuristic moves, elapsed
 execution time, settings and installed-build/runtime hashes are retained under `out`
 or `$OUT`. Parsing and provenance capture are outside the execution timer.
+Nonlinear integer source metadata is supported on the compiled/schema path, with
+separate original Boolean, integer and real namespaces. No source domains are
+inferred from a schema box; independent result checking uses original constraints.
+
+`conditions=<JSON file>` supplies caller pins keyed by original source SHA-256.
+Each entry contains optional `bools` and `ints` maps from original names to exact
+Boolean/Long values. Missing source entries, undeclared names and other condition
+kinds decline. The probe retains condition bytes/hash and the applied named pins.
+One compiled request is reused across source cases; each execution captures its own
+supplied objective, direction and conditions. The
+[objective-scopes-v1 fixtures](smoke-corpus/objective-scopes-v1/manifest.json)
+change objectives and pins over finite Int domains, AllDifferent and fixed nonlinear
+real coordinates. Boolean, integer and real declaration zero remain distinct.
 
 Run the committed main through a lab profile job on a trusted pushed branch:
 
@@ -769,6 +783,13 @@ deploy/lab profile com.eignex.klause.bench.profile.ObjectiveRepresentationProbe 
 Add `schema=klause-bench/smoke-corpus/objective-affine-v1/square.schema.json` to run
 the same inputs through schema compilation and its named float objective API. Its
 declared `0<=y<=1` follows from the original source `x*x=y`, `-1<=x<=1`.
+
+Use `source=klause-bench/smoke-corpus/objective-scopes-v1`,
+`schema=klause-bench/smoke-corpus/objective-scopes-v1/scope.schema.json` and
+`conditions=klause-bench/smoke-corpus/objective-scopes-v1/conditions.json` for the
+40-record changed-scope comparison. All coordinates are fixed by the source scope,
+so a zero heuristic move count is legitimate; exact witness, condition, result-role
+and bound checks remain required.
 
 The [precision fixtures](smoke-corpus/objective-affine-v1/manifest.json) distinguish
 adjacent exact objective values sharing a binary64 projection. After fetching the

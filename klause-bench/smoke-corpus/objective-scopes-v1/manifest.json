@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "license": "Apache-2.0",
+  "attribution": "Self-authored Klause source scope regression fixtures",
+  "cases": [
+    {
+      "file": "first-minimize.smt2",
+      "sha256": "53bb5c5c20edf6108b68213314eb57cf58b53fd3038c119bf7e240e14e39d4ee",
+      "scope": "first",
+      "sense": "MINIMIZE",
+      "expectedCost": "31/2"
+    },
+    {
+      "file": "next-minimize.smt2",
+      "sha256": "48a129d6ee6bf44430df70682a78d04d8fbe6467fd06c5381a5a6fb5c3298777",
+      "scope": "next",
+      "sense": "MINIMIZE",
+      "expectedCost": "27/2"
+    },
+    {
+      "file": "first-maximize.smt2",
+      "sha256": "ba11e172699d62d792b6999ab3ab6e65b49ff7c2114a751ebe3cb365e12d1e42",
+      "scope": "first",
+      "sense": "MAXIMIZE",
+      "expectedCost": "31/2"
+    },
+    {
+      "file": "next-maximize.smt2",
+      "sha256": "310e563d574a9e3759cc7d0a260dc0d9b746c1ff954833eba0a1a8c0d9b0b558",
+      "scope": "next",
+      "sense": "MAXIMIZE",
+      "expectedCost": "27/2"
+    }
+  ],
+  "schema": {
+    "file": "scope.schema.json",
+    "sha256": "8af640b5f4420da222dc522c045327036d730dc649c5a7b763fb05fef2312321"
+  },
+  "conditions": {
+    "file": "conditions.json",
+    "sha256": "34f149065489a9e2822c986257710ff8216d7a97c0fe914e1bbd9439978e2f98"
+  }
+}
