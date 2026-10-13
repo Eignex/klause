@@ -109,7 +109,9 @@ containing sink survives branches, retractions, restarts and retained queries.
 `SearchStopCause` separates timeout, cancellation, native work, checks, decisions,
 operation allowance and representation decline. A component reports a local
 operation stop through its context; beginning another operation clears that local
-cause without renewing containing allowances. Cancellation and containing work
+cause without renewing containing allowances. The traversal retains the cause of
+unresolved branches if subsequent operations clear their local diagnostics.
+Cancellation and containing work
 exhaustion take precedence over a local decline. An incomplete residual remains
 unknown and cannot prove exhaustion. Open routing maps representation decline to
 `Unsupported`, operation/check/decision/work stops to `BudgetExhausted`, and keeps

@@ -22,6 +22,7 @@ class SearchRun internal constructor(
     private var decisions = 0L
     private var decisionsSinceRestart = 0L
     private var sawIndeterminate = false
+    private var indeterminateCause: SearchStopCause? = null
 
     // Whether the last [applyLearnedConflict] call reached its backjump, so the conflict that produced it is spent.
     private var learnedApplied = false
@@ -211,7 +212,7 @@ class SearchRun internal constructor(
                     }
 
                     ComponentCheck.Indeterminate -> {
-                        sawIndeterminate = true
+                        rememberIndeterminate()
                         if (session.cancelled()) {
                             return lifecycle.onCancellation(session).toEvent()
                                 ?: finish(SearchRunEvent.Indeterminate.Cancelled)
@@ -283,7 +284,7 @@ class SearchRun internal constructor(
 
                 ComponentResult.Indeterminate -> {
                     session.popTo(level)
-                    sawIndeterminate = true
+                    rememberIndeterminate()
                 }
 
                 is ComponentResult.Conflict -> {
@@ -397,7 +398,7 @@ class SearchRun internal constructor(
         -> false
 
         SearchLearnedConflictResult.Indeterminate -> {
-            sawIndeterminate = true
+            rememberIndeterminate()
             false
         }
 
@@ -435,7 +436,15 @@ class SearchRun internal constructor(
         SearchRunEvent.Exhausted
     }
 
+    private fun rememberIndeterminate() {
+        sawIndeterminate = true
+        indeterminateCause = session.executionControls.stopCause ?: SearchStopCause.RepresentationDecline
+    }
+
     private fun finish(event: SearchRunEvent): SearchRunEvent {
+        if (event == SearchRunEvent.Indeterminate.Component && session.executionControls.stopCause == null) {
+            session.executionControls.reportStop(indeterminateCause ?: SearchStopCause.RepresentationDecline)
+        }
         terminal = event
         return event
     }

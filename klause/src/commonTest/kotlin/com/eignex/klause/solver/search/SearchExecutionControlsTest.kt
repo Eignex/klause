@@ -131,6 +131,24 @@ class SearchExecutionControlsTest {
     }
 
     @Test
+    fun `an unresolved branch retains its cause after a later complete check`() {
+        val controls = SearchExecutionControlAdapter()
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(0) == true) {
+                controls.reportStop(SearchStopCause.OperationAllowance)
+                ComponentCheck.Indeterminate
+            } else {
+                controls.beginOperation()
+                ComponentCheck.Infeasible()
+            }
+        }), executionControls = controls)
+
+        assertIs<SearchResult.Indeterminate>(session.solve(1))
+
+        assertEquals(SearchStopCause.OperationAllowance, controls.stopCause)
+    }
+
+    @Test
     fun `controls cannot be replaced after component initialization`() {
         val session = SearchSession(emptyList())
         session.initialize()
