@@ -68,6 +68,7 @@ internal class OpenPortfolio(
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
     private val lifetime = theoryParams.cancellation or theoryParams.timeout
     private val preparedPlan = request?.preparedPlan ?: model.prepareExecutionPlan()
+    private val sourceModel = preparedPlan.originalSource as? Problem ?: model
 
     private fun workerParams(slot: PortfolioWorkerSlot): TheoryParams = theoryParams.copy(
         openWorkLimit = slot.nativeAllowance(theoryParams.openWorkLimit),
@@ -85,7 +86,7 @@ internal class OpenPortfolio(
         val localSearch = localSearchFactories(firstLocalArm, lifetime or cancellation, objective = null)
         val factories = buildList {
             request?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
-                theoryWorker(source, slot).bindEvidence(ModelIdentity.of(model))
+                theoryWorker(source, slot).bindEvidence(ModelIdentity.of(sourceModel))
             }) }
             addAll(localSearch)
         }
@@ -93,7 +94,7 @@ internal class OpenPortfolio(
         val portfolio = PortfolioInvocation(preparedPlan, factories,
             PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
                 nodeBudget = theoryParams.nodeBudget),
-            PortfolioEvidence(ModelIdentity.of(model), openWitnessVerifier(model, null))) { workers ->
+            PortfolioEvidence(ModelIdentity.of(sourceModel), openWitnessVerifier(sourceModel, null))) { workers ->
             PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = false),
                 reservedShares(workers, if (request != null) THEORY_SHARE else 0.0))
         }
@@ -133,15 +134,15 @@ internal class OpenPortfolio(
         val factories = buildList {
             minimizer?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
                 descentWorker(source, slot) { incumbents.exchange.integerBound() }
-                    .bindEvidence(ModelIdentity.of(model, objective))
+                    .bindEvidence(ModelIdentity.of(sourceModel, objective))
             }) }
             if (rational) add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
                 PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
-                    RationalTheoryDescent(model, objective, workerParams(slot)) {
+                    RationalTheoryDescent(sourceModel, objective, workerParams(slot)) {
                         incumbents.exchange.current()?.let { it.assignment to it.objective }
                     }
                 }) { _, _, _, _ -> error("the rational descent runs only by slice") }
-                    .bindEvidence(ModelIdentity.of(model, objective))
+                    .bindEvidence(ModelIdentity.of(sourceModel, objective))
             })
             addAll(localSearch)
         }
@@ -150,7 +151,8 @@ internal class OpenPortfolio(
         val portfolio = PortfolioInvocation(preparedPlan, factories,
             PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
                 nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0),
-            PortfolioEvidence(ModelIdentity.of(model, objective), openWitnessVerifier(model, objective))) { workers ->
+            PortfolioEvidence(ModelIdentity.of(sourceModel, objective),
+                openWitnessVerifier(sourceModel, objective))) { workers ->
             PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = true),
                 reservedShares(workers, if (minimizer != null || rational) DESCENT_SHARE else 0.0))
         }
@@ -215,7 +217,7 @@ internal class OpenPortfolio(
         }
 
     private fun toSolveResult(result: OpenTheoryResult): SolveResult = when (result) {
-        is OpenTheoryResult.Sat -> SolveResult.Sat(result.assignment.toSample(model), result.stats)
+        is OpenTheoryResult.Sat -> SolveResult.Sat(result.assignment.toSample(sourceModel), result.stats)
         is OpenTheoryResult.Unsat -> SolveResult.Unsat(stats = result.stats)
         is OpenTheoryResult.Unknown -> SolveResult.Unknown(result.reason, result.stats)
     }
@@ -244,14 +246,14 @@ internal class OpenPortfolio(
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
             ): MinimizeResult? {
                 val verdict = descent.runSlice(global, sliceMillis, sliceNodes) { assignment, value ->
-                    val sample = assignment.toSample(model)
+                    val sample = assignment.toSample(sourceModel)
                     val objective = value.toDouble()
                     onIncumbent(MinimizeResult.BestFound(sample, objective, TerminationReason.BudgetExhausted))
                 } ?: return null
                 if (verdict is OpenTheoryOptimum.Unbounded) descentVerdict.compareAndSet(null, verdict)
                 return when (verdict) {
                     is OpenTheoryOptimum.Optimal -> MinimizeResult.Optimal(
-                        verdict.assignment.toSample(model),
+                        verdict.assignment.toSample(sourceModel),
                         verdict.value.toDouble(),
                         verdict.stats,
                     )
@@ -259,7 +261,7 @@ internal class OpenPortfolio(
                     is OpenTheoryOptimum.Infeasible -> MinimizeResult.Infeasible(stats = verdict.stats)
 
                     is OpenTheoryOptimum.Unbounded -> MinimizeResult.Unbounded(
-                        verdict.witness.toSample(model),
+                        verdict.witness.toSample(sourceModel),
                         verdict.value.toDouble(),
                         direction = emptyList(),
                         stats = verdict.stats,
@@ -291,13 +293,13 @@ internal class OpenPortfolio(
                 PortfolioArmFactory(preparedPlan, firstArm + index,
                     if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch) { slot ->
                     val local = workerParams(slot)
-                    val adapter = slot.own(OpenExactNeighborhood(model, local, objective, preparedPlan))
+                    val adapter = slot.own(OpenExactNeighborhood(sourceModel, local, objective, preparedPlan))
                     exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
                         firstArm + index, objective, local.cancellation or local.timeout, timeout = local.timeout,
                         exhausted = { adapter.exhausted }, open = { adapter.search(adaptive,
                             slot.baseSeed + slot.index - firstArm,
                             maximumImprovementMoves = if (adaptive) local.alnsIterations.toLong() else null) })
-                        .bindEvidence(ModelIdentity.of(model, objective), provesResults = false)
+                        .bindEvidence(ModelIdentity.of(sourceModel, objective), provesResults = false)
                 }
             }
         }
@@ -310,7 +312,7 @@ internal class OpenPortfolio(
             PortfolioArmFactory(preparedPlan, firstArm + i, ArmFamily.LocalSearch) { slot ->
                 val local = workerParams(slot)
                 val completion = if (model.numRealVars > 0) {
-                    val theory = slot.own(TheoryCompletion(model, local, preparedPlan))
+                    val theory = slot.own(TheoryCompletion(sourceModel, local, preparedPlan))
                     if (objective != null && objective.realCoefficientValues.any { it != 0.0 }) {
                         OptimizingCompletion(model, objective, theory)
                     } else theory
@@ -338,7 +340,7 @@ internal class OpenPortfolio(
                             maxInstructions = budget?.let { minOf(it, params.maxInstructions ?: it) }), warm = null)
                     }
                 }
-                worker.bindEvidence(ModelIdentity.of(model, objective), provesResults = false)
+                worker.bindEvidence(ModelIdentity.of(sourceModel, objective), provesResults = false)
             }
         }
     }

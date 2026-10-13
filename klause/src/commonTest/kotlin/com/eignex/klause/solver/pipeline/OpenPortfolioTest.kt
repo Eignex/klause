@@ -37,6 +37,21 @@ class OpenPortfolioTest {
     private fun optimum(execution: OpenTheoryExecution) = assertIs<OpenTheoryExecution.Optimize>(execution).result
 
     @Test
+    fun `completion retains original identity beside a bound narrowed execution model`() {
+        val original = openColumns(1, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7))
+        val working = Problem(numBoolVars = 0, factors = original.factors,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0),
+                Bits(1), Bits(1).also { it.set(0) }))
+        val plan = working.prepareExecutionPlan(original, objective = null, maximize = false, preferFinite = false)
+        val request = OpenTheoryRequest(working, componentPlan = requireNotNull(plan.componentPlan),
+            preparedPlan = plan)
+
+        val result = satisfied(OpenTheoryPipeline.executePortfolio(request, params(), cores = 4))
+
+        assertEquals("7", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(0))
+    }
+
+    @Test
     fun `open construction materializes private replicas for requested lanes beyond its recipe count`() {
         val model = openColumns(1, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7))
         val request = OpenTheoryRequest(model, componentPlan = model.componentPlan())
