@@ -119,7 +119,6 @@ internal class EvidenceCertificate private constructor(
             return EvidenceCertificate(model, kind, completion)
         }
 
-        fun verified(model: ModelIdentity, kind: EvidenceKind): EvidenceCertificate = EvidenceCertificate(model, kind)
     }
 }
 
