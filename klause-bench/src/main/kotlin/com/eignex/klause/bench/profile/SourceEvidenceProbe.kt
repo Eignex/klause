@@ -23,6 +23,7 @@ import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import java.io.File
 import java.security.MessageDigest
+import java.util.Locale
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -111,5 +112,5 @@ internal object SourceEvidenceProbe {
     }
 
     private fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
-        .joinToString("") { "%02x".format(it) }
+        .joinToString("") { "%02x".format(Locale.ROOT, it) }
 }
