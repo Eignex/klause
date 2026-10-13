@@ -24,6 +24,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class SourceQuadraticEvidenceTest {
     private val variable = QuadraticVariable.Int(SourceIntId(0))
@@ -144,4 +145,61 @@ class SourceQuadraticEvidenceTest {
         assertEquals(evidence, completed.evidence)
     }
 
+    @Test
+    fun `quadratic capture preserves typed native derivations after source binding`() {
+        val capture = assertNotNull(model.quadraticSourceResultCapture(scope, objective))
+        val zero = AlgebraicArithmetic().rational(BigFraction.ZERO)
+        val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(0)), zero)
+        val identity = ModelIdentity.of(model, objective)
+        val invocation = QuadraticEngineInvocation(QuadraticEngineSource.ExactIr(model), objective,
+            ObjectiveSense.MINIMIZE, SourceCondition())
+        val derivation = QuadraticEngineDerivation.Branches(emptyList())
+        val bound = QuadraticCertificate.engine(identity, invocation, QuadraticClaim.Bound, derivation)
+        val terminal = QuadraticCertificate.engine(identity, invocation, QuadraticClaim.Optimal, derivation)
+        val result = QuadraticOptimizationResult.Optimal(point, QuadraticObjectiveBound(zero, false, bound),
+            terminal, ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+
+        val captured = assertIs<QuadraticOptimizationResult.Optimal>(capture.quadratic(result, "fixture-engine",
+            boundDerivation = SourceQuadraticBoxDerivation))
+
+        assertEquals(derivation, captured.certificate.derivation)
+        assertEquals(invocation, captured.certificate.invocation)
+        assertEquals(SourceEvidenceCheck.Checked, captured.verifySourceEvidence(capture.context))
+    }
+
+    @Test
+    fun `quadratic capture cannot replace a native invocation source with an equal shaped model`() {
+        val foreign = Problem(0, 1, arrayOf(IntDomain(-2, 3)), emptyArray())
+        val capture = assertNotNull(foreign.quadraticSourceResultCapture(scope, objective))
+        val identity = ModelIdentity.of(model, objective)
+        val invocation = QuadraticEngineInvocation(QuadraticEngineSource.ExactIr(model), objective,
+            ObjectiveSense.MINIMIZE, SourceCondition())
+        val certificate = QuadraticCertificate.engine(identity, invocation, QuadraticClaim.Infeasible,
+            QuadraticEngineDerivation.Branches(emptyList()))
+        val result = QuadraticOptimizationResult.Infeasible(certificate, ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+
+        val captured = capture.quadratic(result, "fixture-engine")
+
+        assertEquals(result, captured)
+        assertNull(captured.evidence)
+    }
+
+    @Test
+    fun `quadratic capture cannot replace conditional native completion with a root invocation`() {
+        val capture = assertNotNull(model.quadraticSourceResultCapture(scope, objective))
+        val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE),
+            upper = mapOf(coordinate to BigFraction.ONE))
+        val invocation = QuadraticEngineInvocation(QuadraticEngineSource.ExactIr(model), objective,
+            ObjectiveSense.MINIMIZE, condition)
+        val identity = ModelIdentity.of(model, objective)
+        val certificate = QuadraticCertificate.engine(identity, invocation, QuadraticClaim.Infeasible,
+            QuadraticEngineDerivation.Branches(emptyList()))
+        val result = QuadraticOptimizationResult.Infeasible(certificate, ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+
+        val captured = capture.quadratic(result, "fixture-engine")
+
+        assertEquals(result, captured)
+        assertNull(captured.evidence)
+    }
 }

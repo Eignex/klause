@@ -14,6 +14,16 @@ import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.intervalBounds
 import com.eignex.klause.util.Cancellation
 
+/** Bind optional quadratic result capture to the actual original exact IR source and objective. */
+fun Problem.quadraticSourceResultCapture(
+    scope: SourceScope,
+    objective: QuadraticObjectiveSpec,
+    cancellation: Cancellation = Cancellation.Never,
+): SourceResultCapture? {
+    val context = quadraticSourceProofContext(scope, objective, cancellation) ?: return null
+    return SourceResultCapture.forQuadratic(context, this, objective)
+}
+
 /** Bind exact quadratic objective checks to an original IR source, without inventing an affine objective. */
 fun Problem.quadraticSourceProofContext(
     scope: SourceScope,

@@ -1,9 +1,10 @@
 package com.eignex.klause.solver.evidence
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.engine.CertifiedLpBound
 import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactBounds
+import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactRhs
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.forEachRationalColumn
@@ -24,7 +25,9 @@ internal class LpSourceEvidenceCapture(
         model: LpModel,
         bound: CertifiedLpBound,
         cancellation: Cancellation = Cancellation.Never,
-    ): SourceEvidence = capture(SourceClaim.Bound(bound.value), cancellation) { step ->
+    ): SourceEvidence = capture(SourceClaim.Bound(
+        if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) bound.value.negated() else bound.value,
+    ), cancellation) { step ->
         val certificate = bound.certificate
         if (certificate != null && !certificate.belongsTo(model)) {
             missing("exact LP certificate belongs to another active model")

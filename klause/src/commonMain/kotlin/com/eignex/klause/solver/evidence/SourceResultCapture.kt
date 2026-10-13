@@ -1,23 +1,39 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
-import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
 
 /** Optional claim capture over independently supplied original-source verification data. */
-class SourceResultCapture(
+class SourceResultCapture private constructor(
     /** Original-source context used for every captured result. */
     val context: SourceProofContext,
+    private val quadraticBinding: QuadraticSourceBinding?,
 ) {
+    /** Capture manually supplied source-scoped results using an independent context. */
+    constructor(context: SourceProofContext) : this(context, null)
+
+    internal fun accepts(invocation: QuadraticEngineInvocation): Boolean =
+        quadraticBinding?.matches(invocation) == true && invocation.condition == context.scope.condition &&
+            invocation.sense == context.scope.objective?.sense
+
+    internal companion object {
+        fun forQuadratic(
+            context: SourceProofContext, source: Problem, objective: QuadraticObjectiveSpec,
+        ): SourceResultCapture = SourceResultCapture(context, QuadraticSourceBinding(source, objective))
+    }
+
     /** Retain exact quadratic result claims with explicitly optional bound and traversal derivations. */
     fun quadratic(
         result: QuadraticOptimizationResult,
@@ -29,7 +45,9 @@ class SourceResultCapture(
         require(context.scope.objective?.sense == result.sense) {
             "quadratic capture requires the source objective direction"
         }
-        if (cancellation() || result.capturedScopes().any { it != context.scope }) return result
+        if (cancellation() || result.capturedScopes().any { it != context.scope } ||
+            result.capturedInvocations().any { !accepts(it) }
+        ) return result
         val expected = result::class
         val captured = SourceQuadraticResultCapture(context, producer, derivation, boundDerivation).capture(result)
         check(captured::class == expected) {
@@ -133,4 +151,9 @@ class SourceResultCapture(
         }
         return value.rational?.let { SourceValue.Rational(it) } ?: SourceValue.Algebraic(value)
     }
+}
+
+private class QuadraticSourceBinding(private val source: Problem, private val objective: QuadraticObjectiveSpec) {
+    fun matches(invocation: QuadraticEngineInvocation): Boolean =
+        (invocation.source as? QuadraticEngineSource.ExactIr)?.problem === source && invocation.objective === objective
 }

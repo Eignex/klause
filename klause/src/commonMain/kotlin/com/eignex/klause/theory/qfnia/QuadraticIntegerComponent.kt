@@ -3,6 +3,8 @@ package com.eignex.klause.theory.qfnia
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
@@ -21,20 +23,20 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.plus
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.plus
 
 internal sealed interface QuadraticIntegerNode {
     data class Closed(
         val assignment: QfNraAssignment,
         val value: AlgebraicReal,
         val attained: Boolean,
-        val proof: Any,
+        val proof: SourceDerivation,
     ) : QuadraticIntegerNode
-    data class Empty(val proof: Any) : QuadraticIntegerNode
-    data class Pruned(val proof: Any) : QuadraticIntegerNode
+    data class Empty(val proof: SourceDerivation) : QuadraticIntegerNode
+    data class Pruned(val proof: SourceDerivation) : QuadraticIntegerNode
     data class Split(val coordinate: Int, val threshold: BigInt) : QuadraticIntegerNode
-    data class Unbounded(val assignment: QfNraAssignment, val proof: Any) : QuadraticIntegerNode
+    data class Unbounded(val assignment: QfNraAssignment, val proof: SourceDerivation) : QuadraticIntegerNode
     data object BranchBooleans : QuadraticIntegerNode
     data object Unknown : QuadraticIntegerNode
 }
@@ -122,7 +124,9 @@ internal class QuadraticIntegerComponent(
                 step()
                 upper[id]?.let { value > it } == true
             }
-            (if (contradictory || boolConflict) QuadraticIntegerNode.Empty(root to condition)
+            (if (contradictory || boolConflict) QuadraticIntegerNode.Empty(QuadraticEngineDerivation.Both(
+                QuadraticEngineDerivation.Condition(root), QuadraticEngineDerivation.Condition(condition),
+            ))
             else complete(condition, context)).also {
                 current = it
             }
