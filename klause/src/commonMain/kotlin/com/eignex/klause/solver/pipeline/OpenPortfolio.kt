@@ -182,9 +182,8 @@ internal class OpenPortfolio(
         val share = if (integral != null || rational) DESCENT_SHARE else 0.0
         val controls = PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = stop,
             nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0)
-        val portfolio = PortfolioInvocation(preparedPlan, boundFactories, controls, evidence) { workers ->
-            PortfolioInvocationPolicy(profile, reservedShares(workers, share))
-        }
+        fun policy(arms: List<PortfolioWorker>) = PortfolioInvocationPolicy(profile, reservedShares(arms, share))
+        val portfolio = PortfolioInvocation(preparedPlan, boundFactories, controls, evidence, policy = ::policy)
         val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents,
             terminalCheck = linear, onAccepted = { accepted -> publication?.accepted(accepted.assignment,
                 SourceValue.Rational(accepted.objective.source), accepted.version) }) }
