@@ -51,8 +51,11 @@ be presented as an attained optimum.
 
 ## State and resources
 
-Immutable row addresses, forms and Boolean dependencies are prepared once per
-component. Scoped assertions, graph potentials, LP bases and witness candidates
+Immutable row addresses, forms and Boolean dependencies can be shared by fresh
+components over one canonical immutable fragment. `prepareExactLiraSource` returns
+an opaque factory only after complete, uncancelled preparation; its openings retain
+the public component's source semantics. The direct constructor still prepares its
+own rows. Scoped assertions, graph potentials, LP bases and witness candidates
 remain invocation-owned. Retraction restores their premises and invalidates
 incompatible evidence. Open work and numerical limits retain their own currencies;
 a stopped source check withholds the witness or proof.

@@ -6,8 +6,10 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.complemented
+import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.ExactMixedBoundedRow
@@ -137,12 +139,18 @@ class ExactLiraAssignment(
 }
 
 /** Incremental source arithmetic on the shared LP and search lifecycles. */
-class ExactLiraSearchComponent(
-    private val model: Problem,
-    private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
+class ExactLiraSearchComponent private constructor(
+    private val preparedSource: PreparedExactLiraSource,
+    private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)?,
 ) : TheoryComponent,
     SearchBrancher,
     AutoCloseable {
+    constructor(
+        model: Problem,
+        modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
+    ) : this(legacyExactLiraSource(model), modelContribution)
+
+    private val model = preparedSource.model
     private var smtStats: SmtStatsSink? = null
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
@@ -150,18 +158,8 @@ class ExactLiraSearchComponent(
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
     private val disjunctOwner = Any()
     private var disjunctionRegistrationDeclined = false
-    private val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
-    private val preparedRows = model.factors.flatMapIndexed { factorIndex, factor ->
-        factor.linearRows.mapIndexed { index, row ->
-            PreparedSourceRow(
-                RowAddress(factorIndex, index),
-                row,
-                exactForms[factorIndex][index],
-                row.booleanVariables().toIntArray(),
-                factor.linearForm is LinearForm.Disjunction,
-            )
-        }
-    }
+    private val exactForms = preparedSource.exactForms
+    private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
@@ -189,10 +187,8 @@ class ExactLiraSearchComponent(
     }
     internal var operationBudgetExhausted = false
         private set
-    private val arithmeticRows = model.factors.flatMap { it.linearRows }.filter { row ->
-        (0 until row.size).any { !Term.isBool(row.ref(it)) }
-    }
-    private val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
+    private val arithmeticRows = preparedSource.arithmeticRows
+    private val arithmeticVariables = preparedSource.arithmeticVariables
     private val branchNames = HashMap<SourceBoundAtom, SearchDecision>()
     private var context: SearchContext? = null
     private val lpDelegate: Lazy<LpPropagator> = lazy {
@@ -242,7 +238,9 @@ class ExactLiraSearchComponent(
     }
 
     init {
-        require(model.supportsExactLira() || model.supportsExactLra()) { "unsupported exact linear component" }
+        require(preparedSource.validated || model.supportsExactLira() || model.supportsExactLra()) {
+            "unsupported exact linear component"
+        }
         nodesByLevel.put(0, root)
     }
 
@@ -873,6 +871,16 @@ class ExactLiraSearchComponent(
         dirty = true
     }
 
+    internal companion object {
+        fun prepareSource(fragment: Problem, stop: Cancellation): PreparedExactLiraComponentFactory? {
+            val source = sharedExactLiraSource(fragment, stop) ?: return null
+            val factory = PreparedExactLiraComponentFactory { contribution ->
+                ExactLiraSearchComponent(source, contribution)
+            }
+            return factory.takeUnless { stop() }
+        }
+    }
+
     override fun contributeModel(model: SearchModel, context: SearchContext) {
         if (outcome != ComponentCheck.Feasible || context.cancelled()) return
         assignment?.let { value ->
@@ -880,6 +888,120 @@ class ExactLiraSearchComponent(
             modelContribution?.invoke(value, model)
         }
     }
+}
+
+internal class PreparedExactLiraComponentFactory(
+    private val openComponent: (((ExactLiraAssignment, SearchModel) -> Unit)?) -> ExactLiraSearchComponent,
+) {
+    fun open(
+        modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
+    ): ExactLiraSearchComponent = openComponent(modelContribution)
+}
+
+internal fun prepareExactLiraSource(
+    fragment: Problem,
+    stop: Cancellation,
+): PreparedExactLiraComponentFactory? = ExactLiraSearchComponent.prepareSource(fragment, stop)
+
+private class PreparedExactLiraSource(
+    val model: Problem,
+    val exactForms: List<List<ExactRowForm>>,
+    val preparedRows: List<PreparedSourceRow>,
+    val arithmeticRows: List<LinearRow>,
+    val arithmeticVariables: Set<Int>,
+    val validated: Boolean,
+)
+
+private fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
+    val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    val preparedRows = model.factors.flatMapIndexed { factorIndex, factor ->
+        factor.linearRows.mapIndexed { index, row ->
+            PreparedSourceRow(
+                RowAddress(factorIndex, index),
+                row,
+                exactForms[factorIndex][index],
+                row.booleanVariables().toIntArray(),
+                factor.linearForm is LinearForm.Disjunction,
+            )
+        }
+    }
+    val arithmeticRows = model.factors.flatMap { it.linearRows }.filter { row ->
+        (0 until row.size).any { !Term.isBool(row.ref(it)) }
+    }
+    val arithmeticVariables = arithmeticRows.flatMap { it.booleanVariables() }.toSet()
+    return PreparedExactLiraSource(
+        model, exactForms, preparedRows, arithmeticRows, arithmeticVariables, validated = false,
+    )
+}
+
+private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedExactLiraSource? {
+    fun charge(units: Long): Boolean {
+        if (stop()) return false
+        stop.charge(units)
+        return !stop()
+    }
+    if (!charge(1) || (model.numIntVars == 0 && model.numRealVars == 0)) return null
+    val exactForms = ArrayList<List<ExactRowForm>>()
+    val preparedRows = ArrayList<PreparedSourceRow>()
+    val arithmeticRows = ArrayList<LinearRow>()
+    val arithmeticVariables = LinkedHashSet<Int>()
+    for ((factorIndex, factor) in model.factors.withIndex()) {
+        if (!charge(1)) return null
+        val form = factor.linearForm
+        if (form !is LinearForm.Conjunction && form !is LinearForm.Disjunction) return null
+        val forms = ArrayList<ExactRowForm>()
+        for ((rowIndex, row) in factor.linearRows.withIndex()) {
+            if (!charge(1)) return null
+            when (val constants = row.constants) {
+                is IntegralConstants -> Unit
+                is RealConstants -> {
+                    if (!constants.bound.isFinite()) return null
+                    for (index in constants.intCoefficients.indices) {
+                        if (!charge(1) || !constants.intCoefficients.at(index).isFinite()) return null
+                    }
+                    for (index in constants.realCoefficients.indices) {
+                        if (!charge(1) || !constants.realCoefficients.at(index).isFinite()) return null
+                    }
+                }
+            }
+            val booleans = LinkedHashSet<Int>()
+            if (row.activator != LinearRow.ALWAYS) booleans += row.activator
+            var arithmetic = false
+            for (index in 0 until row.size) {
+                if (!charge(1)) return null
+                val reference = row.ref(index)
+                if (Term.isBool(reference)) {
+                    booleans += Lit.variable(Term.lit(reference))
+                } else {
+                    arithmetic = true
+                }
+            }
+            // Exact rational conversion and its owned term buffers are one atomic row operation.
+            if (!charge(4L * row.size + 4L)) return null
+            val exact = row.exactForm(model.numRealVars)
+            if (stop()) return null
+            forms += exact
+            preparedRows += PreparedSourceRow(
+                RowAddress(factorIndex, rowIndex), row, exact, booleans.toIntArray(), form is LinearForm.Disjunction,
+            )
+            if (arithmetic) {
+                arithmeticRows += row
+                for (variable in booleans) {
+                    if (!charge(1)) return null
+                    arithmeticVariables += variable
+                }
+            }
+        }
+        if (!charge(forms.size.toLong() + 1L)) return null
+        exactForms += forms.toList()
+    }
+    val copies = exactForms.size.toLong() + preparedRows.size + arithmeticRows.size + arithmeticVariables.size + 1L
+    if (!charge(copies)) return null
+    val source = PreparedExactLiraSource(
+        model, exactForms.toList(), preparedRows.toList(), arithmeticRows.toList(), arithmeticVariables.toSet(),
+        validated = true,
+    )
+    return source.takeUnless { stop() }
 }
 
 private const val UNASSIGNED = -1

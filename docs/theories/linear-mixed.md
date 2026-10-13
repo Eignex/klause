@@ -56,7 +56,10 @@ alone does not establish optimization coverage.
 ## State and resources
 
 The invocation owns LP assertions, reduction caches, integer branches and candidate
-assignments. Finite projections own their domain state separately. A source rewrite
+assignments. The shared [linear source preparation](../solver/search.md#shared-component-search)
+factory retains only immutable row forms, source addresses and Boolean dependencies;
+each opening binds fresh callbacks, cancellation and mutable arithmetic owners.
+Finite projections own their domain state separately. A source rewrite
 or objective change needs matching reconstruction and proof scope; a retained basis
 alone cannot transfer result authority. [Resources](../solver/resources.md) and
 [LP certification](../lp/certification.md) define the containing and native budgets.

@@ -60,9 +60,16 @@ Complete assignments use source-keyed values from each owner. CP-learned Boolean
 remain natively owned by CP while their shared consequences reach theory peers. The
 shared store does not duplicate the CP pin.
 
-Open linear arithmetic prepares immutable source row addresses, forms and Boolean
-dependencies once per component. A resolved comparison remains asserted through
-its LP scope; deeper checks reuse it until retraction removes that scope. Root
+Open linear arithmetic can prepare immutable source row addresses, exact forms and
+Boolean dependencies once for one canonical theory fragment through
+`prepareExactLiraSource`. Its opaque factory opens a fresh component for each source
+session. The direct public component constructor prepares those same inputs for its
+own component. Neither route shares Boolean levels, atom registrations, LP state,
+reductions, outcomes or model-contribution callbacks between openings. A partial
+initialization belongs to its original context and must be closed before opening a
+replacement; immutable preparation does not make it reinitializable. A resolved
+comparison remains asserted through its LP scope; deeper checks reuse it until
+retraction removes that scope. Root
 checks can substitute newly fixed columns. Disequalities re-evaluate their justified
 direction against active bounds, and complete witnesses still check source rows.
 
