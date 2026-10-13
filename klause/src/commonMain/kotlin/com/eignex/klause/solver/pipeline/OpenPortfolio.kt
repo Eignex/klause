@@ -7,29 +7,37 @@ import com.eignex.klause.localsearch.LocalSearchEngine
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.lp.relaxation.lpSeed
-import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.ArmFamily
+import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.kind
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
+import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
-import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
@@ -37,9 +45,9 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.toDouble
 import com.eignex.klause.util.toLongExact
-import kotlin.math.abs
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.math.abs
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -65,6 +73,8 @@ internal class OpenPortfolio(
     private val seed: Long = 0L,
     private val lanes: Int = 1,
     private val searchesContinuousOnly: Boolean = false,
+    private val sourceObjective: OpenSourceObjective? = null,
+    private val publication: SourcePublicationObserver? = null,
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
     private val lifetime = theoryParams.cancellation or theoryParams.timeout
@@ -128,26 +138,25 @@ internal class OpenPortfolio(
         require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
             "the theory's descent minimizes no continuous column"
         }
-        val rational = request != null && minimizer == null
-        val firstLocalArm = if (minimizer != null || rational) 1 else 0
+        val sourceValues = sourceObjective ?: OpenSourceObjective(objective,
+            request?.objective ?: objective, request?.maximize ?: false,
+            request?.linearAuthorityContext(lifetime or cancellation))
+        val context = sourceValues.context
+        val integral = minimizer.takeIf { context == null }
+        val rational = request != null && integral == null
+        val firstLocalArm = if (integral != null || rational) 1 else 0
         val localSearch = localSearchFactories(firstLocalArm, lifetime or cancellation, objective)
-        val incumbents = PortfolioIncumbents<BigFraction>(
-            valueOf = { candidate ->
-                objective.evaluateExact(candidate.sample)
-            },
-            improves = { candidate, standing -> candidate < standing },
-            approximateValue = { it.toDouble() },
-            gain = { standing, candidate -> (standing - candidate).toDouble() },
-        )
+        val incumbents = sourceValues.incumbents()
         val factories = buildList {
-            minimizer?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
-                descentWorker(source, slot) { incumbents.exchange.integerBound() }
-                    .bindEvidence(ModelIdentity.of(sourceModel, objective))
+            integral?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
+                descentWorker(source, slot) {
+                    incumbents.exchange.current()?.objective?.execution?.let { if (it.den == BIG_ONE) it.num else null }
+                }.bindEvidence(ModelIdentity.of(sourceModel, objective))
             }) }
             if (rational) add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
                 PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
-                    RationalTheoryDescent(sourceModel, objective, workerParams(slot)) {
-                        incumbents.exchange.current()?.let { it.assignment to it.objective }
+                    RationalTheoryDescent(sourceModel, objective, workerParams(slot), context) {
+                        incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
                     }
                 }) { _, _, _, _ -> error("the rational descent runs only by slice") }
                     .bindEvidence(ModelIdentity.of(sourceModel, objective))
@@ -165,27 +174,32 @@ internal class OpenPortfolio(
         val portfolio = PortfolioInvocation(preparedPlan, boundFactories,
             PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
                 nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0),
-            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, objective))
+            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, objective, context, lifetime or cancellation))
                 .bindInvocation(binding, lifetime or cancellation)) { workers ->
             PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = true),
-                reservedShares(workers, if (minimizer != null || rational) DESCENT_SHARE else 0.0))
+                reservedShares(workers, if (integral != null || rational) DESCENT_SHARE else 0.0))
         }
-        val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents) }
+        val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents,
+            onAccepted = { accepted -> publication?.accepted(accepted.assignment,
+                SourceValue.Rational(accepted.objective.source), accepted.version) }) }
         return optimumOf(result, incumbents)
     }
 
-    private fun optimumOf(result: MinimizeResult, incumbents: PortfolioIncumbents<BigFraction>): OpenTheoryOptimum =
-        when (result) {
+    private fun optimumOf(
+        result: MinimizeResult,
+        incumbents: PortfolioIncumbents<OpenIncumbentValue>,
+    ): OpenTheoryOptimum = when (result) {
             is MinimizeResult.Optimal -> {
                 val incumbent = checkNotNull(incumbents.exchange.current())
-                OpenTheoryOptimum.Optimal(assignmentOf(incumbent.assignment), incumbent.objective, result.stats)
+                OpenTheoryOptimum.Optimal(assignmentOf(incumbent.assignment),
+                    incumbent.objective.execution, result.stats)
             }
 
             is MinimizeResult.BestFound -> {
                 val incumbent = checkNotNull(incumbents.exchange.current())
                 OpenTheoryOptimum.Bounded(
                     assignmentOf(incumbent.assignment),
-                    incumbent.objective,
+                    incumbent.objective.execution,
                     result.reason,
                     result.stats,
                 )
@@ -374,7 +388,12 @@ internal class OpenPortfolio(
     }
 }
 
-internal fun openWitnessVerifier(model: Problem, objective: LinearObjective?): CandidateVerifier<Sample, Double?> =
+internal fun openWitnessVerifier(
+    model: Problem,
+    objective: LinearObjective?,
+    context: SourceProofContext? = null,
+    cancellation: Cancellation = Cancellation.Never,
+): CandidateVerifier<Sample, Double?> =
     CandidateVerifier { candidate ->
         val sample = candidate.assignment
         val claimed = candidate.objective
@@ -385,14 +404,25 @@ internal fun openWitnessVerifier(model: Problem, objective: LinearObjective?): C
                     "witness certificate belongs to a different model or claim",
                 )
             }
-        } else {
+        }
+        if (claimed?.isNaN() == true) return@CandidateVerifier Verification.Rejected("objective is NaN")
+        if (context != null) {
+            val witness = SourceEvidence(context.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
+            return@CandidateVerifier when (val checked =
+                SourceEvidenceVerifier(context.withLinearAuthority()).verify(witness, cancellation)
+            ) {
+                SourceEvidenceCheck.Checked -> Verification.Accepted(candidate)
+                is SourceEvidenceCheck.Rejected -> Verification.Rejected(checked.reason)
+                is SourceEvidenceCheck.Unavailable -> Verification.Indeterminate(checked.reason)
+            }
+        }
+        if (certificate == null) {
             when (val checked = verifyOpenWitness(model, sample)) {
                 is Verification.Rejected -> return@CandidateVerifier checked
                 is Verification.Indeterminate -> return@CandidateVerifier checked
                 is Verification.Accepted -> Unit
             }
         }
-        if (claimed?.isNaN() == true) return@CandidateVerifier Verification.Rejected("objective is NaN")
         if (objective == null || claimed == null) return@CandidateVerifier Verification.Accepted(candidate)
         val exact = objective.evaluateExact(sample)
         val value = exact.toDouble()

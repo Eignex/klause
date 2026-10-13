@@ -37,7 +37,19 @@ same owned snapshot contract; live producer workspaces remain private. See
 [model and ownership](../model.md). Copying an unchanged assignment preserves its
 coordinates and theory acceptance. Changing coordinates requires a fresh witness check.
 The exact objective is evaluated from the carried assignment, including integers outside
-`Long`.
+`Long`. Open affine invocations capture the original owner's exact objective coefficients
+and constant once. Their exchange retains that source value separately from the minimized
+execution value used by worker cutoffs; rounded IR coefficients do not order captured
+source incumbents.
+
+`OpenTheoryPipeline.execute` and `searchWithoutTheory` observer overloads publish
+`SourceIncumbentPublication` after verified installation. The payload retains the owned
+source sample, exact original-direction `SourceValue` and invocation version. The final
+`OpenTheoryExecution.Optimize.acceptedIncumbent` retains the latest receipt independently
+of a terminal's private proof witness. Callbacks run under the existing schedule lock;
+callback failures propagate after every worker and source service has closed. Complete
+single-worker invocations observe their source-checked improvements without allocating
+portfolio replicas.
 
 A wide exact sample exposes no finite integer array. Supported linear workers retain
 arbitrary-width coordinates through exact neighborhood completion. Windowed fallback

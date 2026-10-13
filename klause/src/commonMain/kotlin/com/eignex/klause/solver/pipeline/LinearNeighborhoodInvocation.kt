@@ -3,10 +3,10 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
-import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -18,6 +18,8 @@ internal fun linearNeighborhoodInvocation(
     adaptive: Boolean,
     cores: Int,
     preparedSource: PreparedSourcePlan? = null,
+    sourceObjective: OpenSourceObjective? = null,
+    publication: SourcePublicationObserver? = null,
 ): OpenTheoryExecution {
     val count = cores.coerceAtLeast(1)
     val prepared = preparedSource ?: model.prepareExecutionPlan(objective)
@@ -44,7 +46,7 @@ internal fun linearNeighborhoodInvocation(
     }
     val portfolio = PortfolioInvocation(prepared, factories,
         PortfolioInvocationControls(parallelism = count, workerSeed = params.randomSeed, cancellation = stop,
-            nodeBudget = params.nodeBudget), PortfolioEvidence(identity, openWitnessVerifier(source, objective))
+            nodeBudget = params.nodeBudget), PortfolioEvidence(identity, openWitnessVerifier(source, objective, sourceObjective?.context, stop))
             .bindInvocation(binding, stop))
     return portfolio.use {
         if (objective == null) {
@@ -57,7 +59,12 @@ internal fun linearNeighborhoodInvocation(
                 is SolveResult.Unknown -> OpenTheoryResult.Unknown(result.reason, result.stats)
             })
         }
-        val result = it.minimize(stop, null, PortfolioIncumbents.exact(objective))
+        val values = sourceObjective ?: OpenSourceObjective(objective)
+        val incumbents = values.incumbents()
+        val result = it.minimize(stop, null, incumbents, onAccepted = { accepted ->
+            publication?.accepted(accepted.assignment,
+                SourceValue.Rational(accepted.objective.source), accepted.version)
+        })
         OpenTheoryExecution.Optimize(when (result) {
             is MinimizeResult.WithSample -> OpenTheoryOptimum.Bounded(
                 OpenTheoryAssignment.Sampled(result.sample), objective.evaluateExact(result.sample),
