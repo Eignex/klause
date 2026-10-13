@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.catalog.ProblemSets
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.report.Reports
@@ -102,8 +103,21 @@ internal object MiniZincCompatibilityProbe {
             exclusions.close()
         }
         val frozen = options["set"]?.let { set ->
-            BenchCli.selectProblems(mapOf("set" to set, "name" to auditedNames.joinToString(",")))
+            val directory = ProblemSets.dir()
+            val before = MiniZincCompatibility.treeHash(directory)
+            val members = ProblemSets.load(listOf(set)).map { "${it.suite}/${it.problem}" }
+            val selected = BenchCli.selectProblems(mapOf("set" to set, "name" to auditedNames.joinToString(",")))
                 .map { "${it.suite}/${it.ref.name}" }
+            check(selected.toSet() == members.filter { it.substringAfter('/') in auditedNames }.toSet())
+            directory.copyRecursively(out.resolve("frozen-sets"), overwrite = true)
+            check(before == MiniZincCompatibility.treeHash(directory)) { "frozen membership changed during audit" }
+            out.resolve("frozen-membership.json").writeText(buildJsonObject {
+                put("set", set)
+                put("directorySha256", before)
+                put("originalMembers", Reports.json.encodeToJsonElement(members))
+                put("selectedMembers", Reports.json.encodeToJsonElement(selected))
+            }.toString() + "\n")
+            selected
         }.orEmpty()
         out.resolve("summary.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())

@@ -394,7 +394,7 @@ statistics and portfolio attribution. `solve-one` writes load failures too:
 failed. Source model/data hashes and `finalWitness` (up to 8 MiB) are captured
 outside subprocess timing. Missing captures remain absent; included MiniZinc
 files are outside original model/data hashes. `compilerIdentity` records the compiler
-and library identity for MiniZinc solves and compilation failures.
+and library identity for Klause MiniZinc solves and compilation failures.
 
 | Field/channel | Contract |
 |---|---|
