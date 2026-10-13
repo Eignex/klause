@@ -6,11 +6,8 @@ import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.incumbent.CandidateVerifier
-import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -93,11 +90,7 @@ internal class PolynomialStrategyAdapters(
             PortfolioInvocationControls(parallelism = parallelism,
                 seed = params.localSearch.randomSeed ?: 0, cancellation = cancellation,
                 nodeBudget = params.backtrack.nodeBudget ?: params.localSearch.nodeBudget, reseedStaleThreshold = 0),
-            PortfolioEvidence(identity, CandidateVerifier { candidate ->
-                val certificate = candidate.assignment.witnessCertificate
-                if (certificate?.kind == EvidenceKind.Witness &&
-                    certificate.model.sameModel(ModelIdentity.of(model.source))) Verification.Accepted(candidate)
-                else Verification.Indeterminate("polynomial source witness has no matching exact certificate")
-            }).bindInvocation(binding, cancellation), objective)
+            PortfolioEvidence(identity, polynomialWitnessVerifier(binding, cancellation))
+                .bindInvocation(binding, cancellation), objective)
     }
 }
