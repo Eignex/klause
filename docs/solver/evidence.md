@@ -196,6 +196,10 @@ Bound backtrack incumbent callbacks carry their actual witness publication throu
 the existing shared pool admission with the containing runtime and cancellation.
 The exchange's installed source checker still decides whether the point supplies a
 valid cutoff; metadata alone cannot replace that check.
+`PortfolioEvidence.witness` passes a carried ordinary native publication to the model
+verifier with the containing runtime, capture scope and cancellation. Producer
+conditions and point/value matching therefore remain part of witness admission.
+Legacy witness tags supply no additional authority to its installed source checker.
 
 `CompletedEngineResult` retains an actual ordinary completed result and its source
 binding for the completion-taking worker issuance hook. `EngineInvocation` retains
@@ -212,7 +216,7 @@ an exhausted reason without that value supplies no bound claim. Derivation check
 match the completed coordinates and ray direction, and an attained optimum is
 checked at its actual assignment. An unbounded completion's feasible point has a
 separate witness check from its ray. A scoped non-witness import requires the same
-consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance and opaque quadratic producer arguments remain
+consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance remains
 until their consumers migrate; these hooks do not assert that migration is complete.
 
 Runtime admission compares the actual prepared plan, execution identity/objective,
