@@ -68,11 +68,9 @@ class SharedPoolsTest {
         val problem = Problem(1, 0, emptyArray(),
             arrayOf(Cardinality(intArrayOf(Lit.make(0, true)), min = 1, max = 1))).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(7))
-        val model = ModelIdentity.of(problem, objective)
-        val invocation = EngineInvocation(problem.prepareExecutionPlan(objective), model, objective)
         val worker = PortfolioBuilder.build(problem,
             PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.BACKTRACK),
-            objective = objective).single().bindInvocation(invocation).bindSharingInvocation(invocation)
+            objective = objective).single()
         val exchange = requireNotNull(worker.sharedPools?.solutions)
 
         worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }

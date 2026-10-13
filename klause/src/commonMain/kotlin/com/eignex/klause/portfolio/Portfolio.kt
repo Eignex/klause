@@ -133,7 +133,12 @@ class Portfolio(
     internal var incumbentProbeArms: Set<Int> = emptySet()
 
     internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
-        PortfolioEvidence(it, CandidateVerifier.trusting())
+        val verifier = PortfolioEvidence(it, CandidateVerifier.trusting())
+        val binding = workers.firstNotNullOfOrNull { worker -> worker.sharingInvocation }
+        if (binding != null && workers.all { worker -> worker.sharingInvocation?.matches(binding) == true }) {
+            verifier.bindInvocation(binding)
+        }
+        verifier
     }
 
     private val lanes = minOf(lanes, workers.size)
