@@ -5,6 +5,7 @@ import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.SolveStats
@@ -22,6 +23,7 @@ internal class NonlinearIntegerPortfolio(
         val polynomial = params.polynomial
         val scope = QuadraticNativeScope(polynomial)
         val identity = ModelIdentity.of(request.problem)
+        val binding = EngineInvocation(plan, identity, sourceAssumptions = polynomial.strategy.assumptions)
         val workers = ArrayList<NonlinearIntegerInvocation>()
         val families = listOf(ArmFamily.Backtrack, ArmFamily.LocalSearch, ArmFamily.Lns)
         val factories = families.mapIndexed { arm, family ->
@@ -49,7 +51,7 @@ internal class NonlinearIntegerPortfolio(
                 val worker = NonlinearIntegerInvocation(request, controls, engine)
                 workers += worker
                 slot.own(AutoCloseable { native.observe(worker.nativeStats) })
-                worker.worker(arm, slot)
+                worker.worker(arm, slot).bindInvocation(binding)
             }
         }
         val invocation = PortfolioInvocation(plan, factories,
@@ -62,7 +64,7 @@ internal class NonlinearIntegerPortfolio(
                 if (certificate?.kind == EvidenceKind.Witness && certificate.model.sameModel(identity)) {
                     Verification.Accepted(candidate)
                 } else Verification.Indeterminate("native nonlinear witness has no matching source check")
-            })) { materialized ->
+            }).bindInvocation(binding, scope.polynomial)) { materialized ->
             val complete = materialized.indices.filter { materialized[it].family == ArmFamily.Backtrack }
             PortfolioInvocationPolicy(shares = DoubleArray(materialized.size) {
                 if (it in complete) 0.75 / complete.size else 0.0

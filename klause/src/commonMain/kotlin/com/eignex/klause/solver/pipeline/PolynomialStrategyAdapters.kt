@@ -8,6 +8,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -66,11 +67,18 @@ internal class PolynomialStrategyAdapters(
 
     private fun portfolio(objective: LinearObjective? = null): PortfolioInvocation {
         val identity = ModelIdentity.of(model.source, objective)
+        val binding = EngineInvocation(plan, identity, objective, sourceAssumptions = params.assumptions)
         val families = listOf(ArmFamily.Backtrack, ArmFamily.LocalSearch, ArmFamily.Lns)
         val factories = families.mapIndexed { arm, family ->
             PortfolioArmFactory(plan, arm, family) { slot ->
-                PolynomialWorkerAdapter(model, scope.worker(slot), workerParams(slot), scope.workerCancellation(slot))
+                val controls = workerParams(slot)
+                val executionAssumptions = if (arm == 0) {
+                    controls.backtrack.withAssumptions(controls.assumptions).assumptions
+                } else controls.localSearch.withAssumptions(controls.assumptions).assumptions
+                PolynomialWorkerAdapter(model, scope.worker(slot), controls, scope.workerCancellation(slot))
                     .worker(arm, objective, slot)
+                    .bindInvocation(EngineInvocation(plan, identity, objective, controls.assumptions,
+                        executionAssumptions))
             }
         }
         return PortfolioInvocation(plan, factories,
@@ -82,6 +90,6 @@ internal class PolynomialStrategyAdapters(
                 if (certificate?.kind == EvidenceKind.Witness &&
                     certificate.model.sameModel(ModelIdentity.of(model.source))) Verification.Accepted(candidate)
                 else Verification.Indeterminate("polynomial source witness has no matching exact certificate")
-            }), objective)
+            }).bindInvocation(binding, cancellation), objective)
     }
 }
