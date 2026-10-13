@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -20,6 +21,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.minus
@@ -33,6 +35,27 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class OpenWitnessTest {
+    @Test
+    fun `ordinary theory workers publish the retained source runtime`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val request = OpenTheoryRequest(source)
+
+        val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request,
+            TheoryParams(openWorkLimit = 1000, maxFlips = 0), FiniteEngine.MIXED, 1))
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(result.result).assignment
+        val sample = assertIs<OpenTheoryAssignment.Sampled>(assignment).sample
+        val publication = assertIs<CompletedEnginePublication.Witness>(
+            assertNotNull(sample.witnessCertificate).publication)
+        assertSame(request.preparedPlan, publication.invocation.preparedPlan)
+        assertEquals(BigFraction.ofLong(3).reciprocal(), assertNotNull(publication.sample.exactReals).single())
+        assertNull(publication.value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            publication.invocation.checkWitness(publication.sample, Cancellation.Never))
+    }
+
     @Test
     fun `theory conversion retains its actual invocation and execution value`() {
         val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
