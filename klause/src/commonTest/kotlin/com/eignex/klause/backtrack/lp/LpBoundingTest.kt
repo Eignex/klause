@@ -46,6 +46,30 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `mixed node pruning requires an exact bound beyond the enclosing rational cutoff`() {
+        for ((coefficient, minimum) in listOf(0.5 to 3.125, -0.5 to 2.375)) {
+            for (cutoff in listOf(minimum - 0.125, minimum, minimum + 0.125)) {
+                val problem = Problem(
+                    0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+                    numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25),
+                )
+                val objective = LinearObjective(
+                    intCoefficients = longArrayOf(1L), realCoefficients = doubleArrayOf(coefficient), constant = 3L,
+                )
+                val sink = SolveStatsSink(backend = "mixed-rational-prune")
+                val session = PropagationSession(problem)
+                LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                    val result = engine.sparseSafePrune(
+                        assertNotNull(engine.lpRelaxer), session, cutoff, sink, Cancellation.Never, -1, true,
+                    )
+
+                    assertEquals(cutoff < minimum, result.prune)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `noncanonical legacy node fallback keeps source hints and closes displaced owners`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)

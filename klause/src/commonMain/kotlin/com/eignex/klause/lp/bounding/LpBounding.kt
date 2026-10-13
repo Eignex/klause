@@ -601,6 +601,20 @@ internal fun LpEngine.sparseSafePrune(
         null
     }
     if (cancellation()) return LpNodeOutcome(false, null)
+    val rationalCutoff = if (canPrune && !boundRel.model.hasIntegralObjective()) {
+        BigFraction.ofDouble(bound.nextUp())
+    } else {
+        null
+    }
+    if (rationalCutoff != null && cert != null) {
+        val lower = cert.exactObjectiveBound()
+        val words = (maxOf(Long.SIZE_BITS, exactBits(listOf(lower, rationalCutoff))) + 63L) / 64L
+        noteNodeOverhead(4L * words * words)
+        if (lower + BigFraction.ofLong(boundRel.objectiveConstant) >= rationalCutoff) {
+            sink.lp.observePrune()
+            return LpNodeOutcome(true, null)
+        }
+    }
     // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
     // so the prune decides on the tighter of the two rather than on the float bound alone.
     val lower = certifiedTightObjectiveLowerBound(
