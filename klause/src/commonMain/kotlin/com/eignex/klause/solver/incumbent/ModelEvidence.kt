@@ -177,17 +177,27 @@ internal class ModelEvidenceVerifier<A, V>(
         if (certificate != null && (!certificate.model.matches(model) || certificate.kind != evidence.kind)) {
             return Verification.Rejected("certificate belongs to a different model, objective or claim")
         }
+        val witnessPublication = certificate?.publication as? CompletedEnginePublication.Witness
         if (evidence.kind != EvidenceKind.Witness || certificate?.publication != null) {
             val completedInvocation = certificate?.completion?.invocation ?: certificate?.publication?.invocation
-            if (invocation != null && completedInvocation != null && !invocation.matches(completedInvocation)) {
-                return Verification.Rejected("evidence belongs to a different runtime invocation")
+            if (invocation != null && completedInvocation != null) {
+                val matching = if (witnessPublication != null) {
+                    invocation.preparedPlan === completedInvocation.preparedPlan &&
+                        invocation.model.matches(completedInvocation.model)
+                } else invocation.matches(completedInvocation)
+                if (!matching) return Verification.Rejected("evidence belongs to a different runtime invocation")
             }
             if ((invocation == null) != (completedInvocation == null)) {
                 return Verification.Indeterminate("the proof consumer and completion require a runtime invocation")
             }
             val completionScope = certificate?.completion?.scope ?: certificate?.publication?.invocation?.scope
-            if (scope != null && completionScope != null && completionScope != scope) {
-                return Verification.Rejected("evidence belongs to a different original-source invocation")
+            if (scope != null && completionScope != null) {
+                val matching = if (witnessPublication != null) {
+                    scope.revision == completionScope.revision && scope.objective == completionScope.objective
+                } else scope == completionScope
+                if (!matching) {
+                    return Verification.Rejected("evidence belongs to a different original-source invocation")
+                }
             }
             if ((scope == null) != (completionScope == null)) {
                 return Verification.Indeterminate("the proof consumer and completion require a source invocation")
@@ -212,10 +222,12 @@ internal class ModelEvidenceVerifier<A, V>(
             }
             if (!matches) return Verification.Rejected("published claim differs from the actual engine publication")
             if (publication is CompletedEnginePublication.Witness) {
-                when (val checked = publication.invocation.checkWitness(publication.sample, cancellation)) {
-                    SourceEvidenceCheck.Checked -> Unit
-                    is SourceEvidenceCheck.Rejected -> return Verification.Rejected(checked.reason)
-                    is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
+                for (binding in listOf(publication.invocation, requireNotNull(invocation))) {
+                    when (val checked = binding.checkWitness(publication.sample, cancellation)) {
+                        SourceEvidenceCheck.Checked -> Unit
+                        is SourceEvidenceCheck.Rejected -> return Verification.Rejected(checked.reason)
+                        is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
+                    }
                 }
             }
         }

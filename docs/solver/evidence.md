@@ -159,8 +159,10 @@ unavailable independent derivation coverage.
 Its witness variant retains the actual immutable assignment, reported execution value
 and runtime invocation after a native witness check. It is an in-search publication,
 so it does not manufacture a terminal result or termination reason. The consumer
-requires that invocation, compares the actual point and value, checks its source and
-execution restrictions, and runs its installed source checker. Cancellation or
+requires the same prepared source and objective, compares the actual point and value,
+checks both the producing and containing query restrictions, and runs its installed
+source checker. A more restricted worker can supply a feasible point to the containing
+query after those checks; its point supplies no global bound. Cancellation or
 unavailable source validation withholds admission. Uncaptured publications cannot
 gain independent source derivation coverage from their native type.
 
@@ -170,6 +172,10 @@ query or change it after binding. Bound and integer-window callbacks on a bound
 backtrack worker retain their actual native values and coordinates in typed
 publications, including origin and contribution bookkeeping. Unbound compatibility
 traffic retains its existing engine admission path until its consumer is bound.
+Bound backtrack incumbent callbacks carry their actual witness publication through
+the existing shared pool admission with the containing runtime and cancellation.
+The exchange's installed source checker still decides whether the point supplies a
+valid cutoff; metadata alone cannot replace that check.
 
 `CompletedEngineResult` retains an actual ordinary completed result and its source
 binding for the completion-taking worker issuance hook. `EngineInvocation` retains
