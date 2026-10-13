@@ -4,24 +4,6 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.magnitudeBitLength
 
-internal interface LpDeductionCertificate {
-    fun belongsTo(model: LpModel, observer: LpCertificationObserver? = null): Boolean
-    fun exactMultipliers(): List<BigFraction>
-    fun exactReducedCost(col: Int): BigFraction
-    fun exactObjectiveBound(): BigFraction
-    fun dualNonzeroRow(row: Int): Boolean
-    fun reducedCostSign(col: Int): Int
-    fun objectiveBoundCeil(extraConstant: Long): Long?
-    fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean
-    fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long?
-    fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? {
-        val reduced = exactReducedCost(col)
-        if (reduced.isZero) return null
-        val cost = if (reduced.signum() < 0) reduced.negated() else reduced
-        return ((cutoff - BigFraction.ofLong(sourceConstant) - exactObjectiveBound()) * cost.reciprocal()).floorLong()
-    }
-}
-
 internal fun nodeDualCertificate(
     model: LpModel,
     duals: DoubleArray,
@@ -78,10 +60,10 @@ private fun mixedCertificate(
     }
     value = meter.add(meter.multiply(value, scale.reciprocal()), state.model.objective.externalConstant.value)
     meter.poll()
-    return MixedCertificate(state, y.toList(), reduced, value)
+    return MixedDualBound(state, y.toList(), reduced, value)
 }
 
-private class MixedCertificate(
+internal class MixedDualBound(
     private val authority: LpExactState,
     private val multipliers: List<BigFraction>,
     private val reduced: List<BigFraction>,
