@@ -46,6 +46,7 @@ internal class CoreGuidedSearch(
     private val base: BakedProblem,
     private val objective: LinearObjective,
     private val params: BacktrackParams,
+    private val stratify: Boolean = false,
 ) : ResumableSearch,
     ReseedGuard {
     private val lifetime = params.cancellation.lifetimeCancellation()
@@ -115,7 +116,7 @@ internal class CoreGuidedSearch(
             if (initialIndex < objective.boolWeightValues.size) {
                 prepareObjective()
                 if (preparationPending) continue
-                threshold = maximumWeight()
+                threshold = if (stratify) maximumWeight() else BIG_ONE
             }
             if (core != null) {
                 extendCore()
