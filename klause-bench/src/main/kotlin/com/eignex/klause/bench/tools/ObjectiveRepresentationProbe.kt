@@ -43,8 +43,14 @@ internal object ObjectiveRepresentationProbe {
             parts[0] to parts[1]
         }
         require(options.keys.all {
-            it in setOf("source", "engines", "out", "work", "seed", "moves", "timeout", "checker")
+            it in setOf("source", "engines", "out", "work", "seed", "moves", "timeout", "checker", "processors")
         })
+        val processors = options["processors"]?.toInt() ?: 1
+        require(processors > 0)
+        if (Runtime.getRuntime().availableProcessors() != processors) {
+            launchWithProcessors(args, options, processors)
+            return
+        }
         val input = File(requireNotNull(options["source"]) { "source is required" })
         val sources = if (input.isDirectory) input.walkTopDown().filter { it.extension == "smt2" }.toList()
             else listOf(input)
@@ -91,6 +97,21 @@ internal object ObjectiveRepresentationProbe {
             }
             else -> error("checker must be none, existing or provision")
         }
+    }
+
+    private fun launchWithProcessors(args: Array<String>, options: Map<String, String>, processors: Int) {
+        val output = File(options["out"] ?: requireNotNull(System.getenv("OUT")))
+        require(output.mkdirs() || output.isDirectory)
+        val jvm = ManagementFactory.getRuntimeMXBean().inputArguments.filterNot {
+            it.startsWith("-XX:ActiveProcessorCount=") || it.startsWith("-XX:StartFlightRecording=")
+        }
+        val command = listOf(File(System.getProperty("java.home"), "bin/java").absolutePath) + jvm + listOf(
+            "-XX:ActiveProcessorCount=$processors",
+            "-XX:StartFlightRecording=filename=${File(output, "objective-probe.jfr").absolutePath},settings=profile",
+            "-cp", System.getProperty("java.class.path"), ObjectiveRepresentationProbe::class.java.name,
+        ) + args
+        val child = ProcessBuilder(command).inheritIO().start()
+        check(child.waitFor() == 0) { "Objective probe JVM failed" }
     }
 
     private fun checkOutput(output: File, engines: List<FiniteEngine>, python: String) {
