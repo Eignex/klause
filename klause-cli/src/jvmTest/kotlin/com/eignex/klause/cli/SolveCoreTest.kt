@@ -17,8 +17,10 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0} maximize={1}")
-        fun variants(): List<Array<Any>> = listOf("quadratic-polynomial", "quadratic-integer", "polynomial")
-            .flatMap { route -> listOf(false, true).map { arrayOf<Any>(route, it) } }
+        fun variants(): List<Array<Any>> {
+            val routes = listOf("quadratic-polynomial", "quadratic-integer", "polynomial", "open-linear")
+            return routes.flatMap { route -> listOf(false, true).map { arrayOf<Any>(route, it) } }
+        }
     }
 
     @Test
@@ -30,6 +32,11 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
             "quadratic-polynomial" -> """
                 (declare-const b Bool) (declare-const x Real)
                 (assert (= x (ite b 0 1))) ($direction $objective) (check-sat)
+            """.trimIndent()
+            "open-linear" -> """
+                (declare-const b Bool) (declare-const x Real)
+                (assert (= (* 3 x) (ite b 0 1)))
+                ($direction ${if (maximize) "(+ 7 x)" else "(- 7 x)"}) (check-sat)
             """.trimIndent()
             "quadratic-integer" -> """
                 (declare-const i Int) (assert (and (>= i 0) (<= i 100)))
@@ -50,6 +57,7 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
             """.trimIndent()
         })
         val common = CommonOptions().apply { engine = "cp"; parallel = 1; randomSeed = 17; exact = true }
+        if (route == "open-linear") common.presolve = "off"
         if (route == "quadratic-integer") {
             common.engine = "ls"
             common.engineParams += "max-flips=100000"
@@ -63,7 +71,8 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
             override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
                 assertFalse(terminal, rendered)
                 assertTrue(rendered.isNotBlank())
-                values += requireNotNull(assertIs<SourceValue.Algebraic>(objective).value.rational)
+                values += if (route == "open-linear") assertIs<SourceValue.Rational>(objective).value
+                else requireNotNull(assertIs<SourceValue.Algebraic>(objective).value.rational)
                 return true
             }
             override fun onVerdictContext(context: VerdictContext) { terminal = true }
@@ -76,6 +85,7 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
         try {
             val solvable = session.load(source.absolutePath, common)
             if (route == "polynomial") assertIs<SolvablePipeline.PolynomialTheory>(solvable.pipeline)
+            else if (route == "open-linear") assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
             else {
                 val pipeline = assertIs<SolvablePipeline.QuadraticTheory>(solvable.pipeline)
                 if (route == "quadratic-integer") assertIs<QuadraticRequest.Integer>(pipeline.request)
@@ -89,7 +99,11 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
         val expected = if (route == "quadratic-integer") {
             if (maximize) listOf(8L, 11L) else listOf(6L, 3L)
         } else listOf(7L, if (maximize) 8L else 6L)
-        assertEquals(expected.map(BigFraction::ofLong), values)
+        val expectedValues = if (route == "open-linear") {
+            val third = BigFraction.ofLong(3).reciprocal()
+            listOf(BigFraction.ofLong(7), BigFraction.ofLong(7) + if (maximize) third else third.negated())
+        } else expected.map(BigFraction::ofLong)
+        assertEquals(expectedValues, values)
         assertTrue(terminal)
         assertEquals(if (route == "quadratic-integer") Verdict.BEST_FOUND else Verdict.OPTIMAL, completed)
     }
