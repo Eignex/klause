@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -128,6 +129,22 @@ class OpenTheoryPipelineTest {
         assertNotNull(authority.incumbent)
         assertNull(authority.terminal)
         assertNull(authority.bound)
+    }
+
+    @Test
+    fun `exact declarative rows retain constant objective authority without finite propagation`() {
+        val third = BigFraction.ofLong(3).reciprocal()
+        val row = ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)), listOf(third), LinearOp.EQ, BigFraction.ONE)
+        val model = Problem(0, 0, emptyArray(), arrayOf(row), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val request = OpenTheoryRequest(model, LinearObjective(constant = 7))
+
+        val result = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(request)).result
+
+        val optimum = assertIs<OpenTheoryOptimum.Optimal>(result)
+        assertEquals(BigFraction.ofLong(7), optimum.value)
+        assertEquals("3", optimum.assignment.realValue(0))
     }
 
     @Test
