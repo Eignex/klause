@@ -575,7 +575,7 @@ object BenchCli {
             put("compilerExit", failure.exitCode)
             put("compilerElapsedNs", failure.elapsedNs)
             put("compilerCommand", Reports.json.encodeToJsonElement(failure.command))
-            put("sourceHashes", Reports.json.encodeToJsonElement(SolveEvidence.sourceHashes(candidate.ref)))
+            put("sourceHashes", Reports.json.encodeToJsonElement(failure.sourceHashes))
             put("compilerIdentity", Reports.json.encodeToJsonElement(failure.compiler))
         })
         return false

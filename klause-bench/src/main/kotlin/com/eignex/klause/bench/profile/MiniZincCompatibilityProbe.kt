@@ -58,7 +58,7 @@ internal object MiniZincCompatibilityProbe {
                         put("repetition", repetition)
                         put("elapsedNs", System.nanoTime() - start)
                         put("compilerExit", failure?.exitCode ?: 0)
-                        put("compilerCommand", failure?.command?.let { Reports.json.encodeToJsonElement(it) })
+                        put("compilerCommand", Reports.json.encodeToJsonElement(failure?.command))
                         put("compilerElapsedNs", failure?.elapsedNs)
                         put("status", if (failure == null) "compilable" else "source-compiler-incompatible")
                         put("reason", failure?.incompatibility)
