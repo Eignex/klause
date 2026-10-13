@@ -43,7 +43,7 @@ class LinearOptimizationExecutionTest {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val wide = BigFraction.of(parseBigInt("18446744073709551616"), BIG_ONE)
-        val third = BigFraction.ONE / BigFraction.ofLong(3)
+        val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
         val pins = mapOf(integer to wide, real to third)
         val context = SourceProofContext(scope.copy(condition = SourceCondition(mapOf(0 to true), pins, pins)),
             setOf(bool, integer, real), emptyMap(), mapOf(integer to BigFraction.ONE, real to BigFraction.ONE))
@@ -66,7 +66,8 @@ class LinearOptimizationExecutionTest {
         val result = OpenTheoryPipeline.optimizeLinear(restricted)
 
         for (evidence in listOf(assertNotNull(result.terminal), assertNotNull(result.bound))) {
-            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(parent.withLinearAuthority()).verify(evidence))
+            assertIs<SourceEvidenceCheck.Rejected>(
+                SourceEvidenceVerifier(parent.withLinearAuthority()).verify(evidence))
         }
     }
 
