@@ -265,7 +265,7 @@ internal object ObjectiveRepresentationProbe {
         var weaker = "not applicable"
         if (result is QuadraticOptimizationResult.Optimal) {
             check(retained is QuadraticOptimizationResult.Optimal)
-            check(result.certificate.derivation != null)
+            checkNotNull(result.certificate.derivation)
             check(retained.certificate.derivation === result.certificate.derivation)
             check(retained.bound.certificate.derivation === result.bound.certificate.derivation)
             if (encoding == "linear") {

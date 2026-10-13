@@ -143,6 +143,9 @@ invocation conditions. Equal-shaped replacement objectives cannot recapture an o
 native completion. Incompatible quadratic views or nonfinite affine metadata
 supply no original affine binding; explicit quadratic capture retains its own
 objective identity.
+Quadratic portfolio admission keeps the actual caller invocation while using the
+normalized quadratic plan for strategy selection; rebinding that plan cannot
+replace the original affine identity used by its workers and terminal verifier.
 The integer, branch-completion and finite quadratic producers use these typed records.
 Their source checker must justify coordinate
 bindings and complete coverage; a flat branch list is not a traversal proof. A
