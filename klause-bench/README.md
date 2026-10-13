@@ -1049,7 +1049,9 @@ deploy/lab profile com.eignex.klause.bench.profile.ObjectiveFrontendProbe <branc
 
 [verify_objective_frontend.py](tools/verify_objective_frontend.py) checks the complete
 manifest matrix, original hashes, exact witnesses/costs, source bound direction,
-global inequalities and strictness. Its one-variable affine controls independently
+global inequalities and strictness. Multiple accepted models use the shared stream
+checker for every source witness, exact cost and strict original-direction improvement;
+terminal checks use the final published point. Its one-variable affine controls independently
 check source approach paths and witness-anchored improving rays. Heuristics retain
 BestFound status; MIXED may finish before a heuristic move. Actual engine proof
 export is not captured. Provisioning uses pinned source-check requirements in an

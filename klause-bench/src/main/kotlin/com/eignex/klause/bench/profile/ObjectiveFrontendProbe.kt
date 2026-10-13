@@ -121,7 +121,7 @@ internal object ObjectiveFrontendProbe {
         execute(File(output, "checker.log"), python,
             "klause-bench/tools/verify_objective_frontend.py", output.absolutePath)
         val tools = listOf("verify_objective_frontend.py", "verify_nra_source_results.py", "verify_source_results.py",
-            "requirements-source-checks.txt")
+            "verify_stream_source_results.py", "requirements-source-checks.txt")
         File(output, "checker-tool-hashes.json").writeText(buildJsonObject {
             for (tool in tools) put(tool, sha256(File("klause-bench/tools", tool).readBytes()))
         }.toString() + "\n")
