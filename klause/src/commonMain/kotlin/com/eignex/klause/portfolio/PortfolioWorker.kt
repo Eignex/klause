@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -87,6 +88,8 @@ class PortfolioWorker private constructor(
         sharedPools?.varBounds?.bindInvocation(invocation)
         sharingInvocation = invocation
     }
+    internal var executionAssumptions: Assumptions? = null
+        private set
 
     internal fun bindInvocation(invocation: EngineInvocation): PortfolioWorker = also {
         require(evidenceModel?.matches(invocation.model) == true) { "invocation differs from the worker model" }
@@ -245,7 +248,7 @@ class PortfolioWorker private constructor(
                 },
                 withInstructions = withInstructionBudget != null,
                 closeFn = { session.close() },
-            )
+            ).also { it.executionAssumptions = params.assumptions }
         }
 
         /**

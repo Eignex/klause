@@ -24,6 +24,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -91,10 +92,17 @@ internal class OpenPortfolio(
             addAll(localSearch)
         }
         if (factories.isEmpty()) return OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
-        val portfolio = PortfolioInvocation(preparedPlan, factories,
+        val identity = ModelIdentity.of(sourceModel)
+        val binding = EngineInvocation(preparedPlan, identity)
+        val boundFactories = factories.map { factory ->
+            PortfolioArmFactory(preparedPlan, factory.armId, factory.family,
+                bind = { it.bindInvocation(binding) }) { slot -> factory.materialize(preparedPlan, slot) }
+        }
+        val portfolio = PortfolioInvocation(preparedPlan, boundFactories,
             PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
                 nodeBudget = theoryParams.nodeBudget),
-            PortfolioEvidence(ModelIdentity.of(sourceModel), openWitnessVerifier(sourceModel, null))) { workers ->
+            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, null))
+                .bindInvocation(binding, lifetime or cancellation)) { workers ->
             PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = false),
                 reservedShares(workers, if (request != null) THEORY_SHARE else 0.0))
         }
@@ -148,11 +156,17 @@ internal class OpenPortfolio(
         }
         if (factories.isEmpty()) return OpenTheoryOptimum.Bounded(null, null,
             TerminationReason.Unsupported, SolveStats.EMPTY)
-        val portfolio = PortfolioInvocation(preparedPlan, factories,
+        val identity = ModelIdentity.of(sourceModel, objective)
+        val binding = EngineInvocation(preparedPlan, identity, objective)
+        val boundFactories = factories.map { factory ->
+            PortfolioArmFactory(preparedPlan, factory.armId, factory.family,
+                bind = { it.bindInvocation(binding) }) { slot -> factory.materialize(preparedPlan, slot) }
+        }
+        val portfolio = PortfolioInvocation(preparedPlan, boundFactories,
             PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
                 nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0),
-            PortfolioEvidence(ModelIdentity.of(sourceModel, objective),
-                openWitnessVerifier(sourceModel, objective))) { workers ->
+            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, objective))
+                .bindInvocation(binding, lifetime or cancellation)) { workers ->
             PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = true),
                 reservedShares(workers, if (minimizer != null || rational) DESCENT_SHARE else 0.0))
         }
