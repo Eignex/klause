@@ -18,6 +18,7 @@ import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
@@ -78,5 +79,45 @@ class AffineOptimizationExecutionTest(
         }
         if (engine == FiniteEngine.MIXED) assertEquals(3, result.stats.portfolio.arms.size)
         assertTrue(execution.nativeWork > 0)
+    }
+
+    @Test
+    fun `accepted callbacks preserve exact source values for both objective encodings`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(1.0, Double.POSITIVE_INFINITY))
+        val expected = BigFraction.ofLong(constant) +
+            if (sense == ObjectiveSense.MINIMIZE) BigFraction.ZERO else BigFraction.ONE
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17), alnsIterations = 1,
+        ))
+        val published = mutableListOf<QuadraticIncumbentPublication>()
+
+        val execution = if (affine) OpenTheoryPipeline.optimize(
+            source.pipelineRequest(),
+            LinearObjective(constant = constant, realCoefficients = doubleArrayOf(0.0, 1.0)),
+            params, engine, sense, 1, onAccepted = { published += it },
+        ) else OpenTheoryPipeline.minimize(
+            source.pipelineRequest(), QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(
+                QuadraticCoefficient.ONE, QuadraticVariable.Real(SourceRealId(1)),
+            )), QuadraticCoefficient.ofLong(constant)), params, engine, sense, 1,
+            onAccepted = { published += it },
+        )
+
+        assertTrue(published.isNotEmpty())
+        val arithmetic = AlgebraicArithmetic()
+        for (publication in published) {
+            val values = requireNotNull(publication.incumbent.sample.algebraicReals)
+            assertEquals(0, arithmetic.compare(arithmetic.multiply(values[0], values[0]), values[1]))
+            val originalValue = arithmetic.add(arithmetic.rational(BigFraction.ofLong(constant)), values[1])
+            assertEquals(0, arithmetic.compare(originalValue, publication.incumbent.value))
+        }
+        for ((previous, next) in published.zipWithNext()) {
+            val comparison = arithmetic.compare(previous.incumbent.value, next.incumbent.value)
+            assertTrue(if (sense == ObjectiveSense.MINIMIZE) comparison > 0 else comparison < 0)
+            assertTrue(next.version > previous.version)
+        }
+        assertEquals(expected, published.last().incumbent.value.rational)
+        assertSame(published.last(), execution.acceptedIncumbent)
     }
 }
