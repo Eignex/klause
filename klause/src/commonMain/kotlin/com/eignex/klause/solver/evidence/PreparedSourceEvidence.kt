@@ -23,5 +23,5 @@ fun PreparedSourcePlan.sourceResultCapture(
     }
     val scope = SourceScope(revision, assumptions.sourceCondition(), descriptor)
     val context = original.sourceProofContext(scope, objective, cancellation) ?: return null
-    return SourceResultCapture(context)
+    return SourceResultCapture.forOriginal(context, original, objective)
 }

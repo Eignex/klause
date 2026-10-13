@@ -89,6 +89,23 @@ projection transfers only a proof using its covered premises; source-specific ta
 semantic extensions remain unavailable without their own projection justification.
 Projection obligations and terminal checks share one containing verification allowance.
 
+Completed mapping capture retains the reduced package, including worker imports, and
+every optional stage in `SourceResultEvidence.mappings`. Reconstruction checks the
+original witness and removes private target coordinates. Supported refutation and
+bound citations are translated into original premise references and checked against
+the original context; identity Boolean/integer coverage and compatible imports retain
+their actual derivations. This checks the original claim, not an entire projection
+contract. Missing stages, source-specific derivations and unsupported coordinate
+coverage remain unavailable. Mapping normalization and verification share one allowance.
+
+`SourceResultEvidence.engineScope` records terminal admission separately from original
+derivation scope. A transformed terminal retains reduced or unknown engine scope until
+its original claim checks. Completion-taking issuance refuses that foreign or missing
+admission scope; original witnesses remain separately checkable. Recapture cannot erase
+withheld admission. Mapping capture keeps original exact objective units and source
+sense; ordinary minimization telemetry stays in minimized units. Transformation flags
+and reduced engine labels provide no independent original-source proof coverage.
+
 `SourceResultCapture.quadratic` retains exact incumbent, bound, limit and unboundedness
 claims on quadratic results. General unboundedness requires a source-specific
 trajectory derivation; an affine `Ray` retains its explicit direction. Completed
