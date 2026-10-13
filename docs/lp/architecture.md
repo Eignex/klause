@@ -110,6 +110,9 @@ For unrounded Lagrangian bound `L`, reduced cost `d(j)` and cutoff `U`, a fixing
 allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoint.
 Use that certificate's costs and scale, round integer movement on the source
 lattice, and retain cutoff and row/bound premises.
+Continuous terms contribute exact source-valid endpoints to mixed certificates;
+they do not become integer domain-fixing targets. Fractional objective gaps retain
+source units and do not acquire an integer objective lattice.
 
 Objective changes retract dependent bounds, cuts and clauses. If dependent
 learning cannot be retracted selectively, restore an objective-independent
