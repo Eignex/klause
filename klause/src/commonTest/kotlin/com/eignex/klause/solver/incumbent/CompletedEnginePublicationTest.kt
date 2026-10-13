@@ -14,6 +14,7 @@ import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -25,6 +26,93 @@ class CompletedEnginePublicationTest {
     private val model = ModelIdentity.of(source, objective)
     private val invocation = EngineInvocation(plan, model, objective)
     private val verifier = ModelEvidenceVerifier<Sample, Double>(model, CandidateVerifier.trusting())
+
+    @Test
+    fun `native witness publication retains its actual point and execution value`() {
+        val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(invocation, sample, 2.0))
+
+        val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate),
+            invocation = invocation)
+
+        assertIs<Verification.Accepted<*, *>>(checked)
+    }
+
+    @Test
+    fun `native witness publication cannot authorize another point or value`() {
+        val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(invocation, sample, 2.0))
+
+        for ((point, value) in listOf(sample.copy(ints = longArrayOf(3, 1)) to 2.0, sample to 3.0)) {
+            val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(point, value), certificate),
+                invocation = invocation)
+
+            assertIs<Verification.Rejected>(checked)
+        }
+    }
+
+    @Test
+    fun `native witness publication requires its actual consumer invocation`() {
+        val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(invocation, sample, 2.0))
+
+        val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate))
+
+        assertIs<Verification.Indeterminate>(checked)
+    }
+
+    @Test
+    fun `native witness publication enforces its source restrictions`() {
+        val restricted = EngineInvocation(plan, model, objective,
+            sourceAssumptions = Assumptions(ints = mapOf(0 to 3L)))
+        val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(restricted, sample, 2.0))
+
+        val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate),
+            invocation = restricted)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `native witness publication cannot cross runtime restrictions`() {
+        val restricted = EngineInvocation(plan, model, objective,
+            sourceAssumptions = Assumptions(ints = mapOf(0 to 2L)))
+        val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(restricted, sample, 2.0))
+
+        val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate),
+            invocation = invocation)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `native witness publication preserves unavailable source validation`() {
+        val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(invocation, sample, 2.0))
+        val incomplete = ModelEvidenceVerifier<Sample, Double>(model) {
+            Verification.Indeterminate("source unavailable")
+        }
+
+        val checked = incomplete.verify(ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate),
+            invocation = invocation)
+
+        assertIs<Verification.Indeterminate>(checked)
+    }
+
+    @Test
+    fun `cancelled native witness restriction checks withhold admission`() {
+        val restricted = EngineInvocation(plan, model, objective,
+            sourceAssumptions = Assumptions(ints = mapOf(0 to 2L)))
+        val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(restricted, sample, 2.0))
+
+        val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate),
+            invocation = restricted, cancellation = Cancellation { true })
+
+        assertIs<Verification.Indeterminate>(checked)
+    }
 
     @Test
     fun `native objective publication retains its actual value`() {
