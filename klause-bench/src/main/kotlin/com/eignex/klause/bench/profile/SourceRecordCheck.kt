@@ -60,8 +60,8 @@ object SourceRecordCheck {
             sources.resolve("$digest.txt").writeBytes(source)
         }
         val log = out.resolve("checker-install.log")
-        fun execute(file: File, vararg command: String) {
-            val process = ProcessBuilder(command.toList()).redirectErrorStream(true)
+        fun execute(file: File, vararg command: String, extraArguments: List<String> = emptyList()) {
+            val process = ProcessBuilder(command.toList() + extraArguments).redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(file)).start()
             check(process.waitFor() == 0) { "${command.first()} failed; see ${file.path}" }
         }
@@ -83,7 +83,7 @@ object SourceRecordCheck {
             cases.absolutePath, "--source-root", sources.absolutePath,
             "--progress", out.resolve("checked-prefix.jsonl").absolutePath,
             "--output", out.resolve("source-checks.json").absolutePath,
-            *if (witnessOnly) arrayOf("--witness-only") else emptyArray())
+            extraArguments = if (witnessOnly) listOf("--witness-only") else emptyList())
         check(environment.deleteRecursively())
         println(out.resolve("source-checks.json").readText())
     }
