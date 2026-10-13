@@ -136,7 +136,8 @@ class SourceEvidenceVerifier(
                         !scope.condition.implies(imported.scope.condition)
                     ) return reject("import has a foreign source, objective or stronger assumptions")
                     if (claim is SourceClaim.Witness || claim is SourceClaim.Ray ||
-                        claim is SourceClaim.Optimal || claim is SourceClaim.Limit || claim is SourceClaim.Extension) {
+                        claim is SourceClaim.Optimal || claim is SourceClaim.Limit || claim is SourceClaim.Unbounded ||
+                        claim is SourceClaim.Extension) {
                         return reject("import does not establish the requested claim")
                     }
                     val matching = matchSourceClaims(claim, imported.claim, cancellation)
@@ -237,7 +238,7 @@ class SourceEvidenceVerifier(
                     }
                     verify(discharged.refutation, scope.copy(condition = condition), depth + 1)
                 }
-                is SourceClaim.Limit, is SourceClaim.Extension ->
+                is SourceClaim.Limit, is SourceClaim.Unbounded, is SourceClaim.Extension ->
                     SourceEvidenceCheck.Unavailable("source-specific claim requires a supported derivation")
                 SourceClaim.Refutation -> if (inequality(derivation, scope, depth + 1).contradicts()) {
                     SourceEvidenceCheck.Checked

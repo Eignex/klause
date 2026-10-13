@@ -14,16 +14,18 @@ import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.polynomialFor
 import com.eignex.klause.solver.result.QuadraticIncumbent
-import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialBooleanCondition
+import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialObjectiveResult
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.theory.qfnra.QfNraParams
-import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.polynomialPointFixings
+import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -31,13 +33,13 @@ import com.eignex.klause.util.bigIntOf
 
 internal sealed interface QuadraticBranchResult {
     data class Optimal(
-        val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: Any,
+        val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: SourceDerivation,
     ) : QuadraticBranchResult
     data class Limit(
-        val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: Any,
+        val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: SourceDerivation,
     ) : QuadraticBranchResult
-    data class Unbounded(val incumbent: QuadraticIncumbent, val proof: Any) : QuadraticBranchResult
-    data class Infeasible(val proof: Any) : QuadraticBranchResult
+    data class Unbounded(val incumbent: QuadraticIncumbent, val proof: SourceDerivation) : QuadraticBranchResult
+    data class Infeasible(val proof: SourceDerivation) : QuadraticBranchResult
     data object Unknown : QuadraticBranchResult
 }
 
@@ -95,7 +97,7 @@ internal class QuadraticBranchCompletion(
                 }
             ) {
                 arithmetic.step()
-                return QuadraticBranchResult.Infeasible(condition)
+                return QuadraticBranchResult.Infeasible(QuadraticEngineDerivation.Condition(condition))
             }
             val expression = objective.polynomialFor(finite).let {
                 if (sense == ObjectiveSense.MINIMIZE) it else PolynomialExpression.Product(listOf(
@@ -117,7 +119,9 @@ internal class QuadraticBranchCompletion(
             if (convex != null) {
                 val point = capture(convex.assignment, finite)
                 arithmetic.step()
-                QuadraticBranchResult.Optimal(point, point.value, convex)
+                QuadraticBranchResult.Optimal(point, point.value, QuadraticEngineDerivation.Both(
+                    QuadraticEngineDerivation.Condition(condition), QuadraticEngineDerivation.Convex(convex),
+                ))
             } else {
                 val result = solvePolynomialObjectiveImage(
                     model.service.formula, expression, model.service.boolCount, model.service.realCount,
@@ -126,15 +130,23 @@ internal class QuadraticBranchCompletion(
                 native.observe(result.stats)
                 when (result) {
                     is PolynomialObjectiveResult.Optimum -> QuadraticBranchResult.Optimal(
-                        capture(result.assignment, finite), sourceValue(result.value), result.evidence,
+                        capture(result.assignment, finite), sourceValue(result.value),
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
                     is PolynomialObjectiveResult.Infimum -> QuadraticBranchResult.Limit(
-                        capture(result.incumbent, finite), sourceValue(result.value), result.evidence,
+                        capture(result.incumbent, finite), sourceValue(result.value),
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
                     is PolynomialObjectiveResult.Unbounded -> QuadraticBranchResult.Unbounded(
-                        capture(result.incumbent, finite), result.evidence,
+                        capture(result.incumbent, finite),
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
-                    is PolynomialObjectiveResult.Infeasible -> QuadraticBranchResult.Infeasible(condition)
+                    is PolynomialObjectiveResult.Infeasible -> QuadraticBranchResult.Infeasible(
+                        QuadraticEngineDerivation.Condition(condition),
+                    )
                     is PolynomialObjectiveResult.Unknown -> {
                         result.resource?.let(native::decline)
                         QuadraticBranchResult.Unknown

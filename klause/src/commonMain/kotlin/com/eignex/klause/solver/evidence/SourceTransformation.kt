@@ -57,12 +57,9 @@ class SourceTransformationVerifier(
         if (transformation.source != source.scope || transformation.target != target.scope) {
             return SourceEvidenceCheck.Rejected("transformation belongs to different source revisions or invocations")
         }
-        if ((target.scope.condition.lower.keys + target.scope.condition.upper.keys).any {
-                it !in target.coordinates
-            } || target.scope.condition.bools.keys.any {
-                SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in target.coordinates
-            }
-        ) return SourceEvidenceCheck.Rejected("target invocation references undeclared coordinates")
+        if (!declaredCondition(source) || !declaredCondition(target)) {
+            return SourceEvidenceCheck.Rejected("transformation invocation references undeclared coordinates")
+        }
         if (transformation.images.keys != target.coordinates) {
             return SourceEvidenceCheck.Unavailable("transformation lacks a total target coordinate image")
         }
@@ -242,3 +239,9 @@ class SourceTransformationVerifier(
         return SourceInequality(coefficients, rhs, row.strict)
     }
 }
+
+private fun declaredCondition(context: SourceProofContext): Boolean =
+    (context.scope.condition.lower.keys + context.scope.condition.upper.keys).all { it in context.coordinates } &&
+        context.scope.condition.bools.keys.all {
+            SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in context.coordinates
+        }

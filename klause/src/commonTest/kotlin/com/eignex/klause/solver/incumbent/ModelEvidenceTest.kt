@@ -1,7 +1,12 @@
 package com.eignex.klause.solver.incumbent
 
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
 import kotlin.test.Test
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 class ModelEvidenceTest {
     @Test
@@ -76,4 +81,32 @@ class ModelEvidenceTest {
 
         assertIs<Verification.Accepted<*, *>>(verifier.verify(claim))
     }
+    @Test
+    fun `a conditional refutation cannot be imported into its containing source invocation`() {
+        val model = ModelIdentity.of(Any())
+        val original = SourceScope(SourceRevision("original", "exact-affine"))
+        val conditional = original.copy(condition = SourceCondition(bools = mapOf(0 to true)))
+        val certificate = assertNotNull(EvidenceCertificate.completed(model, EvidenceKind.Infeasible,
+            CompletedEngineResult.Solve(conditional, SolveResult.Unsat())))
+        val verifier = ModelEvidenceVerifier<String, Int>(model, CandidateVerifier.trusting())
+        val claim = ModelEvidence.Infeasible(model, certificate)
+
+        val checked = verifier.verify(claim, original)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `a consumer without a source invocation cannot import a scoped refutation`() {
+        val model = ModelIdentity.of(Any())
+        val scope = SourceScope(SourceRevision("original", "exact-affine"))
+        val certificate = assertNotNull(EvidenceCertificate.completed(model, EvidenceKind.Infeasible,
+            CompletedEngineResult.Solve(scope, SolveResult.Unsat())))
+        val verifier = ModelEvidenceVerifier<String, Int>(model, CandidateVerifier.trusting())
+
+        val checked = verifier.verify(ModelEvidence.Infeasible(model, certificate))
+
+        assertIs<Verification.Indeterminate>(checked)
+    }
+
 }

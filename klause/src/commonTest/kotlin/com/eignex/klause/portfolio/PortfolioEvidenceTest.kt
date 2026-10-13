@@ -3,7 +3,11 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -116,6 +120,37 @@ class PortfolioEvidenceTest {
             assertEquals(objective.evaluateExact(optimum),
                 objective.evaluateExact(assertIs<MinimizeResult.Optimal>(result).sample))
         }
+    }
+
+
+    @Test
+    fun `a foreign completion scope is quarantined before engine admission`() {
+        val model = ModelIdentity.of(Any())
+        val scope = SourceScope(SourceRevision("original", "exact-affine"))
+        val worker = PortfolioWorker.ofSolve("complete", 0) { _, _ -> SolveResult.Unsat() }
+            .bindEvidence(model).bindSourceScope(scope)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
+        val foreign = scope.copy(revision = scope.revision.copy(identity = "foreign"))
+
+        val checked = verifier.proof(worker, EvidenceKind.Infeasible,
+            CompletedEngineResult.Solve(foreign, SolveResult.Unsat()))
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `an invalid completed optimum witness cannot gain admission from its label`() {
+        val model = ModelIdentity.of(Any())
+        val scope = SourceScope(SourceRevision("original", "exact-affine"))
+        val worker = PortfolioWorker.ofSolve("complete", 0) { _, _ -> SolveResult.Unsat() }
+            .bindEvidence(model).bindSourceScope(scope)
+        val verifier = PortfolioEvidence(model) { Verification.Rejected("original source refutes this point") }
+        verifier.bindSourceScope(scope)
+        val result = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 0.0)
+
+        val checked = verifier.proof(worker, EvidenceKind.Bound, CompletedEngineResult.Minimize(scope, result))
+
+        assertIs<Verification.Rejected>(checked)
     }
 
 }
