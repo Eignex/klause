@@ -29,12 +29,13 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
         source.writeText(when (route) {
             "quadratic-polynomial" -> """
                 (declare-const b Bool) (declare-const x Real)
-                (assert (= x (ite b 1 0))) ($direction $objective) (check-sat)
+                (assert (= x (ite b 0 1))) ($direction $objective) (check-sat)
             """.trimIndent()
             "quadratic-integer" -> """
                 (declare-const i Int) (declare-const x Real)
                 (assert (and (>= i 0) (<= i 1) (= x (to_real i))))
-                ($direction ${if (maximize) "(+ 7 (* i i))" else "(- 7 (* i i))"}) (check-sat)
+                ($direction ${if (maximize) "(- 7 (* (- (* 3 i) 2) (- (* 3 i) 2)))"
+                else "(+ 7 (* (- (* 3 i) 2) (- (* 3 i) 2)))"}) (check-sat)
             """.trimIndent()
             else -> """
                 var 0..1: i :: output_var;
@@ -82,7 +83,10 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
             source.delete()
         }
 
-        assertEquals(listOf(BigFraction.ofLong(7), BigFraction.ofLong(if (maximize) 8 else 6)), values)
+        val expected = if (route == "quadratic-integer") {
+            if (maximize) listOf(3L, 6L) else listOf(11L, 8L)
+        } else listOf(7L, if (maximize) 8L else 6L)
+        assertEquals(expected.map(BigFraction::ofLong), values)
         assertTrue(terminal)
         assertEquals(Verdict.OPTIMAL, completed)
     }
