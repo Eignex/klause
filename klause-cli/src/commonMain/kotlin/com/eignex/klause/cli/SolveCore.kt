@@ -264,6 +264,7 @@ internal object SolveCore {
                         output,
                         rawSolvable.routingLpStats,
                         rawSolvable.routingElapsedMs,
+                        completePool = false,
                         publication = publication,
                     ) {
                         budgetSpent(common, it)
@@ -357,6 +358,7 @@ internal object SolveCore {
                         output,
                         rawSolvable.routingLpStats,
                         rawSolvable.routingElapsedMs,
+                        completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
                         publication = publication,
                     ) {
                         budgetSpent(common, it)
