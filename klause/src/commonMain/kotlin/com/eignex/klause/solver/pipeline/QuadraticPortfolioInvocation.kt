@@ -77,8 +77,10 @@ internal class QuadraticPortfolioInvocation(
         create: (Int, PortfolioWorkerSlot, QuadraticNativeScope, () -> QuadraticIncumbent?) -> PortfolioWorker,
     ): QuadraticOptimizationResult {
         val admission = plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE)
-        if (!admission.runnable || expected == null) return QuadraticOptimizationResult.Unknown(
+        if (!admission.runnable || expected == null || !expected.matchesModel(identity) || expected.sense != sense) {
+            return QuadraticOptimizationResult.Unknown(
             null, TerminationReason.Unsupported, sense, SolveStats.EMPTY)
+        }
         val factories = admission.arms.map { strategy ->
             val arm = when (strategy) {
                 ExecutionStrategy.COMPLETE -> 0
