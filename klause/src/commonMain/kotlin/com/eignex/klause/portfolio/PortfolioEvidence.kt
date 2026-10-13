@@ -50,6 +50,13 @@ internal class PortfolioEvidence(
     fun witness(worker: PortfolioWorker, sample: Sample, value: Double?): Verification<Sample, Double?> {
         val identity = worker.evidenceModel ?: return Verification.Indeterminate("worker has no model identity")
         val candidate = Candidate(sample, value)
+        val produced = worker.evidenceInvocation?.checkWitness(sample, scopeCancellation)
+            ?: worker.evidenceScope?.condition?.checkWitness(sample, scopeCancellation)
+        when (produced) {
+            is SourceEvidenceCheck.Rejected -> return Verification.Rejected(produced.reason)
+            is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(produced.reason)
+            SourceEvidenceCheck.Checked, null -> Unit
+        }
         val conditions = invocation?.checkWitness(sample, scopeCancellation)
             ?: sourceScope?.condition?.checkWitness(sample, scopeCancellation)
         when (val checked = conditions) {
