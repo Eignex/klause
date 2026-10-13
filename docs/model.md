@@ -194,3 +194,18 @@ against its retained source mapping, preserving arbitrary-width integers, ration
 algebraic and symbolic reals. Missing or multiply represented coordinates withhold
 publication. [Typed contributions](api.md#typed-contributions-and-migration) define
 the decoding and ownership boundary; assembly adds no independent proof authority.
+
+## Factor projection selection
+
+`FactorProjectionProviders.prepare(problem)` captures immutable selected propagation,
+scoring and relaxation descriptors against one canonical `Problem`. The descriptors
+couple declared capabilities to their factories or emitters; null selects an unsupported
+role, while an explicit inert descriptor records deliberate absence. Source factors
+remain engine-neutral and borrowed read-only. `forProblem` retains the capture only
+for the identical model; a rewritten or remapped model selects against its own factors.
+
+`PropagationProblem(problem, selection)` and `LocalSearchProblem(problem, selection,
+domains)` open mechanisms from that capture. Factories allocate private mutable
+mechanisms or stateless projections whose payloads belong to engine states. Scoring
+uses the actual move domains when choosing exact wide-linear sums. Built-in selectors
+retain their existing algorithms, relation indexes and linear-row caches.

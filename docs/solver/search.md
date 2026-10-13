@@ -452,3 +452,15 @@ from truncating an evidenced sub-millisecond measurement. The
 pipeline, declared theory and reported backend without extending search clocks.
 
 `openReductionNs` is zero when the cap is off or no reduction pass is needed.
+
+## Selected propagation projections
+
+`PropagationProjectionProvider` selects a source-bound factory and its filtering and
+pinned-assignment-check capabilities during preparation. Engine projection creation
+rejects a factory whose `NoPropagator` result disagrees with its declared inert role.
+An unsupported role refuses construction. Alternative deductions must remain sound
+for the original factor, including watcher subscriptions and explanations.
+
+A selected custom propagation provider uses the general CP lane, including on clause
+models, so packed SAT propagation cannot bypass the replacement. The built-in
+provider retains native-clause eligibility and owner-local table/MDD preparation.

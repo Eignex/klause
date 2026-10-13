@@ -15,8 +15,6 @@ import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.*
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.solver.ScoringCapability
-import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongHashSet
@@ -27,19 +25,14 @@ import com.eignex.klause.util.MutableIntIntMap
  * moves over: a linear row whose running sum can leave the 64-bit range over them takes the exact
  * [ExactLinearInvariant].
  */
-internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Invariant {
-    val capabilities = executionCapabilities()
-    check(capabilities.scoring != ScoringCapability.UNSUPPORTED) {
-        "unsupported local-search route for ${this::class.simpleName}; implement Invariant or delegate to NoInvariant"
-    }
-    return buildInvariantProjection(domains).also {
-        check((it === NoInvariant) == (capabilities.scoring == ScoringCapability.INERT)) {
-            "local-search capability disagrees with projection for ${this::class.simpleName}"
-        }
-    }
-}
+internal fun Factor.invariantProjection(
+    domains: Array<IntDomain>? = null,
+    provider: ScoringProjectionProvider = BuiltInScoringProjectionProvider,
+): Invariant = checkNotNull(provider.select(this)) {
+    "unsupported local-search route for ${this::class.simpleName}; select a scoring provider"
+}.create(domains)
 
-private fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invariant = when (this) {
+internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invariant = when (this) {
     is AllDifferent -> allDifferentInvariantProjection()
 
     is ArrayMinMax -> ArrayMinMaxInvariant(result, xs, max)

@@ -31,6 +31,7 @@ import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.emitLpRelaxation
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
@@ -637,6 +638,7 @@ internal class CpToLpRelaxation(
     private val suppressedHullFactors: Set<Int> = emptySet(),
     internal val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
     deferred: Boolean = false,
+    private val projections: PreparedFactorProjections? = null,
 ) {
     private val linearProjection = LinearLpProjection()
 
@@ -657,6 +659,7 @@ internal class CpToLpRelaxation(
     private var structurallyPersistent: Boolean = false
 
     init {
+        projections?.requireSource(problem)
         if (!deferred) preparation().forEach { }
     }
 
@@ -668,7 +671,7 @@ internal class CpToLpRelaxation(
             owner.preparation().forEach { yield(Unit) }
             cumulativeRelaxation = owner.takeIf { it.applicable }
         }
-        structurallyPersistent = !objectiveCone && !cumulative && !diffn
+        structurallyPersistent = !objectiveCone && !cumulative && !diffn && projections?.builtInRelaxation != false
         if (structurallyPersistent) for (fid in problem.factors.indices) {
             val factor = problem.factors[fid]
             if (factor is ReifiedLinear || factor is ReifiedPseudoBoolean || factor is ReifiedCardinality ||
@@ -1263,7 +1266,11 @@ internal class CpToLpRelaxation(
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags)
-                factor.emitLpRelaxation(this, linearProjection)
+                if (projections == null) {
+                    factor.emitLpRelaxation(this, linearProjection)
+                } else {
+                    projections.emitRelaxation(factorId, this, linearProjection)
+                }
                 attributeRows(factorId)
             }
 
