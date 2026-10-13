@@ -14,7 +14,10 @@ internal class ArithmeticPublication(private val output: OutputProtocol) {
     fun publish(rendered: String, objective: SourceValue, acceptedVersion: Long? = null): Boolean {
         val sourceValue = output.arithmeticSourceValue(objective) ?: return false
         if (acceptedVersion != null && acceptedVersion == lastAcceptedVersion) return true
-        if (rendered == lastRendered && sameObjective(sourceValue, lastObjective)) return true
+        if (rendered == lastRendered && sameObjective(sourceValue, lastObjective)) {
+            if (acceptedVersion != null) lastAcceptedVersion = acceptedVersion
+            return true
+        }
         if (!output.onArithmeticIncumbent(rendered, sourceValue)) return false
         lastRendered = rendered
         lastObjective = sourceValue
