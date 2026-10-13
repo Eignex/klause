@@ -13,15 +13,10 @@ import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
-import java.io.File
-import java.math.BigInteger
-import java.security.MessageDigest
-import java.util.Base64
-import java.util.Locale
-import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -30,6 +25,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
+import java.io.File
+import java.math.BigInteger
+import java.security.MessageDigest
+import java.util.Base64
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 /** Inspect bounded Diffn proposals at a supplied integer MiniZinc witness on a remote profile host. */
@@ -67,23 +68,44 @@ object DiffnNeighborhoodProbe {
         val execution = parseFlatZincExecution(fzn.readText())
         val program = execution.program
         require(program.problem.numRealVars == 0 && program.floatVarsByName.isEmpty())
-        out.resolve("variable-map.json").writeText(buildJsonObject {
+        out.resolve("variable-map.json").writeText(
+            buildJsonObject {
             put("integers", buildJsonObject { for ((name, v) in program.intVarsByName) put(name, v) })
             put("booleans", buildJsonObject { for ((name, v) in program.boolVarsByName) put(name, v) })
-            put("arrays", buildJsonObject {
+            put(
+                "arrays",
+                buildJsonObject {
                 for ((name, array) in program.arraysByName) {
                     if (array !is FlatZincArray.Vars) continue
-                    put(name, buildJsonObject {
+                    put(
+                        name,
+                        buildJsonObject {
                         put("kind", array.elementKind.name)
-                        put("variables", buildJsonArray { for (v in array.varIds) add(kotlinx.serialization.json.JsonPrimitive(v)) })
-                    })
+                        put(
+                            "variables",
+                            buildJsonArray { for (v in array.varIds) add(JsonPrimitive(v)) },
+                        )
+                    }
+                    )
                 }
-            })
-        }.toString() + "\n")
+            }
+            )
+        }.toString() + "\n"
+        )
         val directive = program.solve
         val objectiveName = when (directive) {
-            is SolveDirective.Minimize -> directive.objVar.also { require(directive.kind == SolveDirective.ObjKind.Int) }
-            is SolveDirective.Maximize -> directive.objVar.also { require(directive.kind == SolveDirective.ObjKind.Int) }
+            is SolveDirective.Minimize -> directive.objVar.also {
+                require(
+                    directive.kind == SolveDirective.ObjKind.Int,
+                )
+            }
+
+            is SolveDirective.Maximize -> directive.objVar.also {
+                require(
+                    directive.kind == SolveDirective.ObjKind.Int,
+                )
+            }
+
             else -> error("integer optimization source required")
         }
         val objectiveVar = requireNotNull(program.intVarsByName[objectiveName])
@@ -120,16 +142,22 @@ object DiffnNeighborhoodProbe {
                             state.apply(move)
                             val cost = state.cost
                             val objective = state.assignment.intValue(objectiveVar)
-                            add(buildJsonObject {
+                            add(
+                                buildJsonObject {
                                 put("factor", factorId)
                                 put("draw", draw)
                                 put("move", move.toString())
                                 put("cost", cost)
                                 put("predictedCost", predicted)
                                 put("objective", objective.toString())
-                                put("objectiveDelta", BigInteger.valueOf(objective).subtract(
-                                    BigInteger.valueOf(initialObjective)).toString())
-                            })
+                                put(
+                                    "objectiveDelta",
+                                    BigInteger.valueOf(objective).subtract(
+                                    BigInteger.valueOf(initialObjective),
+                                ).toString()
+                                )
+                            }
+                            )
                             for (v in beforeInts.indices) state.assignment.setInt(v, beforeInts[v])
                             for (v in beforeBools.indices) state.assignment.setBool(v, beforeBools[v])
                             state.recompute()
@@ -139,7 +167,8 @@ object DiffnNeighborhoodProbe {
                 }
             }
         }
-        out.resolve("proposals.json").writeText(buildJsonObject {
+        out.resolve("proposals.json").writeText(
+            buildJsonObject {
             put("suite", options["suite"])
             put("problem", options["problem"])
             put("modelHash", hash(model.readBytes()))
@@ -153,7 +182,8 @@ object DiffnNeighborhoodProbe {
             put("factors", state.problem.numFactors)
             put("diffnFactors", state.problem.factors.count { it is Diffn })
             put("proposals", proposals)
-        }.toString() + "\n")
+        }.toString() + "\n"
+        )
         println("initial cost=${state.cost}, proposals=${proposals.size}")
     }
 
@@ -182,7 +212,9 @@ object DiffnNeighborhoodProbe {
         for ((name, value) in values) {
             when {
                 name in program.intVarsByName -> bindInt(program.intVarsByName.getValue(name), value)
+
                 name in program.boolVarsByName -> bindBool(program.boolVarsByName.getValue(name), value)
+
                 else -> {
                     val array = program.arraysByName[name] as? FlatZincArray.Vars
                         ?: error("unknown variable or variable array $name")
@@ -199,7 +231,11 @@ object DiffnNeighborhoodProbe {
         }
         return {
             for ((v, value) in assignedInts) require(state.assignment.intValue(v) == value) { "rewritten source input" }
-            for ((v, value) in assignedBools) require(state.assignment.boolValue(v) == value) { "rewritten source input" }
+            for ((v, value) in assignedBools) {
+                require(
+                state.assignment.boolValue(v) == value,
+            ) { "rewritten source input" }
+            }
         }
     }
 
