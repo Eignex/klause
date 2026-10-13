@@ -125,6 +125,9 @@ direction and explicit original-coordinate pins. Native invocation metadata is
 separate from an optional original-source revision. `Problem.quadraticSourceResultCapture`
 binds capture to that actual original object and objective; an unrelated equal-shaped
 model or weaker invocation cannot replace it. Recapture preserves the native payload.
+Native certificate construction requires its engine identity to name the same source
+object. Invocation matching compares that object, objective, direction and explicit
+conditions; it supplies no independent derivation coverage.
 The integer and branch-completion producers use these typed records; the finite
 quadratic adapter retains its compatibility factory until its consumer migration. Their source checker must justify coordinate
 bindings and complete coverage; a flat branch list is not a traversal proof. A

@@ -42,6 +42,8 @@ class QuadraticCertificate private constructor(
     /** Captured original revision, invocation restrictions and objective direction. */
     val scope: SourceScope? get() = attestedScope
 
+    internal fun matchesInvocation(expected: QuadraticEngineInvocation): Boolean = invocation?.matches(expected) == true
+
     /** Check the actual expected claim against independently supplied original-source semantics. */
     fun verify(
         expected: SourceClaim,
@@ -78,9 +80,10 @@ class QuadraticCertificate private constructor(
         fun engine(
             model: ModelIdentity, invocation: QuadraticEngineInvocation,
             claim: QuadraticClaim, derivation: SourceDerivation,
-        ): QuadraticCertificate = QuadraticCertificate(
-            model, claim, null, derivation = derivation, invocation = invocation,
-        )
+        ): QuadraticCertificate {
+            require(invocation.matchesModel(model)) { "quadratic certificate model differs from its native source" }
+            return QuadraticCertificate(model, claim, null, derivation = derivation, invocation = invocation)
+        }
 
         @Suppress("UNUSED_PARAMETER")
         fun verified(model: ModelIdentity, scope: Any, evidence: Any, claim: QuadraticClaim): QuadraticCertificate =
