@@ -651,7 +651,10 @@ counters exclude native CP analysis; matching SAT reports are not source checks.
 affine and exact quadratic entries on the same admitted polynomial real source.
 Pass `source=<SMT file or directory>` and optionally `engines=BACKTRACK,FIXED,LOCAL_SEARCH,ALNS,MIXED`,
 `work=200000`, `seed=17`, `moves=1`, `timeout=25000`, `out=<directory>` and
-`checker=none|existing|provision` (default `none`).
+`checker=none|existing|provision` (default `none`), with `processors=1` by default.
+If the launching JVM sees a different processor count, the probe runs in a child
+JVM with `-XX:ActiveProcessorCount` and its own `objective-probe.jfr`; the lab's
+parent recording covers the wrapper. Settings record the actual execution JVM.
 The source objective must be affine, with integer Boolean weights/constant fitting
 Long and real coefficients exactly representable in binary64. Other objectives
 decline rather than acquire rounded coefficients. Each execution gets fresh state,
