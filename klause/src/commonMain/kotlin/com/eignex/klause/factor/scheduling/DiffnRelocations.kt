@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.factor.saturatedAdd
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
@@ -112,8 +111,8 @@ internal class DiffnRelocations(
                 if (nonStrict && (wi == 0L || hi == 0L || wj == 0L || hj == 0L)) continue
                 val xj = value(xs[j], parts)
                 val yj = value(ys[j], parts)
-                if (saturatedAdd(xi, wi) <= xj || saturatedAdd(xj, wj) <= xi) continue
-                if (saturatedAdd(yi, hi) <= yj || saturatedAdd(yj, hj) <= yi) continue
+                if (endBeforeOrAt(xi, wi, xj) || endBeforeOrAt(xj, wj, xi)) continue
+                if (endBeforeOrAt(yi, hi, yj) || endBeforeOrAt(yj, hj, yi)) continue
                 return false
             }
         }
@@ -123,6 +122,11 @@ internal class DiffnRelocations(
     private fun endpoint(origin: Long, size: Long): Long? {
         val target = origin + size
         return if ((origin xor target) and (size xor target) < 0L) null else target
+    }
+
+    private fun endBeforeOrAt(origin: Long, size: Long, position: Long): Boolean {
+        val end = origin + size
+        return if ((origin xor end) and (size xor end) < 0L) size < 0L else end <= position
     }
 
     private fun before(origin: Long, size: Long): Long? {
