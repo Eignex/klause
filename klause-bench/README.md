@@ -230,6 +230,29 @@ Lab agreement and regression confirmation remain recorded-result evidence;
 `profileCli` requires AWS execution and explicit `parallel: 1`; its instrumented
 timing stays separate from ordinary comparisons.
 
+`com.eignex.klause.bench.profile.SourceEvidenceProbe` checks produced quadratic
+evidence for the exact IR fixture schema `real-box-square`: one real coordinate in
+an integer-ended closed interval, objective `coefficient*x*x + constant`, and an
+explicit source sense. It accepts the source JSON bytes as its first argument and
+a `FiniteEngine` name as its second. Extra source fields and inexact endpoints are
+refused. Submit it through the configured lab client at a pinned revision:
+
+```sh
+LAB_URL=https://lab.eignex.com ./deploy/lab profile \
+  com.eignex.klause.bench.profile.SourceEvidenceProbe <revision> \
+  "check original quadratic witness, bound and attainment" aws 600 \
+  '{"semantics":"klause-ir-exact-v1","kind":"real-box-square","lower":-2,"upper":3,"coefficient":1,"constant":0,"sense":"MINIMIZE"}' \
+  BACKTRACK
+```
+
+The probe saves original bytes and the actual result/capture payload under `$OUT`,
+then runs the packaged independent Python fractions checker in a separate process.
+`independent-check.json` records checked or unavailable coverage and source, payload
+and checker identities. An unavailable capture cannot count as checked evidence.
+This fixture checker is not general proof-file export, a verdict reference comparison
+or a performance measurement. Retrieve records with `lab files`, `cat` and `fetch`;
+keep generated output outside the repository.
+
 ## Catalog and corpus
 
 [Suites.kt](src/main/kotlin/com/eignex/klause/bench/catalog/Suites.kt) declares
