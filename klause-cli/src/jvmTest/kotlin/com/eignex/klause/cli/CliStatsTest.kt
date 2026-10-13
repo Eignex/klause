@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
+import com.eignex.klause.solver.result.CoreGuidedStats
 import com.eignex.klause.solver.result.LocalSearchResidual
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.LocalSearchStats
@@ -31,6 +32,7 @@ import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.parseBigInt
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,6 +40,18 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class CliStatsTest {
+
+    @Test
+    fun `core bounds preserve exact integers when worker snapshots combine`() {
+        val first = SolveStats(coreGuided = CoreGuidedStats(1, 2, parseBigInt("9007199254740993")))
+        val second = SolveStats(coreGuided = CoreGuidedStats(2, 3, parseBigInt("9007199254740995")))
+
+        val pairs = searchStatPairs(first.mergedWith(second)).toMap()
+
+        assertEquals("9007199254740995", pairs["coreGuidedLowerBound"])
+        assertEquals("3", pairs["coreGuidedCores"])
+        assertEquals("3", pairs["coreGuidedLargestCore"])
+    }
 
     @Test
     fun `presolve prints native construction separately from converted phase work`() {
