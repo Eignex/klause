@@ -15,9 +15,11 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /** Measures actual completion initialization retries and checks their exact source witnesses. */
@@ -29,7 +31,7 @@ object CompletionInitializationProfile {
         val source = source(options.rows)
         val model = model(options.rows)
         val access = CompletionAccess()
-        val meter = ManagementFactory.getThreadMXBean() as com.sun.management.ThreadMXBean
+        val meter = ManagementFactory.getThreadMXBean() as ThreadMXBean
         meter.isThreadAllocatedMemoryEnabled = true
         val thread = Thread.currentThread().threadId()
         val records = ArrayList<String>()
@@ -139,7 +141,7 @@ object CompletionInitializationProfile {
                     var operations = 0L
                     var polls = 0
                     val stop = object : Cancellation {
-                        private val meter = WorkMeter { operations += it }
+                        private val meter = WorkMeter { units -> operations += units }
                         override fun isCancelled(): Boolean = if (options.charged) operations > 0 else ++polls >= 3
                         override fun workMeter(): WorkMeter = meter
                     }
@@ -260,5 +262,5 @@ object CompletionInitializationProfile {
         }
         return hex(digest.digest())
     }
-    private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
+    private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(Locale.ROOT, it) }
 }
