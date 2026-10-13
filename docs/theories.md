@@ -27,6 +27,25 @@ use the same algorithm. [Input semantics](formats.md) owns frontend admission an
 current route limits. [Solver vision](vision.md) requires common strategy breadth
 and distinguishes proof authority from mathematical completeness.
 
+## Extension roles and completeness
+
+`Theory<A>` checks one source fragment in a batch under a complete Boolean assignment
+and active semantic bounds. `TheorySearchComponent<A>` bridges that service into
+shared decisions, propagation, complete checks and retraction. A decided batch answer
+is cached only while its conditions remain active; unresolved answers are not cached.
+
+`SearchComponent` is the common incremental participant contract for finite propagation
+and arithmetic. Incremental arithmetic implementations need not implement `Theory`.
+Optional branching, blocking and conflict capabilities extend that lifecycle.
+`TheoryComponent` remains a deprecated compatibility marker with no extra behavior.
+Arithmetic components retain the dependency boundary against finite CP domains.
+
+Participation and completeness are separate. A batch service can be sound and incomplete;
+its legacy `TheoryCheck.Cancelled` answer leaves the fragment undecided under cancellation,
+limits or incomplete checking. The bridge maps it to an indeterminate component answer.
+An indeterminate required leaf cannot justify source exhaustion. Fragment feasibility,
+conditional infeasibility and global proof authority retain their distinct scopes.
+
 ## Shared composition contract
 
 The pipeline selects ownership from the source model. A theory-owned integer is not

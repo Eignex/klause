@@ -94,11 +94,13 @@ sealed interface ComponentCheck {
 }
 
 /**
- * A deductive participant in [SearchSession].
+ * The common incremental lifecycle for finite and arithmetic participants in [SearchSession].
  *
  * Components receive every shared decision and every retraction. They may retain theory-local or
  * finite-domain state. Only a [SearchExplanation] may enter the engine's learned-clause database;
  * an unexplained conflict remains usable for chronological backtracking but is never learned.
+ * Participation does not imply mathematical completeness. An incomplete residual check returns
+ * [ComponentCheck.Indeterminate], so traversal cannot turn undecided leaves into source exhaustion.
  */
 interface SearchComponent {
     /** Called once after the session has constructed its post-build root. */
@@ -452,12 +454,13 @@ data class SearchSolveParams(
 }
 
 /**
- * A [SearchComponent] whose state is theory-local rather than finite-domain state.
+ * Compatibility marker for arithmetic participants in the [SearchComponent] lifecycle.
  *
- * This marker records the dependency rule for SMT theories: implementations may use the shared
- * decisions and explanations, but must not read or materialize CP domains. Difference logic, linear
- * arithmetic, EUF, arrays, and quantifier-instantiation engines all fit this lifecycle.
+ * It supplies no additional callbacks or completeness authority. Arithmetic participants implement
+ * [SearchComponent] and optional capabilities directly; they must not materialize finite CP domains.
+ * [com.eignex.klause.theory.Theory] is a separate batch fragment-checking contract.
  */
+@Deprecated("Implement SearchComponent and its optional capabilities; Theory is a batch checking service")
 interface TheoryComponent : SearchComponent
 
 /** Shared state exposed to components without exposing finite CP domains. */
