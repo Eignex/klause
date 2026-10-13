@@ -183,9 +183,11 @@ outputs, including `cases/<index>/record.json` for the offline source verifier.
 `lab ssh <id> [instance] [command]` reaches a running AWS job's instance. Measure as a lab
 experiment rather than directly on the lab Mac, where a run competes with the lab's cases.
 A measurement no experiment expresses, such as timing a component on captured inputs, runs as
-a script job: `lab script <file> <ref> <description>` runs the file once in a build of `<ref>`,
-on AWS by default, and keeps its output and whatever it writes to `$OUT` with the job. Script
-jobs are not for tests, lint or other gates; CI runs those.
+a profile job: `lab profile <main> <ref> <description> [aws|lab] [timeout-sec] [arg...]` runs
+the class `<main>` (under `com.eignex.klause`, committed at `<ref>`) once under JFR, on AWS by
+default, and keeps its output and whatever it writes to `$OUT` with the job. The lab runs no
+shell scripts: the code goes in a commit. Profile jobs are not for tests, lint or other gates;
+CI runs those. Every ref the lab builds must be `main` or a branch only trusted users pushed to.
 
 Cases disable result caching, alternate configurations across seeds/repetitions,
 and retain installed-build provenance when supported by the selected revision.
