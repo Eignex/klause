@@ -12,11 +12,13 @@ internal class DiffnRelocations(
     private val widthVars: IntArray?,
     private val heightVars: IntArray?,
     private val nonStrict: Boolean,
+    factorId: Int,
     private val state: LocalSearchState,
     private val sink: MoveSink,
 ) {
     private var emitted = 0
     private var probes = 0
+    private val boundCompletion = DiffnBoundCompletion(state, sink, factorId)
 
     fun propose() {
         val start = state.rng.nextInt(xs.size)
@@ -89,7 +91,8 @@ internal class DiffnRelocations(
         if (parts.isEmpty()) return
         probes++
         if (!feasible(parts)) return
-        sink.addCompound(parts)
+        val completed = boundCompletion.complete(parts)
+        sink.addCompound(if (completed === parts || feasible(completed)) completed else parts)
         emitted++
     }
 
