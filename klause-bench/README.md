@@ -159,7 +159,10 @@ Use immutable commit IDs for reproducible revision comparisons. Selection refere
 filters can change membership; `reference=any` keeps the benchmark selection, and
 named sets default to that policy. Record the actual planned inputs and hashes.
 
-From the separate `klause-lab` checkout, using its configured client:
+From the separate `klause-lab` checkout, using its configured client. The lab needs its
+password on every call: the client reads it from `~/.config/klause-lab/password` (or
+`LAB_PASSWORD`), so never pass it on a command line. Off the lab's home network, set
+`LAB_URL=https://lab.eignex.com`.
 
 ```sh
 ./deploy/lab run /absolute/path/to/klause-evidence/campaigns/lp-ceiling/experiment.json
@@ -184,10 +187,11 @@ outputs, including `cases/<index>/record.json` for the offline source verifier.
 experiment rather than directly on the lab Mac, where a run competes with the lab's cases.
 A measurement no experiment expresses, such as timing a component on captured inputs, runs as
 a profile job: `lab profile <main> <ref> <description> [aws|lab] [timeout-sec] [arg...]` runs
-the class `<main>` (under `com.eignex.klause`, committed at `<ref>`) once under JFR, on AWS by
+the class `<main>` (in `com.eignex.klause.bench.profile`, committed at `<ref>`) once under JFR, on AWS by
 default, and keeps its output and whatever it writes to `$OUT` with the job. The lab runs no
 shell scripts: the code goes in a commit. Profile jobs are not for tests, lint or other gates;
-CI runs those. Every ref the lab builds must be `main` or a branch only trusted users pushed to.
+CI runs those. Every ref the lab builds must be `main` or a branch only trusted users pushed to,
+and an experiment may not set `suite`, `problem`, `out` or `solver-seed` itself.
 
 Cases disable result caching, alternate configurations across seeds/repetitions,
 and retain installed-build provenance when supported by the selected revision.
