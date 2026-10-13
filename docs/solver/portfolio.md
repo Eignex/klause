@@ -361,7 +361,9 @@ same schedule only after source, condition, objective, authority, witness and ex
 attainment/strictness checks. Scalar worker telemetry remains incomplete; the
 accepted native result retains its optimum, strict limit or ray semantics.
 Heuristic completion cannot finish a source proof. Single-engine execution retains
-its own traversal semantics; FIXED runs one lane.
+its own traversal semantics; FIXED runs one lane. Exact-neighborhood preparation
+contributes to scheduler instruction coverage once; retained slices keep that charge
+separate from moves and atomic repair charges.
 
 Supported linear sources pair complete traversal with exact-coordinate local search
 and adaptive block repair, including real-only models and arbitrary-width integers.

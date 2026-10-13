@@ -13,6 +13,7 @@ import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SearchEvent
@@ -307,4 +308,32 @@ class QuadraticOptimizationExecutionTest {
         assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { } }
     }
 
+
+    @Test
+    fun `quadratic neighborhood preparation is charged once before its first repair`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+        val request = source.pipelineRequest()
+        val params = PolynomialTheoryParams()
+        val native = QuadraticNativeScope(params)
+        val adapter = QuadraticWorkerAdapter(request, request.resolvedModel(), objective, ObjectiveSense.MINIMIZE,
+            params, native, FiniteEngine.LOCAL_SEARCH)
+        val handle = assertIs<InstructionSlicedSearch>(
+            adapter.worker(1).newResumableSearch { Double.POSITIVE_INFINITY },
+        )
+
+        handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 0) { }
+        val preparation = handle.chargedInstructions
+        val nativePreparation = native.work
+        handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 0) { }
+        handle.close()
+        adapter.close()
+
+        assertTrue(preparation > 0)
+        assertEquals(preparation, handle.chargedInstructions)
+        assertEquals(nativePreparation, native.work)
+        assertEquals(0.0, handle.stats.ls.moves.sum)
+    }
 }

@@ -17,6 +17,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.plus
@@ -251,4 +252,37 @@ class QuadraticIntegerOptimizationTest {
         assertEquals(4, optimum.stats.portfolio.arms.size)
     }
 
+
+    @Test
+    fun `sliced integer traversal preserves exact completion and cumulative native work`() {
+        val source = NonlinearIntegerProblem(
+            PolynomialRealFormula.Constant(true), 1, 0, mapOf("i" to 0), emptyMap(), emptyMap(),
+        )
+        val i = QuadraticVariable.Int(SourceIntId(0))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, i, i),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), i),
+        ))
+        val request = source.pipelineRequest()
+        val params = NonlinearIntegerTheoryParams()
+        val whole = OpenTheoryPipeline.minimize(request, objective, params, FiniteEngine.BACKTRACK)
+        val native = QuadraticNativeScope(params.polynomial)
+        val adapter = QuadraticIntegerOptimization(source, objective, params, FiniteEngine.BACKTRACK,
+            ObjectiveSense.MINIMIZE, native, request.preparedPlan)
+        val handle = assertIs<QuadraticPortfolioSearch>(
+            adapter.worker(0).newResumableSearch { Double.POSITIVE_INFINITY },
+        )
+        var slices = 0
+
+        while (!handle.isDone && slices++ < 4096) handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { }
+        val result = assertIs<QuadraticOptimizationResult.Optimal>(handle.completion)
+        handle.close()
+        adapter.close()
+
+        assertTrue(slices > 1)
+        assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
+        assertEquals(BigFraction.ZERO, result.bound.value.rational)
+        assertEquals(whole.nativeWork, native.work)
+        assertEquals(whole.result.stats.search.nodes.sum, result.stats.search.nodes.sum)
+    }
 }
