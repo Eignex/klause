@@ -250,12 +250,16 @@ internal class DiffnInvariant(
             if (i == j || xs[i] == ys[i] || xs[j] == ys[j]) continue
             if (varToRectOf(xs[i]) != i || varToRectOf(ys[i]) != i ||
                 varToRectOf(xs[j]) != j || varToRectOf(ys[j]) != j
-            ) continue
+            ) {
+                continue
+            }
             if (widthVars?.get(i) == xs[i] || widthVars?.get(i) == ys[i] ||
                 widthVars?.get(j) == xs[j] || widthVars?.get(j) == ys[j] ||
                 heightVars?.get(i) == xs[i] || heightVars?.get(i) == ys[i] ||
                 heightVars?.get(j) == xs[j] || heightVars?.get(j) == ys[j]
-            ) continue
+            ) {
+                continue
+            }
             if (rw(state, i, -1, 0L) != rw(state, j, -1, 0L)) continue
             if (rh(state, i, -1, 0L) != rh(state, j, -1, 0L)) continue
             val xi = state.assignment.intValue(xs[i])

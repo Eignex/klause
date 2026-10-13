@@ -25,10 +25,20 @@ internal class DiffnRelocations(
             if (emitted >= MOVE_CAP || probes >= PROBE_CAP) return
             val i = (start + offset) % xs.size
             val j = state.rng.nextInt(xs.size)
-            proposeAxis(i, j, if (axis) xs else ys, if (axis) widths else heights,
-                if (axis) widthVars else heightVars)
-            proposeAxis(i, j, if (axis) ys else xs, if (axis) heights else widths,
-                if (axis) heightVars else widthVars)
+            proposeAxis(
+                i,
+                j,
+                if (axis) xs else ys,
+                if (axis) widths else heights,
+                if (axis) widthVars else heightVars,
+            )
+            proposeAxis(
+                i,
+                j,
+                if (axis) ys else xs,
+                if (axis) heights else widths,
+                if (axis) heightVars else widthVars,
+            )
         }
     }
 
@@ -93,8 +103,13 @@ internal class DiffnRelocations(
         val affected = IntArray(AFFECTED_CAP)
         var count = 0
         for (i in xs.indices) {
-            if (parts.none { it.varId == xs[i] || it.varId == ys[i] ||
-                    it.varId == widthVars?.get(i) || it.varId == heightVars?.get(i) }) continue
+            if (parts.none {
+                    it.varId == xs[i] || it.varId == ys[i] ||
+                        it.varId == widthVars?.get(i) || it.varId == heightVars?.get(i)
+                }
+            ) {
+                continue
+            }
             if (count == AFFECTED_CAP) return false
             affected[count++] = i
         }

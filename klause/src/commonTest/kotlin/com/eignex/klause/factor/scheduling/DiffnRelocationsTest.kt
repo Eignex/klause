@@ -103,8 +103,14 @@ class DiffnRelocationsTest {
     @Test
     fun `aliased position and dimension roles use the final joint footprint`() {
         for (nonStrict in listOf(false, true)) {
-            val factor = Diffn(intArrayOf(0, 1, 0), intArrayOf(2, 3, 4), LongArray(3), longArrayOf(1, 2, 0),
-                widthVars = intArrayOf(1, 5, 5), nonStrict = nonStrict)
+            val factor = Diffn(
+                intArrayOf(0, 1, 0),
+                intArrayOf(2, 3, 4),
+                LongArray(3),
+                longArrayOf(1, 2, 0),
+                widthVars = intArrayOf(1, 5, 5),
+                nonStrict = nonStrict,
+            )
             val domains = Array(6) { IntDomain(0, 10) }
             val state = LocalSearchState(Problem(0, 6, domains, listOf(factor)).bake(), Random(19))
             val values = longArrayOf(0, 3, 0, 0, 4, 2)
@@ -146,10 +152,21 @@ class DiffnRelocationsTest {
     @Test
     fun `zero width relocations preserve the source strictness`() {
         for (nonStrict in listOf(false, true)) {
-            val factor = Diffn(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5),
-                longArrayOf(0, 3, 1), longArrayOf(1, 2, 1), nonStrict = nonStrict)
-            val domains = arrayOf(IntDomain(0, 4), IntDomain(0, 0), IntDomain(1, 1),
-                IntDomain(0, 0), IntDomain(0, 0), IntDomain(4, 4))
+            val factor = Diffn(
+                intArrayOf(0, 1, 2),
+                intArrayOf(3, 4, 5),
+                longArrayOf(0, 3, 1),
+                longArrayOf(1, 2, 1),
+                nonStrict = nonStrict,
+            )
+            val domains = arrayOf(
+                IntDomain(0, 4),
+                IntDomain(0, 0),
+                IntDomain(1, 1),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(4, 4),
+            )
             val problem = Problem(0, 6, domains, listOf(factor))
             val state = LocalSearchState(LocalSearchModel.open(problem, domains), Random(29))
             val values = longArrayOf(4, 0, 1, 0, 0, 4)
@@ -166,8 +183,12 @@ class DiffnRelocationsTest {
     @Test
     fun `overflowing adjacency endpoints do not wrap into source positions`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 4), longArrayOf(1, 2))
-        val domains = arrayOf(IntDomain(Long.MIN_VALUE + 1, Long.MAX_VALUE - 1),
-            IntDomain(Long.MAX_VALUE - 1, Long.MAX_VALUE - 1), IntDomain(0, 0), IntDomain(5, 5))
+        val domains = arrayOf(
+            IntDomain(Long.MIN_VALUE + 1, Long.MAX_VALUE - 1),
+            IntDomain(Long.MAX_VALUE - 1, Long.MAX_VALUE - 1),
+            IntDomain(0, 0),
+            IntDomain(5, 5),
+        )
         val state = LocalSearchState(Problem(0, 4, domains, listOf(factor)).bake(), Random(31))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, Long.MAX_VALUE - 1)
@@ -182,11 +203,20 @@ class DiffnRelocationsTest {
 
     @Test
     fun `overflowing footprints do not appear adjacent at the largest coordinate`() {
-        val factor = Diffn(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5),
-            longArrayOf(2, 1, 1), longArrayOf(1, 1, 1))
-        val domains = arrayOf(IntDomain(Long.MAX_VALUE - 5, Long.MAX_VALUE),
-            IntDomain(Long.MAX_VALUE - 1, Long.MAX_VALUE - 1), IntDomain(Long.MAX_VALUE, Long.MAX_VALUE),
-            IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 0))
+        val factor = Diffn(
+            intArrayOf(0, 1, 2),
+            intArrayOf(3, 4, 5),
+            longArrayOf(2, 1, 1),
+            longArrayOf(1, 1, 1),
+        )
+        val domains = arrayOf(
+            IntDomain(Long.MAX_VALUE - 5, Long.MAX_VALUE),
+            IntDomain(Long.MAX_VALUE - 1, Long.MAX_VALUE - 1),
+            IntDomain(Long.MAX_VALUE, Long.MAX_VALUE),
+            IntDomain(0, 0),
+            IntDomain(0, 0),
+            IntDomain(0, 0),
+        )
         val problem = Problem(0, 6, domains, listOf(factor))
         val state = LocalSearchState(LocalSearchModel.open(problem, domains), Random(41))
         val values = longArrayOf(Long.MAX_VALUE - 5, Long.MAX_VALUE - 1, Long.MAX_VALUE, 0, 0, 0)

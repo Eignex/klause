@@ -313,8 +313,8 @@ only when their targets agree. Geometry reads every aliased position and variabl
 size at its final target, and declines moves affecting more than eight rectangles.
 Overflowing adjacency targets decline; geometry compares mathematical endpoints
 beyond the Long range without saturating them onto a searched coordinate. Strict
-and nonstrict zero-size semantics
-match the ordinary invariant. Equal-footprint swaps require independent position
+and nonstrict zero-size semantics match the ordinary invariant. Equal-footprint
+swaps require independent position
 coordinates that do not alias dimensions.
 
 Geometry checks only establish the proposing Diffn's satisfaction. Ordinary complete
