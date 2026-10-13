@@ -11,6 +11,9 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -18,6 +21,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FiniteExactNeighborhoodTest {
@@ -37,8 +42,28 @@ class FiniteExactNeighborhoodTest {
             assertEquals("1/3", witness.exactReals?.get(0).toString())
             assertEquals("1", witness.exactReals?.get(1).toString())
             assertTrue(result.stats.ls.completionsRefuted.sum > 0)
+            assertNull(witness.witnessCertificate)
         }
     }
+    @Test
+    fun `bound real repairs publish their actual containing invocation`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(3, 3)),
+            arrayOf(RealProduct(0, 0, 1, 0.0, 1.0), Linear(intArrayOf(), doubleArrayOf(),
+                intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)),
+            numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 3.0)).bake()
+        val point = assertNotNull(source.fixedDiscreteSample())
+        val binding = EngineInvocation(source.prepareExecutionPlan(preferFinite = true), ModelIdentity.of(source))
+        val worker = finiteExactNeighborhoodWorker(source, point, null, null, false, 17, 0).bindInvocation(binding)
+
+        val result = worker.use { it.solve(Cancellation.Never) }
+
+        val sample = assertIs<SolveResult.Sat>(result).assignment
+        val publication = assertIs<CompletedEnginePublication.Witness>(sample.witnessCertificate?.publication)
+        assertSame(binding, publication.invocation)
+        assertEquals(sample, publication.sample)
+        assertEquals("1/3", publication.sample.exactReals?.get(0).toString())
+    }
+
     @Test
     fun `finite mixed portfolios retain fractional cost improvements across integer branches`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),

@@ -11,7 +11,7 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -31,6 +31,7 @@ internal class FiniteExactNeighborhood(
     fixed: Sample,
     private val params: TheoryParams,
     objective: LinearObjective?,
+    private val certify: (Sample) -> Unit,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val linear = source.withIntDomains(source.rootIntDomainsInPlace).withFactors(
         source.factors.map { factor ->
@@ -51,11 +52,9 @@ internal class FiniteExactNeighborhood(
     ): ExactNeighborhoodResult {
         val result = adapter.check(condition, cancellation)
         if (result !is ExactNeighborhoodResult.Witness) return result
-        return when (verifyOpenWitness(source, result.sample)) {
+        return when (verifyOpenWitness(source, result.sample, cancellation)) {
             is Verification.Accepted -> {
-                result.sample.witnessCertificate = EvidenceCertificate.verified(
-                    ModelIdentity.of(source), EvidenceKind.Witness,
-                )
+                certify(result.sample)
                 result
             }
             is Verification.Rejected -> ExactNeighborhoodResult.Undecided
@@ -79,9 +78,22 @@ internal fun finiteExactNeighborhoodWorker(
     armId: Int,
 ): com.eignex.klause.portfolio.PortfolioWorker {
     val params = TheoryParams(nodeBudget = nodeBudget)
-    val adapter = FiniteExactNeighborhood(source, fixed, params, objective)
-    return exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
-        armId, objective, Cancellation.Never, exhausted = { adapter.exhausted },
-        open = { adapter.search(adaptive, seed) })
+    lateinit var worker: com.eignex.klause.portfolio.PortfolioWorker
+    var retained: FiniteExactNeighborhood? = null
+    fun adapter(): FiniteExactNeighborhood {
+        retained?.let { return it }
+        val created = FiniteExactNeighborhood(source, fixed, params, objective) { sample ->
+            sample.witnessCertificate = worker.evidenceInvocation?.let { binding ->
+                val value = binding.executionObjective?.evaluateExact(sample)?.toDouble()
+                EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, sample, value))
+            }
+        }
+        retained = created
+        return created
+    }
+    worker = exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
+        armId, objective, Cancellation.Never, exhausted = { retained?.exhausted == true },
+        open = { adapter().search(adaptive, seed) })
         .bindEvidence(ModelIdentity.of(source, objective), provesResults = false)
+    return worker
 }
