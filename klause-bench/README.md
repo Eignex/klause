@@ -261,7 +261,8 @@ Save the specification outside the repository, then use
 The probe saves original bytes and the actual result/capture payload under `$OUT`,
 then runs the packaged independent Python fractions checker in a separate process.
 `independent-check.json` records checked or unavailable coverage and source, payload
-and checker identities. An unavailable capture cannot count as checked evidence.
+and checker identities. `runtime-provenance.json` records the revision, JDK and
+classpath artifact hashes. An unavailable capture cannot count as checked evidence.
 This fixture checker is not general proof-file export, a verdict reference comparison
 or a performance measurement. Retrieve records with `lab files`, `cat` and `fetch`;
 keep generated output outside the repository.
