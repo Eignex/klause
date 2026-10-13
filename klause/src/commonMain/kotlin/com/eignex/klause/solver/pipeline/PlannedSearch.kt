@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.CardinalitySearchComponent
@@ -48,32 +49,46 @@ internal fun ComponentPlan.search(
     learnedDb: SearchLearnedDbParams,
     smtStats: SmtStatsSink?,
     theorySolveStop: Cancellation? = null,
-): PlannedSearch {
-    val components = ArrayList<SearchComponent>(3)
-    val cp = if (hasCpComponent) {
-        val projection = cpProjection(spec, cpDomains)
-        CpSearchComponent(
-            PropagationSession(projection.problem, cancellation),
-            IntArray(projection.problem.numIntVars) { projection.sourceId(it) },
-        ).also(components::add)
-    } else {
-        null
-    }
-    components += ClauseSearchComponent(spec.factors.filterIsInstance<Clause>())
-    // Only the cardinalities CP did not take: a finite projection has its own watched-literal propagator
-    // for them, and running both would enforce one constraint twice.
-    val cardinalities = spec.factors.indices
-        .filter { factorOwner(it) != FactorOwner.CP }
+): PlannedSearch = PreparedSearchComponents(this, spec, cpDomains).open(
+    maxChecks, cancellation, learnedDb, smtStats, theorySolveStop,
+)
+
+internal class PreparedSearchComponents(
+    private val plan: ComponentPlan,
+    spec: Problem,
+    cpDomains: Map<Int, IntDomain>,
+) {
+    private val fragment = plan.theoryFragment(spec)
+    private val projection = if (plan.hasCpComponent) plan.cpProjection(spec, cpDomains) else null
+    private val propagation = projection?.let { PropagationProblem(it.problem) }
+    private val boolCount = spec.numBoolVars
+    private val clauses = spec.factors.filterIsInstance<Clause>()
+    // CP owns its projected cardinalities; a second component would enforce them twice.
+    private val cardinalities = spec.factors.indices
+        .filter { plan.factorOwner(it) != FactorOwner.CP }
         .mapNotNull { spec.factors[it] as? Cardinality }
-    if (cardinalities.isNotEmpty()) components += CardinalitySearchComponent(cardinalities)
-    val theory = theoryComponent(spec, smtStats, theorySolveStop)
-    if (theory != null) components += theory
-    cp?.rebase()
-    return PlannedSearch(
-        SearchComponentSet(
-            components,
-        ).session(maxChecks, cancellation, learnedDb, SearchAtomRegistry(spec.numBoolVars)),
-        cp,
-        theory,
-    )
+
+    fun open(
+        maxChecks: Long = Long.MAX_VALUE,
+        cancellation: Cancellation = Cancellation.Never,
+        learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+        smtStats: SmtStatsSink? = null,
+        theorySolveStop: Cancellation? = null,
+    ): PlannedSearch {
+        val components = ArrayList<SearchComponent>(3)
+        val cp = projection?.let {
+            CpSearchComponent(PropagationSession(requireNotNull(propagation), cancellation),
+                IntArray(it.problem.numIntVars) { local -> it.sourceId(local) }).also(components::add)
+        }
+        components += ClauseSearchComponent(clauses)
+        if (cardinalities.isNotEmpty()) components += CardinalitySearchComponent(cardinalities)
+        val theory = plan.openTheoryComponent(fragment, smtStats, theorySolveStop)
+        if (theory != null) components += theory
+        cp?.rebase()
+        return PlannedSearch(
+            SearchComponentSet(components).session(maxChecks, cancellation, learnedDb, SearchAtomRegistry(boolCount)),
+            cp,
+            theory,
+        )
+    }
 }

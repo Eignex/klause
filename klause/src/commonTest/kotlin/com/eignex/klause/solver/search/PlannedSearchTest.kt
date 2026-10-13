@@ -15,15 +15,18 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.FactorOwner
+import com.eignex.klause.solver.pipeline.PreparedSearchComponents
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PlannedSearchTest {
@@ -214,6 +217,43 @@ class PlannedSearchTest {
         val planned = model.componentPlan().search(model, differenceHybridDomains())
 
         assertIs<ComponentResult.Conflict>(planned.session.initialize())
+    }
+
+    @Test
+    fun `an interrupted root retains its prepared propagation projection`() {
+        val model = differenceHybridFixture()
+        val prepared = PreparedSearchComponents(model.componentPlan(), model, differenceHybridDomains())
+        var stopped = false
+        val interrupted = prepared.open(cancellation = Cancellation { stopped })
+        val projection = requireNotNull(interrupted.cp).session.projection
+        stopped = true
+        interrupted.use {
+            assertIs<ComponentResult.Indeterminate>(it.session.initialize())
+        }
+
+        prepared.open().use { sibling ->
+            assertIs<ComponentResult.Consistent>(sibling.session.initialize())
+
+            assertSame(projection, requireNotNull(sibling.cp).session.projection)
+            assertIs<SearchResult.Satisfied>(sibling.session.solve(1))
+        }
+    }
+
+    @Test
+    fun `prepared component sources create independent mutable trails`() {
+        val model = differenceHybridFixture()
+        val prepared = PreparedSearchComponents(model.componentPlan(), model, differenceHybridDomains())
+
+        prepared.open().use { first ->
+            assertIs<ComponentResult.Consistent>(first.session.initialize())
+            assertIs<ComponentResult.Consistent>(first.session.push(SearchDecision.IntEqual(HYBRID_Z, 3L)))
+            prepared.open().use { sibling ->
+                assertIs<ComponentResult.Consistent>(sibling.session.initialize())
+
+                assertEquals(0L, sibling.session.intLowerBound(HYBRID_Z))
+                assertEquals(6L, sibling.session.intUpperBound(HYBRID_Z))
+            }
+        }
     }
 
     private fun differenceHybridDomains(): Map<Int, IntDomain> =

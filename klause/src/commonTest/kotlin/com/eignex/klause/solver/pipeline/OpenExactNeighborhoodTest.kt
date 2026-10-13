@@ -173,6 +173,24 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
+    fun `interrupted initialization cannot renew the containing native allowance`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.EQ, 1.0)), numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val adapter = OpenExactNeighborhood(model, TheoryParams(openWorkLimit = 1))
+        val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+
+        adapter.use {
+            val interrupted = it.check(free, Cancellation { it.work >= 1 })
+            val sibling = it.check(free, Cancellation.Never)
+
+            assertIs<ExactNeighborhoodResult.Undecided>(interrupted)
+            assertIs<ExactNeighborhoodResult.Undecided>(sibling)
+            assertEquals(1L, it.work)
+        }
+    }
+
+    @Test
     fun `empty model retries retain an exhausted native allowance`() {
         val model = Problem(0, 0, emptyArray(), emptyArray())
         val adapter = OpenExactNeighborhood(model, TheoryParams(maxLeaves = 1))

@@ -32,6 +32,12 @@ internal class OpenExactNeighborhood(
     private val prepared by lazy {
         (preparedSource ?: model.prepareExecutionPlan(objective)).prepareConditionedLinearQuery()
     }
+    private val components by lazy {
+        val source = prepared ?: return@lazy null
+        val working = requireNotNull(source.model)
+        val plan = requireNotNull(source.componentPlan)
+        PreparedSearchComponents(plan, working, plan.cpSourceDomains(working))
+    }
     private val queries = RetainedLinearQueries(model, params, objective, hints = { stop, state ->
         val source = prepared
         val plan = source?.componentPlan
@@ -48,14 +54,11 @@ internal class OpenExactNeighborhood(
         }
     }
 
-    private fun open(stop: Cancellation, state: OpenTheorySolveState): PlannedSearch? {
-        val source = prepared ?: return null
-        val working = requireNotNull(source.model)
-        val plan = requireNotNull(source.componentPlan)
-        return plan.search(working, plan.cpSourceDomains(working), maxChecks = params.maxLeaves,
-            cancellation = stop, learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
-            smtStats = state.smt, theorySolveStop = stop)
-    }
+    private fun open(stop: Cancellation, state: OpenTheorySolveState): PlannedSearch? = components?.open(
+        maxChecks = params.maxLeaves, cancellation = stop,
+        learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
+        smtStats = state.smt, theorySolveStop = stop,
+    )
 
     fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T =
         queries.withCondition(condition, cancellation, action)

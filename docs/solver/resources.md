@@ -122,8 +122,8 @@ the caller meter, and resource exhaustion withholds an incomplete verdict.
 Linear repair completion retains the same native check, decision and work ledgers
 across candidate queries. Cached source planning neither renews an allowance nor
 rearms the containing deadline. An interrupted native root installation releases
-that partial mutable search; a retry keeps the immutable source plan and its charged
-work. Active query assertions retract even when an invocation expires.
+that partial mutable search; a retry keeps the immutable source plan, canonical
+CP projection, selected theory fragment and charged work. Active query assertions retract even when an invocation expires.
 
 [Theory contracts](../theories.md#state-and-resources) link each service's native
 units, representation caps and controls. Finite decision and move counters cannot
