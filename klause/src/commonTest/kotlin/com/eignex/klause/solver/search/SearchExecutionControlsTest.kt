@@ -175,6 +175,29 @@ class SearchExecutionControlsTest {
     }
 
     @Test
+    fun `a fresh traversal clears only its own decision diagnostic`() {
+        val controls = SearchExecutionControlAdapter()
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
+        }), executionControls = controls)
+        assertIs<SearchResult.Indeterminate>(session.solve(1, SearchSolveParams(maxDecisions = 0)))
+        assertEquals(SearchStopCause.DecisionAllowance, controls.stopCause)
+
+        assertIs<SearchResult.Indeterminate>(session.solve(1))
+
+        assertEquals(SearchStopCause.RepresentationDecline, controls.stopCause)
+    }
+
+    @Test
+    fun `native allowance exhaustion precedes concurrent external cancellation`() {
+        val work = OpenTheoryWorkSink(0)
+        work.hasAllowance()
+        val controls = SearchExecutionControlAdapter(Cancellation { true }, OpenTheoryExecutionAccounting(work))
+
+        assertEquals(SearchStopCause.WorkAllowance, controls.stopCause)
+    }
+
+    @Test
     fun `controls cannot be replaced after component initialization`() {
         val session = SearchSession(emptyList())
         session.initialize()

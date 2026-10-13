@@ -1416,6 +1416,7 @@ abstract interface com.eignex.klause.solver.search/SearchExecutionControls : com
 
     abstract fun beginOperation() // com.eignex.klause.solver.search/SearchExecutionControls.beginOperation|beginOperation(){}[0]
     abstract fun reportStop(com.eignex.klause.solver.search/SearchStopCause) // com.eignex.klause.solver.search/SearchExecutionControls.reportStop|reportStop(com.eignex.klause.solver.search.SearchStopCause){}[0]
+    open fun beginTraversal() // com.eignex.klause.solver.search/SearchExecutionControls.beginTraversal|beginTraversal(){}[0]
     open fun operationAllowance(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.search/SearchExecutionControls.operationAllowance|operationAllowance(com.eignex.klause.util.Cancellation){}[0]
 }
 
@@ -14363,6 +14364,7 @@ final class com.eignex.klause.solver.search/SearchExecutionControlAdapter : com.
         final fun <get-stopCause>(): com.eignex.klause.solver.search/SearchStopCause? // com.eignex.klause.solver.search/SearchExecutionControlAdapter.stopCause.<get-stopCause>|<get-stopCause>(){}[0]
 
     final fun beginOperation() // com.eignex.klause.solver.search/SearchExecutionControlAdapter.beginOperation|beginOperation(){}[0]
+    final fun beginTraversal() // com.eignex.klause.solver.search/SearchExecutionControlAdapter.beginTraversal|beginTraversal(){}[0]
     final fun canCommitDecision(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionControlAdapter.canCommitDecision|canCommitDecision(){}[0]
     final fun consumeCheck(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionControlAdapter.consumeCheck|consumeCheck(){}[0]
     final fun operationAllowance(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.search/SearchExecutionControlAdapter.operationAllowance|operationAllowance(com.eignex.klause.util.Cancellation){}[0]

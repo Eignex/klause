@@ -688,6 +688,7 @@ class SearchSession(
             "scoped runs require chronological model continuation"
         }
         decisionsExhausted = false
+        executionControls.beginTraversal()
         val listener = booleanBranching as? SearchUnassignListener
         observeUnassignments(
             if (atoms != null && listener != null) {

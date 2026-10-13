@@ -61,6 +61,9 @@ interface SearchExecutionControls : SearchExecutionAccounting {
     /** Report a stopped or declined operation. */
     fun reportStop(cause: SearchStopCause)
 
+    /** Begin a traversal without renewing any native allowance owned by its containing scope. */
+    fun beginTraversal() = beginOperation()
+
     /** Begin another component operation; containing allowance stops remain owned by their scope. */
     fun beginOperation()
 }
@@ -75,11 +78,15 @@ class SearchExecutionControlAdapter(
 
     override val exhausted: Boolean get() = accounting.exhausted
 
-    override val stopCause: SearchStopCause? get() = when {
-        cancellation.deadline()?.hasPassedNow() == true -> SearchStopCause.Timeout
-        cancellation() -> SearchStopCause.Cancelled
-        accounting.stopCause != null -> accounting.stopCause
-        else -> cause
+    override val stopCause: SearchStopCause? get() {
+        val nativeCause = accounting.stopCause
+        return when {
+            cancellation.deadline()?.hasPassedNow() == true -> SearchStopCause.Timeout
+            nativeCause.isAllowance -> nativeCause
+            cause.isAllowance -> cause
+            cancellation() -> SearchStopCause.Cancelled
+            else -> nativeCause ?: cause
+        }
     }
 
     override fun canCommitDecision(): Boolean = accounting.canCommitDecision().also {
@@ -108,7 +115,18 @@ class SearchExecutionControlAdapter(
         this.cause = cause
     }
 
+    override fun beginTraversal() {
+        if (cause == SearchStopCause.DecisionAllowance) cause = null
+        beginOperation()
+    }
+
     override fun beginOperation() {
         if (cause == SearchStopCause.OperationAllowance || cause == SearchStopCause.RepresentationDecline) cause = null
     }
+}
+
+private val SearchStopCause?.isAllowance: Boolean get() = when (this) {
+    SearchStopCause.WorkAllowance, SearchStopCause.CheckAllowance,
+    SearchStopCause.DecisionAllowance, SearchStopCause.OperationAllowance -> true
+    else -> false
 }

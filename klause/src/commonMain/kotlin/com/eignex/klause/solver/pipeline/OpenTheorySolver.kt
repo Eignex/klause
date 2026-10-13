@@ -480,12 +480,12 @@ class OpenTheoryEngine internal constructor(
             when {
                 timedOut || cause == SearchStopCause.Timeout -> TerminationReason.Timeout
 
-                cause == SearchStopCause.Cancelled -> TerminationReason.Cancelled
 
                 budgetExhausted || state.work.exhausted || cause == SearchStopCause.WorkAllowance ||
                     cause == SearchStopCause.CheckAllowance || cause == SearchStopCause.DecisionAllowance ||
                     cause == SearchStopCause.OperationAllowance -> TerminationReason.BudgetExhausted
 
+                cause == SearchStopCause.Cancelled -> TerminationReason.Cancelled
                 cause == SearchStopCause.RepresentationDecline -> TerminationReason.Unsupported
 
                 else -> TerminationReason.Cancelled
