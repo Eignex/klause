@@ -6,6 +6,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.Base64
@@ -16,6 +17,9 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -73,7 +77,7 @@ internal object CorpusSourceCapture {
             val worker = out.resolve("capture_corpus_sources.py").apply { writeBytes(workerBytes) }
             out.resolve("planned.json").writeText(buildJsonObject {
                 put("schema", "corpus-original-source-capture-plan-v1")
-                put("revision", kotlinx.serialization.json.JsonNull)
+                put("revision", JsonNull)
                 put("revisionAuthority", "owned profile admission; installed harness and runtime hashes")
                 put("requestSha256", hash(bytes))
                 put("resolvedRequestSha256", hash(request.readBytes()))
@@ -149,7 +153,7 @@ internal object CorpusSourceCapture {
         val overflow = AtomicBoolean()
         val drainFailure = AtomicReference<String?>()
         val cleanupIssues = ConcurrentLinkedQueue<String>()
-        val terminationAttempts = ConcurrentLinkedQueue<kotlinx.serialization.json.JsonObject>()
+        val terminationAttempts = ConcurrentLinkedQueue<JsonObject>()
         val interrupted = ConcurrentHashMap.newKeySet<Thread>()
         val groupResolved = AtomicBoolean()
         val processReaped = AtomicBoolean()
@@ -258,7 +262,7 @@ internal object CorpusSourceCapture {
                     cleanup("process receipt durability") {
                         write(out.resolve("worker-process.json"), buildJsonObject {
                             put("command", buildJsonArray {
-                                command.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) }
+                                command.forEach { add(JsonPrimitive(it)) }
                             })
                             put("pid", process?.pid())
                             put("exit", exit)
@@ -273,7 +277,7 @@ internal object CorpusSourceCapture {
                             put("workerReaped", processReaped.get())
                             put("terminationAttempts", buildJsonArray { terminationAttempts.forEach { add(it) } })
                             put("cleanupIssues", buildJsonArray {
-                                cleanupIssues.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) }
+                                cleanupIssues.forEach { add(JsonPrimitive(it)) }
                             })
                         }.toString().toByteArray())
                     }
@@ -297,7 +301,7 @@ internal object CorpusSourceCapture {
                 check(!stopping.get()) { "containing capture stopped" }
                 ProcessBuilder(command).start().also { active = it }
             }
-            fun drain(input: java.io.InputStream, destination: File): Thread = Thread {
+            fun drain(input: InputStream, destination: File): Thread = Thread {
                 try {
                     FileOutputStream(destination).use { output ->
                         input.use {
@@ -338,9 +342,12 @@ internal object CorpusSourceCapture {
             }
             if (!process.isAlive) exit = process.exitValue()
             afterWorker()
+        } catch (stop: InterruptedException) {
+            primary = stop
+            stopping.set(true)
+            throw stop
         } catch (error: Throwable) {
             primary = error
-            if (error is InterruptedException) stopping.set(true)
             throw error
         } finally {
             try {
@@ -360,7 +367,7 @@ internal object CorpusSourceCapture {
                                 cleanupIssues.isEmpty() && groupResolved.get() && processReaped.get())
                             put("terminationAttempts", buildJsonArray { terminationAttempts.forEach { add(it) } })
                             put("issues", buildJsonArray {
-                                cleanupIssues.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) }
+                                cleanupIssues.forEach { add(JsonPrimitive(it)) }
                             })
                         }.toString().toByteArray())
                     }
