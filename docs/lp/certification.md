@@ -167,6 +167,21 @@ differ from the best incumbent; its Boolean and integer coordinates stay fixed a
 carry original-direction rational values and never publish closure endpoints.
 Callback failure retracts and closes the invocation before propagating.
 
+Ordinary `OpenTheoryRequest` execution binds affine authority to the prepared plan's
+original source and original objective direction. Its exact IR binder requires
+complete represented affine conjunctions; omitted disequality, guarded equality or
+unsupported Boolean capture does not acquire complete authority. A source owner can
+supply complete exact rows, objective and original-coordinate semantics through
+`withLinearAuthority`; source preparation preserves that binding. Rounded frontend
+values do not replace the supplied source data.
+
+`RationalTheoryDescent.linearResult` carries the retained typed completion across
+its scalar resumable interface. Attainment and refutation retain source evidence.
+A limit or full lattice ray has no scalar completion representation, so its scalar
+compatibility result remains `BestFound(Unsupported)` rather than an exhausted
+optimality signal. `OpenTheoryOptimum.linearResult` exposes the actual exact terminal,
+bound and incumbent separately; its scalar objective remains in minimized units.
+
 ## Tolerance recovery
 
 MPS finite-leaf tolerance recovery can obtain exact dyadic basis duals to justify

@@ -43,15 +43,18 @@ structure. Bounds, conflicts and unboundedness require the corresponding exact
 numerical and source packages. Mixed unboundedness requires an integer-feasible
 point and an integrality-preserving improving ray.
 
-Specialized integral descent handles integer objectives without Boolean or
-continuous cost when its cutoff rows remain admitted. Other supported linear
-objectives use exact strict-improvement theory rounds, including Boolean and real
-costs. A completed cutoff refutation can prove a checked incumbent optimal, but
-rational descent supplies neither a recession certificate nor an unattained-limit
-result. Unbounded objectives and unattained infima can continue until interrupted.
-Objective admission checks that the cutoff remains in a supported theory; source
-correspondence requirements still govern frontend publication. Feasibility coverage
-alone does not establish optimization coverage.
+Complete affine source capture uses the retained linear authority invocation for
+integer, Boolean and real costs. Fractional integer points request adjacent exhaustive
+integer splits. Global bounds, attained optima and limits require complete checked
+coverage; an improving ray requires a source-feasible base and integral lattice steps.
+`OpenTheoryOptimum.linearResult` retains full original-source directions and separates
+the incumbent from independently checked bounds and limiting values. A continuous
+relaxation or neighborhood refutation cannot replace those source checks.
+
+Without complete affine capture, specialized integral descent or strict-improvement
+theory rounds retain their existing admission. Unsupported or interrupted checks
+withhold global optimization claims. Objective admission and source correspondence
+remain owned by preparation and the source adapter.
 
 ## State and resources
 
