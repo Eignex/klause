@@ -58,9 +58,13 @@ class LpAutoConfigTest {
 
     @Test
     fun `ordinary integral root cuts retain source valid rounding proofs`() {
-        val p = problem(Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 3), intVars = 1)
+        val p = problem(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+        )
         val plan = LpAutoConfig.resolve(p, LpConfig.parse("default,+cuts"))
-        val objective = LinearObjective(intCoefficients = longArrayOf(-1))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val relaxer = CpToLpRelaxation(p, objective)
         val session = PropagationSession(p)
         val cuts = LpEngine(p, objective, LpParams(lpPlan = plan), SolveStatsSink("cuts")).use {
@@ -71,12 +75,14 @@ class LpAutoConfigTest {
         for (cut in cuts) {
             assertTrue(cut.global)
             assertTrue(assertNotNull(cut.provenance).rules.isNotEmpty())
-            for (point in 0L..1L) {
-                val lhs = cut.cols.indices.sumOf { cut.coeffs[it] * point }
+            for (x in 0L..5L) for (y in 0L..5L) for (z in 0L..5L) {
+                if (x + y < 1 || y + z < 1 || x + z < 1) continue
+                val point = longArrayOf(x, y, z)
+                val lhs = cut.cols.indices.sumOf { cut.coeffs[it] * point[cut.cols[it]] }
                 assertTrue(lhs >= cut.rhs)
             }
-            assertTrue(cut.cols.indices.sumOf { cut.coeffs[it] * 1.5 } < cut.rhs)
         }
+        assertTrue(cuts.any { cut -> cut.coeffs.sum() * 0.5 < cut.rhs })
     }
 
     @Test
