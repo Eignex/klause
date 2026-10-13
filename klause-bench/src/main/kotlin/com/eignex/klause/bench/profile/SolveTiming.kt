@@ -41,7 +41,10 @@ object SolveTiming {
     @Serializable
     internal data class Timings(val suite: String, val problem: String, val timeoutMs: Long, val runs: List<Run>)
 
-    /** Run the measurement [args] describe, writing into `$OUT` (`build/profile-out` when unset), and print a summary. */
+    /**
+     * Run the measurement [args] describe, writing into `$OUT` (`build/profile-out` when unset), and print a
+     * summary.
+     */
     @JvmStatic
     fun main(args: Array<String>) {
         val out = System.getenv("OUT")?.let(::File) ?: File("build/profile-out")
