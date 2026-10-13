@@ -194,6 +194,8 @@ See [search](search.md#finite-propagation) and [resource allowances](resources.m
 ### Polynomial root preparation
 
 Polynomial complete workers defer component initialization into their retained handle.
+Clausal optimization with additional components uses retained preparation instead of
+opening its component root eagerly; native SAT settings and work currencies are preserved.
 Root normalization, bounded witness probing and projection retain completed phases and
 projection resultant batches across slices. A slice stops between completed native
 operations; one polynomial operation or the final cell check can overrun it. Arithmetic
