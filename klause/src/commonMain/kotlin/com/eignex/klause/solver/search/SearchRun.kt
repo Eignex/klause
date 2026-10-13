@@ -438,7 +438,9 @@ class SearchRun internal constructor(
 
     private fun rememberIndeterminate() {
         sawIndeterminate = true
-        indeterminateCause = session.executionControls.stopCause ?: SearchStopCause.RepresentationDecline
+        val cause = session.executionControls.stopCause
+        indeterminateCause = cause.takeUnless { it == SearchStopCause.Timeout || it == SearchStopCause.Cancelled }
+            ?: SearchStopCause.RepresentationDecline
     }
 
     private fun finish(event: SearchRunEvent): SearchRunEvent {

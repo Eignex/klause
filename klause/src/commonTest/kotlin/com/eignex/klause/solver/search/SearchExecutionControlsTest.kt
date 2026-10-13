@@ -149,6 +149,32 @@ class SearchExecutionControlsTest {
     }
 
     @Test
+    fun `an expired slice does not become lifetime cancellation after resumption`() {
+        var cancelled = false
+        var firstCheck = true
+        val controls = SearchExecutionControlAdapter(Cancellation { cancelled })
+        val component = object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck = if (firstCheck) {
+                firstCheck = false
+                cancelled = true
+                ComponentCheck.Indeterminate
+            } else {
+                ComponentCheck.Infeasible()
+            }
+        }
+        val session = SearchSession(listOf(component), executionControls = controls)
+        val run = session.openRun(1, lifecycle = object : SearchRunLifecycle {
+            override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+        })
+        assertIs<SearchRunEvent.Paused>(run.next())
+        cancelled = false
+
+        assertIs<SearchRunEvent.Indeterminate.Component>(run.next())
+
+        assertEquals(SearchStopCause.RepresentationDecline, controls.stopCause)
+    }
+
+    @Test
     fun `controls cannot be replaced after component initialization`() {
         val session = SearchSession(emptyList())
         session.initialize()
