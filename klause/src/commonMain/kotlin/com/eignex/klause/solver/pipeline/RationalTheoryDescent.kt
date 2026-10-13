@@ -12,7 +12,6 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
@@ -20,11 +19,9 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.solver.evidence.SourceResultEvidence
-import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LinearOptimizationResult
@@ -41,8 +38,18 @@ internal class RationalTheoryDescent(
     private val params: TheoryParams,
     private val context: SourceProofContext? = source.linearAuthorityContext(
         objective, ObjectiveSense.MINIMIZE, params.cancellation or params.timeout),
+    private val publicationInvocation: EngineInvocation? = null,
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
+    init {
+        require(publicationInvocation == null ||
+            (publicationInvocation.sourceModel.sameModel(ModelIdentity.of(source)) &&
+                publicationInvocation.model.matches(ModelIdentity.of(source, objective)) &&
+                publicationInvocation.scope == context?.scope)) {
+            "rational witness publication has a different source invocation"
+        }
+    }
+
     private val state = OpenTheorySolveState(params)
     private var linear = context?.let {
         LinearAuthorityInvocation(it, params, external = { external()?.first }, state = state)
@@ -209,9 +216,10 @@ internal class RationalTheoryDescent(
         if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(evidence, cancellation) !=
             SourceEvidenceCheck.Checked
         ) return
-        val result = SolveResult.Sat(sample, evidence = SourceResultEvidence(original.scope, listOf(evidence)))
-        sample.witnessCertificate = EvidenceCertificate.completed(ModelIdentity.of(source), EvidenceKind.Witness,
-            CompletedEngineResult.Solve(original.scope, result))
+        sample.witnessCertificate = publicationInvocation?.let { binding ->
+            EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, sample,
+                objective.evaluateExact(sample).toDouble()))
+        }
     }
 
     private fun retainChecked(sample: Sample, cancellation: Cancellation): Boolean {

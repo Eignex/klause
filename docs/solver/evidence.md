@@ -247,7 +247,9 @@ caller supplies the actual runtime. Open exact-neighborhood factories read the b
 worker invocation after allocation and attach the checked native point and execution
 value. Unbound conversions and low-level completion adapters retain exact coordinates
 without issuing a runtime certificate. Their native source checks remain required;
-these publications add no independent derivation coverage.
+these publications add no independent derivation coverage. Rational-descent fallback
+source checking retains its actual invocation and witness publication when bound;
+it withholds a certificate when no runtime is supplied.
 
 The public `PortfolioBuilder.build` and `buildExplicit` worker-list entry points
 prepare one actual finite source invocation for their operation and bind each
