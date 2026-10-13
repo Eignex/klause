@@ -235,11 +235,10 @@ internal class DiffnInvariant(
 
     override val providesImplicitNeighbourhood: Boolean get() = true
 
-    /** Feasibility-preserving neighbourhood: swap the positions of two rectangles with identical
-     *  current footprint (same width and height). Each rectangle takes the other's lower-left
-     *  corner, so the set of occupied cells is exactly preserved and no overlap is introduced. */
+    /** Bounded feasible relocations and equal-footprint position swaps. */
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (n < 2) return
+        if (n < 2 || isViolated(state, factorId)) return
+        DiffnRelocations(xs, ys, widths, heights, widthVars, heightVars, nonStrict, state, sink).propose()
         var emitted = 0
         var attempts = 0
         while (emitted < DIFFN_STRUCTURED_SWAP_CAP &&
@@ -249,6 +248,12 @@ internal class DiffnInvariant(
             val i = state.rng.nextInt(n)
             val j = state.rng.nextInt(n)
             if (i == j || xs[i] == ys[i] || xs[j] == ys[j]) continue
+            if (varToRectOf(xs[i]) != i || varToRectOf(ys[i]) != i ||
+                varToRectOf(xs[j]) != j || varToRectOf(ys[j]) != j
+            ) continue
+            if (widthVars?.any { it == xs[i] || it == ys[i] || it == xs[j] || it == ys[j] } == true ||
+                heightVars?.any { it == xs[i] || it == ys[i] || it == xs[j] || it == ys[j] } == true
+            ) continue
             if (rw(state, i, -1, 0L) != rw(state, j, -1, 0L)) continue
             if (rh(state, i, -1, 0L) != rh(state, j, -1, 0L)) continue
             val xi = state.assignment.intValue(xs[i])
@@ -263,6 +268,7 @@ internal class DiffnInvariant(
             if (yj != yi) parts.add(IntSet(ys[i], yj))
             if (xi != xj) parts.add(IntSet(xs[j], xi))
             if (yi != yj) parts.add(IntSet(ys[j], yi))
+            if (parts.any { it is IntSet && !sink.allowsInt(it.varId) }) continue
             sink.addCompound(parts)
             emitted++
         }
