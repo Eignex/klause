@@ -10,8 +10,9 @@ separately at [eignex.com/docs/klause](https://eignex.com/docs/klause/).
 1. Read [system architecture](architecture.md) for the source-to-result flow and
    the responsibilities of each layer.
 2. Read [solver vision](vision.md) for the intended model breadth, paired portfolios
-   and independent proof verification, with [active planned work](vision.md#active-work-toward-the-vision)
-   tracked separately from [current coverage](formats.md#solving-coverage).
+   and independent proof verification, with [current execution contracts](vision.md#current-execution-contracts)
+   and [remaining work](vision.md#active-work-toward-the-vision) distinguished from
+   [current coverage](formats.md#solving-coverage).
 3. Use [development](development.md) to build and contribute, or follow the
    subsystem links below for the contract you are changing.
 
@@ -64,7 +65,6 @@ does not change the relative place of each theory in the model or support contra
 | [LP certification](lp/certification.md) | Exact checks for witnesses, bounds, conflicts and rays |
 | [Exact quadratic certificates](arithmetic/quadratic.md) | Rational quadratic bounds, attainment, approach paths and rays |
 | [Exact polynomial arithmetic](arithmetic/polynomial.md) | Polynomial operations, algebraic scalars, root isolation and arithmetic limits |
-| [Certified transcendental enclosures](arithmetic/transcendental.md) | Rational enclosures and affine relaxations; source/theory integration remains planned |
 | [Certified transcendental enclosures](arithmetic/transcendental.md) | Rational function enclosures, range reduction and affine relaxations |
 | [Exact analytic real coordinates](arithmetic/real.md) | Authoritative symbolic function expressions with rational and algebraic leaves |
 | [Numerical dependencies](lp/dependencies.md) | Kernel provenance, integration contracts and runtime support |
