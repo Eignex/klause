@@ -101,8 +101,9 @@ solver policy owns conversions and result/proof semantics.
 Built-in finite portfolios with more than one lane partition the remaining solve
 allowance over every materialized worker, including replicas. Integer division gives
 equal shares, with remainder units assigned in worker order. Sequential portfolios
-retain one shared allowance. Open portfolios partition their LS decision/move
-allowance across LS workers; complete theory work retains its separate native scope.
+retain one shared allowance. Shared finite, open, polynomial and nonlinear-integer invocations partition the
+decision/move allowance over their materialized parallel slots. Complete theory work
+retains its separate native currency and reservation.
 
 Quotas persist on the containing budget across reopens and reseeds. They are not
 redistributed after a worker finishes, fails or is cancelled. A quota can therefore

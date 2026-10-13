@@ -65,7 +65,7 @@ class PolynomialStrategyAdaptersTest {
         val shared = assertNotNull(SharedPolynomialModel.assemble(source, formula.formula))
 
         shared.service.invocation().use { invocation ->
-            assertIs<SolveResult.Unsat>(PolynomialStrategyAdapters(
+            assertIs<SolveResult.Unsat>(PolynomialWorkerAdapter(
                 shared, invocation, PolynomialStrategyParams(), Cancellation.Never,
             ).solve(FiniteEngine.BACKTRACK))
         }
@@ -82,7 +82,7 @@ class PolynomialStrategyAdaptersTest {
         val shared = assertNotNull(SharedPolynomialModel.assemble(source, formula.formula))
 
         shared.service.invocation().use { invocation ->
-            assertIs<SolveResult.Unknown>(PolynomialStrategyAdapters(
+            assertIs<SolveResult.Unknown>(PolynomialWorkerAdapter(
                 shared, invocation,
                 PolynomialStrategyParams(localSearch = LocalSearchParams(maxFlips = 2)), Cancellation.Never,
             ).solve(FiniteEngine.LOCAL_SEARCH))
@@ -103,7 +103,7 @@ class PolynomialStrategyAdaptersTest {
         for (pin in listOf(0L, 1L, 0L)) {
             shared.service.invocation(QfNraParams()).use { invocation ->
                 val params = PolynomialStrategyParams(assumptions = Assumptions(ints = mapOf(0 to pin)))
-                val result = PolynomialStrategyAdapters(shared, invocation, params, Cancellation.Never)
+                val result = PolynomialWorkerAdapter(shared, invocation, params, Cancellation.Never)
                     .solve(FiniteEngine.BACKTRACK)
                 if (pin == 0L) assertIs<SolveResult.Unsat>(result) else assertIs<SolveResult.Sat>(result)
             }
@@ -172,6 +172,44 @@ class PolynomialStrategyAdaptersTest {
                 assertEquals(2L, sample.intValue(1))
             }
         }
+    }
+
+    @Test
+    fun `mixed polynomial replicas preserve original finite and algebraic coordinates`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+        val request = source.pipelineRequest()
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(randomSeed = 17),
+            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 8), alnsIterations = 1,
+        ))
+
+        val result = OpenTheoryPipeline.execute(request, params, FiniteEngine.MIXED, 8).result
+
+        val sat = assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals("1", sat.assignment.intValue(0))
+        assertEquals(1.0, assertNotNull(sat.assignment.algebraicRealValue(0)).rational?.toDouble())
+        assertEquals(8, sat.stats.portfolio.arms.size)
+    }
+
+    @Test
+    fun `parallel finite polynomial optimization preserves exact cost below floating precision`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L shl 62, -1))
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(randomSeed = 17),
+            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 8), alnsIterations = 1,
+        ))
+
+        val result = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, params, FiniteEngine.MIXED, 4)
+
+        val optimal = assertIs<MinimizeResult.Optimal>(result.result)
+        assertEquals(1L, optimal.sample.intValue(0))
+        assertEquals(2L, optimal.sample.intValue(1))
+        assertEquals(4, optimal.stats.portfolio.arms.size)
     }
 
 }

@@ -57,11 +57,12 @@ coordinates are free it uses coordinate repairs; fixed/single-coordinate windows
 use exact relaxed completion with checked integer candidates. A failed real
 relaxation covers only that neighborhood; integer candidate exhaustion is undecided.
 
-Mixed execution initially offers sixteen whole-source candidate attempts with a
-4,096-unit native arithmetic slice, then up to 32 LS moves and the configured
-adaptive ALNS moves, before remaining whole-source candidate search. These slices
-share the source, node allowance and cumulative native work. A slice's incomplete
-stop permits another arm; containing allowance exhaustion stops the invocation.
+Mixed execution supplies retained whole-source traversal, LS and adaptive ALNS
+factories to the [common invocation](../solver/portfolio.md). Materialized workers
+keep private cursors and cumulative native reservations, with explicit parallel
+lanes and stable seeds. Candidate and completed repair checks are atomic with
+respect to segment limits. A segment pause preserves state; containing native
+allowance exhaustion stops optional work. Neighborhood refutations remain local.
 Default whole-source candidates are 1,024, heuristic moves 256 and ALNS iterations
 50. Every definitive result receives the containing scope's final stop check.
 

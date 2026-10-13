@@ -295,6 +295,7 @@ class Portfolio(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
         incumbents: PortfolioIncumbents<V>,
+        terminalCheck: PortfolioTerminalCheck? = null,
     ): MinimizeResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSearch>(workers.size))
         val incumbent = incumbents.exchange
@@ -306,6 +307,7 @@ class Portfolio(
         var callbackFailure: Throwable? = null
         var unbounded: MinimizeResult.Unbounded? = null
         var exhausted = false
+        var terminalPublished = false
 
         // Install a strictly-improving incumbent and credit it to [claim]'s arm. Called under the run's lock, so the
         // check, the callback and the install are one step: concurrent lanes report improvements in the order they
@@ -315,6 +317,7 @@ class Portfolio(
             val before = incumbent.current()
             if (!incumbents.isImproving(candidate.objective)) return
             val worker = workers[claim.arm]
+            if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
             try {
                 onImprovement?.invoke(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r))
             } catch (failure: Throwable) {
@@ -322,7 +325,6 @@ class Portfolio(
                 run.finish()
                 throw failure
             }
-            if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
             claim.improved = true
             if (before != null) {
                 if (claim.hadIncumbent) {
@@ -451,6 +453,8 @@ class Portfolio(
                     evidenceVerification?.proof(worker, proofKind, terminal?.assignment, terminal?.objectiveValue),
                 )
             }
+            val publication = if (!failed && claim.fault == null) terminalCheck?.check(worker, handle) else null
+            claim.verified(publication?.verification)
             run.locked {
                 val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
                 run.record(
@@ -469,6 +473,17 @@ class Portfolio(
                 if (claim.fault != null) {
                     run.quarantine(claim)
                     return@locked
+                }
+                if (!terminalPublished && publication?.verification is Verification.Accepted) {
+                    try {
+                        publication.accepted()
+                        terminalPublished = true
+                    } catch (failure: Throwable) {
+                        callbackFailure = failure
+                        run.finish()
+                        throw failure
+                    }
+                    run.finish()
                 }
                 if (claim.foundFirst) run.startImprovementPhase()
                 if (claim.improved && (handle as? ReseedGuard)?.canContinuePreparation == true) {
