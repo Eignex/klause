@@ -1394,6 +1394,8 @@ abstract interface com.eignex.klause.solver.search/SearchContext { // com.eignex
 abstract interface com.eignex.klause.solver.search/SearchExecutionAccounting { // com.eignex.klause.solver.search/SearchExecutionAccounting|null[0]
     open val exhausted // com.eignex.klause.solver.search/SearchExecutionAccounting.exhausted|{}exhausted[0]
         open fun <get-exhausted>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionAccounting.exhausted.<get-exhausted>|<get-exhausted>(){}[0]
+    open val stopCause // com.eignex.klause.solver.search/SearchExecutionAccounting.stopCause|{}stopCause[0]
+        open fun <get-stopCause>(): com.eignex.klause.solver.search/SearchStopCause? // com.eignex.klause.solver.search/SearchExecutionAccounting.stopCause.<get-stopCause>|<get-stopCause>(){}[0]
 
     open fun canCommitDecision(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionAccounting.canCommitDecision|canCommitDecision(){}[0]
     open fun consumeCheck(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionAccounting.consumeCheck|consumeCheck(){}[0]

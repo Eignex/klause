@@ -34,6 +34,9 @@ interface SearchExecutionAccounting {
     /** The containing native allowance has been exhausted. */
     val exhausted: Boolean get() = false
 
+    /** Native reason for refusing an event; adapters can distinguish their own check and decision limits. */
+    val stopCause: SearchStopCause? get() = if (exhausted) SearchStopCause.WorkAllowance else null
+
     /** Unmetered accounting. */
     data object Unlimited : SearchExecutionAccounting
 }
@@ -44,7 +47,7 @@ interface SearchExecutionControls : SearchExecutionAccounting {
     val cancellation: Cancellation
 
     /** Most recent unresolved stop, with containing cancellation and work limits taking precedence. */
-    val stopCause: SearchStopCause?
+    override val stopCause: SearchStopCause?
 
     /** Select a native operation allowance without renewing the containing allowance. */
     fun operationAllowance(parent: Cancellation): Cancellation = parent.shorten(0.5)
@@ -69,20 +72,20 @@ class SearchExecutionControlAdapter(
     override val stopCause: SearchStopCause? get() = when {
         cancellation.deadline()?.hasPassedNow() == true -> SearchStopCause.Timeout
         cancellation() -> SearchStopCause.Cancelled
-        exhausted -> SearchStopCause.WorkAllowance
+        accounting.stopCause != null -> accounting.stopCause
         else -> cause
     }
 
     override fun canCommitDecision(): Boolean = accounting.canCommitDecision().also {
-        if (!it) reportStop(SearchStopCause.WorkAllowance)
+        if (!it) reportStop(accounting.stopCause ?: SearchStopCause.DecisionAllowance)
     }
 
     override fun recordDecision(decision: SearchDecision): Boolean = accounting.recordDecision(decision).also {
-        if (!it) reportStop(SearchStopCause.WorkAllowance)
+        if (!it) reportStop(accounting.stopCause ?: SearchStopCause.DecisionAllowance)
     }
 
     override fun consumeCheck(): Boolean = accounting.consumeCheck().also {
-        if (!it) reportStop(SearchStopCause.WorkAllowance)
+        if (!it) reportStop(accounting.stopCause ?: SearchStopCause.CheckAllowance)
     }
 
     override fun operationAllowance(parent: Cancellation): Cancellation = allowance(parent)

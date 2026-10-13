@@ -106,6 +106,21 @@ class SearchExecutionControlsTest {
     }
 
     @Test
+    fun `injected native limits retain their typed refusal causes`() {
+        for (cause in listOf(SearchStopCause.CheckAllowance, SearchStopCause.DecisionAllowance)) {
+            val controls = SearchExecutionControlAdapter(accounting = object : SearchExecutionAccounting {
+                override val stopCause = cause
+                override fun consumeCheck(): Boolean = false
+                override fun canCommitDecision(): Boolean = false
+            })
+
+            if (cause == SearchStopCause.CheckAllowance) controls.consumeCheck() else controls.canCommitDecision()
+
+            assertEquals(cause, controls.stopCause)
+        }
+    }
+
+    @Test
     fun `a new component operation clears only a local decline`() {
         val controls = SearchExecutionControlAdapter()
         controls.reportStop(SearchStopCause.OperationAllowance)
