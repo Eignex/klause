@@ -93,7 +93,8 @@ class LocalSearchProblem private constructor(
                 }
                 @Suppress("UNCHECKED_CAST")
                 yield(LocalSearchProblem(
-                    problem, invariants as Array<Invariant>, selection, boolOccurrences, intOccurrences, realOccurrences,
+                    problem, invariants as Array<Invariant>, selection,
+                    boolOccurrences, intOccurrences, realOccurrences,
                 ))
             }.iterator()
 
