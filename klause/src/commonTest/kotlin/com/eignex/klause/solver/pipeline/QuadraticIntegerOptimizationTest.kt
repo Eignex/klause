@@ -232,4 +232,23 @@ class QuadraticIntegerOptimizationTest {
         assertEquals(BigFraction.ofLong(-1) * BigFraction.ofLong(4).reciprocal(), result.bound?.value?.rational)
         assertEquals(TerminationReason.Cancelled, result.reason)
     }
+    @Test
+    fun `parallel integer traversal preserves the exact fractional relaxation optimum`() {
+        val source = NonlinearIntegerProblem(
+            PolynomialRealFormula.Constant(true), 1, 0, mapOf("i" to 0), emptyMap(), emptyMap())
+        val i = QuadraticVariable.Int(SourceIntId(0))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, i, i),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), i),
+        ))
+
+        val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, NonlinearIntegerTheoryParams(),
+            FiniteEngine.MIXED, ObjectiveSense.MINIMIZE, 4)
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
+        assertEquals(BigFraction.ZERO, optimum.incumbent.value.rational)
+        assertEquals(BigFraction.ZERO, optimum.bound.value.rational)
+        assertEquals(4, optimum.stats.portfolio.arms.size)
+    }
+
 }

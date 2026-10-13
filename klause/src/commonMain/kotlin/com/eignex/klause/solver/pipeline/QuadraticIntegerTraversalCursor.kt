@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.SliceBudget
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -11,8 +12,6 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qfnia.QuadraticIntegerComponent
 import com.eignex.klause.theory.qfnia.QuadraticIntegerNode
 import com.eignex.klause.util.Cancellation
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
 
 internal class QuadraticIntegerTraversalCursor(
     private val boolCount: Int,
@@ -24,6 +23,7 @@ internal class QuadraticIntegerTraversalCursor(
     private val work: () -> Long,
 ) : AutoCloseable {
     private var global = lifetime
+    private val slice = SliceBudget(work, { 0L }, { 0L })
     private val session = SearchSession(
         listOf(component), cancellation = Cancellation { global() },
         branchers = listOf(component), atoms = SearchAtomRegistry(boolCount),
@@ -49,12 +49,8 @@ internal class QuadraticIntegerTraversalCursor(
             return terminal
         }
         if (sliceWork == 0L || sliceMillis == 0L) return null
-        val started = work()
-        val deadline = if (sliceMillis == Long.MAX_VALUE) null
-            else TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
-        val paused = {
-            deadline?.hasPassedNow() == true || (sliceWork >= 0 && work() - started >= sliceWork)
-        }
+        if (!slice.begin(sliceMillis, sliceWork)) return null
+        val paused = { slice.expired() }
         if (!initialized) {
             when (session.initialize()) {
                 is ComponentResult.Conflict -> terminal = if (global()) SearchRunEvent.Indeterminate.Cancelled
@@ -74,6 +70,7 @@ internal class QuadraticIntegerTraversalCursor(
                 is SearchRunEvent.Satisfied -> onModel(requireNotNull(event.model.valueOf(component.modelKey)))
                 SearchRunEvent.Paused -> {
                     if (component.outcome is QuadraticIntegerNode.Unbounded) terminal = event
+                    slice.noteOverspend()
                     return terminal
                 }
                 SearchRunEvent.Exhausted, is SearchRunEvent.Indeterminate -> {
@@ -82,6 +79,7 @@ internal class QuadraticIntegerTraversalCursor(
                 }
             }
         }
+        slice.noteOverspend()
         return null
     }
 

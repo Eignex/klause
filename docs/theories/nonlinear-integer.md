@@ -105,9 +105,12 @@ and real completion. Initial integer proposals use unrestricted real completion;
 later real windows retain exact incumbent isolating intervals. Boolean pins and
 single-coordinate, block and whole-tuple moves preserve typed source identities
 and wide integer centers. Adaptive operator weights reward incumbent improvement.
-Neighborhood proof does not become a whole-source proof. MIXED offers a bounded
-adaptive phase before complete traversal. Every branch and repair shares cumulative
-numerical/polynomial work and the containing decision/move allowance. Optional real
+Neighborhood proof does not become a whole-source proof. MIXED supplies retained
+integer traversal and neighborhood factories to the common invocation, including
+private Boolean/search sessions, exact arithmetic, centers and adaptive state.
+Every branch and repair shares cumulative numerical/polynomial work and the
+containing decision/move allowance. Slice pauses retain pending source traversal;
+completed arithmetic and repairs are atomic segment operations. Optional real
 representation decline allows a fixed-integer completion attempt; an unresolved
 whole-source decline remains explicit.
 

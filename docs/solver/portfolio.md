@@ -359,9 +359,14 @@ invocations; fallback ALNS retains its bootstrap and repairs. Nonlinear integer
 traversal retains tuple enumeration, candidate state and arithmetic work across
 slices; exact neighborhoods retain their centers and adaptive state. CLI parallelism
 reaches these factories, and replicas keep private state and native reservations.
-Quadratic mixed execution retains the fixed phases documented in
-[quadratic strategy execution](../theories/polynomial-real.md#quadratic-strategy-execution). The vision's
-[active work](../vision.md#active-work-toward-the-vision) tracks the related refactors.
+Quadratic finite and open-integer adapters supply retained traversal and exact
+neighborhood factories to that invocation. Their exchange keeps original and
+minimized algebraic values separately. A typed terminal publication enters the
+same schedule only after source, condition, objective, authority, witness and exact
+attainment/strictness checks. Scalar worker telemetry remains incomplete; the
+accepted native result retains its optimum, strict limit or ray semantics.
+Heuristic completion cannot finish a source proof. Single-engine execution retains
+its own traversal semantics; FIXED runs one lane.
 
 Supported linear sources pair complete traversal with exact-coordinate local search
 and adaptive block repair, including real-only models and arbitrary-width integers.

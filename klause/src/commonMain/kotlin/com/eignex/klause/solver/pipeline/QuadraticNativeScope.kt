@@ -24,6 +24,9 @@ internal class QuadraticNativeScope private constructor(
     private val workers = mutableMapOf<Int, QuadraticNativeScope>()
     private var representationDecline: PolynomialTheoryResource? = null
     val resource: PolynomialTheoryResource? get() = ledger.lock.withLock { representationDecline }
+    val declinedResource: PolynomialTheoryResource? get() = ledger.lock.withLock {
+        representationDecline ?: workers.values.firstNotNullOfOrNull { it.representationDecline }
+    }
     val work: Long get() = ledger.lock.withLock {
         if (root == null) ledger.work else sum(polynomialWork, quadraticWork)
     }

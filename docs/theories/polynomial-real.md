@@ -229,9 +229,10 @@ The quadratic execution owner counts numerical proposal/certificate work and
 polynomial work in separate counters under one cumulative `maximumWork` cap.
 Finite branches and neighborhood repairs receive the remaining native allowance;
 every charge reaches the containing meter once. Mandatory polynomial allocation
-declines retain their resource cause. The MIXED heuristic phase receives one
-quarter of remaining native work and deadline before complete traversal. Completed
-atomic work can overspend that phase; it cannot renew the containing allowance.
+declines retain their resource cause. MIXED supplies retained worker factories to
+the [common invocation](../solver/portfolio.md). Complete and heuristic families
+receive persistent native reservations; replicas divide those reservations.
+Completed atomic work can overspend a segment; it cannot renew the containing allowance.
 Private worker cancellation reaches every nested numerical and polynomial query.
 
 ### Invocation ownership

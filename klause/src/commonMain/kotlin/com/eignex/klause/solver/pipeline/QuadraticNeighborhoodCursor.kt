@@ -40,6 +40,8 @@ internal class QuadraticNeighborhoodCursor(
     private val propose: (Set<Int>, BigFraction, Random) -> ExactNeighborhoodCondition,
     private val completion: ExactNeighborhoodCompletion,
     private val accept: (Sample) -> Boolean,
+    private val releaseFirst: Boolean = false,
+    private val rotateSingle: Boolean = false,
 ) : AutoCloseable {
     private val random = Random(seed)
     private var radius = BigFraction.ONE
@@ -66,8 +68,12 @@ internal class QuadraticNeighborhoodCursor(
                 if (random.nextDouble() < weights[draw] / requireNotNull(weights.maxOrNull())) draw else 2
             }
             val amount = when (operator) { 0 -> 1; 1 -> maxOf(1, coordinates / 2); else -> coordinates }
-            val released = if (allowance.moves == initialMoves) emptySet()
-                else (0 until coordinates).shuffled(random).take(amount).toSet()
+            val released = when {
+                coordinates == 0 -> emptySet()
+                rotateSingle && !adaptive -> setOf((allowance.moves % coordinates).toInt())
+                allowance.moves == initialMoves && !releaseFirst -> emptySet()
+                else -> (0 until coordinates).shuffled(random).take(amount).toSet()
+            }
             val before = nativeWork()
             val condition = propose(released, radius, random)
             // A repair and its accepted witness form one atomic segment operation.
