@@ -6,6 +6,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -119,7 +120,10 @@ class SearchExecutionControlsTest {
             }
             )
 
-            if (cause == SearchStopCause.CheckAllowance) controls.consumeCheck() else controls.canCommitDecision()
+            val accepted = if (cause == SearchStopCause.CheckAllowance) controls.consumeCheck()
+                else controls.canCommitDecision()
+
+            assertFalse(accepted)
 
             assertEquals(cause, controls.stopCause)
         }
