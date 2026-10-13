@@ -50,6 +50,18 @@ class ScoringProjection internal constructor(
 
 /** Built-in scoring, retaining exact wide-linear sums over the actual move domains. */
 object BuiltInScoringProjectionProvider : ScoringProjectionProvider {
+    internal fun create(factor: Factor, domains: Array<IntDomain>?): Invariant {
+        val capabilities = factor.defaultExecutionCapabilities()
+        check(capabilities.scoring != ScoringCapability.UNSUPPORTED) {
+            "unsupported scoring route for ${factor::class.simpleName}"
+        }
+        return factor.buildInvariantProjection(domains).also {
+            check((it === NoInvariant) == (capabilities.scoring == ScoringCapability.INERT)) {
+                "scoring capability disagrees with projection"
+            }
+        }
+    }
+
     override fun select(factor: Factor): ScoringProjection? {
         val capabilities = factor.defaultExecutionCapabilities()
         if (capabilities.scoring == ScoringCapability.UNSUPPORTED) return null
