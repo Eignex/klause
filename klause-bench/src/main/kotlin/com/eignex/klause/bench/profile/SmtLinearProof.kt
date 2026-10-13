@@ -71,7 +71,7 @@ object SmtLinearProof {
             val objective = requireNotNull(compiled.objective).toLinearObjective()
             val sense = if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
             val capture = requireNotNull(compiled.model.sourceProofContext(SourceScope(
-                SourceRevision(sha(bytes), "smtlib-affine"), objective = SourceObjective("cost", sense)), objective))
+                SourceRevision(sha(bytes), "klause-ir-exact-v1"), objective = SourceObjective("cost", sense)), objective))
             val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model, objective,
                 maximize = maximize), params, engine, cores) as OpenTheoryExecution.Optimize
             val witnessOnly = engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS
@@ -121,11 +121,13 @@ object SmtLinearProof {
                 put("constant", capture.objectiveConstant.toString())
                 put("rows", buildJsonObject {
                     capture.premises.forEach { (id, row) ->
-                        require(row.guards.isEmpty())
                         put(id, buildJsonObject {
                             put("coefficients", coefficients(row.inequality.coefficients))
                             put("rhs", row.inequality.rhs.toString())
                             put("strict", row.inequality.strict)
+                            put("guards", buildJsonObject {
+                                row.guards.forEach { (id, value) -> put("Boolean/$id", value) }
+                            })
                         })
                     }
                 })
