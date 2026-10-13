@@ -357,7 +357,7 @@ class QuadraticOptimizationExecutionTest {
             localSearch = LocalSearchParams(maxFlips = 0), alnsIterations = 0,
         ))
         val execution = OpenTheoryPipeline.minimize(source, objective, params,
-            FiniteEngine.MIXED, ObjectiveSense.MINIMIZE, 4, onAccepted = { published += it })
+            FiniteEngine.MIXED, ObjectiveSense.MINIMIZE, 2, onAccepted = { published += it })
         val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
 
         assertEquals(1, published.size)
