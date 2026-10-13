@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import pathlib
+import sys
 
 import z3
 
@@ -113,7 +114,15 @@ def main():
             left, right = (results[(source, engine, encoding)] for encoding in ('linear', 'quadratic'))
             for field in ('status', 'sense', 'objective', 'bound', 'strict', 'reason'):
                 assert left.get(field) == right.get(field), (source, engine, field, 'representation differs')
+    package = pathlib.Path(z3.__file__).parent
+    executable = pathlib.Path(sys.executable).resolve()
+    runtime = dict(version=sys.version, executable=str(executable),
+                   executableSha256=hashlib.sha256(executable.read_bytes()).hexdigest())
+    package_hashes = {str(path.relative_to(package)): hashlib.sha256(path.read_bytes()).hexdigest()
+                      for path in sorted(package.rglob('*'))
+                      if path.is_file() and '__pycache__' not in path.parts}
     summary = dict(checker='exact original-source objective comparison', z3Version=z3.get_version_string(),
+                   python=runtime, checkerPackageSha256=package_hashes,
                    exportedProof='not checked', performance='instrumented diagnostic only', cases=checks)
     if args.output:
         args.output.write_text(json.dumps(summary, indent=2) + '\n')

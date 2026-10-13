@@ -42,7 +42,9 @@ internal object ObjectiveRepresentationProbe {
             require(parts.size == 2) { "Use source=<file or directory> [engines=BACKTRACK,...] [out=<directory>]" }
             parts[0] to parts[1]
         }
-        require(options.keys.all { it in setOf("source", "engines", "out", "work", "seed", "moves", "timeout") })
+        require(options.keys.all {
+            it in setOf("source", "engines", "out", "work", "seed", "moves", "timeout", "checker")
+        })
         val input = File(requireNotNull(options["source"]) { "source is required" })
         val sources = if (input.isDirectory) input.walkTopDown().filter { it.extension == "smt2" }.toList()
             else listOf(input)
@@ -70,6 +72,42 @@ internal object ObjectiveRepresentationProbe {
         for (source in sources.sortedBy { it.path }) {
             measure(source, output, engines, work, seed, moves, timeout)
         }
+        when (options["checker"] ?: "none") {
+            "none" -> Unit
+            "existing" -> checkOutput(output, engines, "python3")
+            "provision" -> {
+                val log = File(output, "checker-install.log")
+                runProcess(log, "sudo", "apt-get", "update")
+                runProcess(log, "sudo", "apt-get", "install", "-y", "python3-venv")
+                val environment = File(output, "checker-venv")
+                require(!environment.exists()) { "Checker environment already exists: $environment" }
+                runProcess(log, "python3", "-m", "venv", environment.absolutePath)
+                val python = File(environment, "bin/python").absolutePath
+                runProcess(log, python, "-m", "pip", "install", "-r",
+                    "klause-bench/tools/requirements-source-checks.txt")
+                runProcess(File(output, "checker-dependencies.txt"), python, "-m", "pip", "freeze")
+                checkOutput(output, engines, python)
+                check(environment.deleteRecursively()) { "Could not dispose the owned checker environment" }
+            }
+            else -> error("checker must be none, existing or provision")
+        }
+    }
+
+    private fun checkOutput(output: File, engines: List<FiniteEngine>, python: String) {
+        runProcess(File(output, "checker.log"), python, "klause-bench/tools/verify_objective_probe.py",
+            output.absolutePath, "--engines", engines.joinToString(",") { it.name },
+            "--require-incumbent", "--output", File(output, "source-checks.json").absolutePath)
+        val tools = listOf("verify_objective_probe.py", "verify_nra_source_results.py", "verify_source_results.py",
+            "requirements-source-checks.txt")
+        File(output, "checker-tool-hashes.json").writeText(buildJsonObject {
+            for (tool in tools) put(tool, sha256(File("klause-bench/tools", tool).readBytes()))
+        }.toString() + "\n")
+    }
+
+    private fun runProcess(log: File, vararg command: String) {
+        val process = ProcessBuilder(command.toList()).redirectErrorStream(true)
+            .redirectOutput(ProcessBuilder.Redirect.appendTo(log)).start()
+        check(process.waitFor() == 0) { "${command.first()} failed; see ${log.path}" }
     }
 
     private fun measure(
