@@ -2,14 +2,58 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 
 class ArithmeticPublicationTest {
+    @Test
+    fun `a consumer failure aborts actual source publication and leaves a later invocation usable`() {
+        val source = File.createTempFile("quadratic-output-failure", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (and (>= x (- 2)) (<= x 3))) " +
+                "(minimize (* x x)) (check-sat)")
+        }
+        val common = CommonOptions().apply { engine = "fixed"; parallel = 1 }
+        val session = SmtLibMode.newSession()
+        val solvable = session.load(source.absolutePath, common)
+        val expected = IOException("closed consumer")
+        var terminal = false
+        val failed = object : OutputProtocol by session.output(common) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                assertEquals(false, terminal)
+                throw expected
+            }
+            override fun onVerdictContext(context: VerdictContext) { terminal = true }
+        }
+        var emitted = 0
+        var completed: Verdict? = null
+        val healthy = object : OutputProtocol by session.output(common) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                emitted++
+                return true
+            }
+            override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {}
+            override fun onComplete(verdict: Verdict) { completed = verdict }
+        }
+
+        try {
+            assertSame(expected, assertFailsWith<IOException> { SolveCore.solve(solvable, common, failed) })
+            SolveCore.solve(solvable, CommonOptions().apply { engine = "fixed"; parallel = 1 }, healthy)
+        } finally {
+            source.delete()
+        }
+
+        assertEquals(false, terminal)
+        assertEquals(1, emitted)
+        assertEquals(Verdict.OPTIMAL, completed)
+    }
+
     @Test
     fun `an accepted identity suppresses a final source-owned equivalent representation`() {
         var emitted = 0

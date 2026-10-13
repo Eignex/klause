@@ -90,8 +90,8 @@ are the implementation source for supported names, aliases and help text.
 SMT-LIB optimization emits `; objective=<value>` for each published incumbent in
 the source objective's direction and `; optimizationStatus=<status>` at completion.
 These comments appear without `-s`; `sat` alone does not establish optimality.
-Finite optimization streams improvements. Open-theory, polynomial and quadratic
-optimization report the returned incumbent after their invocation completes.
+Finite, polynomial and quadratic optimization stream accepted improvements.
+Open-theory optimization reports the returned incumbent after its invocation completes.
 Quadratic results additionally separate the exact incumbent objective from its
 certified `objectiveBound`, direction and strictness. Unattained boundaries report
 `unattained-infimum` or `unattained-supremum` with a feasible model distinct from
@@ -128,6 +128,11 @@ records its exact-source or tolerance qualification. The adapter
 uses retained scalar metadata and performs no solver work or candidate admission.
 A frontend source-rendering veto emits nothing and does not advance publication
 state; it cannot suppress a later accepted rendering of the same payload.
+Polynomial and quadratic callbacks consume immutable accepted source assignments,
+their already evaluated exact objectives and invocation versions. Completion renders
+the latest accepted receipt; a terminal certificate's private witness does not replace
+it or create another improvement. An accepted receipt surviving an incomplete result
+retains `best-found` status.
 [Portfolio admission](solver/portfolio.md) owns acceptance;
 [source values](model.md#published-assignments-and-objectives) own exact payloads.
 
@@ -136,8 +141,8 @@ state; it cannot suppress a later accepted rendering of the same payload.
 Solver-control flags are common to **every** mode:
 
 - `-a` / `--all-solutions`, `-n <count>` — enumeration controls (satisfy).
-- `-i` — accepted as a no-op; finite optimization streams improvements independently
-  of this flag, while open-theory, polynomial and quadratic routes report their
+- `-i` — accepted as a no-op; finite, polynomial and quadratic optimization stream
+  improvements independently of this flag. Open-theory optimization reports its
   returned incumbent.
 - `-f` / `--free-search` — ignore the model's search annotations. Alias for `-e cp` (the free
   backtrack portfolio); with no `-f` and no `-e`, the built-in default is `mixed`,

@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 
 internal class ArithmeticPublication(private val output: OutputProtocol) {
@@ -26,8 +27,12 @@ internal class ArithmeticPublication(private val output: OutputProtocol) {
         return true
     }
 
-    fun quadratic(rendered: String?, result: QuadraticOptimizationResult, acceptedVersion: Long? = null): Boolean {
-        val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
+    fun quadratic(
+        rendered: String?,
+        result: QuadraticOptimizationResult,
+        acceptedVersion: Long? = null,
+        point: QuadraticIncumbent? = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent,
+    ): Boolean {
         if (rendered != null && point != null &&
             !publish(rendered, SourceValue.Algebraic(point.value), acceptedVersion)
         ) return false
