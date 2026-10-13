@@ -19,13 +19,20 @@ object SourceRecordCheck {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("bundle", "sha256")) { "Use bundle=<https URL> sha256=<digest>" }
-        val url = URI(requireNotNull(options["bundle"]))
-        require(url.scheme == "https" && url.userInfo == null)
+        require(options.keys == setOf("bundle", "sha256") || options.keys == setOf("input64", "sha256")) {
+            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest>"
+        }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val root = File(System.getProperty("klause.workspace.root", "."))
-        val connection = url.toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
-        val bytes = connection.getInputStream().use { it.readNBytes(32 * 1024 * 1024 + 1) }
+        val bytes = options["input64"]?.let { encoded ->
+            require(encoded.length <= 96 * 1024) { "Inline bundle is oversized; use a URL" }
+            Base64.getDecoder().decode(encoded)
+        } ?: run {
+            val url = URI(requireNotNull(options["bundle"]))
+            require(url.scheme == "https" && url.userInfo == null)
+            val connection = url.toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
+            connection.getInputStream().use { it.readNBytes(32 * 1024 * 1024 + 1) }
+        }
         require(bytes.size <= 32 * 1024 * 1024 && sha(bytes) == options["sha256"]) { "Bundle identity differs" }
         out.resolve("input.json.gz").writeBytes(bytes)
         val text = GZIPInputStream(bytes.inputStream()).use { it.readNBytes(64 * 1024 * 1024 + 1) }
