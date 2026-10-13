@@ -1,8 +1,18 @@
 package com.eignex.klause.solver.incumbent
 
+import com.eignex.klause.solver.Sample
+
 internal sealed interface CompletedEnginePublication {
     val invocation: EngineInvocation
     val model: ModelIdentity
+
+    class Witness(
+        override val invocation: EngineInvocation,
+        val sample: Sample,
+        val value: Double?,
+    ) : CompletedEnginePublication {
+        override val model: ModelIdentity get() = invocation.model
+    }
 
     class ObjectiveBound(
         override val invocation: EngineInvocation,

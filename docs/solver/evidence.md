@@ -156,6 +156,14 @@ and publication folding are atomic, and a pool containing unscoped deductions ca
 acquire a different invocation. Uncaptured native deductions have explicitly
 unavailable independent derivation coverage.
 
+Its witness variant retains the actual immutable assignment, reported execution value
+and runtime invocation after a native witness check. It is an in-search publication,
+so it does not manufacture a terminal result or termination reason. The consumer
+requires that invocation, compares the actual point and value, checks its source and
+execution restrictions, and runs its installed source checker. Cancellation or
+unavailable source validation withholds admission. Uncaptured publications cannot
+gain independent source derivation coverage from their native type.
+
 `PortfolioWorker.bindSharingInvocation` binds the containing pool query separately
 from the worker's actual runtime. A restricted worker cannot select the containing
 query or change it after binding. Bound and integer-window callbacks on a bound
