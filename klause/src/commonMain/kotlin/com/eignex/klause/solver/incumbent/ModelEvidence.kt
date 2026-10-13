@@ -29,6 +29,7 @@ internal class EvidenceCertificate private constructor(
     val model: ModelIdentity,
     val kind: EvidenceKind,
     val completion: CompletedEngineResult? = null,
+    val publication: CompletedEnginePublication? = null,
 ) {
     fun verifyDerivation(
         claim: SourceClaim, context: SourceProofContext, cancellation: Cancellation = Cancellation.Never,
@@ -83,6 +84,9 @@ internal class EvidenceCertificate private constructor(
     }
 
     companion object {
+        fun published(publication: CompletedEnginePublication): EvidenceCertificate =
+            EvidenceCertificate(publication.model, EvidenceKind.Bound, publication = publication)
+
         fun completed(
             model: ModelIdentity, kind: EvidenceKind, completion: CompletedEngineResult,
         ): EvidenceCertificate? {
@@ -137,6 +141,16 @@ internal sealed interface ModelEvidence<out A, out V> {
         override val kind: EvidenceKind get() = EvidenceKind.Infeasible
     }
 
+    data class IntegerWindow(
+        override val model: ModelIdentity,
+        val coordinate: Int,
+        val lower: Long,
+        val upper: Long,
+        override val certificate: EvidenceCertificate?,
+    ) : ModelEvidence<Nothing, Nothing> {
+        override val kind: EvidenceKind get() = EvidenceKind.Bound
+    }
+
     data class Unbounded<A, V>(
         override val model: ModelIdentity,
         val candidate: Candidate<A, V>,
@@ -161,14 +175,14 @@ internal class ModelEvidenceVerifier<A, V>(
             return Verification.Rejected("certificate belongs to a different model, objective or claim")
         }
         if (evidence.kind != EvidenceKind.Witness) {
-            val completedInvocation = certificate?.completion?.invocation
+            val completedInvocation = certificate?.completion?.invocation ?: certificate?.publication?.invocation
             if (invocation != null && completedInvocation != null && !invocation.matches(completedInvocation)) {
                 return Verification.Rejected("evidence belongs to a different runtime invocation")
             }
             if ((invocation == null) != (completedInvocation == null)) {
                 return Verification.Indeterminate("the proof consumer and completion require a runtime invocation")
             }
-            val completionScope = certificate?.completion?.scope
+            val completionScope = certificate?.completion?.scope ?: certificate?.publication?.invocation?.scope
             if (scope != null && completionScope != null && completionScope != scope) {
                 return Verification.Rejected("evidence belongs to a different original-source invocation")
             }
@@ -178,6 +192,16 @@ internal class ModelEvidenceVerifier<A, V>(
         }
         if (evidence.kind != EvidenceKind.Witness && certificate == null) {
             return Verification.Indeterminate("the required ${evidence.kind.name.lowercase()} certificate is withheld")
+        }
+        certificate?.publication?.let { publication ->
+            val matches = when (publication) {
+                is CompletedEnginePublication.ObjectiveBound -> evidence is ModelEvidence.Bound &&
+                    publication.value.equals(evidence.value)
+                is CompletedEnginePublication.IntegerWindow -> evidence is ModelEvidence.IntegerWindow &&
+                    evidence.coordinate == publication.coordinate && evidence.lower == publication.lower &&
+                    evidence.upper == publication.upper
+            }
+            if (!matches) return Verification.Rejected("published claim differs from the actual engine publication")
         }
         if (evidence is ModelEvidence.Bound && certificate?.completion != null) {
             val actual = (certificate.completion as? CompletedEngineResult.Minimize)?.executionBound

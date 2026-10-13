@@ -1,12 +1,51 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SharedObjectiveBoundTest {
+
+    @Test
+    fun `runtime bound sharing preserves the actual native value`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val model = ModelIdentity.of(source, objective)
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
+        val bounds = SharedObjectiveBound(identity = model)
+        bounds.bindInvocation(invocation)
+        val publication = CompletedEnginePublication.ObjectiveBound(invocation, 7.0)
+
+        bounds.publish(publication)
+        bounds.publish(100.0, model, EvidenceCertificate.published(publication))
+
+        assertEquals(7.0, bounds.current())
+    }
+
+    @Test
+    fun `runtime bound sharing refuses a stronger source invocation`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val model = ModelIdentity.of(source, objective)
+        val plan = source.prepareExecutionPlan(objective)
+        val invocation = EngineInvocation(plan, model, objective)
+        val stronger = EngineInvocation(plan, model, objective, sourceAssumptions = Assumptions(ints = mapOf(0 to 9L)))
+        val bounds = SharedObjectiveBound(identity = model)
+        bounds.bindInvocation(invocation)
+
+        bounds.publish(CompletedEnginePublication.ObjectiveBound(stronger, 9.0))
+
+        assertEquals(Double.NEGATIVE_INFINITY, bounds.current())
+    }
 
     @Test
     fun `current is negative infinity until a bound is published`() {

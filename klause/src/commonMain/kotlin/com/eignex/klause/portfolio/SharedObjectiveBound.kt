@@ -1,6 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
@@ -32,17 +34,32 @@ internal class SharedObjectiveBound(
     private val identity: ModelIdentity? = null,
 ) {
     private var lb = Double.NEGATIVE_INFINITY
+    private var invocation: EngineInvocation? = null
+
+    fun bindInvocation(binding: EngineInvocation) = lock.withLock {
+        require(identity?.matches(binding.model) != false) { "bound pool belongs to another execution model" }
+        require(invocation?.matches(binding) != false) { "bound pool cannot change its runtime invocation" }
+        require(invocation != null || lb == Double.NEGATIVE_INFINITY) { "bound pool already contains unscoped bounds" }
+        invocation = binding
+    }
+
+    fun publish(publication: CompletedEnginePublication.ObjectiveBound): Double =
+        publish(publication.value, publication.model, EvidenceCertificate.published(publication))
 
     /** Fold a proven global lower bound on the optimum into the shared maximum, returning how far it raised a
      *  finite bound: `0` when it raised nothing or set the first one. Ignores a non-finite value (no information). */
     fun publish(value: Double, model: ModelIdentity? = null, certificate: EvidenceCertificate? = null): Double {
         if (!value.isFinite()) return 0.0
-        if (identity != null) {
-            if (model == null) return 0.0
-            val verifier = ModelEvidenceVerifier<Unit, Double>(identity, CandidateVerifier.trusting())
-            if (verifier.verify(ModelEvidence.Bound(model, value, certificate)) !is Verification.Accepted) return 0.0
-        }
         return lock.withLock {
+            val expected = identity ?: invocation?.model
+            if (certificate?.publication != null && invocation == null) return@withLock 0.0
+            if (expected != null) {
+                if (model == null) return@withLock 0.0
+                val verifier = ModelEvidenceVerifier<Unit, Double>(expected, CandidateVerifier.trusting())
+                if (verifier.verify(ModelEvidence.Bound(model, value, certificate), invocation?.scope, invocation) !is
+                    Verification.Accepted
+                ) return@withLock 0.0
+            }
             val raise = if (value > lb && lb.isFinite()) value - lb else 0.0
             if (value > lb) lb = value
             raise
