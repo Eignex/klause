@@ -3,11 +3,8 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.incumbent.CandidateVerifier
-import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 
@@ -48,7 +45,7 @@ internal class NonlinearIntegerPortfolio(
                     1 -> FiniteEngine.LOCAL_SEARCH
                     else -> FiniteEngine.ALNS
                 }
-                val worker = NonlinearIntegerInvocation(request, controls, engine)
+                val worker = NonlinearIntegerInvocation(request, controls, engine, binding)
                 workers += worker
                 slot.own(AutoCloseable { native.observe(worker.nativeStats) })
                 worker.worker(arm, slot).bindInvocation(binding)
@@ -59,12 +56,8 @@ internal class NonlinearIntegerPortfolio(
                 seed = polynomial.strategy.localSearch.randomSeed ?: 1L, cancellation = scope.polynomial,
                 nodeBudget = params.nodeBudget ?: polynomial.strategy.backtrack.nodeBudget
                     ?: polynomial.strategy.localSearch.nodeBudget, reseedStaleThreshold = 0),
-            PortfolioEvidence(identity, CandidateVerifier { candidate ->
-                val certificate = candidate.assignment.witnessCertificate
-                if (certificate?.kind == EvidenceKind.Witness && certificate.model.sameModel(identity)) {
-                    Verification.Accepted(candidate)
-                } else Verification.Indeterminate("native nonlinear witness has no matching source check")
-            }).bindInvocation(binding, scope.polynomial)) { materialized ->
+            PortfolioEvidence(identity, polynomialWitnessVerifier(binding, scope.polynomial))
+                .bindInvocation(binding, scope.polynomial)) { materialized ->
             val complete = materialized.indices.filter { materialized[it].family == ArmFamily.Backtrack }
             PortfolioInvocationPolicy(shares = DoubleArray(materialized.size) {
                 if (it in complete) 0.75 / complete.size else 0.0

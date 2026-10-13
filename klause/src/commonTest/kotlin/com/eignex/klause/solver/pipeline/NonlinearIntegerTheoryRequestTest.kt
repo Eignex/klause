@@ -4,6 +4,11 @@ import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.parseBigInt
@@ -13,6 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class NonlinearIntegerTheoryRequestTest {
@@ -76,6 +82,31 @@ class NonlinearIntegerTheoryRequestTest {
         val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
         assertEquals("2", witness.intValue(0))
         assertNotNull(witness.algebraicRealValue(0))
+    }
+
+    @Test
+    fun `nonlinear neighborhoods publish their retained source binding and coordinate mapping`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
+            "(declare-const x Real) (declare-const n Int) " +
+                "(assert (= (* n n) 4)) (assert (= (* x x) (to_real n)))",
+        )).problem
+        val request = source.pipelineRequest()
+        val params = NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(assumptions = Assumptions(ints = mapOf(0 to 2L))),
+        ))
+        val binding = EngineInvocation(request.preparedPlan, ModelIdentity.of(source),
+            sourceAssumptions = params.polynomial.strategy.assumptions)
+        val invocation = NonlinearIntegerInvocation(request, params, FiniteEngine.LOCAL_SEARCH, binding)
+
+        val result = invocation.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+
+        val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+        val publication = assertIs<CompletedEnginePublication.Witness>(sample.witnessCertificate?.publication)
+        assertSame(binding, publication.invocation)
+        assertEquals("2", publication.sample.exactIntValue(0).toString())
+        assertNotNull(publication.sample.algebraicReals?.get(0))
+        assertIs<Verification.Accepted<*, *>>(polynomialWitnessVerifier(binding, Cancellation.Never)
+            .verify(Candidate(sample, null)))
     }
 
     @Test

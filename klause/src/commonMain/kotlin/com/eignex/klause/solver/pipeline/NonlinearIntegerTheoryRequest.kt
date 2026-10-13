@@ -16,7 +16,8 @@ import com.eignex.klause.theory.qfnia.NonlinearIntegerCursor
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.theory.qfnia.NonlinearIntegerStrategy
 import com.eignex.klause.theory.qfnia.integerSeeds
@@ -86,6 +87,8 @@ internal class NonlinearIntegerInvocation(
     request: NonlinearIntegerTheoryRequest,
     private val params: NonlinearIntegerTheoryParams,
     private val engine: FiniteEngine,
+    private val binding: EngineInvocation = EngineInvocation(request.preparedPlan, ModelIdentity.of(request.problem),
+        sourceAssumptions = params.polynomial.strategy.assumptions),
 ) : ExactNeighborhoodCompletion {
     private val source = request.problem
     private val plan = request.preparedPlan
@@ -350,7 +353,9 @@ internal class NonlinearIntegerInvocation(
                 value.rational?.toDouble() ?: (value.lowerBound.toDouble() / 2 + value.upperBound.toDouble() / 2)
             },
             exactInts = integers, algebraicReals = reals,
-        ).also { it.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(source), EvidenceKind.Witness) }
+        ).also { sample ->
+            sample.witnessCertificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, sample))
+        }
     }
 
     private fun capture(assignment: QfNraAssignment): OpenTheoryAssignment = capture(sample(assignment))
