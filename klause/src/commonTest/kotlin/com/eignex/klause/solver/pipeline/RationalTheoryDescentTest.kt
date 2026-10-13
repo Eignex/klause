@@ -88,8 +88,8 @@ class RationalTheoryDescentTest {
         val open = Bits(1).also { it.set(0) }
         val source = Problem(numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(),
-                doubleArrayOf(), LinearOp.GE, 0.0, strict = true)))
+            factors = arrayOf(ExactSearchRow.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
+                LinearOp.GE, BigFraction.ZERO, strict = true)))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val descent = RationalTheoryDescent(source, objective, TheoryParams())
 
