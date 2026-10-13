@@ -895,7 +895,8 @@ class Portfolio(
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
             if (unproductiveTrial && (trialSearchSegments[arm] >= AUXILIARY_SEARCH_SEGMENTS ||
-                    trialSegments[arm] >= AUXILIARY_TRIAL_SEGMENTS)) retire(arm)
+                    trialSegments[arm] >= AUXILIARY_TRIAL_SEGMENTS)
+            ) retire(arm)
         }
 
         /** Quarantine [claim]'s arm for its refuted claim: retire it, count the fault, and report it. Call under

@@ -8,15 +8,15 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
