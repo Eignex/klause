@@ -251,8 +251,10 @@ internal class DiffnInvariant(
             if (varToRectOf(xs[i]) != i || varToRectOf(ys[i]) != i ||
                 varToRectOf(xs[j]) != j || varToRectOf(ys[j]) != j
             ) continue
-            if (widthVars?.any { it == xs[i] || it == ys[i] || it == xs[j] || it == ys[j] } == true ||
-                heightVars?.any { it == xs[i] || it == ys[i] || it == xs[j] || it == ys[j] } == true
+            if (widthVars?.get(i) == xs[i] || widthVars?.get(i) == ys[i] ||
+                widthVars?.get(j) == xs[j] || widthVars?.get(j) == ys[j] ||
+                heightVars?.get(i) == xs[i] || heightVars?.get(i) == ys[i] ||
+                heightVars?.get(j) == xs[j] || heightVars?.get(j) == ys[j]
             ) continue
             if (rw(state, i, -1, 0L) != rw(state, j, -1, 0L)) continue
             if (rh(state, i, -1, 0L) != rh(state, j, -1, 0L)) continue

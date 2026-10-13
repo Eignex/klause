@@ -4,8 +4,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.Assumptions
@@ -56,6 +56,28 @@ class DiffnRelocationsTest {
         assertEquals(0L, state.netDelta(joint))
         state.apply(joint)
         assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `joint compaction uses each rectangles source lower bound`() {
+        val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
+        val domains = arrayOf(IntDomain(0, 10), IntDomain(11, 12), IntDomain(0, 0), IntDomain(0, 0))
+        val state = LocalSearchState(Problem(0, 4, domains, listOf(factor)).bake(), Random(37))
+        state.assignment.setInt(0, 10)
+        state.assignment.setInt(1, 12)
+        state.recompute()
+        val sink = MoveSink()
+
+        repeat(16) { state.factors[0].proposeStructuredMoves(state, 0, sink) }
+
+        val joint = sink.list.filterIsInstance<Move.Compound>().first {
+            it.parts.toSet() == setOf(Move.IntSet(0, 9), Move.IntSet(1, 11))
+        }
+        assertTrue(state.netDelta(Move.IntSet(1, 11)) > 0)
+        assertEquals(0L, state.netDelta(joint))
+        state.apply(joint)
         state.recompute()
         assertEquals(0L, state.cost)
     }
