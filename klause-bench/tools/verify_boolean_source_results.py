@@ -219,7 +219,8 @@ def check(case, source_root):
             if not weighted:
                 cost = None
         if cost is not None:
-            assert cost == integer_objective(r), 'source objective mismatch'
+            reported = integer_objective(r)
+            assert cost == reported, f'source objective mismatch: source={cost}, reported={reported}'
         else:
             assert r.get('exactObjective') is None and r.get('objective') is None, 'source has no objective'
         result['witness'] = 'source feasible'
