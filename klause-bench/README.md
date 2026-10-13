@@ -598,6 +598,9 @@ endpoints and rays are checked against those separate caller bytes; a conditiona
 proof cannot be checked as a parent proof by omitting or weakening its restrictions.
 `conditioned-affine.smt2` and `conditioned-affine.condition.json` exercise a Boolean
 pin, a real pin at `1/3` and an integer pin at `2^64`.
+`--route=authority` isolates the public source-authority entry point with cp and one
+core. The default `--route=request` exercises ordinary request and portfolio execution;
+the output records which entry point produced the claim.
 `admission-box.smt2` is a self-authored bounded real source beyond the numerical
 authority's column ceiling. With `--work=8` it checks the retained source witness
 from feasibility fallback; `--work=1` checks that the authority attempt cannot renew

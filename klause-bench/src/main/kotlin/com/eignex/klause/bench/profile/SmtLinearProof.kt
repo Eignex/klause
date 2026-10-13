@@ -52,7 +52,7 @@ object SmtLinearProof {
             require(pair.size == 2) { "Use --name=value" }
             pair[0] to pair[1]
         }
-        require(options.keys.all { it in setOf("engine", "cores", "checks", "work", "timeout", "condition") })
+        require(options.keys.all { it in setOf("engine", "cores", "checks", "work", "timeout", "condition", "route") })
         val engine = when (options["engine"] ?: "cp") {
             "cp" -> FiniteEngine.BACKTRACK
             "fixed" -> FiniteEngine.FIXED
@@ -62,6 +62,12 @@ object SmtLinearProof {
             else -> error("Unknown engine")
         }
         val cores = (options["cores"] ?: "1").toInt().also { require(it > 0) }
+        val direct = when (options["route"] ?: "request") {
+            "request" -> false
+            "authority" -> true
+            else -> error("Unknown route")
+        }
+        require(!direct || engine == FiniteEngine.BACKTRACK && cores == 1)
         val inputs = args.dropWhile { it.startsWith("--") }
         require(inputs.isNotEmpty()) { "Pass original SMT paths" }
         val root = File(System.getProperty("klause.workspace.root", "."))
@@ -91,21 +97,21 @@ object SmtLinearProof {
             val scope = SourceScope(SourceRevision(sha(bytes), "klause-ir-exact-v1"),
                 condition = condition, objective = SourceObjective("cost", sense))
             val capture = requireNotNull(compiled.model.sourceProofContext(scope, objective))
-            val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model, objective,
+            val execution = if (direct) null else OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model, objective,
                 maximize = maximize).let { if (conditionBytes == null) it else it.withLinearAuthority(capture) },
                 params, engine, cores) as OpenTheoryExecution.Optimize
             val witnessOnly = engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS
-            val result = execution.result.linearResult
+            val result = if (direct) OpenTheoryPipeline.optimizeLinear(capture, params) else execution?.result?.linearResult
             require(witnessOnly || result != null) { "Complete route omitted typed linear authority" }
-            if (witnessOnly) require(execution.result is OpenTheoryOptimum.Bounded)
+            if (witnessOnly) require(execution?.result is OpenTheoryOptimum.Bounded)
             require(result == null || result.scope.condition == condition)
             val terminal = result?.terminal
             require(!witnessOnly || terminal == null) { "Witness-only route published a terminal" }
             val claim = terminal?.claim
-            val incumbent = result?.incumbent ?: (execution.result as? OpenTheoryOptimum.Bounded)?.incumbent?.let {
+            val incumbent = result?.incumbent ?: (execution?.result as? OpenTheoryOptimum.Bounded)?.incumbent?.let {
                 (it as? OpenTheoryAssignment.Sampled)?.sample
             }
-            val value = result?.value ?: (execution.result as? OpenTheoryOptimum.Bounded)?.value?.let {
+            val value = result?.value ?: (execution?.result as? OpenTheoryOptimum.Bounded)?.value?.let {
                 if (maximize) it.negated() else it
             }
             val point = when (claim) {
@@ -118,8 +124,9 @@ object SmtLinearProof {
                 put("sourceSHA256", sha(bytes))
                 put("conditionSHA256", conditionBytes?.let { JsonPrimitive(sha(it)) } ?: JsonNull)
                 put("maximize", maximize)
-                put("reason", (result?.reason ?: (execution.result as? OpenTheoryOptimum.Bounded)?.reason).toString())
+                put("reason", (result?.reason ?: (execution?.result as? OpenTheoryOptimum.Bounded)?.reason).toString())
                 put("engine", engine.id)
+                put("route", if (direct) "authority" else "request")
                 put("cores", cores)
                 put("kind", when (claim) {
                     is SourceClaim.Optimal -> "optimal"
