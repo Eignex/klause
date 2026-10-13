@@ -22,6 +22,7 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
@@ -568,6 +569,7 @@ internal interface OutputProtocol {
     fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
         rendered?.let { onSolution(it, null) }
     }
+    fun onLinearResult(result: LinearOptimizationResult) {}
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
     fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {}

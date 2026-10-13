@@ -8,6 +8,7 @@ import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -273,6 +274,13 @@ internal class MpsOutput(
 
     override fun formatExactObjective(objective: BigFraction): String =
         exactMpsNumber(sourceObjective() ?: (objective * BigFraction.ofLong(objectiveScale).reciprocal()))
+
+    override fun formatArithmeticObjective(objective: SourceValue): String = when (objective) {
+        is SourceValue.Rational -> exactMpsNumber(objective.value)
+        is SourceValue.Algebraic -> objective.value.rational?.let(::exactMpsNumber)
+            ?: arithmeticObjectiveText(objective)
+        is SourceValue.Extension -> arithmeticObjectiveText(objective)
+    }
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
