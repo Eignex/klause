@@ -84,6 +84,9 @@ internal class EvidenceCertificate private constructor(
         ): EvidenceCertificate? {
             val foreignCapture = completion.evidence?.scope?.let { it != completion.scope } == true
             if (!completion.attests(kind) || foreignCapture) return null
+            if (kind != EvidenceKind.Witness &&
+                completion.evidence?.let { it.engineScope != completion.scope } == true
+            ) return null
             if ((kind == EvidenceKind.Bound || kind == EvidenceKind.Unbounded) && completion.scope.objective == null) {
                 return null
             }

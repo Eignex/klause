@@ -34,7 +34,12 @@ use the identity adjustment; binary substitution only zero-extends Boolean weigh
 Independent source objective evaluation checks the composed adjustment against
 reconstructed witnesses. A mapping discards reduced-model witness certificates when its
 source differs from its target and never issues a proof certificate; source publication
-retains its complete checker.
+retains its complete checker. Optional `SourceMapping.captureSolve` and `captureMinimize`
+retain reduced evidence and transformation stages on completed results. They check
+reconstructed original witnesses and normalize supported citations into original-source
+derivations. A transformed terminal cannot gain original engine admission from a
+reduced label; absent or unsupported justification withholds that admission. See
+[original-source evidence](evidence.md).
 
 Sensitive queries require a bijection even when a pass is explicitly enabled. Affine
 elimination and other multiplicity-changing reductions remain disabled for enumeration,

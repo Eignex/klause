@@ -19,19 +19,28 @@ import com.eignex.klause.util.Cancellation
 class SourceResultCapture private constructor(
     /** Original-source context used for every captured result. */
     val context: SourceProofContext,
-    private val quadraticBinding: QuadraticSourceBinding?,
+    private val sourceBinding: OriginalSourceBinding?,
 ) {
     /** Capture manually supplied source-scoped results using an independent context. */
     constructor(context: SourceProofContext) : this(context, null)
 
     internal fun accepts(invocation: QuadraticEngineInvocation): Boolean =
-        quadraticBinding?.matches(invocation) == true && invocation.condition == context.scope.condition &&
+        sourceBinding?.matches(invocation) == true && invocation.condition == context.scope.condition &&
             invocation.sense == context.scope.objective?.sense
 
+    internal fun belongsTo(source: Problem): Boolean = sourceBinding?.belongsTo(source) == true
+
+    internal fun belongsTo(source: Problem, objective: LinearObjective): Boolean =
+        sourceBinding?.matches(source, objective) == true
+
     internal companion object {
+        fun forOriginal(
+            context: SourceProofContext, source: Problem, objective: LinearObjective?,
+        ): SourceResultCapture = SourceResultCapture(context, OriginalSourceBinding(source, null, objective))
+
         fun forQuadratic(
             context: SourceProofContext, source: Problem, objective: QuadraticObjectiveSpec,
-        ): SourceResultCapture = SourceResultCapture(context, QuadraticSourceBinding(source, objective))
+        ): SourceResultCapture = SourceResultCapture(context, OriginalSourceBinding(source, objective))
     }
 
     /** Retain exact quadratic result claims with explicitly optional bound and traversal derivations. */
@@ -46,7 +55,8 @@ class SourceResultCapture private constructor(
             "quadratic capture requires the source objective direction"
         }
         if (cancellation() || result.capturedScopes().any { it != context.scope } ||
-            result.capturedInvocations().any { !accepts(it) }
+            result.capturedInvocations().any { !accepts(it) } ||
+            result.evidence?.let { it.engineScope != context.scope } == true
         ) return result
         val expected = result::class
         val captured = SourceQuadraticResultCapture(context, producer, derivation, boundDerivation).capture(result)
@@ -58,7 +68,7 @@ class SourceResultCapture private constructor(
 
     /** Capture exact source assignments and explicitly classify missing complete-search proof data. */
     fun solve(result: SolveResult, producer: String, derivation: SourceDerivation? = null): SolveResult {
-        if (result.evidence?.scope?.let { it != context.scope } == true) return result
+        if (result.evidence?.let { it.scope != context.scope || it.engineScope != context.scope } == true) return result
         val claim = when (result) {
             is SolveResult.Sat -> SourceClaim.Witness(result.assignment)
             is SolveResult.Unsat -> SourceClaim.Refutation
@@ -67,7 +77,9 @@ class SourceResultCapture private constructor(
         val proof = derivation ?: if (claim is SourceClaim.Witness) SourceDerivation.SourceWitness
             else SourceDerivation.Unavailable("complete traversal derivation not captured")
         val payload = SourceResultEvidence(context.scope, listOf(SourceEvidence(context.scope, claim, proof)),
-            listOf(SourceEngineAttestation(producer, claim)))
+            listOf(SourceEngineAttestation(producer, claim))).withMappings(
+                context.scope, result.evidence?.mappings.orEmpty(),
+            )
         return when (result) {
             is SolveResult.Sat -> result.copy(evidence = payload)
             is SolveResult.Unsat -> result.copy(evidence = payload)
@@ -85,7 +97,7 @@ class SourceResultCapture private constructor(
     ): MinimizeResult {
         require(context.scope.objective != null) { "objective result capture requires an objective scope" }
         if (cancellation() || result is MinimizeResult.Unknown ||
-            result.evidence?.scope?.let { it != context.scope } == true
+            result.evidence?.let { it.scope != context.scope || it.engineScope != context.scope } == true
         ) return result
         val sample = result.assignment
         val witness = sample?.let { SourceClaim.Witness(it) }
@@ -119,7 +131,10 @@ class SourceResultCapture private constructor(
             }
             add(SourceEvidence(context.scope, claim, proof))
         }
-        val payload = SourceResultEvidence(context.scope, evidence, listOf(SourceEngineAttestation(producer, claim)))
+        val payload = SourceResultEvidence(context.scope, evidence,
+            listOf(SourceEngineAttestation(producer, claim))).withMappings(
+            context.scope, result.evidence?.mappings.orEmpty(),
+        )
         return when (result) {
             is MinimizeResult.Optimal -> result.copy(evidence = payload)
             is MinimizeResult.BestFound -> result.copy(evidence = payload)
@@ -153,7 +168,15 @@ class SourceResultCapture private constructor(
     }
 }
 
-private class QuadraticSourceBinding(private val source: Problem, private val objective: QuadraticObjectiveSpec) {
+private class OriginalSourceBinding(
+    private val source: Problem,
+    private val objective: QuadraticObjectiveSpec?,
+    private val affine: LinearObjective? = null,
+) {
+    fun belongsTo(model: Problem): Boolean = source === model
+    fun matches(model: Problem, original: LinearObjective): Boolean = source === model && affine === original
+
     fun matches(invocation: QuadraticEngineInvocation): Boolean =
-        (invocation.source as? QuadraticEngineSource.ExactIr)?.problem === source && invocation.objective === objective
+        objective != null && (invocation.source as? QuadraticEngineSource.ExactIr)?.problem === source &&
+            invocation.objective === objective
 }
