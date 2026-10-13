@@ -186,7 +186,9 @@ Boolean coordinates expand into their exact Boolean polynomial terms; their
 guarded auxiliary definitions remain private to the formula. Hidden nonpolynomial
 coordinates and objectives above degree two decline. Nonlinear objective syntax
 cannot be published as a finite proxy objective. Affine objectives over linear
-constraints retain linear admission.
+constraints retain linear admission when integer coefficients and constants are
+integral and real coefficients are exactly representable in binary64. Other
+affine objective representations use the exact polynomial fallback.
 
 ### Source representation
 

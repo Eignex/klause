@@ -53,7 +53,7 @@ class CliModeTest {
     fun `ordinary source publication cancellation preserves its original exception without terminal claims`() {
         val source = File.createTempFile("linear-publication-cancel", ".smt2").apply {
             writeText("(declare-const b Bool) (declare-const x Real) " +
-                "(assert (= (* 3 x) (ite b 0 1))) (minimize (- 7 x)) (check-sat)")
+                "(assert (= (* 3 x) (ite b 0 1))) (minimize (+ 7 x)) (check-sat)")
         }
         val common = CommonOptions().apply { engine = "cp"; parallel = 1; randomSeed = 17; presolve = "off" }
         val session = SmtLibMode.newSession()
@@ -79,7 +79,7 @@ class CliModeTest {
             source.delete()
         }
 
-        assertEquals(listOf(BigFraction.ofLong(7), BigFraction.ofLong(20) * BigFraction.ofLong(3).reciprocal()), values)
+        assertEquals(listOf(BigFraction.ofLong(22) * BigFraction.ofLong(3).reciprocal(), BigFraction.ofLong(7)), values)
         assertFalse(terminal)
     }
 

@@ -36,7 +36,7 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
             "open-linear" -> """
                 (declare-const b Bool) (declare-const x Real)
                 (assert (= (* 3 x) (ite b 0 1)))
-                ($direction ${if (maximize) "(+ 7 x)" else "(- 7 x)"}) (check-sat)
+                ($direction ${if (maximize) "(- 7 x)" else "(+ 7 x)"}) (check-sat)
             """.trimIndent()
             "quadratic-integer" -> """
                 (declare-const i Int) (assert (and (>= i 0) (<= i 100)))
@@ -101,7 +101,7 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
         } else listOf(7L, if (maximize) 8L else 6L)
         val expectedValues = if (route == "open-linear") {
             val third = BigFraction.ofLong(3).reciprocal()
-            listOf(BigFraction.ofLong(7), BigFraction.ofLong(7) + if (maximize) third else third.negated())
+            listOf(BigFraction.ofLong(7) + if (maximize) third.negated() else third, BigFraction.ofLong(7))
         } else expected.map(BigFraction::ofLong)
         assertEquals(expectedValues, values)
         assertTrue(terminal)
