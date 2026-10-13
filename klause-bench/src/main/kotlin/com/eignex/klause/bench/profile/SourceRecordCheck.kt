@@ -4,6 +4,7 @@ import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Base64
+import java.util.Locale
 import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -68,5 +69,5 @@ object SourceRecordCheck {
     }
 
     private fun sha(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
-        .joinToString("") { "%02x".format(it.toInt() and 255) }
+        .joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 255) }
 }
