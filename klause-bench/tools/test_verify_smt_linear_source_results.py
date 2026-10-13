@@ -38,6 +38,13 @@ class SmtLinearProofTest(unittest.TestCase):
         record = self.conditioned_record()
         self.assertTrue(verify(CONDITION_SOURCE, record, CONDITION)["checked"])
 
+    def test_integer_branch_preserves_a_stronger_caller_bound(self):
+        record = self.conditioned_record()
+        conflict = ["sum", [["1", ["assume", "Integer/0", False]],
+                            ["1", ["assume", "Integer/0", True]]]]
+        record["proof"] = ["int", "Integer/0", "18446744073709551614", conflict, record["proof"]]
+        self.assertTrue(verify(CONDITION_SOURCE, record, CONDITION)["checked"])
+
     def test_conditioned_proof_cannot_be_reused_without_its_condition(self):
         with self.assertRaises(AssertionError):
             verify(CONDITION_SOURCE, self.conditioned_record())
