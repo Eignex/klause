@@ -6,6 +6,8 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.Session
+import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -13,6 +15,8 @@ import com.eignex.klause.solver.result.TerminationReason
 internal class CoreGuidedSolver(override val problem: BakedProblem) :
     Solver<BacktrackParams> by BacktrackSolver(problem),
     ResumableOptimizer<BacktrackParams> {
+    override fun session(): Session<BacktrackParams> = StatelessSession(this)
+
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
         CoreGuidedOptimizer(problem).resumable(objective, params)
 
