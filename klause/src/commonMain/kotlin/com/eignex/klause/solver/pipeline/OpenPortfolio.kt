@@ -7,7 +7,6 @@ import com.eignex.klause.localsearch.LocalSearchEngine
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
-import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.lp.relaxation.lpSeed
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.LocalSearchCatalog
@@ -21,11 +20,6 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.evidence.SourceClaim
-import com.eignex.klause.solver.evidence.SourceDerivation
-import com.eignex.klause.solver.evidence.SourceEvidence
-import com.eignex.klause.solver.evidence.SourceEvidenceCheck
-import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.CandidateVerifier
@@ -83,6 +77,7 @@ internal class OpenPortfolio(
     private val sourceModel = preparedPlan.originalSource as? Problem ?: model
 
     private fun workerParams(slot: PortfolioWorkerSlot): TheoryParams = theoryParams.copy(
+        randomSeed = slot.seed,
         openWorkLimit = slot.nativeAllowance(theoryParams.openWorkLimit),
         maxLeaves = slot.nativeAllowance(theoryParams.maxLeaves),
         maxDecisions = slot.nativeAllowance(theoryParams.maxDecisions),
@@ -135,19 +130,24 @@ internal class OpenPortfolio(
         minimizer: OpenTheoryMinimizer?,
         cancellation: Cancellation,
     ): OpenTheoryOptimum {
+        val stop = lifetime or cancellation
         descentVerdict.store(null)
         require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
             "the theory's descent minimizes no continuous column"
         }
         val sourceValues = sourceObjective ?: OpenSourceObjective(objective,
             request?.objective ?: objective, request?.maximize ?: false,
-            request?.linearAuthorityContext(lifetime or cancellation))
+            request?.linearAuthorityContext(stop), stop)
         val context = sourceValues.context
         val integral = minimizer.takeIf { context == null }
         val rational = request != null && integral == null
         val firstLocalArm = if (integral != null || rational) 1 else 0
-        val localSearch = localSearchFactories(firstLocalArm, lifetime or cancellation, objective)
+        val localSearch = localSearchFactories(firstLocalArm, stop, objective)
         val incumbents = sourceValues.incumbents()
+        val identity = ModelIdentity.of(sourceModel, objective)
+        val binding = EngineInvocation(preparedPlan, identity, objective, scope = context?.scope)
+        val linear = context?.let { OpenLinearPortfolioResults(binding, it, sourceValues, incumbents,
+            stop) }
         val factories = buildList {
             integral?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
                 descentWorker(source, slot) {
@@ -155,35 +155,39 @@ internal class OpenPortfolio(
                 }.bindEvidence(ModelIdentity.of(sourceModel, objective))
             }) }
             if (rational) add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
-                PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
-                    RationalTheoryDescent(sourceModel, objective, workerParams(slot), context) {
+                val retained = AtomicReference<LinearPortfolioSearch?>(null)
+                val worker = PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
+                    val descent = RationalTheoryDescent(sourceModel, objective, workerParams(slot), context) {
                         incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
                     }
+                    if (linear == null) descent else {
+                        OpenLinearPortfolioSearch(LinearPortfolioSearch(descent, binding).also(retained::store))
+                    }
                 }) { _, _, _, _ -> error("the rational descent runs only by slice") }
-                    .bindEvidence(ModelIdentity.of(sourceModel, objective))
+                    .bindEvidence(identity)
+                linear?.retain(worker, retained)
+                worker
             })
             addAll(localSearch)
         }
         if (factories.isEmpty()) return OpenTheoryOptimum.Bounded(null, null,
             TerminationReason.Unsupported, SolveStats.EMPTY)
-        val identity = ModelIdentity.of(sourceModel, objective)
-        val binding = EngineInvocation(preparedPlan, identity, objective, scope = context?.scope)
         val boundFactories = factories.map { factory ->
             PortfolioArmFactory(preparedPlan, factory.armId, factory.family,
                 bind = { it.bindInvocation(binding) }) { slot -> factory.materialize(preparedPlan, slot) }
         }
-        val verifier = openWitnessVerifier(sourceModel, objective, context, lifetime or cancellation)
-        val evidence = PortfolioEvidence(identity, verifier).bindInvocation(binding, lifetime or cancellation)
+        val verifier = openWitnessVerifier(sourceModel, objective, context, stop)
+        val evidence = PortfolioEvidence(identity, verifier).bindInvocation(binding, stop)
         val portfolio = PortfolioInvocation(preparedPlan, boundFactories,
-            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
+            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = stop,
                 nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0), evidence) { workers ->
             PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = true),
                 reservedShares(workers, if (integral != null || rational) DESCENT_SHARE else 0.0))
         }
         val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents,
-            onAccepted = { accepted -> publication?.accepted(accepted.assignment,
+            terminalCheck = linear, onAccepted = { accepted -> publication?.accepted(accepted.assignment,
                 SourceValue.Rational(accepted.objective.source), accepted.version) }) }
-        return optimumOf(result, incumbents)
+        return linear?.fold(result) ?: optimumOf(result, incumbents)
     }
 
     private fun optimumOf(
@@ -407,16 +411,7 @@ internal fun openWitnessVerifier(
             }
         }
         if (claimed?.isNaN() == true) return@CandidateVerifier Verification.Rejected("objective is NaN")
-        if (context != null) {
-            val witness = SourceEvidence(context.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
-            return@CandidateVerifier when (val checked =
-                SourceEvidenceVerifier(context.withLinearAuthority()).verify(witness, cancellation)
-            ) {
-                SourceEvidenceCheck.Checked -> Verification.Accepted(candidate)
-                is SourceEvidenceCheck.Rejected -> Verification.Rejected(checked.reason)
-                is SourceEvidenceCheck.Unavailable -> Verification.Indeterminate(checked.reason)
-            }
-        }
+        if (context != null) return@CandidateVerifier context.linearWitnessVerifier(cancellation).verify(candidate)
         if (certificate == null) {
             when (val checked = verifyOpenWitness(model, sample)) {
                 is Verification.Rejected -> return@CandidateVerifier checked

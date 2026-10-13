@@ -9,7 +9,6 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.TerminationReason
 
 internal fun linearNeighborhoodInvocation(
     model: Problem,
@@ -66,13 +65,7 @@ internal fun linearNeighborhoodInvocation(
             publication?.accepted(accepted.assignment,
                 SourceValue.Rational(accepted.objective.source), accepted.version)
         })
-        OpenTheoryExecution.Optimize(when (result) {
-            is MinimizeResult.WithSample -> OpenTheoryOptimum.Bounded(
-                OpenTheoryAssignment.Sampled(result.sample), objective.evaluateExact(result.sample),
-                (result as? MinimizeResult.BestFound)?.reason ?: TerminationReason.BudgetExhausted, result.stats,
-            )
-            is MinimizeResult.Infeasible -> error("a heuristic neighborhood cannot refute the source")
-            is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
-        })
+        check(result !is MinimizeResult.Infeasible) { "a heuristic neighborhood cannot refute the source" }
+        OpenTheoryExecution.Optimize(values.incomplete(result, incumbents))
     }
 }

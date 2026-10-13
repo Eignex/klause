@@ -51,6 +51,15 @@ callback failures propagate after every worker and source service has closed. Co
 single-worker invocations observe their source-checked improvements without allocating
 portfolio replicas.
 
+Affine mixed workers retain `LinearPortfolioSearch` handles and publish checked typed
+terminals through the same scheduler hook. Scalar worker telemetry cannot establish a
+strict limit or source ray. After all workers close, the invocation folds their retained,
+already checked global root bounds with the shared original-source incumbent. Private
+branch bounds and terminals that the scheduler did not admit cannot finish the source.
+Cancellation retains completed partial bound metadata without running additional arithmetic
+or promoting an interrupted proof. A ray's private base and its exact value remain paired;
+the latest accepted point can be a different, better source incumbent.
+
 A wide exact sample exposes no finite integer array. Supported linear workers retain
 arbitrary-width coordinates through exact neighborhood completion. Windowed fallback
 workers project warm starts and discard theory acceptance; their seeds cannot replace
