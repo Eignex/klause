@@ -309,3 +309,19 @@ invocation cleanup. Affine mixed results retain typed optimality, limits and int
 rays in `OpenTheoryOptimum.linearResult`; incomplete execution retains independently
 checked global root bounds and the accepted source point. These fields remain separate
 from scalar telemetry and from a ray's private base.
+
+## Projection provider extensions
+
+`FactorProjectionProviders` groups engine-owned `PropagationProjectionProvider`,
+`ScoringProjectionProvider` and `RelaxationProjectionProvider` selectors. Their
+selected descriptors pair declared participation and check authority with the
+implementation factory or emitter. Providers may delegate unmatched factors to
+the built-in selector without editing central dispatch. Null refuses propagation
+or scoring and contributes no relaxation. Explicit inert roles keep their source
+check obligation.
+
+Prepare once with `providers.prepare(problem)` and pass the source-associated
+`PreparedFactorProjections` to the engine projection constructors. A descriptor
+contains no mutable workspace; its factory must return a private mechanism or a
+stateless projection using state-owned payloads. Source membership, soundness,
+exact checks and scoring delta consistency remain extension obligations.

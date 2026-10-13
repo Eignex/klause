@@ -13,12 +13,17 @@ import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.impliedLinearRows
-import com.eignex.klause.solver.RelaxationCapability
-import com.eignex.klause.solver.executionCapabilities
 
 /** Emit this factor's LP relaxation into [builder]. */
-internal fun Factor.emitLpRelaxation(builder: RelaxationBuilder, linearProjection: LinearLpProjection? = null) {
-    if (executionCapabilities().relaxation == RelaxationCapability.NONE) return
+internal fun Factor.emitLpRelaxation(
+    builder: RelaxationBuilder,
+    linearProjection: LinearLpProjection? = null,
+    provider: RelaxationProjectionProvider = BuiltInRelaxationProjectionProvider,
+) {
+    provider.select(this)?.emit(builder, linearProjection)
+}
+
+internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjection: LinearLpProjection?) {
     if (impliedLinearRows.isNotEmpty()) {
         for (row in impliedLinearRows) row.emitLpRelaxation(builder, linearProjection)
         return

@@ -17,25 +17,18 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.propagation.difference.DifferenceSystemPropagator
-import com.eignex.klause.solver.PropagationCapability
-import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.PermutationGroup
 
 /** Builds the propagation-engine view of immutable factor data. */
-internal fun Factor.propagatorProjection(preparation: FactorProjectionPreparation? = null): Propagator {
-    val capabilities = executionCapabilities()
-    check(capabilities.propagation != PropagationCapability.UNSUPPORTED) {
-        "unsupported propagation route for ${this::class.simpleName}; implement Propagator for a custom factor"
-    }
-    return buildPropagatorProjection(preparation).also {
-        check((it === NoPropagator) == (capabilities.propagation == PropagationCapability.INERT)) {
-            "propagation capability disagrees with projection for ${this::class.simpleName}"
-        }
-    }
-}
+internal fun Factor.propagatorProjection(
+    preparation: FactorProjectionPreparation? = null,
+    provider: PropagationProjectionProvider = BuiltInPropagationProjectionProvider,
+): Propagator = checkNotNull(provider.select(this)) {
+    "unsupported propagation route for ${this::class.simpleName}; select a propagation provider"
+}.create(preparation)
 
-private fun Factor.buildPropagatorProjection(preparation: FactorProjectionPreparation?): Propagator = when (this) {
+internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPreparation?): Propagator = when (this) {
     is AllDifferent -> AllDifferentPropagator(
         boolVars,
         intVars,
