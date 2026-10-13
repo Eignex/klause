@@ -20,24 +20,54 @@ class SourceMappingEvidence(
         claim: SourceClaim,
         context: SourceProofContext,
         cancellation: Cancellation = Cancellation.Never,
-    ): SourceEvidenceCheck {
-        if (context.scope != source) return SourceEvidenceCheck.Rejected("mapping has a foreign original invocation")
-        val allowance = SourceProofAllowance(100_000, 128)
-        return SourceEvidenceVerifier(context).verify(project(claim, cancellation, allowance), cancellation, allowance)
-    }
+    ): SourceEvidenceCheck = select(claim, context, cancellation, SourceProofAllowance(100_000, 128)).second
 
     internal fun project(
         claim: SourceClaim,
+        context: SourceProofContext,
         cancellation: Cancellation,
         allowance: SourceProofAllowance = SourceProofAllowance(100_000, 128),
-    ): SourceEvidence {
-        val proof = try {
-            MappingProofTranslation(cancellation, allowance).project(source,
-                target ?: missing("reduced-source evidence capture unavailable"), captured, claim)
-        } catch (stop: MappingProofUnavailable) {
-            SourceDerivation.Unavailable(stop.reason)
+    ): SourceEvidence = select(claim, context, cancellation, allowance).first
+
+    private fun select(
+        claim: SourceClaim, context: SourceProofContext, cancellation: Cancellation, allowance: SourceProofAllowance,
+    ): Pair<SourceEvidence, SourceEvidenceCheck> {
+        fun absent(reason: String) = SourceEvidence(source, claim, SourceDerivation.Unavailable(reason)) to
+            SourceEvidenceCheck.Unavailable(reason)
+        if (context.scope != source) return SourceEvidence(source, claim,
+            SourceDerivation.Unavailable("mapping has a foreign original invocation")) to
+            SourceEvidenceCheck.Rejected("mapping has a foreign original invocation")
+        val payload = target ?: return absent("reduced-source evidence capture unavailable")
+        if (payload.derivations.any { it.scope != payload.scope }) {
+            return absent("mapped evidence has mixed target scopes")
         }
-        return SourceEvidence(source, claim, proof)
+        var stopped = false
+        val limited = Cancellation {
+            stopped = stopped || cancellation() || !allowance.consume(0)
+            stopped
+        }
+        val translator = MappingProofTranslation(limited, allowance)
+        val verifier = SourceEvidenceVerifier(context)
+        var unavailable = absent("mapping has no captured target claim")
+        for (terminal in payload.derivations) {
+            if (limited()) return absent("mapping evidence capture allowance exhausted")
+            if (claim is SourceClaim.Bound) {
+                if (terminal.claim !is SourceClaim.Bound && terminal.claim !is SourceClaim.Optimal) continue
+            } else if (claim != SourceClaim.Refutation || terminal.claim != SourceClaim.Refutation) continue
+            val proof = try {
+                translator.project(source, payload.scope, captured, terminal, claim)
+            } catch (stop: MappingProofUnavailable) {
+                unavailable = absent(stop.reason)
+                continue
+            }
+            val evidence = SourceEvidence(source, claim, proof)
+            when (val checked = verifier.verify(evidence, limited, allowance)) {
+                SourceEvidenceCheck.Checked -> return evidence to checked
+                is SourceEvidenceCheck.Rejected -> return evidence to checked
+                is SourceEvidenceCheck.Unavailable -> unavailable = absent(checked.reason)
+            }
+        }
+        return unavailable
     }
 }
 
@@ -52,25 +82,17 @@ private class MappingProofTranslation(
 
     fun project(
         source: SourceScope,
-        target: SourceResultEvidence,
+        target: SourceScope,
         transformations: List<SourceTransformation?>,
+        terminal: SourceEvidence,
         claim: SourceClaim,
     ): SourceDerivation {
         step(0)
-        if (claim != SourceClaim.Refutation && claim !is SourceClaim.Bound) {
-            missing("mapping transfer supports original refutations and objective bounds")
-        }
-        if (target.derivations.any { it.scope != target.scope }) missing("mapped evidence has mixed target scopes")
         val bound = claim is SourceClaim.Bound
-        val terminal = target.derivations.firstOrNull {
-            if (bound) it.claim is SourceClaim.Bound || it.claim is SourceClaim.Optimal
-            else it.claim == SourceClaim.Refutation
-        } ?: missing("mapping has no captured target claim")
-        var proof = if (terminal.claim is SourceClaim.Optimal) {
-            (terminal.derivation as? SourceDerivation.Optimum)?.bound
-                ?: missing("mapped optimum has no actual bound derivation")
-        } else terminal.derivation
-        var scope = target.scope
+        if (claim is SourceClaim.Bound) matchBound(source, target, transformations, terminal.claim, claim)
+        var proof = if (terminal.claim is SourceClaim.Optimal) optimumBound(terminal, target, 0)
+            else terminal.derivation
+        var scope = target
         if (scope == source) return proof
         if (transformations.isEmpty()) missing("mapping has no captured transformation stages")
         for (stage in transformations.asReversed()) {
@@ -91,6 +113,58 @@ private class MappingProofTranslation(
         }
         if (scope != source) missing("mapping original revision or invocation does not match")
         return proof
+    }
+
+    private fun matchBound(
+        source: SourceScope, target: SourceScope, transformations: List<SourceTransformation?>,
+        terminal: SourceClaim, claim: SourceClaim.Bound,
+    ) {
+        val value = when (terminal) {
+            is SourceClaim.Bound -> terminal.value
+            is SourceClaim.Optimal -> terminal.value
+            else -> missing("mapping has no target bound")
+        }
+        val strict = (terminal as? SourceClaim.Bound)?.strict ?: false
+        if (source == target) {
+            if (matchSourceClaims(SourceClaim.Bound(value, strict), claim, cancellation) !=
+                SourceEvidenceCheck.Checked
+            ) {
+                missing("mapped bound does not match the requested original claim")
+            }
+            return
+        }
+        var rational = when (value) {
+            is SourceValue.Rational -> value.value
+            is SourceValue.Algebraic -> value.value.rational
+            is SourceValue.Extension -> null
+        } ?: missing("mapped non-rational bound adjustment unavailable")
+        var scope = target
+        for (stage in transformations.asReversed()) {
+            step(0)
+            val transformation = stage ?: missing("mapping transformation justification unavailable")
+            if (transformation.target != scope) missing("mapping target revision or invocation does not match")
+            rational = transformation.objectiveScale * rational + transformation.objectiveOffset
+            scope = transformation.source
+        }
+        if (scope != source || matchSourceClaims(SourceClaim.Bound(rational, strict), claim, cancellation) !=
+            SourceEvidenceCheck.Checked
+        ) missing("mapped bound does not match the requested original claim")
+    }
+
+    private fun optimumBound(evidence: SourceEvidence, scope: SourceScope, depth: Int): SourceDerivation {
+        step(depth)
+        return when (val proof = evidence.derivation) {
+            is SourceDerivation.Optimum -> proof.bound
+            is SourceDerivation.Import -> {
+                val imported = proof.evidence
+                if (imported.scope.revision != scope.revision || imported.scope.objective != scope.objective ||
+                    !scope.condition.implies(imported.scope.condition) ||
+                    matchSourceClaims(imported.claim, evidence.claim, cancellation) != SourceEvidenceCheck.Checked
+                ) missing("mapped optimum import has a foreign invocation or claim")
+                optimumBound(imported, imported.scope, depth + 1)
+            }
+            else -> missing("mapped optimum has no actual bound derivation")
+        }
     }
 
     private fun translate(

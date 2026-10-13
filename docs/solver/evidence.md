@@ -99,7 +99,12 @@ bound citations are translated into original premise references and checked agai
 the original context; identity Boolean/integer coverage and compatible imports retain
 their actual derivations. This checks the original claim, not an entire projection
 contract. Missing stages, source-specific derivations and unsupported coordinate
-coverage remain unavailable. Mapping normalization and verification share one allowance.
+coverage remain unavailable. Bound selection compares exact target values after every
+source objective scale and offset with the actual requested original bound. Unavailable
+local capture does not mask a later matching imported bound or refutation; an invalid
+matching proof is rejected before considering other alternatives. Imported optima retain
+their actual bound derivation. Candidate comparison, normalization and original-context
+verification share one sticky cancellation and containing allowance.
 
 `SourceResultEvidence.engineScope` records terminal admission separately from original
 derivation scope. A transformed terminal retains reduced or unknown engine scope until
