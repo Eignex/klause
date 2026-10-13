@@ -12,9 +12,9 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
-import com.eignex.klause.lp.engine.IntegerCertificate
-import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
@@ -32,11 +32,11 @@ import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.finiteExactInput
 import com.eignex.klause.lp.engine.floorLong
 import com.eignex.klause.lp.engine.hasIntegralObjective
-import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
+import com.eignex.klause.lp.engine.nodeDualCertificate
 import com.eignex.klause.lp.engine.sourceObjective
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
@@ -583,7 +583,9 @@ internal fun LpEngine.sparseSafePrune(
     val cert = if ((learn && canPropagate) || canPrune) {
         solveContext.certificationPolicy.acceptNullable(
             LpCertifier.INTEGER,
-            integerCertify(boundRel.model, boundRes.duals, observer = sink.lp.certificationObserver(LpRoute.NODE)),
+            nodeDualCertificate(
+                boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
+            ),
         ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
             sink.lp.observeCertification(
@@ -678,7 +680,7 @@ internal fun LpEngine.sparseSafePrune(
 }
 
 /**
- * Reduced-cost fixing from one [IntegerCertificate], over exact scaled integers. For any column with
+ * Reduced-cost fixing from one [LpDeductionCertificate], over exact scaled integers. For any column with
  * nonzero reduced cost, moving Δ integer steps from that certificate term's minimizing endpoint raises
  * its Lagrangian by `|reducedCost|·Δ`. Any incumbent-beating solution has source objective
  * `≤ ⌈bound⌉ − 1`, so the column can move at most the exact unrounded certificate gap divided by
@@ -690,7 +692,7 @@ internal fun LpEngine.sparseSafePrune(
 @Suppress("LongParameterList", "CyclomaticComplexMethod")
 internal fun LpEngine.applySparseReducedCostFixing(
     relaxation: LpRelaxation,
-    cert: IntegerCertificate,
+    cert: LpDeductionCertificate,
     session: PropagationSession,
     bound: Double,
     sink: SolveStatsSink,
@@ -700,14 +702,19 @@ internal fun LpEngine.applySparseReducedCostFixing(
     cancellation: Cancellation = Cancellation.Never,
 ): Boolean {
     if (cancellation() || !cert.belongsTo(relaxation.model, sink.lp.certificationObserver(LpRoute.NODE))) return false
-    if (sourceObjectiveRange(relaxation) == null) return false
-    val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
-    if (ceiling == Long.MIN_VALUE) return false
-    val improvingMax = ceiling - 1L
+    val sourceRange = sourceObjectiveRange(relaxation)
+    val improvingMax = if (sourceRange != null) {
+        val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
+        if (ceiling == Long.MIN_VALUE) return false
+        BigFraction.ofLong(ceiling - 1L)
+    } else {
+        if (!bound.isFinite()) return false
+        BigFraction.ofDouble(bound.nextUp()) ?: return false
+    }
     val sourceConstant = relaxation.objectiveConstant
-    if (!cert.improvingGapNonNegative(improvingMax, sourceConstant)) return false
-    val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending) {
-        reducedCostFixingReasons(relaxation, cert, session, objectiveVar, improvingMax,
+    if (improvingMax < cert.exactObjectiveBound() + BigFraction.ofLong(sourceConstant)) return false
+    val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending && sourceRange != null) {
+        reducedCostFixingReasons(relaxation, cert, session, objectiveVar, checkNotNull(improvingMax.floorLong()),
             sink.lp.certificationObserver(LpRoute.NODE))
     } else {
         null
@@ -717,7 +724,9 @@ internal fun LpEngine.applySparseReducedCostFixing(
     for (col in relaxation.colVarId.indices) {
         if (cancellation()) return false
         val varId = relaxation.colVarId[col]
-        if (varId < 0) continue // auxiliary column — no CP variable to fix
+        if (varId < 0 || relaxation.model.colContinuous[col] ||
+            relaxation.model.exactState?.model?.column(col)?.integral == false
+        ) continue
         val isBool = relaxation.colIsBool[col]
         if (isBool && session.boolValue(varId) != null) continue
         val liveMin: Long
@@ -732,7 +741,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
         }
         if (liveMin == liveMax) continue
         val sign = cert.reducedCostSign(col)
-        val dMax = cert.fixSteps(col, improvingMax, sourceConstant) ?: continue
+        val dMax = cert.fixStepsAtCutoff(col, improvingMax, sourceConstant) ?: continue
         val res = when {
             // A positive reduced cost is minimized at the certificate model's lower endpoint.
             sign > 0 -> {
@@ -806,7 +815,7 @@ internal class ReducedCostFixingReasons(
  */
 internal fun reducedCostFixingReasons(
     relaxation: LpRelaxation,
-    cert: IntegerCertificate,
+    cert: LpDeductionCertificate,
     session: PropagationSession,
     objectiveVar: Int,
     improvingMax: Long,
