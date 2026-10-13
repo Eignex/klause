@@ -21,17 +21,17 @@ The [build](../../klause/build.gradle.kts) pins immutable timestamps for both th
 alone is insufficient because its Gradle metadata redirects to mutable platform snapshots. Strict
 platform constraints propagate into klause publications.
 
-The pins consume Koblas revision `c001f98d9568324a65b669b2103602cde3868c65`,
-published by its [snapshot workflow](https://github.com/Eignex/koblas/actions/runs/38115348971).
+The pins consume Koblas revision `74cf0237084597cce8eeef47ddd9c3613c30cf8e`,
+published by its [snapshot workflow](https://github.com/Eignex/koblas/actions/runs/38446077479).
 Koblas coordinates use group `com.eignex`:
 
 | Module | Version | Binary SHA-256 |
 |---|---|---|
-| koblas | `0.1.1-20261011.054003-257` | `2e09140ac35d8da98d2e15fd259a73f86ec3237bddc556152c7378cefe55c1e9` |
-| koblas-jvm | `0.1.1-20261011.054003-260` | `b12d7927421bedf8f166a5402e8121830486f666afe44cfef33bb4cf87562127` |
-| koblas-linuxx64 | `0.1.1-20261011.054003-256` | `a087dbf22d9bcd5b690c0555104999e049af48a2c1c2e4cb2f8ff9adef7dbd0b` |
-| koblas-linuxarm64 | `0.1.1-20261011.054003-257` | `54062376e00b9c0840101af0d59d38cb448a95d0191a92dff0115f13a721c57d` |
-| koblas-macosarm64 | `0.1.1-20261011.053716-280` | `d4ef605ceef8071ffa883e597eb6a4381cd28d8528db570bd2154acd8cfc8054` |
+| koblas | `0.1.1-20261013.182449-263` | `4bb78bbe9448b937e2bf88601e22c9414c5d8000b5ec75024be2d9c8444161b5` |
+| koblas-jvm | `0.1.1-20261013.182449-266` | `36c06138be124ab6df809e7f9dde8f5dad4efd890585fc1350724b26662bd57d` |
+| koblas-linuxx64 | `0.1.1-20261013.182449-262` | `27020e001be9346a675c0246b053e10f71d68e2577a139c3d99715d94b3c6492` |
+| koblas-linuxarm64 | `0.1.1-20261013.182449-263` | `26224afb64a272b51e723bacca20e1b5e01b20473cb42d3f6b66c454eabd1004` |
+| koblas-macosarm64 | `0.1.1-20261013.182206-286` | `8534ca098a41e671db582d14f664770895ec9b84b845d85f72ce80e12cadc36f` |
 
 The build does not consult Maven Local. For source integration, use Gradle's supported composite
 substitution with an isolated checkout at the revision under test:
@@ -49,18 +49,21 @@ must update every platform pin together and repeat provenance and published-meta
 Kumulant supplies online statistics and adaptive bandits. The library, CLI and benchmark
 builds use its timestamped `0.3.4-SNAPSHOT` publication. Contextual-bandit features use
 `com.eignex.koblas.DenseVector`; Kumulant exposes Koblas vector types and declares
-`koblas:0.1.1-SNAPSHOT` transitively. Klause strictly pins the Koblas root and platforms
-listed above so this transitive dependency cannot select different numerical binaries.
+the immutable Koblas root and platform pins listed above transitively. Klause also
+strictly pins those coordinates so direct and transitive consumers select the same
+numerical binaries.
 
-Kumulant coordinates use group `com.eignex` and version prefix `0.3.4-20260922.073440-`:
+The pins consume Kumulant revision `9df19df5c48e2cce2caf0a612e51e39430903352`,
+published by its [snapshot workflow](https://github.com/Eignex/kumulant/actions/runs/38456722493).
+Kumulant coordinates use group `com.eignex` and version prefix `0.3.4-20261013.194059-`:
 
 | Module | Build | Binary SHA-256 |
 |---|---:|---|
-| kumulant | 66 | `81bf47d09d6135b0857fc49510d17fbeac5dd958c5932753656d021bdfb78bae` |
-| kumulant-jvm | 66 | `41b110903da23f17f9c0c1b7c4e8722707bc369aadf21bfcd9fd05762a0eb3dc` |
-| kumulant-linuxx64 | 66 | `844f4b33057686b7ab47898757ae053f3aa377a508bc93cd0c7fbfc27ffa3a1a` |
-| kumulant-linuxarm64 | 66 | `a705527909d08e53a8b1a05f1051da970980a6183ed2aea315ba9cb8fa6f5416` |
-| kumulant-macosarm64 | 65 | `f0ce4c7f2f76c8aae200f8b443d4c4d2ad211733ebc540e7854916425ba1678c` |
+| kumulant | 67 | `81bf47d09d6135b0857fc49510d17fbeac5dd958c5932753656d021bdfb78bae` |
+| kumulant-jvm | 67 | `0b8e8e18088fca26f6045879083cbc11bd1a571dffe36b8cf0a90a1f1fab4c23` |
+| kumulant-linuxx64 | 67 | `844f4b33057686b7ab47898757ae053f3aa377a508bc93cd0c7fbfc27ffa3a1a` |
+| kumulant-linuxarm64 | 67 | `a705527909d08e53a8b1a05f1051da970980a6183ed2aea315ba9cb8fa6f5416` |
+| kumulant-macosarm64 | 66 | `f0ce4c7f2f76c8aae200f8b443d4c4d2ad211733ebc540e7854916425ba1678c` |
 
 Kumulant's root metadata also redirects to mutable platform snapshots, so its platform
 constraints follow the same publication policy. Verify numerical ownership and transitive

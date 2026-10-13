@@ -23,7 +23,7 @@ dependencies {
     implementation("org.xcsp:xcsp3-tools:2.5")
     testImplementation("org.junit.jupiter:junit-jupiter")
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
-    implementation("com.eignex:kumulant:0.3.4-20260922.073440-66")
+    implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     // runBlocking + Flow.collect bridge for the suspend Portfolio API in the anytime metric.
