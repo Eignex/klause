@@ -88,32 +88,38 @@ internal object Suites {
             archiveSuite(
                 "smtlib-qflia",
                 "SMT-LIB QF_LIA non-incremental set (fetched, full ~13k .smt2; 1/family by default)",
-                ExternalCollections.smtlibQfLia, "non-incremental/QF_LIA",
+                ExternalCollections.smtlibQfLia,
+                "non-incremental/QF_LIA",
             ),
             archiveSuite(
                 "smtlib-qflra",
                 "SMT-LIB QF_LRA non-incremental set (fetched, ~1.7k .smt2; 1/family by default)",
-                ExternalCollections.smtlibQfLra, "non-incremental/QF_LRA",
+                ExternalCollections.smtlibQfLra,
+                "non-incremental/QF_LRA",
             ),
             archiveSuite(
                 "smtlib-qfnra",
                 "SMT-LIB QF_NRA archive (fetched; membership unclassified; 1/family by default)",
-                ExternalCollections.smtlibQfNra, "non-incremental/QF_NRA",
+                ExternalCollections.smtlibQfNra,
+                "non-incremental/QF_NRA",
             ),
             archiveSuite(
                 "smtlib-qfidl",
                 "SMT-LIB QF_IDL non-incremental set (fetched, integer difference logic; 1/family by default)",
-                ExternalCollections.smtlibQfIdl, "non-incremental/QF_IDL",
+                ExternalCollections.smtlibQfIdl,
+                "non-incremental/QF_IDL",
             ),
             archiveSuite(
                 "smtlib-qfrdl",
                 "SMT-LIB QF_RDL non-incremental set (fetched, real difference logic; 1/family by default)",
-                ExternalCollections.smtlibQfRdl, "non-incremental/QF_RDL",
+                ExternalCollections.smtlibQfRdl,
+                "non-incremental/QF_RDL",
             ),
             archiveSuite(
                 "smtlib-qflira",
                 "SMT-LIB QF_LIRA non-incremental set (fetched, small mixed int/real .smt2; 1/family by default)",
-                ExternalCollections.smtlibQfLira, "non-incremental/QF_LIRA",
+                ExternalCollections.smtlibQfLira,
+                "non-incremental/QF_LIRA",
             ),
             DynamicSuite(
                 "miplib2017",
@@ -718,8 +724,11 @@ internal object Suites {
         }
         for (name in listOf("dense-2x12", "dense-8x24")) {
             vendored(
-                "mps-$name", Category.CSP, Expected.Sat,
-                relPath = "lp-component-split/$name.mps", format = Format.MPS,
+                "mps-$name",
+                Category.CSP,
+                Expected.Sat,
+                relPath = "lp-component-split/$name.mps",
+                format = Format.MPS,
             )
         }
     }
@@ -1110,7 +1119,10 @@ internal object ExternalCollections {
 }
 
 private fun archiveSuite(
-    id: String, description: String, collection: ExternalCollection, subDir: String,
+    id: String,
+    description: String,
+    collection: ExternalCollection,
+    subDir: String,
 ): DynamicSuite {
     val layout = CorpusSelection.Layout.Flat(subDir, "smt2")
     return DynamicSuite(id, description, defaultPerFamily = 1, sourceLayout = ArchiveSourceLayout(collection, layout)) {

@@ -124,12 +124,18 @@ internal class MiniZincRunner(
                 error("minizinc compile timed out after ${timeoutSec}s for ${mzn.name}")
             }
             val output = log.readText()
-            check(sourceHashes["model"] == MiniZincCompatibility.hash(mzn) &&
-                (dzn == null || sourceHashes["data"] == MiniZincCompatibility.hash(dzn))
+            check(
+                sourceHashes["model"] == MiniZincCompatibility.hash(mzn) &&
+                    (dzn == null || sourceHashes["data"] == MiniZincCompatibility.hash(dzn)),
             ) { "MiniZinc source changed during compilation" }
             if (proc.exitValue() != 0) {
                 throw MiniZincCompileFailure(
-                    proc.exitValue(), output, MiniZincCompatibility.compiler, cmd, System.nanoTime() - start, sourceHashes,
+                    proc.exitValue(),
+                    output,
+                    MiniZincCompatibility.compiler,
+                    cmd,
+                    System.nanoTime() - start,
+                    sourceHashes,
                 )
             }
             require(tmp.exists()) { "minizinc compile produced no .fzn for ${mzn.name}" }

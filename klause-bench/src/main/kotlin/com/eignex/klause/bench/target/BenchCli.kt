@@ -565,7 +565,8 @@ object BenchCli {
 
     private fun compatible(candidate: SelectedProblem): Boolean {
         val failure = MiniZincCompatibility.exclusion(candidate.ref) ?: return true
-        System.err.println(buildJsonObject {
+        System.err.println(
+            buildJsonObject {
             put("suite", candidate.suite)
             put("problem", candidate.ref.name)
             put("selectionPolicy", MZN_COMPATIBILITY_POLICY)
@@ -577,7 +578,8 @@ object BenchCli {
             put("compilerCommand", Reports.json.encodeToJsonElement(failure.command))
             put("sourceHashes", Reports.json.encodeToJsonElement(failure.sourceHashes))
             put("compilerIdentity", Reports.json.encodeToJsonElement(failure.compiler))
-        })
+        }
+        )
         return false
     }
 

@@ -79,7 +79,9 @@ internal object CorpusSelection {
             override fun discover(root: File): List<Discovered> {
                 val years = root.listFiles { f -> f.isDirectory && f.name.toIntOrNull() != null }
                     ?.sortedBy { it.name } ?: return emptyList()
-                return interleave(years.map { discoverFamilyDirs(root, it, prefix = it.name, legacyExclusions = legacyExclusions) })
+                return interleave(
+                    years.map { discoverFamilyDirs(root, it, prefix = it.name, legacyExclusions = legacyExclusions) },
+                )
             }
         }
 
@@ -227,7 +229,10 @@ internal object CorpusSelection {
      *  from different years don't collide. Shared by [Layout.MznChallenge] (one year, no prefix)
      *  and [Layout.MznChallengeAllYears] (every year, prefixed). */
     private fun discoverFamilyDirs(
-        root: File, base: File, prefix: String? = null, legacyExclusions: Boolean = true,
+        root: File,
+        base: File,
+        prefix: String? = null,
+        legacyExclusions: Boolean = true,
     ): List<Discovered> {
         val families = base.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
             ?.sortedBy { it.name } ?: return emptyList()
