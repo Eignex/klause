@@ -46,6 +46,9 @@ attestations and reference agreement remain distinct from checked derivations.
 `SourceResultEvidence` captures derivations separately from `SourceEngineAttestation`.
 Checking a completed package requires the actual expected claim and matching source
 context; an engine completion label or evidence for another claim cannot substitute.
+An unavailable local derivation does not mask a later checkable import for the same
+claim. Alternative capture comparison and traversal spend one containing allowance;
+invalid proofs and foreign invocation imports remain rejected.
 An attained optimum requires a feasible witness, an equal global bound and original
 objective evaluation. An unattained limit additionally requires supported approach
 and nonattainment derivations; a strict bound alone does not establish convergence.

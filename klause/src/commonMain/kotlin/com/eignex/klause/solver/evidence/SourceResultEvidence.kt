@@ -50,19 +50,32 @@ class SourceResultEvidence private constructor(
         claim: SourceClaim,
         context: SourceProofContext,
         cancellation: Cancellation = Cancellation.Never,
+    ): SourceEvidenceCheck = verify(claim, context, cancellation, SourceProofAllowance(100_000, 128))
+
+    internal fun verify(
+        claim: SourceClaim, context: SourceProofContext, cancellation: Cancellation, allowance: SourceProofAllowance,
     ): SourceEvidenceCheck {
         if (scope != context.scope || capturedDerivations.any { it.scope != scope }) {
             return SourceEvidenceCheck.Rejected("completed result evidence has mismatched original-source scopes")
         }
+        val limited = Cancellation { cancellation() || !allowance.consume(0) }
+        val verifier = SourceEvidenceVerifier(context)
         var mismatch: SourceEvidenceCheck? = null
+        var unavailable: SourceEvidenceCheck.Unavailable? = null
         for (evidence in capturedDerivations) {
+            if (limited()) return SourceEvidenceCheck.Unavailable("completed evidence checking allowance exhausted")
             if (!sameSourceClaimKind(evidence.claim, claim)) continue
-            when (val matching = matchSourceClaims(evidence.claim, claim, cancellation)) {
-                SourceEvidenceCheck.Checked -> return SourceEvidenceVerifier(context).verify(evidence, cancellation)
-                is SourceEvidenceCheck.Unavailable -> return matching
+            when (val matching = matchSourceClaims(evidence.claim, claim, limited)) {
+                SourceEvidenceCheck.Checked -> when (val checked = verifier.verify(evidence, limited, allowance)) {
+                    SourceEvidenceCheck.Checked -> return checked
+                    is SourceEvidenceCheck.Rejected -> return checked
+                    is SourceEvidenceCheck.Unavailable -> unavailable = checked
+                }
+                is SourceEvidenceCheck.Unavailable -> unavailable = matching
                 is SourceEvidenceCheck.Rejected -> mismatch = matching
             }
         }
-        return mismatch ?: SourceEvidenceCheck.Unavailable("completed result has no derivation for the requested claim")
+        return unavailable ?: mismatch
+            ?: SourceEvidenceCheck.Unavailable("completed result has no derivation for the requested claim")
     }
 }
