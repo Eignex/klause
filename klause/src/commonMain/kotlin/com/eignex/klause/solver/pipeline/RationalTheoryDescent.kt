@@ -153,7 +153,7 @@ internal class RationalTheoryDescent(
             invocation.model.matches(ModelIdentity.of(source, objective)) &&
             invocation.executionObjective === objective &&
             invocation.scope == context?.scope &&
-            invocation.executionCondition == context?.scope?.condition
+            context?.scope?.condition?.implies(invocation.executionCondition) == true
 
     private fun attestWitness(sample: Sample, cancellation: Cancellation) {
         val original = witnessContext ?: source.linearAuthorityContext(LinearObjective(), ObjectiveSense.MINIMIZE,

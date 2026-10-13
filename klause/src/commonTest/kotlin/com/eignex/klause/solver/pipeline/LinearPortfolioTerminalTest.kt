@@ -9,8 +9,10 @@ import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceObjective
@@ -56,6 +58,30 @@ class LinearPortfolioTerminalTest {
         assertFailsWith<IllegalStateException> {
             descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
         }
+    }
+
+    @Test
+    fun `weaker execution pins cannot erase the retained original source query`() {
+        val pinnedModel = Problem(numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0),
+                Bits(1), Bits(1).also { it.set(0) }), factors = emptyArray())
+        val cost = LinearObjective(intCoefficients = longArrayOf(1))
+        val pinnedRequest = OpenTheoryRequest(pinnedModel, cost)
+        val captured = assertNotNull(pinnedRequest.linearAuthorityContext(Cancellation.Never))
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val original = SourceProofContext(captured.scope.copy(condition = SourceCondition(
+            lower = mapOf(integer to BigFraction.ONE), upper = mapOf(integer to BigFraction.ONE))),
+            captured.coordinates, captured.premises, captured.objective, captured.objectiveConstant,
+            captured.semanticsChecker)
+        val runtime = EngineInvocation(pinnedRequest.preparedPlan, ModelIdentity.of(pinnedModel, cost),
+            sourceAssumptions = Assumptions(ints = mapOf(0 to 1L)), executionAssumptions = Assumptions.None,
+            scope = original.scope)
+        val search = LinearPortfolioSearch(RationalTheoryDescent(pinnedModel, cost, TheoryParams(), original), runtime)
+
+        search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> } }
+
+        val claim = assertIs<SourceClaim.Optimal>(assertNotNull(search.result?.terminal).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ONE), claim.value)
     }
 
     @Test
