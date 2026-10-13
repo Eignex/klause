@@ -8,6 +8,8 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
@@ -403,10 +405,14 @@ object OpenTheoryPipeline {
         val context = values?.context
         if (context == null) {
             val integral = integralMinimizer(request, objective)
-            if (integral != null) return integral.descent(params).use { descent ->
-                OpenTheoryExecution.Optimize(requireNotNull(descent.runSlice(
-                    params.cancellation or params.timeout, Long.MAX_VALUE, -1,
-                ) { assignment, _ -> values?.publish(assignment.toSample(request.model), publication) }))
+            if (integral != null) {
+                val binding = EngineInvocation(request.preparedPlan,
+                    ModelIdentity.of(request.model, objective), objective)
+                return integral.descent(params).use { descent ->
+                    OpenTheoryExecution.Optimize(requireNotNull(descent.runSlice(
+                        params.cancellation or params.timeout, Long.MAX_VALUE, -1,
+                    ) { assignment, _ -> values?.publish(assignment.toSample(request.model, binding), publication) }))
+                }
             }
         }
         return RationalTheoryDescent(request.model, objective, params, context).use { descent ->
