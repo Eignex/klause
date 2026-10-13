@@ -178,7 +178,7 @@ internal class TranscendentalWorkerAdapter(
                 when (val event = requireNotNull(run).next()) {
                     is SearchRunEvent.Satisfied -> finish(SolveResult.Sat(
                         capture(requireNotNull(event.model.valueOf(requireNotNull(component).witnessKey))), stats))
-                    SearchRunEvent.Exhausted -> finish(SolveResult.Unsat(stats))
+                    SearchRunEvent.Exhausted -> finish(SolveResult.Unsat(stats = stats))
                     SearchRunEvent.Paused -> null
                     else -> finish(SolveResult.Unknown(terminationReason(), stats))
                 }
