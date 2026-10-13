@@ -1,6 +1,9 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -20,6 +23,8 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryRequest
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.ValSelectorKind
 import com.eignex.klause.solver.pipeline.VarSelectorKind
@@ -51,19 +56,21 @@ import kotlin.test.assertTrue
 class CliModeTest {
     @Test
     fun `ordinary source publication cancellation preserves its original exception without terminal claims`() {
-        val started = System.nanoTime()
-        val source = File.createTempFile("linear-publication-cancel", ".smt2").apply {
-            writeText("(declare-const b Bool) (declare-const x Real) " +
-                "(assert (= (* 3 x) (ite b 0 1))) (minimize (+ 7 x)) (check-sat)")
-        }
+        val model = Problem(2, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val objective = LinearObjective(boolWeights = longArrayOf(-2, -1), constant = 7)
+        val solvable = openTheorySolvable(OpenTheoryRequest(model, objective), {
+            renderOpenTheoryModel(emptyMap(), mapOf("a" to 0, "b" to 1), mapOf("x" to 0), it)
+        })
         val common = CommonOptions().apply { engine = "cp"; parallel = 1; randomSeed = 17; presolve = "off" }
-        val session = SmtLibMode.newSession()
         val expected = CancellationException("linear consumer cancelled")
         val values = mutableListOf<BigFraction>()
         var terminal = false
-        val output = object : OutputProtocol by session.output(common) {
+        val output = object : OutputProtocol by SmtLibOutput() {
             override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
                 assertFalse(terminal)
+                assertTrue("(/ 1.0 3.0)" in rendered, rendered)
                 values += assertIs<SourceValue.Rational>(objective).value
                 if (values.size == 2) throw expected
                 return true
@@ -72,24 +79,10 @@ class CliModeTest {
             override fun onComplete(verdict: Verdict) = error("cancelled publication cannot emit a terminal claim")
         }
 
-        try {
-            val loadStarted = System.nanoTime()
-            val solvable = session.load(source.absolutePath, common)
-            val loaded = System.nanoTime()
-            assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
-            try {
-                val thrown = assertFailsWith<CancellationException> { SolveCore.solve(solvable, common, output) }
-                assertSame(expected, thrown)
-            } finally {
-                val solved = System.nanoTime()
-                System.err.println("ordinary cancellation phases: setupNs=${loadStarted - started} " +
-                    "loadNs=${loaded - loadStarted} solveNs=${solved - loaded}")
-            }
-        } finally {
-            source.delete()
-        }
+        val thrown = assertFailsWith<CancellationException> { SolveCore.solve(solvable, common, output) }
 
-        assertEquals(listOf(BigFraction.ofLong(22) * BigFraction.ofLong(3).reciprocal(), BigFraction.ofLong(7)), values)
+        assertSame(expected, thrown)
+        assertEquals(listOf(BigFraction.ofLong(7), BigFraction.ofLong(6)), values)
         assertFalse(terminal)
     }
 
