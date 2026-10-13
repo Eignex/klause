@@ -47,7 +47,9 @@ def parse_smt(text):
         operator, *arguments = expression
         if operator == "to_real":
             assert len(arguments) == 1
-            return affine(arguments[0])
+            terms, constant = affine(arguments[0])
+            assert constant.denominator == 1 and all(declarations[key] == "Int" for key in terms)
+            return terms, constant
         values = [affine(argument) for argument in arguments]
         if operator in {"+", "-"}:
             assert values
