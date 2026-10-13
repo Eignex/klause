@@ -70,6 +70,12 @@ class MiniZincModeTest(private val direction: String) {
         assertTrue(point > BigFraction.ZERO && point < BigFraction.ONE)
         assertEquals(1, text.lines().count { it == "----------" }, text)
         assertTrue("% objective=$point" in text.lines(), text)
+        val status = if (direction == "minimize") "unattained-infimum" else "unattained-supremum"
+        val boundDirection = if (direction == "minimize") "lower" else "upper"
+        assertTrue("% optimizationStatus=$status" in text.lines(), text)
+        assertTrue("% objectiveBoundDirection=$boundDirection" in text.lines(), text)
+        assertTrue("% objectiveBound=$expected" in text.lines(), text)
+        assertTrue("% objectiveBoundStrict=true" in text.lines(), text)
         assertFalse("==========" in text.lines(), text)
         assertFalse("=====UNKNOWN=====" in text.lines(), text)
     }
