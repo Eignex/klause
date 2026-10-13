@@ -11,7 +11,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -21,6 +22,7 @@ import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.minus
 import com.eignex.klause.util.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -68,8 +70,10 @@ class OpenWitnessTest {
     @Test
     fun `a wide theory witness is explicitly projected into local search windows`() {
         val wide = parseBigInt("9223372036854775808")
-        val witness = Sample(BooleanArray(0), LongArray(0), exactInts = listOf(wide, -wide))
-        witness.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
+        val witness = Sample(BooleanArray(0), LongArray(0), exactInts = listOf(wide, bigIntOf(10) - wide))
+        val runtime = EngineInvocation(model.prepareExecutionPlan(), ModelIdentity.of(model))
+        val publication = CompletedEnginePublication.Witness(runtime, witness, null)
+        witness.witnessCertificate = EvidenceCertificate.published(publication)
         val search = LocalSearchModel.open(model)
 
         val projected = inWindows(witness.copy(), search)
@@ -115,7 +119,10 @@ class OpenWitnessTest {
     @Test
     fun `a copied witness from another model is rejected by the source verifier`() {
         val candidate = sample(3, 7)
-        candidate.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
+        val foreign = model.withFactors(model.factors)
+        val runtime = EngineInvocation(foreign.prepareExecutionPlan(), ModelIdentity.of(foreign))
+        val publication = CompletedEnginePublication.Witness(runtime, candidate, null)
+        candidate.witnessCertificate = EvidenceCertificate.published(publication)
 
         val verdict = openWitnessVerifier(model, null).verify(Candidate(candidate.copy(), null))
 
