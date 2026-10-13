@@ -38,7 +38,9 @@ class ArithmeticPublicationTest {
                 emitted++
                 return true
             }
-            override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {}
+            override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
+                assertEquals(null, rendered)
+            }
             override fun onComplete(verdict: Verdict) { completed = verdict }
         }
 

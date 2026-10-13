@@ -54,8 +54,9 @@ class PolynomialAffineFrontendTest(
 
         val text = bytes.toString(Charsets.UTF_8.name())
         val expected = if (direction == "minimize") 7 else 8
-        val integer = assertNotNull(Regex("""\(define-fun (?:\|i\||i) \(\) Int ([01])\)""").findAll(text).lastOrNull(), text)
-            .groupValues[1].toInt()
+        val integer = assertNotNull(
+            Regex("""\(define-fun (?:\|i\||i) \(\) Int ([01])\)""").findAll(text).lastOrNull(), text,
+        ).groupValues[1].toInt()
         assertEquals(0, code, text)
         assertTrue("sat" in text.lines(), text)
         assertTrue("; objective=${7 + integer}.0" in text.lines(), text)
