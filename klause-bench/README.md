@@ -590,6 +590,10 @@ installed-jar hashes remain in the profile output. Self-authored `strict-min.smt
 `smoke-corpus/linear-authority` exercise these source semantics. Boolean coverage uses
 an unconstrained declared Boolean beside a strict real row; guarded formulas are outside
 this independent parser's subset.
+`admission-box.smt2` is a self-authored bounded real source beyond the numerical
+authority's column ceiling. With `--work=8` it checks the retained source witness
+from feasibility fallback; `--work=1` checks that the authority attempt cannot renew
+the containing allowance. Neither control may publish a terminal proof after decline.
 
 [verify_source_results.py](tools/verify_source_results.py) checks `mps-core`,
 `smtlib-core`, `miplib3` and the SMT corpus suites `smtlib-qfidl`, `smtlib-qflia`,
