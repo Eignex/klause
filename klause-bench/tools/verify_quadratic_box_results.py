@@ -41,6 +41,12 @@ def check_record(source_bytes, record):
     objective = source['objective']
     assert record['sense'] == objective['sense'] in ('MINIMIZE', 'MAXIMIZE'), 'foreign objective direction'
     bounds, lower, upper = objective_range(source)
+    if 'forwardedWork' in record:
+        assert record['forwardedWork'] == record['nativeWork'], 'native meter forwarding differs'
+        assert record['polynomialWork'] + record['numericalWork'] == record['nativeWork'], 'native ledger differs'
+    if record.get('publicationCount', 0) > 0 and record['kind'] == 'Optimal':
+        assert record['acceptedIdentityRetained'], 'final optimum lost accepted publication identity'
+        assert record['acceptedVersion'] == record['publicationCount'], 'accepted version differs from publication order'
     witness = record.get('witness')
     if witness is None or record.get('value') is None or any(value is None for value in witness):
         return {'witnessCheck': 'Unavailable', 'terminalCheck': 'Unavailable'}

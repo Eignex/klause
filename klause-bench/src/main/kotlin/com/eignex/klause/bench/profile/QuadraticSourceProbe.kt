@@ -17,10 +17,13 @@ import com.eignex.klause.solver.evidence.verifySourceEvidence
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.QuadraticIncumbentPublication
 import com.eignex.klause.solver.pipeline.minimize
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.parseBigInt
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -35,6 +38,7 @@ import kotlinx.serialization.json.put
 import java.io.File
 import java.security.MessageDigest
 import java.util.HexFormat
+import java.util.concurrent.atomic.AtomicLong
 
 internal object QuadraticSourceProbe {
     @JvmStatic
@@ -77,9 +81,15 @@ internal object QuadraticSourceProbe {
             for (control in (options["controls"] ?: "BACKTRACK:1,MIXED:1,MIXED:4").split(',')) {
                 val engine = FiniteEngine.valueOf(control.substringBefore(':'))
                 val cores = control.substringAfter(':').toInt()
+                val forwarded = AtomicLong()
+                val lifetime = object : Cancellation {
+                    override fun isCancelled(): Boolean = false
+                    override fun workMeter(): WorkMeter = WorkMeter { forwarded.addAndGet(it) }
+                }
+                val publications = ArrayList<QuadraticIncumbentPublication>()
                 val execution = OpenTheoryPipeline.minimize(original.pipelineRequest(), objective,
-                    PolynomialTheoryParams(maximumWork = options["maximumWork"]?.toLong() ?: 100_000), engine,
-                    sense, cores)
+                    PolynomialTheoryParams(maximumWork = options["maximumWork"]?.toLong() ?: 100_000,
+                        cancellation = lifetime), engine, sense, cores, onAccepted = { publications += it })
                 val result = execution.result
                 val captured = capture.quadratic(result, control, boundDerivation = SourceQuadraticBoxDerivation)
                 add(buildJsonObject {
@@ -88,6 +98,14 @@ internal object QuadraticSourceProbe {
                     put("sense", sense.name)
                     put("sourceHash", scope.revision.identity)
                     put("nativeWork", execution.nativeWork)
+                    put("polynomialWork", execution.polynomialStats.workSpent)
+                    put("numericalWork", execution.numericalWork)
+                    put("forwardedWork", forwarded.get())
+                    put("publicationCount", publications.size)
+                    put("acceptedVersion", execution.acceptedIncumbent?.version)
+                    put("acceptedIdentityRetained", publications.lastOrNull()?.let {
+                        it === execution.acceptedIncumbent
+                    } ?: false)
                     put("portfolioArms", result.stats.portfolio.arms.size)
                     put("sourceCapture", captured.verifySourceEvidence(capture.context)::class.simpleName)
                     put("engineOnly", capture.quadratic(result, control)
