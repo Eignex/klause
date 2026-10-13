@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.simplex.exact.BigFraction
@@ -35,6 +36,22 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class OpenWitnessTest {
+    @Test
+    fun `native publication metadata cannot rescue an invalid exact row witness`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)),
+            listOf(BigFraction.ofLong(3)), LinearOp.EQ, BigFraction.ONE)), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val binding = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        val sample = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        sample.witnessCertificate = EvidenceCertificate.published(
+            CompletedEnginePublication.Witness(binding, sample, null))
+
+        val checked = openWitnessVerifier(source, null).verify(Candidate(sample, null))
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
     @Test
     fun `ordinary theory workers publish the retained source runtime`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),

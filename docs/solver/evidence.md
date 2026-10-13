@@ -249,7 +249,11 @@ value. Unbound conversions and low-level completion adapters retain exact coordi
 without issuing a runtime certificate. Their native source checks remain required;
 these publications add no independent derivation coverage. Rational-descent fallback
 source checking retains its actual invocation and witness publication when bound;
-it withholds a certificate when no runtime is supplied.
+it withholds a certificate when no runtime is supplied. A canonical model produced
+by coordinate-identical bound preparation can use its retained plan while keeping
+the original source identity distinct. Low-level exact-row and wide-coordinate
+witness admission uses the original affine source checker; publication metadata
+does not bypass source feasibility.
 
 The public `PortfolioBuilder.build` and `buildExplicit` worker-list entry points
 prepare one actual finite source invocation for their operation and bind each

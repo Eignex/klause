@@ -43,7 +43,8 @@ internal class RationalTheoryDescent(
 ) : ResumableSearch {
     init {
         require(publicationInvocation == null ||
-            (publicationInvocation.sourceModel.sameModel(ModelIdentity.of(source)) &&
+            ((publicationInvocation.sourceModel.sameModel(ModelIdentity.of(source)) ||
+                publicationInvocation.preparedPlan.model === source) &&
                 publicationInvocation.model.matches(ModelIdentity.of(source, objective)) &&
                 publicationInvocation.scope == context?.scope)) {
             "rational witness publication has a different source invocation"
