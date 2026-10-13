@@ -403,11 +403,11 @@ object OpenTheoryPipeline {
         val objective = request.minimizedObjective
         if (objective == null) return OpenTheoryExecution.Satisfy(engineFor(request).solve(params))
         val context = values?.context
+        val binding = EngineInvocation(request.preparedPlan, ModelIdentity.of(request.model, objective), objective,
+            scope = context?.scope, condition = context?.scope?.condition)
         if (context == null) {
             val integral = integralMinimizer(request, objective)
             if (integral != null) {
-                val binding = EngineInvocation(request.preparedPlan,
-                    ModelIdentity.of(request.model, objective), objective)
                 return integral.descent(params).use { descent ->
                     OpenTheoryExecution.Optimize(requireNotNull(descent.runSlice(
                         params.cancellation or params.timeout, Long.MAX_VALUE, -1,
@@ -415,7 +415,8 @@ object OpenTheoryPipeline {
                 }
             }
         }
-        return RationalTheoryDescent(request.model, objective, params, context).use { descent ->
+        return RationalTheoryDescent(request.model, objective, params, context,
+            publicationInvocation = binding).use { descent ->
             val result = requireNotNull(descent.runSlice(
                 params.cancellation or params.timeout, Long.MAX_VALUE, -1,
             ) { incumbent -> values?.publish(incumbent.sample, publication) })

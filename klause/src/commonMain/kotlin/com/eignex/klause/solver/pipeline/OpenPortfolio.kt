@@ -195,7 +195,8 @@ internal class OpenPortfolio(
                     PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
                 val retained = AtomicReference<LinearPortfolioSearch?>(null)
                 val worker = PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
-                    val descent = RationalTheoryDescent(sourceModel, objective, workerParams(slot), context) {
+                    val descent = RationalTheoryDescent(sourceModel, objective, workerParams(slot), context,
+                        publicationInvocation = binding) {
                         incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
                     }
                     if (linear == null) {
