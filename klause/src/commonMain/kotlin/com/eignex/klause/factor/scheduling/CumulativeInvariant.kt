@@ -11,6 +11,7 @@ import com.eignex.klause.factor.scheduling.internals.firstInDomainAtLeast
 import com.eignex.klause.factor.scheduling.internals.simulateCumulativeDurDelta
 import com.eignex.klause.factor.scheduling.internals.simulateCumulativeResDelta
 import com.eignex.klause.factor.scheduling.internals.simulateCumulativeStartDelta
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.ChannelingSink
@@ -355,28 +356,43 @@ internal class CumulativeInvariant(
             val r = curRes(state, i)
             if (d <= 0 || r <= 0) continue
             val dom = state.rootDomains[v]
-            val runsAtPeak = (hasPeak && cur <= absT && absT < cur + d)
-            if (runsAtPeak) {
-                val afterPeak = absT + 1
-                if (afterPeak in dom && afterPeak != cur) sink.addChannelingIntSet(state, v, afterPeak)
-                val beforePeak = absT - d
-                if (beforePeak in dom && beforePeak != cur) sink.addChannelingIntSet(state, v, beforePeak)
-            }
-            if (cur < dom.max) sink.addChannelingIntSet(state, v, dom.higher(cur))
-            if (cur > dom.min) sink.addChannelingIntSet(state, v, dom.lower(cur))
-            val few = dom.spanOrNull(maxTargets.toLong())
-            if (few != null) {
-                few.forEach { target -> if (target != cur) sink.addChannelingIntSet(state, v, target) }
-            } else {
-                repeat(maxTargets) {
-                    val pick = dom.randomValue(state.rng)
-                    if (pick != cur) sink.addChannelingIntSet(state, v, pick)
-                }
-            }
+            emitStartRepairTargets(state, v, cur, d, dom, hasPeak, absT, maxTargets, sink)
         }
         if (peakTasks.isNotEmpty()) {
             emitFeasibleSwaps(state, ls, peakTasks, sink)
             emitConditionalChoiceSwaps(state, ls, peakTasks, sink)
+        }
+    }
+
+    @Suppress("LongParameterList")
+    private fun emitStartRepairTargets(
+        state: LocalSearchState,
+        v: Int,
+        cur: Long,
+        d: Long,
+        dom: IntDomain,
+        hasPeak: Boolean,
+        absT: Long,
+        maxTargets: Int,
+        sink: MoveSink,
+    ) {
+        val runsAtPeak = (hasPeak && cur <= absT && absT < cur + d)
+        if (runsAtPeak) {
+            val afterPeak = absT + 1
+            if (afterPeak in dom && afterPeak != cur) sink.addChannelingIntSet(state, v, afterPeak)
+            val beforePeak = absT - d
+            if (beforePeak in dom && beforePeak != cur) sink.addChannelingIntSet(state, v, beforePeak)
+        }
+        if (cur < dom.max) sink.addChannelingIntSet(state, v, dom.higher(cur))
+        if (cur > dom.min) sink.addChannelingIntSet(state, v, dom.lower(cur))
+        val few = dom.spanOrNull(maxTargets.toLong())
+        if (few != null) {
+            few.forEach { target -> if (target != cur) sink.addChannelingIntSet(state, v, target) }
+        } else {
+            repeat(maxTargets) {
+                val pick = dom.randomValue(state.rng)
+                if (pick != cur) sink.addChannelingIntSet(state, v, pick)
+            }
         }
     }
 
