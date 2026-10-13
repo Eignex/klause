@@ -332,3 +332,9 @@ own state. Ordinary `bake()` and existing solver constructors retain built-in de
 
 An inert descriptor requires an explicit reason and cannot claim an exact check:
 its absent mechanism needs an enforcing peer or separate source certification.
+
+Factories and emitters receive the immutable factor in the engine's coordinate
+namespace; use that argument for variable ids rather than a captured source factor.
+Scoring also receives actual move domains. `problem.bake(selection)` retains the
+source-prepared choice through finite root construction. Coordinate projections
+bind captured choices to mapped factor data, while a source rewrite selects anew.

@@ -30,7 +30,7 @@ internal fun Factor.invariantProjection(
     provider: ScoringProjectionProvider = BuiltInScoringProjectionProvider,
 ): Invariant = checkNotNull(provider.select(this)) {
     "unsupported local-search route for ${this::class.simpleName}; select a scoring provider"
-}.create(domains)
+}.create(this, domains)
 
 internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invariant = when (this) {
     is AllDifferent -> allDifferentInvariantProjection()

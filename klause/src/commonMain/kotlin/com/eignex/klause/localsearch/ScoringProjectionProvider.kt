@@ -20,15 +20,15 @@ class ScoringProjection internal constructor(
     val assignmentCheck: AssignmentCheckCapability,
     /** Explanation when scoring is deliberately inert. */
     val inertReason: String?,
-    private val factory: (Array<IntDomain>?) -> Invariant,
+    private val factory: (Factor, Array<IntDomain>?) -> Invariant,
     internal val builtIn: Boolean,
 ) {
-    /** Allocate a private invariant, selecting exact arithmetic over the supplied move domains. */
+    /** Build from the supplied engine-view factor and actual move domains, with private mutable payloads. */
     constructor(
         capability: ScoringCapability,
         assignmentCheck: AssignmentCheckCapability,
         inertReason: String? = null,
-        factory: (Array<IntDomain>?) -> Invariant,
+        factory: (Factor, Array<IntDomain>?) -> Invariant,
     ) : this(capability, assignmentCheck, inertReason, factory, false)
 
     init {
@@ -38,9 +38,9 @@ class ScoringProjection internal constructor(
         }
     }
 
-    internal fun create(domains: Array<IntDomain>?): Invariant {
+    internal fun create(factor: Factor, domains: Array<IntDomain>?): Invariant {
         check(capability != ScoringCapability.UNSUPPORTED) { "unsupported local-search route" }
-        return factory(domains).also {
+        return factory(factor, domains).also {
             check((it === NoInvariant) == (capability == ScoringCapability.INERT)) {
                 "local-search capability disagrees with projection"
             }
@@ -55,7 +55,7 @@ object BuiltInScoringProjectionProvider : ScoringProjectionProvider {
         if (capabilities.scoring == ScoringCapability.UNSUPPORTED) return null
         return ScoringProjection(
             capabilities.scoring, capabilities.assignmentCheck, capabilities.inertReason,
-            factor::buildInvariantProjection, true,
+            { view, domains -> view.buildInvariantProjection(domains) }, true,
         )
     }
 }

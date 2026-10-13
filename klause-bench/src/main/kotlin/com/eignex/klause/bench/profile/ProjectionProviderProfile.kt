@@ -35,8 +35,8 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.ScoringCapability
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -218,12 +218,13 @@ object ProjectionProviderProfile {
     private fun alternatives(): FactorProjectionProviders = FactorProjectionProviders(
         propagation = PropagationProjectionProvider { factor ->
             if (factor !is Clause) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) {
+            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                val clause = view as Clause
                 object : Propagator {
                     override fun propagate(state: PropagationState, factorId: Int): Boolean {
                         var remaining = 0
                         var free = -1
-                        for (literal in factor.literals) when (state.litTruth(literal)) {
+                        for (literal in clause.literals) when (state.litTruth(literal)) {
                             true -> return true
                             false -> Unit
                             null -> { remaining++; free = literal }
@@ -235,14 +236,15 @@ object ProjectionProviderProfile {
         },
         scoring = ScoringProjectionProvider { factor ->
             if (factor !is Clause) BuiltInScoringProjectionProvider.select(factor)
-            else ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _ ->
+            else ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { view, _ ->
+                val clause = view as Clause
                 object : Invariant {
                     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
-                        factor.literals.none { Lit.evaluate(it, state.assignment.boolValue(Lit.variable(it))) }
+                        clause.literals.none { Lit.evaluate(it, state.assignment.boolValue(Lit.variable(it))) }
                     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
                         if (isViolated(state, factorId)) 2 else 0
                     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-                        val after = factor.literals.none {
+                        val after = clause.literals.none {
                             val variable = Lit.variable(it)
                             Lit.evaluate(it, state.assignment.boolValue(variable) xor (variable == boolVar))
                         }
@@ -254,10 +256,12 @@ object ProjectionProviderProfile {
         relaxation = RelaxationProjectionProvider { factor ->
             val constants = (factor as? Linear)?.integerConstants
             if (factor !is Linear || constants == null) BuiltInRelaxationProjectionProvider.select(factor)
-            else RelaxationProjection(RelaxationCapability.SOUND) { builder ->
-                builder.linearRow(factor.op, factor.vars, LongArray(constants.coeffs.size) {
-                    Math.multiplyExact(2L, constants.coeffs[it].toLong())
-                }, Math.multiplyExact(2L, constants.bound))
+            else RelaxationProjection(RelaxationCapability.SOUND) { view, builder ->
+                val row = view as Linear
+                val values = checkNotNull(row.integerConstants)
+                builder.linearRow(row.op, row.vars, LongArray(values.coeffs.size) {
+                    Math.multiplyExact(2L, values.coeffs[it].toLong())
+                }, Math.multiplyExact(2L, values.bound))
             }
         },
     )

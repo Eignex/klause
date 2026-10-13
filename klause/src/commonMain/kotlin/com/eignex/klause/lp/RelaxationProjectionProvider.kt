@@ -15,14 +15,14 @@ class RelaxationProjection internal constructor(
     /** Declared relaxation authority; engine feature and resource gates still apply. */
     val capability: RelaxationCapability,
     internal val builtIn: Boolean,
-    private val emitter: (RelaxationBuilder, LinearLpProjection?) -> Unit,
+    private val emitter: (Factor, RelaxationBuilder, LinearLpProjection?) -> Unit,
 ) {
-    /** Custom emission is rebuilt against live domains and never implies retained-layout eligibility. */
-    constructor(capability: RelaxationCapability, emitter: (RelaxationBuilder) -> Unit) :
-        this(capability, false, { builder, _ -> emitter(builder) })
+    /** Emit from the supplied engine-view factor; custom rows never imply retained-layout eligibility. */
+    constructor(capability: RelaxationCapability, emitter: (Factor, RelaxationBuilder) -> Unit) :
+        this(capability, false, { factor, builder, _ -> emitter(factor, builder) })
 
-    internal fun emit(builder: RelaxationBuilder, linear: LinearLpProjection?) {
-        if (capability == RelaxationCapability.SOUND) emitter(builder, linear)
+    internal fun emit(factor: Factor, builder: RelaxationBuilder, linear: LinearLpProjection?) {
+        if (capability == RelaxationCapability.SOUND) emitter(factor, builder, linear)
     }
 }
 
@@ -37,6 +37,6 @@ object BuiltInRelaxationProjectionProvider : RelaxationProjectionProvider {
     override fun select(factor: Factor): RelaxationProjection? {
         val capability = factor.defaultExecutionCapabilities().relaxation
         if (capability == RelaxationCapability.NONE) return null
-        return RelaxationProjection(capability, true, factor::buildLpRelaxation)
+        return RelaxationProjection(capability, true) { view, builder, linear -> view.buildLpRelaxation(builder, linear) }
     }
 }

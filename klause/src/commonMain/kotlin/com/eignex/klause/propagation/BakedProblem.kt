@@ -57,6 +57,7 @@ class BakedProblem private constructor(
     internal val cancellation: Cancellation,
     settings: ProblemSettings,
     internal val projectionProviders: FactorProjectionProviders?,
+    private val projectionSelection: ((Problem) -> PreparedFactorProjections)?,
 ) : Problem(
     settings = settings,
     numBoolVars = numBoolVars,
@@ -78,7 +79,7 @@ class BakedProblem private constructor(
     realUpper = realUpper,
 ) {
     internal val factorProjections: PreparedFactorProjections? by lazy {
-        projectionProviders?.prepare(this)
+        projectionSelection?.invoke(this) ?: projectionProviders?.prepare(this)
     }
 
     /** Deductions established while constructing this propagation projection. */
@@ -144,6 +145,7 @@ class BakedProblem private constructor(
         alreadyFolded: Boolean = false,
         settings: ProblemSettings = ProblemSettings(),
         projectionProviders: FactorProjectionProviders? = null,
+        projectionSelection: ((Problem) -> PreparedFactorProjections)? = null,
     ) : this(
         settings = settings,
         numBoolVars = numBoolVars,
@@ -170,6 +172,7 @@ class BakedProblem private constructor(
         modelBounds = modelBounds,
         cancellation = cancellation,
         projectionProviders = projectionProviders,
+        projectionSelection = projectionSelection,
     )
 
     internal constructor(
