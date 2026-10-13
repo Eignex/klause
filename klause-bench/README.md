@@ -843,6 +843,38 @@ refutations. Approach paths, unbounded trajectories and exported proofs are expl
 unavailable from these records. JFR-instrumented elapsed times are diagnostics, not
 an uninstrumented performance comparison. Keep all generated records externally.
 
+### Objective CLI publication probe
+
+`com.eignex.klause.bench.profile.ObjectiveFrontendProbe` runs the installed CLI
+on a directory's original source manifest. Pass `source=<directory>`, optional
+`out=<directory>` and `checker=none|provision`. Manifest cases name source files,
+hashes, family/encoding identities and selected CLI engines. The probe retains
+original bytes, stdout/stderr/exit, launcher/runtime provenance and per-child JFR.
+Each child uses `-p 1`, seed17, native work200000, one LS move/ALNS iteration and
+a25-second process allowance. Its actual JFR JVM arguments must retain
+`ActiveProcessorCount=1`. Timings include process startup, solving and delivery;
+JFR collection affects them, so they are diagnostics rather than performance claims.
+
+The [objective-cli-v1 manifest](smoke-corpus/objective-cli-v1/manifest.json) fixes
+64 outcomes: mixed product and rational objectives across all5engines, plus
+algebraic, strict-limit, unbounded and infeasible controls through CP/FIXED.
+Each source objective has affine and zero-square representations in both directions.
+
+```sh
+deploy/lab profile com.eignex.klause.bench.profile.ObjectiveFrontendProbe <branch> \
+  "check original objective publication through the CLI" aws 1800 \
+  source=klause-bench/smoke-corpus/objective-cli-v1 checker=provision
+```
+
+[verify_objective_frontend.py](tools/verify_objective_frontend.py) checks the complete
+manifest matrix, original hashes, exact witnesses/costs, source bound direction,
+global inequalities and strictness. Its one-variable affine controls independently
+check source approach paths and witness-anchored improving rays. Heuristics retain
+BestFound status; MIXED may finish before a heuristic move. Actual engine proof
+export is not captured. Provisioning uses pinned source-check requirements in an
+output-local environment and retains checker/package/runtime identities before
+disposing that environment. Keep generated outputs and recordings externally.
+
 ### Component-split fixtures
 
 [scripts/lp-component-split](scripts/lp-component-split/) generates bounded dense
