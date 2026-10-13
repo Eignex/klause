@@ -287,3 +287,6 @@ with separately retained caller conditions and actual claims. The committed
 check their supported affine and quadratic subsets; runtime provenance and engine
 completion remain separate from mathematical verification. Missing retained inputs
 or checker reports cannot supply that acceptance.
+
+[Admission evidence](../evidence/source-scoped-derivations.md) records the supported
+source controls and the coverage they establish.
