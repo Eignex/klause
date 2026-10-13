@@ -39,8 +39,8 @@ internal class LinearAuthorityInvocation(
     private val context: SourceProofContext,
     private val params: TheoryParams,
     private val external: () -> Sample? = { null },
+    private val state: OpenTheorySolveState = OpenTheorySolveState(params),
 ) : AutoCloseable {
-    private val state = OpenTheorySolveState(params)
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
     private var currentStop = params.timeout or params.cancellation
@@ -61,7 +61,8 @@ internal class LinearAuthorityInvocation(
     val stats: SolveStats get() = SolveStats(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
-        smt = state.smt.snapshot(), openTheory = state.work.snapshot())
+        smt = state.smt.snapshot(), openTheory = state.work.snapshot(),
+        search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
         SourceLpBudget(onWork = state.smt::observeSourceLp), stop, ::paused, ::offer)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
@@ -173,6 +174,7 @@ internal class LinearAuthorityInvocation(
     override fun close() {
         if (closed) return
         closed = true
+        state.capture(session)
         session.popTo(0)
         callback = { _, _ -> }
     }

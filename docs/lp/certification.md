@@ -187,6 +187,16 @@ compatibility result remains `BestFound(Unsupported)` rather than an exhausted
 optimality signal. `OpenTheoryOptimum.linearResult` exposes the actual exact terminal,
 bound and incumbent separately; its scalar objective remains in minimized units.
 
+A numerical authority decline without a terminal retires that proof attempt and
+continues the existing exact feasibility/strict-improvement descent. Both phases
+share one `OpenTheorySolveState`, including work, checks, decisions and source-LP
+diagnostics. The current slice retains its original work ceiling and deadline.
+Fallback witnesses must satisfy the captured source scope and retain exact original
+objective values; an external incumbent can seed further improvements. Independently
+checked root bounds survive separately. Feasibility exhaustion after a declined
+authority attempt cannot issue a source terminal, and numerical admission limits
+are unchanged.
+
 Retained linear snapshots expose only previously checked root bounds and accepted
 incumbents. Closing a paused descent retains that partial carrier without running
 another theory check or manufacturing a terminal claim. Completed results remain

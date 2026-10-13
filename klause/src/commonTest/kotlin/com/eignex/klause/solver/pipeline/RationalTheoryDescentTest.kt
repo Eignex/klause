@@ -6,19 +6,23 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class RationalTheoryDescentTest {
     @Test
@@ -102,5 +106,105 @@ class RationalTheoryDescentTest {
         assertNotNull(partial.incumbent)
         val bound = assertIs<SourceClaim.Bound>(assertNotNull(partial.bound).claim)
         assertEquals(SourceValue.Rational(BigFraction.ZERO), bound.value)
+    }
+
+    @Test
+    fun `declined numerical authority retains a checked fallback witness without a terminal`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
+            realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        var candidate: MinimizeResult.WithSample? = null
+        val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8))
+
+        val result = descent.use {
+            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
+        }
+
+        val witness = assertNotNull(candidate)
+        assertEquals(BigFraction.ZERO, objective.evaluateExact(witness.sample))
+        assertIs<Verification.Accepted<*, *>>(openWitnessVerifier(source, objective).verify(
+            Candidate(witness.sample, witness.objective)))
+        assertIs<MinimizeResult.BestFound>(result)
+        val partial = assertNotNull(descent.linearResult)
+        assertEquals(BigFraction.ZERO, partial.value)
+        assertNull(partial.terminal)
+        assertTrue(partial.stats.openTheory.openTheoryChecks >= 2)
+    }
+
+    @Test
+    fun `declined numerical authority cannot renew containing work or checks`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
+            realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+
+        for (params in listOf(TheoryParams(openWorkLimit = 1), TheoryParams(openWorkLimit = 8, maxLeaves = 1))) {
+            val result = RationalTheoryDescent(source, objective, params).use {
+                it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
+            }
+
+            val unknown = assertIs<MinimizeResult.Unknown>(result)
+            assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
+            assertEquals(1L, unknown.stats.openTheory.openWork)
+            assertEquals(1L, unknown.stats.openTheory.openTheoryChecks)
+        }
+    }
+
+    @Test
+    fun `declined numerical authority cannot renew a retained slice`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
+            realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        var candidate: MinimizeResult.WithSample? = null
+        val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8))
+
+        descent.use {
+            val paused = it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { point -> candidate = point }
+            assertNull(paused)
+            assertNull(candidate)
+            assertEquals(1L, it.work)
+            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
+        }
+
+        assertNotNull(candidate)
+        assertNull(assertNotNull(descent.linearResult).terminal)
+    }
+
+    @Test
+    fun `declined numerical authority continues improving an external source witness`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
+            realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val external = Sample(booleanArrayOf(), longArrayOf(), exactReals = List(43) { BigFraction.ONE })
+        val values = ArrayList<BigFraction>()
+        val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8)) {
+            external to BigFraction.ONE
+        }
+
+        descent.use {
+            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point ->
+                values += objective.evaluateExact(point.sample)
+            }
+        }
+
+        assertEquals(BigFraction.ZERO, values.last())
+        assertEquals(BigFraction.ZERO, assertNotNull(descent.linearResult).value)
+        assertNull(descent.linearResult?.terminal)
+    }
+
+    @Test
+    fun `fallback publication failure retires the retained descent`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
+            realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8))
+
+        assertFailsWith<IllegalStateException> {
+            descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("publication failed") }
+        }
+
+        assertFailsWith<IllegalStateException> {
+            descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
+        }
+        descent.close()
     }
 }
