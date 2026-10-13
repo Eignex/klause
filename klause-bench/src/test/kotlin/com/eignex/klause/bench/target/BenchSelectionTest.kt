@@ -5,8 +5,11 @@ import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.corpus
+import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.CorpusSelection.Selection
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class BenchSelectionTest {
     private fun problem(suite: String, name: String, family: String? = null, default: Int? = null) = SelectedProblem(
@@ -68,5 +71,52 @@ class BenchSelectionTest {
             listOf(listOf("f/cop1", "f/cop2"), listOf("f/csp", "f/cop1", "f/cop2")),
             listOf(names(selected), read),
         )
+    }
+
+    @Test
+    fun `compiler exclusions leave room for valid siblings before family and overall caps`() {
+        val candidates = listOf(
+            problem("s", "f/broken", family = "f"),
+            problem("s", "f/valid", family = "f"),
+            problem("s", "g/valid", family = "g"),
+        )
+        val reached = mutableListOf<String>()
+
+        val capped = BenchSelection.capFamilies(candidates, perFamily = 1, seed = null, compatible = {
+            reached += it.ref.name
+            it.ref.name != "f/broken"
+        })
+        val selected = CorpusSelection.applySelectionBy(
+            capped,
+            Selection(maxInstances = 2),
+        ) { it.family }
+
+        assertEquals(listOf("f/valid", "g/valid"), names(selected))
+        assertEquals(listOf("f/broken", "f/valid", "g/valid"), reached)
+    }
+
+    @Test
+    fun `compiler infrastructure failures stop selection instead of consuming a cap`() {
+        val candidates = listOf(problem("s", "f/one"), problem("s", "f/two"))
+
+        assertFailsWith<IllegalStateException> {
+            BenchSelection.capFamilies(candidates, perFamily = 1, seed = 7, compatible = {
+                error("compiler unavailable")
+            })
+        }
+    }
+
+    @Test
+    fun `seeded compatibility selection fills caps deterministically`() {
+        val candidates = (1..8).map { problem("s", "f/$it") }
+        val selections = List(2) { _ ->
+            BenchSelection.capFamilies(candidates, perFamily = 3, seed = 7, compatible = { candidate ->
+                candidate.ref.name.substringAfter('/').toInt() % 2 == 0
+            })
+        }
+
+        assertEquals(names(selections[0]), names(selections[1]))
+        assertEquals(3, selections[0].size)
+        assertEquals(true, selections[0].all { it.ref.name.substringAfter('/').toInt() % 2 == 0 })
     }
 }

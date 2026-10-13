@@ -12,8 +12,8 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.theory.qflra.SourceBoundAtom
-import com.eignex.klause.theory.qflra.SourceBoundTerm
+import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
@@ -81,6 +81,33 @@ class LpSourcePremisesTest {
         val foreign = SearchSession(emptyList(), atoms = SearchAtomRegistry(3))
         foreign.push(guard)
         assertNull(names.explain(CutProvenance(root, 0, listOf(proof.facts[0])), foreign))
+    }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun `legacy predicates retain exact cut antecedents`() {
+        val root = Any()
+        val names = LpSourcePremises(root)
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
+        val atom = assertNotNull(
+            com.eignex.klause.theory.qflra.SourceBoundAtom.integerSplit(
+                session,
+                listOf(com.eignex.klause.theory.qflra.SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                BigFraction.ZERO,
+            ),
+        )
+        val decision = SearchDecision.Theory(atom.positive)
+        session.push(decision)
+        names.record(decision, session)
+        val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE))
+        val proof = CutProvenance(
+            root, 0,
+            listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ZERO), false)),
+        )
+
+        val explanation = assertNotNull(names.explain(proof, session))
+
+        assertEquals(setOf(atom.negative.literal), explanation.literals.toSet())
     }
 
     @Test

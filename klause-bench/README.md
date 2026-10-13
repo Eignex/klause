@@ -284,7 +284,8 @@ keep generated output outside the repository.
 
 [Suites.kt](src/main/kotlin/com/eignex/klause/bench/catalog/Suites.kt) declares
 vendored, generated, workspace and fetched inputs. Collection declarations own
-license and redistribution policy. Family sampling precedes resolution;
+license and redistribution policy. Legacy family sampling precedes resolution;
+compatibility selection checks compilation while filling family caps.
 `-Dklause.bench.shard=i/n` selects every nth chosen input before compilation-cache
 access. MiniZinc Challenge instances with data use `year/family/data` keys.
 Data-free instances use `year/family/model`, retaining the selected model's relative
@@ -292,6 +293,46 @@ path without `.mzn`; families retain `year/family`. Bare data-free family refere
 keys cannot identify that model or be reused for its instance key. Discovery excludes
 2026 families without `.dzn`/`.json` data and `2010/depot_placement`, whose legacy
 annotation does not compile, before caps.
+`mzn-bench-compatible-v1` is a separate installed-compiler compatibility selection.
+It discovers depot-placement sources as well, then compiles the original model/data
+with the installed MiniZinc compiler and Klause globals before filling family and
+suite caps. Type/syntax errors and array index-set mismatches exclude only the
+identity checked. Compilable siblings remain eligible. Compiler timeouts, missing
+files, crashes and unclassified errors stop selection; they cannot establish source
+incompatibility. Compilation uses seed 1 and never invokes a solver. Checks run only
+on candidates reached while filling a family cap, after source-kind filtering;
+seeded ordering remains deterministic. Compatibility preparation precedes sharding. Catalogue `suite` selection applies
+its admission policy before provider property/default caps as well. Raw identity
+lookup (`uncapped`, named sets and `solve-one`) bypasses admission and provider
+property caps for compatibility suites, retaining every original identity.
+
+`select` emits excluded identities as JSON lines on stderr with the reason,
+diagnostic, compiler exit, original model/data hashes and compiler/library identity.
+Selected JSON lines carry `selectionPolicy=minizinc-compile-compatibility-v1` and
+that identity. It includes the compiler version and binary hash, standard and
+Klause library tree hashes, solver configuration hash and compiler seed. Selection
+can change with any of these identities or source bytes; retain the actual selected
+and excluded records together. This is compiler admission, not solver or proof
+coverage. Fresh admission does not reuse compilation failures or prior compiler
+results. Successful FlatZinc caches bind the compiler/library identity.
+
+The original `mzn-bench` discovery and existing named sets retain their membership
+policy and reference namespaces. Named sets bypass compatibility filtering, including
+when they contain the versioned suite; `solve-one` still resolves every discoverable
+identity and records compilation failure separately under `sourceCompilerIncompatible`
+and `compilerExit`, preserving the legacy `loadError` diagnostic. Original source
+hashes and compiler identity accompany those failures. Use a new set name when
+freezing a compatibility selection; do not redraw an existing set or reinterpret
+its old solver records.
+
+The reusable remote `MiniZincCompatibilityProbe` accepts `names=<comma-separated
+identities>`, `repeats=N`, `per-family=N`, `max=N`, optional `families=<comma-separated families>`
+(up to 128 total identities), and `set=<frozen set>` through `lab profile`. It retains
+original source bytes, build/compiler provenance, fresh alternating-order compilation
+receipts, exclusion diagnostics and legacy/compatibility selections under both
+head and seeded caps. Its solver invocation count is zero; it measures compilation
+and selection cost separately from solver outcomes.
+
 Categories/formats, global/linear counts, Boolean-heavy structure and SMT logic
 or MPS LP/MIP markers feed classification and theme sets.
 
@@ -355,7 +396,8 @@ statistics and portfolio attribution. `solve-one` writes load failures too:
 `stats.unsupported` means declined input; `stats.loadError` means parsing/compilation
 failed. Source model/data hashes and `finalWitness` (up to 8 MiB) are captured
 outside subprocess timing. Missing captures remain absent; included MiniZinc
-files and compiler identity are outside original model/data hashes.
+files are outside original model/data hashes. `compilerIdentity` records the compiler
+and library identity for Klause MiniZinc solves and compilation failures.
 
 | Field/channel | Contract |
 |---|---|

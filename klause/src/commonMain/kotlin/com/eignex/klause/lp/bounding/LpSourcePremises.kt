@@ -14,9 +14,10 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
+import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundPredicate
+import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.theory.qflra.SourceBoundAtom
-import com.eignex.klause.theory.qflra.SourceBoundTerm
 import com.eignex.klause.util.BIG_ONE
 
 internal class LpSourcePremises(private val root: Any) {
@@ -32,7 +33,7 @@ internal class LpSourcePremises(private val root: Any) {
 
             is SearchDecision.Theory -> {
                 val registered = decision.decision as? RegisteredTheoryDecision ?: return
-                val atom = registered.payload as? SourceBoundAtom ?: return
+                val atom = (registered.payload as? SourceBoundPredicate)?.sourceBound ?: return
                 val terms = atom.terms.associate { term ->
                     val source = when (val key = term.source) {
                         is SearchIntValue -> CutSource(CutSourceKind.INTEGER, key.variable)

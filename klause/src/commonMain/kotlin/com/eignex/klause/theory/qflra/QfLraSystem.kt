@@ -29,6 +29,7 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
+import com.eignex.klause.solver.search.SourceBoundAtom
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {

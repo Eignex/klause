@@ -26,6 +26,8 @@ import com.eignex.klause.bench.metric.Xcsp3SourceValidation
 import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.MZN_COMPATIBILITY_POLICY
+import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.source.CorpusCache
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
@@ -36,6 +38,7 @@ import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import java.io.File
@@ -250,6 +253,10 @@ object BenchCli {
                 put("family", selected.family.substringAfter(':'))
                 put("format", selected.ref.format.name)
                 put("category", selected.ref.category.name)
+                if (selected.suite == "mzn-bench-compatible-v1" && f["set"] == null) {
+                    put("selectionPolicy", MZN_COMPATIBILITY_POLICY)
+                    put("compilerIdentity", Reports.json.encodeToJsonElement(MiniZincCompatibility.compiler))
+                }
                 if (features) {
                     InstanceClassifier.classify(selected.ref)?.let { feat ->
                         put("structure", feat.structure)
@@ -506,7 +513,7 @@ object BenchCli {
      *  sharing a family name do not share its cap. `kind=cop|csp` is checked only on the instances a cap
      *  reaches (via [ProblemKind]), so a capped selection fills its cap with the requested kind without reading
      *  every source of a large corpus. */
-    private fun selectProblems(f: Map<String, String>): List<SelectedProblem> {
+    internal fun selectProblems(f: Map<String, String>): List<SelectedProblem> {
         val suiteIds = f["suite"]?.split(",")?.map { it.trim() }?.flatMap { expandSuiteIds(it) }
             ?: Catalog.suites.map { it.id }
         var candidates = f["set"]?.let { sets ->
@@ -534,6 +541,9 @@ object BenchCli {
             candidates,
             perFamily = f["per-family"]?.toIntOrNull(),
             seed = f["seed"]?.toLongOrNull(),
+            compatible = { candidate ->
+                f["set"] != null || candidate.suite != "mzn-bench-compatible-v1" || compatible(candidate)
+            },
             accept = { wantCop == null || ProblemKind.isCop(it) == wantCop },
         )
         // Families are already capped; what is left is the round-robin interleave and the overall `max`.
@@ -552,6 +562,9 @@ object BenchCli {
         require(n > 0 && idx in 0 until n) { "klause.bench.shard must be i/n with 0 <= i < n, got $shard" }
         return selected.filterIndexed { i, _ -> i % n == idx }
     }
+
+    private fun compatible(candidate: SelectedProblem): Boolean =
+        MiniZincCompatibility.admit(candidate.suite, candidate.ref)
 
     /** The problems of the named sets, restricted to [suites] when given. A set is selected whole: no suite's
      *  default per-family cap applies to it, only an explicit `per-family`. */

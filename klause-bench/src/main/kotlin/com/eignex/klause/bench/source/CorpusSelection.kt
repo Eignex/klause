@@ -75,11 +75,13 @@ internal object CorpusSelection {
          *  [MznChallenge] layout. Names and family keys are year-prefixed (`2013/cargo`) since the
          *  same problem name recurs across years (`black-hole` in both 2013 and 2025) and a bare
          *  name would silently merge two different problems into one family. */
-        data object MznChallengeAllYears : Layout {
+        data class MznChallengeAllYears(val legacyExclusions: Boolean = true) : Layout {
             override fun discover(root: File): List<Discovered> {
                 val years = root.listFiles { f -> f.isDirectory && f.name.toIntOrNull() != null }
                     ?.sortedBy { it.name } ?: return emptyList()
-                return interleave(years.map { discoverFamilyDirs(root, it, prefix = it.name) })
+                return interleave(
+                    years.map { discoverFamilyDirs(root, it, prefix = it.name, legacyExclusions = legacyExclusions) },
+                )
             }
         }
 
@@ -173,12 +175,25 @@ internal object CorpusSelection {
 
     /** Generic family-aware selection over any item type, keyed by [family]. Reused for
      *  catalog [com.eignex.klause.bench.catalog.ProblemRef] selection in the ad-hoc CLI. */
-    fun <T> applySelectionBy(all: List<T>, sel: Selection, family: (T) -> String): List<T> {
+    fun <T> applySelectionBy(all: List<T>, sel: Selection, family: (T) -> String): List<T> =
+        applyAdmittedSelectionBy(all, sel, family) { true }
+
+    fun <T> applyAdmittedSelectionBy(
+        all: List<T>,
+        sel: Selection,
+        family: (T) -> String,
+        admit: (T) -> Boolean,
+    ): List<T> {
         val byFamily = LinkedHashMap<String, MutableList<T>>()
-        for (d in all) byFamily.getOrPut(family(d)) { mutableListOf() }.add(d)
-        val capped = byFamily.values.map { fam ->
-            val k = sel.perFamily ?: return@map fam.toList()
-            if (sel.sampleSeed != null) fam.shuffled(Random(sel.sampleSeed)).take(k) else fam.take(k)
+        for (item in all) byFamily.getOrPut(family(item)) { mutableListOf() }.add(item)
+        val capped = byFamily.values.map { members ->
+            val ordered = if (sel.perFamily != null && sel.sampleSeed != null) {
+                members.shuffled(Random(sel.sampleSeed))
+            } else {
+                members
+            }
+            val eligible = ordered.asSequence().filter(admit)
+            sel.perFamily?.let { eligible.take(it).toList() } ?: eligible.toList()
         }
         val interleaved = interleave(capped)
         return sel.maxInstances?.let { interleaved.take(it) } ?: interleaved
@@ -226,13 +241,18 @@ internal object CorpusSelection {
      *  [Layout.MznChallengeAllYears]) is prepended to the name/family key so same-named problems
      *  from different years don't collide. Shared by [Layout.MznChallenge] (one year, no prefix)
      *  and [Layout.MznChallengeAllYears] (every year, prefixed). */
-    private fun discoverFamilyDirs(root: File, base: File, prefix: String? = null): List<Discovered> {
+    private fun discoverFamilyDirs(
+        root: File,
+        base: File,
+        prefix: String? = null,
+        legacyExclusions: Boolean = true,
+    ): List<Discovered> {
         val families = base.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
             ?.sortedBy { it.name } ?: return emptyList()
         val out = ArrayList<Discovered>()
         for (pd in families) {
             // The model uses an is_output annotation undefined in MiniZinc.
-            if (pd.relativeTo(root).path == "2010/depot_placement") continue
+            if (legacyExclusions && pd.relativeTo(root).path == "2010/depot_placement") continue
             val candidates = pd.listFiles { f -> f.isFile && f.extension == "mzn" }?.toList()
                 ?: pd.walkTopDown().maxDepth(3).filter { it.isFile && it.extension == "mzn" }.toList()
             if (candidates.isEmpty()) continue

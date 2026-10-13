@@ -20,6 +20,7 @@ internal object BenchSelection {
         candidates: List<SelectedProblem>,
         perFamily: Int?,
         seed: Long?,
+        compatible: (SelectedProblem) -> Boolean = { true },
         accept: (ProblemRef) -> Boolean = { true },
     ): List<SelectedProblem> {
         val families = LinkedHashMap<String, MutableList<SelectedProblem>>()
@@ -27,7 +28,7 @@ internal object BenchSelection {
         return families.values.flatMap { family ->
             val cap = perFamily ?: family.first().defaultPerFamily
             val ordered = if (cap != null && seed != null) family.shuffled(Random(seed)) else family
-            val accepted = ordered.asSequence().filter { accept(it.ref) }
+            val accepted = ordered.asSequence().filter { accept(it.ref) && compatible(it) }
             if (cap == null) accepted.toList() else accepted.take(cap).toList()
         }
     }

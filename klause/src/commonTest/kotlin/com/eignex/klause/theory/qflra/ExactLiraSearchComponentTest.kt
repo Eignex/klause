@@ -40,6 +40,8 @@ import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext

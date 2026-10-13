@@ -54,6 +54,10 @@ When a model also contains finite factors, each engine projection retains the pa
 it can enforce and completion checks the remaining source constraints.
 
 [Search](solver/search.md) owns decisions, levels, retraction and shared reasons.
+Its neutral `SourceBoundAtom` describes exact source-coordinate predicates without
+linear-theory or LP dependencies. Arithmetic adapters interpret the same normalized
+meaning; linear row conversion remains in the linear adapter. Shared Boolean naming
+alone supplies no agreement between independently chosen arithmetic witnesses.
 [Local search](solver/local-search.md#continuous-candidate-completion) owns candidate
 generation and requests completion before publication. [Portfolios](solver/portfolio.md)
 shares only accepted witnesses and justified deductions under the same source and

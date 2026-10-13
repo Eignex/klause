@@ -176,6 +176,7 @@ internal data class DynamicSuite(
     /** Instances kept per family when the caller sets no cap; null keeps the whole corpus. */
     val defaultPerFamily: Int? = null,
     val sourceLayout: ArchiveSourceLayout? = null,
+    val admit: ((ProblemRef) -> Boolean)? = null,
     val provider: (CorpusSelection.Selection) -> List<ProblemRef>,
 )
 
@@ -191,20 +192,37 @@ internal object Catalog {
     fun suite(id: String): Suite {
         suites.firstOrNull { it.id == id }?.let { return it }
         dynamicSuites.firstOrNull { it.id == id }?.let {
-            // The declared default is by construction the one the provider sees, so a suite over a
-            // large corpus cannot silently resolve uncapped and OOM the in-process ingest.
-            return Suite(it.id, it.description, it.provider(CorpusSelection.Selection.fromProps(it.defaultPerFamily)))
+            return selected(it, CorpusSelection.Selection.fromProps(it.defaultPerFamily))
         }
         error("no such suite: $id (have $suiteIds)")
     }
 
     /**
      * All problems of suite [id], without its default per-family cap. Explicit
-     * `-Dklause.bench.select.*` selection settings apply.
+     * `-Dklause.bench.select.*` selection settings apply to legacy providers. Suites
+     * with admission policies discover every original identity without admission or caps.
      */
     fun uncapped(id: String): Suite {
         val dynamic = dynamicSuites.firstOrNull { it.id == id } ?: return suite(id)
-        return Suite(dynamic.id, dynamic.description, dynamic.provider(CorpusSelection.Selection.fromProps()))
+        return if (dynamic.admit == null) {
+            Suite(dynamic.id, dynamic.description, dynamic.provider(CorpusSelection.Selection.fromProps()))
+        } else {
+            Suite(dynamic.id, dynamic.description, discovered(dynamic))
+        }
+    }
+
+    fun discovered(dynamic: DynamicSuite): List<ProblemRef> = dynamic.provider(CorpusSelection.Selection())
+
+    fun selected(dynamic: DynamicSuite, selection: CorpusSelection.Selection): Suite {
+        val admit = dynamic.admit
+        val problems = if (admit == null) {
+            dynamic.provider(selection)
+        } else {
+            CorpusSelection.applyAdmittedSelectionBy(
+                discovered(dynamic), selection, { it.family ?: it.name.substringBefore('/') }, admit,
+            )
+        }
+        return Suite(dynamic.id, dynamic.description, problems)
     }
 
     /** The per-family cap suite [id] applies when the caller sets none; null for a suite kept whole. */

@@ -40,7 +40,6 @@ import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.lp.sourceDoubleBoundedSplit
 import com.eignex.klause.lp.sourceEqualityRows
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.snapshotValues
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -60,8 +59,12 @@ import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchTheoryDecision
+import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundPredicate
+import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.solver.snapshotValues
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
@@ -482,7 +485,7 @@ class ExactLiraSearchComponent private constructor(
                             integer.upper,
                         ) ?: return ComponentResult.Indeterminate
                     } else {
-                        payload.payload as? SourceBoundAtom ?: return ComponentResult.Consistent
+                        (payload.payload as? SourceBoundPredicate)?.sourceBound ?: return ComponentResult.Consistent
                     }
                     if (context.atomLiteral(decision) == null) return ComponentResult.Indeterminate
                     if (system.sourceTerms(atom) == null) return ComponentResult.Indeterminate
@@ -1673,8 +1676,8 @@ private class DisjunctAtom(
     val fails: RegisteredTheoryDecision,
     val address: RowAddress,
 ) {
-    val row = holds.payload as? SourceBoundAtom
-    val complement = fails.payload as? SourceBoundAtom
+    val row = (holds.payload as? SourceBoundPredicate)?.sourceBound
+    val complement = (fails.payload as? SourceBoundPredicate)?.sourceBound
 }
 
 // The source branches search made. A decided disjunct restates a model row the size limits already count.

@@ -53,6 +53,21 @@ atoms must exist before first-UIP learning. Boolean atom names belong to one imm
 source root; changing root meaning requires a fresh session. Unnameable conflicts remain
 chronological and unexplained.
 
+[SourceBoundAtom](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SourceBoundAtom.kt)
+owns neutral exact source-coordinate bounds, terms and normalization limits. Integer
+splits prove an integral activity and retain arbitrary-precision adjacent thresholds;
+rational splits retain complementary strictness. Normalization copies, combines and
+orders source terms before registration. Unsupported source kinds, coefficient growth,
+term/bit limits and registry capacity decline without installing a partial pair.
+Retraction and restart preserve immutable atom meanings and Boolean names. Positive
+scalar multiples remain distinct. The linear adapter alone converts these predicates
+to LP rows and checks source ids against its source model. Retained linear queries
+and LP cut-premise naming consume the neutral predicates; legacy registered payloads
+resolve through the same canonical meaning. Deprecated linear-package
+constructors share canonical equality and names through `SourceBoundPredicate`; they
+retain compatibility payload access when they create the first registration. Neither
+an atom nor its registration establishes multi-component witness agreement.
+
 Exact affine optimization contexts use the same session and chronological frame
 stack. Their model-facing authority component records Boolean and integer coverage
 alongside checked source bounds or refutations. Resolving one optimized node prunes
