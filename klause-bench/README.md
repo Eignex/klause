@@ -822,7 +822,7 @@ from feasibility fallback; `--work=1` checks that the authority attempt cannot r
 the containing allowance. Neither control may publish a terminal proof after decline.
 
 [verify_source_results.py](tools/verify_source_results.py) checks `mps-core`,
-`smtlib-core`, `miplib3` and the SMT corpus suites `smtlib-qfidl`, `smtlib-qflia`,
+`smtlib-core`, `miplib3`, `miplib2003`, `miplib2017` and the SMT corpus suites `smtlib-qfidl`, `smtlib-qflia`,
 `smtlib-qflira`, `smtlib-qflra` and `smtlib-qfrdl` against original sources using exact arithmetic.
 Vendored inputs are retrieved at the recorded revision; original MIPLIB3 inputs
 are retrieved separately. All source hashes must match. `--source-root` instead

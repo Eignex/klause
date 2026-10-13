@@ -223,6 +223,28 @@ class ProofCheckTest(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError, 'source hash differs'):
                     proof_check.source(case, [], root)
 
+    def test_mps_corpus_sources_route_from_hash_named_original_bytes(self):
+        data = self.mps_source.encode('utf-8')
+        digest = hashlib.sha256(data).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / (digest + '.txt')).write_bytes(data)
+            for suite in sorted(proof_check.MPS_CORPUS_SUITES):
+                with self.subTest(suite=suite):
+                    case = self.case(suite=suite, arm='default', proven=False, objective='-1/10',
+                                     sourceHashes={'model': digest}, finalWitness='v x=1')
+
+                    result = proof_check.check([case], root)[0]['check']
+
+                    self.assertTrue(result['sourceHashVerified'])
+                    self.assertEqual(result['witness'], 'exact source feasible')
+                    self.assertEqual(result['objectiveCheck'], 'source point objective matches')
+
+    def test_mps_corpus_sources_require_an_original_source_root(self):
+        for suite in sorted(proof_check.MPS_CORPUS_SUITES):
+            with self.subTest(suite=suite), self.assertRaisesRegex(ValueError, '--source-root'):
+                proof_check.check([self.case(suite=suite)])
+
     def test_hash_named_corpus_source_bytes_must_match_the_record(self):
         data = b'(declare-const x Int) (assert (= x 1))'
         digest = hashlib.sha256(data).hexdigest()
