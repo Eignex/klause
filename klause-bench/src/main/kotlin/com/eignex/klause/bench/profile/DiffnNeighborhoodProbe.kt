@@ -81,8 +81,12 @@ object DiffnNeighborhoodProbe {
         for (v in state.rootDomains.indices) state.assignment.setInt(v, state.rootDomains[v].min)
         pins.forEachBool { v, value -> state.assignment.setBool(v, value) }
         pins.forEachInt { v, value -> state.assignment.setInt(v, value) }
-        loadValues(program, state, Json.parseToJsonElement(values.decodeToString()).jsonObject)
+        val valuesText = values.decodeToString()
+        val namedValues = Json.parseToJsonElement(valuesText).jsonObject
+        require(namedValues.toString() == valuesText) { "canonical JSON without duplicate fields required" }
+        val checkSupplied = loadValues(program, state, namedValues)
         execution.definitionalSweep?.sweep(state.assignment, state.rootDomains, state.problem.factors)
+        checkSupplied()
         state.invariants = execution.definitionalSweep?.network(state.problem.numIntVars, state.problem.numBoolVars)
         state.recompute()
         val initialObjective = state.assignment.intValue(objectiveVar)
@@ -140,7 +144,11 @@ object DiffnNeighborhoodProbe {
         println("initial cost=${state.cost}, proposals=${proposals.size}")
     }
 
-    private fun loadValues(program: FlatZincProgram, state: LocalSearchState, values: Map<String, JsonElement>) {
+    private fun loadValues(
+        program: FlatZincProgram,
+        state: LocalSearchState,
+        values: Map<String, JsonElement>,
+    ): () -> Unit {
         val assignedInts = mutableMapOf<Int, Long>()
         val assignedBools = mutableMapOf<Int, Boolean>()
         fun bindInt(v: Int, value: JsonElement) {
@@ -175,6 +183,10 @@ object DiffnNeighborhoodProbe {
                     }
                 }
             }
+        }
+        return {
+            for ((v, value) in assignedInts) require(state.assignment.intValue(v) == value) { "rewritten source input" }
+            for ((v, value) in assignedBools) require(state.assignment.boolValue(v) == value) { "rewritten source input" }
         }
     }
 
