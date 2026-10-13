@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.meta.coreguided.CoreGuidedSolver
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -53,7 +54,7 @@ internal class CoreGuidedWorkerConfig(
         }
         worker = PortfolioWorker.of(
             workerLabel, armId, CoreGuidedSolver(problem).session(), params, sourceObjective,
-        ).bindEvidence(identity).also {
+        ).bindEvidence(identity, provesResults = CoreGuidedSearch.scalarProofs(sourceObjective)).also {
             it.sharedPools = matched
             it.sharingMeter = meter
             it.sharing = if (matched?.bounds != null) setOf(Contribution.Floor) else emptySet()

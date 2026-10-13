@@ -282,6 +282,13 @@ internal class CoreGuidedSearch(
     }
 
     companion object {
+        fun scalarProofs(objective: LinearObjective): Boolean {
+            val magnitude = objective.boolWeightValues.fold(bigIntOf(objective.constant).abs()) { value, weight ->
+                value + bigIntOf(weight).abs()
+            }
+            return magnitude <= bigIntOf(9_007_199_254_740_992L)
+        }
+
         fun eligible(problem: BakedProblem, objective: LinearObjective): Boolean =
             problem.numRealVars == 0 && objective.boolWeightValues.size <= problem.numBoolVars &&
                 objective.intCoefficientValues.all { it == 0L } &&

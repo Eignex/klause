@@ -298,7 +298,12 @@ assumptions, preserving the accumulated bound and all residual terms.
 Published incumbents project away auxiliary selectors and pass the source fixpoint
 check. Optimality requires exact equality between the original objective and the
 accumulated lower bound. Shared scalar floors round downward; they do not replace
-the exact internal comparison. Cancellation publishes neither a partial encoding
+the exact internal comparison. The finite scalar terminal carrier cannot retain a
+wide exact bound separately from rounded point telemetry. Core workers with an
+objective range beyond exact binary64 integers therefore withhold source terminal
+proof certificates while retaining checked points and downward-rounded shared
+floors. Their direct retained handle still compares its exact objective and bound.
+Cancellation publishes neither a partial encoding
 nor an unfinished refutation. Core encoding checkpoints retain their cursor, and
 query propagation fractions and slice overspend carry across rounds. Containing
 decision quotas survive every query rebuild. These engine completions retain the
