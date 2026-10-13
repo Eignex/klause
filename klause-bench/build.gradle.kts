@@ -34,6 +34,15 @@ application {
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
 }
 
+// Ground witness validation uses the maintained checker bytes from the installed bench artifact.
+tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
+    from("tools") {
+        include("smt_witness_validation.py", "verify_nra_source_results.py",
+            "verify_source_results.py", "requirements-source-checks.txt")
+        into("smt-witness-validation")
+    }
+}
+
 // Choco installation includes its FlatZinc jar, globals library, wrapper and MiniZinc registration.
 val chocoVersion = "6.0.1"
 val chocoCacheDir = File(System.getProperty("user.home"), ".cache/klause-choco")

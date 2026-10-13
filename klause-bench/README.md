@@ -632,6 +632,44 @@ checking unknown; a feasible point receives no optimum credit without that check
 Errors are recorded per case and make the command exit unsuccessfully. The checker
 supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
 
+### Ground witness profile
+
+`com.eignex.klause.bench.profile.SmtWitnessValidation` evaluates retained complete
+named Int/Real/Bool polynomial SMT models against their original source bytes.
+Submit a trusted committed profile main through the configured lab client, with
+`machines: 1`, `parallel: 1` and an outer timeout of at least 1,200 seconds. The
+single `request64=<base64>` argument encodes canonical compact UTF-8 JSON. Serialize
+this shape compactly, without whitespace or duplicate keys, before base64 encoding:
+
+```json
+{
+  "schema": "smt-ground-witness-request-v1",
+  "cases": [{
+    "id": "input-0",
+    "source": {"bytes": N, "sha256": "<hash>", "base64": "<original bytes>"},
+    "model": {"bytes": M, "sha256": "<hash>", "base64": "<complete model bytes>"}
+  }]
+}
+```
+
+Replace `N` and `M` with integer byte counts. Requests allow at most 16 distinct
+case IDs, 32 KiB per source or model and 48 KiB for the complete encoded request.
+These bounds can exclude large original inputs; validation never drops coordinates
+or rewrites a source/model to fit. No catalog scan, solver call or reference search
+runs. The main retains the verbatim inputs and packaged checker identities under
+`$OUT/smt-witness-validation`, then provisions the SHA-256-pinned Z3 4.15.3.0
+Python wheel in a private Linux x86-64 runtime without global installation.
+
+Each ground child calls only the maintained `check_witness` function, with a
+30-second watchdog and 16 GiB address-space limit. The containing supervisor has
+a 1,100-second deadline; setup, raw streams, true process exits, stopped/overflow
+coverage and cleanup are retained. `summary.json` distinguishes accepted, rejected,
+unavailable and not-reached cases. A failed batch preserves its accepted prefix;
+missing, unsupported or interrupted models receive no accepted source claim.
+JFR is part of profile execution, so validation timing is not ordinary solve timing.
+Ground acceptance establishes only the supplied original-source model, not an UNSAT
+proof, optimization claim, reference latency or a current solver performance gap.
+
 ### Polynomial source witness verifier
 
 [verify_nra_source_results.py](tools/verify_nra_source_results.py) independently
