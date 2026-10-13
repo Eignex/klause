@@ -41,6 +41,7 @@ object SolveTiming {
     @Serializable
     internal data class Timings(val suite: String, val problem: String, val timeoutMs: Long, val runs: List<Run>)
 
+    /** Run the measurement [args] describe, writing into `$OUT` (`build/profile-out` when unset), and print a summary. */
     @JvmStatic
     fun main(args: Array<String>) {
         val out = System.getenv("OUT")?.let(::File) ?: File("build/profile-out")
@@ -87,7 +88,7 @@ object SolveTiming {
             } else {
                 // The objective is minimise-canonical; report it in the source's own sense.
                 val r = solver.minimize(objective, params)
-                val value = r.objectiveValue?.let { if (entry.maximize) -it else it }
+                val value = r.objectiveValue?.let { v -> if (entry.maximize) -v else v }
                 when (r) {
                     is MinimizeResult.Optimal -> Run(0, true, value, true)
                     is MinimizeResult.Infeasible -> Run(0, false, null, true)
