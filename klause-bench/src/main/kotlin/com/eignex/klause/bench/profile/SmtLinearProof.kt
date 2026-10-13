@@ -70,16 +70,17 @@ object SmtLinearProof {
             val maximize = compiled.sense == ObjectiveSense.MAXIMIZE
             val objective = requireNotNull(compiled.objective).toLinearObjective()
             val sense = if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
-            val capture = requireNotNull(compiled.model.sourceProofContext(SourceScope(
-                SourceRevision(sha(bytes), "klause-ir-exact-v1"), objective = SourceObjective("cost", sense)), objective))
+            val scope = SourceScope(SourceRevision(sha(bytes), "klause-ir-exact-v1"),
+                objective = SourceObjective("cost", sense))
+            val capture = requireNotNull(compiled.model.sourceProofContext(scope, objective))
             val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model, objective,
                 maximize = maximize), params, engine, cores) as OpenTheoryExecution.Optimize
             val witnessOnly = engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS
             val result = execution.result.linearResult
             require(witnessOnly || result != null) { "Complete route omitted typed linear authority" }
             if (witnessOnly) require(execution.result is OpenTheoryOptimum.Bounded)
-            require(result == null || result.scope.condition.bools.isEmpty() &&
-                result.scope.condition.lower.isEmpty() && result.scope.condition.upper.isEmpty())
+            require(result == null || (result.scope.condition.bools.isEmpty() &&
+                result.scope.condition.lower.isEmpty() && result.scope.condition.upper.isEmpty()))
             val terminal = result?.terminal
             require(!witnessOnly || terminal == null) { "Witness-only route published a terminal" }
             val claim = terminal?.claim
