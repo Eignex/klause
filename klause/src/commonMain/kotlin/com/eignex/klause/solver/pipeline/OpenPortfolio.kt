@@ -188,7 +188,9 @@ internal class OpenPortfolio(
         fun accept(point: AcceptedPortfolioIncumbent<OpenIncumbentValue>) {
             publication?.accepted(point.assignment, SourceValue.Rational(point.objective.source), point.version)
         }
-        fun run(invocation: PortfolioInvocation) = invocation.minimize(cancellation, null, incumbents, linear, ::accept)
+        fun run(invocation: PortfolioInvocation): MinimizeResult {
+            return invocation.minimize(cancellation, null, incumbents, linear, ::accept)
+        }
         val result = portfolio.use(::run)
         return linear?.fold(result) ?: optimumOf(result, incumbents)
     }
