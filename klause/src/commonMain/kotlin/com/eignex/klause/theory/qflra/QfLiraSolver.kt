@@ -210,6 +210,9 @@ class ExactLiraSearchComponent private constructor(
                 override fun observeContinuation(metrics: ExactContinuationMetrics) {
                     smtStats?.observeContinuation(metrics)
                 }
+                override fun observeContinuationRejection(key: String, count: Long) {
+                    smtStats?.observeContinuationRejection(key, count)
+                }
             },
         )
     }

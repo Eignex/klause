@@ -181,6 +181,19 @@ class CliStatsTest {
     }
 
     @Test
+    fun `paired continuation rejection details retain their own count`() {
+        val key = "VERIFY_CANDIDATE_FIRST_STRICT_LOGICAL_ENDPOINT_NO_STRICT_ATTEMPT_WORK"
+        val stats = SolveStats(smt = SmtStats(continuation = LpContinuationStats(
+            calls = 2L, declines = mapOf(key to 1L),
+        )))
+
+        val pairs = openTheoryStatPairs(stats, 1L).toMap()
+
+        assertEquals("2", pairs["smtContinuationCalls"])
+        assertEquals("1", pairs["smtContinuationDecline_$key"])
+    }
+
+    @Test
     fun `rational basis resource work is visible without a float solve`() {
         val stats = SolveStats(
             lp = LpStats(

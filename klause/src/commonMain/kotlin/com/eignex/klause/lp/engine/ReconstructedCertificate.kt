@@ -42,6 +42,13 @@ internal enum class ReconstructionDecline {
     CANDIDATE,
 }
 
+internal enum class LpPointRejection {
+    STRICT_COLUMN_ENDPOINT,
+    STRICT_LOGICAL_ENDPOINT,
+    COLUMN_BOUND,
+    LOGICAL_BOUND,
+}
+
 internal enum class ReconstructionPhase { INPUT, POINT, DUAL, RAY, SUPPORT, VIOLATION, VECTOR, SCHEDULE }
 
 internal data class ReconstructionMetrics(
@@ -69,6 +76,7 @@ internal class ReconstructedCertificate(
     val nonbasicStatusesMatch: Boolean,
     val complementary: Boolean,
     val metrics: ReconstructionMetrics,
+    val pointRejection: LpPointRejection? = null,
 )
 
 internal class ReconstructionOverflow : RuntimeException()
@@ -249,6 +257,9 @@ private class FixedReconstructionVerifier(
     private val a: ReconstructionAuthority,
     private val meter: ReconstructionMeter,
 ) {
+    var pointRejection: LpPointRejection? = null
+        private set
+
     private val ops = Frac128Ops()
 
     private fun checked(value: Frac128): Frac128 {
@@ -315,11 +326,17 @@ private class FixedReconstructionVerifier(
             val bounds = a.bounds[j]
             bounds.lower?.let {
                 val compare = compare(x[j], from(it.number.value))
-                if (compare < 0 || (compare == 0 && it.strict)) return null
+                if (compare < 0 || (compare == 0 && it.strict)) {
+                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+                    return null
+                }
             }
             bounds.upper?.let {
                 val compare = compare(x[j], from(it.number.value))
-                if (compare > 0 || (compare == 0 && it.strict)) return null
+                if (compare > 0 || (compare == 0 && it.strict)) {
+                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+                    return null
+                }
             }
             value = plus(value, times(from(a.costs[j]), x[j]))
         }
@@ -358,6 +375,9 @@ private class BigReconstructionVerifier(
     private val a: ReconstructionAuthority,
     private val meter: ReconstructionMeter,
 ) {
+    var pointRejection: LpPointRejection? = null
+        private set
+
     private fun from(value: BigFraction): BigFraction = meter.fraction(value)
     private fun big(value: BigFraction): BigFraction = meter.fraction(value)
     private fun plus(x: BigFraction, y: BigFraction): BigFraction = meter.fraction(x + y)
@@ -383,11 +403,17 @@ private class BigReconstructionVerifier(
             val bounds = a.bounds[j]
             bounds.lower?.let {
                 val compare = compare(x[j], from(it.number.value))
-                if (compare < 0 || (compare == 0 && it.strict)) return null
+                if (compare < 0 || (compare == 0 && it.strict)) {
+                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+                    return null
+                }
             }
             bounds.upper?.let {
                 val compare = compare(x[j], from(it.number.value))
-                if (compare > 0 || (compare == 0 && it.strict)) return null
+                if (compare > 0 || (compare == 0 && it.strict)) {
+                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+                    return null
+                }
             }
             value = plus(value, times(from(a.costs[j]), x[j]))
         }
@@ -422,7 +448,20 @@ private class BigReconstructionVerifier(
     }
 }
 
+private fun classifyPointRejection(column: Int, structuralColumns: Int, strictEndpoint: Boolean): LpPointRejection =
+    if (strictEndpoint) {
+        if (column < structuralColumns) {
+            LpPointRejection.STRICT_COLUMN_ENDPOINT
+        } else {
+            LpPointRejection.STRICT_LOGICAL_ENDPOINT
+        }
+    } else {
+        if (column < structuralColumns) LpPointRejection.COLUMN_BOUND else LpPointRejection.LOGICAL_BOUND
+    }
+
 private class ReconstructionRun(private val a: ReconstructionAuthority, private val meter: ReconstructionMeter) {
+    var pointRejection: LpPointRejection? = null
+        private set
     var point: ReconstructedPoint? = null
     var bound: CertifiedLpBound? = null
     var dual: ReconstructedDual? = null
@@ -435,10 +474,12 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
         meter.phase = ReconstructionPhase.POINT
         meter.pointChecks++
         val checked = try {
-            FixedReconstructionVerifier(a, meter).point(candidate)
+            val verifier = FixedReconstructionVerifier(a, meter)
+            verifier.point(candidate).also { pointRejection = verifier.pointRejection }
         } catch (_: ReconstructionOverflow) {
             meter.verificationRestarts++
-            BigReconstructionVerifier(a, meter).point(candidate)
+            val verifier = BigReconstructionVerifier(a, meter)
+            verifier.point(candidate).also { pointRejection = verifier.pointRejection }
         } ?: return
         val matches = statusesMatch(checked.coordinates, basis)
         meter.step()
@@ -701,6 +742,7 @@ private fun reconstructCandidates(
         run?.statusesMatch ?: false,
         run?.complementary ?: false,
         meter.snapshot(decline),
+        run?.pointRejection.takeIf { decline == ReconstructionDecline.CANDIDATE },
     )
 }
 
@@ -814,5 +856,6 @@ internal fun verifyRationalCertificate(
         run?.statusesMatch ?: false,
         run?.complementary ?: false,
         meter.snapshot(decline),
+        run?.pointRejection.takeIf { decline == ReconstructionDecline.CANDIDATE },
     )
 }
