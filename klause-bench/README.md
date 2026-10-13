@@ -330,7 +330,8 @@ under that workflow; do not retain a historical archive.
 including QF_NRA; Klause frontend support does not control reference selection.
 The executable resolved from `PATH` (or `-Dklause.bench.z3`) is hashed once per
 bench process. Its version/SHA-256, memory ceiling, single-thread options and
-`smt-reference-v2` policy form `referenceVersion` and the reference cache key.
+`smt-reference-v3` policy form `referenceVersion` and the reference cache key.
+Input paths use the explicit `-file:` option, preserving literal filenames containing `=`.
 `-model pp.decimal=false` requests exact rational and algebraic `root-obj` models.
 Input options may override printing; a decimal approximation is not algebraic
 witness evidence. Records retain original `sourceHashes`, stdout SHA-256,
