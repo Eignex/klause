@@ -71,7 +71,12 @@ checker. Numerical proofs remain owned by their engines; a point alone never cer
 recession direction.
 
 Completed-result issuance can retain the actual `SolveResult` or `MinimizeResult`
-and its immutable source invocation. That hook refuses foreign scopes and completion
+and its immutable source invocation. Runtime binding retains the existing prepared
+plan, actual original/execution model and objective references, direction and owned
+assumptions; explicit revision capture remains optional. It does not manufacture a
+source revision for an uncaptured operation. Execution cutoff values remain in native
+minimized units, separate from exact original-source claims. That hook refuses foreign
+scopes and completion
 kinds unsupported by the result. Worker model, objective and invocation bindings
 cannot change after materialization; repeated matching binding retains witness-only
 withholding. Mixed invocation derivations cannot issue a completed certificate.

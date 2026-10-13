@@ -10,6 +10,7 @@ import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.CompletedEngineResult
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -22,11 +23,24 @@ internal class PortfolioEvidence(
 ) {
     private var sourceScope: SourceScope? = null
     private var scopeCancellation: Cancellation = Cancellation.Never
+    private var invocation: EngineInvocation? = null
+
+    fun bindInvocation(
+        binding: EngineInvocation, cancellation: Cancellation = Cancellation.Never,
+    ): PortfolioEvidence = also {
+        require(model.matches(binding.model)) { "runtime invocation differs from the portfolio model" }
+        require(invocation?.matches(binding) != false) { "portfolio cannot change its runtime invocation" }
+        require(sourceScope == null || sourceScope == binding.scope) { "portfolio has another capture scope" }
+        invocation = binding
+        scopeCancellation = scopeCancellation or cancellation
+        binding.scope?.let { bindSourceScope(it, cancellation) }
+    }
 
     fun bindSourceScope(
         scope: SourceScope, cancellation: Cancellation = Cancellation.Never,
     ): PortfolioEvidence = also {
         require(sourceScope == null || sourceScope == scope) { "portfolio cannot change its source invocation" }
+        require(invocation == null || invocation?.scope == scope) { "portfolio has another runtime capture scope" }
         sourceScope = scope
         scopeCancellation = scopeCancellation or cancellation
     }
@@ -36,9 +50,11 @@ internal class PortfolioEvidence(
     fun witness(worker: PortfolioWorker, sample: Sample, value: Double?): Verification<Sample, Double?> {
         val identity = worker.evidenceModel ?: return Verification.Indeterminate("worker has no model identity")
         val candidate = Candidate(sample, value)
-        when (val condition = sourceScope?.condition?.checkWitness(sample, scopeCancellation)) {
-            is SourceEvidenceCheck.Rejected -> return Verification.Rejected(condition.reason)
-            is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(condition.reason)
+        val conditions = invocation?.checkWitness(sample, scopeCancellation)
+            ?: sourceScope?.condition?.checkWitness(sample, scopeCancellation)
+        when (val checked = conditions) {
+            is SourceEvidenceCheck.Rejected -> return Verification.Rejected(checked.reason)
+            is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
             SourceEvidenceCheck.Checked, null -> Unit
         }
         return when (val verdict = verifier.verify(ModelEvidence.Witness(identity, candidate))) {
@@ -63,7 +79,17 @@ internal class PortfolioEvidence(
         kind: EvidenceKind,
         completion: CompletedEngineResult,
     ): Verification<Unit, Unit> {
-        val expected = sourceScope ?: return Verification.Indeterminate("portfolio has no original-source scope")
+        val runtime = invocation
+        if (runtime != null) {
+            val produced = completion.invocation
+                ?: return Verification.Indeterminate("completion has no runtime invocation")
+            if (!runtime.matches(produced) || worker.evidenceInvocation?.matches(runtime) != true) {
+                return Verification.Rejected("completion belongs to another runtime invocation")
+            }
+        } else if (sourceScope == null) {
+            return Verification.Indeterminate("portfolio has no source or runtime invocation")
+        }
+        val expected = sourceScope
         if (completion.scope != expected || worker.evidenceScope != expected ||
             completion.evidence?.scope?.let { it != expected } == true
         ) return Verification.Rejected("completion belongs to a different original-source invocation")
@@ -72,9 +98,11 @@ internal class PortfolioEvidence(
             is CompletedEngineResult.Solve -> (completion.result as? SolveResult.Sat)?.assignment
             is CompletedEngineResult.Minimize -> completion.result.assignment
         }
-        val value = (completion as? CompletedEngineResult.Minimize)?.result?.objectiveValue
+        val minimized = completion as? CompletedEngineResult.Minimize
+        val pointValue = minimized?.result?.objectiveValue
+        val value = if (kind == EvidenceKind.Bound) minimized?.executionBound else pointValue
         if (sample != null) {
-            when (val checked = witness(worker, sample, value)) {
+            when (val checked = witness(worker, sample, pointValue)) {
                 is Verification.Rejected -> return checked
                 is Verification.Indeterminate -> return checked
                 is Verification.Accepted -> Unit
@@ -98,7 +126,7 @@ internal class PortfolioEvidence(
             )
             EvidenceKind.Witness -> error("a witness is checked separately")
         }
-        return when (val verdict = verifier.verify(evidence, sourceScope)) {
+        return when (val verdict = verifier.verify(evidence, sourceScope, invocation)) {
             is Verification.Accepted -> Verification.Accepted(Candidate(Unit, Unit))
             is Verification.Rejected -> verdict
             is Verification.Indeterminate -> verdict
