@@ -188,7 +188,9 @@ experiment rather than directly on the lab Mac, where a run competes with the la
 A measurement no experiment expresses, such as timing a component on captured inputs, runs as
 a profile job: `lab profile <main> <ref> <description> [aws|lab] [timeout-sec] [arg...]` runs
 the class `<main>` (directly in `com.eignex.klause.bench.profile`, committed at `<ref>`) once
-under JFR, on AWS by default, and keeps its output and whatever it writes to `$OUT` with the job.
+under JFR, on AWS by default, and keeps its output and whatever it writes to `$OUT` with the job; from AWS at most 1 GiB
+of `$OUT` comes back, smallest files first, with the rest listed in `$OUT/omitted.tsv` and lost, so
+write summaries rather than raw dumps.
 The lab runs no shell scripts: the code goes in a commit. Profile jobs are not for tests, lint or
 other gates; CI runs those. Every ref the lab builds must be `main` or a branch only trusted users
 pushed to, and an experiment may not set `suite`, `problem`, `out` or `solver-seed` itself.
