@@ -51,9 +51,14 @@ internal class SourceQuadraticResultCapture(
                 result.incumbent, result.bound?.let { bound(it, point?.sample) },
                 result.reason, result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.Unknown -> return QuadraticOptimizationResult.Unknown(
-                result.bound?.let { bound(it, point?.sample) }, result.reason, result.sense, result.stats,
-            )
+            is QuadraticOptimizationResult.Unknown -> {
+                check(result::class == QuadraticOptimizationResult.Unknown::class) {
+                    "quadratic unknown branch received ${result::class}"
+                }
+                return QuadraticOptimizationResult.Unknown(
+                    result.bound?.let { bound(it, point?.sample) }, result.reason, result.sense, result.stats,
+                )
+            }
         }
     }
 
