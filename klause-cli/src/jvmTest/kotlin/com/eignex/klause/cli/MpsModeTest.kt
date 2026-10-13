@@ -218,13 +218,14 @@ class MpsModeTest {
         val output = session.output(CommonOptions())
 
         val text = capture {
-            output.onExactSolution(rendered, BigFraction.ONE)
+            ArithmeticPublication(output).publish(rendered, SourceValue.Rational(BigFraction.ONE))
             output.onComplete(Verdict.BEST_FOUND)
         }
 
         assertTrue("o 1.0000000000000000001" in text.lines(), text)
         assertTrue("s SATISFIABLE" in text.lines(), text)
         assertFalse("s OPTIMUM FOUND" in text.lines(), text)
+        assertEquals(1, text.lines().count { it.startsWith("v ") })
     }
 
     @Test
@@ -247,7 +248,7 @@ class MpsModeTest {
         val output = session.output(CommonOptions())
 
         val text = capture {
-            output.onExactSolution(rendered, BigFraction.ONE)
+            ArithmeticPublication(output).publish(rendered, SourceValue.Rational(BigFraction.ONE))
             output.onComplete(Verdict.BEST_FOUND)
         }
 
