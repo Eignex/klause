@@ -1,7 +1,7 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -163,6 +163,8 @@ class PortfolioEvidenceTest {
         val model = ModelIdentity.of(Any())
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val absentInteger = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val absentReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val conditions = listOf(
             SourceCondition(bools = mapOf(0 to true)),
             SourceCondition(lower = mapOf(integer to BigFraction.ONE)),
@@ -170,8 +172,8 @@ class PortfolioEvidenceTest {
             SourceCondition(lower = mapOf(real to BigFraction.ONE)),
             SourceCondition(upper = mapOf(real to BigFraction.MINUS_ONE)),
             SourceCondition(bools = mapOf(1 to false)),
-            SourceCondition(lower = mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 1) to BigFraction.ZERO)),
-            SourceCondition(lower = mapOf(SourceCoordinate(SourceCoordinate.Kind.Real, 1) to BigFraction.ZERO)),
+            SourceCondition(lower = mapOf(absentInteger to BigFraction.ZERO)),
+            SourceCondition(lower = mapOf(absentReal to BigFraction.ZERO)),
         )
         val point = Sample(booleanArrayOf(false), longArrayOf(0), doubleArrayOf(0.0), listOf(BigFraction.ZERO))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
@@ -222,7 +224,8 @@ class PortfolioEvidenceTest {
         val scope = SourceScope(SourceRevision("original", "exact-affine"), SourceCondition(bools = mapOf(0 to true)))
         val point = Sample(booleanArrayOf(false), longArrayOf())
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
-        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope, Cancellation { true })
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting())
+            .bindSourceScope(scope, Cancellation { true })
 
         val checked = verifier.witness(worker, point, null)
 
