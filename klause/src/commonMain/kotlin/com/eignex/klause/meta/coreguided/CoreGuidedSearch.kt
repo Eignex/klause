@@ -121,6 +121,11 @@ internal class CoreGuidedSearch(
                 if (core != null) continue
                 publishLowerBound()
             }
+            if (token() || deadline.hasPassedNow()) return null
+            val incumbent = best
+            if (incumbent != null && bestValue == lowerBound) {
+                return finish(MinimizeResult.Optimal(incumbent, requireNotNull(bestValue).toDouble(), stats))
+            }
             if (allowance >= 0L && work - start >= allowance) return null
             val handle = query ?: try {
                 openQuery(token).also { query = it }

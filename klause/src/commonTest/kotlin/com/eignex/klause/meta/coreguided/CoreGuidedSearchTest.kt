@@ -20,6 +20,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.test.assertTrue
 
 class CoreGuidedSearchTest {
@@ -121,6 +122,36 @@ class CoreGuidedSearchTest {
         assertNull(paused)
         val optimal = assertIs<MinimizeResult.Optimal>(result)
         assertTrue(optimal.sample.boolValue(0))
+        assertEquals(objective.evaluateExact(optimal.sample), search.lowerBound)
+    }
+
+    @Test
+    fun `cancellation after a core bound retains the checked incumbent and residual weights`() {
+        val problem = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+        )).bake()
+        val objective = LinearObjective(longArrayOf(-6, -1, -1), constant = 8)
+        var cancelled = false
+        val incumbents = mutableListOf<Long>()
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams(
+            objectiveLowerBoundSink = { if (it == 1.0) cancelled = true },
+        ))
+
+        val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {
+            incumbents += objective.evaluateLong(it.sample)
+        }
+        val retainedBound = search.lowerBound
+        cancelled = false
+        val result = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {
+            incumbents += objective.evaluateLong(it.sample)
+        }
+
+        assertNull(paused)
+        assertEquals(BigFraction.ONE, retainedBound)
+        assertEquals(listOf(2L), incumbents)
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(2L, objective.evaluateLong(optimal.sample))
         assertEquals(objective.evaluateExact(optimal.sample), search.lowerBound)
     }
 
