@@ -206,6 +206,25 @@ internal class LiveQfLraSystem(
         return true
     }
 
+    fun impliedComparison(comparison: ExactComparison): SearchAtomPremise? {
+        if (comparison.op != LinearOp.LE && comparison.op != LinearOp.GE) return null
+        val key = preparedTerms[comparison.ordered]?.positive ?: return null
+        val slot = normalized[key] ?: return null
+        val term = slot.term
+        if (term.coefficients.isEmpty()) return null
+        val column = slot.column.takeIf { it >= 0 } ?: term.coefficients.keys.singleOrNull()
+            ?: definitions[term.coefficients] ?: return null
+        val sourceUpper = comparison.op == LinearOp.LE
+        val upper = if (term.scale.signum() < 0) !sourceUpper else sourceUpper
+        val active = lp.state?.activeSide(column, upper) ?: return null
+        val threshold = term.bound(comparison.bound)
+        val side = active.side
+        if ((side.premises?.size ?: 0L) > 64L) return null
+        val stronger = if (upper) side.number.value < threshold else side.number.value > threshold
+        if (!stronger && (side.number.value != threshold || (comparison.strict && !side.strict))) return null
+        return lp.activeBoundPremise(column, upper)?.let(term::premise)
+    }
+
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
         val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
         val fixed = rootFixedColumns(key.columns)

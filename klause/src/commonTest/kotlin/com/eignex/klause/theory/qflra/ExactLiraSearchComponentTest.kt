@@ -1448,6 +1448,93 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `active term bounds imply signed and scaled arithmetic guards`() {
+        for ((comparison, expected) in listOf(
+            Triple(2.0, LinearOp.GE, 2.0) to true,
+            Triple(-2.0, LinearOp.LE, -2.0) to true,
+            Triple(1.0, LinearOp.LE, 1.0) to false,
+        )) {
+            val (scale, relation, threshold) = comparison
+            val model = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(0),
+                numRealVars = 3,
+                realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+                factors = arrayOf(
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.GE, 2.0),
+                    ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        DoubleArray(3) { scale }, relation, threshold),
+                ),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertEquals(expected, session.boolValue(1))
+                val reason = assertNotNull(session.reasonFor(1))
+                assertContentEquals(intArrayOf(Lit.make(1, expected), Lit.make(0, false)), reason.literals)
+                assertIs<ComponentCheck.Indeterminate>(component.check(session))
+            }
+        }
+    }
+
+    @Test
+    fun `strict feedback requires an interior bound at an equal threshold`() {
+        for (strict in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 3,
+                intBounds = openBounds(0),
+                numRealVars = 3,
+                realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+                factors = arrayOf(
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.GE, 2.0, strict),
+                    ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                        doubleArrayOf(1.0, 1.0, 1.0), LinearOp.GE, 2.0, strict = true),
+                ),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                if (strict) assertEquals(true, session.boolValue(1)) else assertNull(session.boolValue(1))
+            }
+        }
+    }
+
+    @Test
+    fun `bound feedback retracts its support before a feasible sibling`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 3,
+            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0), LinearOp.GE, 2.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertEquals(true, session.boolValue(1))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertNull(session.boolValue(1))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+        }
+    }
+
+    @Test
     fun `undecided reified row is relaxed and retraction checks its decided complement`() {
         val session = SearchSession(listOf(ExactLiraSearchComponent(partialModel())))
 

@@ -27,6 +27,19 @@ those assertions through their decision scope, checks the residual system and
 contributes exact source coordinates at a complete check. Disequalities require
 an applicable direction and remain part of the source check.
 
+On the LP-backed route, an active exact term bound can imply an undecided reified
+arithmetic atom with the same normalized term. Signed scales reverse the bound
+side, and strict targets require an interior bound at an equal threshold. Source
+Boolean coefficients must be fixed and explained. The comparison's iff activator
+is the target; a source implication guard is not implied from its consequent.
+The current bound witness and fixed-column substitutions supply the reason.
+
+Feedback follows the ordinary eager LP check. Publication clears its candidate
+and repeats the shared fixpoint, so new activators and substitutions enter the
+next source assertion before a complete witness. Graph-first checking retains its
+separate behavior. Private source branches and custom certification policy decline
+this optional feedback.
+
 Linear completion also serves finite mixed models and local-search candidates.
 Boolean pins and source rows stay intact through completion. The shared search
 session owns traversal; [LP architecture](../lp/architecture.md) owns numerical
@@ -53,8 +66,14 @@ be presented as an attained optimum.
 
 Immutable row addresses, forms and Boolean dependencies are prepared once per
 component. Scoped assertions, graph potentials, LP bases and witness candidates
-remain invocation-owned. Retraction restores their premises and invalidates
-incompatible evidence. Open work and numerical limits retain their own currencies;
+remain invocation-owned. Feedback retains only an immutable-row cursor and cumulative
+work counter; it looks up active sides afresh and keeps no proof or Boolean state
+across checks. Each pass visits at most 64 rows, publishes at most 8 atoms and spends
+at most 4096 optional work units; its component lifetime spends at most 65536.
+Rows with more than 64 terms decline. Source visits, comparison lookup, bounded
+premise expansion and publication are prepaid to the containing operation meter.
+Retraction restores their premises and invalidates incompatible evidence. Open
+work and numerical limits retain their own currencies;
 a stopped source check withholds the witness or proof.
 
 ## Implementation

@@ -175,6 +175,8 @@ class ExactLiraSearchComponent(
     private var candidate: List<BigFraction>? = null
     private var dirty = true
     private var sourceInstalled = false
+    private var boundFeedbackCursor = 0
+    private var boundFeedbackWork = 0L
     private var graphFirst = false
     private var solveContext = LpSolveContext.Production
     private var solveStop: Cancellation? = null
@@ -632,6 +634,76 @@ class ExactLiraSearchComponent(
         return ComponentResult.Conflict(explanation)
     }
 
+    private fun boundFeedback(context: SearchContext): ComponentResult? {
+        if (graphFirst || node.sourceBranches.isNotEmpty() ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy || preparedRows.isEmpty()
+        ) return null
+        var work = 0L
+        var implied = 0
+        fun pay(units: Long): Boolean {
+            if (units > 4096L - work || units > 65536L - boundFeedbackWork) return false
+            work += units
+            boundFeedbackWork += units
+            operationStop.charge(units)
+            return !operationStop()
+        }
+        fun stopped(): ComponentResult? = when {
+            operationStop() -> ComponentResult.Indeterminate
+            implied > 0 -> ComponentResult.Consistent
+            else -> null
+        }
+        repeat(minOf(64, preparedRows.size)) {
+            if (!pay(1L)) return stopped()
+            val index = boundFeedbackCursor
+            boundFeedbackCursor = if (index + 1 == preparedRows.size) 0 else index + 1
+            val prepared = preparedRows[index]
+            val row = prepared.row
+            val variable = row.activator
+            if (prepared.disjunction || variable == LinearRow.ALWAYS || bools[variable] != UNASSIGNED ||
+                context.boolValue(variable) != null || row.size > 64 ||
+                (row.relation != LinearOp.LE && row.relation != LinearOp.GE)
+            ) return@repeat
+            if (!pay(2L * row.size + prepared.booleans.size)) {
+                return stopped()
+            }
+            if (prepared.booleans.any { it != variable && bools[it] == UNASSIGNED } ||
+                (0 until row.size).any { term ->
+                    Term.isBool(row.ref(term)) && Lit.variable(Term.lit(row.ref(term))) == variable
+                }
+            ) return@repeat
+            for (truth in listOf(true, false)) {
+                // Lookup and source-premise conversion share the bounded expansion precharge.
+                if (!pay(256L)) return stopped()
+                val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
+                val support = system.impliedComparison(comparison) ?: continue
+                // Premise expansion declines without omitting unavailable or oversized references.
+                val literals = prepared.booleans.filter { it != variable }.map { boolean ->
+                    SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(boolean, bools[boolean] == TRUE)))
+                }
+                val literal = Lit.make(variable, truth)
+                val reason = context.explainAtoms(
+                    SearchAtomPremise.All(listOf(support) + literals), SearchDecision.Bool(literal), maxNodes = 64,
+                ) ?: continue
+                if (!pay(reason.literals.size.toLong())) return stopped()
+                if (reason.literals.any { antecedent ->
+                        antecedent != literal && context.boolValue(Lit.variable(antecedent))?.let {
+                            Lit.evaluate(antecedent, it)
+                        } != false
+                    }
+                ) continue
+                if (context.boolValue(variable) != null) break
+                val published = context.imply(literal, reason)
+                if (published !is ComponentResult.Consistent) return published
+                val accepted = accept(SearchDecision.Bool(literal), context)
+                if (accepted !is ComponentResult.Consistent) return accepted
+                implied++
+                break
+            }
+            if (implied == 8) return ComponentResult.Consistent
+        }
+        return if (implied == 0) null else ComponentResult.Consistent
+    }
+
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
@@ -695,6 +767,7 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
+        boundFeedback(context)?.let { return it }
         val complete = bools.none { it == UNASSIGNED } && node.selectsEveryDisjunction(model, disjunctionAtoms) &&
             node.nextDisequality(model, disjunctionAtoms, bools) == null
         if (complete) {

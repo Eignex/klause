@@ -66,6 +66,13 @@ its LP scope; deeper checks reuse it until retraction removes that scope. Root
 checks can substitute newly fixed columns. Disequalities re-evaluate their justified
 direction against active bounds, and complete witnesses still check source rows.
 
+LP-backed linear bound feedback publishes only an undecided arithmetic row's iff
+activator. Its active bound witnesses expand through the current atom registry,
+and every antecedent is revalidated before publication. The producer accepts its
+own Boolean consequence explicitly because delivery excludes it. The shared
+fixpoint then reasserts affected source comparisons; the previous LP candidate
+cannot supply a witness after that Boolean substitution.
+
 ## Finite propagation
 
 Fresh presolve rebuilds retain the originating cancellation token and accounting
@@ -243,6 +250,8 @@ deferred preparation. Search-time filtering retains STR2 explanations.
 LP explanations cite selected source bound witnesses and recursively expanded row,
 fixing and cutoff premises. Current CP propagation and source LP conflicts do not
 include an optional exact-theory row-propagation scanner or explanation weakening pass.
+Open linear bound feedback reads existing bound witnesses rather than tightening
+LP rows or weakening conflict explanations.
 See [LP consumer contracts](../lp/architecture.md#consumers-explanations-and-cuts).
 
 ## Learned-clause retention

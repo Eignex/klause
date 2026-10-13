@@ -30,6 +30,14 @@ retracts assertions with their decision scope. Exact reductions can preserve
 integer structure while shrinking the system. Reconstruction recovers original
 integer and real coordinates before acceptance.
 
+The shared [LP-backed bound feedback](linear-real.md#solving-and-composition)
+contract also applies to mixed linear rows. An existing active exact term bound
+can imply an undecided arithmetic row's iff activator with current source
+premises, including signed scales, strictness and fixed Boolean substitutions.
+Publication re-enters the shared fixpoint before witness acceptance; it supplies
+neither source integer integrality nor a complete mixed verdict. The same private
+branch, certification and containing-resource limits apply.
+
 Complete workers and open local search can share checked incumbents under the
 same source and objective. Candidate integer windows guide heuristic search; they
 do not bound the source model for a refutation. [Portfolios](../solver/portfolio.md)
