@@ -79,7 +79,7 @@ class CliModeTest {
             source.delete()
         }
 
-        assertEquals(listOf(BigFraction.ofLong(7), BigFraction.ofLong(20) / BigFraction.ofLong(3)), values)
+        assertEquals(listOf(BigFraction.ofLong(7), BigFraction.ofLong(20) * BigFraction.ofLong(3).reciprocal()), values)
         assertFalse(terminal)
     }
 
@@ -120,7 +120,7 @@ class CliModeTest {
         }
 
         assertFalse(terminal)
-        assertEquals(listOf(BigFraction.ofLong(22) / BigFraction.ofLong(3)), values)
+        assertEquals(listOf(BigFraction.ofLong(22) * BigFraction.ofLong(3).reciprocal()), values)
         assertEquals(Verdict.OPTIMAL, completed)
     }
 
