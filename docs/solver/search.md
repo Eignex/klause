@@ -81,7 +81,12 @@ a global optimum or limit; a checked source ray can finish existentially. A slic
 pause preserves the current node and pending alternatives. See
 [linear certification](../lp/certification.md#refinement-and-strict-inequalities).
 
-Complete assignments use source-keyed values from each owner. CP-learned Boolean clauses
+Complete assignments use typed source-keyed values from each owner. The open executor
+reads those coordinates through its source-bound assembler and retained reconstruction
+mapping, rather than decoding concrete components. All required checks finish before
+assembly. Missing, unmapped or multiply represented coordinates leave publication
+unavailable; decoding supplies neither agreement between peer fragments nor proof
+coverage. Published snapshots retain exact values after their producing components close. CP-learned Boolean clauses
 remain natively owned by CP while their shared consequences reach theory peers. The
 shared store does not duplicate the CP pin.
 

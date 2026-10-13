@@ -13451,6 +13451,20 @@ public final class com/eignex/klause/solver/search/SearchDecisionBudget$Unlimite
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/search/SearchExactAlgebraicRealValue : com/eignex/klause/solver/search/TypedSearchValueKey {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-P0Uu7zc ()I
+	public final fun copy-NWoOmUI (I)Lcom/eignex/klause/solver/search/SearchExactAlgebraicRealValue;
+	public static synthetic fun copy-NWoOmUI$default (Lcom/eignex/klause/solver/search/SearchExactAlgebraicRealValue;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchExactAlgebraicRealValue;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getValueType ()Lkotlin/reflect/KClass;
+	public final fun getVariable-P0Uu7zc ()I
+	public fun hashCode ()I
+	public fun snapshot (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/search/SearchExactIntValue : com/eignex/klause/solver/search/TypedSearchValueKey {
 	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-2srAOhM ()I
@@ -13462,6 +13476,20 @@ public final class com/eignex/klause/solver/search/SearchExactIntValue : com/eig
 	public fun hashCode ()I
 	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
 	public fun snapshot (Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchExactRealExpressionValue : com/eignex/klause/solver/search/TypedSearchValueKey {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-P0Uu7zc ()I
+	public final fun copy-NWoOmUI (I)Lcom/eignex/klause/solver/search/SearchExactRealExpressionValue;
+	public static synthetic fun copy-NWoOmUI$default (Lcom/eignex/klause/solver/search/SearchExactRealExpressionValue;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchExactRealExpressionValue;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getValueType ()Lkotlin/reflect/KClass;
+	public final fun getVariable-P0Uu7zc ()I
+	public fun hashCode ()I
+	public fun snapshot (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
 	public fun toString ()Ljava/lang/String;
 }
 

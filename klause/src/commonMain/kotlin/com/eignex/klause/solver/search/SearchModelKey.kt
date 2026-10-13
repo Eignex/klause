@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.search
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
@@ -45,6 +47,26 @@ data class SearchExactRealValue(
     val variable: SourceRealId,
 ) : TypedSearchValueKey<BigFraction> {
     override val valueType: KClass<BigFraction> get() = BigFraction::class
+}
+
+/** Authoritative owned algebraic value of a source continuous variable. */
+data class SearchExactAlgebraicRealValue(
+    /** Continuous location in the contributing source model. */
+    val variable: SourceRealId,
+) : TypedSearchValueKey<AlgebraicReal> {
+    override val valueType: KClass<AlgebraicReal> get() = AlgebraicReal::class
+}
+
+/**
+ * Authoritative algebraic or symbolic value of a source continuous variable.
+ * Contribute one of this key, [SearchExactAlgebraicRealValue] or [SearchExactRealValue]
+ * for one coordinate.
+ */
+data class SearchExactRealExpressionValue(
+    /** Continuous location in the contributing source model. */
+    val variable: SourceRealId,
+) : TypedSearchValueKey<ExactRealValue> {
+    override val valueType: KClass<ExactRealValue> get() = ExactRealValue::class
 }
 
 /** Contribute a value of the type associated with [key]; session assembly captures its ownership. */
