@@ -28,7 +28,9 @@ class QfNraSolverTest {
                 (check-sat)
             """.trimIndent())
 
-            val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, source.boolCount, source.realCount))
+            val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+                source.formula, source.boolCount, source.realCount,
+            ))
 
             assertEquals(0L, result.stats.projectedPolynomials)
             val x = result.assignment.realValue(0)
@@ -75,7 +77,7 @@ class QfNraSolverTest {
             (declare-const x Real)
             (declare-const y Real)
             (declare-const unused Real)
-            (assert (and (not (> x 3)) (or b (> x 1)) (>= y 4)))
+            (assert (and (not (> x 3)) (or b (> x 1)) (>= y 4) (<= (* x x) 9)))
             (check-sat)
         """.trimIndent())
         val condition = PolynomialCondition(bools = mapOf(0 to false),
@@ -99,7 +101,7 @@ class QfNraSolverTest {
         val source = SmtLibPolynomial.parse("""
             (declare-const b Bool)
             (declare-const x Real)
-            (assert (and (or b (> x 2)) (not b) (<= x 2)))
+            (assert (and (or b (> x 2)) (not b) (<= x 2) (>= (* x x) 0)))
             (check-sat)
         """.trimIndent())
 
@@ -131,6 +133,22 @@ class QfNraSolverTest {
         assertEquals(QfNraReason.Interrupted, unknown.reason)
         assertEquals(0L, unknown.stats.projectedPolynomials)
         assertEquals(spent, unknown.stats.workSpent)
+    }
+
+    @Test
+    fun `affine contradictions retain small complete refutation allowances`() {
+        for (boundary in listOf(0, 2)) {
+            val source = SmtLibPolynomial.parse("""
+                (declare-const unused Real)
+                (declare-const x Real)
+                (assert (and (<= x $boundary) (> x $boundary)))
+                (check-sat)
+            """.trimIndent())
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount, QfNraParams(maximumWork = 4096))
+
+            assertTrue(assertIs<QfNraResult.Unsatisfiable>(result).stats.projectedPolynomials > 0)
+        }
     }
 
     @Test

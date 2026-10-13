@@ -159,6 +159,7 @@ private fun probeWitness(
         arithmetic.step()
         it.relation == PolynomialRelation.EQ
     }
+    var nonlinear = false
     val axes = ArrayList<Triple<PolynomialAtom, List<Int>, Int>>()
     for (atom in formula.atoms) {
         arithmetic.step()
@@ -170,16 +171,23 @@ private fun probeWitness(
             if (term.coefficient.num.magnitudeBitLength() > MAX_WITNESS_BITS ||
                 term.coefficient.den.magnitudeBitLength() > MAX_WITNESS_BITS
             ) return null
+            if (inequalityGuides && !nonlinear) {
+                repeat(realCount + 1) { arithmetic.step() }
+                val variables = term.monomial.variables
+                nonlinear = variables.size > 1 || variables.any { term.monomial.exponent(it) > 1 }
+            }
         }
         terms += count
         repeat(count * (realCount + 1) + realCount + 1) { arithmetic.step() }
         if (atom.relation == PolynomialRelation.EQ ||
-            inequalityGuides && atom.relation != PolynomialRelation.NE
+            (inequalityGuides && atom.relation != PolynomialRelation.NE)
         ) {
             val variables = atom.polynomial.variables.filter { it !in fixed }
             axes.add(Triple(atom, variables, count))
         }
     }
+    // Affine relaxations leave their containing allowance for complete projection.
+    if (inequalityGuides && !nonlinear) axes.clear()
     var proposals = 0
     var attemptedAxes = 0
     fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? {
@@ -220,7 +228,9 @@ private fun probeWitness(
                             roots[cell / 2]
                         } else {
                             val root = cell / 2
-                            algebraic.rational(algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)))
+                            algebraic.rational(algebraic.sampleBetween(
+                                roots.getOrNull(root - 1), roots.getOrNull(root),
+                            ))
                         }
                         repeat(realCount + 1) { arithmetic.step() }
                         val proposed = LinkedHashMap(point)
