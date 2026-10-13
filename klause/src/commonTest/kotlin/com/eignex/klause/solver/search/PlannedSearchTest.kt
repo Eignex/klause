@@ -27,6 +27,50 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PlannedSearchTest {
+    @Test
+    fun `hybrid integer plans refute active disequalities before unrelated Booleans`() {
+        val open = Bits(3).also { it.set(2) }
+        val model = Problem(
+            numBoolVars = 12,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(1, 1, 0), open, open),
+            factors = arrayOf(
+                AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2),
+                Linear(intArrayOf(2), intArrayOf(2), LinearOp.GE, -1),
+                Linear(intArrayOf(2), intArrayOf(2), LinearOp.LE, 1),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.NE, 0),
+            ),
+        )
+        model.componentPlan().search(model, mapOf(0 to IntDomain(0, 1), 1 to IntDomain(0, 1))).use { planned ->
+            assertNotNull(planned.cp)
+            assertNotNull(planned.theory)
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+
+            assertIs<SearchResult.Exhausted>(planned.session.solve(12, SearchSolveParams(maxDecisions = 1)))
+        }
+    }
+
+    @Test
+    fun `early integer sides preserve finite peer model contributions`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, -1), longArrayOf(1, 1, 1), null, null),
+            factors = arrayOf(
+                AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.NE, 0),
+            ),
+        )
+        model.componentPlan().search(model, mapOf(0 to IntDomain(0, 1), 1 to IntDomain(0, 1))).use { planned ->
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            val sides = assertNotNull(planned.session.earlyBranchAlternatives())
+            assertIs<ComponentResult.Consistent>(planned.session.push(sides.first()))
+
+            val result = assertIs<SearchResult.Satisfied>(planned.session.solve(2))
+
+            val finite = assertNotNull(result.model.valueOf<Sample>(assertNotNull(planned.cp)))
+            assertEquals(setOf(0L, 1L), finite.ints.toSet())
+            assertTrue(assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(2)))) != bigIntOf(0))
+        }
+    }
 
     @Test
     fun `planned hybrid search builds CP and theory components without theory domains`() {

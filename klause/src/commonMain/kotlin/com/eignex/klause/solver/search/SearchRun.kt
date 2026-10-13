@@ -247,6 +247,11 @@ class SearchRun internal constructor(
     }
 
     private fun alternatives(): Alternatives {
+        if (booleanBranching is BooleanBranching.SourceOrder && decisions < params.maxDecisions &&
+            session.canCommitOpenTheoryDecision()
+        ) {
+            session.earlyBranchAlternatives()?.let { return Alternatives.Branch(it) }
+        }
         booleanBranching.alternatives(session)?.let { return Alternatives.Branch(it) }
         val decisions = session.branchAlternatives()
         return if (decisions == null) Alternatives.Leaf else Alternatives.Branch(decisions)
@@ -555,7 +560,7 @@ interface SearchRunObserver {
     data object None : SearchRunObserver
 }
 
-/** Supplies Boolean alternatives before component-owned residual splits. */
+/** Supplies Boolean alternatives; shared traversal owns their priority relative to theory splits. */
 fun interface BooleanBranching {
     /** Exhaustive alternatives for one unassigned Boolean, or null when Boolean branching is complete. */
     fun alternatives(context: SearchContext): List<SearchDecision>?

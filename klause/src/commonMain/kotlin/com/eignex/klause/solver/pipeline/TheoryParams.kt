@@ -53,8 +53,8 @@ data class TheoryParams(
     /**
      * Boolean branching for each feasibility traversal.
      *
-     * Only the Boolean skeleton is branched here, so this is the whole variable-order lever the open
-     * route has; the theory decides the arithmetic residual at a leaf either way.
+     * This selects Boolean variable order. Source-order integer plans can also propose bounded active
+     * disequality splits before the remaining Booleans; other selectors keep Boolean-first order.
      */
     val openBranching: OpenBranching = OpenBranching.SourceOrder,
     /**

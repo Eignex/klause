@@ -7,6 +7,71 @@ import kotlin.test.assertIs
 
 class SearchRunTest {
     @Test
+    fun `source order consults optional early splits while custom Boolean order keeps priority`() {
+        for (custom in listOf(false, true)) {
+            val session = SearchSession(emptyList())
+            session.useEarlyBrancher { context ->
+                if (context.boolValue(1) == null) {
+                    listOf(SearchDecision.Bool(Lit.make(1, false)), SearchDecision.Bool(Lit.make(1, true)))
+                } else {
+                    null
+                }
+            }
+            val committed = ArrayList<SearchDecision>()
+            val observer = object : SearchRunObserver {
+                override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                    committed += decision
+                }
+            }
+            val sourceOrder = BooleanBranching.SourceOrder(2)
+            val branching = if (custom) BooleanBranching(sourceOrder::alternatives) else sourceOrder
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<SearchResult.Satisfied>(session.solve(2, booleanBranching = branching, observer = observer))
+
+            assertEquals(SearchDecision.Bool(Lit.make(if (custom) 0 else 1, false)), committed.first())
+        }
+    }
+
+    @Test
+    fun `declined early splits preserve ordinary Boolean traversal`() {
+        val session = SearchSession(emptyList())
+        session.useEarlyBrancher { null }
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        val result = assertIs<SearchResult.Satisfied>(session.solve(2))
+
+        assertEquals(false, result.model.valueOf(SearchBoolValue(0)))
+        assertEquals(false, result.model.valueOf(SearchBoolValue(1)))
+    }
+
+    @Test
+    fun `an exhausted decision allowance skips optional early selection`() {
+        val session = SearchSession(emptyList())
+        session.useEarlyBrancher { error("no decision allowance") }
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<SearchResult.Indeterminate>(session.solve(1, SearchSolveParams(maxDecisions = 0)))
+    }
+
+    @Test
+    fun `activity and hinted Boolean selectors keep priority over optional early splits`() {
+        for (hinted in listOf(false, true)) {
+            val session = SearchSession(emptyList())
+            session.useEarlyBrancher { error("custom Boolean policy") }
+            val branching = if (hinted) BooleanBranching.SourceOrder(2) else HeuristicBooleanBranching(Vsids(), 2)
+            val hints = if (hinted) SearchCandidateHints { true } else SearchCandidateHints.None
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(2,
+                candidateHints = hints, booleanBranching = branching))
+
+            assertEquals(hinted, result.model.valueOf(SearchBoolValue(0)))
+            assertEquals(hinted, result.model.valueOf(SearchBoolValue(1)))
+        }
+    }
+
+    @Test
     fun `a learned backjump preserves nested conditions`() {
         val session = SearchSession(listOf(object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck =

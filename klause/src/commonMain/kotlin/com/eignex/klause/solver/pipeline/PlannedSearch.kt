@@ -15,6 +15,7 @@ import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
 
 /** Components and session built from a [ComponentPlan]. */
@@ -69,11 +70,10 @@ internal fun ComponentPlan.search(
     val theory = theoryComponent(spec, smtStats, theorySolveStop)
     if (theory != null) components += theory
     cp?.rebase()
-    return PlannedSearch(
-        SearchComponentSet(
-            components,
-        ).session(maxChecks, cancellation, learnedDb, SearchAtomRegistry(spec.numBoolVars)),
-        cp,
-        theory,
-    )
+    val session = SearchComponentSet(components)
+        .session(maxChecks, cancellation, learnedDb, SearchAtomRegistry(spec.numBoolVars))
+    if (spec.numRealVars == 0 && theoryPipeline == ProblemPipeline.EXACT_LIRA) {
+        (theory as? ExactLiraSearchComponent)?.let { session.useEarlyBrancher(it::nextEarlyBranch) }
+    }
+    return PlannedSearch(session, cp, theory)
 }

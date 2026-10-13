@@ -30,6 +30,16 @@ A fractional candidate causes complementary integer branches at exact floor and
 ceiling thresholds. Shared search owns decision levels, retraction and conflict
 learning; the arithmetic component owns row assertions and numerical checks.
 
+Under default source-order search, resolved necessary integer disequalities can
+split before all source Booleans are assigned. Equality guards fixed false and
+disequality guards fixed true are eligible only when every Boolean term is known
+and agrees with the shared trail. Disjunction rows, continuous terms, unsupported
+integer atoms and custom LP certification policies decline this optional path.
+After Boolean substitution, coefficients and the threshold must be integral;
+fractional raw coefficients can qualify only when their exact coalesced sum is integral.
+It uses the ordinary complementary integer atom registration and LP assertion
+premises. A partial relaxation or a selected side supplies no source verdict.
+
 [Open portfolios](../solver/portfolio.md) can pair the proof-producing route with
 source-checked local-search workers. Current strategy admission limits remain
 coverage gaps under the [vision](../vision.md#shared-model-breadth).
@@ -58,6 +68,16 @@ integer branches, reduction caches and LP state. Retraction removes scoped premi
 before evidence can be reused. [TheoryParams](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/TheoryParams.kt)
 separates theory checks, open work, decisions and cancellation. Native numerical
 work retains the [LP certification](../lp/certification.md) resource contract.
+
+The optional selector visits at most 128 prepared row addresses per request and
+65,536 per component lifetime, returning at most eight split proposals. Rows above 256
+terms decline. A rotating cursor and these quotas survive retraction and restart;
+they retain no comparison, assignment or LP result. Selection charges descriptor
+and term/dependency visits to the existing operation token.
+A proposed split consumes an existing theory check; committed alternatives use
+the ordinary traversal decision allowance. Cancellation or
+local expiry discards the proposal; exhausting an optional quota restores ordinary
+branching without renewing any containing allowance.
 
 ## Implementation
 

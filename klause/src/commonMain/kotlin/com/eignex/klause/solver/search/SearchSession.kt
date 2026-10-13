@@ -38,6 +38,7 @@ class SearchSession(
     private var checksExhausted = false
     private var decisionsExhausted = false
     private var openTheoryWork: OpenTheoryWorkSink? = null
+    private var earlyBrancher: ((SearchContext) -> List<SearchDecision>?)? = null
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.decisionLevel
@@ -535,6 +536,13 @@ class SearchSession(
         return AssembledSearchModel(values)
     }
 
+    internal fun useEarlyBrancher(brancher: (SearchContext) -> List<SearchDecision>?) {
+        check(earlyBrancher == null) { "early branching belongs to one search session" }
+        earlyBrancher = brancher
+    }
+
+    internal fun earlyBranchAlternatives(): List<SearchDecision>? = earlyBrancher?.invoke(this)
+
     /** First component-owned exhaustive split available at the current shared level. */
     internal fun branchAlternatives(): List<SearchDecision>? {
         singleComponent?.let { component ->
@@ -585,8 +593,9 @@ class SearchSession(
     /**
      * Drive Boolean and component-provided decisions through one shared search loop.
      *
-     * Boolean variables are selected first for compatibility with the existing SAT and theory
-     * fragments. Once they are assigned, a [SearchBrancher] may split its remaining local state.
+     * Boolean variables are selected first unless the planned session supplies an optional early
+     * split under source-order branching. Once they are assigned, a [SearchBrancher] may split its
+     * remaining local state.
      * A component with no branch is expected to decide its residual in [SearchComponent.check].
      *
      * [candidateHints] steer which side of a Boolean split is tried first and nothing else, so the

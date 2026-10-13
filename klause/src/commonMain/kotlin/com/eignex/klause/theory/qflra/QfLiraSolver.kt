@@ -145,6 +145,7 @@ class ExactLiraSearchComponent(
     AutoCloseable {
     private var smtStats: SmtStatsSink? = null
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
+    private var unassignedBooleans = model.numBoolVars
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
@@ -175,6 +176,9 @@ class ExactLiraSearchComponent(
     private var candidate: List<BigFraction>? = null
     private var dirty = true
     private var sourceInstalled = false
+    private var earlyRowCursor = 0
+    private var earlyRowsVisited = 0
+    private var earlySplits = 0
     private var graphFirst = false
     private var solveContext = LpSolveContext.Production
     private var solveStop: Cancellation? = null
@@ -302,6 +306,55 @@ class ExactLiraSearchComponent(
             endOperation(context)
         }
     }
+
+    internal fun nextEarlyBranch(context: SearchContext): List<SearchDecision>? {
+        if (this.context !== context || !sourceInstalled || model.numRealVars != 0 ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy || outcome != null ||
+            earlySplits >= 8 || earlyRowsVisited >= 65_536 || preparedRows.isEmpty() || unassignedBooleans == 0
+        ) return null
+        beginOperation()
+        val proposed = try {
+            earlyBranch(context)
+        } finally {
+            endOperation(context)
+        }
+        return proposed?.takeUnless { operationBudgetExhausted || context.cancelled() }
+    }
+
+    private fun earlyBranch(context: SearchContext): List<SearchDecision>? {
+        repeat(minOf(128, preparedRows.size)) {
+            if (earlyRowsVisited >= 65_536 || operationStop() || context.cancelled()) return null
+            val prepared = preparedRows[earlyRowCursor]
+            earlyRowCursor = (earlyRowCursor + 1) % preparedRows.size
+            earlyRowsVisited++
+            operationStop.charge(1)
+            if (prepared.disjunction || prepared.row.size > 256 ||
+                prepared.address in node.disequalityDirections
+            ) return@repeat
+            operationStop.charge(4L * prepared.row.size + prepared.booleans.size)
+            if (operationStop() || prepared.booleans.any { variable ->
+                    context.boolValue(variable)?.let { if (it) TRUE else FALSE } != bools[variable]
+                }
+            ) return@repeat
+            val truth = node.rowTruth(prepared.address, prepared.row, bools) ?: return@repeat
+            val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
+            if (comparison.op != LinearOp.NE || comparison.hasReals || comparison.terms.isEmpty() ||
+                !comparison.bound.isInteger() || comparison.terms.values.any { !it.isInteger() }
+            ) return@repeat
+            if (operationStop() || !context.consumeCheck()) return null
+            val split = disequalitySplit(comparison, context) ?: return null
+            // Registered alternatives already on the trail cannot advance this node.
+            if (split.any { decision ->
+                    context.atomLiteral(decision)?.let { context.boolValue(Lit.variable(it)) } != null
+                }
+            ) return@repeat
+            if (operationStop() || context.cancelled()) return null
+            earlySplits++
+            return split
+        }
+        return null
+    }
+
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) = lp.onRestart(context)
     override fun close() {
@@ -447,6 +500,7 @@ class ExactLiraSearchComponent(
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
+                if (bools[variable] == UNASSIGNED) unassignedBooleans--
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
                 node = node.copy(
@@ -723,21 +777,9 @@ class ExactLiraSearchComponent(
             val comparison = exactForms[address.factor][address.row].comparison(truth) {
                 bools[it] == TRUE
             }
-            val terms = comparison.terms.map { (column, coefficient) ->
-                val source = if (column < model.numRealVars) {
-                    SearchRealValue(column)
-                } else {
-                    SearchIntValue(column - model.numRealVars)
-                }
-                SourceBoundTerm(source, coefficient)
-            }
-            val split = if (comparison.hasReals) {
-                SourceBoundAtom.rationalSplit(context, terms, comparison.bound, strict = true)
-            } else {
-                SourceBoundAtom.integerSplit(context, terms, comparison.bound - BigFraction.ONE)
-            }
+            val split = disequalitySplit(comparison, context)
             if (split == null) outcome = ComponentCheck.Indeterminate
-            return split?.let { listOf(SearchDecision.Theory(it.negative), SearchDecision.Theory(it.positive)) }
+            return split
         }
         if (candidate == null) {
             outcome = ComponentCheck.Indeterminate
@@ -805,6 +847,23 @@ class ExactLiraSearchComponent(
         return null
     }
 
+    private fun disequalitySplit(comparison: ExactComparison, context: SearchContext): List<SearchDecision>? {
+        val terms = comparison.terms.map { (column, coefficient) ->
+            val source = if (column < model.numRealVars) {
+                SearchRealValue(column)
+            } else {
+                SearchIntValue(column - model.numRealVars)
+            }
+            SourceBoundTerm(source, coefficient)
+        }
+        val split = if (comparison.hasReals) {
+            SourceBoundAtom.rationalSplit(context, terms, comparison.bound, strict = true)
+        } else {
+            SourceBoundAtom.integerSplit(context, terms, comparison.bound - BigFraction.ONE)
+        }
+        return split?.let { listOf(SearchDecision.Theory(it.negative), SearchDecision.Theory(it.positive)) }
+    }
+
     private fun registeredSplit(
         reduced: ExactLiraReduction.Bounded,
         integer: Int,
@@ -861,6 +920,7 @@ class ExactLiraSearchComponent(
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
+                unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
             }

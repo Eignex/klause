@@ -66,6 +66,14 @@ its LP scope; deeper checks reuse it until retraction removes that scope. Root
 checks can substitute newly fixed columns. Disequalities re-evaluate their justified
 direction against active bounds, and complete witnesses still check source rows.
 
+Pure integer exact-linear plans register an internal optional branch callback with
+the session, including plans with a finite peer. Default source-order traversal
+can select an already resolved necessary disequality before unrelated Boolean
+choices. Other Boolean selectors retain their order. The callback supplies the
+same registered complementary source atoms as leaf branching; shared traversal
+still owns every decision, scoped assertion, retraction and learned conflict.
+Declining an optional split resumes ordinary Boolean and residual branching.
+
 ## Finite propagation
 
 Fresh presolve rebuilds retain the originating cancellation token and accounting
