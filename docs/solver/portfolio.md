@@ -57,7 +57,10 @@ recession direction.
 
 Completed-result issuance can retain the actual `SolveResult` or `MinimizeResult`
 and its immutable source invocation. That hook refuses foreign scopes and completion
-kinds unsupported by the result. Its derivation verifier separately checks the actual
+kinds unsupported by the result. Worker model, objective and invocation bindings
+cannot change after materialization; repeated matching binding retains witness-only
+withholding. Mixed invocation derivations cannot issue a completed certificate.
+Its derivation verifier separately checks the actual
 requested source claim; an engine completion without captured derivations stays
 unavailable for independent proof checking. The legacy kind-only issuance remains
 pending consumer migration. [Original-source evidence](evidence.md) defines exact
