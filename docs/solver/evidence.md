@@ -156,6 +156,13 @@ and publication folding are atomic, and a pool containing unscoped deductions ca
 acquire a different invocation. Uncaptured native deductions have explicitly
 unavailable independent derivation coverage.
 
+`PortfolioWorker.bindSharingInvocation` binds the containing pool query separately
+from the worker's actual runtime. A restricted worker cannot select the containing
+query or change it after binding. Bound and integer-window callbacks on a bound
+backtrack worker retain their actual native values and coordinates in typed
+publications, including origin and contribution bookkeeping. Unbound compatibility
+traffic retains its existing engine admission path until its consumer is bound.
+
 `CompletedEngineResult` retains an actual ordinary completed result and its source
 binding for the completion-taking worker issuance hook. `EngineInvocation` retains
 the existing prepared plan, its original source and objective/direction, the actual
