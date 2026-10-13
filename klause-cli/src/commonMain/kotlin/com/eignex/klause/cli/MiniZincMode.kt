@@ -7,11 +7,15 @@ import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.result.LinearOptimizationResult
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 
 /**
@@ -216,6 +220,29 @@ internal class MiniZincOutput(private val floatApproximation: Boolean = false) :
         print(rendered)
         flushCliOutput()
         return true
+    }
+
+    override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
+        rendered?.let { onSolution(it, null) }
+        if (result is QuadraticOptimizationResult.UnattainedLimit) {
+            unattainedLimit(SourceValue.Algebraic(result.bound.value), result.sense, result.bound.strict)
+        }
+    }
+
+    override fun onLinearResult(result: LinearOptimizationResult) {
+        val claim = result.terminal?.claim as? SourceClaim.Limit ?: return
+        val sense = result.scope.objective?.sense ?: return
+        unattainedLimit(claim.value, sense, strict = true)
+    }
+
+    private fun unattainedLimit(value: SourceValue, sense: ObjectiveSense, strict: Boolean) {
+        val minimize = sense == ObjectiveSense.MINIMIZE
+        val status = if (minimize) "unattained-infimum" else "unattained-supremum"
+        val direction = if (minimize) "lower" else "upper"
+        println("% optimizationStatus=$status")
+        println("% objectiveBoundDirection=$direction")
+        println("% objectiveBound=${arithmeticObjectiveText(value)}")
+        println("% objectiveBoundStrict=$strict")
     }
 
     override fun onComplete(verdict: Verdict) {
