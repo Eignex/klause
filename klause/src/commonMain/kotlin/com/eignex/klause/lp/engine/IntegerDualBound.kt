@@ -202,6 +202,9 @@ internal class IntegerCertificate(
     override fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean =
         gapNumerator(improvingMax, sourceConstant).isNonNegative()
 
+    override fun rationalFixingWork(col: Int, cutoff: BigFraction): Long =
+        if (ExactLpNumber.of(cutoff).exactLong() != null) 0L else super.rationalFixingWork(col, cutoff)
+
     override fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? {
         if (authority?.model?.column(col)?.integral == false) return null
         val integer = ExactLpNumber.of(cutoff).exactLong()

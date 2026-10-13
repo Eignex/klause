@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.PollStride
 import com.eignex.klause.util.magnitudeBitLength
 
 internal fun nodeDualCertificate(
@@ -92,18 +93,25 @@ internal class MixedDualBound(
         BigFraction.ofLong(improvingMax) - BigFraction.ofLong(sourceConstant) - bound
 }
 
-private class MixedCertificateMeter(cancellation: Cancellation) {
-    private val meter = LpProjectionMeter(250_000L, 16L * 1024L * 1024L, cancellation)
+private class MixedCertificateMeter(private val cancellation: Cancellation) {
+    private val meter = LpProjectionMeter(250_000L, 16L * 1024L * 1024L)
+    private val stride = PollStride()
+    private val meteredCancellation = cancellation.workMeter() != null
     val work: Long get() = meter.work
-    fun poll() = meter.poll()
-    fun step() = meter.reserve(1L, 0L, matrix = true)
-    fun reserve(bytes: Long) = meter.reserve(bytes / 8L + 1L, bytes, matrix = false)
+    fun poll() { if (cancellation()) throw LpProjectionStop() }
+    fun step() = charge(1L, 0L, matrix = true)
+    fun reserve(bytes: Long) = charge(bytes / 8L + 1L, bytes, matrix = false)
+
+    private fun charge(work: Long, bytes: Long, matrix: Boolean) {
+        if (meteredCancellation || stride.due(work)) poll()
+        meter.reserve(work, bytes, matrix)
+    }
 
     fun read(value: BigFraction): BigFraction {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         if (bits > 128) throw LpProjectionStop()
         val words = (bits.toLong() + 63L) / 64L
-        meter.reserve(1L + words * words, 64L + (bits.toLong() + 7L) / 4L, matrix = false)
+        charge(1L + words * words, 64L + (bits.toLong() + 7L) / 4L, matrix = false)
         return value
     }
 
