@@ -1,11 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -17,8 +21,13 @@ internal class RationalTheoryDescent(
     private val source: Problem,
     private val objective: LinearObjective,
     private val params: TheoryParams,
+    private val context: SourceProofContext? = source.linearAuthorityContext(
+        objective, ObjectiveSense.MINIMIZE, params.cancellation or params.timeout),
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
+    private val linear = context?.let { LinearAuthorityInvocation(it, params, external = { external()?.first }) }
+    var linearResult: LinearOptimizationResult? = null
+        private set
     private val state = OpenTheorySolveState(params)
     private var round: ResumableOpenTheory? = null
     private var incumbent: Sample? = null
@@ -27,9 +36,9 @@ internal class RationalTheoryDescent(
     private var result: MinimizeResult? = null
     private var closed = false
     override val isDone: Boolean get() = result != null
-    override val stats: SolveStats get() = nativeStats.copy(openTheory = state.work.snapshot(),
+    override val stats: SolveStats get() = linear?.stats ?: nativeStats.copy(openTheory = state.work.snapshot(),
         search = state.progress(null))
-    override val work: Long get() = state.work.spent
+    override val work: Long get() = linear?.work ?: state.work.spent
 
     override fun runSlice(
         global: Cancellation,
@@ -39,6 +48,32 @@ internal class RationalTheoryDescent(
     ): MinimizeResult? {
         result?.let { return it }
         check(!closed)
+        linear?.let { invocation ->
+            val sign = if (context?.scope?.objective?.sense == ObjectiveSense.MAXIMIZE) BigFraction.MINUS_ONE
+                else BigFraction.ONE
+            val completed = invocation.runSlice(global, sliceMillis, sliceNodes) { sample, exact ->
+                onIncumbent(MinimizeResult.BestFound(sample, (exact * sign).toDouble(),
+                    TerminationReason.BudgetExhausted, stats))
+            } ?: return null
+            val sourceContext = requireNotNull(context)
+            val authority = LinearOptimizationResult(sourceContext.scope, completed.terminal, completed.bound,
+                completed.incumbent, completed.value, completed.reason, completed.stats)
+            linearResult = authority
+            val sample = authority.incumbent
+            val exact = authority.value?.let { it * sign }
+            result = when (val claim = authority.terminal?.claim) {
+                is SourceClaim.Optimal -> MinimizeResult.Optimal(claim.sample, requireNotNull(exact).toDouble(),
+                    stats, authority.evidence)
+                SourceClaim.Refutation -> MinimizeResult.Infeasible(stats = stats, evidence = authority.evidence)
+                else -> {
+                    // Scalar worker completion cannot express a limit or a lattice ray.
+                    val reason = if (authority.terminal != null) TerminationReason.Unsupported else authority.reason
+                    sample?.let { MinimizeResult.BestFound(it, requireNotNull(exact).toDouble(), reason,
+                        stats, authority.evidence) } ?: MinimizeResult.Unknown(reason, stats, authority.evidence)
+                }
+            }
+            return result
+        }
         val deadline = if (sliceMillis == Long.MAX_VALUE) null
             else TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         val endWork = if (sliceNodes < 0) Long.MAX_VALUE else work + minOf(sliceNodes, Long.MAX_VALUE - work)
@@ -98,6 +133,7 @@ internal class RationalTheoryDescent(
     }
 
     override fun close() {
+        linear?.close()
         round?.let { pending -> nativeStats = pending.stats.copy(lp = nativeStats.lp.mergedWith(pending.stats.lp)) }
         round?.close()
         round = null

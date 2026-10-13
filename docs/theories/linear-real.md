@@ -40,13 +40,14 @@ Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
 Strict infeasibility requires a completed strict-feasibility check, not failure to
 find a positive margin within a budget.
 
-Open real objectives use exact strict-improvement theory rounds when the objective
-cutoff remains admitted. `RationalTheoryDescent` retains checked incumbents and can
-prove an attained optimum by refuting a strict improvement. It supplies neither
-a recession certificate nor an unattained-limit result; unbounded objectives and
-unattained infima can continue until interrupted. Finite/LP-backed optimization
-retains its separate admission and certificate checks. An unattained infimum cannot
-be presented as an attained optimum.
+Open real objectives with complete affine source capture use `RationalTheoryDescent`'s
+retained linear authority invocation. Shared Boolean traversal, exact source bounds,
+attained witnesses, strict approach paths and feasible improving rays determine its
+result. `OpenTheoryOptimum.linearResult` retains original-direction evidence and
+separates the incumbent value from an unattained limit. A limit is not an attained
+optimum. Unsupported source capture retains the theory's strict-improvement route;
+incomplete optimization withholds global claims and preserves checked incumbents.
+[LP certification](../lp/certification.md) defines the affine authority checks.
 [Input semantics](../formats.md) defines each frontend's exact or tolerance policy.
 
 ## State and resources
