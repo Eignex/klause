@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.solver.SolveResult
@@ -16,24 +16,32 @@ internal fun linearNeighborhoodInvocation(
     objective: LinearObjective?,
     adaptive: Boolean,
     cores: Int,
+    preparedSource: PreparedSourcePlan? = null,
 ): OpenTheoryExecution {
-    val identity = ModelIdentity.of(model, objective)
     val count = cores.coerceAtLeast(1)
-    val quota = if (count > 1) params.nodeBudget?.quotas(count) else null
-    val native = params.strategyQuotas(count, complete = false)
-    val prepared = model.prepareExecutionPlan(objective)
-    val workers = List(count) { index ->
-        val local = native[index].copy(nodeBudget = quota?.get(index) ?: params.nodeBudget)
-        val adapter = OpenExactNeighborhood(model, local, objective, prepared)
-        exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood", index, objective,
-            params.cancellation or params.timeout, timeout = params.timeout, exhausted = { adapter.exhausted },
-            open = { adapter.search(adaptive, params.randomSeed + index,
-                maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null) })
-            .bindEvidence(identity, provesResults = false)
-    }
-    val portfolio = Portfolio.thompson(workers, lanes = cores.coerceAtLeast(1))
-    portfolio.evidenceVerification = PortfolioEvidence(identity, openWitnessVerifier(model, objective))
+    val prepared = preparedSource ?: model.prepareExecutionPlan(objective)
+    val source = prepared.originalSource as? Problem ?: model
+    val identity = ModelIdentity.of(source, objective)
     val stop = params.cancellation or params.timeout
+    val factories = List(count) { index ->
+        PortfolioArmFactory(prepared, index, if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch) { slot ->
+            val local = params.copy(openWorkLimit = slot.nativeAllowance(params.openWorkLimit),
+                maxLeaves = slot.nativeAllowance(params.maxLeaves),
+                maxDecisions = slot.nativeAllowance(params.maxDecisions),
+                maxFlips = slot.heuristicAllowance(params.maxFlips),
+                maxInstructions = params.maxInstructions?.let(slot::heuristicAllowance),
+                nodeBudget = slot.nodeBudget)
+            val adapter = slot.own(OpenExactNeighborhood(source, local, objective, prepared))
+            exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood", index,
+                objective, stop, timeout = params.timeout, exhausted = { adapter.exhausted },
+                open = { adapter.search(adaptive, slot.seed,
+                    maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null) })
+                .bindEvidence(identity, provesResults = false)
+        }
+    }
+    val portfolio = PortfolioInvocation(prepared, factories,
+        PortfolioInvocationControls(parallelism = count, workerSeed = params.randomSeed, cancellation = stop,
+            nodeBudget = params.nodeBudget), PortfolioEvidence(identity, openWitnessVerifier(source, objective)))
     return portfolio.use {
         if (objective == null) {
             val result = it.solve(stop)

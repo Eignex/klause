@@ -15,6 +15,16 @@ fun OpenTheoryPipeline.optimize(
     params: PolynomialTheoryParams = PolynomialTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
     sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+): QuadraticOptimizationExecution = optimize(request, objective, params, engine, sense, 1)
+
+/** Optimize an affine source objective with explicit parallel lanes. */
+fun OpenTheoryPipeline.optimize(
+    request: PolynomialTheoryRequest,
+    objective: LinearObjective,
+    params: PolynomialTheoryParams,
+    engine: FiniteEngine,
+    sense: ObjectiveSense,
+    cores: Int,
 ): QuadraticOptimizationExecution = minimize(
-    request.affineOperation(objective, sense), objective.toQuadraticObjectiveSpec(), params, engine, sense,
+    request.affineOperation(objective, sense), objective.toQuadraticObjectiveSpec(), params, engine, sense, cores,
 )

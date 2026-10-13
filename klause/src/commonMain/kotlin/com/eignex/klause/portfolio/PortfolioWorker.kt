@@ -71,6 +71,7 @@ class PortfolioWorker private constructor(
         private set
     private var certificates: (EvidenceKind) -> EvidenceCertificate? = { null }
     private var provesSourceResults = true
+    internal val permitsSourceProofs: Boolean get() = provesSourceResults
     internal var evidenceScope: SourceScope? = null
         private set
 

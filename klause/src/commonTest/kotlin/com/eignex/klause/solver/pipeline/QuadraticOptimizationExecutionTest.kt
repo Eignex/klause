@@ -226,4 +226,39 @@ class QuadraticOptimizationExecutionTest {
         val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
         assertEquals(BigFraction.ONE, result.incumbent.value.rational)
     }
+    @Test
+    fun `parallel mixed execution preserves a strict unattained source limit`() {
+        val parsed = SmtLibPolynomial.parse("(declare-const x Real) (assert (> x 0))")
+        val source = PolynomialRealProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.sourceRealCount, parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames)
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+
+        val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, PolynomialTheoryParams(),
+            FiniteEngine.MIXED, ObjectiveSense.MINIMIZE, 4)
+
+        val limit = assertIs<QuadraticOptimizationResult.UnattainedLimit>(execution.result)
+        assertEquals(BigFraction.ZERO, limit.bound.value.rational)
+        assertTrue(limit.bound.strict)
+        assertTrue(AlgebraicArithmetic().sign(limit.incumbent.value) > 0)
+        assertEquals(4, limit.stats.portfolio.arms.size)
+    }
+
+    @Test
+    fun `parallel mixed maximization retains the original exact objective direction`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x, x)))
+
+        val execution = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective, PolynomialTheoryParams(),
+            FiniteEngine.MIXED, ObjectiveSense.MAXIMIZE, 4)
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
+        assertEquals(ObjectiveSense.MAXIMIZE, optimum.sense)
+        assertEquals(BigFraction.ZERO, optimum.incumbent.value.rational)
+        assertEquals(BigFraction.ZERO, optimum.bound.value.rational)
+        assertEquals(4, optimum.stats.portfolio.arms.size)
+    }
+
 }
