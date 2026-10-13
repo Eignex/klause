@@ -186,6 +186,15 @@ withholds this publication because it lacks the quadratic source checker. The na
 carrier has no independent derivation capture or invented revision; its producer and
 consumer migration remains separate from its typed transport contract.
 
+Projected polynomial witness checking fixes the original Boolean and exact real
+coordinates in the retained formula and leaves lowering auxiliaries existential.
+Rational coordinates use equalities; algebraic coordinates use their defining
+polynomial and open isolating interval, excluding a different conjugate root.
+The existing complete polynomial theory checks that extension under the caller's
+containing cancellation, work meter and representation limits. Approximate-only
+coordinates, interruption and incomplete checking remain unavailable. A feasible
+extension checks the source point; it supplies no global bound or proof export.
+
 `PortfolioWorker.bindSharingInvocation` binds the containing pool query separately
 from the worker's actual runtime. A restricted worker cannot select the containing
 query or change it after binding. Bound and integer-window callbacks on a bound
