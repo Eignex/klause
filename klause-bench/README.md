@@ -654,7 +654,8 @@ counters exclude native CP analysis; matching SAT reports are not source checks.
 `com.eignex.klause.bench.tools.ObjectiveRepresentationProbe` measures the public
 affine and exact quadratic entries on the same admitted polynomial real source.
 Pass `source=<SMT file or directory>` and optionally `engines=BACKTRACK,FIXED,LOCAL_SEARCH,ALNS,MIXED`,
-`work=200000`, `seed=17`, `moves=1`, `timeout=25000` and `out=<directory>`.
+`work=200000`, `seed=17`, `moves=1`, `timeout=25000`, `out=<directory>` and
+`checker=none|existing|provision` (default `none`).
 The source objective must be affine, with integer Boolean weights/constant fitting
 Long and real coefficients exactly representable in binary64. Other objectives
 decline rather than acquire rounded coefficients. Each execution gets fresh state,
@@ -668,7 +669,7 @@ Run the committed main through a lab profile job on a trusted pushed branch:
 ```sh
 deploy/lab profile com.eignex.klause.bench.tools.ObjectiveRepresentationProbe <branch> \
   "compare objective representations on original sources" aws 1800 \
-  source=klause-bench/smoke-corpus/objective-affine-v1
+  source=klause-bench/smoke-corpus/objective-affine-v1 checker=provision
 ```
 
 The [precision fixtures](smoke-corpus/objective-affine-v1/manifest.json) distinguish
@@ -680,6 +681,12 @@ requirements and [verify_objective_probe.py](tools/verify_objective_probe.py):
 python3 klause-bench/tools/verify_objective_probe.py /path/to/probe/out \
   --require-incumbent --output /path/to/source-checks.json
 ```
+
+`checker=existing` runs the independent verifier with the host's `python3`.
+`checker=provision` installs Linux `python3-venv` through sudo/apt and the pinned
+requirements into an output-local environment before running the same verifier.
+Dependency installation and verification are outside the execution timer; install
+logs, dependency versions and checker tool hashes accompany the checked records.
 
 The verifier requires both encodings for every selected engine and original source.
 It checks exact witnesses, costs, claimed global bounds, strict nonattainment and
