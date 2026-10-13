@@ -936,6 +936,10 @@ pigeonhole subformula can establish a refutation directly. Timeout leaves proof
 checking unknown; a feasible point receives no optimum credit without that check.
 Errors are recorded per case and make the command exit unsuccessfully. The checker
 supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
+Pass `checker=boolean` to the saved-record `SourceRecordCheck` AWS profile to run
+this checker against the same hash-pinned `cases`/`sources` bundle. Its retained
+source checks, runtime/package versions, checker hashes and process log distinguish
+verified witnesses/objectives, independently checked proofs and unknown proof queries.
 
 ### Exact function source controls
 
