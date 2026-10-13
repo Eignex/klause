@@ -368,7 +368,12 @@ accepted native result retains its optimum, strict limit or ray semantics. An ac
 observer receives the installed immutable assignment, its already evaluated exact
 value and a monotonic invocation version under the schedule lock. It runs only for
 strict verified exchange improvements; callback failures stop the invocation and
-remain primary through retained-handle cleanup.
+remain primary through retained-handle cleanup. Quadratic route-level observers carry
+`QuadraticIncumbentPublication` with the already evaluated original-direction value.
+Final optimum folding retains the exchange's accepted assignment, value object and
+version when it attains the verified bound; scalar telemetry does not drive publication.
+Single-worker native paths use the same exact publication payload and propagate output
+failure after cleanup. FIXED ignores additional lane requests.
 Heuristic completion cannot finish a source proof. Single-engine execution retains
 its own traversal semantics; FIXED runs one lane. Exact-neighborhood preparation
 contributes to scheduler instruction coverage once; retained slices keep that charge

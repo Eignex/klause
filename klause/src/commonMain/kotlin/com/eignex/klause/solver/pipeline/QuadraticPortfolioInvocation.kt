@@ -8,6 +8,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.portfolio.AcceptedPortfolioIncumbent
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
@@ -67,9 +68,11 @@ internal class QuadraticPortfolioInvocation(
         }, exactValue = { it.minimized }, arithmetic = evaluation, onResource = native::decline,
     )
     private var terminal: QuadraticOptimizationResult? = null
+    private var attainingIncumbent: QuadraticIncumbent? = null
     private var sharedBound: QuadraticObjectiveBound? = null
 
     fun execute(
+        onAccepted: ((AcceptedPortfolioIncumbent<QuadraticIncumbent>) -> Unit)? = null,
         create: (Int, PortfolioWorkerSlot, QuadraticNativeScope, () -> QuadraticIncumbent?) -> PortfolioWorker,
     ): QuadraticOptimizationResult {
         val admission = plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE)
@@ -120,8 +123,11 @@ internal class QuadraticPortfolioInvocation(
                 val checked = terminalLock.withLock { check(worker, completed) }
                     ?: return@PortfolioTerminalCheck null
                 PortfolioTerminalPublication(checked) { if (terminal == null) terminal = completed }
+            }, onAccepted = { accepted ->
+                onAccepted?.invoke(AcceptedPortfolioIncumbent(accepted.version, accepted.assignment,
+                    QuadraticIncumbent(accepted.assignment, accepted.objective.source)))
             }) }
-        terminal?.let { return it.withPortfolioStats(scalar.stats) }
+        terminal?.let { return it.withAcceptedValue().withPortfolioStats(scalar.stats) }
         val best = incumbents.exchange.current()?.let { QuadraticIncumbent(it.assignment, it.objective.source) }
         val reason = if (params.timeout()) TerminationReason.Timeout else if (params.cancellation()) {
             TerminationReason.Cancelled
@@ -130,9 +136,25 @@ internal class QuadraticPortfolioInvocation(
             else QuadraticOptimizationResult.BestFound(best, sharedBound, reason, sense, scalar.stats)
     }
 
+    private fun QuadraticOptimizationResult.withAcceptedValue(): QuadraticOptimizationResult {
+        val accepted = incumbents.exchange.current() ?: return this
+        fun retain(point: QuadraticIncumbent): QuadraticIncumbent =
+            if (point.sample === accepted.assignment) {
+                QuadraticIncumbent(point.sample, accepted.objective.source)
+            } else point
+        return when (this) {
+            is QuadraticOptimizationResult.Optimal -> copy(incumbent = attainingIncumbent ?: retain(incumbent))
+            is QuadraticOptimizationResult.UnattainedLimit -> copy(incumbent = retain(incumbent))
+            is QuadraticOptimizationResult.Unbounded -> copy(incumbent = retain(incumbent))
+            is QuadraticOptimizationResult.BestFound -> copy(incumbent = retain(incumbent))
+            is QuadraticOptimizationResult.Infeasible, is QuadraticOptimizationResult.Unknown -> this
+        }
+    }
+
     private fun check(
         worker: PortfolioWorker, result: QuadraticOptimizationResult,
     ): Verification<Unit, Unit>? = try {
+        attainingIncumbent = null
         when (result) {
             is QuadraticOptimizationResult.Optimal -> checkOptimum(worker, result)
             is QuadraticOptimizationResult.UnattainedLimit -> checkLimit(worker, result)
@@ -157,7 +179,15 @@ internal class QuadraticPortfolioInvocation(
         if (result.bound.strict ||
             terminalArithmetic.compare(result.incumbent.value, result.bound.value) != 0
         ) return Verification.Rejected("quadratic optimum does not attain its bound")
-        return bound(result.bound.value, false)
+        val checked = bound(result.bound.value, false)
+        if (checked is Verification.Accepted) {
+            incumbents.exchange.current()?.let { accepted ->
+                if (terminalArithmetic.compare(accepted.objective.source, result.bound.value) == 0) {
+                    attainingIncumbent = QuadraticIncumbent(accepted.assignment, accepted.objective.source)
+                }
+            }
+        }
+        return checked
     }
 
     private fun checkLimit(
