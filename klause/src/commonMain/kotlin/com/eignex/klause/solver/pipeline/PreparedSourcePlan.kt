@@ -23,6 +23,9 @@ enum class PreparedExecutionKind {
     /** Original open or wide integer polynomial coordinates remain theory-owned. */
     NONLINEAR_INTEGER,
 
+    /** Original exact real functions retain their sound incomplete source service. */
+    TRANSCENDENTAL,
+
     /** A required source component has no implemented execution adapter. */
     DECLINED,
 }
@@ -153,7 +156,7 @@ class PreparedSourcePlan internal constructor(
             linear.realCoefficientValues.size > sourceRealCount || linear.intCoefficientValues.size > sourceIntCount ||
             linear.boolWeightValues.size > sourceBoolCount
         ) return false
-        if (kind == PreparedExecutionKind.NONLINEAR_INTEGER) return false
+        if (kind == PreparedExecutionKind.NONLINEAR_INTEGER || kind == PreparedExecutionKind.TRANSCENDENTAL) return false
         return true
     }
 

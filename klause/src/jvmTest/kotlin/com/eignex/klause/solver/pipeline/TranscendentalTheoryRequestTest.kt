@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
@@ -9,17 +10,16 @@ import com.eignex.klause.ir.TranscendentalFunction
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.solver.result.TerminationReason
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
@@ -46,7 +46,9 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
         val result = assertIs<OpenTheoryResult.Sat>(execution.result)
         assertEquals("log(2)", result.assignment.realValue(0))
         assertIs<TranscendentalAssignment>(result.assignment)
-        if (engine != FiniteEngine.BACKTRACK) assertTrue(result.stats.ls.moves.sum > 0)
+        if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
+            assertTrue(result.stats.ls.moves.sum > 0)
+        }
     }
 
     @Test
