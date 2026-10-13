@@ -31,7 +31,9 @@ internal object TranscendentalSourceProbe {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("sources", "controls", "seeds", "repeats", "work", "timeout", "cancel-work") })
+        require(options.keys.all {
+            it in setOf("sources", "controls", "seeds", "repeats", "work", "timeout", "cancel-work")
+        })
         val sources = Json.parseToJsonElement(requireNotNull(options["sources"])).jsonArray
         val controls = (options["controls"] ?: "BACKTRACK:1,FIXED:4,LOCAL_SEARCH:1,ALNS:1,MIXED:1,MIXED:4").split(',')
         val seeds = (options["seeds"] ?: "1,7").split(',').map(String::toLong)
@@ -70,7 +72,8 @@ internal object TranscendentalSourceProbe {
                         }
                         val params = PolynomialTheoryParams(maximumWork = maximumWork,
                             timeout = Cancellation.after(timeout.milliseconds), cancellation = cancellation,
-                            strategy = PolynomialStrategyParams(backtrack = BacktrackParams(randomSeed = seed), localSearch = LocalSearchParams(
+                            strategy = PolynomialStrategyParams(
+                                backtrack = BacktrackParams(randomSeed = seed), localSearch = LocalSearchParams(
                                 randomSeed = seed, maxFlips = 16, maxInstructions = maximumWork), alnsIterations = 16))
                         val started = TimeSource.Monotonic.markNow()
                         val execution = problem.pipelineRequest().execute(params, engine, cores)
@@ -105,9 +108,13 @@ internal object TranscendentalSourceProbe {
                                 }) }
                             })
                             if (result is OpenTheoryResult.Sat) put("witness", buildJsonObject {
-                                problem.boolVarNames.forEach { (name, id) -> put(name, result.assignment.boolValue(id)) }
+                                problem.boolVarNames.forEach { (name, id) ->
+                                    put(name, result.assignment.boolValue(id))
+                                }
                                 problem.intVarNames.forEach { (name, id) -> put(name, result.assignment.intValue(id)) }
-                                problem.realVarNames.forEach { (name, id) -> put(name, result.assignment.realValue(id)) }
+                                problem.realVarNames.forEach { (name, id) ->
+                                    put(name, result.assignment.realValue(id))
+                                }
                             })
                         })
                     }

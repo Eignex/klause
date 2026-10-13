@@ -61,11 +61,13 @@ internal class TranscendentalPortfolioInvocation(
                     cancellation = scope.cancellation, nodeBudget = slot.nodeBudget,
                     strategy = strategyParams.copy(
                         assumptions = binding.assumptions,
-                        backtrack = strategyParams.backtrack.copy(randomSeed = slot.seed, assumptions = Assumptions.None,
+                        backtrack = strategyParams.backtrack.copy(
+                            randomSeed = slot.seed, assumptions = Assumptions.None,
                             maxDecisions = slot.nativeAllowance(strategyParams.backtrack.maxDecisions),
                             maxInstructions = strategyParams.backtrack.maxInstructions?.let(slot::nativeAllowance),
                             nodeBudget = slot.nodeBudget),
-                        localSearch = strategyParams.localSearch.copy(randomSeed = slot.seed, assumptions = Assumptions.None,
+                        localSearch = strategyParams.localSearch.copy(
+                            randomSeed = slot.seed, assumptions = Assumptions.None,
                             maxFlips = slot.heuristicAllowance(strategyParams.localSearch.maxFlips),
                             maxInstructions = strategyParams.localSearch.maxInstructions?.let(slot::heuristicAllowance),
                             nodeBudget = slot.nodeBudget),
@@ -75,8 +77,9 @@ internal class TranscendentalPortfolioInvocation(
                     1 -> FiniteEngine.LOCAL_SEARCH
                     else -> FiniteEngine.ALNS
                 }
-                slot.own(TranscendentalWorkerAdapter(request.problem, controls, selected, binding)).also { workers += it }
-                    .worker(arm)
+                val adapter = slot.own(TranscendentalWorkerAdapter(request.problem, controls, selected, binding))
+                workers += adapter
+                adapter.worker(arm)
             }
         }
         val budget = params.nodeBudget ?: params.strategy.backtrack.nodeBudget ?: params.strategy.localSearch.nodeBudget

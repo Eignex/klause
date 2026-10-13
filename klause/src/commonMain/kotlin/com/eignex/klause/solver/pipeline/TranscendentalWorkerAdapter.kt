@@ -52,7 +52,8 @@ internal class TranscendentalWorkerAdapter(
     private val external = params.timeout or params.cancellation
     private val nodeBudget = params.nodeBudget ?: params.strategy.backtrack.nodeBudget
         ?: params.strategy.localSearch.nodeBudget
-    private var nativeService: TranscendentalTheoryService? = TranscendentalTheoryService(source, external, params.maximumWork, params.maximumBits,
+    private var nativeService: TranscendentalTheoryService? = TranscendentalTheoryService(
+        source, external, params.maximumWork, params.maximumBits,
         PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells))
     private val service: TranscendentalTheoryService get() = checkNotNull(nativeService) {
         "transcendental worker is closed"
@@ -188,7 +189,9 @@ internal class TranscendentalWorkerAdapter(
             }
         }
         private fun terminationReason(): TerminationReason =
-            if (global() && !stop() && !params.strategy.backtrack.cancellation()) TerminationReason.Cancelled else reason()
+            if (global() && !stop() && !params.strategy.backtrack.cancellation()) {
+                TerminationReason.Cancelled
+            } else reason()
 
         private fun finish(value: SolveResult): SolveResult = value.also { result = it }
         override fun close() {
