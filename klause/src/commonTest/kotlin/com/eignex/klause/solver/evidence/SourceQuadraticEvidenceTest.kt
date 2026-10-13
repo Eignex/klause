@@ -126,4 +126,22 @@ class SourceQuadraticEvidenceTest {
         assertIs<SourceEvidenceCheck.Rejected>(captured.verifySourceEvidence(context))
     }
 
+    @Test
+    fun `a quadratic optimal constructor retains an explicitly supplied source payload`() {
+        val context = assertNotNull(model.quadraticSourceProofContext(scope, objective))
+        val zero = AlgebraicArithmetic().rational(BigFraction.ZERO)
+        val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(0)), zero)
+        val identity = ModelIdentity.of(model, objective)
+        val boundCertificate = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Bound)
+        val terminal = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Optimal)
+        val evidence = SourceResultEvidence(context.scope, emptyList())
+
+        val result: QuadraticOptimizationResult = QuadraticOptimizationResult.Optimal(point,
+            QuadraticObjectiveBound(zero, false, boundCertificate), terminal, ObjectiveSense.MINIMIZE,
+            SolveStats.EMPTY, evidence)
+
+        val completed = assertIs<QuadraticOptimizationResult.Optimal>(result, "direct constructor variant")
+        assertEquals(evidence, completed.evidence)
+    }
+
 }

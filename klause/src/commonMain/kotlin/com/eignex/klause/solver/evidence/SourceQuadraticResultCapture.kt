@@ -33,11 +33,7 @@ internal class SourceQuadraticResultCapture(
         }
         val evidence = claim?.let { payload(it, proof, point?.sample) }
         when (result) {
-            is QuadraticOptimizationResult.Optimal -> return QuadraticOptimizationResult.Optimal(
-                result.incumbent, bound(result.bound, point?.sample),
-                certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.Optimal),
-                result.sense, result.stats, evidence,
-            )
+            is QuadraticOptimizationResult.Optimal -> return optimal(result, checkNotNull(evidence))
             is QuadraticOptimizationResult.UnattainedLimit -> return QuadraticOptimizationResult.UnattainedLimit(
                 result.incumbent, bound(result.bound, point?.sample),
                 certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.UnattainedLimit),
@@ -59,6 +55,19 @@ internal class SourceQuadraticResultCapture(
                 result.bound?.let { bound(it, point?.sample) }, result.reason, result.sense, result.stats,
             )
         }
+    }
+
+    private fun optimal(
+        result: QuadraticOptimizationResult.Optimal, evidence: SourceResultEvidence,
+    ): QuadraticOptimizationResult.Optimal {
+        val captured = QuadraticOptimizationResult.Optimal(
+            result.incumbent, bound(result.bound, result.incumbent.sample),
+            certificate(result.certificate, evidence, QuadraticClaim.Optimal), result.sense, result.stats, evidence,
+        )
+        check(captured::class == QuadraticOptimizationResult.Optimal::class) {
+            "quadratic optimal constructor returned ${captured::class}"
+        }
+        return captured
     }
 
     private fun payload(claim: SourceClaim, proof: SourceDerivation, sample: Sample?): SourceResultEvidence {
