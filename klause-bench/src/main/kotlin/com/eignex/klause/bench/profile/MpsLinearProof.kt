@@ -1,4 +1,4 @@
-package com.eignex.klause.bench.tools
+package com.eignex.klause.bench.profile
 
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem

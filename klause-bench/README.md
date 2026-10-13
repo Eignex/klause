@@ -444,7 +444,7 @@ identity and the checked XCSP assignment when accepted, without solving again.
 
 ### Offline source verifier
 
-`com.eignex.klause.bench.tools.MpsLinearProof` accepts original MPS paths and captures the
+`com.eignex.klause.bench.profile.MpsLinearProof` accepts original MPS paths and captures the
 ordinary exact-source optimization result, original coordinate mapping, rows and derivation.
 It runs [verify_mps_linear_proof.py](tools/verify_mps_linear_proof.py) in a separate Python
 process using only standard-library exact fractions. The checker parses original unguarded
@@ -456,7 +456,7 @@ The self-authored inputs in `smoke-corpus/linear-authority` cover a constant obj
 a coupled integral/real ray and an objective coefficient beyond binary64 precision.
 
 ```sh
-lab profile com.eignex.klause.bench.tools.MpsLinearProof <ref> "check exact MPS claims" aws 900 \
+lab profile com.eignex.klause.bench.profile.MpsLinearProof <ref> "check exact MPS claims" aws 900 \
   klause-bench/smoke-corpus/linear-authority/constant.mps \
   klause-bench/smoke-corpus/linear-authority/recession.mps \
   klause-bench/smoke-corpus/linear-authority/decimal.mps
