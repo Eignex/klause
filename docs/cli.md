@@ -117,7 +117,10 @@ publication returns; output failure propagates to the caller. Linear and quadrat
 terminal metadata is delivered separately from the incumbent, preserving checked
 bounds and nonattainment status without repeating an emitted model. Linear limits
 retain their feasible incumbent separately from the unattained endpoint. MPS
-accepted objectives use original units and its exact decimal/fraction formatter. The adapter
+accepted objectives use original units and its exact decimal/fraction formatter.
+Its per-load source checker supplies the current exact source cost before duplicate
+handling; rejected checks supply no publishable value. Every streamed MPS witness
+records its exact-source or tolerance qualification. The adapter
 uses retained scalar metadata and performs no solver work or candidate admission.
 A frontend source-rendering veto emits nothing and does not advance publication
 state; it cannot suppress a later accepted rendering of the same payload.

@@ -173,6 +173,9 @@ internal object MpsMode : CliMode {
                 state.sourceExact && !state.witnessOnly,
                 { state.sourceWitnessAccepted },
                 { state.exactSourceWitness },
+                { _ ->
+                    if (state.sourceWitnessAccepted) state.latestSourceObjective?.let(SourceValue::Rational) else null
+                },
             )
         }
     }
@@ -253,6 +256,7 @@ internal class MpsOutput(
     private val proofExact: Boolean = sourceExact,
     private val sourceWitnessAccepted: () -> Boolean = { true },
     private val exactSourceWitness: () -> Boolean? = { null },
+    private val sourceArithmeticValue: ((SourceValue) -> SourceValue?)? = null,
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
@@ -274,6 +278,15 @@ internal class MpsOutput(
 
     override fun formatExactObjective(objective: BigFraction): String =
         exactMpsNumber(sourceObjective() ?: (objective * BigFraction.ofLong(objectiveScale).reciprocal()))
+
+    override fun arithmeticSourceValue(objective: SourceValue): SourceValue? =
+        if (sourceArithmeticValue == null) objective else sourceArithmeticValue.invoke(objective)
+
+    override fun arithmeticWitnessStatus(): String? = when (exactSourceWitness()) {
+        true -> "c exact original MPS source witness"
+        false -> "c MPS source tolerance witness"
+        null -> null
+    }
 
     override fun formatArithmeticObjective(objective: SourceValue): String = when (objective) {
         is SourceValue.Rational -> exactMpsNumber(objective.value)

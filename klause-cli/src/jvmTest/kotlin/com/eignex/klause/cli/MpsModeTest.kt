@@ -16,6 +16,23 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `MPS publication uses the checked current source value before duplicate handling`() {
+        var checked: BigFraction? = BigFraction.ONE * BigFraction.ofLong(2).reciprocal()
+        val output = MpsOutput(objectiveScale = 3L, sourceArithmeticValue = { checked?.let(SourceValue::Rational) })
+        val publication = ArithmeticPublication(output)
+
+        val text = capture {
+            publication.publish("v X=1/2", SourceValue.Rational(BigFraction.ofLong(3)))
+            publication.publish("v X=1/2", SourceValue.Rational(BigFraction.ofLong(99)))
+            checked = null
+            publication.publish("v X=1/2", SourceValue.Rational(BigFraction.ofLong(3)))
+        }
+
+        assertEquals("o 0.5\nv X=1/2\n", text)
+        assertEquals(1L, publication.solutions)
+    }
+
+    @Test
     fun `accepted MPS objectives retain original units and decimal formatting`() {
         val output = MpsOutput(objectiveScale = 3L, sourceObjective = { BigFraction.ofLong(99) })
 
