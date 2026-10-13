@@ -133,7 +133,9 @@ class LocalSearchState private constructor(
 
     // Clause degrees are binary, so their maintained break/make counts sum the exact raw delta.
     internal val repairChainClauseOnly: Boolean by lazy(LazyThreadSafetyMode.NONE) {
-        problem.factors.all { it is Clause }
+        (projection.selection == null ||
+            projection.selection.providers.scoring === BuiltInScoringProjectionProvider) &&
+            problem.factors.all { it is Clause }
     }
 
     /** The problem's invariants, aliased so the hot LS loops read `factors` directly. */

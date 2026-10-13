@@ -16,10 +16,10 @@ class PropagationProblem private constructor(
     val problem: Problem,
     preparedPropagators: Array<out Propagator>?,
     private val preparedIndexes: PropagationIndexes? = null,
-    private val selection: PreparedFactorProjections? = null,
+    internal val selection: PreparedFactorProjections? = null,
 ) {
     /** Construct a private propagation projection over [problem]. */
-    constructor(problem: Problem) : this(problem, null)
+    constructor(problem: Problem) : this(problem, null, null, (problem as? BakedProblem)?.factorProjections)
 
     /** Open private mechanisms selected for [problem] during preparation. */
     constructor(problem: Problem, selection: PreparedFactorProjections) : this(problem, null, null, selection) {
@@ -117,7 +117,7 @@ class PropagationProblem private constructor(
     internal companion object {
         fun preparation(
             problem: Problem,
-            selection: PreparedFactorProjections? = null,
+            selection: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
         ): Iterator<PropagationProblem?> = sequence {
             selection?.requireSource(problem)
             val preparation = FactorProjectionPreparation()

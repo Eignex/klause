@@ -15,6 +15,7 @@ import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.ResumableSearch
@@ -1264,9 +1265,12 @@ internal class LocalSearchEngine(
 internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = false): Boolean {
     val problem = model.problem
     if (problem.numRealVars != 0 && !completes) return false
-    if (problem.factors.any {
-            it.executionCapabilities().assignmentCheck == AssignmentCheckCapability.UNSUPPORTED &&
-                it.variables.reals.isNotEmpty()
+    val selection = (problem as? BakedProblem)?.factorProjections
+    if (problem.factors.indices.any { id ->
+            val capabilities = selection?.capabilities(id) ?: problem.factors[id].executionCapabilities()
+            capabilities.scoring == com.eignex.klause.solver.ScoringCapability.UNSUPPORTED ||
+                (capabilities.assignmentCheck == AssignmentCheckCapability.UNSUPPORTED &&
+                    problem.factors[id].variables.reals.isNotEmpty())
         }
     ) return false
     val domains = model.domains

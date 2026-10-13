@@ -209,3 +209,10 @@ domains)` open mechanisms from that capture. Factories allocate private mutable
 mechanisms or stateless projections whose payloads belong to engine states. Scoring
 uses the actual move domains when choosing exact wide-linear sums. Built-in selectors
 retain their existing algorithms, relation indexes and linear-row caches.
+
+`problem.bake(providers)` binds these selectors to the finite engine projection for
+one invocation. Root propagation, later assumption checks, appended objective
+overlays, conditioned roots, local scoring and model-facing LP emission retain that
+selection. The neutral `Problem` has no engine provider field. Custom scoring
+mechanisms are prepared separately for portfolio workers; only built-in stateless
+scoring projections enter the shared preparation pool.

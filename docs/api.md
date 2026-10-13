@@ -325,3 +325,7 @@ Prepare once with `providers.prepare(problem)` and pass the source-associated
 contains no mutable workspace; its factory must return a private mechanism or a
 stateless projection using state-owned payloads. Source membership, soundness,
 exact checks and scoring delta consistency remain extension obligations.
+
+Finite facades accept `problem.bake(providers)` for invocation-specific selection.
+The baked projection carries immutable factories, and each live search allocates its
+own state. Ordinary `bake()` and existing solver constructors retain built-in defaults.

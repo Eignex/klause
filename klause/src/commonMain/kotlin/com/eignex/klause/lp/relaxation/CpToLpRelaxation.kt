@@ -32,6 +32,7 @@ import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.emitLpRelaxation
 import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
@@ -638,7 +639,7 @@ internal class CpToLpRelaxation(
     private val suppressedHullFactors: Set<Int> = emptySet(),
     internal val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
     deferred: Boolean = false,
-    private val projections: PreparedFactorProjections? = null,
+    private val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ) {
     private val linearProjection = LinearLpProjection()
 

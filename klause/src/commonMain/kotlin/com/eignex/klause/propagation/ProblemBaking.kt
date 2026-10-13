@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -27,8 +28,15 @@ val Problem.baked: PropagationResult
  * range materialized. Every declared side must be closed — no fallback endpoint is invented here, because
  * inventing one narrows the model.
  */
-fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem {
-    if (this is BakedProblem) return this
+fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem =
+    bakeSelected(null, cancellation)
+
+/** Bake a private finite projection using the providers selected for this invocation. */
+fun Problem.bake(providers: FactorProjectionProviders, cancellation: Cancellation = Cancellation.Never): BakedProblem =
+    bakeSelected(providers, cancellation)
+
+private fun Problem.bakeSelected(providers: FactorProjectionProviders?, cancellation: Cancellation): BakedProblem {
+    if (this is BakedProblem && (providers == null || projectionProviders === providers)) return this
     return BakedProblem(
         settings = this.settings,
         numBoolVars = numBoolVars,
@@ -42,6 +50,7 @@ fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem 
         realLower = realLower,
         realUpper = realUpper,
         modelBounds = intBounds,
+        projectionProviders = providers,
     )
 }
 
@@ -63,6 +72,7 @@ internal fun BakedProblem.withAppendedFactor(extra: Factor): BakedProblem = Bake
     packedOpenIntHi = intBounds.openUpperBits,
     modelBounds = intBounds,
     alreadyFolded = true,
+    projectionProviders = projectionProviders,
 )
 
 /** Run deductive propagation against [assumptions] through the propagation engine. */
@@ -109,6 +119,7 @@ internal fun BakedProblem.conditionedRoot(assumptions: Assumptions, token: Cance
         packedOpenIntLo = intBounds.openLowerBits,
         packedOpenIntHi = intBounds.openUpperBits,
         modelBounds = intBounds,
+        projectionProviders = projectionProviders,
     )
     if (token()) throw CancellationException("root preparation cancelled")
     return conditioned
