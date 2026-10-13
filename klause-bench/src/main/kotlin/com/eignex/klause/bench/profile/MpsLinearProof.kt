@@ -16,13 +16,18 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
+import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.security.MessageDigest
 import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -35,11 +40,29 @@ object MpsLinearProof {
     /** Write captures and independent checker results for the original MPS paths in [args] under `OUT`. */
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isNotEmpty()) { "Pass original MPS paths" }
+        val options = args.takeWhile { it.startsWith("--") }.associate { argument ->
+            val pair = argument.removePrefix("--").split('=', limit = 2)
+            require(pair.size == 2) { "Use --name=value" }
+            pair[0] to pair[1]
+        }
+        require(options.keys.all { it in setOf("engine", "cores", "checks", "work", "timeout") })
+        val engine = when (options["engine"] ?: "cp") {
+            "cp" -> FiniteEngine.BACKTRACK
+            "fixed" -> FiniteEngine.FIXED
+            "mixed" -> FiniteEngine.MIXED
+            "ls" -> FiniteEngine.LOCAL_SEARCH
+            "alns" -> FiniteEngine.ALNS
+            else -> error("Unknown engine")
+        }
+        val cores = (options["cores"] ?: "1").toInt().also { require(it > 0) }
+        val inputs = args.dropWhile { it.startsWith("--") }
+        require(inputs.isNotEmpty()) { "Pass original MPS paths" }
         val root = File(System.getProperty("klause.workspace.root", "."))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
-        val params = TheoryParams(maxLeaves = 1_000, openWorkLimit = 2_000_000, maxDecisions = 1_000)
-        args.forEachIndexed { index, path ->
+        inputs.forEachIndexed { index, path ->
+            val params = TheoryParams(maxLeaves = (options["checks"] ?: "1000").toLong(),
+                openWorkLimit = (options["work"] ?: "2000000").toLong(), maxDecisions = 1_000,
+                timeout = Cancellation.after((options["timeout"] ?: "3000").toLong().milliseconds))
             val input = File(path).let { if (it.isAbsolute) it else root.resolve(path) }
             val bytes = input.readBytes()
             out.resolve("$index.mps").writeBytes(bytes)
@@ -49,19 +72,31 @@ object MpsLinearProof {
             val capture = requireNotNull(compiled.model.sourceProofContext(SourceScope(
                 SourceRevision("probe", "klause-ir-exact-v1"), objective = SourceObjective("cost", sense)), objective))
             val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model, objective,
-                maximize = compiled.maximize), params) as OpenTheoryExecution.Optimize
-            val result = requireNotNull(execution.result.linearResult)
-            val terminal = result.terminal
+                maximize = compiled.maximize), params, engine, cores) as OpenTheoryExecution.Optimize
+            val witnessOnly = engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS
+            val result = execution.result.linearResult
+            require(witnessOnly || result != null) { "Complete route omitted typed linear authority" }
+            if (witnessOnly) require(execution.result is OpenTheoryOptimum.Bounded)
+            val terminal = result?.terminal
+            require(!witnessOnly || terminal == null) { "Witness-only route published a terminal" }
             val claim = terminal?.claim
+            val incumbent = result?.incumbent ?: (execution.result as? OpenTheoryOptimum.Bounded)?.incumbent?.let {
+                (it as? OpenTheoryAssignment.Sampled)?.sample
+            }
+            val value = result?.value ?: (execution.result as? OpenTheoryOptimum.Bounded)?.value?.let {
+                if (compiled.maximize) it.negated() else it
+            }
             val point = when (claim) {
                 is SourceClaim.Optimal -> claim.sample
                 is SourceClaim.Ray -> claim.sample
-                else -> result.incumbent
+                else -> incumbent
             }
             val record = buildJsonObject {
                 put("sourceSHA256", sha(bytes))
                 put("maximize", compiled.maximize)
-                put("reason", result.reason.toString())
+                put("reason", (result?.reason ?: (execution.result as? OpenTheoryOptimum.Bounded)?.reason).toString())
+                put("engine", engine.id)
+                put("cores", cores)
                 put("kind", when (claim) {
                     is SourceClaim.Optimal -> "optimal"
                     is SourceClaim.Ray -> "ray"
@@ -73,6 +108,8 @@ object MpsLinearProof {
                     compiled.columns.forEach { put(it.name, "${if (it.real) "Real" else "Integer"}/${it.id}") }
                 })
                 put("point", point?.let(::sample) ?: JsonNull)
+                put("incumbent", incumbent?.let(::sample) ?: JsonNull)
+                put("value", value?.let { JsonPrimitive(it.toString()) } ?: JsonNull)
                 put("objective", coefficients(capture.objective))
                 put("constant", capture.objectiveConstant.toString())
                 put("rows", buildJsonObject {
@@ -89,6 +126,10 @@ object MpsLinearProof {
                 } ?: JsonNull)
                 put("proof", terminal?.let { proof(it.derivation) } ?: JsonNull)
                 put("ray", (claim as? SourceClaim.Ray)?.let { coefficients(it.direction) } ?: JsonNull)
+                put("globalBound", result?.bound?.let {
+                    JsonPrimitive(((it.claim as SourceClaim.Bound).value as SourceValue.Rational).value.toString())
+                } ?: JsonNull)
+                put("globalProof", result?.bound?.let { proof(it.derivation) } ?: JsonNull)
             }
             out.resolve("$index.json").writeText("$record\n")
             val checker = root.resolve("klause-bench/tools/verify_mps_linear_proof.py")
@@ -98,12 +139,13 @@ object MpsLinearProof {
             out.resolve("$index-check.json").writeText(checked)
             check(process.waitFor() == 0) { checked }
             println(checked.trim())
+            out.resolve("$index-settings.txt").writeText("engine=${engine.id}\ncores=$cores\n$params\n")
         }
         val jars = root.resolve("klause-bench/build/install/klause-bench/lib").listFiles().orEmpty()
             .filter { it.extension == "jar" }.sortedBy { it.name }
         out.resolve("installed-jars.txt").writeText(jars.joinToString("\n") { "${sha(it.readBytes())}  ${it.name}" })
         out.resolve("runtime.txt").writeText("${System.getProperty("java.runtime.version")}\n" +
-            "${java.lang.management.ManagementFactory.getRuntimeMXBean().inputArguments}\n$params\n")
+            "${java.lang.management.ManagementFactory.getRuntimeMXBean().inputArguments}\n$options\n")
         root.resolve("build/provenance.json").takeIf { it.isFile }?.copyTo(out.resolve("build-provenance.json"),
             overwrite = true)
     }

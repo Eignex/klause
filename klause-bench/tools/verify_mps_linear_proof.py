@@ -138,8 +138,10 @@ def parse_mps(text):
 def multiple(row, original):
     terms, rhs = row
     expected, bound = original
-    if terms.keys() != expected.keys() or not terms:
+    if terms.keys() != expected.keys():
         return False
+    if not terms:
+        return rhs == 0 if bound == 0 else rhs / bound > 0
     key = next(iter(terms))
     scale = terms[key] / expected[key]
     return scale > 0 and rhs == scale * bound and all(terms[k] == scale * expected[k] for k in terms)
@@ -181,8 +183,7 @@ def verify(source, record):
                                                      for original in constraints + rounded), row_id
         rows[row_id] = terms, bound
 
-    point = record["point"]
-    if point is not None:
+    def check_point(point):
         values = {name: number(point[coordinate]) for name, coordinate in mapping.items()}
         assert all(values[name].denominator == 1 for name in integers)
         assert all(sum(value * values[name] for name, value in terms.items()) <= rhs
@@ -190,26 +191,25 @@ def verify(source, record):
         source_value = constant + sum(value * values[name] for name, value in objective.items())
         if auxiliary:
             assert number(point[auxiliary]) == source_value
-    else:
-        assert record["kind"] == "refutation"
+        return source_value
 
-    if record["kind"] == "ray":
-        direction = {name: number(record["ray"].get(coordinate, 0)) for name, coordinate in mapping.items()}
-        assert set(record["ray"]) <= set(inverse) | extra
-        assert all(direction[name].denominator == 1 for name in integers)
-        assert all(sum(value * direction[name] for name, value in terms.items()) <= 0 for terms, _ in constraints)
-        improvement = sum(value * direction[name] for name, value in objective.items())
-        assert improvement > 0 if maximize else improvement < 0
-        if auxiliary:
-            assert number(record["ray"].get(auxiliary, 0)) == improvement
-    elif record["kind"] in {"optimal", "refutation"}:
+    point = record["point"]
+    if point is not None:
+        source_value = check_point(point)
+    else:
+        assert record["kind"] in {"refutation", "partial"}
+    incumbent, value = record.get("incumbent"), record.get("value")
+    assert (incumbent is None) == (value is None)
+    if incumbent is not None:
+        assert check_point(incumbent) == number(value)
+
+    steps = 0
+
+    def check_proof(proof, bound=None):
         target = None
-        if record["kind"] == "optimal":
-            bound = number(record["bound"])
-            assert source_value == bound
+        if bound is not None:
             sign = F(1) if maximize else F(-1)
             target = clean({key: sign * value for key, value in captured_objective.items()}), sign * (bound - number(record["constant"]))
-        steps = 0
 
         def derive(proof, assumptions, depth=0):
             nonlocal steps
@@ -244,11 +244,31 @@ def verify(source, record):
                 coefficients, rhs = derive(proof, assumptions)
                 assert (not coefficients and rhs < 0) or (target is not None and coefficients == target[0] and rhs <= target[1])
 
-        coverage(record["proof"], {})
+        coverage(proof, {})
+
+    if record["kind"] == "ray":
+        direction = {name: number(record["ray"].get(coordinate, 0)) for name, coordinate in mapping.items()}
+        assert set(record["ray"]) <= set(inverse) | extra
+        assert all(direction[name].denominator == 1 for name in integers)
+        assert all(sum(value * direction[name] for name, value in terms.items()) <= 0 for terms, _ in constraints)
+        improvement = sum(value * direction[name] for name, value in objective.items())
+        assert improvement > 0 if maximize else improvement < 0
+        if auxiliary:
+            assert number(record["ray"].get(auxiliary, 0)) == improvement
+    elif record["kind"] == "optimal":
+        bound = number(record["bound"])
+        assert source_value == bound
+        check_proof(record["proof"], bound)
+    elif record["kind"] == "refutation":
+        check_proof(record["proof"])
     else:
         assert record["kind"] == "partial" and record["proof"] is None and record["bound"] is None
+    global_bound, global_proof = record.get("globalBound"), record.get("globalProof")
+    assert (global_bound is None) == (global_proof is None)
+    if global_bound is not None:
+        check_proof(global_proof, number(global_bound))
     return {"sourceSHA256": record["sourceSHA256"], "claim": record["kind"], "checked": True,
-            "checker": "mps-linear-fraction-v1"}
+            "checker": "mps-linear-fraction-v2", "globalBound": global_bound}
 
 
 if __name__ == "__main__":

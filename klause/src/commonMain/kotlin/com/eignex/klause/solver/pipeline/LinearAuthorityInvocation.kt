@@ -21,7 +21,6 @@ import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.Vsids
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
@@ -149,18 +148,7 @@ internal class LinearAuthorityInvocation(
         val checked = SourceEvidenceVerifier(context.withLinearAuthority()).verify(SourceEvidence(context.scope,
             SourceClaim.Witness(sample), SourceDerivation.SourceWitness), stop)
         if (checked != SourceEvidenceCheck.Checked) return
-        var exact = context.objectiveConstant
-        for ((coordinate, weight) in context.objective) {
-            val scalar = when (coordinate.kind) {
-                com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean ->
-                    if (sample.boolValue(coordinate.id)) BigFraction.ONE else BigFraction.ZERO
-                com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Integer ->
-                    BigFraction.of(sample.exactIntValue(coordinate.id), BIG_ONE)
-                com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Real ->
-                    requireNotNull(sample.exactReals)[coordinate.id]
-            }
-            exact += weight * scalar
-        }
+        val exact = context.linearValue(sample, stop) ?: return
         val standing = value
         val minimizes = context.scope.objective?.sense == ObjectiveSense.MINIMIZE
         if (standing != null && if (minimizes) exact >= standing else exact <= standing) return
@@ -168,6 +156,9 @@ internal class LinearAuthorityInvocation(
         value = exact
         callback(sample, exact)
     }
+
+    fun snapshot(reason: TerminationReason): LinearInvocationResult = result ?:
+        LinearInvocationResult(null, component.rootBound, incumbent, value, reason, stats)
 
     private fun finish(terminal: SourceEvidence?, reason: TerminationReason): LinearInvocationResult {
         val cancelled = stop()
