@@ -289,6 +289,10 @@ all source constraints and caller assumptions in every round. Auxiliary selector
 clauses and core thresholds remain private; their learned clauses never enter shared
 source clause channels.
 
+The core solver owns its session through `StatelessSession(this)`, so session optimization
+opens its retained core handle. Delegated satisfaction operations use the backing
+backtrack solver without transferring optimization-session ownership to it.
+
 Weights, negative-coefficient offsets and the accumulated lower bound use arbitrary-precision
 integers. A refuted core charges its minimum residual weight. Its violation count `s`
 is replaced by `1 + sum(k = 2..n, s >= k)` using exact reified cardinality thresholds;

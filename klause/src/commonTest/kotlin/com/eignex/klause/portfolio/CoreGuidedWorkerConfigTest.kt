@@ -1,5 +1,7 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -17,8 +19,47 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class CoreGuidedWorkerConfigTest {
+    @Test
+    fun `catalog worker retains a completed core bound across cancellation`() {
+        val source = Problem(
+            3, 0, emptyArray(),
+            arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+            ),
+        )
+        val objective = LinearObjective(longArrayOf(-1, -1, -1), constant = 3)
+        var cancelled = false
+        val floors = mutableListOf<Double>()
+        val recipe = BacktrackRecipe("core-guided") { _, _ ->
+            BacktrackParams(objectiveLowerBoundSink = {
+                floors += it
+                if (it == 1.0) cancelled = true
+            })
+        }
+        val worker = BacktrackWorkerConfig(recipe).materialize(
+            source.bake(), 0, 0, 3L, 1.0, objective, null, null, null, null,
+        )
+        val handle = requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never))
+
+        val paused = handle.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) { error("unfinished core") }
+        assertNull(paused)
+        assertEquals(listOf(1.0), floors)
+        cancelled = false
+        val result = assertIs<MinimizeResult.Optimal>(
+            handle.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {},
+        )
+
+        assertEquals(listOf(1.0, 2.0), floors)
+        assertEquals(2L, objective.evaluateLong(result.sample))
+        handle.close()
+        worker.close()
+    }
+
     @Test
     fun `rounded wide completion cannot certify a scalar source bound`() {
         val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
