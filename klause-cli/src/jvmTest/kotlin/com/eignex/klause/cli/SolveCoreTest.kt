@@ -52,7 +52,8 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
         val common = CommonOptions().apply { engine = "cp"; parallel = 1; randomSeed = 17; exact = true }
         if (route == "quadratic-integer") {
             common.engine = "ls"
-            common.engineParams += "max-flips=2"
+            common.engineParams += "max-flips=100000"
+            common.engineParams += "nia-moves=2"
         }
         val session = if (route == "polynomial") MiniZincMode.newSession() else SmtLibMode.newSession()
         val values = mutableListOf<BigFraction>()
