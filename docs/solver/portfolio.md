@@ -70,6 +70,8 @@ identities: a fresh or transformed model needs its own check, even if structural
 equivalent. Polynomial worker and neighborhood completion publications retain their actual prepared
 invocation, execution assumptions, owned point and execution objective telemetry. A native
 witness check precedes that envelope; a model/kind label cannot replace the checked point.
+Polynomial pool admission consumes the native publication and checks the containing
+invocation, actual point/value and both producer and consumer conditions.
 Copies of unchanged exact witnesses retain their source certificate;
 coordinate changes and warm-start projections discard it. Objective changes cannot reuse
 objective bounds or unboundedness claims. Unconditional variable bounds use the model
