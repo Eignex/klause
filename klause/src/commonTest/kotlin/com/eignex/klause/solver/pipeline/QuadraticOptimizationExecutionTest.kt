@@ -23,6 +23,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
+import kotlin.test.assertFailsWith
 
 class QuadraticOptimizationExecutionTest {
     @Test
@@ -259,6 +261,50 @@ class QuadraticOptimizationExecutionTest {
         assertEquals(BigFraction.ZERO, optimum.incumbent.value.rational)
         assertEquals(BigFraction.ZERO, optimum.bound.value.rational)
         assertEquals(4, optimum.stats.portfolio.arms.size)
+    }
+
+    @Test
+    fun `sliced quadratic traversal preserves exact completion and native accounting`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+        val request = source.pipelineRequest()
+        val params = PolynomialTheoryParams()
+        val whole = OpenTheoryPipeline.minimize(request, objective, params, FiniteEngine.BACKTRACK)
+        val native = QuadraticNativeScope(params)
+        val adapter = QuadraticWorkerAdapter(request, request.resolvedModel(), objective, ObjectiveSense.MINIMIZE,
+            params, native, FiniteEngine.BACKTRACK)
+        val worker = adapter.worker(0)
+        val handle = assertIs<QuadraticPortfolioSearch>(worker.newResumableSearch { Double.POSITIVE_INFINITY })
+        var slices = 0
+
+        while (!handle.isDone && slices++ < 4096) handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { }
+        val result = assertIs<QuadraticOptimizationResult.Optimal>(assertNotNull(handle.completion))
+        handle.close()
+        adapter.close()
+
+        assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
+        assertEquals(whole.nativeWork, native.work)
+        assertEquals(whole.polynomialStats, native.polynomialStats)
+        assertTrue(handle.isDone)
+    }
+
+    @Test
+    fun `closed pending quadratic traversal rejects more slices`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+        val request = source.pipelineRequest()
+        val params = PolynomialTheoryParams()
+        val adapter = QuadraticWorkerAdapter(request, request.resolvedModel(), objective, ObjectiveSense.MINIMIZE,
+            params, QuadraticNativeScope(params), FiniteEngine.BACKTRACK)
+        val handle = assertNotNull(adapter.worker(0).newResumableSearch { Double.POSITIVE_INFINITY })
+
+        handle.close()
+
+        assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { } }
     }
 
 }

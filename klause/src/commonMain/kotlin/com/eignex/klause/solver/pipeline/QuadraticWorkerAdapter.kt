@@ -161,6 +161,7 @@ internal class QuadraticWorkerAdapter(
 
     private fun run(onIncumbent: (MinimizeResult.WithSample) -> Unit, advance: () -> Unit): MinimizeResult? {
         terminal?.let { return scalar(it) }
+        check(!closed) { "quadratic worker is closed" }
         publish = { onIncumbent(quadraticScalar(it, sense, stats)) }
         try {
             advance()
