@@ -105,7 +105,7 @@ class DiffnRelocationsTest {
     @Test
     fun `packing proposals still grade other model constraints`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
-        val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)
+        val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 12)
         val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0))
         val state = LocalSearchState(Problem(0, 4, domains, listOf(factor, row)).bake(), Random(23))
         state.assignment.setInt(0, 5)
