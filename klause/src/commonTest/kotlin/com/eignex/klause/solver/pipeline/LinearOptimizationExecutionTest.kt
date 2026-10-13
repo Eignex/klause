@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -31,12 +32,84 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LinearOptimizationExecutionTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val scope = SourceScope(SourceRevision("public-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+
+    @Test
+    fun `ordinary complete routes preserve captured exact coordinate pins and source receipts`() {
+        val model = Problem(numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0),
+                Bits(1), Bits(1).also { it.set(0) }), factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val request = OpenTheoryRequest(model,
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(1.0)))
+        val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val wide = BigFraction.of(parseBigInt("18446744073709551616"), BIG_ONE)
+        val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
+        val pins = mapOf(integer to wide, real to third)
+        val context = SourceProofContext(original.scope.copy(condition = SourceCondition(mapOf(0 to true), pins, pins)),
+            original.coordinates, original.premises, original.objective, original.objectiveConstant,
+            original.semanticsChecker)
+        val params = TheoryParams(maxLeaves = 32, openWorkLimit = 100_000, maxFlips = 0)
+
+        for ((engine, lanes) in listOf(FiniteEngine.BACKTRACK to 1, FiniteEngine.FIXED to 1,
+            FiniteEngine.MIXED to 1, FiniteEngine.MIXED to 4)) {
+            val publications = ArrayList<SourceIncumbentPublication>()
+
+            val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
+                request.withLinearAuthority(context), params, engine, lanes) { publications += it })
+
+            val authority = assertNotNull(assertIs<OpenTheoryOptimum.Optimal>(execution.result).linearResult)
+            val optimal = assertIs<SourceClaim.Optimal>(assertNotNull(authority.terminal).claim)
+            assertEquals(SourceValue.Rational(wide + third), optimal.value)
+            assertEquals(context.scope, authority.scope)
+            assertEquals(SourceEvidenceCheck.Checked,
+                authority.evidence.verify(optimal, context.withLinearAuthority()))
+            val receipt = assertNotNull(execution.acceptedIncumbent)
+            assertSame(publications.last(), receipt)
+            assertSame(receipt.sample, authority.incumbent)
+            assertEquals(SourceValue.Rational(wide + third), receipt.value)
+            assertTrue(receipt.sample.boolValue(0))
+            assertEquals(wide.num, receipt.sample.exactIntValue(0))
+            assertEquals(third, assertNotNull(receipt.sample.exactReals).single())
+        }
+    }
+
+    @Test
+    fun `ordinary witness only routes retain exact scoped receipts without terminal claims`() {
+        val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
+        val model = Problem(0, 0, emptyArray(), arrayOf(ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)),
+            listOf(BigFraction.ONE), LinearOp.EQ, third)), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val request = OpenTheoryRequest(model, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
+        val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val context = SourceProofContext(original.scope.copy(condition = SourceCondition(
+            lower = mapOf(real to third), upper = mapOf(real to third))), original.coordinates,
+            original.premises, original.objective, original.objectiveConstant, original.semanticsChecker)
+        val params = TheoryParams(openWorkLimit = 100_000, maxFlips = 12, alnsIterations = 1)
+
+        for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val publications = ArrayList<SourceIncumbentPublication>()
+
+            val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
+                request.withLinearAuthority(context), params, engine, 1) { publications += it })
+
+            val bounded = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
+            assertNull(bounded.linearResult?.terminal)
+            assertNull(bounded.linearResult?.bound)
+            val receipt = assertNotNull(execution.acceptedIncumbent)
+            assertSame(publications.last(), receipt)
+            assertEquals(SourceValue.Rational(third), receipt.value)
+            assertEquals(third, assertNotNull(receipt.sample.exactReals).single())
+        }
+    }
 
     @Test
     fun `public linear execution preserves exact wide integer and rational condition pins`() {
