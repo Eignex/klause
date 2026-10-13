@@ -64,6 +64,9 @@ fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.prob
     for ((index, soft) in softClauses.withIndex()) {
         if (direct[index]) continue
         factors.add(Clause(intArrayOf(Lit.make(relax, positive = true)) + soft.literals))
+        for (literal in soft.literals) {
+            factors.add(Clause(intArrayOf(Lit.make(relax, positive = false), Lit.negate(literal))))
+        }
         weights[relax++] = soft.weight
     }
     if (triviallyUnsat) {
