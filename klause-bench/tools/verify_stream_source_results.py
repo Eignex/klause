@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import pathlib
+import re
 
 import z3
 
@@ -49,7 +50,11 @@ def check_stream(source, output, interrupted=False, minimum_witnesses=1):
         elif line.startswith('; objective='):
             assert pending_cost is None and model_lines is None, 'cost without a preceding complete witness'
             assert not terminal, 'incumbent after terminal optimization status'
-            parsed = expressions('(value ' + line.split('=', 1)[1] + ')')
+            value_text = line.split('=', 1)[1].strip()
+            fraction = re.fullmatch(r'(-?\d+)/(-?\d+)', value_text)
+            if fraction:
+                value_text = '(/ ' + fraction[1] + ' ' + fraction[2] + ')'
+            parsed = expressions('(value ' + value_text + ')')
             assert len(parsed) == 1 and len(parsed[0]) == 2, 'invalid objective value'
             pending_cost = exact_value(parsed[0][1])
         elif line in ('(', '(model'):

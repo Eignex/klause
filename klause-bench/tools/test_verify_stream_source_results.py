@@ -24,6 +24,10 @@ class VerifyStreamSourceResultsTest(unittest.TestCase):
             ('(declare-const x Real) (assert (= (* 3 x) 1)) '
              '(define-fun shifted ((arg Real)) Real (+ 7 arg)) (minimize (shifted x)) (check-sat)',
              '(/ 22.0 3.0)', '(define-fun x () Real (/ 1.0 3.0))'),
+            ('(declare-const x Real) (assert (= (* 3 x) 1)) (minimize (+ 7 x)) (check-sat)',
+             '22/3', '(define-fun x () Real (/ 1.0 3.0))'),
+            ('(declare-const x Real) (assert (= (* 3 x) 1)) (maximize (- x)) (check-sat)',
+             '-1/3', '(define-fun x () Real (/ 1.0 3.0))'),
             ('(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (maximize x) (check-sat)',
              root, '(define-fun x () Real ' + root + ')'),
             ('(declare-const x Int) (assert (= x 100000000000000000000)) (minimize (* x x)) (check-sat)',
