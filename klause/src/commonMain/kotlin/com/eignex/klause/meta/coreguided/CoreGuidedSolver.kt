@@ -18,9 +18,12 @@ internal class CoreGuidedSolver(override val problem: BakedProblem) :
     override fun minimize(objective: LinearObjective, params: BacktrackParams): MinimizeResult =
         resumable(objective, params).use { handle ->
             var result: MinimizeResult? = null
+            var incumbent: MinimizeResult.WithSample? = null
             while (result == null && !params.cancellation()) {
-                result = handle.runSlice(params.cancellation, Long.MAX_VALUE, -1L) {}
+                result = handle.runSlice(params.cancellation, Long.MAX_VALUE, -1L) { incumbent = it }
             }
-            result ?: MinimizeResult.Unknown(TerminationReason.Cancelled, handle.stats)
+            result ?: incumbent?.let {
+                MinimizeResult.BestFound(it.sample, it.objective, TerminationReason.Cancelled, handle.stats)
+            } ?: MinimizeResult.Unknown(TerminationReason.Cancelled, handle.stats)
         }
 }
