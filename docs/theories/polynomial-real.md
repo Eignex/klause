@@ -313,7 +313,7 @@ Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
 coordinates. Repaired points can guide later repairs even when the full check fails.
 Equalities under negation or disjunction are proposal guides, never asserted facts.
-For a conjunction of numeric inequalities and disequalities, an optional guide view
+For a nonlinear conjunction of numeric inequalities and disequalities, an optional guide view
 complements directly negated atoms without changing the source formula. It excludes
 Boolean alternatives and unresolved positive equalities. Per-coordinate boundaries
 combine roots of the specialized source polynomials; root sections and rational
@@ -321,6 +321,8 @@ interior sectors provide complete-point proposals. Negated denominator equalitie
 therefore guide nonzero intervals rather than requiring a zero. Rejected points are
 ordered by the effective conjunctive relations. This path starts with a positive
 rational center, retains fixed coordinates and assigns zero to unused declarations.
+Affine-only normalized queries retain their uniform point checks and complete
+projection allowance; short conditioned relaxation checks do not spend it on sector repairs.
 Acceptance still checks every source atom, strict relation, disequality, Boolean
 alternative and query pin with the same complete sample checker. Fixed coordinates
 remain fixed, and unused declarations retain complete coordinates.

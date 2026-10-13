@@ -156,6 +156,7 @@ private fun probeWitness(
         formula.atoms.size > MAX_WITNESS_ATOMS
     ) return null
     var terms = 0
+    var nonlinear = false
     val termCounts = HashMap<Polynomial, Int>()
     val axes = ArrayList<Triple<PolynomialAtom, List<Int>, Int>>()
     for (atom in formula.atoms) {
@@ -168,6 +169,14 @@ private fun probeWitness(
             if (term.coefficient.num.magnitudeBitLength() > MAX_WITNESS_BITS ||
                 term.coefficient.den.magnitudeBitLength() > MAX_WITNESS_BITS
             ) return null
+            if (!nonlinear) {
+                repeat(realCount + 1) { arithmetic.step() }
+                val variables = term.monomial.variables
+                nonlinear = variables.size > 1 || variables.any {
+                    arithmetic.step()
+                    term.monomial.exponent(it) > 1
+                }
+            }
         }
         terms += count
         termCounts[atom.polynomial] = count
@@ -178,7 +187,7 @@ private fun probeWitness(
         }
     }
     val conjunctive = formula.conjunctiveAtoms(arithmetic, MAX_WITNESS_ATOMS)
-    if (conjunctive != null && conjunctive.none {
+    if (nonlinear && conjunctive != null && conjunctive.none {
             arithmetic.step()
             it.relation == PolynomialRelation.EQ && !it.polynomial.isZero
         }
