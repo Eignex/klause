@@ -87,6 +87,57 @@ class NraSourceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'incomplete source model'):
             check.check_witness(source, '((define-fun x () Real 0))')
 
+    def test_unused_division_completion_preserves_all_scalar_source_checks(self):
+        source = '(declare-const x Real) (assert (= (/ x 2) 1))'
+        definitions = '(define-fun x () Real 2) ' \
+                      '(define-fun /0 ((a Real) (b Real)) Real (ite (= b 0) a 0))'
+        for envelope in ('(' + definitions + ')', '(model ' + definitions + ')'):
+            with self.subTest(envelope=envelope), \
+                    mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+                result = check.check_witness(source, envelope)
+            self.assertEqual(1, result['coordinates'])
+            self.assertEqual(1, result['assertions'])
+        with self.assertRaisesRegex(AssertionError, 'original source assertion 0 is false'):
+            check.check_witness(source, '(' + definitions.replace('() Real 2', '() Real 3') + ')')
+
+    def test_division_completion_cannot_supply_missing_source_coordinates(self):
+        source = '(declare-const x Real) (declare-const unused Real) (assert (= x 0))'
+        witness = '((define-fun x () Real 0) (define-fun /0 ((a Real) (b Real)) Real 0))'
+        with self.assertRaisesRegex(AssertionError, 'incomplete source model'):
+            check.check_witness(source, witness)
+
+    def test_auxiliary_model_definitions_require_the_unique_division_signature(self):
+        source = '(declare-const x Real) (assert (= x 0))'
+        division = '(define-fun /0 ((a Real) (b Real)) Real 0)'
+        variants = (
+            '(define-fun other ((a Real) (b Real)) Real 0)',
+            division + ' ' + division,
+            '(define-fun /0 ((a Int) (b Real)) Real 0)',
+            '(define-fun /0 ((a Real) (b Real)) Int 0)',
+            '(define-fun /0 ((a Real)) Real 0)',
+            '(define-fun /0 ((a Real) (a Real)) Real 0)',
+            '(define-fun /0 (a b) Real 0)',
+        )
+        for auxiliary in variants:
+            with self.subTest(auxiliary=auxiliary), self.assertRaises(AssertionError):
+                check.check_witness(source, '((define-fun x () Real 0) ' + auxiliary + ')')
+        with self.assertRaisesRegex(AssertionError, 'unsupported auxiliary model definition'):
+            check.witness_values('(' + division + ')', {'/0': z3.Real('/0')}, allow_unused_division=True)
+
+    def test_division_completion_is_declined_without_source_admission(self):
+        witness = '((define-fun x () Real 0) (define-fun /0 ((a Real) (b Real)) Real 0))'
+        with self.assertRaisesRegex(AssertionError, 'unsupported auxiliary model definition'):
+            check.witness_values(witness, {'x': z3.Real('x')})
+
+    def test_division_completion_cannot_override_undefined_source_division(self):
+        witness = '((define-fun x () Real 0) (define-fun /0 ((a Real) (b Real)) Real 0))'
+        for denominator in ('0', 'x'):
+            source = '(declare-const x Real) (assert (= (/ x ' + denominator + ') 0))'
+            with self.subTest(denominator=denominator), \
+                    mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')), \
+                    self.assertRaisesRegex(AssertionError, 'nonconstant source division'):
+                check.check_witness(source, witness)
+
     def test_ambiguous_source_models_are_rejected(self):
         source = '(declare-const x Real) (assert (= x 0))'
         variants = (
