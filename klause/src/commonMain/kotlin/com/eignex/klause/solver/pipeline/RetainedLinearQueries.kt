@@ -54,7 +54,8 @@ internal class RetainedLinearQueries(
     private val marker = object : SearchTheoryDecision {}
     val work: Long get() = state.work.spent
     val stats: SolveStats get() = SolveStats(openTheory = state.work.snapshot(), smt = state.smt.snapshot(),
-        openTheoryClauses = planned?.session?.learnedClauseStats() ?: state.clauses, openHints = state.hints)
+        openTheoryClauses = planned?.session?.learnedClauseStats() ?: state.clauses, openHints = state.hints,
+        search = state.progress(planned?.session))
     val exhausted: Boolean get() = !state.work.hasAllowance() ||
         state.work.snapshot().openTheoryChecks >= params.maxLeaves
 

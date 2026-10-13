@@ -8,12 +8,16 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceResultCapture
+import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.sourceProofContext
@@ -107,4 +111,16 @@ class CompletedEngineResultTest {
         assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
 
+    @Test
+    fun `mixed invocation derivations cannot issue a completed certificate`() {
+        val foreign = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
+        val evidence = SourceResultEvidence(scope, listOf(SourceEvidence(foreign, SourceClaim.Refutation,
+            SourceDerivation.Unavailable("conditional traversal"))))
+        val result = SolveResult.Unsat(evidence = evidence)
+
+        val certificate = EvidenceCertificate.completed(identity, EvidenceKind.Infeasible,
+            CompletedEngineResult.Solve(scope, result))
+
+        assertNull(certificate)
+    }
 }

@@ -21,9 +21,10 @@ internal fun linearNeighborhoodInvocation(
     val count = cores.coerceAtLeast(1)
     val quota = if (count > 1) params.nodeBudget?.quotas(count) else null
     val native = params.strategyQuotas(count, complete = false)
+    val prepared = model.prepareExecutionPlan(objective)
     val workers = List(count) { index ->
         val local = native[index].copy(nodeBudget = quota?.get(index) ?: params.nodeBudget)
-        val adapter = OpenExactNeighborhood(model, local, objective)
+        val adapter = OpenExactNeighborhood(model, local, objective, prepared)
         exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood", index, objective,
             params.cancellation or params.timeout, timeout = params.timeout, exhausted = { adapter.exhausted },
             open = { adapter.search(adaptive, params.randomSeed + index,

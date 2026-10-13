@@ -86,6 +86,7 @@ class PortfolioWorker private constructor(
     }
 
     internal fun bindEvidence(model: ModelIdentity, provesResults: Boolean = true): PortfolioWorker = also {
+        require(evidenceModel?.matches(model) != false) { "worker cannot change its model or objective" }
         evidenceModel = model
         provesSourceResults = provesSourceResults && provesResults
         certificates = { kind -> if (provesSourceResults) EvidenceCertificate.verified(model, kind) else null }
