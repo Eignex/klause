@@ -46,7 +46,7 @@ internal class NValueEliminationMoves(
             if (parts.none { it.varId == n } && targetN != state.assignment.intValue(n)) {
                 parts += Move.IntSet(n, targetN)
             }
-            if (queue(state, parts, sink, complete = emitted == 0)) emitted++
+            if (queue(state, parts, sink, emitted == 0, distinct - 1)) emitted++
         }
     }
 
@@ -85,7 +85,13 @@ internal class NValueEliminationMoves(
         return parts.takeIf { it.isNotEmpty() }
     }
 
-    private fun queue(state: LocalSearchState, parts: List<Move.IntSet>, sink: MoveSink, complete: Boolean): Boolean {
+    private fun queue(
+        state: LocalSearchState,
+        parts: List<Move.IntSet>,
+        sink: MoveSink,
+        complete: Boolean,
+        expectedDistinct: Int,
+    ): Boolean {
         val first = parts[0]
         val coordinated = ChannelingSink(first.varId, first.newValue)
         // Counter-shifts must not resurrect the removed class or change its surviving destination.
@@ -117,24 +123,26 @@ internal class NValueEliminationMoves(
         coordinated.carryBinaryChannels(state, sink)
         val move = coordinated.toMove()
         val coordinatedParts = if (move is Move.Compound) move.parts else listOf(move)
-        if (!preservesCount(state, coordinatedParts)) return false
+        if (!preservesCount(state, coordinatedParts, expectedDistinct)) return false
         val before = sink.size
         sink.addCompound(coordinatedParts)
-        if (complete && state.cost == 0L && state.netDelta(move) > 0L) completeMove(state, move, sink)
+        if (complete && state.cost == 0L && state.netDelta(move) > 0L) {
+            completeMove(state, move, sink, expectedDistinct)
+        }
         return sink.size > before
     }
 
-    private fun completeMove(state: LocalSearchState, move: Move, sink: MoveSink) {
+    private fun completeMove(state: LocalSearchState, move: Move, sink: MoveSink, expectedDistinct: Int) {
         val repairs = MoveSink(state.assumptions)
         repairs.setInvariants(state.invariants)
         repairs.setOwners(state.seeding.ownerInt)
         val parts = state.buildRepairChain(move, MAX_REPAIR_DEPTH, repairs) ?: return
-        if (parts.size > MAX_COMPLETED_PARTS || !preservesCount(state, parts)) return
+        if (parts.size > MAX_COMPLETED_PARTS || !preservesCount(state, parts, expectedDistinct)) return
         val candidate = if (parts.size == 1) parts[0] else Move.Compound(parts)
         if (state.netDelta(candidate) == 0L) sink.addCompound(parts)
     }
 
-    private fun preservesCount(state: LocalSearchState, parts: List<Move>): Boolean {
+    private fun preservesCount(state: LocalSearchState, parts: List<Move>, expectedDistinct: Int): Boolean {
         val targets = parts.filterIsInstance<Move.IntSet>().associate { it.varId to it.newValue }
         val flips = parts.filterIsInstance<Move.BoolFlip>().map { it.varId }.toSet()
         // Presence changes have a separate neighborhood; a class merge keeps its participating positions.
@@ -143,6 +151,7 @@ internal class NValueEliminationMoves(
         for (i in xs.indices) {
             if (present(state, i)) values.add(targets[xs[i]] ?: state.assignment.intValue(xs[i]))
         }
+        if (values.size != expectedDistinct) return false
         val count = targets[n] ?: state.assignment.intValue(n)
         return when (mode) {
             NValue.Mode.Eq -> values.size.toLong() == count

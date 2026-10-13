@@ -293,7 +293,7 @@ domains and protected partners do not prevent later partners from absorbing the 
 ## NValue neighborhoods
 
 Satisfied NValue factors supplement count-preserving coordinate moves with bounded
-value-class elimination. A proposal moves every present coordinate of one class to
+value-class elimination. A proposal removes one distinct value, moving every present coordinate of one class to
 an existing value admitted by every participating root domain and reconciles the
 count for its equality or inequality mode. Repeated coordinates are changed once;
 count aliases are checked against the final distinct values. Frozen, maintained or
