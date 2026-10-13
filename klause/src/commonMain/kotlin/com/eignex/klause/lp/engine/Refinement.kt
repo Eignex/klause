@@ -155,6 +155,60 @@ internal class LpRefinementRequest(
         ((sourceWorkLimit - preparationWork).coerceAtLeast(0L) - sourceSolve.workOps).coerceAtLeast(0L)
             .let { (it - additionalSourceWork).coerceAtLeast(0L) }
 
+    fun strictBasisPointAdmission(
+        model: LpModel,
+        basis: Basis,
+        cancellation: Cancellation,
+    ): Triple<Boolean, LpRefinementMetrics, Cancellation>? {
+        val state = model.exactState ?: return null
+        val effective = effectiveLimits()
+        if (source.state !== state || effective.maxAuxiliaries == 0 ||
+            cache.work >= effective.maxWork || cache.allocation >= effective.maxAllocation ||
+            (cache.attempted === state && effective == cache.lastLimits && cache.attemptedUnseeded)
+        ) return null
+        val meter = RefinementMeter(effective, cache, cancellation)
+        var admitted = false
+        var decline: LpRefinementDecline? = null
+        lateinit var metrics: LpRefinementMetrics
+        try {
+            meter.poll()
+            if (state.model.numVars > effective.maxCoordinates || basis.status.size != state.model.numVars) {
+                meter.stop(LpRefinementDecline.DIMENSION)
+            }
+            meter.charge(state.model.numVars.toLong() + state.model.n, 64L)
+            if ((0 until state.model.numVars).all { state.model.objective.cost(it).value.isZero }) {
+                admitted = (0 until state.model.n).any { column ->
+                    val bounds = state.model.column(column).bounds
+                    when (basis.status[column]) {
+                        VarStatus.AT_LOWER -> bounds.lower?.strict == true
+                        VarStatus.AT_UPPER -> bounds.upper?.strict == true
+                        else -> false
+                    }
+                }
+            }
+        } catch (stop: RefinementStop) {
+            decline = stop.reason
+        } finally {
+            metrics = meter.finish(decline)
+        }
+        val token = if (effective.time.isInfinite()) {
+            meter.token
+        } else {
+            meter.token or Cancellation { cache.elapsed >= effective.time }
+        }
+        return Triple(admitted, metrics, token)
+    }
+
+    fun remainingProofLimits(): ReconstructionLimits = RefinementMeter(
+        effectiveLimits(), cache, Cancellation.Never,
+    ).proofLimits()
+
+    fun accountDirect(work: Long, allocation: Long, elapsed: Duration) {
+        cache.work = addSaturated(cache.work, work)
+        cache.allocation = addSaturated(cache.allocation, allocation)
+        cache.elapsed += elapsed
+    }
+
     fun effectiveLimits(additionalSourceWork: Long = 0L): LpRefinementLimits = limits.copy(
         maxWork = if (sourceWorkLimit > 0L) {
             minOf(limits.maxWork, remainingSourceWork(additionalSourceWork))
@@ -700,8 +754,23 @@ private class RefinementRun(
         hint: DoubleArray?,
         reconstructInitial: Boolean,
         preferBasis: Boolean,
+        strictPointFirst: Boolean,
     ) {
         candidate.basis = basis
+        var strictPointAttempted = false
+        if (strictPointFirst && known == null && needPoint && meter.limits.maxAuxiliaries > 0) {
+            strictPointAttempted = true
+            try {
+                strictFeasibility()
+            } catch (stop: RefinementStop) {
+                meter.poll()
+                if (stop.reason == LpRefinementDecline.CANCELLED || stop.reason == LpRefinementDecline.TIME ||
+                    meter.remainingWork == 0L || meter.remainingAllocation == 0L
+                ) throw stop
+            }
+            meter.diagnostic?.stage = LpRefinementStage.RUN
+            if (candidate.point != null || candidate.conflict != null) return
+        }
         if (preferBasis && basis != null && sourceModel.m <= meter.basisLimits().factor.dimension) {
             meter.diagnostic?.stage = LpRefinementStage.SOURCE_BASIS
             checkBasis(sourceModel, basis, sourceFactors, candidate)
@@ -713,7 +782,7 @@ private class RefinementRun(
             candidate.accept(check(source, known.primal, null, null, false))
             meter.diagnostic?.stage = LpRefinementStage.RUN
         }
-        if (candidate.point == null && needPoint && meter.limits.maxAuxiliaries > 0 &&
+        if (candidate.point == null && !strictPointAttempted && needPoint && meter.limits.maxAuxiliaries > 0 &&
             sourceModel.hasStrictSides(meter)
         ) {
             strictFeasibility()
@@ -1330,6 +1399,7 @@ internal fun refineLp(
     preferredBasisCache: ExactBasisCache? = null,
     additionalSourceWork: Long = 0L,
     diagnostic: LpRefinementPath? = null,
+    strictPointFirst: Boolean = false,
 ): LpRefinementResult {
     val state = model.exactState
     val limits = request.effectiveLimits(additionalSourceWork)
@@ -1363,7 +1433,8 @@ internal fun refineLp(
         val factors = preferredBasisCache?.takeIf { preferBasis && basis != null } ?: ExactBasisCache()
         val current = RefinementRun(request, meter, model, factors)
         run = current
-        current.run(primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis)
+        current.run(primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis,
+            strictPointFirst)
         diagnostic?.stage = LpRefinementStage.COMPLETION
         meter.poll()
         reason = if (current.candidate.attained || current.candidate.conflict != null ||

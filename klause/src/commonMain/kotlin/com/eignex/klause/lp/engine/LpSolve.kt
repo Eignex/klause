@@ -414,7 +414,8 @@ private fun certifyLpResultWithin(
     sparsePointRecovery: Boolean = false,
     pairing: LpRejectionPairing? = null,
 ): CertifiedLpResult {
-    fun stopped(): Boolean = cancellation().also {
+    var proofCancellation = cancellation
+    fun stopped(): Boolean = proofCancellation().also {
         if (it) pairing?.stopObserved = true
     }
     val certificationStarted = refinement?.let { TimeSource.Monotonic.markNow() }
@@ -428,7 +429,7 @@ private fun certifyLpResultWithin(
         solver,
         result,
         continuationLimits,
-        cancellation,
+        proofCancellation,
     ).also { capturedTarget = it }
     if (state != null) {
         if (stopped()) return CertifiedLpResult(null, null, null, null, null, false, { null })
@@ -475,7 +476,7 @@ private fun certifyLpResultWithin(
                 model,
                 continuationTarget().basis,
                 continuationCache,
-                cancellation,
+                proofCancellation,
                 continuationLimits,
                 fullEffort = fullContinuation,
                 targetMetrics = continuationTarget().metrics,
@@ -538,9 +539,11 @@ private fun certifyLpResultWithin(
     var chargedWork = 0L
     var chargedAllocation = 0L
     var chargedElapsed = Duration.ZERO
+    var admissionElapsed = Duration.ZERO
     fun directElapsed(): Duration =
-        (certificationStarted?.elapsedNow() ?: Duration.ZERO) - (pointRecovery?.elapsed ?: Duration.ZERO)
-    fun refine() {
+        (certificationStarted?.elapsedNow() ?: Duration.ZERO) - (pointRecovery?.elapsed ?: Duration.ZERO) -
+            admissionElapsed
+    fun refine(strictPointFirst: Boolean = false) {
         if (refinement == null || state == null || stopped()) return
         if (result == null) {
             val decline = continuationTarget().metrics.decline
@@ -552,7 +555,7 @@ private fun certifyLpResultWithin(
             (exactBasis?.metrics?.allocation ?: 0L) + (capturedTarget?.metrics?.allocation ?: 0L)
         val recovered = refineLp(
             model, refinement, result?.primal, result?.duals,
-            result?.basis ?: continuationTarget().basis, numericalWitness, cancellation,
+            result?.basis ?: continuationTarget().basis, numericalWitness, proofCancellation,
             directWork = (directWork - chargedWork).coerceAtLeast(0L),
             directAllocation = (directAllocation - chargedAllocation).coerceAtLeast(0L),
             needPoint = numericalWitness == null, direction = solver.recessionDirection,
@@ -564,6 +567,7 @@ private fun certifyLpResultWithin(
             },
             additionalSourceWork = pointRecovery?.work ?: 0L,
             diagnostic = pairing?.newRefinement(result != null && policy === ProductionLpCertificationPolicy),
+            strictPointFirst = strictPointFirst,
         )
         refined = recovered
         refinementMetrics = refinementMetrics?.plus(recovered.metrics) ?: recovered.metrics
@@ -614,14 +618,61 @@ private fun certifyLpResultWithin(
             withheldConflict = conflict == null
         }
     }
+    var refinedBeforeReconstruction = false
+    var strictPointDeadlineBound = false
+    if (result != null && numericalWitness == null && policy === ProductionLpCertificationPolicy &&
+        refinement != null && !stopped()
+    ) {
+        refinement.strictBasisPointAdmission(model, result.basis, proofCancellation)?.let { admission ->
+            admissionElapsed += admission.second.elapsed
+            refinementMetrics = admission.second
+            pairing?.refinement = refinementMetrics
+            observer?.observe(LpCertifier.RATIONAL, false, LpCertifierCost.Metered(admission.second.work))
+            if (admission.first && !stopped()) {
+                proofCancellation = admission.third
+                strictPointDeadlineBound = true
+                refine(strictPointFirst = true)
+                refinedBeforeReconstruction = refined != null
+            }
+        }
+    }
+    fun accountCompletedDirect() {
+        if (!refinedBeforeReconstruction || refinement == null) return
+        val work = (reconstruction?.metrics?.work ?: 0L) + (exactBasis?.metrics?.work ?: 0L) +
+            (capturedTarget?.metrics?.work ?: 0L)
+        val allocation = (reconstruction?.metrics?.allocation ?: 0L) +
+            (exactBasis?.metrics?.allocation ?: 0L) + (capturedTarget?.metrics?.allocation ?: 0L)
+        val elapsed = directElapsed()
+        refinement.accountDirect((work - chargedWork).coerceAtLeast(0L),
+            (allocation - chargedAllocation).coerceAtLeast(0L),
+            (elapsed - chargedElapsed).coerceAtLeast(Duration.ZERO))
+        chargedWork = work
+        chargedAllocation = allocation
+        chargedElapsed = elapsed
+    }
     if (result != null && (bound?.value != witness?.objective || witness == null) && !stopped()) {
-        reconstruction = reconstructCertificate(
-            model,
-            result.primal,
-            result.duals,
-            result.basis,
-            cancellation = cancellation,
-        )
+        val limits = if (refinedBeforeReconstruction) {
+            requireNotNull(refinement).remainingProofLimits()
+        } else {
+            ReconstructionLimits()
+        }
+        reconstruction = try {
+            reconstructCertificate(
+                model,
+                result.primal,
+                result.duals,
+                result.basis,
+                cancellation = proofCancellation,
+                limits = limits,
+            )
+        } catch (failure: Throwable) {
+            if (refinedBeforeReconstruction) {
+                requireNotNull(refinement).accountDirect(limits.maxWork, limits.maxAllocation,
+                    (directElapsed() - chargedElapsed).coerceAtLeast(Duration.ZERO))
+            }
+            throw failure
+        }
+        accountCompletedDirect()
         observer?.observe(
             LpCertifier.RATIONAL,
             reconstruction.witness != null || reconstruction.bound != null,
@@ -635,7 +686,7 @@ private fun certifyLpResultWithin(
         if (stronger != null && (bound == null || stronger.value > requireNotNull(bound).value)) bound = stronger
     }
     if (result != null && witness == null && !stopped()) {
-        witness = component?.exactWitness(observer, policy, cancellation)
+        witness = component?.exactWitness(observer, policy, proofCancellation)
         numericalWitness = witness ?: numericalWitness
     }
     if (result != null && numericalWitness == null && refinement != null &&
@@ -657,7 +708,7 @@ private fun certifyLpResultWithin(
                 model,
                 result.primal,
                 refinement,
-                cancellation,
+                proofCancellation,
                 observer,
             )
             pointRecovery = recovered
@@ -666,8 +717,8 @@ private fun certifyLpResultWithin(
         numericalWitness = point
         witness = policy.acceptNullable(LpCertifier.EXACT_POINT, point)
     }
-    if (result != null && (numericalWitness == null || numericalBound?.value != numericalWitness?.objective) &&
-        !stopped()
+    if (result != null && !refinedBeforeReconstruction &&
+        (numericalWitness == null || numericalBound?.value != numericalWitness?.objective) && !stopped()
     ) {
         refine()
     }
@@ -680,10 +731,11 @@ private fun certifyLpResultWithin(
             model,
             result.basis,
             cache = solver.exactBasisCache ?: ExactBasisCache(),
-            cancellation = cancellation,
+            cancellation = proofCancellation,
             observer = observer,
         )
         exactBasis = checked
+        accountCompletedDirect()
         if (checked.singularRank != null) {
             continuationTarget()
             solver.rejectSingularBasis(model, result.basis)
@@ -726,7 +778,7 @@ private fun certifyLpResultWithin(
         !stopped()
     ) {
         solver.infeasibleRay?.let { candidate ->
-            reconstruction = reconstructCertificate(model, ray = candidate, cancellation = cancellation)
+            reconstruction = reconstructCertificate(model, ray = candidate, cancellation = proofCancellation)
             observer?.observe(
                 LpCertifier.RATIONAL,
                 reconstruction.conflict != null,
@@ -745,7 +797,7 @@ private fun certifyLpResultWithin(
                 basis,
                 rayRow = solver.infeasibleRow,
                 cache = solver.exactBasisCache ?: ExactBasisCache(),
-                cancellation = cancellation,
+                cancellation = proofCancellation,
                 observer = observer,
             )
             exactBasis = checked
@@ -770,7 +822,7 @@ private fun certifyLpResultWithin(
             model,
             continuationTarget().basis,
             continuationCache,
-            cancellation,
+            proofCancellation,
             continuationLimits,
             fullEffort = fullContinuation,
             targetMetrics = continuationTarget().metrics,
@@ -787,13 +839,14 @@ private fun certifyLpResultWithin(
         // refinement that can prove the optimum.
         if (witness != null && bound?.value != witness?.objective && !stopped()) refine()
     }
+    accountCompletedDirect()
     if (continued == null) {
         capturedTarget?.let {
             observer?.observeContinuation(it.metrics)
         }
     }
     if (ray != null || conflict != null) bound = null
-    val unboundedness = if (bound == null && witness != null && !withheldWitness) {
+    val unboundedness = if (bound == null && witness != null && !withheldWitness && !stopped()) {
         if (refined?.unboundedness != null) {
             policy.acceptNullable(LpCertifier.RATIONAL, refined.unboundedness)?.let {
                 if (refined.unboundednessUsesBasis) policy.acceptNullable(LpCertifier.EXACT_BASIS, it) else it
@@ -809,7 +862,7 @@ private fun certifyLpResultWithin(
     } else {
         null
     }
-    if (refined != null && stopped()) {
+    if ((refined != null || strictPointDeadlineBound) && stopped()) {
         return CertifiedLpResult(
             null,
             null,

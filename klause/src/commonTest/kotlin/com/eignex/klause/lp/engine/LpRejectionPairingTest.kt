@@ -11,6 +11,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 class LpRejectionPairingTest {
     @Test
@@ -293,6 +294,147 @@ class LpRejectionPairingTest {
         assertSame(primary, caught)
         assertSame(secondary, assertNotNull(caught).suppressedExceptions.single())
         assertEquals(1L, records[key("PAIRING_UNAVAILABLE_ABORTED")])
+    }
+
+    @Test
+    fun `strict source basis endpoint recovers before optional reconstruction`() {
+        val state = strictState()
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val float = FloatLpResult(basis, 0.0, doubleArrayOf(), doubleArrayOf(0.0), exactState = state)
+        LpScopedSolver(state).use { owner ->
+            val result = certifyLpResult(
+                assertNotNull(state.toWorkingModel()), targetSolver(state), float,
+                refinement = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+            )
+
+            val point = assertNotNull(result.witness)
+            assertTrue(point.primal.single() > BigFraction.ZERO)
+            assertEquals(1, assertNotNull(result.refinement).strictAttempts)
+            assertNull(result.reconstruction)
+            assertNull(result.continuation)
+        }
+    }
+
+    @Test
+    fun `closed and optimizing sources retain initial reconstruction`() {
+        for (optimizing in listOf(false, true)) {
+            val zero = ExactLpNumber.of(0L)
+            val one = ExactLpNumber.of(1L)
+            val state = LpExactState(ExactLpModel(
+                listOf(emptyList()), emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = optimizing), ExactLpSide(one)))),
+                emptyList(), ExactLpObjective(listOf(if (optimizing) one else zero)),
+            ))
+            val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+            val float = FloatLpResult(basis, 0.0, doubleArrayOf(), doubleArrayOf(0.0), exactState = state)
+            LpScopedSolver(state).use { owner ->
+                val result = certifyLpResult(
+                    assertNotNull(state.toWorkingModel()), targetSolver(state), float,
+                    refinement = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+                )
+
+                assertNotNull(result.reconstruction)
+            }
+        }
+    }
+
+    @Test
+    fun `unavailable cumulative allowance opens no strict child and retains spending`() {
+        val state = strictState()
+        val limits = LpRefinementLimits()
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val float = FloatLpResult(basis, 0.0, doubleArrayOf(), doubleArrayOf(0.0), exactState = state)
+        LpScopedSolver(state).use { owner ->
+            owner.refinementCache.work = limits.maxWork
+            owner.refinementCache.allocation = limits.maxAllocation
+            val result = certifyLpResult(
+                assertNotNull(state.toWorkingModel()), targetSolver(state), float,
+                refinement = LpRefinementRequest(owner, owner.refinementCache, limits),
+            )
+
+            assertNull(result.witness)
+            assertEquals(0, assertNotNull(result.refinement).strictAttempts)
+            assertEquals(0L, owner.metrics.createdOwners)
+            assertTrue(owner.refinementCache.work >= limits.maxWork)
+            assertTrue(owner.refinementCache.allocation >= limits.maxAllocation)
+        }
+    }
+
+    @Test
+    fun `private strict child decline preserves reconstruction and charges it once`() {
+        val state = strictState()
+        val limits = LpRefinementLimits(maxRounds = 0, maxPivots = 1)
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val float = FloatLpResult(basis, 0.0, doubleArrayOf(), doubleArrayOf(0.5), exactState = state)
+        LpScopedSolver(state).use { owner ->
+            val result = certifyLpResult(
+                assertNotNull(state.toWorkingModel()), targetSolver(state), float,
+                refinement = LpRefinementRequest(owner, owner.refinementCache, limits),
+            )
+
+            assertNotNull(result.witness)
+            val direct = assertNotNull(result.reconstruction)
+            val refined = assertNotNull(result.refinement)
+            assertEquals(1, refined.strictAttempts)
+            assertEquals(refined.work + direct.work, owner.refinementCache.work)
+            assertEquals(refined.allocation + direct.allocation, owner.refinementCache.allocation)
+            assertEquals(0L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `containing stop after early strict point withholds the witness and keeps costs`() {
+        val state = strictState()
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val float = FloatLpResult(basis, 0.0, doubleArrayOf(), doubleArrayOf(0.0), exactState = state)
+        var cancelled = false
+        val stop = Cancellation { cancelled }
+        val observed = object : LpCertificationObserver by observer(HashMap()) {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                if (certifier == LpCertifier.RATIONAL && success) cancelled = true
+            }
+        }
+        LpScopedSolver(state).use { owner ->
+            val result = certifyLpResult(
+                assertNotNull(state.toWorkingModel()), targetSolver(state), float, cancellation = stop,
+                observer = observed,
+                refinement = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
+            )
+
+            assertNull(result.witness)
+            assertTrue(owner.refinementCache.work > 0L)
+            assertTrue(owner.refinementCache.allocation > 0L)
+            assertNull(result.reconstruction)
+        }
+    }
+
+    @Test
+    fun `finite owner deadline blocks reconstruction after a private strict child decline`() {
+        val state = strictState()
+        val limits = LpRefinementLimits(maxRounds = 0, maxPivots = 1, time = 1.seconds)
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val float = FloatLpResult(basis, 0.0, doubleArrayOf(), doubleArrayOf(0.5), exactState = state)
+        LpScopedSolver(state).use { owner ->
+            val observed = object : LpCertificationObserver by observer(HashMap()) {
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                    if (certifier == LpCertifier.RATIONAL && success) owner.refinementCache.elapsed = limits.time
+                }
+            }
+            val result = certifyLpResult(
+                assertNotNull(state.toWorkingModel()), targetSolver(state), float,
+                observer = observed,
+                refinement = LpRefinementRequest(owner, owner.refinementCache, limits),
+            )
+
+            assertNull(result.witness)
+            assertNull(result.lowerBound)
+            assertNull(result.reconstruction)
+            assertNull(result.continuation)
+            assertEquals(1, assertNotNull(result.refinement).strictAttempts)
+            assertTrue(owner.refinementCache.elapsed >= limits.time)
+            assertTrue(owner.refinementCache.work > 0L)
+            assertEquals(0L, owner.metrics.createdOwners)
+        }
     }
 
     private fun strictState(): LpExactState {

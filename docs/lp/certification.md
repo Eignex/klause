@@ -137,6 +137,23 @@ bound that loses authority cannot block a legitimate unboundedness package.
 
 ## Refinement and strict inequalities
 
+A current production satisfaction basis selecting a strict structural endpoint can
+attempt the strict-margin source query before optional closure reconstruction.
+Zero objective, exact source identity, enabled auxiliaries and positive cumulative
+allowances gate this order. The bounded source metadata scan is charged to the
+same owner; a selected endpoint schedules work and does not validate a float point.
+One unseeded refinement performs the strict attempt and existing basis/semantic
+fallbacks. Private child admission or representation declines preserve fallback
+under the remainder; containing stops and exhausted owner ledgers withhold evidence.
+Later reconstruction uses the remaining proof allowance, and its completed costs
+are debited even on failure or cancellation without a second unseeded attempt.
+Admission elapsed is excluded from later direct-cost debit because its meter
+already owns that time. The admission's absolute deadline and cumulative elapsed
+stop stay attached to subsequent proof phases and publication; neither fallback
+nor private child admission obtains a new deadline.
+Closed, optimizing and other basis cases retain the initial reconstruction order.
+
+
 For exact candidates `x,y`, refinement constructs
 
 ```text
