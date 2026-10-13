@@ -48,7 +48,7 @@ internal class PullSearchStream<T : Any>(
             try {
                 close()
             } catch (closeFailure: Throwable) {
-                failure.addSuppressed(closeFailure)
+                if (failure !== closeFailure) failure.addSuppressed(closeFailure)
             }
             throw failure
         }

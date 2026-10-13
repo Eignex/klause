@@ -15,6 +15,9 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -23,9 +26,65 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BacktrackSolverTest {
+
+    @Test
+    fun `a completed satisfaction call releases its additional peers`() {
+        var closes = 0
+        val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
+
+        val result = solver.solve(BacktrackParams(componentFactory = {
+            listOf(object : SearchComponent, AutoCloseable {
+                override fun close() { closes++ }
+            })
+        }))
+
+        assertIs<SolveResult.Sat>(result)
+        assertEquals(1, closes)
+    }
+
+    @Test
+    fun `closing an abandoned enumeration releases additional peers in reverse order`() {
+        val closed = ArrayList<Int>()
+        val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
+        val stream = solver.openEnumerate(BacktrackParams(componentFactory = {
+            List(2) { index -> object : SearchComponent, AutoCloseable {
+                override fun close() { closed += index }
+            } }
+        }))
+        val sample = stream.next()
+        val values = BooleanArray(2) { sample.boolValue(it) }
+
+        stream.close()
+        stream.close()
+
+        assertEquals(listOf(1, 0), closed)
+        assertEquals(values.toList(), List(2) { sample.boolValue(it) })
+    }
+
+    @Test
+    fun `finite initialization failures preserve multiple peer cleanup failures`() {
+        val primary = IllegalArgumentException("initialization")
+        val cleanups = List(2) { IllegalStateException("cleanup-$it") }
+        val closed = ArrayList<Int>()
+        val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            solver.solve(BacktrackParams(componentFactory = {
+                List(2) { index -> object : SearchComponent, AutoCloseable {
+                    override fun initialize(context: SearchContext): ComponentResult = throw primary
+                    override fun close() { closed += index; throw cleanups[index] }
+                } }
+            }))
+        }
+
+        assertSame(primary, failure)
+        assertEquals(listOf(1, 0), closed)
+        assertEquals(cleanups.asReversed(), failure.suppressedExceptions)
+    }
 
     @Test
     fun `successful search propagation informs the finite selector`() {

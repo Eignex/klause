@@ -4,14 +4,51 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 
 class RetainedLinearQueriesTest {
+    @Test
+    fun `failed root initialization preserves its failure and releases every peer`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val primary = IllegalArgumentException("initialization")
+        val cleanup = IllegalStateException("cleanup")
+        val closed = ArrayList<Int>()
+        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("peers",
+            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
+            List(2) { index -> object : SearchComponent, AutoCloseable {
+                override fun initialize(context: SearchContext): ComponentResult = throw primary
+                override fun close() {
+                    closed += index
+                    if (index == 1) throw cleanup
+                }
+            } }
+        }
+        val prepared = PreparedSearchRegistrations(source, listOf(registration))
+        val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
+            prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null)
+        }
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            queries.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+        }
+        queries.close()
+
+        assertSame(primary, failure)
+        assertSame(cleanup, failure.suppressedExceptions.single())
+        assertEquals(listOf(1, 0), closed)
+    }
+
     @Test
     fun `a refuted bound leaves a sibling exact source witness available`() {
         val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),

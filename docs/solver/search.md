@@ -181,6 +181,12 @@ chunks. MDD preparation sharing includes the initial and accepting states; value
 relabeling prepares an index over the relabeled transition array. Reversible live
 tuples, diagram reachability and all assignment-dependent payloads remain state-owned.
 
+Prepared factories receive an opening owner for construction-time resources.
+The invocation owns every installed closeable peer independently of its CP/theory
+compatibility accessor. Failure and terminal cleanup follow the reverse registration
+contract in [sessions](sessions.md#theory-invocation-scopes); factory selection and
+resource ownership do not change traversal order or specialized capabilities.
+
 ### Branching and global deductions
 
 Finite branching receives the native conflict's full variable and factor attribution,

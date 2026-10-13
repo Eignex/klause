@@ -10,6 +10,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.CardinalitySearchComponent
 import com.eignex.klause.solver.search.ClauseSearchComponent
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TheoryComponent
@@ -26,10 +27,11 @@ class PlannedSearch internal constructor(
     val cp: CpSearchComponent?,
     /** Theory participant, if selected. */
     val theory: TheoryComponent?,
+    private val resources: SearchInvocationResources,
 ) : AutoCloseable {
-    override fun close() {
-        (theory as? AutoCloseable)?.close()
-    }
+    override fun close() = resources.close()
+
+    internal fun closeAfter(failure: Throwable?) = resources.closeAfter(failure)
 }
 
 /** Builds the selected search components. */
@@ -83,6 +85,7 @@ internal class PreparedSearchComponents(
                     PropagationSession(requireNotNull(propagation), opening.cancellation),
                     IntArray(projection.problem.numIntVars) { local -> projection.sourceId(local) },
                 )
+                opening.ownComponent(cp)
                 cp.rebase()
                 listOf(cp)
             }

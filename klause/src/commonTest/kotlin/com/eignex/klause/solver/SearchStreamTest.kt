@@ -9,6 +9,17 @@ import kotlin.test.assertTrue
 
 class SearchStreamTest {
     @Test
+    fun `a shared search and cleanup failure is not suppressed onto itself`() {
+        val failure = IllegalArgumentException("shared failure")
+        val stream = PullSearchStream<Int>(pull = { throw failure }, release = { throw failure })
+
+        assertSame(failure, assertFailsWith<IllegalArgumentException> { stream.hasNext() })
+
+        assertTrue(failure.suppressedExceptions.isEmpty())
+        stream.close()
+    }
+
+    @Test
     fun `closing a buffered cursor discards its value and releases once`() {
         var releases = 0
         val stream = PullSearchStream(pull = { 1 }, release = { releases++ })

@@ -97,6 +97,25 @@ query results and work ledger remain private. Conditioned queries capture their 
 without changing the source model. The containing owner closes the invocation after
 its operation finishes.
 
+Prepared search openings own an invocation resource registry. Factories register
+scratch resources as soon as construction succeeds, and every installed closeable
+component joins the same registry. Ownership is deduplicated by identity. Partial
+construction or installation failure releases successful registrations in reverse
+order; normal completion and explicit close use that order too. Cleanup attempts
+every owner once, including after a cleanup failure. A construction or initialization
+failure stays primary, with distinct cleanup failures suppressed onto it; without a
+primary failure, the first cleanup failure is thrown. Ownership clears before
+callbacks, so repeated and reentrant close cannot dispose an owner twice.
+
+Finite satisfaction and optimization invocations also register their additional
+component peers and native resource owners. Closeable streams release them on
+completion, failure and explicit early close. Legacy sequence yields retain their
+existing native LP release points; callers using resource-owning extensions must use
+a closeable stream when abandoning consumption. Factories passed through the legacy
+finite component callback must clean up allocations they cannot return. Prepared
+factories instead register partial allocations through their opening owner.
+Published models and exact coordinates remain owned snapshots after cleanup.
+
 Internal conditioned linear query owners retain one private prepared search and
 native work ledger. Canonical CP projection, its immutable propagator indexes and
 theory fragments and completed exact-linear source factories remain prepared
@@ -107,7 +126,7 @@ bounds and a strict source-objective cutoff. Assertions retract after success,
 refutation, representation decline or cancellation; nested descriptor scopes add
 conditions without changing the source. Invocation deadlines and meters retract
 with their conditions. Check and decision allowances belong to the containing
-owner, and a sibling query cannot renew them. Closing disposes arithmetic state;
+owner, and a sibling query cannot renew them. Closing disposes the invocation registry;
 published witness coordinates remain owned by their samples.
 
 Conditioned traversal retains its opening decision level through restarts and

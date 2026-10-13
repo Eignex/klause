@@ -18,6 +18,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRealValue
@@ -124,10 +125,12 @@ internal class RetainedLinearQueries(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught") // Invocation cleanup preserves an arbitrary primary failure.
     private fun prepared(): PlannedSearch? {
         planned?.let { return it }
         val created = open(scope.stop, state) ?: return null
         var retained = false
+        var failure: Throwable? = null
         try {
             created.session.bindOpenTheoryWork(state.work)
             when (created.session.initialize()) {
@@ -140,8 +143,11 @@ internal class RetainedLinearQueries(
                 ComponentResult.Indeterminate -> Unit
             }
             return null
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
         } finally {
-            if (!retained) created.close()
+            if (!retained) created.closeAfter(failure)
         }
     }
 
@@ -240,10 +246,13 @@ internal class RetainedLinearQueries(
     override fun close() {
         if (closed) return
         closed = true
-        scope.close()
-        state.capture(planned?.session)
-        planned?.close()
+        val search = planned
         planned = null
+        val resources = SearchInvocationResources()
+        search?.let(resources::own)
+        resources.own(AutoCloseable { state.capture(search?.session) })
+        resources.own(scope)
+        resources.close()
     }
 }
 

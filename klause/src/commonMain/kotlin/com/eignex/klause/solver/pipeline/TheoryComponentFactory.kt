@@ -8,6 +8,7 @@ import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.TheoryComponent
@@ -25,14 +26,21 @@ internal fun ComponentPlan.theoryComponent(
     theorySolveStop: Cancellation? = null,
 ): TheoryComponent? = openTheoryComponent(theoryFragment(spec), smtStats, theorySolveStop)
 
+@Suppress("TooGenericExceptionCaught") // Invocation cleanup preserves an arbitrary primary failure.
 internal fun ComponentPlan.openTheoryComponent(
     fragment: Problem,
     smtStats: SmtStatsSink? = null,
     theorySolveStop: Cancellation? = null,
     preparedSource: PreparedExactLiraComponentFactory? = null,
 ): TheoryComponent? {
-    val opening = SearchComponentOpening(Cancellation.Never, smtStats, theorySolveStop)
-    return theoryComponentFactory(fragment) { preparedSource }?.invoke(opening)?.single() as? TheoryComponent
+    val resources = SearchInvocationResources()
+    val opening = SearchComponentOpening(Cancellation.Never, smtStats, theorySolveStop, resources)
+    return try {
+        theoryComponentFactory(fragment) { preparedSource }?.invoke(opening)?.single() as? TheoryComponent
+    } catch (failure: Throwable) {
+        resources.closeAfter(failure)
+        throw failure
+    }
 }
 
 internal fun ComponentPlan.theoryComponentFactory(
@@ -44,6 +52,7 @@ internal fun ComponentPlan.theoryComponentFactory(
         contribution: (ExactLiraAssignment, SearchModel) -> Unit,
     ): List<SearchComponent> = listOf(
         (preparedSource()?.open(contribution) ?: ExactLiraSearchComponent(fragment, contribution)).also { component ->
+            opening.ownComponent(component)
             component.useSolveStop(opening.theorySolveStop)
             opening.smtStats?.let(component::observeWith)
         },

@@ -201,11 +201,10 @@ class BacktrackSolver internal constructor(
     override fun solve(params: BacktrackParams): SolveResult {
         val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
-        for (outcome in driveSearch(params, sink = sink)) {
-            return verdictOf(outcome, params.assumptions, params.cancellation, sink)
+        return CpSatisfactionTraversal(problem, params, sink, lpSolveContext).use { traversal ->
+            val outcome = checkNotNull(traversal.next()) { "an unsliced traversal never pauses" }
+            verdictOf(outcome, params.assumptions, params.cancellation, sink)
         }
-        sink.stop()
-        return SolveResult.Unsat(stats = sink.snapshot())
     }
 
     /** Open a satisfaction search that pauses and resumes across slices. See [ResumableSolve]. */
@@ -299,13 +298,12 @@ class BacktrackSolver internal constructor(
         }
     }
 
-    private fun solveOnce(params: BacktrackParams): SolveResult {
-        for (outcome in driveSearch(params)) {
-            return when (outcome) {
+    private fun solveOnce(params: BacktrackParams): SolveResult =
+        CpSatisfactionTraversal(problem, params, null, lpSolveContext).use { traversal ->
+            when (val outcome = checkNotNull(traversal.next()) { "an unsliced traversal never pauses" }) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample)
 
-                // An exhaustion a component could not decide leaves part of the tree unvisited, so it
-                // refutes nothing — see the same split in [solve].
+                // An undecided leaf cannot establish exhaustion of the source.
                 is SearchOutcome.Exhausted -> if (outcome.indeterminate) {
                     SolveResult.Unknown(TerminationReason.Unsupported)
                 } else {
@@ -315,8 +313,6 @@ class BacktrackSolver internal constructor(
                 SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }
-        return SolveResult.Unsat()
-    }
 
     /**
      * Distinct SAT assignments via single-DFS traversal of the search tree. Complete:

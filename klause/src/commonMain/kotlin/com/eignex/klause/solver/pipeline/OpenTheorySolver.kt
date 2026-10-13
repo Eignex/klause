@@ -315,6 +315,7 @@ class OpenTheoryEngine internal constructor(
      * branch, so a caller that pauses there gets a run it can resume slice by slice; the theory's own checks stop
      * only on [params]' tokens, never on a slice.
      */
+    @Suppress("TooGenericExceptionCaught") // Invocation cleanup preserves an arbitrary primary failure.
     internal fun begin(
         params: TheoryParams,
         state: OpenTheorySolveState,
@@ -372,6 +373,7 @@ class OpenTheoryEngine internal constructor(
             theorySolveStop = cancellation,
         )
         var handedOff = false
+        var failure: Throwable? = null
         try {
             planned.session.bindOpenTheoryWork(work)
             when (planned.session.initialize()) {
@@ -412,8 +414,11 @@ class OpenTheoryEngine internal constructor(
             )
             handedOff = true
             return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
         } finally {
-            if (!handedOff) planned.close()
+            if (!handedOff) planned.closeAfter(failure)
         }
     }
 
