@@ -80,6 +80,7 @@ does not change the relative place of each theory in the model or support contra
 | [Portfolio slice evidence](evidence/slice-policy.md) | Evidence supporting scheduling defaults |
 | [Numerical kernel evidence](evidence/numerical-kernels.md) | Evidence supporting arithmetic implementation choices |
 | [State ownership evidence](evidence/coordinator-ownership.md) | Evidence supporting concrete lifecycle owners |
+| [Source derivation evidence](evidence/source-scoped-derivations.md) | Evidence supporting scoped mathematical admission |
 
 ## Maintaining this documentation
 
