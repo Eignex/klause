@@ -5,9 +5,12 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.SelectedProjectionChecks
+import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 
 /**
  * Immutable source-associated mechanism selection. Factories are retained, never mutable workspaces;
@@ -34,7 +37,18 @@ class PreparedFactorProjections internal constructor(
     }
 
     internal val nativePropagation: Boolean = providers.propagation === BuiltInPropagationProjectionProvider
-    internal val builtInRelaxation: Boolean = relaxation.all { it == null || it.builtIn }
+    internal val builtInRelaxation: Boolean = providers.relaxation === BuiltInRelaxationProjectionProvider ||
+        relaxation.indices.all(::usesBuiltInRelaxation)
+
+    internal val originalChecks: SelectedProjectionChecks? = if (problem.factors.indices.any { id ->
+            requiresOriginalCheck(id) && problem.factors[id].variables.reals.isEmpty() &&
+                problem.factors[id] !is ObjectiveBoundFactor
+        }) SelectedProjectionChecks(this) else null
+
+    internal val requiresRealSourceCheck: Boolean = problem.factors.indices.any { id ->
+        problem.factors[id].variables.reals.isNotEmpty() &&
+            (propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id))
+    }
 
     /** Retain selection only for the identical canonical source; rewrites select against their own factors. */
     fun forProblem(problem: Problem): PreparedFactorProjections =
@@ -46,13 +60,19 @@ class PreparedFactorProjections internal constructor(
 
     internal fun capabilities(factorId: Int): FactorExecutionCapabilities = declarations[factorId]
 
+    internal fun requiresOriginalCheck(factorId: Int): Boolean = propagation[factorId]?.builtIn == false &&
+        propagation[factorId]?.assignmentCheck != AssignmentCheckCapability.EXACT
+
+
     internal fun propagator(factorId: Int, preparation: FactorProjectionPreparation?): Propagator =
         checkNotNull(propagation[factorId]) { "unsupported propagation route for factor $factorId" }.create(preparation)
 
     internal fun invariant(factorId: Int, domains: Array<IntDomain>?): Invariant =
         checkNotNull(scoring[factorId]) { "unsupported local-search route for factor $factorId" }.create(domains)
 
-    internal fun usesBuiltInRelaxation(factorId: Int): Boolean = relaxation[factorId]?.builtIn != false
+    internal fun usesBuiltInRelaxation(factorId: Int): Boolean = relaxation[factorId]?.builtIn == true ||
+        (relaxation[factorId] == null &&
+            problem.factors[factorId].defaultExecutionCapabilities().relaxation == RelaxationCapability.NONE)
 
     internal fun emitRelaxation(factorId: Int, builder: RelaxationBuilder, linear: LinearLpProjection?) {
         relaxation[factorId]?.emit(builder, linear)

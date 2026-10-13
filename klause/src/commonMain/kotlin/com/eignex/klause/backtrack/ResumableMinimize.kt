@@ -18,6 +18,7 @@ import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LeafRealSolver
+import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
@@ -245,7 +246,14 @@ internal class ResumableMinimize(
             resources.own(it)
             leafSolver = it
         }
-        return owner.solve(sample, cancellation, params.toleranceCheck)
+        val result = owner.solve(sample, cancellation, params.toleranceCheck)
+        if (problem.factorProjections?.requiresRealSourceCheck != true || result.verdict !in setOf(
+                LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM, LpVerdict.UNBOUNDED,
+            )
+        ) return result
+        val completed = sample.copy(reals = result.reals, exactReals = result.exactReals)
+        return if (verifyRealCoordinates(problem, completed) is Verification.Accepted) result
+        else LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
     }
 
     // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.

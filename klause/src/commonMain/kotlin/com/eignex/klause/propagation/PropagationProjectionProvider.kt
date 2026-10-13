@@ -20,6 +20,7 @@ class PropagationProjection internal constructor(
     /** Explanation when deduction is deliberately inert. */
     val inertReason: String?,
     private val factory: (FactorProjectionPreparation?) -> Propagator,
+    internal val builtIn: Boolean,
 ) {
     init {
         require(capability != PropagationCapability.INERT ||
@@ -34,7 +35,7 @@ class PropagationProjection internal constructor(
         assignmentCheck: AssignmentCheckCapability,
         inertReason: String? = null,
         factory: () -> Propagator,
-    ) : this(capability, assignmentCheck, inertReason, { _ -> factory() })
+    ) : this(capability, assignmentCheck, inertReason, { _ -> factory() }, false)
 
     internal fun create(preparation: FactorProjectionPreparation?): Propagator {
         check(capability != PropagationCapability.UNSUPPORTED) { "unsupported propagation route" }
@@ -53,7 +54,7 @@ object BuiltInPropagationProjectionProvider : PropagationProjectionProvider {
         if (capabilities.propagation == PropagationCapability.UNSUPPORTED) return null
         return PropagationProjection(
             capabilities.propagation, capabilities.propagationCheck, capabilities.inertReason,
-            factor::buildPropagatorProjection,
+            factor::buildPropagatorProjection, true,
         )
     }
 }
