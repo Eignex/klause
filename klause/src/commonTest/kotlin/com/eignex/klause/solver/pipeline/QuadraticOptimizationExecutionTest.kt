@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
@@ -266,7 +267,7 @@ class QuadraticOptimizationExecutionTest {
 
     @Test
     fun `sliced quadratic traversal preserves exact completion and native accounting`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
         val x = QuadraticVariable.Real(SourceRealId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
@@ -285,6 +286,7 @@ class QuadraticOptimizationExecutionTest {
         handle.close()
         adapter.close()
 
+        assertTrue(slices > 1)
         assertEquals(BigFraction.ZERO, result.incumbent.value.rational)
         assertEquals(whole.nativeWork, native.work)
         assertEquals(whole.polynomialStats, native.polynomialStats)
