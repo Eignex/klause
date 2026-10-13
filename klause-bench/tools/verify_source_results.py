@@ -253,9 +253,21 @@ def mps_values(witness, variables):
 
 
 def mps_point(expression, variables, values):
-    return z3.simplify(z3.substitute(expression, *[(variable, z3.IntVal(values[name].numerator) if z3.is_int(variable)
-                                                 else rational(values[name]))
-                                                for name, variable in variables.items()]))
+    pending, visited, substitutions = [expression], set(), []
+    while pending:
+        node = pending.pop()
+        identity = node.get_id()
+        if identity in visited:
+            continue
+        visited.add(identity)
+        if z3.is_const(node) and node.decl().kind() == z3.Z3_OP_UNINTERPRETED:
+            name = node.decl().name()
+            if name in variables and node.eq(variables[name]):
+                value = values[name]
+                substitutions.append((node, z3.IntVal(value.numerator) if z3.is_int(node) else rational(value)))
+        else:
+            pending.extend(node.children())
+    return z3.simplify(z3.substitute(expression, *substitutions))
 
 
 def mps_objective_matches(objective, variables, values, reported, exact_mode, exact_objective, witness):
@@ -394,7 +406,7 @@ def check(cases, source_root=None, progress=None):
                     if witness_scope:
                         solver.pop()
                     result["witness"] = "exact source feasible"
-                else:
+                elif witness is None:
                     require_verdict(solver, z3.sat, record["problem"], 'source feasibility')
                 result["verdictCheck"] = "source sat"
                 if witness is not None and not is_smt:
@@ -414,6 +426,8 @@ def check(cases, source_root=None, progress=None):
                         accepted = all(z3.is_true(mps_point(row, variables, values)) for row in tolerance_rows)
                         result["toleranceAccepted"] = accepted
                         assert accepted, "MPS point exceeds source tolerance"
+                    if not exact_feasible:
+                        require_verdict(solver, z3.sat, record["problem"], 'source feasibility')
                 if record["proven"] and record["kind"] == "optimize":
                     assert reported_objective is not None and objective is not None
                     value = rational(reported_objective)
