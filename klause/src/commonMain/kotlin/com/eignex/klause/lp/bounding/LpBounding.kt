@@ -676,11 +676,11 @@ internal fun LpEngine.sparseSafePrune(
 }
 
 /**
- * Reduced-cost fixing from one [LpDeductionCertificate], over exact scaled integers. For any column with
- * nonzero reduced cost, moving Δ integer steps from that certificate term's minimizing endpoint raises
- * its Lagrangian by `|reducedCost|·Δ`. Any incumbent-beating solution has source objective
- * `≤ ⌈bound⌉ − 1`, so the column can move at most the exact unrounded certificate gap divided by
- * `|reducedCost|`. With [learn] each integer fixing carries the LP dual-decomposition reason (the other
+ * Reduced-cost fixing from one [LpDeductionCertificate] in minimized source objective units. Moving
+ * an integral column Δ steps from its minimizing endpoint raises the Lagrangian by `|reducedCost|·Δ`.
+ * A verified integral objective uses `ceil(bound) - 1`; other objectives retain an enclosing rational
+ * cutoff. The allowed movement uses the unrounded gap divided by `|reducedCost|`.
+ * With [learn] each integer fixing carries the LP dual-decomposition reason (the other
  * support columns' seated bounds + the incumbent bound + any dual-weighted non-global row's premises);
  * when the reason is inexpressible the fixing falls back to a reason-less level-local tightening (a
  * conflict-analysis leaf). Returns true if a reduction empties a domain (the node is then pruned).
