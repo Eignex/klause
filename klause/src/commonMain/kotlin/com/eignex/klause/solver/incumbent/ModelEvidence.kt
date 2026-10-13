@@ -61,7 +61,8 @@ internal class EvidenceCertificate private constructor(
                     else -> null
                 }
                 is MinimizeResult.Infeasible -> SourceClaim.Refutation
-                is MinimizeResult.Unbounded -> SourceClaim.Ray(result.sample,
+                is MinimizeResult.Unbounded -> if (kind == EvidenceKind.Witness) SourceClaim.Witness(result.sample)
+                    else SourceClaim.Ray(result.sample,
                     result.direction.withIndex().associate { (id, step) ->
                         SourceCoordinate(SourceCoordinate.Kind.Real, id) to step
                     })
