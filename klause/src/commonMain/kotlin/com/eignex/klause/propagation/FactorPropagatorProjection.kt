@@ -24,9 +24,13 @@ import com.eignex.klause.util.PermutationGroup
 internal fun Factor.propagatorProjection(
     preparation: FactorProjectionPreparation? = null,
     provider: PropagationProjectionProvider = BuiltInPropagationProjectionProvider,
-): Propagator = checkNotNull(provider.select(this)) {
-    "unsupported propagation route for ${this::class.simpleName}; select a propagation provider"
-}.create(this, preparation)
+): Propagator = if (provider === BuiltInPropagationProjectionProvider) {
+    BuiltInPropagationProjectionProvider.create(this, preparation)
+} else {
+    checkNotNull(provider.select(this)) {
+        "unsupported propagation route for ${this::class.simpleName}; select a propagation provider"
+    }.create(this, preparation)
+}
 
 internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPreparation?): Propagator = when (this) {
     is AllDifferent -> AllDifferentPropagator(

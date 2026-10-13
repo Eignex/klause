@@ -49,6 +49,18 @@ class PropagationProjection internal constructor(
 
 /** Default finite deduction, including compatibility with custom factors implementing [Propagator]. */
 object BuiltInPropagationProjectionProvider : PropagationProjectionProvider {
+    internal fun create(factor: Factor, preparation: FactorProjectionPreparation?): Propagator {
+        val capabilities = factor.defaultExecutionCapabilities()
+        check(capabilities.propagation != PropagationCapability.UNSUPPORTED) {
+            "unsupported propagation route for ${factor::class.simpleName}"
+        }
+        return factor.buildPropagatorProjection(preparation).also {
+            check((it === NoPropagator) == (capabilities.propagation == PropagationCapability.INERT)) {
+                "propagation capability disagrees with projection"
+            }
+        }
+    }
+
     override fun select(factor: Factor): PropagationProjection? {
         val capabilities = factor.defaultExecutionCapabilities()
         if (capabilities.propagation == PropagationCapability.UNSUPPORTED) return null

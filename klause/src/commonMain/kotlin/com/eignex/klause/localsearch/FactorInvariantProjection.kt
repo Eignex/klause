@@ -28,9 +28,13 @@ import com.eignex.klause.util.MutableIntIntMap
 internal fun Factor.invariantProjection(
     domains: Array<IntDomain>? = null,
     provider: ScoringProjectionProvider = BuiltInScoringProjectionProvider,
-): Invariant = checkNotNull(provider.select(this)) {
-    "unsupported local-search route for ${this::class.simpleName}; select a scoring provider"
-}.create(this, domains)
+): Invariant = if (provider === BuiltInScoringProjectionProvider) {
+    BuiltInScoringProjectionProvider.create(this, domains)
+} else {
+    checkNotNull(provider.select(this)) {
+        "unsupported local-search route for ${this::class.simpleName}; select a scoring provider"
+    }.create(this, domains)
+}
 
 internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invariant = when (this) {
     is AllDifferent -> allDifferentInvariantProjection()
