@@ -51,9 +51,11 @@ internal class DiffnRelocations(
         endpoint(lower, si)?.let { offer(listOf(Move.IntSet(vi, lower), Move.IntSet(vj, it))) }
         endpoint(lower, sj)?.let { offer(listOf(Move.IntSet(vj, lower), Move.IntSet(vi, it))) }
         // Translate the pair without closing its internal gap.
-        val floor = maxOf(state.rootDomains[vi].min, state.rootDomains[vj].min)
-        if (floor < lower) {
-            before(lower, floor)?.let { shift ->
+        val roomI = before(ci, state.rootDomains[vi].min)
+        val roomJ = before(cj, state.rootDomains[vj].min)
+        if (roomI != null && roomJ != null) {
+            val shift = minOf(roomI, roomJ)
+            if (shift > 0L) {
                 before(ci, shift)?.let { ti ->
                     before(cj, shift)?.let { tj -> offer(listOf(Move.IntSet(vi, ti), Move.IntSet(vj, tj))) }
                 }
