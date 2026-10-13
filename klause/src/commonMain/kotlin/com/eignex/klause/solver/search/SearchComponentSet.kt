@@ -26,5 +26,6 @@ class SearchComponentSet(
         cancellation: Cancellation = Cancellation.Never,
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         atoms: SearchAtomRegistry? = null,
-    ): SearchSession = SearchSession(components, maxChecks, cancellation, learnedDb, branchers, atoms)
+        executionControls: SearchExecutionControls = SearchExecutionControlAdapter(cancellation),
+    ): SearchSession = SearchSession(components, maxChecks, cancellation, learnedDb, branchers, atoms, executionControls)
 }

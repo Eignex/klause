@@ -465,6 +465,10 @@ interface TheoryComponent : SearchComponent
 
 /** Shared state exposed to components without exposing finite CP domains. */
 interface SearchContext {
+    /** Execution controls; custom contexts can inject deadline, accounting and stop diagnostics. */
+    val executionControls: SearchExecutionControls
+        get() = SearchExecutionControlAdapter(com.eignex.klause.util.Cancellation(::cancelled))
+
     /** Current shared decision level. */
     val decisionLevel: Int
 

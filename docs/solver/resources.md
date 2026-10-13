@@ -96,6 +96,30 @@ one available meter, rather than charging all possible ancestors. Presolve's ada
 explicitly owns native root-work conversion. Numerical kernels consume native controls;
 solver policy owns conversions and result/proof semantics.
 
+## Component execution controls
+
+`SearchContext.executionControls` supplies the invocation token with its deadline
+and caller meter, native check/decision accounting, and policy-owned operation
+allowances. `SearchExecutionControlAdapter` binds those services without exposing
+a concrete coordinator to components. The open-theory pipeline supplies its
+`OpenTheoryWorkSink` through an accounting adapter; shared search does not price
+or convert native work. Binding happens before component initialization. The
+containing sink survives branches, retractions, restarts and retained queries.
+
+`SearchStopCause` separates timeout, cancellation, native work, checks, decisions,
+operation allowance and representation decline. A component reports a local
+operation stop through its context; beginning another operation clears that local
+cause without renewing containing allowances. Cancellation and containing work
+exhaustion take precedence over a local decline. An incomplete residual remains
+unknown and cannot prove exhaustion. Open routing maps representation decline to
+`Unsupported`, operation/check/decision/work stops to `BudgetExhausted`, and keeps
+timeout and cancellation distinct. Slice pauses remain traversal lifecycle events;
+they do not renew lifetime controls or become refutations.
+
+Custom contexts retain the cancellation-only default for compatibility. Alternate
+coordinators inject persistent controls to retain deadline metadata, accounting
+and typed diagnostics across component callbacks.
+
 ## Parallel cap
 
 Built-in finite portfolios with more than one lane partition the remaining solve

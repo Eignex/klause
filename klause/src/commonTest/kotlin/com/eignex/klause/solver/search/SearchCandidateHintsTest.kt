@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.solver.pipeline.bindOpenTheoryWork
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -162,7 +163,7 @@ class SearchCandidateHintsTest {
             val work = OpenTheoryWorkSink()
             val commits = CommitRecorder()
             val session = SearchSession(emptyList())
-            session.attachOpenTheoryWork(work)
+            session.bindOpenTheoryWork(work)
             val run = session.openRun(numBoolVars = 2, observer = commits, candidateHints = hint)
 
             assertIs<SearchRunEvent.Satisfied>(run.next())
