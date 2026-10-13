@@ -81,7 +81,7 @@ object PortfolioBuilder {
             clausePeers = (0 until count).count { configs[it % configs.size] is BacktrackWorkerConfig } > 1)
         return configs.mapIndexed { armId, config ->
             val family = when (config) {
-                is BacktrackWorkerConfig -> ArmFamily.Backtrack
+                is BacktrackWorkerConfig, is CoreGuidedWorkerConfig -> ArmFamily.Backtrack
                 is LocalSearchWorkerConfig -> ArmFamily.LocalSearch
                 is AlnsWorkerConfig -> ArmFamily.Lns
             }
