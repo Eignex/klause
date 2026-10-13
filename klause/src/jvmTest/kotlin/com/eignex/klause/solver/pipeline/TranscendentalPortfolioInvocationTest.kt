@@ -94,6 +94,23 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
     }
 
     @Test
+    fun `parallel heuristics cannot turn failed neighborhoods into a source refutation`() {
+        val source = assertIs<SmtLibInput.Transcendental>(SmtLibAdmission.parse("""
+            (declare-const x Real)
+            (assert (<= (exp x) 0))
+            (check-sat)
+        """.trimIndent())).problem
+        val params = TranscendentalTheoryParams(maximumWork = 8000, maximumDepth = 0,
+            strategy = PolynomialStrategyParams(localSearch = LocalSearchParams(maxFlips = 4), alnsIterations = 4))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine, 4)
+
+        if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
+            assertIs<OpenTheoryResult.Unknown>(execution.result)
+        } else assertIs<OpenTheoryResult.Unsat>(execution.result)
+    }
+
+    @Test
     fun `parallel workers cannot optimize a captured function objective`() {
         val source = assertIs<SmtLibInput.Transcendental>(SmtLibAdmission.parse("""
             (declare-const x Real)
