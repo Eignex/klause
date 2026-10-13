@@ -121,6 +121,16 @@ class SearchExecutionControlsTest {
     }
 
     @Test
+    fun `a local operation stop preserves the containing allowance cause`() {
+        val controls = SearchExecutionControlAdapter()
+        controls.reportStop(SearchStopCause.CheckAllowance)
+
+        controls.reportStop(SearchStopCause.OperationAllowance)
+
+        assertEquals(SearchStopCause.CheckAllowance, controls.stopCause)
+    }
+
+    @Test
     fun `a new component operation clears only a local decline`() {
         val controls = SearchExecutionControlAdapter()
         controls.reportStop(SearchStopCause.OperationAllowance)
