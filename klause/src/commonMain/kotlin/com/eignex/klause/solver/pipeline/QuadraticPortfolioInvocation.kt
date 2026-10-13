@@ -79,7 +79,7 @@ internal class QuadraticPortfolioInvocation(
         val admission = plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE)
         if (!admission.runnable || expected == null || !expected.matchesModel(identity) || expected.sense != sense) {
             return QuadraticOptimizationResult.Unknown(
-            null, TerminationReason.Unsupported, sense, SolveStats.EMPTY)
+                null, TerminationReason.Unsupported, sense, SolveStats.EMPTY)
         }
         val factories = admission.arms.map { strategy ->
             val arm = when (strategy) {
