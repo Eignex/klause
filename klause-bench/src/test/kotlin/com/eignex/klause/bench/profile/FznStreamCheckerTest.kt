@@ -10,6 +10,47 @@ class FznStreamCheckerTest {
     private val declarations = "var 0..1: i; var float: x; var float: y; " +
         "constraint float_times(x, x, y); constraint float_le(y, 4.0); "
 
+    @Test
+    fun `finite objective fields are checked against the original source cost`() {
+        val source = "var 0..2: i; solve minimize i;"
+        val output = "i = 2;\n_objective = 2;\n----------\ni = 1;\n_objective = 1;\n----------\n"
+
+        val results = FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 2)
+
+        assertEquals(listOf("valid", "valid"), results.map { it.status })
+    }
+
+    @Test
+    fun `an incorrect finite objective field cannot earn a checked witness`() {
+        val source = "var 0..2: i; solve minimize i;"
+        val output = "i = 2;\n_objective = 1;\n----------\n"
+
+        val result = FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1).single()
+
+        assertEquals("invalid", result.status)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["2", "2.0"])
+    fun `equivalent comment and finite objective fields retain source acceptance`(helper: String) {
+        val source = "var 0..2: i; solve minimize i;"
+        val output = "% objective=2/1\ni = 2;\n_objective = $helper;\n----------\n"
+
+        val result = FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1).single()
+
+        assertEquals("valid", result.status)
+    }
+
+    @Test
+    fun `conflicting comment and finite objective field are rejected`() {
+        val source = "var 0..2: i; solve minimize i;"
+        val output = "% objective=2\ni = 2;\n_objective = 1;\n----------\n"
+
+        assertFailsWith<IllegalArgumentException> {
+            FznStreamChecker.check(source, output, interrupted = false, minimumWitnesses = 1)
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["minimize", "maximize"])
     fun `each improving publication is checked against original rows and objective`(sense: String) {

@@ -438,7 +438,8 @@ later cases still capture output and record their unavailable checker outcome.
 `checkFzn=true` checks every complete FlatZinc publication with the existing independent
 flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome in
 `source-check-fzn.json`. It uses authoritative coordinate comments when supplied and
-checks the exact preceding cost against the original solve objective. Its source scope
+checks the preceding `% objective=` cost or finite `_objective` field against the
+original solve objective. When both are present, their exact values must agree. Its source scope
 is `flatzinc-binary64`, as described under source validation below. Interrupted
 captures reject verdict markers and terminal `optimizationStatus` comments, including
 unattained boundaries; these belong after invocation completion.
@@ -450,6 +451,10 @@ use the stream checker's controls. It verifies byte hashes before checking each
 record, preserves the original solver revision separately from checker provenance,
 and retains an outcome for every supplied record. Replay does not relabel the
 original solve or establish its output timing.
+`com.eignex.klause.bench.profile.FznStreamChecker` accepts the same saved-record
+array for FlatZinc output. It retains original bytes and source-check results,
+including failures, without invoking the CLI. These replays check witness and
+objective semantics; terminal proof claims require their separate evidence checks.
 
 ### SMT reference records
 
