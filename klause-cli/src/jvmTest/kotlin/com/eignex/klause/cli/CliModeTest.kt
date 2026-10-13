@@ -50,6 +50,116 @@ import kotlin.test.assertTrue
 
 class CliModeTest {
     @Test
+    fun `ordinary source publication cancellation preserves its original exception without terminal claims`() {
+        val source = File.createTempFile("linear-publication-cancel", ".smt2").apply {
+            writeText("(declare-const b Bool) (declare-const x Real) " +
+                "(assert (= (* 3 x) (ite b 0 1))) (minimize (- 7 x)) (check-sat)")
+        }
+        val common = CommonOptions().apply { engine = "cp"; parallel = 1; randomSeed = 17; presolve = "off" }
+        val session = SmtLibMode.newSession()
+        val expected = CancellationException("linear consumer cancelled")
+        val values = mutableListOf<BigFraction>()
+        var terminal = false
+        val output = object : OutputProtocol by session.output(common) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                assertFalse(terminal)
+                values += assertIs<SourceValue.Rational>(objective).value
+                if (values.size == 2) throw expected
+                return true
+            }
+            override fun onVerdictContext(context: VerdictContext) { terminal = true }
+            override fun onComplete(verdict: Verdict) = error("cancelled publication cannot emit a terminal claim")
+        }
+
+        try {
+            val solvable = session.load(source.absolutePath, common)
+            assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
+            assertSame(expected, assertFailsWith<CancellationException> { SolveCore.solve(solvable, common, output) })
+        } finally {
+            source.delete()
+        }
+
+        assertEquals(listOf(BigFraction.ofLong(7), BigFraction.ofLong(20) / BigFraction.ofLong(3)), values)
+        assertFalse(terminal)
+    }
+
+    @Test
+    fun `ordinary source publication failure leaves a later invocation independent`() {
+        val source = File.createTempFile("linear-publication-failure", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (* 3 x) 1)) (minimize (+ 7 x)) (check-sat)")
+        }
+        val common = CommonOptions().apply { engine = "fixed"; parallel = 1; presolve = "off" }
+        val session = SmtLibMode.newSession()
+        val expected = IOException("closed linear consumer")
+        var terminal = false
+        val failed = object : OutputProtocol by session.output(common) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                assertFalse(terminal)
+                throw expected
+            }
+            override fun onVerdictContext(context: VerdictContext) { terminal = true }
+        }
+        val values = mutableListOf<BigFraction>()
+        var completed: Verdict? = null
+        val healthy = object : OutputProtocol by session.output(common) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                values += assertIs<SourceValue.Rational>(objective).value
+                return true
+            }
+            override fun onComplete(verdict: Verdict) { completed = verdict }
+        }
+
+        try {
+            val solvable = session.load(source.absolutePath, common)
+            assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
+            assertSame(expected, assertFailsWith<IOException> { SolveCore.solve(solvable, common, failed) })
+            val later = CommonOptions().apply { engine = "fixed"; parallel = 1; presolve = "off" }
+            SolveCore.solve(solvable, later, healthy)
+        } finally {
+            source.delete()
+        }
+
+        assertFalse(terminal)
+        assertEquals(listOf(BigFraction.ofLong(22) / BigFraction.ofLong(3)), values)
+        assertEquals(Verdict.OPTIMAL, completed)
+    }
+
+    @Test
+    fun `an ordinary source rendering veto withholds its witness and terminal metadata`() {
+        val source = File.createTempFile("linear-source-veto", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= x 1)) (minimize x) (check-sat)")
+        }
+        val common = CommonOptions().apply { engine = "fixed"; parallel = 1; presolve = "off" }
+        val session = SmtLibMode.newSession()
+        var checked = 0
+        var completed: Verdict? = null
+        val output = object : OutputProtocol by session.output(common) {
+            override fun arithmeticSourceValue(objective: SourceValue): SourceValue? {
+                checked++
+                return null
+            }
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean =
+                error("a rejected source rendering cannot reach publication")
+
+            override fun onLinearResult(result: LinearOptimizationResult) =
+                error("a rejected source rendering cannot justify terminal metadata")
+
+            override fun onComplete(verdict: Verdict) { completed = verdict }
+        }
+
+        try {
+            val solvable = session.load(source.absolutePath, common)
+            assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
+            SolveCore.solve(solvable, common, output)
+        } finally {
+            source.delete()
+        }
+
+        assertTrue(checked > 0)
+        assertEquals(Verdict.UNKNOWN, completed)
+    }
+
+    @Test
     fun `cancellation from the second actual arithmetic publication survives cleanup without terminal claims`() {
         val source = File.createTempFile("quadratic-publication-cancel", ".smt2").apply {
             writeText("(declare-const b Bool) (declare-const x Real) (assert (= x (ite b 0 1))) " +

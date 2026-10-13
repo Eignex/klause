@@ -128,7 +128,7 @@ records its exact-source or tolerance qualification. The adapter
 uses retained scalar metadata and performs no solver work or candidate admission.
 A frontend source-rendering veto emits nothing and does not advance publication
 state; it cannot suppress a later accepted rendering of the same payload.
-Polynomial and quadratic callbacks consume immutable accepted source assignments,
+Open-theory, polynomial and quadratic callbacks consume immutable accepted source assignments,
 their already evaluated exact objectives and invocation versions. Completion renders
 the latest accepted receipt; a terminal certificate's private witness does not replace
 it or create another improvement. An accepted receipt surviving an incomplete result

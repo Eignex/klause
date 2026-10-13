@@ -254,10 +254,14 @@ internal object SolveCore {
                 val objective = pipeline.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = pipeline.maximize)
-                    val execution =
-                        OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, objective, engine, openCores)
+                    val execution = OpenTheoryPipeline.searchWithoutTheory(
+                        pipeline.model, params, objective, engine, openCores, pipeline.maximize,
+                    ) { accepted ->
+                        val rendered = pipeline.render(OpenTheoryAssignment.Sampled(accepted.sample))
+                        publication.publish(rendered, accepted.value, accepted.version)
+                    }
                     reportOpenTheoryOptimum(
-                        (execution as OpenTheoryExecution.Optimize).result,
+                        execution as OpenTheoryExecution.Optimize,
                         pipeline.maximize,
                         pipeline.render,
                         common.statistics,
@@ -349,9 +353,12 @@ internal object SolveCore {
                 val objective = request.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = request.maximize)
-                    val execution = OpenTheoryPipeline.execute(request, theoryParams, engine, openCores)
+                    val execution = OpenTheoryPipeline.execute(request, theoryParams, engine, openCores) { accepted ->
+                        val rendered = pipeline.render(OpenTheoryAssignment.Sampled(accepted.sample))
+                        publication.publish(rendered, accepted.value, accepted.version)
+                    }
                     reportOpenTheoryOptimum(
-                        (execution as OpenTheoryExecution.Optimize).result,
+                        execution as OpenTheoryExecution.Optimize,
                         request.maximize,
                         pipeline.render,
                         common.statistics,
@@ -1033,14 +1040,8 @@ internal fun portfolioVerboseListener(verbose: Boolean): ((String, SearchEvent) 
 /** Bytes per mebibyte — heap figures are reported in MiB, the unit `-Xmx` is set in. */
 private const val MIB = 1024L * 1024L
 
-/**
- * Report the outcome of minimizing an open model's objective.
- *
- * A maximize is driven as the minimization of the negated objective, and the reported value is negated
- * back, so the descent has one direction and the sign lives only at this boundary.
- */
 private fun reportOpenTheoryOptimum(
-    result: OpenTheoryOptimum,
+    execution: OpenTheoryExecution.Optimize,
     maximize: Boolean,
     render: (OpenTheoryAssignment) -> String,
     statistics: Boolean,
@@ -1051,16 +1052,23 @@ private fun reportOpenTheoryOptimum(
     publication: ArithmeticPublication,
     budgetExhausted: (Boolean) -> Boolean,
 ) {
+    val result = execution.result
+    val receipt = execution.acceptedIncumbent
     result.linearResult?.let { linear ->
         reportLinearOptimization(linear, { render(OpenTheoryAssignment.Sampled(it)) }, output, publication,
-            statistics, routingElapsedMs, completePool, routingLpStats, budgetExhausted)
+            statistics, routingElapsedMs, completePool, routingLpStats, budgetExhausted, receipt)
         return
     }
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
 
-    fun solution(rendered: String, value: BigFraction?): Boolean {
+    fun solution(assignment: OpenTheoryAssignment?, value: BigFraction?): Boolean {
+        receipt?.let {
+            return publication.publish(render(OpenTheoryAssignment.Sampled(it.sample)), it.value, it.version)
+        }
         val signed = if (maximize) value?.negated() else value
-        return signed?.let { publication.publish(rendered, SourceValue.Rational(it)) } ?: false
+        return if (assignment != null && signed != null) {
+            publication.publish(render(assignment), SourceValue.Rational(signed))
+        } else false
     }
 
     fun complete(verdict: Verdict, accepted: Boolean) {
@@ -1077,7 +1085,7 @@ private fun reportOpenTheoryOptimum(
     )
     when (result) {
         is OpenTheoryOptimum.Optimal -> {
-            complete(Verdict.OPTIMAL, solution(render(result.assignment), result.value))
+            complete(Verdict.OPTIMAL, solution(result.assignment, result.value))
         }
 
         is OpenTheoryOptimum.Infeasible -> output.onComplete(Verdict.UNSATISFIABLE)
@@ -1085,15 +1093,16 @@ private fun reportOpenTheoryOptimum(
         // The witness is reported like any other solution: it is one, and the verdict beside it says the
         // objective reaches past it without limit rather than that this is the best value found.
         is OpenTheoryOptimum.Unbounded -> {
-            complete(Verdict.UNBOUNDED, solution(render(result.witness), result.value))
+            complete(Verdict.UNBOUNDED, solution(result.witness, result.value))
         }
 
         is OpenTheoryOptimum.Bounded -> {
             val incumbent = result.incumbent
             if (incumbent == null) {
-                output.onComplete(Verdict.UNKNOWN)
+                if (receipt == null) output.onComplete(Verdict.UNKNOWN)
+                else complete(Verdict.BEST_FOUND, solution(null, null))
             } else {
-                complete(Verdict.BEST_FOUND, solution(render(incumbent), result.value))
+                complete(Verdict.BEST_FOUND, solution(incumbent, result.value))
             }
         }
     }
