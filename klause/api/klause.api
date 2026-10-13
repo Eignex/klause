@@ -9885,6 +9885,8 @@ public final class com/eignex/klause/solver/evidence/SourceQuadraticBoxDerivatio
 public final class com/eignex/klause/solver/evidence/SourceQuadraticEvidenceKt {
 	public static final fun quadraticSourceProofContext (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceProofContext;
 	public static synthetic fun quadraticSourceProofContext$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceProofContext;
+	public static final fun quadraticSourceResultCapture (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceResultCapture;
+	public static synthetic fun quadraticSourceResultCapture$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceResultCapture;
 }
 
 public final class com/eignex/klause/solver/evidence/SourceQuadraticResultCaptureKt {
@@ -12322,6 +12324,7 @@ public final class com/eignex/klause/solver/result/PresolveStats {
 
 public final class com/eignex/klause/solver/result/QuadraticCertificate {
 	public final fun getClaim ()Lcom/eignex/klause/solver/result/QuadraticClaim;
+	public final fun getDerivation ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
 	public final fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
 	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
 	public final fun verify (Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceProofContext;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
