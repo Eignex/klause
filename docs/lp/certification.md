@@ -97,6 +97,11 @@ other endpoint contributions and every weighted scoped row. A continuous endpoin
 that differs from its declared bound withholds a reusable CP reason; the deduction
 remains local to the numerical scope. Bounds and certificates cannot survive a
 foreign exact state, rollback or objective change.
+For a nonintegral objective, node pruning compares the exact certified bound in
+minimized source units with an enclosing rational incumbent cutoff. It uses the
+unrounded objective without an integer objective atom, so the prune has no
+reusable CP reason. Equality at the reported binary64 incumbent
+remains conservative because the cutoff uses its upper neighbor.
 
 Reconstruction converts signed single-word fractions directly between
 `BigFraction` and `Frac128`; wider values use both words. Both paths retain the
