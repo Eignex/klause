@@ -19,15 +19,21 @@ object SourceRecordCheck {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("bundle", "sha256") || options.keys == setOf("input64", "sha256")) {
-            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest>"
+        val parts = options.keys.filter { it.startsWith("input64.") }.sorted()
+        require(parts.size <= 8 && parts.withIndex().all { (index, name) -> name == "input64.$index" }) {
+            "Inline parts must be contiguous input64.0 through input64.7"
+        }
+        require(options.keys == setOf("bundle", "sha256") || options.keys == setOf("input64", "sha256") ||
+            (parts.isNotEmpty() && options.keys == parts.toSet() + "sha256")) {
+            "Use bundle=<https URL> or base64 gzip input64 parts, with sha256=<digest>"
         }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val root = File(System.getProperty("klause.workspace.root", "."))
-        val bytes = options["input64"]?.let { encoded ->
-            require(encoded.length <= 96 * 1024) { "Inline bundle is oversized; use a URL" }
-            Base64.getDecoder().decode(encoded)
-        } ?: run {
+        val encoded = options["input64"]?.let(::listOf) ?: parts.map(options::getValue)
+        val bytes = if (encoded.isNotEmpty()) {
+            require(encoded.all { it.length <= 96 * 1024 }) { "Inline part is oversized; use a URL" }
+            Base64.getDecoder().decode(encoded.joinToString(""))
+        } else {
             val url = URI(requireNotNull(options["bundle"]))
             require(url.scheme == "https" && url.userInfo == null)
             val connection = url.toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
