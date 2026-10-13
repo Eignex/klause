@@ -660,6 +660,58 @@ class PortfolioTest {
     }
 
     @Test
+    fun `accepted callbacks retain exact values and monotonic versions through rounded ties`() {
+        val first = BigFraction.of(parseBigInt("9007199254740993"), BIG_ONE)
+        val second = BigFraction.of(parseBigInt("9007199254740992"), BIG_ONE)
+        val values = listOf(first, second, first)
+        val incumbents = PortfolioIncumbents(
+            valueOf = { candidate -> values[candidate.sample.ints.single().toInt()] },
+            improves = { candidate, standing -> candidate < standing },
+            approximateValue = { it.toDouble() },
+            gain = { standing, candidate -> (standing - candidate).toDouble() },
+        )
+        val worker = PortfolioWorker.ofMinimize("exact", 0) { _, _, _, _ -> sequence {
+            for (i in values.indices) yield(MinimizeResult.BestFound(
+                Sample(BooleanArray(0), longArrayOf(i.toLong())), values[i].toDouble(),
+                TerminationReason.BudgetExhausted,
+            ))
+            yield(MinimizeResult.Unknown(TerminationReason.SearchExhausted))
+        } }
+        val accepted = mutableListOf<AcceptedPortfolioIncumbent<BigFraction>>()
+
+        Portfolio.thompson(listOf(worker)).use { portfolio ->
+            portfolio.minimize(Cancellation.Never, null, incumbents, onAccepted = {
+                assertEquals(it.objective, incumbents.exchange.current()?.objective)
+                accepted += it
+            })
+        }
+
+        assertEquals(listOf(1L, 2L), accepted.map { it.version })
+        assertEquals(listOf(first, second), accepted.map { it.objective })
+        assertEquals(listOf(0L, 1L), accepted.map { it.assignment.ints.single() })
+    }
+
+    @Test
+    fun `accepted callback failure remains primary after retained handle cleanup`() {
+        val sample = Sample(BooleanArray(0), longArrayOf(1))
+        val handle = TrackingResumableSearch(
+            MinimizeResult.Optimal(sample, 1.0),
+            MinimizeResult.BestFound(sample, 1.0, TerminationReason.BudgetExhausted),
+            closeFailure = "close failure",
+        )
+        val portfolio = Portfolio.thompson(listOf(trackingWorker("failing", 0, handle)))
+
+        val failure = assertFailsWith<IllegalStateException> {
+            portfolio.minimize(Cancellation.Never, null, PortfolioIncumbents.floating(),
+                onAccepted = { error("accepted output failure") })
+        }
+
+        assertEquals("accepted output failure", failure.message)
+        assertEquals(1, handle.closes)
+        assertEquals("close failure", failure.suppressedExceptions.single().message)
+    }
+
+    @Test
     fun `real unresolved arms terminate without claiming complete coverage`() {
         for (withIncumbent in listOf(false, true)) {
             val fixtures = List(2) { UnresolvedRealLeafFixture(withIncumbent) }

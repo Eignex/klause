@@ -364,7 +364,11 @@ neighborhood factories to that invocation. Their exchange keeps original and
 minimized algebraic values separately. A typed terminal publication enters the
 same schedule only after source, condition, objective, authority, witness and exact
 attainment/strictness checks. Scalar worker telemetry remains incomplete; the
-accepted native result retains its optimum, strict limit or ray semantics.
+accepted native result retains its optimum, strict limit or ray semantics. An accepted-incumbent
+observer receives the installed immutable assignment, its already evaluated exact
+value and a monotonic invocation version under the schedule lock. It runs only for
+strict verified exchange improvements; callback failures stop the invocation and
+remain primary through retained-handle cleanup.
 Heuristic completion cannot finish a source proof. Single-engine execution retains
 its own traversal semantics; FIXED runs one lane. Exact-neighborhood preparation
 contributes to scheduler instruction coverage once; retained slices keep that charge

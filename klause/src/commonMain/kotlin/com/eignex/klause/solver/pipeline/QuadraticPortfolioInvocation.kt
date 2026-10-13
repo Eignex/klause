@@ -115,7 +115,8 @@ internal class QuadraticPortfolioInvocation(
         }
         val scalar = invocation.use { it.minimize(native.polynomial, null, incumbents,
             PortfolioTerminalCheck { worker, search ->
-                val completed = (search as? QuadraticPortfolioSearch)?.completion ?: return@PortfolioTerminalCheck null
+                val completed = (search as? QuadraticPortfolioSearch)?.completion
+                    ?: return@PortfolioTerminalCheck null
                 val checked = terminalLock.withLock { check(worker, completed) }
                     ?: return@PortfolioTerminalCheck null
                 PortfolioTerminalPublication(checked) { if (terminal == null) terminal = completed }
@@ -133,30 +134,10 @@ internal class QuadraticPortfolioInvocation(
         worker: PortfolioWorker, result: QuadraticOptimizationResult,
     ): Verification<Unit, Unit>? = try {
         when (result) {
-            is QuadraticOptimizationResult.Optimal -> common(worker, result.sense, result.incumbent)
-                ?: certificate(result.certificate, QuadraticClaim.Optimal)
-                ?: certificate(result.bound.certificate, QuadraticClaim.Bound)
-                ?: if (result.bound.strict ||
-                    terminalArithmetic.compare(result.incumbent.value, result.bound.value) != 0
-                ) {
-                    Verification.Rejected("quadratic optimum does not attain its bound")
-                } else bound(result.bound.value, false)
-            is QuadraticOptimizationResult.UnattainedLimit -> common(worker, result.sense, result.incumbent)
-                ?: certificate(result.certificate, QuadraticClaim.UnattainedLimit)
-                ?: certificate(result.bound.certificate, QuadraticClaim.Bound)
-                ?: if (!result.bound.strict || !beyond(result.incumbent.value, result.bound.value)) {
-                    Verification.Rejected("quadratic unattained limit has an invalid strict witness")
-                } else bound(result.bound.value, true)
-            is QuadraticOptimizationResult.Unbounded -> common(worker, result.sense, result.incumbent)
-                ?: certificate(result.certificate, QuadraticClaim.Unbounded)
-                ?: Verification.Accepted(Candidate(Unit, Unit))
-            is QuadraticOptimizationResult.Infeasible -> {
-                common(worker, result.sense, null)
-                    ?: certificate(result.certificate, QuadraticClaim.Infeasible)
-                    ?: if (incumbents.exchange.current() != null) {
-                        Verification.Rejected("source refutation contradicts a witness")
-                    } else Verification.Accepted(Candidate(Unit, Unit))
-            }
+            is QuadraticOptimizationResult.Optimal -> checkOptimum(worker, result)
+            is QuadraticOptimizationResult.UnattainedLimit -> checkLimit(worker, result)
+            is QuadraticOptimizationResult.Unbounded -> checkUnbounded(worker, result)
+            is QuadraticOptimizationResult.Infeasible -> checkRefutation(worker, result)
             is QuadraticOptimizationResult.BestFound -> partialBound(worker, result.bound)
             is QuadraticOptimizationResult.Unknown -> partialBound(worker, result.bound)
         }
@@ -165,6 +146,49 @@ internal class QuadraticPortfolioInvocation(
     } catch (stop: PolynomialResourceLimit) {
         native.decline(stop.resource)
         Verification.Indeterminate("quadratic terminal checking exceeded representation limits")
+    }
+
+    private fun checkOptimum(
+        worker: PortfolioWorker, result: QuadraticOptimizationResult.Optimal,
+    ): Verification<Unit, Unit> {
+        common(worker, result.sense, result.incumbent)?.let { return it }
+        certificate(result.certificate, QuadraticClaim.Optimal)?.let { return it }
+        certificate(result.bound.certificate, QuadraticClaim.Bound)?.let { return it }
+        if (result.bound.strict ||
+            terminalArithmetic.compare(result.incumbent.value, result.bound.value) != 0
+        ) return Verification.Rejected("quadratic optimum does not attain its bound")
+        return bound(result.bound.value, false)
+    }
+
+    private fun checkLimit(
+        worker: PortfolioWorker, result: QuadraticOptimizationResult.UnattainedLimit,
+    ): Verification<Unit, Unit> {
+        common(worker, result.sense, result.incumbent)?.let { return it }
+        certificate(result.certificate, QuadraticClaim.UnattainedLimit)?.let { return it }
+        certificate(result.bound.certificate, QuadraticClaim.Bound)?.let { return it }
+        if (!result.bound.strict || !beyond(result.incumbent.value, result.bound.value)) {
+            return Verification.Rejected("invalid witness for the strict quadratic limit")
+        }
+        return bound(result.bound.value, true)
+    }
+
+    private fun checkUnbounded(
+        worker: PortfolioWorker, result: QuadraticOptimizationResult.Unbounded,
+    ): Verification<Unit, Unit> {
+        common(worker, result.sense, result.incumbent)?.let { return it }
+        certificate(result.certificate, QuadraticClaim.Unbounded)?.let { return it }
+        return Verification.Accepted(Candidate(Unit, Unit))
+    }
+
+    private fun checkRefutation(
+        worker: PortfolioWorker, result: QuadraticOptimizationResult.Infeasible,
+    ): Verification<Unit, Unit> {
+        common(worker, result.sense, null)?.let { return it }
+        certificate(result.certificate, QuadraticClaim.Infeasible)?.let { return it }
+        if (incumbents.exchange.current() != null) {
+            return Verification.Rejected("source refutation contradicts a witness")
+        }
+        return Verification.Accepted(Candidate(Unit, Unit))
     }
 
     private fun partialBound(
