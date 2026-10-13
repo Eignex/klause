@@ -1,13 +1,17 @@
 package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.test.assertIs
 
 class DimacsTest {
 
@@ -70,7 +74,9 @@ class DimacsTest {
         val w = Dimacs.parseWcnf(text)
         assertEquals(3, w.numOriginalBoolVars)
         assertEquals(5, w.problem.numBoolVars)
-        assertEquals(3, w.problem.factors.size)
+        assertIs<PropagationResult.Unsat>(
+            w.problem.propagate(Assumptions(bools = mapOf(0 to false, 1 to false))),
+        )
         assertEquals(0L, w.objective.boolWeights[0])
         assertEquals(1L, w.objective.boolWeights[3])
         assertEquals(2L, w.objective.boolWeights[4])
@@ -115,7 +121,9 @@ class DimacsTest {
         val w = Dimacs.parseWcnf(text)
         assertEquals(2, w.numOriginalBoolVars)
         assertEquals(4, w.problem.numBoolVars)
-        assertEquals(3, w.problem.factors.size)
+        assertIs<PropagationResult.Unsat>(
+            w.problem.propagate(Assumptions(bools = mapOf(0 to false, 1 to false))),
+        )
         assertEquals(5L, w.objective.boolWeights[2])
         assertEquals(3L, w.objective.boolWeights[3])
     }
