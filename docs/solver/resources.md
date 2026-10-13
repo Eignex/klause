@@ -131,14 +131,18 @@ Linear repair completion retains the same native check, decision and work ledger
 across candidate queries. Cached source planning neither renews an allowance nor
 rearms the containing deadline. An interrupted native root installation releases
 that partial mutable search; a retry keeps the immutable source plan, canonical
-CP projection, selected theory fragment and charged work. Active query assertions retract even when an invocation expires.
+CP projection, selected theory fragment, completed native row factory and charged work. Active query assertions retract even when an invocation expires.
 
 The exact-linear source factory charges factor, row and coefficient visits to its
 supplied cancellation meter. Exact rational row conversion and owned-buffer copies
 are charged before their atomic operation; the next poll can withhold the entire
 preparation after cooperative overspend. A stopped preparation exports no factory
 or partial row catalogue and refunds no work. The completed factory retains neither
-that token nor an allowance. Opening it creates fresh mutable components whose
+that token nor an allowance. Linear completion caches only a completed factory per
+worker. Its separate preparation counter records every charged attempt without
+refunding cancelled preparation; native check/decision units retain their existing
+scale. A retry after interrupted mutable initialization opens from the same factory
+and does not repeat those immutable preparation charges. Opening it creates fresh mutable components whose
 invocation stop, certification, statistics and LP/search budgets are bound by their
 caller; it does not grant new containing work or transfer an old context.
 

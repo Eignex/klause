@@ -9,9 +9,12 @@ import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
+import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
 import com.eignex.klause.util.Cancellation
 
 /** Builds the theory component selected by this plan. */
@@ -25,7 +28,10 @@ internal fun ComponentPlan.openTheoryComponent(
     fragment: Problem,
     smtStats: SmtStatsSink? = null,
     theorySolveStop: Cancellation? = null,
+    preparedSource: PreparedExactLiraComponentFactory? = null,
 ): TheoryComponent? {
+    fun exact(contribution: (ExactLiraAssignment, SearchModel) -> Unit): ExactLiraSearchComponent =
+        preparedSource?.open(contribution) ?: ExactLiraSearchComponent(fragment, contribution)
     return when (theoryPipeline) {
         ProblemPipeline.DIFFERENCE_THEORY -> DifferenceSearchComponent.withRootBounds(
             fragment,
@@ -33,7 +39,7 @@ internal fun ComponentPlan.openTheoryComponent(
             cpIntVars,
         )
 
-        ProblemPipeline.EXACT_LRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
+        ProblemPipeline.EXACT_LRA -> exact { assignment, model ->
             assignment.reals.forEachIndexed { variable, value ->
                 model.put(SearchRealValue(variable), value)
                 model.contribute(SearchExactRealValue(SourceRealId(variable)), value)
@@ -43,7 +49,7 @@ internal fun ComponentPlan.openTheoryComponent(
             smtStats?.let(component::observeWith)
         }
 
-        ProblemPipeline.EXACT_LIRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
+        ProblemPipeline.EXACT_LIRA -> exact { assignment, model ->
             assignment.ints.forEachIndexed { variable, value ->
                 if (intOwner(variable) == IntVariableOwner.THEORY) {
                     model.put(SearchIntValue(variable), value)

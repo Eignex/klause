@@ -32,12 +32,13 @@ internal class OpenExactNeighborhood(
     private val prepared by lazy {
         (preparedSource ?: model.prepareExecutionPlan(objective)).prepareConditionedLinearQuery()
     }
-    private val components by lazy {
+    private val componentPreparation = lazy {
         val source = prepared ?: return@lazy null
         val working = requireNotNull(source.model)
         val plan = requireNotNull(source.componentPlan)
         PreparedSearchComponents(plan, working, plan.cpSourceDomains(working))
     }
+    private val components by componentPreparation
     private val queries = RetainedLinearQueries(model, params, objective, hints = { stop, state ->
         val source = prepared
         val plan = source?.componentPlan
@@ -47,6 +48,8 @@ internal class OpenExactNeighborhood(
     val exhausted: Boolean get() = queries.exhausted
     val work: Long get() = queries.work
     val stats: SolveStats get() = queries.stats
+    val preparationWork: Long get() = if (componentPreparation.isInitialized()) components?.preparationWork ?: 0 else 0
+    val sourcePrepared: Boolean get() = componentPreparation.isInitialized() && components?.sourcePrepared == true
 
     init {
         require(preparedSource == null || preparedSource.belongsTo(model)) {
@@ -54,11 +57,13 @@ internal class OpenExactNeighborhood(
         }
     }
 
-    private fun open(stop: Cancellation, state: OpenTheorySolveState): PlannedSearch? = components?.open(
-        maxChecks = params.maxLeaves, cancellation = stop,
-        learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
-        smtStats = state.smt, theorySolveStop = stop,
-    )
+    private fun open(stop: Cancellation, state: OpenTheorySolveState): PlannedSearch? {
+        val source = components ?: return null
+        if (!source.prepareSource(stop)) return null
+        return source.open(maxChecks = params.maxLeaves, cancellation = stop,
+            learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
+            smtStats = state.smt, theorySolveStop = stop)
+    }
 
     fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T =
         queries.withCondition(condition, cancellation, action)
