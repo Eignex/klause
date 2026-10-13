@@ -18,15 +18,17 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ObjectiveShavingOptimumTest {
 
     @Test
-    fun `unbound objective shaving retains its native optimum without sharing a floor`() {
+    fun `unbound objective shaving retains its exhausted incumbent without sharing a floor`() {
         val source = triangleCover()
         val executable = source.bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
@@ -40,7 +42,9 @@ class ObjectiveShavingOptimumTest {
 
         val result = worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
 
-        assertTrue(result is MinimizeResult.Optimal && result.objectiveValue == 2.0)
+        val completed = assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(2.0, completed.objective)
+        assertEquals(TerminationReason.SearchExhausted, completed.reason)
         assertEquals(Double.NEGATIVE_INFINITY, bounds.current())
     }
 

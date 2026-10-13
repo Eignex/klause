@@ -25,6 +25,9 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.MinimizeResult.Optimal
@@ -520,15 +523,19 @@ class PortfolioLanesTest {
         // A single backtrack worker (i % 3 == 0) must be the SAT-optimized config; confirm the
         // built pool both surfaces that worker and solves a conflict-heavy UNSAT instance.
         val problem = pigeonhole(pigeons = 4, holes = 3)
+        val executable = problem.bake()
+        val model = ModelIdentity.of(executable)
+        val invocation = EngineInvocation(executable.prepareExecutionPlan(), model)
         Portfolio.thompson(
             lanes = 4,
             workers = PortfolioBuilder.buildExplicit(
-                problem.bake(),
+                executable,
                 emptyList(),
                 backtrackWorkers = 1,
                 kind = Kind.CSP,
-            ),
+            ).map { it.bindInvocation(invocation) },
         ).use { p ->
+            p.evidenceVerification?.bindInvocation(invocation)
             assertTrue(p.workers.any { it.label.startsWith("bt/") }, "expected a backtrack worker")
             assertIs<SolveResult.Unsat>(p.solve())
         }
