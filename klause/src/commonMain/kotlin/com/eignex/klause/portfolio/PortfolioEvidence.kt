@@ -57,7 +57,9 @@ internal class PortfolioEvidence(
             is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
             SourceEvidenceCheck.Checked, null -> Unit
         }
-        return when (val verdict = verifier.verify(ModelEvidence.Witness(identity, candidate))) {
+        val certificate = sample.witnessCertificate?.takeIf { it.publication != null }
+        val evidence = ModelEvidence.Witness(identity, candidate, certificate)
+        return when (val verdict = verifier.verify(evidence, sourceScope, invocation, scopeCancellation)) {
             is Verification.Accepted -> Verification.Accepted(candidate)
             is Verification.Rejected -> verdict
             is Verification.Indeterminate -> verdict
