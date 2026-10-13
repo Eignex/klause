@@ -67,8 +67,9 @@ internal object ObjectiveFrontendProbe {
             source.absolutePath)
         val builder = ProcessBuilder(command).redirectOutput(File(output, "$stem.stdout"))
             .redirectError(File(output, "$stem.stderr"))
-        val options = "-XX:ActiveProcessorCount=1 -Xmx2g -Xlog:jfr+startup=warning " +
-            "-XX:StartFlightRecording=filename=${recording.absolutePath},settings=profile,dumponexit=true"
+        val options = "-XX:ActiveProcessorCount=1 -Xmx2g " +
+            "-XX:StartFlightRecording=filename=${recording.absolutePath},settings=profile,dumponexit=true " +
+            "-Xlog:jfr+startup=warning"
         builder.environment()["JAVA_OPTS"] = options
         builder.environment()["KLAUSE_CLI_OPTS"] = ""
         val started = System.nanoTime()
