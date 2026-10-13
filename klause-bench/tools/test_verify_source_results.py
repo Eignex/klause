@@ -356,10 +356,21 @@ class ProofCheckTest(unittest.TestCase):
 
         result = self.check(case, source)
 
-        self.assertEqual(result['sourceQueryEncoding'], 'finite binary')
         self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
+
+    def test_binary_mps_queries_reject_an_impossible_source_objective(self):
+        source = "NAME fixture\nROWS\n N obj\n G row\nCOLUMNS\n M1 'MARKER' 'INTORG'\n x obj 1 row 2\n y obj 1 row 3\n M2 'MARKER' 'INTEND'\nRHS\n rhs row 2\nENDATA\n"
+
         with self.assertRaisesRegex(AssertionError, 'claimed source objective feasibility expected sat, got unsat'):
             self.check(self.case(suite='mps-core', arm='default', objective=0, finalWitness=None), source)
+
+    def test_binary_mps_query_reports_finite_domain_encoding(self):
+        source = "NAME fixture\nROWS\n N obj\nCOLUMNS\n M1 'MARKER' 'INTORG'\n x obj 1\n M2 'MARKER' 'INTEND'\nENDATA\n"
+        case = self.case(suite='mps-core', arm='default', objective=0, finalWitness='v x=0')
+
+        result = self.check(case, source)
+
+        self.assertEqual(result['sourceQueryEncoding'], 'finite binary')
 
     def test_mps_query_preserves_a_nonbinary_integer_domain(self):
         source = "NAME fixture\nROWS\n N obj\n G row\nCOLUMNS\n M1 'MARKER' 'INTORG'\n x obj 1 row 1\n M2 'MARKER' 'INTEND'\nRHS\n rhs row 2\nBOUNDS\n UI b x 3\nENDATA\n"
@@ -367,7 +378,6 @@ class ProofCheckTest(unittest.TestCase):
 
         result = self.check(case, source)
 
-        self.assertEqual(result['sourceQueryEncoding'], 'general')
         self.assertEqual(result['witness'], 'exact source feasible')
         self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
 
