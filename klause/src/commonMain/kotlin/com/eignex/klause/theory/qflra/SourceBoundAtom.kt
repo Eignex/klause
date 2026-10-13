@@ -13,7 +13,10 @@ import com.eignex.klause.solver.search.SourceBoundLimits as SharedSourceBoundLim
 import com.eignex.klause.solver.search.SourceBoundTerm as SharedSourceBoundTerm
 
 /** Compatibility coefficient over a source integer or real variable id. */
-@Deprecated("Use solver.search.SourceBoundTerm", ReplaceWith("SourceBoundTerm", "com.eignex.klause.solver.search.SourceBoundTerm"))
+@Deprecated(
+    "Use solver.search.SourceBoundTerm",
+    ReplaceWith("SourceBoundTerm", "com.eignex.klause.solver.search.SourceBoundTerm"),
+)
 data class SourceBoundTerm(
     /** Source coordinate. */
     val source: SearchValueKey,
@@ -22,7 +25,10 @@ data class SourceBoundTerm(
 )
 
 /** Compatibility limits for exact source normalization. */
-@Deprecated("Use solver.search.SourceBoundLimits", ReplaceWith("SourceBoundLimits", "com.eignex.klause.solver.search.SourceBoundLimits"))
+@Deprecated(
+    "Use solver.search.SourceBoundLimits",
+    ReplaceWith("SourceBoundLimits", "com.eignex.klause.solver.search.SourceBoundLimits"),
+)
 data class SourceBoundLimits(
     /** Maximum input terms, including duplicates and zeros. */
     val maxTerms: Int = 256,
@@ -36,7 +42,10 @@ data class SourceBoundLimits(
 }
 
 /** Compatibility representation of a neutral exact source predicate. */
-@Deprecated("Use solver.search.SourceBoundAtom", ReplaceWith("SourceBoundAtom", "com.eignex.klause.solver.search.SourceBoundAtom"))
+@Deprecated(
+    "Use solver.search.SourceBoundAtom",
+    ReplaceWith("SourceBoundAtom", "com.eignex.klause.solver.search.SourceBoundAtom"),
+)
 class SourceBoundAtom private constructor(
     override val sourceBound: SharedSourceBoundAtom,
 ) : SourceBoundPredicate {
@@ -86,7 +95,10 @@ class SourceBoundAtom private constructor(
         }
 
         private fun compatibility(context: SearchContext): SearchContext = object : SearchContext by context {
-            override fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision): SearchTheoryAtom? =
+            override fun registerAtom(
+                positive: SearchTheoryDecision,
+                negative: SearchTheoryDecision,
+            ): SearchTheoryAtom? =
                 context.registerAtom(
                     SourceBoundAtom(positive as SharedSourceBoundAtom),
                     SourceBoundAtom(negative as SharedSourceBoundAtom),
