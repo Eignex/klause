@@ -193,6 +193,9 @@ internal class ModelEvidenceVerifier<A, V>(
         if (evidence.kind != EvidenceKind.Witness && certificate == null) {
             return Verification.Indeterminate("the required ${evidence.kind.name.lowercase()} certificate is withheld")
         }
+        if (evidence is ModelEvidence.IntegerWindow && certificate?.completion != null) {
+            return Verification.Rejected("solver completion does not attest an integer window")
+        }
         certificate?.publication?.let { publication ->
             val matches = when (publication) {
                 is CompletedEnginePublication.ObjectiveBound -> evidence is ModelEvidence.Bound &&
