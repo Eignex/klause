@@ -10741,6 +10741,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimiz
 	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize;
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize;Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution$Optimize;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAcceptedIncumbent ()Lcom/eignex/klause/solver/pipeline/SourceIncumbentPublication;
 	public final fun getResult ()Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -10848,13 +10849,18 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryPipeline {
 	public final fun canMinimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Z
 	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;IILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public final fun executePortfolio (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;I)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun executePortfolio (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun executePortfolio$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;IILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public final fun prepare (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Lcom/eignex/klause/solver/pipeline/OpenPreparation;
 	public final fun searchWithoutTheory (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;IZ)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public final fun searchWithoutTheory (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun searchWithoutTheory (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun searchWithoutTheory (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/FiniteEngine;IZLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun searchWithoutTheory$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;IZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun searchWithoutTheory$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/FiniteEngine;IILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 }
@@ -11221,6 +11227,21 @@ public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecut
 	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;I)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;ILkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceIncumbentPublication {
+	public fun <init> (JLcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;)V
+	public final fun component1 ()J
+	public final fun component2 ()Lcom/eignex/klause/solver/Sample;
+	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceValue;
+	public final fun copy (JLcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;)Lcom/eignex/klause/solver/pipeline/SourceIncumbentPublication;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/SourceIncumbentPublication;JLcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceIncumbentPublication;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public final fun getValue ()Lcom/eignex/klause/solver/evidence/SourceValue;
+	public final fun getVersion ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/SourceProblemRoute {

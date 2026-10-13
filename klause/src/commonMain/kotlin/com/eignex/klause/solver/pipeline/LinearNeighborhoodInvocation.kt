@@ -46,7 +46,8 @@ internal fun linearNeighborhoodInvocation(
     }
     val portfolio = PortfolioInvocation(prepared, factories,
         PortfolioInvocationControls(parallelism = count, workerSeed = params.randomSeed, cancellation = stop,
-            nodeBudget = params.nodeBudget), PortfolioEvidence(identity, openWitnessVerifier(source, objective, sourceObjective?.context, stop))
+            nodeBudget = params.nodeBudget),
+        PortfolioEvidence(identity, openWitnessVerifier(source, objective, sourceObjective?.context, stop))
             .bindInvocation(binding, stop))
     return portfolio.use {
         if (objective == null) {
