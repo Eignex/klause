@@ -12,6 +12,7 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
@@ -59,6 +60,7 @@ internal object SolveCore {
                 protocol.onStatistics(stats, solveTimeMs, solutions)
             }
         }
+        val publication = ArithmeticPublication(output)
         // Engine resolution: explicit `-e` wins, then `-f` (free) ≡ `-e cp`, else the configured
         // default ([defaultEngine] — the built-in [FiniteEngine.DEFAULT] or a packaged image's env override).
         val engine = common.engine
@@ -108,6 +110,7 @@ internal object SolveCore {
                 reportQuadraticOptimization(
                     execution, pipeline, output, common.statistics, rawSolvable.routingElapsedMs,
                     completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
+                    publication = publication,
                 )
                 return
             }
@@ -127,6 +130,7 @@ internal object SolveCore {
                         execution, { pipeline.render(polynomialAssignment(it)) }, output, common.statistics,
                         rawSolvable.routingElapsedMs,
                         completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
+                        publication = publication,
                     )
                     return
                 }
@@ -247,6 +251,7 @@ internal object SolveCore {
                         output,
                         rawSolvable.routingLpStats,
                         rawSolvable.routingElapsedMs,
+                        publication = publication,
                     ) {
                         budgetSpent(common, it)
                     }
@@ -339,6 +344,7 @@ internal object SolveCore {
                         output,
                         rawSolvable.routingLpStats,
                         rawSolvable.routingElapsedMs,
+                        publication = publication,
                     ) {
                         budgetSpent(common, it)
                     }
@@ -1027,13 +1033,20 @@ private fun reportOpenTheoryOptimum(
     routingLpStats: LpStats,
     routingElapsedMs: Long,
     completePool: Boolean = true,
+    publication: ArithmeticPublication,
     budgetExhausted: (Boolean) -> Boolean,
 ) {
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
 
-    fun solution(rendered: String, value: BigFraction?) {
+    fun solution(rendered: String, value: BigFraction?): Boolean {
         val signed = if (maximize) value?.negated() else value
-        if (signed == null) output.onSolution(rendered, null) else output.onExactSolution(rendered, signed)
+        return signed?.let { publication.publish(rendered, SourceValue.Rational(it)) } ?: false
+    }
+
+    fun complete(verdict: Verdict, accepted: Boolean) {
+        output.onComplete(if (accepted) verdict else if (publication.solutions > 0L) {
+            Verdict.BEST_FOUND
+        } else Verdict.UNKNOWN)
     }
     output.onVerdictContext(
         VerdictContext(
@@ -1044,8 +1057,7 @@ private fun reportOpenTheoryOptimum(
     )
     when (result) {
         is OpenTheoryOptimum.Optimal -> {
-            solution(render(result.assignment), result.value)
-            output.onComplete(Verdict.OPTIMAL)
+            complete(Verdict.OPTIMAL, solution(render(result.assignment), result.value))
         }
 
         is OpenTheoryOptimum.Infeasible -> output.onComplete(Verdict.UNSATISFIABLE)
@@ -1053,8 +1065,7 @@ private fun reportOpenTheoryOptimum(
         // The witness is reported like any other solution: it is one, and the verdict beside it says the
         // objective reaches past it without limit rather than that this is the best value found.
         is OpenTheoryOptimum.Unbounded -> {
-            solution(render(result.witness), result.value)
-            output.onComplete(Verdict.UNBOUNDED)
+            complete(Verdict.UNBOUNDED, solution(render(result.witness), result.value))
         }
 
         is OpenTheoryOptimum.Bounded -> {
@@ -1062,18 +1073,11 @@ private fun reportOpenTheoryOptimum(
             if (incumbent == null) {
                 output.onComplete(Verdict.UNKNOWN)
             } else {
-                solution(render(incumbent), result.value)
-                output.onComplete(Verdict.BEST_FOUND)
+                complete(Verdict.BEST_FOUND, solution(render(incumbent), result.value))
             }
         }
     }
     if (statistics) {
-        val found = when (result) {
-            is OpenTheoryOptimum.Optimal -> 1L
-            is OpenTheoryOptimum.Infeasible -> 0L
-            is OpenTheoryOptimum.Unbounded -> 1L
-            is OpenTheoryOptimum.Bounded -> if (result.incumbent == null) 0L else 1L
-        }
-        output.onStatistics(resultStats, resultStats.run.wallMs + routingElapsedMs, found)
+        output.onStatistics(resultStats, resultStats.run.wallMs + routingElapsedMs, publication.solutions)
     }
 }
