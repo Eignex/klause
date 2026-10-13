@@ -844,6 +844,8 @@ python3 klause-bench/tools/verify_source_results.py /path/to/cases.json \
 AWS lab profile without rerunning the solver. Pass `bundle=<https URL>` and
 `sha256=<compressed SHA-256>` for a gzip JSON object containing `cases` (the case
 array) and `sources` (original source SHA-256 keys with base64 original bytes).
+For small saved-record bundles, `input64=<base64 gzip bytes>` replaces `bundle`;
+the encoded input is capped at 96 KiB and the compressed `sha256` remains required.
 It checks bundle/source identities, provisions the pinned checker dependencies,
 and retains checker logs, versions and a checked prefix on failure under `$OUT`.
 Original unknown records retain their no-claim outcome; reference agreement does
