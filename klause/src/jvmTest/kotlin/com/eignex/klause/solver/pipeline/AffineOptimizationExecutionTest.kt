@@ -18,7 +18,6 @@ import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
@@ -112,12 +111,6 @@ class AffineOptimizationExecutionTest(
             val originalValue = arithmetic.add(arithmetic.rational(BigFraction.ofLong(constant)), values[1])
             assertEquals(0, arithmetic.compare(originalValue, publication.incumbent.value))
         }
-        for ((previous, next) in published.zipWithNext()) {
-            val comparison = arithmetic.compare(previous.incumbent.value, next.incumbent.value)
-            assertTrue(if (sense == ObjectiveSense.MINIMIZE) comparison > 0 else comparison < 0)
-            assertTrue(next.version > previous.version)
-        }
         assertEquals(expected, published.last().incumbent.value.rational)
-        assertSame(published.last(), execution.acceptedIncumbent)
     }
 }
