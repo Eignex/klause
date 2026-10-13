@@ -751,6 +751,22 @@ final enum class com.eignex.klause.solver.result/TerminationReason : kotlin/Enum
     final fun values(): kotlin/Array<com.eignex.klause.solver.result/TerminationReason> // com.eignex.klause.solver.result/TerminationReason.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.solver.search/SearchStopCause : kotlin/Enum<com.eignex.klause.solver.search/SearchStopCause> { // com.eignex.klause.solver.search/SearchStopCause|null[0]
+    enum entry Cancelled // com.eignex.klause.solver.search/SearchStopCause.Cancelled|null[0]
+    enum entry CheckAllowance // com.eignex.klause.solver.search/SearchStopCause.CheckAllowance|null[0]
+    enum entry DecisionAllowance // com.eignex.klause.solver.search/SearchStopCause.DecisionAllowance|null[0]
+    enum entry OperationAllowance // com.eignex.klause.solver.search/SearchStopCause.OperationAllowance|null[0]
+    enum entry RepresentationDecline // com.eignex.klause.solver.search/SearchStopCause.RepresentationDecline|null[0]
+    enum entry Timeout // com.eignex.klause.solver.search/SearchStopCause.Timeout|null[0]
+    enum entry WorkAllowance // com.eignex.klause.solver.search/SearchStopCause.WorkAllowance|null[0]
+
+    final val entries // com.eignex.klause.solver.search/SearchStopCause.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.search/SearchStopCause> // com.eignex.klause.solver.search/SearchStopCause.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.search/SearchStopCause // com.eignex.klause.solver.search/SearchStopCause.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.search/SearchStopCause> // com.eignex.klause.solver.search/SearchStopCause.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.solver/ProblemClass : kotlin/Enum<com.eignex.klause.solver/ProblemClass> { // com.eignex.klause.solver/ProblemClass|null[0]
     enum entry Continuous // com.eignex.klause.solver/ProblemClass.Continuous|null[0]
     enum entry FiniteCp // com.eignex.klause.solver/ProblemClass.FiniteCp|null[0]
@@ -1356,6 +1372,8 @@ abstract interface com.eignex.klause.solver.search/SearchConflictResolver : com.
 abstract interface com.eignex.klause.solver.search/SearchContext { // com.eignex.klause.solver.search/SearchContext|null[0]
     abstract val decisionLevel // com.eignex.klause.solver.search/SearchContext.decisionLevel|{}decisionLevel[0]
         abstract fun <get-decisionLevel>(): kotlin/Int // com.eignex.klause.solver.search/SearchContext.decisionLevel.<get-decisionLevel>|<get-decisionLevel>(){}[0]
+    open val executionControls // com.eignex.klause.solver.search/SearchContext.executionControls|{}executionControls[0]
+        open fun <get-executionControls>(): com.eignex.klause.solver.search/SearchExecutionControls // com.eignex.klause.solver.search/SearchContext.executionControls.<get-executionControls>|<get-executionControls>(){}[0]
 
     abstract fun boolValue(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/SearchContext.boolValue|boolValue(kotlin.Int){}[0]
     abstract fun cancelled(): kotlin/Boolean // com.eignex.klause.solver.search/SearchContext.cancelled|cancelled(){}[0]
@@ -1371,6 +1389,32 @@ abstract interface com.eignex.klause.solver.search/SearchContext { // com.eignex
     open fun intUpperBoundPremise(kotlin/Int): com.eignex.klause.solver.search/SearchAtomPremise // com.eignex.klause.solver.search/SearchContext.intUpperBoundPremise|intUpperBoundPremise(kotlin.Int){}[0]
     open fun publish(com.eignex.klause.solver.search/SearchDecision, com.eignex.klause.solver.search/SearchAtomPremise): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchContext.publish|publish(com.eignex.klause.solver.search.SearchDecision;com.eignex.klause.solver.search.SearchAtomPremise){}[0]
     open fun registerAtom(com.eignex.klause.solver.search/SearchTheoryDecision, com.eignex.klause.solver.search/SearchTheoryDecision): com.eignex.klause.solver.search/SearchTheoryAtom? // com.eignex.klause.solver.search/SearchContext.registerAtom|registerAtom(com.eignex.klause.solver.search.SearchTheoryDecision;com.eignex.klause.solver.search.SearchTheoryDecision){}[0]
+}
+
+abstract interface com.eignex.klause.solver.search/SearchExecutionAccounting { // com.eignex.klause.solver.search/SearchExecutionAccounting|null[0]
+    open val exhausted // com.eignex.klause.solver.search/SearchExecutionAccounting.exhausted|{}exhausted[0]
+        open fun <get-exhausted>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionAccounting.exhausted.<get-exhausted>|<get-exhausted>(){}[0]
+
+    open fun canCommitDecision(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionAccounting.canCommitDecision|canCommitDecision(){}[0]
+    open fun consumeCheck(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionAccounting.consumeCheck|consumeCheck(){}[0]
+    open fun recordDecision(com.eignex.klause.solver.search/SearchDecision): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionAccounting.recordDecision|recordDecision(com.eignex.klause.solver.search.SearchDecision){}[0]
+
+    final object Unlimited : com.eignex.klause.solver.search/SearchExecutionAccounting { // com.eignex.klause.solver.search/SearchExecutionAccounting.Unlimited|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionAccounting.Unlimited.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchExecutionAccounting.Unlimited.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchExecutionAccounting.Unlimited.toString|toString(){}[0]
+    }
+}
+
+abstract interface com.eignex.klause.solver.search/SearchExecutionControls : com.eignex.klause.solver.search/SearchExecutionAccounting { // com.eignex.klause.solver.search/SearchExecutionControls|null[0]
+    abstract val cancellation // com.eignex.klause.solver.search/SearchExecutionControls.cancellation|{}cancellation[0]
+        abstract fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.search/SearchExecutionControls.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    abstract val stopCause // com.eignex.klause.solver.search/SearchExecutionControls.stopCause|{}stopCause[0]
+        abstract fun <get-stopCause>(): com.eignex.klause.solver.search/SearchStopCause? // com.eignex.klause.solver.search/SearchExecutionControls.stopCause.<get-stopCause>|<get-stopCause>(){}[0]
+
+    abstract fun beginOperation() // com.eignex.klause.solver.search/SearchExecutionControls.beginOperation|beginOperation(){}[0]
+    abstract fun reportStop(com.eignex.klause.solver.search/SearchStopCause) // com.eignex.klause.solver.search/SearchExecutionControls.reportStop|reportStop(com.eignex.klause.solver.search.SearchStopCause){}[0]
+    open fun operationAllowance(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.search/SearchExecutionControls.operationAllowance|operationAllowance(com.eignex.klause.util.Cancellation){}[0]
 }
 
 abstract interface com.eignex.klause.solver.search/SearchLearnedConflict { // com.eignex.klause.solver.search/SearchLearnedConflict|null[0]
@@ -14273,6 +14317,7 @@ final class com.eignex.klause.solver.search/SearchComponentSet { // com.eignex.k
     constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>, kotlin.collections/List<com.eignex.klause.solver.search/SearchBrancher> = ...) // com.eignex.klause.solver.search/SearchComponentSet.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>;kotlin.collections.List<com.eignex.klause.solver.search.SearchBrancher>){}[0]
 
     final fun session(kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ..., com.eignex.klause.solver.search/SearchAtomRegistry? = ...): com.eignex.klause.solver.search/SearchSession // com.eignex.klause.solver.search/SearchComponentSet.session|session(kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams;com.eignex.klause.solver.search.SearchAtomRegistry?){}[0]
+    final fun session(kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ..., com.eignex.klause.solver.search/SearchAtomRegistry? = ..., com.eignex.klause.solver.search/SearchExecutionControls): com.eignex.klause.solver.search/SearchSession // com.eignex.klause.solver.search/SearchComponentSet.session|session(kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams;com.eignex.klause.solver.search.SearchAtomRegistry?;com.eignex.klause.solver.search.SearchExecutionControls){}[0]
 }
 
 final class com.eignex.klause.solver.search/SearchExactIntValue : com.eignex.klause.solver.search/TypedSearchValueKey<com.ionspin.kotlin.bignum.integer/BigInteger> { // com.eignex.klause.solver.search/SearchExactIntValue|null[0]
@@ -14303,6 +14348,24 @@ final class com.eignex.klause.solver.search/SearchExactRealValue : com.eignex.kl
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchExactRealValue.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchExactRealValue.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchExactRealValue.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.search/SearchExecutionControlAdapter : com.eignex.klause.solver.search/SearchExecutionControls { // com.eignex.klause.solver.search/SearchExecutionControlAdapter|null[0]
+    constructor <init>(com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.search/SearchExecutionAccounting = ..., kotlin/Function1<com.eignex.klause.util/Cancellation, com.eignex.klause.util/Cancellation> = ...) // com.eignex.klause.solver.search/SearchExecutionControlAdapter.<init>|<init>(com.eignex.klause.util.Cancellation;com.eignex.klause.solver.search.SearchExecutionAccounting;kotlin.Function1<com.eignex.klause.util.Cancellation,com.eignex.klause.util.Cancellation>){}[0]
+
+    final val cancellation // com.eignex.klause.solver.search/SearchExecutionControlAdapter.cancellation|{}cancellation[0]
+        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.search/SearchExecutionControlAdapter.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    final val exhausted // com.eignex.klause.solver.search/SearchExecutionControlAdapter.exhausted|{}exhausted[0]
+        final fun <get-exhausted>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionControlAdapter.exhausted.<get-exhausted>|<get-exhausted>(){}[0]
+    final val stopCause // com.eignex.klause.solver.search/SearchExecutionControlAdapter.stopCause|{}stopCause[0]
+        final fun <get-stopCause>(): com.eignex.klause.solver.search/SearchStopCause? // com.eignex.klause.solver.search/SearchExecutionControlAdapter.stopCause.<get-stopCause>|<get-stopCause>(){}[0]
+
+    final fun beginOperation() // com.eignex.klause.solver.search/SearchExecutionControlAdapter.beginOperation|beginOperation(){}[0]
+    final fun canCommitDecision(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionControlAdapter.canCommitDecision|canCommitDecision(){}[0]
+    final fun consumeCheck(): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionControlAdapter.consumeCheck|consumeCheck(){}[0]
+    final fun operationAllowance(com.eignex.klause.util/Cancellation): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.search/SearchExecutionControlAdapter.operationAllowance|operationAllowance(com.eignex.klause.util.Cancellation){}[0]
+    final fun recordDecision(com.eignex.klause.solver.search/SearchDecision): kotlin/Boolean // com.eignex.klause.solver.search/SearchExecutionControlAdapter.recordDecision|recordDecision(com.eignex.klause.solver.search.SearchDecision){}[0]
+    final fun reportStop(com.eignex.klause.solver.search/SearchStopCause) // com.eignex.klause.solver.search/SearchExecutionControlAdapter.reportStop|reportStop(com.eignex.klause.solver.search.SearchStopCause){}[0]
 }
 
 final class com.eignex.klause.solver.search/SearchExplanation { // com.eignex.klause.solver.search/SearchExplanation|null[0]
@@ -14371,9 +14434,12 @@ final class com.eignex.klause.solver.search/SearchRun { // com.eignex.klause.sol
 
 final class com.eignex.klause.solver.search/SearchSession : com.eignex.klause.solver.search/ClauseWatchHost, com.eignex.klause.solver.search/SearchContext { // com.eignex.klause.solver.search/SearchSession|null[0]
     constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>, kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ..., kotlin.collections/List<com.eignex.klause.solver.search/SearchBrancher> = ..., com.eignex.klause.solver.search/SearchAtomRegistry? = ...) // com.eignex.klause.solver.search/SearchSession.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams;kotlin.collections.List<com.eignex.klause.solver.search.SearchBrancher>;com.eignex.klause.solver.search.SearchAtomRegistry?){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>, kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ..., kotlin.collections/List<com.eignex.klause.solver.search/SearchBrancher> = ..., com.eignex.klause.solver.search/SearchAtomRegistry? = ..., com.eignex.klause.solver.search/SearchExecutionControls) // com.eignex.klause.solver.search/SearchSession.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams;kotlin.collections.List<com.eignex.klause.solver.search.SearchBrancher>;com.eignex.klause.solver.search.SearchAtomRegistry?;com.eignex.klause.solver.search.SearchExecutionControls){}[0]
 
     final val decisionLevel // com.eignex.klause.solver.search/SearchSession.decisionLevel|{}decisionLevel[0]
         final fun <get-decisionLevel>(): kotlin/Int // com.eignex.klause.solver.search/SearchSession.decisionLevel.<get-decisionLevel>|<get-decisionLevel>(){}[0]
+    final var executionControls // com.eignex.klause.solver.search/SearchSession.executionControls|{}executionControls[0]
+        final fun <get-executionControls>(): com.eignex.klause.solver.search/SearchExecutionControls // com.eignex.klause.solver.search/SearchSession.executionControls.<get-executionControls>|<get-executionControls>(){}[0]
     final val learnedClauseCount // com.eignex.klause.solver.search/SearchSession.learnedClauseCount|{}learnedClauseCount[0]
         final fun <get-learnedClauseCount>(): kotlin/Int // com.eignex.klause.solver.search/SearchSession.learnedClauseCount.<get-learnedClauseCount>|<get-learnedClauseCount>(){}[0]
 
