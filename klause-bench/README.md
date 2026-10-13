@@ -647,7 +647,7 @@ counters exclude native CP analysis; matching SAT reports are not source checks.
 
 ### Objective representation probe
 
-`com.eignex.klause.bench.tools.ObjectiveRepresentationProbe` measures the public
+`com.eignex.klause.bench.profile.ObjectiveRepresentationProbe` measures the public
 affine and exact quadratic entries on the same admitted polynomial real source.
 Pass `source=<SMT file or directory>` and optionally `engines=BACKTRACK,FIXED,LOCAL_SEARCH,ALNS,MIXED`,
 `work=200000`, `seed=17`, `moves=1`, `timeout=25000`, `out=<directory>` and
@@ -666,7 +666,7 @@ or `$OUT`. Parsing and provenance capture are outside the execution timer.
 Run the committed main through a lab profile job on a trusted pushed branch:
 
 ```sh
-deploy/lab profile com.eignex.klause.bench.tools.ObjectiveRepresentationProbe <branch> \
+deploy/lab profile com.eignex.klause.bench.profile.ObjectiveRepresentationProbe <branch> \
   "compare objective representations on original sources" aws 1800 \
   source=klause-bench/smoke-corpus/objective-affine-v1 checker=provision
 ```
