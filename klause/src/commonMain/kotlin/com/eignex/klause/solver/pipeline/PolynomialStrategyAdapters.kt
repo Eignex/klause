@@ -44,15 +44,23 @@ internal class PolynomialStrategyAdapters(
     fun minimize(objective: LinearObjective, engine: FiniteEngine): MinimizeResult =
         if (engine == FiniteEngine.MIXED) {
             portfolio(objective).use { it.minimize(cancellation) }
-        } else standalone(engine) { it.minimize(objective, engine) }
+        } else standalone(engine, objective) { it.minimize(objective, engine) }
 
-    private fun <T> standalone(engine: FiniteEngine, action: (PolynomialWorkerAdapter) -> T): T {
+    private fun <T> standalone(
+        engine: FiniteEngine,
+        objective: LinearObjective? = null,
+        action: (PolynomialWorkerAdapter) -> T,
+    ): T {
         val complete = engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.FIXED
         val budget = if (complete) params.backtrack.nodeBudget else params.localSearch.nodeBudget
         return PortfolioInvocationResources(1, 1, params.localSearch.randomSeed ?: 0,
             cancellation, budget, if (complete) setOf(0) else emptySet()).use { resources ->
             val slot = resources.slots.single()
-            action(PolynomialWorkerAdapter(model, scope.worker(slot), params, scope.workerCancellation(slot)))
+            val execution = if (complete) params.backtrack.withAssumptions(params.assumptions).assumptions
+                else params.localSearch.withAssumptions(params.assumptions).assumptions
+            val binding = EngineInvocation(plan, ModelIdentity.of(model.source, objective), objective,
+                params.assumptions, execution)
+            action(PolynomialWorkerAdapter(model, scope.worker(slot), params, binding, scope.workerCancellation(slot)))
         }
     }
 
@@ -75,10 +83,10 @@ internal class PolynomialStrategyAdapters(
                 val executionAssumptions = if (arm == 0) {
                     controls.backtrack.withAssumptions(controls.assumptions).assumptions
                 } else controls.localSearch.withAssumptions(controls.assumptions).assumptions
-                PolynomialWorkerAdapter(model, scope.worker(slot), controls, scope.workerCancellation(slot))
-                    .worker(arm, objective, slot)
-                    .bindInvocation(EngineInvocation(plan, identity, objective, controls.assumptions,
-                        executionAssumptions))
+                val workerBinding = EngineInvocation(plan, identity, objective, controls.assumptions,
+                    executionAssumptions)
+                PolynomialWorkerAdapter(model, scope.worker(slot), controls, workerBinding,
+                    scope.workerCancellation(slot)).worker(arm, objective, slot).bindInvocation(workerBinding)
             }
         }
         return PortfolioInvocation(plan, factories,

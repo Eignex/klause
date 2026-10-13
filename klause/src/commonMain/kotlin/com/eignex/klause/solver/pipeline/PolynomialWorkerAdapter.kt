@@ -19,7 +19,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -37,20 +38,21 @@ internal class PolynomialWorkerAdapter(
     private val model: SharedPolynomialModel,
     private val invocation: PolynomialTheoryInvocation,
     private val params: PolynomialStrategyParams,
+    private val binding: EngineInvocation,
     cancellation: Cancellation,
 ) {
     private val cancellation = cancellation or Cancellation {
         invocation.workExhausted || invocation.lastUnknown?.reason == QfNraReason.ResourceLimit
     }
     private val finite: BakedProblem = model.finite.bake(this.cancellation)
-    private val identity = ModelIdentity.of(model.source)
     private val fixed = if (params.assumptions.isEmpty) finite.fixedDiscreteSample() else {
         finite.conditionedRoot(params.assumptions, this.cancellation).fixedDiscreteSample()
     }
 
     private fun neighborhood(adaptive: Boolean, objective: LinearObjective? = null): PortfolioWorker? {
         val point = fixed ?: return null
-        val adapter = PolynomialExactNeighborhood(model, invocation, finite, point, params.assumptions, objective)
+        val adapter = PolynomialExactNeighborhood(model, invocation, finite, point, params.assumptions,
+            objective, ::certified)
         return exactNeighborhoodWorker(if (adaptive) "alns+exact-nra-neighborhood" else "ls+exact-nra-neighborhood",
             if (adaptive) 2 else 1, objective, cancellation or params.localSearch.cancellation,
             exhausted = { cancellation() }, open = {
@@ -61,7 +63,8 @@ internal class PolynomialWorkerAdapter(
     }
 
     private fun certified(sample: Sample): Sample = sample.also {
-        it.witnessCertificate = EvidenceCertificate.verified(identity, EvidenceKind.Witness)
+        val value = binding.executionObjective?.evaluateExact(it)?.toDouble()
+        it.witnessCertificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, it, value))
     }
 
     private fun backtrackParams(): BacktrackParams = params.backtrack.withAssumptions(params.assumptions).copy(
