@@ -192,7 +192,8 @@ continues the existing exact feasibility/strict-improvement descent. Both phases
 share one `OpenTheorySolveState`, including work, checks, decisions and source-LP
 diagnostics. The current slice retains its original work ceiling and deadline.
 Fallback witnesses must satisfy the captured source scope and retain exact original
-objective values; an external incumbent can seed further improvements. Independently
+objective values. Exact declarative rows install its Boolean pins and numeric bounds
+in the fallback search; an external incumbent can seed further improvements. Independently
 checked root bounds survive separately. Feasibility exhaustion after a declined
 authority attempt cannot issue a source terminal, and numerical admission limits
 are unchanged.

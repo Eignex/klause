@@ -1,7 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.optimization.linearCoordinatesSupported
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.presolve.PresolveConfig
@@ -10,6 +14,7 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
@@ -45,6 +50,7 @@ internal class RationalTheoryDescent(
     private var proofDeclined = false
     private var checkedIncumbent: Sample? = null
     private var checkedValue: BigFraction? = null
+    private val conditioned by lazy { conditionedSource() }
     private var witnessContext: SourceProofContext? = null
     var linearResult: LinearOptimizationResult? = null
         private set
@@ -127,8 +133,9 @@ internal class RationalTheoryDescent(
                         }
                     }
                 }
-                val model = value?.let { source.withFactors(source.factors + objective.below(it),
-                    source.impliedFactorMask?.let { mask -> mask + false }) } ?: source
+                val base = if (proofDeclined) conditioned else source
+                val model = value?.let { base.withFactors(base.factors + objective.below(it),
+                    base.impliedFactorMask?.let { mask -> mask + false }) } ?: base
                 val route = model.componentPlan().theoryPipeline
                 if (route == ProblemPipeline.UNSUPPORTED_OPEN || route == ProblemPipeline.FINITE_CP) {
                     return finish(TerminationReason.Unsupported)
@@ -221,6 +228,27 @@ internal class RationalTheoryDescent(
             checkedValue = exact
         }
         return true
+    }
+
+    private fun conditionedSource(): Problem {
+        val condition = context?.scope?.condition ?: return source
+        val rows = ArrayList<Factor>()
+        for ((id, value) in condition.bools) {
+            rows += ExactSearchRow.of(intArrayOf(Term.ofLit(Lit.make(id, true))), listOf(BigFraction.ONE),
+                LinearOp.EQ, if (value) BigFraction.ONE else BigFraction.ZERO)
+        }
+        fun bound(coordinate: SourceCoordinate, value: BigFraction, relation: LinearOp) {
+            val ref = when (coordinate.kind) {
+                SourceCoordinate.Kind.Integer -> Term.ofIntVar(coordinate.id)
+                SourceCoordinate.Kind.Real -> Term.ofRealVar(coordinate.id)
+                SourceCoordinate.Kind.Boolean -> error("numeric condition cannot restrict a Boolean coordinate")
+            }
+            rows += ExactSearchRow.of(intArrayOf(ref), listOf(BigFraction.ONE), relation, value)
+        }
+        condition.lower.forEach { (coordinate, value) -> bound(coordinate, value, LinearOp.GE) }
+        condition.upper.forEach { (coordinate, value) -> bound(coordinate, value, LinearOp.LE) }
+        return if (rows.isEmpty()) source else source.withFactors(source.factors + rows,
+            source.impliedFactorMask?.let { it + BooleanArray(rows.size) })
     }
 
     private fun partial(reason: TerminationReason): LinearOptimizationResult = LinearOptimizationResult(
