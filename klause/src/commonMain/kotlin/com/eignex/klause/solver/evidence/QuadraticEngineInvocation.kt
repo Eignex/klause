@@ -6,6 +6,7 @@ import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 
 internal class QuadraticEngineInvocation(
@@ -13,7 +14,22 @@ internal class QuadraticEngineInvocation(
     val objective: QuadraticObjectiveSpec,
     val sense: ObjectiveSense,
     val condition: SourceCondition,
-)
+) {
+    fun matches(other: QuadraticEngineInvocation): Boolean = when (val original = source) {
+        is QuadraticEngineSource.ExactIr ->
+            (other.source as? QuadraticEngineSource.ExactIr)?.problem === original.problem
+        is QuadraticEngineSource.Polynomial ->
+            (other.source as? QuadraticEngineSource.Polynomial)?.problem === original.problem
+        is QuadraticEngineSource.NonlinearInteger ->
+            (other.source as? QuadraticEngineSource.NonlinearInteger)?.problem === original.problem
+    } && objective === other.objective && sense == other.sense && condition == other.condition
+
+    fun matchesModel(model: ModelIdentity): Boolean = when (val original = source) {
+        is QuadraticEngineSource.ExactIr -> model.sameModel(ModelIdentity.of(original.problem))
+        is QuadraticEngineSource.Polynomial -> model.sameModel(ModelIdentity.of(original.problem))
+        is QuadraticEngineSource.NonlinearInteger -> model.sameModel(ModelIdentity.of(original.problem))
+    }
+}
 
 internal fun PreparedSourcePlan.quadraticEngineInvocation(
     objective: QuadraticObjectiveSpec,

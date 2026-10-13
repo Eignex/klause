@@ -112,6 +112,8 @@ trajectory derivation; an affine `Ray` retains its explicit direction. Completed
 quadratic verification checks actual exact incumbent/bound equality, strictness and
 source objective direction. An optimum label or a strict bound alone cannot establish
 an attained optimum or approach to an unattained limit.
+An individual quadratic certificate checks its declared completion kind before using
+the retained package; unrelated derivations in that package cannot change its claim.
 
 `Problem.quadraticSourceProofContext` reuses original constraints and exact quadratic
 objective evaluation. The typed quadratic interval rule derives bounds from original
@@ -123,6 +125,9 @@ direction and explicit original-coordinate pins. Native invocation metadata is
 separate from an optional original-source revision. `Problem.quadraticSourceResultCapture`
 binds capture to that actual original object and objective; an unrelated equal-shaped
 model or weaker invocation cannot replace it. Recapture preserves the native payload.
+Native certificate construction requires its engine identity to name the same source
+object. Invocation matching compares that object, objective, direction and explicit
+conditions; it supplies no independent derivation coverage.
 The integer and branch-completion producers use these typed records; the finite
 quadratic adapter retains its compatibility factory until its consumer migration. Their source checker must justify coordinate
 bindings and complete coverage; a flat branch list is not a traversal proof. A
@@ -138,7 +143,8 @@ are separate: the latter requires actual retained evidence and an expected sourc
 claim. Search exhaustion must retain its actual source cutoff to attest a bound;
 an exhausted reason without that value supplies no bound claim. Derivation checks
 match the completed coordinates and ray direction, and an attained optimum is
-checked at its actual assignment. A scoped non-witness import requires the same
+checked at its actual assignment. An unbounded completion's feasible point has a
+separate witness check from its ray. A scoped non-witness import requires the same
 consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance and opaque quadratic producer arguments remain
 until their consumers migrate; these hooks do not assert that migration is complete.
 

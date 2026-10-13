@@ -10,18 +10,21 @@ internal class ArithmeticPublication(private val output: OutputProtocol) {
     var solutions: Long = 0
         private set
 
-    fun publish(rendered: String, objective: SourceValue) {
-        if (rendered == lastRendered && sameObjective(objective, lastObjective)) return
-        if (!output.onArithmeticIncumbent(rendered, objective)) return
+    fun publish(rendered: String, objective: SourceValue): Boolean {
+        val sourceValue = output.arithmeticSourceValue(objective) ?: return false
+        if (rendered == lastRendered && sameObjective(sourceValue, lastObjective)) return true
+        if (!output.onArithmeticIncumbent(rendered, sourceValue)) return false
         lastRendered = rendered
-        lastObjective = objective
+        lastObjective = sourceValue
         solutions++
+        return true
     }
 
-    fun quadratic(rendered: String?, result: QuadraticOptimizationResult) {
+    fun quadratic(rendered: String?, result: QuadraticOptimizationResult): Boolean {
         val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
-        if (rendered != null && point != null) publish(rendered, SourceValue.Algebraic(point.value))
+        if (rendered != null && point != null && !publish(rendered, SourceValue.Algebraic(point.value))) return false
         output.onQuadraticResult(null, result)
+        return true
     }
 }
 

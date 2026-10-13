@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
@@ -8,14 +9,26 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceObjective
+import com.eignex.klause.solver.evidence.SourcePremise
+import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.ValSelectorKind
 import com.eignex.klause.solver.pipeline.VarSelectorKind
 import com.eignex.klause.solver.pipeline.ineffectiveNumerics
 import com.eignex.klause.solver.pipeline.minimize
+import com.eignex.klause.solver.pipeline.optimizeLinear
+import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
@@ -28,10 +41,140 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModeTest {
+
+    @Test
+    fun `public linear callbacks publish two original source improvements before cancellation`() {
+        for (sense in ObjectiveSense.entries) {
+            val a = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+            val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 1)
+            val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+            val sign = if (sense == ObjectiveSense.MINIMIZE) -1L else 1L
+            val scope = SourceScope(SourceRevision("cli-linear-improvements", "exact-affine"),
+                objective = SourceObjective("7 plus signed Boolean weights", sense))
+            val context = SourceProofContext(scope, setOf(a, b, x), mapOf(
+                "equal-upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3)), BigFraction.ONE)),
+                "equal-lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-3)),
+                    BigFraction.MINUS_ONE)),
+            ), mapOf(a to BigFraction.ofLong(2 * sign), b to BigFraction.ofLong(sign)), BigFraction.ofLong(7))
+            val protocol = SmtLibOutput()
+            val values = mutableListOf<BigFraction>()
+            var returned = false
+            val output = object : OutputProtocol by protocol {
+                override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                    assertFalse(returned)
+                    assertTrue("(/ 1.0 3.0)" in rendered, rendered)
+                    values += assertIs<SourceValue.Rational>(objective).value
+                    return protocol.onArithmeticIncumbent(rendered, objective)
+                }
+            }
+            val publication = ArithmeticPublication(output)
+            val render: (Sample) -> String = {
+                renderOpenTheoryModel(emptyMap(), mapOf("a" to 0, "b" to 1), mapOf("x" to 0),
+                    OpenTheoryAssignment.Sampled(it))
+            }
+            lateinit var result: LinearOptimizationResult
+
+            val text = capture {
+                output.begin(optimize = true, maximize = sense == ObjectiveSense.MAXIMIZE)
+                result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(
+                    cancellation = Cancellation { values.size == 2 },
+                )) { sample, value -> publication.publish(render(sample), SourceValue.Rational(value)) }
+                returned = true
+                reportLinearOptimization(result, render, output, publication, false, 0L, true)
+            }
+
+            assertEquals(listOf(BigFraction.ofLong(7), BigFraction.ofLong(7 + sign)), values)
+            assertEquals(TerminationReason.Cancelled, result.reason)
+            assertNull(result.terminal)
+            assertEquals(values.last(), result.value)
+            assertEquals(2L, publication.solutions)
+            assertEquals(2, text.lines().count { it.startsWith("; objective=") })
+            assertTrue("; optimizationStatus=best-found" in text.lines(), text)
+        }
+    }
+
+    @Test
+    fun `linear nonattainment metadata does not republish its feasible witness`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val scope = SourceScope(SourceRevision("cli-linear-limit", "exact-affine"),
+            objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val context = SourceProofContext(scope, setOf(x), mapOf("positive" to SourcePremise(
+            SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true))),
+            mapOf(x to BigFraction.ONE))
+        val output = SmtLibOutput()
+        val publication = ArithmeticPublication(output)
+        val render: (Sample) -> String = {
+            renderOpenTheoryModel(emptyMap(), emptyMap(), mapOf("x" to 0), OpenTheoryAssignment.Sampled(it))
+        }
+        lateinit var result: LinearOptimizationResult
+
+        val progress = capture {
+            output.begin(optimize = true, maximize = false)
+            result = OpenTheoryPipeline.optimizeLinear(context) { sample, value ->
+                publication.publish(render(sample), SourceValue.Rational(value))
+            }
+        }
+        val terminal = capture { reportLinearOptimization(result, render, output, publication, false, 0L, true) }
+
+        assertTrue("define-fun x" in progress, progress)
+        assertFalse("; objective=0\n" in progress, progress)
+        assertFalse("define-fun" in terminal, terminal)
+        assertFalse("; objective=" in terminal, terminal)
+        assertTrue("; objectiveBound=0" in terminal.lines(), terminal)
+        assertTrue("; objectiveBoundStrict=true" in terminal.lines(), terminal)
+        assertTrue("; optimizationStatus=unattained-infimum" in terminal.lines(), terminal)
+    }
+
+    @Test
+    fun `cancelled linear admission prints unknown without an assignment`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val scope = SourceScope(SourceRevision("cli-linear-cancelled", "exact-affine"),
+            objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val context = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
+        val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = Cancellation { true }))
+        val output = SmtLibOutput()
+        val publication = ArithmeticPublication(output)
+
+        val text = capture {
+            output.begin(optimize = true, maximize = false)
+            reportLinearOptimization(result, { error("no source witness") }, output, publication, false, 0L, true)
+        }
+
+        assertEquals("unknown\n; optimizationStatus=unknown\n; cancelled\n", text)
+        assertEquals(0L, publication.solutions)
+    }
+
+    @Test
+    fun `linear unbounded completion retains the emitted witness without a duplicate objective`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val scope = SourceScope(SourceRevision("cli-linear-ray", "exact-affine"),
+            objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val context = SourceProofContext(scope, setOf(x), emptyMap(), mapOf(x to BigFraction.ONE))
+        val output = SmtLibOutput()
+        val publication = ArithmeticPublication(output)
+        val render: (Sample) -> String = {
+            renderOpenTheoryModel(emptyMap(), emptyMap(), mapOf("x" to 0), OpenTheoryAssignment.Sampled(it))
+        }
+        lateinit var result: LinearOptimizationResult
+
+        val progress = capture {
+            output.begin(optimize = true, maximize = false)
+            result = OpenTheoryPipeline.optimizeLinear(context) { sample, value ->
+                publication.publish(render(sample), SourceValue.Rational(value))
+            }
+        }
+        val terminal = capture { reportLinearOptimization(result, render, output, publication, false, 0L, true) }
+
+        assertTrue("define-fun x" in progress, progress)
+        assertFalse("optimizationStatus" in progress, progress)
+        assertEquals("sat\n; optimizationStatus=unbounded\n", terminal)
+        assertEquals(1L, publication.solutions)
+    }
 
     @Test
     fun `arithmetic SMT witnesses stream before terminal proof status`() {

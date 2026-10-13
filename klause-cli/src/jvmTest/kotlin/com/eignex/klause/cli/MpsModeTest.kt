@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -14,6 +15,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsModeTest {
+    @Test
+    fun `MPS publication uses the checked current source value before duplicate handling`() {
+        var checked: BigFraction? = BigFraction.ONE * BigFraction.ofLong(2).reciprocal()
+        val output = MpsOutput(objectiveScale = 3L, sourceArithmeticValue = { checked?.let(SourceValue::Rational) })
+        val publication = ArithmeticPublication(output)
+
+        val text = capture {
+            publication.publish("v X=1/2", SourceValue.Rational(BigFraction.ofLong(3)))
+            publication.publish("v X=1/2", SourceValue.Rational(BigFraction.ofLong(99)))
+            checked = null
+            publication.publish("v X=1/2", SourceValue.Rational(BigFraction.ofLong(3)))
+        }
+
+        assertEquals("o 0.5\nv X=1/2\n", text)
+        assertEquals(1L, publication.solutions)
+    }
+
+    @Test
+    fun `accepted MPS objectives retain original units and decimal formatting`() {
+        val output = MpsOutput(objectiveScale = 3L, sourceObjective = { BigFraction.ofLong(99) })
+
+        val text = capture {
+            output.onArithmeticIncumbent("v X=1/2", SourceValue.Rational(BigFraction.ONE *
+                BigFraction.ofLong(2).reciprocal()))
+        }
+
+        assertEquals("o 0.5\nv X=1/2\n", text)
+    }
+
     @Test
     fun `exact open objectives undo the MPS scale without rounding`() {
         for (sign in listOf(-1L, 1L)) {
@@ -188,13 +218,14 @@ class MpsModeTest {
         val output = session.output(CommonOptions())
 
         val text = capture {
-            output.onExactSolution(rendered, BigFraction.ONE)
+            ArithmeticPublication(output).publish(rendered, SourceValue.Rational(BigFraction.ONE))
             output.onComplete(Verdict.BEST_FOUND)
         }
 
         assertTrue("o 1.0000000000000000001" in text.lines(), text)
         assertTrue("s SATISFIABLE" in text.lines(), text)
         assertFalse("s OPTIMUM FOUND" in text.lines(), text)
+        assertEquals(1, text.lines().count { it.startsWith("v ") })
     }
 
     @Test
@@ -217,7 +248,7 @@ class MpsModeTest {
         val output = session.output(CommonOptions())
 
         val text = capture {
-            output.onExactSolution(rendered, BigFraction.ONE)
+            ArithmeticPublication(output).publish(rendered, SourceValue.Rational(BigFraction.ONE))
             output.onComplete(Verdict.BEST_FOUND)
         }
 

@@ -7,6 +7,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
 class ConditionedQueryScopeTest {
     @Test
@@ -43,6 +45,38 @@ class ConditionedQueryScopeTest {
             assertEquals(1, it.size)
             assertTrue(it.single().bools.isEmpty())
             assertFalse(scope.stop())
+        }
+    }
+
+    @Test
+    fun `an expired query deadline retracts before a sibling invocation`() {
+        val clock = TestTimeSource()
+        val scope = ConditionedQueryScope(Cancellation.until(clock.markNow() + 10.seconds))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        val first = clock.markNow() + 2.seconds
+        val sibling = clock.markNow() + 6.seconds
+
+        scope.withCondition(condition, Cancellation.until(first)) {
+            clock += 3.seconds
+            assertTrue(scope.stop())
+        }
+        scope.withCondition(condition, Cancellation.until(sibling)) {
+            assertFalse(scope.stop())
+            assertEquals(sibling, scope.stop.deadline())
+        }
+    }
+
+    @Test
+    fun `a sibling deadline cannot renew the containing deadline`() {
+        val clock = TestTimeSource()
+        val deadline = clock.markNow() + 2.seconds
+        val scope = ConditionedQueryScope(Cancellation.until(deadline))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        clock += 3.seconds
+
+        scope.withCondition(condition, Cancellation.until(clock.markNow() + 10.seconds)) {
+            assertTrue(scope.stop())
+            assertEquals(deadline, scope.stop.deadline())
         }
     }
 

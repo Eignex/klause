@@ -1,13 +1,12 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.solver.pipeline.symbolicRealValue
-
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -17,6 +16,8 @@ import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.pipeline.symbolicRealValue
+import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -319,6 +320,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     private var optimize = false
     private var quadraticResult: QuadraticOptimizationResult? = null
+    private var linearResult: LinearOptimizationResult? = null
 
     override val commentPrefix: String = ";"
     override val streamObjective: Boolean = true
@@ -327,6 +329,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
     override fun begin(optimize: Boolean, maximize: Boolean) {
         this.optimize = optimize
         quadraticResult = null
+        linearResult = null
     }
 
     override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
@@ -352,6 +355,19 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
         }
     }
 
+    override fun onLinearResult(result: LinearOptimizationResult) {
+        linearResult = result
+        val bound = when (val claim = result.terminal?.claim) {
+            is SourceClaim.Optimal -> SourceClaim.Bound(claim.value)
+            is SourceClaim.Limit -> SourceClaim.Bound(claim.value, strict = true)
+            else -> result.bound?.claim as? SourceClaim.Bound
+        } ?: return
+        val direction = if (result.scope.objective?.sense == ObjectiveSense.MINIMIZE) "lower" else "upper"
+        println("; objectiveBoundDirection=$direction")
+        println("; objectiveBound=${formatArithmeticObjective(bound.value)}")
+        println("; objectiveBoundStrict=${bound.strict}")
+    }
+
     override fun arithmeticWitnessStatus(): String = "sat"
 
     override fun formatArithmeticObjective(objective: SourceValue): String =
@@ -362,7 +378,10 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     override fun completionMetadata(verdict: Verdict): String? {
         if (!optimize) return null
-        val status = when (val result = quadraticResult) {
+        val status = if (linearResult?.terminal?.claim is SourceClaim.Limit) {
+            if (linearResult?.scope?.objective?.sense == ObjectiveSense.MINIMIZE) "unattained-infimum"
+            else "unattained-supremum"
+        } else when (val result = quadraticResult) {
             is QuadraticOptimizationResult.UnattainedLimit -> if (result.sense == ObjectiveSense.MINIMIZE) {
                 "unattained-infimum"
             } else "unattained-supremum"

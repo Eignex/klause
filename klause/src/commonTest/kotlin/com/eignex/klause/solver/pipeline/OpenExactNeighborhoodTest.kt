@@ -12,6 +12,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -170,6 +171,91 @@ class OpenExactNeighborhoodTest {
         val sample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
         assertEquals(BigFraction.ZERO, sample.exactReals?.single())
         adapter.close()
+    }
+
+    @Test
+    fun `interrupted initialization cannot renew the containing native allowance`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.EQ, 1.0)), numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val adapter = OpenExactNeighborhood(model, TheoryParams(openWorkLimit = 1))
+        val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+
+        adapter.use {
+            val interrupted = it.check(free, Cancellation { it.work >= 1 })
+            val sibling = it.check(free, Cancellation.Never)
+
+            assertIs<ExactNeighborhoodResult.Undecided>(interrupted)
+            assertIs<ExactNeighborhoodResult.Undecided>(sibling)
+            assertEquals(1L, it.work)
+        }
+    }
+
+    @Test
+    fun `sibling queries cannot renew committed Boolean decisions`() {
+        val model = Problem(1, 0, emptyArray(), emptyArray())
+        val adapter = OpenExactNeighborhood(model, TheoryParams(maxDecisions = 1))
+        val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+
+        adapter.use {
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(free, Cancellation.Never))
+            val sibling = it.check(free, Cancellation.Never)
+
+            assertIs<ExactNeighborhoodResult.Undecided>(sibling)
+            assertEquals(1L, it.stats.openTheory.openBoolDecisions)
+        }
+    }
+
+    @Test
+    fun `native completion charges the current invocation meter`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.EQ, 1.0)), numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val adapter = OpenExactNeighborhood(model, TheoryParams())
+        var firstWork = 0L
+        var siblingWork = 0L
+        val first = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { firstWork += it }
+        }
+        val sibling = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { siblingWork += it }
+        }
+        val zero = mapOf(0 to BigFraction.ZERO)
+        val half = mapOf(0 to BigFraction.ofLong(2).reciprocal())
+
+        adapter.use {
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(
+                ExactNeighborhoodCondition(emptyMap(), zero, zero), first))
+            val firstCharge = firstWork
+            assertTrue(firstCharge > 0)
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(
+                ExactNeighborhoodCondition(emptyMap(), half, half), sibling))
+
+            assertTrue(siblingWork > 0)
+            assertEquals(firstCharge, firstWork)
+        }
+    }
+
+    @Test
+    fun `a sibling invocation cannot rearm containing cancellation`() {
+        var cancelled = false
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val adapter = OpenExactNeighborhood(model, TheoryParams(cancellation = Cancellation { cancelled }))
+        val zero = mapOf(0 to BigFraction.ZERO)
+        val condition = ExactNeighborhoodCondition(emptyMap(), zero, zero)
+
+        adapter.use {
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(condition, Cancellation.Never))
+            val spent = it.work
+            cancelled = true
+            val sibling = it.check(condition, Cancellation.Never)
+
+            assertIs<ExactNeighborhoodResult.Undecided>(sibling)
+            assertEquals(spent, it.work)
+        }
     }
 
     @Test

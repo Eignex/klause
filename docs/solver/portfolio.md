@@ -57,6 +57,9 @@ indeterminate checks publish nothing and do not count as a fault. Finite fixpoin
 cancellation stays indeterminate. Uncertified real coordinates require a complete
 source-row check, including strictness, reification and declared bounds, or the
 configured source tolerance check. Unsupported checkers decline.
+Scoped witness admission checks the containing invocation's Boolean pins and numeric
+windows before the installed source checker. A numeric real restriction needs exact
+coordinates; approximate telemetry cannot establish that the point satisfies it.
 
 Bounds, infeasibility and unboundedness require a matching completed-proof certificate
 in addition to identity. Native adapters issue these certificates only for their

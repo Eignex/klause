@@ -1,8 +1,12 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.CandidateVerifier
@@ -13,6 +17,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -149,6 +154,98 @@ class PortfolioEvidenceTest {
         val result = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 0.0)
 
         val checked = verifier.proof(worker, EvidenceKind.Bound, CompletedEngineResult.Minimize(scope, result))
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `a base model witness cannot enter an invocation whose conditions it violates`() {
+        val model = ModelIdentity.of(Any())
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val absentInteger = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val absentReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val conditions = listOf(
+            SourceCondition(bools = mapOf(0 to true)),
+            SourceCondition(lower = mapOf(integer to BigFraction.ONE)),
+            SourceCondition(upper = mapOf(integer to BigFraction.MINUS_ONE)),
+            SourceCondition(lower = mapOf(real to BigFraction.ONE)),
+            SourceCondition(upper = mapOf(real to BigFraction.MINUS_ONE)),
+            SourceCondition(bools = mapOf(1 to false)),
+            SourceCondition(lower = mapOf(absentInteger to BigFraction.ZERO)),
+            SourceCondition(lower = mapOf(absentReal to BigFraction.ZERO)),
+        )
+        val point = Sample(booleanArrayOf(false), longArrayOf(0), doubleArrayOf(0.0), listOf(BigFraction.ZERO))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
+
+        for (condition in conditions) {
+            val scope = SourceScope(SourceRevision("original", "exact-affine"), condition)
+            val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
+
+            assertIs<Verification.Rejected>(verifier.witness(worker, point, null))
+        }
+    }
+
+    @Test
+    fun `a scoped witness satisfies Boolean integer and exact real conditions`() {
+        val model = ModelIdentity.of(Any())
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val condition = SourceCondition(mapOf(0 to true), mapOf(integer to BigFraction.ONE, real to BigFraction.ONE),
+            mapOf(integer to BigFraction.ONE, real to BigFraction.ONE))
+        val scope = SourceScope(SourceRevision("original", "exact-affine"), condition)
+        val point = Sample(booleanArrayOf(true), longArrayOf(1), doubleArrayOf(1.0), listOf(BigFraction.ONE))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
+
+        val checked = verifier.witness(worker, point, null)
+
+        assertIs<Verification.Accepted<*, *>>(checked)
+    }
+
+    @Test
+    fun `an approximate real coordinate cannot establish an invocation window`() {
+        val model = ModelIdentity.of(Any())
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val scope = SourceScope(SourceRevision("original", "exact-affine"),
+            SourceCondition(lower = mapOf(real to BigFraction.ZERO)))
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
+
+        val checked = verifier.witness(worker, point, null)
+
+        assertIs<Verification.Indeterminate>(checked)
+    }
+
+    @Test
+    fun `cancelling the containing invocation leaves its witness check indeterminate`() {
+        val model = ModelIdentity.of(Any())
+        val scope = SourceScope(SourceRevision("original", "exact-affine"), SourceCondition(bools = mapOf(0 to true)))
+        val point = Sample(booleanArrayOf(false), longArrayOf())
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting())
+            .bindSourceScope(scope, Cancellation { true })
+
+        val checked = verifier.witness(worker, point, null)
+
+        assertIs<Verification.Indeterminate>(checked)
+    }
+
+    @Test
+    fun `a completed optimum outside its source condition cannot establish a bound`() {
+        val model = ModelIdentity.of(Any())
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val scope = SourceScope(SourceRevision("original", "exact-affine"),
+            SourceCondition(lower = mapOf(integer to BigFraction.ONE)),
+            SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val point = Sample(booleanArrayOf(), longArrayOf(0))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
+            .bindEvidence(model).bindSourceScope(scope)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
+        val completion = CompletedEngineResult.Minimize(scope, MinimizeResult.Optimal(point, 0.0))
+
+        val checked = verifier.proof(worker, EvidenceKind.Bound, completion)
 
         assertIs<Verification.Rejected>(checked)
     }
