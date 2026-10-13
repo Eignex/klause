@@ -44,6 +44,32 @@ import kotlin.test.assertTrue
 class LpReducedCostFixingTest {
 
     @Test
+    fun `integral continuous objective definitions use a strict integer fixing cutoff`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(10.0))
+        val session = PropagationSession(problem)
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            val r = addRealVar(0.0, 10.0, cost = 1.0)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(1.0)))
+        val relaxation = LpRelaxation(
+            model, intArrayOf(0, -1), booleanArrayOf(false, false), 0L, intArrayOf(0), intArrayOf(),
+            colRealId = intArrayOf(-1, 0),
+        )
+        val sink = SolveStatsSink(backend = "mixed-integral-fixing")
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+
+            engine.applySparseReducedCostFixing(relaxation, certificate, session, 2.0, sink)
+
+            assertEquals(IntDomain(0, 1), session.intDomain(0))
+        }
+    }
+
+    @Test
     fun `mixed reduced cost fixing preserves continuous objective units`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray())
         val session = PropagationSession(problem)

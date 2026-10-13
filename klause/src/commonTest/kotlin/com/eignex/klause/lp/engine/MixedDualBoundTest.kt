@@ -11,6 +11,72 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `bounded continuous objective definitions retain their integral equality support`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            val r = addRealVar(0.0, 10.0, cost = 1.0)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0)))
+
+        assertEquals(listOf(0), certificate.integralObjectiveRows()?.toList())
+        assertFalse(certificate.dualNonzeroRow(0))
+        assertNull(certificate.fixSteps(1, 3L, 0L))
+    }
+
+    @Test
+    fun `fractional continuous objective definitions retain a rational cutoff`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            val r = addRealVar(0.0, 10.0, cost = 1.0)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(-0.5, 1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0)))
+
+        assertNull(certificate.integralObjectiveRows())
+    }
+
+    @Test
+    fun `continuous objective inequalities cannot supply an integral equality`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            val r = addRealVar(0.0, 10.0, cost = 1.0)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.GE, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0)))
+
+        assertNull(certificate.integralObjectiveRows())
+    }
+
+    @Test
+    fun `objective integrality retains source shifts scale and external constants`() {
+        for (constant in listOf(5.0, 5.25)) {
+            val source = assertNotNull(LpBuilder().apply {
+                val x = addVar(3L, 10L)
+                val r = addRealVar(3.0, 10.0, cost = 2.0)
+                addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
+            }.build(Sense.MINIMIZE).authoritativeModel())
+            val objective = ExactLpObjective(
+                List(source.numVars) { source.objective.cost(it) }, source.objective.constant,
+                scale = ExactLpNumber.of(2L),
+                externalConstant = ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(constant))),
+            )
+            val model = assertNotNull(LpExactState(source.withObjective(objective)).toWorkingModel())
+
+            val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0)))
+
+            assertEquals(if (constant == 5.0) listOf(0) else null, certificate.integralObjectiveRows()?.toList())
+            assertEquals(assertNotNull(BigFraction.ofDouble(3.0 + constant)), certificate.exactObjectiveBound())
+        }
+    }
+
+    @Test
     fun `subnormal rational cutoffs retain exact integral fixing and wide arithmetic charges`() {
         val source = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)

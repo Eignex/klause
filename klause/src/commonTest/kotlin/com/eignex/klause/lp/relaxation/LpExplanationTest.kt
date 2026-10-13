@@ -5,20 +5,20 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lp.engine.ExactLpBounds
-import com.eignex.klause.lp.engine.ExactLpColumn
-import com.eignex.klause.lp.engine.ExactLpNumber
-import com.eignex.klause.lp.engine.ExactLpPremises
-import com.eignex.klause.lp.engine.ExactLpRow
-import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
+import com.eignex.klause.lp.engine.ExactLpBounds
+import com.eignex.klause.lp.engine.ExactLpColumn
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpPremises
+import com.eignex.klause.lp.engine.ExactLpRow
+import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpExactState
@@ -27,12 +27,13 @@ import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
-import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.authoritativeModel
+import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.integerFarkasRay
+import com.eignex.klause.lp.engine.nodeDualCertificate
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import kotlin.test.Test
@@ -42,6 +43,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpExplanationTest {
+    @Test
+    fun `integral objective support cites scoped equality premises without dual weight`() {
+        for (backed in listOf(false, true)) {
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(10.0))
+            val session = PropagationSession(problem)
+            session.pinBool(0, true)
+            val source = LpBuilder().apply {
+                val x = addVar(0L, 10L)
+                val r = addRealVar(0.0, 10.0, cost = 1.0)
+                addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
+            }.build(Sense.MINIMIZE)
+            source.rowGlobal[0] = false
+            if (backed) source.rowPremises[0] = LpRowPremises(
+                intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(Lit.make(0, true)),
+            )
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+            val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0)))
+            val relaxation = LpRelaxation(
+                model, intArrayOf(0, -1), booleanArrayOf(false, false), 0L, intArrayOf(0), intArrayOf(),
+                colRealId = intArrayOf(-1, 0),
+            )
+
+            val reason = LpExplanation.objectiveBoundReason(relaxation, certificate, session)
+
+            assertEquals(if (backed) listOf(Lit.make(0, false)) else null, reason?.toList())
+        }
+    }
+
     @Test
     fun `opaque exact literal identifiers require a native Boolean interpretation before citation`() {
         for (literal in listOf(-13, Int.MAX_VALUE)) {

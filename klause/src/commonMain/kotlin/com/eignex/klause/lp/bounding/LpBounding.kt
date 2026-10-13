@@ -606,7 +606,11 @@ internal fun LpEngine.sparseSafePrune(
         val lower = cert.exactObjectiveBound()
         val words = (maxOf(Long.SIZE_BITS, exactBits(listOf(lower, rationalCutoff))) + 63L) / 64L
         noteNodeOverhead(4L * words * words)
-        if (lower + BigFraction.ofLong(boundRel.objectiveConstant) >= rationalCutoff) {
+        val full = lower + BigFraction.ofLong(boundRel.objectiveConstant)
+        val integralCutoff = if (cert.integralObjectiveRows() != null) enclosingCutoff(bound)?.ceilLong() else null
+        if ((integralCutoff != null && full.ceilLong()?.let { it >= integralCutoff } == true) ||
+            full >= rationalCutoff
+        ) {
             sink.lp.observePrune()
             return LpNodeOutcome(true, null)
         }
@@ -714,7 +718,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
 ): Boolean {
     if (cancellation() || !cert.belongsTo(relaxation.model, sink.lp.certificationObserver(LpRoute.NODE))) return false
     val sourceRange = sourceObjectiveRange(relaxation)
-    val improvingMax = if (sourceRange != null) {
+    val improvingMax = if (sourceRange != null || cert.integralObjectiveRows() != null) {
         val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
         if (ceiling == Long.MIN_VALUE) return false
         BigFraction.ofLong(ceiling - 1L)

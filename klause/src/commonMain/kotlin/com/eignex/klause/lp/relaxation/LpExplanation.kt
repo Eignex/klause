@@ -288,7 +288,7 @@ internal object LpExplanation {
         return true
     }
 
-    /** [addRowPremiseLits] over the rows carrying nonzero dual weight in an optimal [cert]. */
+    /** [addRowPremiseLits] over dual support and the equality proving an integral objective. */
     fun addDualRowPremiseLits(
         lits: IntArrayList,
         seen: IntHashSet,
@@ -298,7 +298,10 @@ internal object LpExplanation {
         observer: LpCertificationObserver? = null,
     ): Boolean {
         if (!cert.belongsTo(relaxation.model, observer)) return false
-        val rows = (0 until relaxation.model.m).filter { cert.dualNonzeroRow(it) }.toIntArray()
+        val integralRows = cert.integralObjectiveRows()
+        val rows = (0 until relaxation.model.m).filter {
+            cert.dualNonzeroRow(it) || integralRows?.contains(it) == true
+        }.toIntArray()
         return addRowPremiseLits(lits, seen, relaxation, rows, session)
     }
 

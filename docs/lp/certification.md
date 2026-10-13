@@ -103,6 +103,18 @@ unrounded objective without an integer objective atom, so the prune has no
 reusable CP reason. Equality at the reported binary64 incumbent
 remains conservative because the cutoff uses its upper neighbor.
 
+A bounded continuous objective coordinate can retain an integral objective
+lattice when a declared equality eliminates it into an integral affine expression.
+The bounded check considers at most eight defining equalities, verifies every
+remaining coefficient and constant in minimized source units, and includes column
+origins, objective scale and the external constant. Inequalities, fractional
+expressions and logical sides narrowed away from their declared equality cannot
+supply this lattice. Its defining row remains a premise even with zero dual
+weight. The lattice authorizes strict integer cutoffs and equality pruning without
+changing continuous column declarations or fixing those coordinates. Optional
+lattice checking shares the certificate allowance; a decline preserves a completed
+unrounded bound and its rational cutoff.
+
 Reconstruction converts signed single-word fractions directly between
 `BigFraction` and `Frac128`; wider values use both words. Both paths retain the
 same bit checks, work charges, allocation allowance and cancellation checks.

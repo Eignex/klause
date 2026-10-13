@@ -7,6 +7,7 @@ internal interface LpDeductionCertificate {
     fun exactMultipliers(): List<BigFraction>
     fun exactReducedCost(col: Int): BigFraction
     fun exactObjectiveBound(): BigFraction
+    fun integralObjectiveRows(): IntArray? = null
     fun dualNonzeroRow(row: Int): Boolean
     fun reducedCostSign(col: Int): Int
     fun objectiveBoundCeil(extraConstant: Long): Long?

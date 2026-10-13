@@ -46,6 +46,30 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `integral continuous objective definitions prune equal incumbent nodes`() {
+        for ((coefficient, minimum) in listOf(1.0 to 1.0, -1.0 to -2.0)) {
+            for (cutoff in listOf(minimum - 0.5, minimum, minimum + 0.5)) {
+                val problem = Problem(
+                    0, 1, arrayOf(IntDomain(1, 2)),
+                    arrayOf(Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(1.0),
+                        LinearOp.EQ, 0.0)),
+                    numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(10.0),
+                )
+                val objective = LinearObjective(realCoefficients = doubleArrayOf(coefficient))
+                val sink = SolveStatsSink(backend = "mixed-integral-prune")
+                val session = PropagationSession(problem)
+                LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                    val result = engine.sparseSafePrune(
+                        assertNotNull(engine.lpRelaxer), session, cutoff, sink, Cancellation.Never, -1, true,
+                    )
+
+                    assertEquals(cutoff <= minimum, result.prune)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `mixed node pruning requires an exact bound beyond the enclosing rational cutoff`() {
         for ((coefficient, minimum) in listOf(0.5 to 3.125, -0.5 to 2.375)) {
             for (cutoff in listOf(minimum - 0.125, minimum, minimum + 0.125)) {

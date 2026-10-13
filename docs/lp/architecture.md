@@ -113,6 +113,9 @@ lattice, and retain cutoff and row/bound premises.
 Continuous terms contribute exact source-valid endpoints to mixed certificates;
 they do not become integer domain-fixing targets. Fractional objective gaps retain
 source units and do not acquire an integer objective lattice.
+A retained defining equality can prove that a bounded continuous objective is an
+integral affine expression. Its row premises then support strict integer cutoffs;
+the continuous declaration and domain-fixing targets retain their original types.
 
 Objective changes retract dependent bounds, cuts and clauses. If dependent
 learning cannot be retracted selectively, restore an objective-independent
