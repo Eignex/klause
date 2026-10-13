@@ -20,7 +20,7 @@ rules remain in their subsystem pages.
 | `solver.objective` | Linear objective construction/evaluation; `Objective` and `IncrementalObjective` scoring extensions |
 | `ir.Factor`, factor data and remapping | Stable membership/structural keys, affine/remapping refusal contracts and immutable borrowed factor payloads |
 | `solver.search` component protocols | Decisions, explanations, context, component/brancher/blocker interfaces, contributed model keys and immutable assembled reads |
-| `theory` protocols | `Theory`, its context/check contract and authoritative exact assignment values; custom theories retain their native representations |
+| `theory` protocols | Batch `Theory`, its context/fragment-check contract and authoritative exact assignment values; incremental participants use `SearchComponent` |
 | `lp` projection protocols | `RelaxationBuilder`, factor relaxation/hull interfaces and typed source/CP/LP mapping handles |
 | Format entry points | Public parsing, compilation and solution-writing facades; source/result meaning follows [input semantics](formats.md) |
 | Exported numerical contracts | `BigInt`, `BigFraction`, `AlgebraicReal`, `Cancellation` and `WorkMeter` retain their JVM/native ownership and representation contracts in `klause` |
@@ -157,6 +157,20 @@ The `lp.lattice` package is an internal implementation mechanism within `klause`
 Its reductions borrow caller-owned input rows and expose read-only result buffers
 to solver consumers.
 The engine's closed dependency list remains in [architecture](architecture.md#package-boundaries).
+
+## Theory and search extension roles
+
+Implement `Theory<A>` for a batch fragment-checking service and use
+`TheorySearchComponent<A>` to join the shared search lifecycle. Implement
+`SearchComponent` directly for incremental finite or arithmetic state, adding optional
+brancher, blocker or conflict capabilities as needed. `TheoryComponent` retains its
+published descriptor as a deprecated marker; it adds neither behavior nor completeness.
+
+A participating service can remain incomplete. Its unresolved batch answer uses the
+legacy `TheoryCheck.Cancelled` surface and the bridge reports indeterminate checking,
+without a witness or refutation. Decided answers apply only to the checked fragment
+and active conditions. See [theory roles](theories.md#extension-roles-and-completeness)
+for admission and proof scope.
 
 ## Typed contributions and migration
 

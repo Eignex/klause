@@ -20,7 +20,12 @@ state and scheduling. [Model ownership](../model.md) defines the engine views.
 [solver.search](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/)
 owns decisions, levels, branching, retraction, complete checks, restarts and model
 assembly. CP and theory components contribute residual state and reasons through the
-same protocol. The session exchanges Boolean literals, semantic integer bounds and
+same `SearchComponent` lifecycle. Batch `Theory` services participate through
+`TheorySearchComponent`; directly incremental arithmetic components use the lifecycle
+without a batch service. `TheoryComponent` is a deprecated compatibility marker.
+Participation supplies no completeness guarantee: indeterminate required checks prevent
+exhaustion from becoming a source refutation. See [theory roles](../theories.md#extension-roles-and-completeness).
+The session exchanges Boolean literals, semantic integer bounds and
 opaque theory decisions rather than native CP domains.
 
 [SearchSession](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchSession.kt)
