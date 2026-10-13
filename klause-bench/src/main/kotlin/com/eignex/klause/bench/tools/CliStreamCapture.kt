@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Base64
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -19,6 +20,8 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 internal object CliStreamCapture {
+    // Ordinary input or launch failures must not discard later planned cases.
+    @Suppress("TooGenericExceptionCaught")
     @JvmStatic
     fun main(args: Array<String>) {
         val output = File(requireNotNull(System.getenv("OUT")) { "OUT must name the capture directory" })
@@ -65,7 +68,7 @@ internal object CliStreamCapture {
             interruption.compareAndSet(null, Interruption("watchdog", System.nanoTime() - start, null))
             kill(process)
             failure = runCatching { reader.get(5, TimeUnit.SECONDS) }.exceptionOrNull()?.toString()
-        } catch (error: Exception) {
+        } catch (error: ExecutionException) {
             failure = error.toString()
         } finally {
             if (failure == null) process.waitFor(5, TimeUnit.SECONDS)
