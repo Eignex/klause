@@ -53,6 +53,18 @@ class CheckArchitectureTest(unittest.TestCase):
                     f"import com.eignex.klause.{dependency}\n"
                 ))
 
+    def test_predicate_consumers_use_the_neutral_boundary(self):
+        for owner in ("lp.bounding", "solver.pipeline"):
+            with self.subTest(owner=owner):
+                self.assertTrue(violations(
+                    f"package com.eignex.klause.{owner}\n"
+                    "import com.eignex.klause.theory.qflra.SourceBoundAtom\n"
+                ))
+                self.assertEqual([], violations(
+                    f"package com.eignex.klause.{owner}\n"
+                    "import com.eignex.klause.solver.search.SourceBoundAtom\n"
+                ))
+
     def test_wildcard_imports_cannot_hide_a_forbidden_symbol(self):
         self.assertTrue(violations("""package com.eignex.klause.theory.qflra
 import com.eignex.klause.ir.*

@@ -28,7 +28,10 @@ FORBIDDEN = {
     "lowering": ("compile", "schema", "formats"),
     "formats": ("compile", "schema", "theory"),
     "bound": ("lp.engine",),
-    "solver.pipeline": ("formats",),
+    "solver.pipeline": (
+        "formats", "theory.qflra.SourceBoundAtom", "theory.qflra.SourceBoundTerm", "theory.qflra.SourceBoundLimits",
+    ),
+    "lp": ("theory.qflra.SourceBoundAtom", "theory.qflra.SourceBoundTerm", "theory.qflra.SourceBoundLimits"),
     "solver.search": ("theory", "lp", "propagation", "backtrack"),
     "theory": ("propagation", "backtrack", "ir.IntDomain", "ir.intdomain"),
 }
