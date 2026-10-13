@@ -181,11 +181,14 @@ class QuadraticIntegerOptimizationTest {
 
     @Test
     fun `fractional real witnesses cannot satisfy an integer square equation`() {
+        val coordinate = PolynomialExpression.Variable(SourceRealId(0))
         val source = NonlinearIntegerProblem(
-            PolynomialRealFormula.Atom(
-                PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2), PolynomialRelation.EQ,
-                PolynomialExpression.Constant.of(parseBigInt("2")),
-            ), 1, 0, mapOf("i" to 0), emptyMap(), emptyMap(),
+            PolynomialRealFormula.And(listOf(
+                PolynomialRealFormula.Atom(PolynomialExpression.Power(coordinate, 2), PolynomialRelation.EQ,
+                    PolynomialExpression.Constant.of(BIG_ONE, parseBigInt("4"))),
+                PolynomialRealFormula.Atom(coordinate, PolynomialRelation.GE,
+                    PolynomialExpression.Constant.of(parseBigInt("0"))),
+            )), 1, 0, mapOf("i" to 0), emptyMap(), emptyMap(),
         )
         val i = QuadraticVariable.Int(SourceIntId(0))
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, i, i)))

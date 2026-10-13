@@ -233,13 +233,32 @@ class NonlinearIntegerTheoryRequestTest {
             "(declare-const x Int) (declare-const y Int) (assert (= x 3)) (assert (= (* x y) 21))",
         ))
         val request = input.problem.pipelineRequest()
+        val params = NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(assumptions = Assumptions(ints = mapOf(0 to 3L, 1 to 7L))),
+        ))
 
-        val execution = OpenTheoryPipeline.execute(request, NonlinearIntegerTheoryParams(), FiniteEngine.MIXED, 4)
+        for (engine in listOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK,
+            FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val execution = OpenTheoryPipeline.execute(request, params, engine, 4)
 
-        val sat = assertIs<OpenTheoryResult.Sat>(execution.result)
-        assertEquals("3", sat.assignment.intValue(0))
-        assertEquals("7", sat.assignment.intValue(1))
-        assertEquals(4, sat.stats.portfolio.arms.size)
+            val sat = assertIs<OpenTheoryResult.Sat>(execution.result)
+            assertEquals("3", sat.assignment.intValue(0))
+            assertEquals("7", sat.assignment.intValue(1))
+            assertEquals(4, sat.stats.portfolio.arms.size)
+        }
+    }
+
+    @Test
+    fun `fixed nonlinear execution ignores additional worker requests`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
+            "(declare-const n Int) (assert (= (* n n) 4))",
+        )).problem
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), NonlinearIntegerTheoryParams(),
+            FiniteEngine.FIXED, 4).result
+
+        assertIs<OpenTheoryResult.Sat>(result)
+        assertTrue(result.stats.portfolio.arms.isEmpty())
     }
 
 }

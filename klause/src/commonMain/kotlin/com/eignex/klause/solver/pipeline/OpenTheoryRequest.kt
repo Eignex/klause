@@ -208,9 +208,10 @@ object OpenTheoryPipeline {
         cores: Int,
         values: OpenSourceObjective?,
         publication: SourcePublicationObserver,
+        completeOnly: Boolean = false,
     ): OpenTheoryExecution {
         val portfolio = OpenPortfolio(request.model, request, params, seed = params.randomSeed, lanes = cores,
-            sourceObjective = values, publication = publication)
+            sourceObjective = values, publication = publication, completeOnly = completeOnly)
         val stop = params.cancellation or params.timeout
         val objective = request.minimizedObjective ?: return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, integralMinimizer(request, objective), stop))
@@ -302,7 +303,10 @@ object OpenTheoryPipeline {
         }
         return when (engine) {
             FiniteEngine.MIXED -> portfolioExecution(request, params, cores, values, publication)
-            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> executeDirect(request, params, values, publication)
+            FiniteEngine.BACKTRACK -> if (cores > 1) {
+                portfolioExecution(request, params, cores, values, publication, completeOnly = true)
+            } else executeDirect(request, params, values, publication)
+            FiniteEngine.FIXED -> executeDirect(request, params, values, publication)
             FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> linearNeighborhoodInvocation(
                 request.model, params, request.minimizedObjective, engine == FiniteEngine.ALNS, cores,
                 request.preparedPlan, values, publication,

@@ -9,8 +9,8 @@ Execution has three parts: prepare retained workers, give them bounded slices, a
 verify their publications before sharing or returning them. Slices preserve state;
 reseeding or retiring a worker has its own lifetime and accounting rules.
 
-Finite, linear open, polynomial and nonlinear-integer source execution supply retained recipe factories to
-`PortfolioInvocation` with the routing plan and current executable projection. The invocation owns worker
+Finite, linear open, polynomial, nonlinear-integer and quadratic source execution supply retained recipe
+factories to `PortfolioInvocation` with the routing plan and current executable projection. The invocation owns worker
 slots, seed offsets, parallel node quotas, scheduler controls, result verification
 and cleanup. Composed arm attribution remains distinct from materialized replica
 slots. Recipes retain their source-specific pools and reservations; mutable source
@@ -400,8 +400,9 @@ Independent original-source derivation capture remains a separate contract.
 
 ## Exact theory strategy execution
 
-Polynomial and nonlinear-integer mixed invocations use the same construction path
-as finite and linear open execution. Polynomial workers keep private arithmetic
+Polynomial, nonlinear-integer and linear open mixed invocations and parallel single-strategy
+requests use the same construction path as finite execution. Complete-only affine
+requests supply private complete workers without adding heuristic arms. Polynomial workers keep private arithmetic
 invocations; fallback ALNS retains its bootstrap and repairs. Nonlinear integer
 traversal retains tuple enumeration, candidate state and arithmetic work across
 slices; exact neighborhoods retain their centers and adaptive state. CLI parallelism

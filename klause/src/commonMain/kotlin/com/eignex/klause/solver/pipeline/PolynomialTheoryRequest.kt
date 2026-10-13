@@ -129,7 +129,7 @@ fun OpenTheoryPipeline.minimize(
     engine: FiniteEngine = FiniteEngine.MIXED,
 ): PolynomialOptimizationExecution = minimize(request, objective, params, engine, 1)
 
-/** Optimize a finite polynomial objective using the requested mixed-portfolio lane count. */
+/** Optimize a finite polynomial objective using the requested lane count; FIXED retains one worker. */
 fun OpenTheoryPipeline.minimize(
     request: PolynomialTheoryRequest,
     objective: LinearObjective,
@@ -185,7 +185,7 @@ fun OpenTheoryPipeline.execute(
     engine: FiniteEngine = FiniteEngine.MIXED,
 ): PolynomialTheoryExecution = execute(request, params, engine, 1)
 
-/** Execute a polynomial source using the requested mixed-portfolio lane count. */
+/** Execute a polynomial source using the requested lane count; FIXED retains one worker. */
 fun OpenTheoryPipeline.execute(
     request: PolynomialTheoryRequest,
     params: PolynomialTheoryParams,

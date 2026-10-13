@@ -232,6 +232,13 @@ Lab agreement and regression confirmation remain recorded-result evidence;
 `profileCli` requires AWS execution and explicit `parallel: 1`; its instrumented
 timing stays separate from ordinary comparisons.
 
+`CliStreamCapture` with `checkSmt=true` checks complete satisfaction models against
+all original SMT assertions. Optimization streams also require each model's exact
+original objective and strict improvement in the declared direction. Satisfaction
+checking supplies no objective or proof claim. Checker failures remain separate from
+a successful solver exit; inspect the saved checker execution and output before
+counting a source case as accepted.
+
 `com.eignex.klause.bench.profile.SourceEvidenceProbe` checks produced quadratic
 evidence for the exact IR fixture schema `real-box-square`: one real coordinate in
 an integer-ended closed interval, objective `coefficient*x*x + constant`, and an
