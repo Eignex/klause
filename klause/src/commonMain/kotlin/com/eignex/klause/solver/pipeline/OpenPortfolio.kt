@@ -2,6 +2,7 @@
 
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchEngine
 import com.eignex.klause.localsearch.LocalSearchModel
@@ -37,6 +38,7 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.toDouble
 import com.eignex.klause.util.toLongExact
@@ -539,12 +541,17 @@ internal fun openWitnessVerifier(
     }
     if (claimed?.isNaN() == true) return@CandidateVerifier Verification.Rejected("objective is NaN")
     if (context != null) return@CandidateVerifier context.linearWitnessVerifier(cancellation).verify(candidate)
-    if (certificate == null) {
-        when (val checked = verifyOpenWitness(model, sample)) {
-            is Verification.Rejected -> return@CandidateVerifier checked
-            is Verification.Indeterminate -> return@CandidateVerifier checked
-            is Verification.Accepted -> Unit
-        }
+    val checked = if (model.factors.any { it is ExactSearchRow } ||
+        sample.exactInts?.any { !it.fitsLong() } == true
+    ) {
+        val source = model.linearAuthorityContext(objective ?: LinearObjective(), ObjectiveSense.MINIMIZE, cancellation)
+            ?: return@CandidateVerifier Verification.Indeterminate("exact original-source witness check unavailable")
+        source.linearWitnessVerifier(cancellation).verify(candidate)
+    } else verifyOpenWitness(model, sample, cancellation)
+    when (checked) {
+        is Verification.Rejected -> return@CandidateVerifier checked
+        is Verification.Indeterminate -> return@CandidateVerifier checked
+        is Verification.Accepted -> Unit
     }
     if (objective == null || claimed == null) return@CandidateVerifier Verification.Accepted(candidate)
     val exact = objective.evaluateExact(sample)
