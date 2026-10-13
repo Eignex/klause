@@ -9,13 +9,15 @@ import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.TheoryComponent
 
 /**
- * Adapts an existing complete open-model [Theory] to the shared component lifecycle.
+ * Bridges a batch fragment-checking [Theory] into the incremental shared search lifecycle.
  *
  * The underlying arithmetic procedures retain their specialised exact search, while this adapter owns
  * their shared-trail boundary: Boolean assignments are trailed, semantic bound changes invalidate the
  * cached theory result, and a complete Boolean skeleton is checked during component propagation rather
- * than by a separate frontend loop. Directly incremental theories can replace this adapter without
- * changing the session contract.
+ * than by a separate frontend loop. A service's completeness is independent of this bridge.
+ * Undecided checks remain indeterminate;
+ * directly incremental components implement [com.eignex.klause.solver.search.SearchComponent] without
+ * implementing [Theory], and can replace this adapter without changing the session contract.
  */
 class TheorySearchComponent<A>(
     private val theory: Theory<A>,

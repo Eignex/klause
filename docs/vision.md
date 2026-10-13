@@ -9,25 +9,34 @@ not fully implemented. [System architecture](architecture.md) describes the curr
 system; [input semantics and coverage](formats.md) records its supported routes and
 limits. Independently checkable proof export remains a target capability.
 
+## Current execution contracts
+
+Preparation, strategy construction and publication share source ownership while
+retaining theory-specific mechanisms and limits.
+
+| Area | Implemented contract |
+|---|---|
+| Source execution planning | [Prepared source plans](model.md#engine-projections-and-factor-capabilities) retain original identity, coordinate mappings, component ownership and objectives for complete and heuristic construction. Finite/linear and polynomial projections retain their own mechanisms under that plan; nonlinear integer sources retain their neutral representation. |
+| Strategy composition | [Portfolio invocation](solver/portfolio.md#exact-theory-strategy-execution) constructs finite, linear, polynomial, nonlinear-integer and quadratic portfolios through shared arm factories, lanes, seeds, quotas, source admission and cleanup. Workers retain private mutable state and exact objective contracts. |
+| Conditioned completion | [Linear query owners](solver/sessions.md#theory-invocation-scopes) retain prepared source decomposition, canonical CP projection, completed native row factories and initialized search across repairs. Conditions retract on every exit; interrupted mutable initialization retries from retained preparation under [cumulative allowances](solver/resources.md#native-arithmetic-allowances). Interrupted immutable preparation exports no partial factory. |
+| Strategy admission | [Prepared capabilities](solver/portfolio.md#prepared-strategy-admission) expose participating arms, supported operations, procedure completeness, claim authority and explicit declines. Direct factor mechanisms alone do not establish whole-source support; resource stops belong to the invocation. |
+
+These contracts preserve finite propagation's Bool+Int boundary, private mutable
+worker state, numerical dependency boundaries and source publication checks.
+[Current coverage](formats.md#solving-coverage) remains the reference for admitted
+fragments and operations; shared construction does not supply a new arithmetic
+decision procedure or independent proof-file support.
+
 ## Active work toward the vision
 
-The following refactors are planned work being pursued toward this vision. Their
-target behavior is not an implemented guarantee. Architecture and subsystem pages
-describe the current system; the linked issues track the work and its status.
+The remaining gaps have narrower scope than the shared execution contracts above.
+Subsystem pages describe current guarantees; linked issues track residual work.
 
-| Area | Current implementation | Planned work |
+| Area | Current implementation | Remaining work |
 |---|---|---|
-| Source execution planning | Linear/finite ownership and polynomial decomposition use separate plans. | [#2648](https://github.com/Eignex/klause/issues/2648): unify preparation and ownership across complete and heuristic arms. |
-| Source evidence | In-memory certificates attest to engine checks; reconstruction retains source mappings. | [#2649](https://github.com/Eignex/klause/issues/2649): retain typed, scoped derivations and transformation justifications toward independent verification. |
-| Strategy composition | Finite, open and polynomial routes construct the shared scheduler separately; nonlinear-integer and quadratic mixed execution uses fixed phases. | [#2650](https://github.com/Eignex/klause/issues/2650): construct one portfolio per invocation through a common path, with theory-specific arms and exact objective/evidence contracts. |
-| Conditioned completion | Open linear repairs rebuild constrained models and theory engines. | [#2651](https://github.com/Eignex/klause/issues/2651): retain prepared completion across candidate queries with scoped retraction and cumulative allowances. |
-| Strategy admission | Factor capabilities inventory direct mechanisms; composed routes select admission separately. | [#2652](https://github.com/Eignex/klause/issues/2652): expose model/operation admission and claim capabilities in the shared plan, with strategy conformance checks. |
-
-These refactors preserve finite propagation's Bool+Int boundary, private mutable
-worker state, numerical dependency boundaries and source publication checks. They
-do not supply new arithmetic decision procedures or proof-file support by
-themselves. [Current coverage](formats.md#solving-coverage) remains the execution
-reference, including the separate transcendental support work.
+| Source evidence | [Typed source-scoped evidence](solver/evidence.md) retains original premises, invocation restrictions, exact claims and optional transformation justifications. Supported derivations are checked separately from engine admission; missing coverage remains unavailable. | [#2649](https://github.com/Eignex/klause/issues/2649) tracks remaining original-source derivation coverage. |
+| Transcendental orchestration | [Transcendental execution](theories/transcendental.md#solving-and-composition) shares source completion across strategies, but MIXED runs a quarter-budget heuristic phase before traversal and the request does not forward explicit parallelism. | [#2791](https://github.com/Eignex/klause/issues/2791) tracks integration with the shared portfolio invocation. |
+| Independent proof export | Exact numerical checks and supported source derivations are in memory. | [Proof-file support](#independently-checkable-proof-files) and a separate checker for entire original-source claims remain target capabilities. |
 
 ## Shared model breadth
 
@@ -116,8 +125,10 @@ polynomial real arithmetic needs checkable algebraic evidence and exhaustive cas
 coverage. Proof export must report unsupported coverage or incomplete evidence
 explicitly rather than claim independent verification.
 
-This is a target capability, not implemented proof-file support. The current
-[portfolio certificates](solver/portfolio.md#witnesses-and-proof-scope) attest to
-engine checks in memory, and [LP certification](lp/certification.md) performs exact
-numerical checks internally. Neither provides an independently checkable proof of
-the entire source solve.
+This is a target capability, not implemented proof-file support.
+[Portfolio certificates](solver/portfolio.md#witnesses-and-proof-scope) retain
+engine admission, [LP certification](lp/certification.md) checks exact numerical
+evidence, and [source derivations](solver/evidence.md) check their supported claims
+against original premises in memory. Unsupported derivation coverage remains
+explicitly unavailable. These contracts do not export an independently checkable
+proof of the entire source solve.
