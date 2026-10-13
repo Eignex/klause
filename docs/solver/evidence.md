@@ -183,8 +183,10 @@ checks both producer and consumer conditions, invokes the installed original-sou
 witness checker, and evaluates the original objective exactly. A restricted point
 can satisfy a containing query after both condition checks. Generic model admission
 withholds this publication because it lacks the quadratic source checker. The native
-carrier has no independent derivation capture or invented revision; its producer and
-consumer migration remains separate from its typed transport contract.
+carrier has no independent derivation capture or invented revision. Native quadratic
+finite/polynomial and nonlinear-integer workers publish this envelope, retaining an
+existing publication when accepting a shared point. Quadratic pool and terminal
+witness admission consume it under the same native allowance.
 
 Projected polynomial witness checking fixes the original Boolean and exact real
 coordinates in the retained formula and leaves lowering auxiliaries existential.
@@ -194,6 +196,9 @@ The existing complete polynomial theory checks that extension under the caller's
 containing cancellation, work meter and representation limits. Approximate-only
 coordinates, interruption and incomplete checking remain unavailable. A feasible
 extension checks the source point; it supplies no global bound or proof export.
+Shared IR checking uses the retained finite projection and polynomial completion;
+native nonlinear-integer checking pins exact integers and reals through their original
+numeric mapping. Both leave lowering auxiliaries existential without preparing another plan.
 
 `PortfolioWorker.bindSharingInvocation` binds the containing pool query separately
 from the worker's actual runtime. A restricted worker cannot select the containing

@@ -17,9 +17,12 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
+import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -30,6 +33,32 @@ import kotlin.test.assertIs
 import kotlin.test.assertSame
 
 class QuadraticPortfolioInvocationTest {
+    @Test
+    fun `a copied native publication cannot admit a different quadratic point`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE,
+            QuadraticVariable.Real(SourceRealId(0)))))
+        val original = assertIs<QuadraticOptimizationResult.WithIncumbent>(OpenTheoryPipeline.minimize(
+            source.pipelineRequest(), objective, engine = FiniteEngine.BACKTRACK).result).incumbent
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
+            exactReals = listOf(BigFraction.ofLong(2)))
+        point.witnessCertificate = original.sample.witnessCertificate
+        val plan = source.preparePolynomialExecutionPlan().withObjective(objective)
+        val identity = ModelIdentity.of(source, objective)
+        val params = PolynomialTheoryParams()
+
+        val result = QuadraticPortfolioInvocation(plan, objective, ObjectiveSense.MINIMIZE, params,
+            QuadraticNativeScope(params), FiniteEngine.LOCAL_SEARCH, 1, Assumptions.None)
+            .execute { arm, _, _, _ ->
+                PortfolioWorker.ofMinimize("copied", arm) { _, _, _, _ ->
+                    MinimizeResult.BestFound(point, 2.0, TerminationReason.BudgetExhausted)
+                }.bindEvidence(identity, provesResults = false)
+            }
+
+        assertIs<QuadraticOptimizationResult.Unknown>(result)
+    }
+
     @Test
     fun `conditional source refutation cannot finish a weaker quadratic invocation`() {
         val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
@@ -156,9 +185,12 @@ class QuadraticPortfolioInvocationTest {
         val arithmetic = AlgebraicArithmetic()
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
             algebraicReals = listOf(arithmetic.rational(BigFraction.ofLong(2))))
-        point.witnessCertificate = terminal.incumbent.sample.witnessCertificate
         val plan = source.preparePolynomialExecutionPlan().withObjective(objective)
         val identity = ModelIdentity.of(source, objective)
+        val invocation = requireNotNull(plan.quadraticEngineInvocation(objective, ObjectiveSense.MINIMIZE,
+            Assumptions.None))
+        point.witnessCertificate = EvidenceCertificate.published(identity, QuadraticWitnessPublication(invocation,
+            QuadraticIncumbent(point, arithmetic.rational(BigFraction.ofLong(-2)))))
         val params = PolynomialTheoryParams()
         val observer = QuadraticPublicationObserver(null)
 

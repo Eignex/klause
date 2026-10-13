@@ -53,20 +53,35 @@ private fun projectedPolynomialPoint(
         ?: if (source.sourceRealCount == 0) emptyList() else {
             return SourceEvidenceCheck.Unavailable("polynomial witness has no exact source coordinates")
         }
+    return checkProjectedPolynomialFormula(source.formula, source.totalBoolCount, source.totalRealCount,
+        point.bools, values.withIndex().associate { it.index to it.value }, cancellation, arithmetic, limits)
+}
+
+internal fun checkProjectedPolynomialFormula(
+    formula: PolynomialRealFormula,
+    boolCount: Int,
+    realCount: Int,
+    booleans: BooleanArray,
+    values: Map<Int, AlgebraicReal>,
+    cancellation: Cancellation,
+    arithmetic: PolynomialArithmetic,
+    limits: PolynomialLimits,
+): SourceEvidenceCheck {
+    val algebraic = AlgebraicArithmetic(arithmetic)
     val fixed = mutableMapOf<Int, BigFraction>()
-    val terms = mutableListOf(source.formula)
-    for ((id, value) in values.withIndex()) {
+    val terms = mutableListOf(formula)
+    for ((id, value) in values) {
         arithmetic.step()
         val rational = value.rational
         if (rational != null) fixed[id] = rational
         else terms.addAll(polynomialRootCondition(id, value, arithmetic))
     }
-    val bools = (0 until source.sourceBoolCount).associateWith {
+    val bools = booleans.indices.associateWith {
         arithmetic.step()
-        point.boolValue(it)
+        booleans[it]
     }
     val checked = solveQfNra(
-        PolynomialRealFormula.And(terms), source.totalBoolCount, source.totalRealCount,
+        PolynomialRealFormula.And(terms), boolCount, realCount,
         QfNraParams(cancellation = cancellation, polynomialLimits = limits),
         PolynomialCondition(bools, fixed, fixed),
     )
@@ -77,7 +92,7 @@ private fun projectedPolynomialPoint(
         is QfNraResult.Unknown ->
             SourceEvidenceCheck.Unavailable("projected polynomial witness checking incomplete: ${checked.reason}")
         is QfNraResult.Satisfiable -> {
-            for ((id, value) in values.withIndex()) {
+            for ((id, value) in values) {
                 if (algebraic.compare(value, checked.assignment.realValue(id)) != 0) {
                     return SourceEvidenceCheck.Rejected("polynomial extension changed the original source point")
                 }

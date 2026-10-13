@@ -22,7 +22,7 @@ import com.eignex.klause.portfolio.PortfolioWorker
 import kotlin.time.Duration.Companion.milliseconds
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
@@ -215,7 +215,10 @@ internal class QuadraticWorkerAdapter(
 
     private fun accept(candidate: QuadraticIncumbent, heuristic: Boolean = false) {
         if (incumbent == null || better(candidate.value, requireNotNull(incumbent).value)) {
-            candidate.sample.witnessCertificate = EvidenceCertificate.verified(identity, EvidenceKind.Witness)
+            if (candidate.sample.witnessCertificate?.quadraticPublication == null) {
+                candidate.sample.witnessCertificate = EvidenceCertificate.published(identity,
+                    QuadraticWitnessPublication(requireNotNull(proofScope), candidate))
+            }
             incumbent = candidate
             onAccepted?.invoke(candidate)
             publish?.invoke(candidate)

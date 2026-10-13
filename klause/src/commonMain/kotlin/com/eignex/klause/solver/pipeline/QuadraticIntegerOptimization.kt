@@ -13,7 +13,7 @@ import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.time.Duration.Companion.milliseconds
@@ -638,7 +638,10 @@ internal class QuadraticIntegerOptimization(
 
     private fun accept(point: QuadraticIncumbent, heuristic: Boolean) {
         if (incumbent == null || better(point.value, requireNotNull(incumbent).value)) {
-            point.sample.witnessCertificate = EvidenceCertificate.verified(identity, EvidenceKind.Witness)
+            if (point.sample.witnessCertificate?.quadraticPublication == null) {
+                point.sample.witnessCertificate = EvidenceCertificate.published(identity,
+                    QuadraticWitnessPublication(scope, point))
+            }
             incumbent = point
             onAccepted?.invoke(point)
             publish?.invoke(point)
