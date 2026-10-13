@@ -193,6 +193,7 @@ internal class RefinementMeter(
     private val cancellation: Cancellation,
     private val onBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
     private val perAttempt: Boolean = false,
+    val diagnostic: LpRefinementPath? = null,
 ) {
     private val started = TimeSource.Monotonic.markNow()
     private val initialWork = cache.work
@@ -220,6 +221,13 @@ internal class RefinementMeter(
         Long.MAX_VALUE - cache.allocation,
     ).coerceAtLeast(0L)
     val remainingPivots: Int get() = (limits.maxPivots - cache.pivots).coerceAtLeast(0)
+
+    fun diagnosticBudget(): LpRefinementBudget = when {
+        remainingWork == 0L && remainingAllocation == 0L -> LpRefinementBudget.BOTH_EMPTY
+        remainingWork == 0L -> LpRefinementBudget.WORK_EMPTY
+        remainingAllocation == 0L -> LpRefinementBudget.ALLOCATION_EMPTY
+        else -> LpRefinementBudget.AVAILABLE
+    }
 
     fun poll() {
         if (cancellation()) stop(LpRefinementDecline.CANCELLED)
@@ -425,6 +433,8 @@ internal class RefinementAuthority(val state: LpExactState, val meter: Refinemen
     val bounds: List<ExactLpBounds>
 
     init {
+        val previousStage = meter.diagnostic?.stage
+        meter.diagnostic?.stage = LpRefinementStage.SOURCE_AUTHORITY
         if (source.numVars > meter.limits.maxCoordinates || source.keySize >
             meter.limits.maxEntries * 3L + source.numVars * 16L + source.m * 16L
         ) {
@@ -458,6 +468,7 @@ internal class RefinementAuthority(val state: LpExactState, val meter: Refinemen
         meter.number(source.objective.scale.value)
         meter.number(source.objective.externalConstant.value)
         model = state.toWorkingModel() ?: meter.stop(LpRefinementDecline.PROJECTION)
+        previousStage?.let { meter.diagnostic?.stage = it }
     }
 
     fun activity(x: List<BigFraction>): List<BigFraction> {
@@ -692,10 +703,16 @@ private class RefinementRun(
     ) {
         candidate.basis = basis
         if (preferBasis && basis != null && sourceModel.m <= meter.basisLimits().factor.dimension) {
+            meter.diagnostic?.stage = LpRefinementStage.SOURCE_BASIS
             checkBasis(sourceModel, basis, sourceFactors, candidate)
+            meter.diagnostic?.stage = LpRefinementStage.RUN
             if (candidate.attained || candidate.conflict != null) return
         }
-        if (known != null) candidate.accept(check(source, known.primal, null, null, false))
+        if (known != null) {
+            meter.diagnostic?.stage = LpRefinementStage.KNOWN_POINT
+            candidate.accept(check(source, known.primal, null, null, false))
+            meter.diagnostic?.stage = LpRefinementStage.RUN
+        }
         if (candidate.point == null && needPoint && meter.limits.maxAuxiliaries > 0 &&
             sourceModel.hasStrictSides(meter)
         ) {
@@ -891,7 +908,10 @@ private class RefinementRun(
         anchor: LpWorkingScope?,
         block: (LpWorkingScope, LpFloatAllowance) -> T,
     ): T {
+        val previousStage = meter.diagnostic?.stage
+        meter.diagnostic?.stage = LpRefinementStage.CHILD_ADMISSION
         val allowance = meter.allowance(true)
+        previousStage?.let { meter.diagnostic?.stage = it }
         return if (anchor == null) {
             request.source.withWorkingModel(working, meter.token, allowance) { block(it, allowance) }
         } else {
@@ -1038,6 +1058,7 @@ private class RefinementRun(
     }
 
     private fun strictFeasibility() {
+        meter.diagnostic?.stage = LpRefinementStage.STRICT_MARGIN
         val started = TimeSource.Monotonic.markNow()
         val before = meter.spentWork
         meter.metrics = meter.metrics.copy(strictAttempts = meter.metrics.strictAttempts + 1)
@@ -1308,11 +1329,12 @@ internal fun refineLp(
     preferBasis: Boolean = false,
     preferredBasisCache: ExactBasisCache? = null,
     additionalSourceWork: Long = 0L,
+    diagnostic: LpRefinementPath? = null,
 ): LpRefinementResult {
     val state = model.exactState
     val limits = request.effectiveLimits(additionalSourceWork)
     val cache = request.cache
-    val meter = RefinementMeter(limits, cache, cancellation, request.onBasisVerification)
+    val meter = RefinementMeter(limits, cache, cancellation, request.onBasisVerification, diagnostic = diagnostic)
     var run: RefinementRun? = null
     var reason: LpRefinementDecline? = LpRefinementDecline.FAILURE
     var metrics: LpRefinementMetrics
@@ -1329,13 +1351,20 @@ internal fun refineLp(
         cache.attempted = state
         cache.lastLimits = limits
         if (witness == null) cache.attemptedUnseeded = true else cache.attemptedSeeded = true
+        diagnostic?.beforePrior = meter.diagnosticBudget()
+        diagnostic?.stage = LpRefinementStage.PRIOR
         meter.prior(directWork, directAllocation, directElapsed)
+        diagnostic?.afterPrior = meter.diagnosticBudget()
+        diagnostic?.stage = LpRefinementStage.ENTRY_CHARGE
         meter.charge()
+        diagnostic?.runEntry = meter.diagnosticBudget()
+        diagnostic?.stage = LpRefinementStage.RUN
         meter.metrics = meter.metrics.copy(eligible = true)
         val factors = preferredBasisCache?.takeIf { preferBasis && basis != null } ?: ExactBasisCache()
         val current = RefinementRun(request, meter, model, factors)
         run = current
         current.run(primal, duals, basis, witness, needPoint, direction, reconstructInitial, preferBasis)
+        diagnostic?.stage = LpRefinementStage.COMPLETION
         meter.poll()
         reason = if (current.candidate.attained || current.candidate.conflict != null ||
             current.unboundedness != null || meter.metrics.strictWitnesses > 0
@@ -1352,6 +1381,7 @@ internal fun refineLp(
             run = null
         }
         metrics = meter.finish(reason)
+        diagnostic?.decline = reason
     }
     val candidate = run?.candidate
     metrics = metrics.copy(

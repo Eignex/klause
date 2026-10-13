@@ -480,7 +480,7 @@ private fun certifyLpResultWithin(
                 fullEffort = fullContinuation,
                 targetMetrics = continuationTarget().metrics,
             )
-            pairing?.observe(continued)
+            pairing?.observe(continued, LpContinuationSite.EARLY, result != null)
             observer?.observeContinuation(continued.metrics)
             val accepted = policy.acceptNullable(LpCertifier.RATIONAL, continued.takeIf { it.metrics.success })
             val point = accepted?.witness?.let { policy.acceptNullable(LpCertifier.EXACT_BASIS, it) }
@@ -563,6 +563,7 @@ private fun certifyLpResultWithin(
                 result != null && policy === ProductionLpCertificationPolicy
             },
             additionalSourceWork = pointRecovery?.work ?: 0L,
+            diagnostic = pairing?.newRefinement(result != null && policy === ProductionLpCertificationPolicy),
         )
         refined = recovered
         refinementMetrics = refinementMetrics?.plus(recovered.metrics) ?: recovered.metrics
@@ -774,7 +775,7 @@ private fun certifyLpResultWithin(
             fullEffort = fullContinuation,
             targetMetrics = continuationTarget().metrics,
         )
-        pairing?.observe(continued)
+        pairing?.observe(continued, LpContinuationSite.LATE, result != null)
         observer?.observeContinuation(continued.metrics)
         observer?.observe(LpCertifier.RATIONAL, continued.metrics.success, LpCertifierCost.Reported)
         numericalWitness = continued.witness

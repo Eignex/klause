@@ -94,6 +94,17 @@ observed stops and aborted operations remain distinct. Cached prior metrics cann
 supply a new attempt. These detail counts do not increment continuation invocation
 or work totals and execute no additional numerical query or comparison.
 
+Additional categorical detail keys identify the early source-authority or late
+unchecked-point continuation call and whether its float result is present. Up to
+two refinement records from the same certification operation retain preferred
+basis selection, work/allocation availability before and after direct-cost debit,
+run-entry availability and the final observed decline stage. Missing stages remain
+unreached; an absent refinement report, a stopped operation, an aborted callback
+and an unavailable excess record remain distinct. These records read existing
+primitive ledgers and guards, execute no numerical query or source comparison and
+cannot replenish allowance. Route and entry counts project the original rejections;
+they must not be added to invocation, work or rejection totals.
+
 A missing report or stopped operation cannot establish that strict refinement was
 unreachable. Rejection details carry no feasible-point, source-model or refutation
 authority; the ordinary exact checks and consumer publication policy still decide
