@@ -35,8 +35,9 @@ split before all source Booleans are assigned. Equality guards fixed false and
 disequality guards fixed true are eligible only when every Boolean term is known
 and agrees with the shared trail. Disjunction rows, continuous terms, unsupported
 integer atoms and custom LP certification policies decline this optional path.
-After Boolean substitution, coefficients and the threshold must be integral;
-fractional raw coefficients can qualify only when their exact coalesced sum is integral.
+Rows represented with real constants decline even when their coalesced terms are
+integral. After Boolean substitution, eligible coefficients and the threshold
+must be integral.
 It uses the ordinary complementary integer atom registration and LP assertion
 premises. A partial relaxation or a selected side supplies no source verdict.
 

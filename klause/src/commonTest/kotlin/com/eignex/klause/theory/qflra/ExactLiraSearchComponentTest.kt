@@ -268,7 +268,7 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `exact fractional coalescing admits integral early disequality atoms`() {
+    fun `fractional source constants retain ordinary disequality completion`() {
         val source = ReifiedLinear(0, intArrayOf(-1), intArrayOf(0), LinearOp.EQ, 0)
         val declaration = object : Factor by source {
             override val linearForm: LinearForm = LinearForm.Conjunction(
@@ -291,13 +291,13 @@ class ExactLiraSearchComponentTest {
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
-            val sides = assertNotNull(component.nextEarlyBranch(session))
-            assertIs<ComponentResult.Consistent>(session.push(sides.first()))
+            assertNull(component.nextEarlyBranch(session))
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(2))
 
             val witness = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-            assertEquals(bigIntOf(-1), witness.ints.single())
+            assertTrue(witness.ints.single() != BIG_ZERO)
+            assertTrue(witness.ints.single() >= bigIntOf(-1) && witness.ints.single() <= BIG_ONE)
             assertContentEquals(booleanArrayOf(false, false), witness.bools)
         }
     }
