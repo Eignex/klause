@@ -849,6 +849,10 @@ the encoded input is capped at 96 KiB and the compressed `sha256` remains requir
 Each `sources` value is base64 original bytes or an object with `gzip64` holding
 base64 gzip bytes. Decompression preserves the original source hash and caps the
 combined uncompressed sources at 64 MiB.
+With `catalog=true`, missing sources are resolved through the maintained corpus
+catalog on the analysis host and must match each record's original model hash.
+This permits record-only bundles for fetched collections without redistributing
+their inputs. Resolved suite/name identities are retained in `catalog-sources.json`.
 It checks bundle/source identities, provisions the pinned checker dependencies,
 and retains checker logs, versions and a checked prefix on failure under `$OUT`.
 Original unknown records retain their no-claim outcome; reference agreement does

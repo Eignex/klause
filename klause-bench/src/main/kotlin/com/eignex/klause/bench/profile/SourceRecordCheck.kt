@@ -1,5 +1,8 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
@@ -7,6 +10,7 @@ import java.util.Base64
 import java.util.Locale
 import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -20,12 +24,13 @@ object SourceRecordCheck {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val bundleOptions = options.keys - "witnessOnly"
+        val bundleOptions = options.keys - setOf("witnessOnly", "catalog")
         require(bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256")) {
             "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest>"
         }
         require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
         val witnessOnly = options["witnessOnly"] == "true"
+        require(options["catalog"] == null || options["catalog"] == "true")
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val root = File(System.getProperty("klause.workspace.root", "."))
         val bytes = options["input64"]?.let { encoded ->
@@ -59,6 +64,7 @@ object SourceRecordCheck {
             }
             sources.resolve("$digest.txt").writeBytes(source)
         }
+        if (options["catalog"] == "true") collectCatalogSources(bundle.getValue("cases").jsonArray, sources, out)
         val log = out.resolve("checker-install.log")
         fun execute(file: File, vararg command: String, extraArguments: List<String> = emptyList()) {
             val process = ProcessBuilder(command.toList() + extraArguments).redirectErrorStream(true)
@@ -86,6 +92,34 @@ object SourceRecordCheck {
             extraArguments = if (witnessOnly) listOf("--witness-only") else emptyList())
         check(environment.deleteRecursively())
         println(out.resolve("source-checks.json").readText())
+    }
+
+    private fun collectCatalogSources(cases: JsonArray, sources: File, out: File) {
+        val origins = buildJsonObject {
+            val suites = cases.groupBy {
+                it.jsonObject.getValue("problem").jsonObject.getValue("suite").jsonPrimitive.content
+            }
+            for ((suite, suiteCases) in suites) {
+                val references = Catalog.uncapped(suite).problems.associateBy { it.name }
+                for (case in suiteCases) {
+                    val record = case.jsonObject.getValue("record").jsonObject
+                    val digest = record.getValue("sourceHashes").jsonObject.getValue("model").jsonPrimitive.content
+                    require(digest.matches(Regex("[0-9a-f]{64}")))
+                    if (sources.resolve("$digest.txt").exists()) continue
+                    val name = record.getValue("problem").jsonPrimitive.content
+                    val reference = requireNotNull(references[name]) { "Catalog source absent: $suite/$name" }
+                    val source = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use {
+                        it.readNBytes(64 * 1024 * 1024 + 1)
+                    }
+                    require(source.size <= 64 * 1024 * 1024 && sha(source) == digest) {
+                        "Catalog source identity differs: $suite/$name"
+                    }
+                    sources.resolve("$digest.txt").writeBytes(source)
+                    put(digest, "$suite/$name")
+                }
+            }
+        }
+        out.resolve("catalog-sources.json").writeText(origins.toString() + "\n")
     }
 
     private fun sha(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
