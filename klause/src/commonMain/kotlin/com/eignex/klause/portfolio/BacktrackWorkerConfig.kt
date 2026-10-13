@@ -134,9 +134,14 @@ internal class BacktrackWorkerConfig(
                     improvedSolutionSink = { sample, value ->
                         meter.exported(SharingChannel.Incumbents, 1)
                         meter.timed(SharingChannel.Incumbents) {
+                            val producer = worker.evidenceInvocation
+                            val consumer = worker.sharingInvocation
+                            val certificate = if (producer != null && consumer != null) {
+                                EvidenceCertificate.published(
+                                    CompletedEnginePublication.Witness(producer, sample, value))
+                            } else EvidenceCertificate.verified(evidenceModel, EvidenceKind.Witness)
                             matchedPools.offerSolution(
-                                evidenceModel, sample, value,
-                                EvidenceCertificate.verified(evidenceModel, EvidenceKind.Witness),
+                                evidenceModel, sample, value, certificate, consumer, params.cancellation,
                             )
                         }
                     },

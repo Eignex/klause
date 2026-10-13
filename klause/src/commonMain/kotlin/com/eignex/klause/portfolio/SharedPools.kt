@@ -6,6 +6,7 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.ModelEvidence
@@ -13,6 +14,7 @@ import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.util.Cancellation
 
 /**
  * The cross-arm sharing channels handed to every backtrack arm of one portfolio: the learned-clause
@@ -41,12 +43,19 @@ internal class SharedPools(
         sample: Sample,
         value: Double,
         certificate: EvidenceCertificate?,
+        invocation: EngineInvocation? = null,
+        cancellation: Cancellation = Cancellation.Never,
     ): Publication<Sample, Double> {
         val exchange = solutions ?: return Publication.Indeterminate("there is no solution exchange")
-        if (identity != null) {
+        if (certificate?.publication != null && invocation == null) {
+            return Publication.Indeterminate("native publication requires its containing runtime")
+        }
+        val expected = identity ?: invocation?.model
+        if (expected != null) {
             if (certificate == null) return Publication.Indeterminate("witness certificate is withheld")
-            val verifier = ModelEvidenceVerifier<Sample, Double>(identity, CandidateVerifier.trusting())
-            when (val verdict = verifier.verify(ModelEvidence.Witness(model, Candidate(sample, value), certificate))) {
+            val verifier = ModelEvidenceVerifier<Sample, Double>(expected, CandidateVerifier.trusting())
+            val evidence = ModelEvidence.Witness(model, Candidate(sample, value), certificate)
+            when (val verdict = verifier.verify(evidence, invocation?.scope, invocation, cancellation)) {
                 is Verification.Rejected -> return Publication.Rejected(verdict.reason)
                 is Verification.Indeterminate -> return Publication.Indeterminate(verdict.reason)
                 is Verification.Accepted -> Unit

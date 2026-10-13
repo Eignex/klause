@@ -75,7 +75,7 @@ class CompletedEnginePublicationTest {
     }
 
     @Test
-    fun `native witness publication cannot cross runtime restrictions`() {
+    fun `a restricted native witness is checked under its containing query`() {
         val restricted = EngineInvocation(plan, model, objective,
             sourceAssumptions = Assumptions(ints = mapOf(0 to 2L)))
         val sample = Sample(booleanArrayOf(), longArrayOf(2, 1))
@@ -84,7 +84,7 @@ class CompletedEnginePublicationTest {
         val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(sample, 2.0), certificate),
             invocation = invocation)
 
-        assertIs<Verification.Rejected>(checked)
+        assertIs<Verification.Accepted<*, *>>(checked)
     }
 
     @Test
