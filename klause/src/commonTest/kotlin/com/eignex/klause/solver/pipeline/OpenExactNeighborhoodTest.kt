@@ -6,6 +6,9 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -19,9 +22,46 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class OpenExactNeighborhoodTest {
+    @Test
+    fun `native neighborhood checking retains the supplied runtime publication`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val plan = source.prepareExecutionPlan(objective)
+        val invocation = EngineInvocation(plan, ModelIdentity.of(source, objective), objective)
+        val adapter = OpenExactNeighborhood(source, TheoryParams(openWorkLimit = 1000), objective, plan,
+            invocation = { invocation })
+        val third = BigFraction.ofLong(3).reciprocal()
+
+        val result = adapter.use { it.check(ExactNeighborhoodCondition(emptyMap(), mapOf(0 to third),
+            mapOf(0 to third)), Cancellation.Never) }
+
+        val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
+        val publication = assertIs<CompletedEnginePublication.Witness>(
+            assertNotNull(sample.witnessCertificate).publication)
+        assertSame(invocation, publication.invocation)
+        assertEquals(sample, publication.sample)
+        assertEquals(third.toDouble(), publication.value)
+    }
+
+    @Test
+    fun `unbound native neighborhood checking withholds a runtime certificate`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+
+        val result = OpenExactNeighborhood(source, TheoryParams()).use {
+            it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
+        }
+
+        assertNull(assertIs<ExactNeighborhoodResult.Witness>(result).sample.witnessCertificate)
+    }
+
     @Test
     fun `a refuted window retracts before a sibling witness`() {
         val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),

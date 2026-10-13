@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
+import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -37,12 +38,16 @@ internal fun linearNeighborhoodInvocation(
                 maxFlips = slot.heuristicAllowance(params.maxFlips),
                 maxInstructions = params.maxInstructions?.let(slot::heuristicAllowance),
                 nodeBudget = slot.nodeBudget)
-            val adapter = slot.own(OpenExactNeighborhood(source, local, objective, prepared))
-            exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood", index,
+            lateinit var worker: PortfolioWorker
+            val adapter = slot.own(OpenExactNeighborhood(source, local, objective, prepared,
+                invocation = { worker.evidenceInvocation }))
+            worker = exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
+                index,
                 objective, stop, timeout = params.timeout, exhausted = { adapter.exhausted },
                 open = { adapter.search(adaptive, slot.seed,
                     maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null) })
                 .bindEvidence(identity, provesResults = false)
+            worker
         }
     }
     val portfolio = PortfolioInvocation(prepared, factories,

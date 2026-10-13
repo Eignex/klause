@@ -290,23 +290,23 @@ internal class OpenPortfolio(
     private fun decide(request: OpenTheoryRequest, params: TheoryParams): OpenTheoryResult =
         (OpenTheoryPipeline.execute(request, params) as OpenTheoryExecution.Satisfy).result
 
-    private fun theoryWorker(request: OpenTheoryRequest, slot: PortfolioWorkerSlot): PortfolioWorker =
-        PortfolioWorker.ofSolve(
+    private fun theoryWorker(request: OpenTheoryRequest, slot: PortfolioWorkerSlot): PortfolioWorker {
+        lateinit var worker: PortfolioWorker
+        worker = PortfolioWorker.ofSolve(
             "theory/${request.route.name.lowercase()}",
             0,
-            resumable = { theorySlices(request, workerParams(slot)) },
+            resumable = { theorySlices(request, workerParams(slot)) { worker.evidenceInvocation } },
         ) { slice, _ ->
-            toSolveResult(
-                decide(
-                    request,
-                    workerParams(slot).copy(
+            toSolveResult(decide(request, workerParams(slot).copy(
                 cancellation = theoryParams.cancellation or slot.cancellation or slice,
-            )
-                )
-            )
+            )), worker.evidenceInvocation)
         }
+        return worker
+    }
 
-    private fun theorySlices(request: OpenTheoryRequest, params: TheoryParams): ResumableSolve =
+    private fun theorySlices(
+        request: OpenTheoryRequest, params: TheoryParams, invocation: () -> EngineInvocation?,
+    ): ResumableSolve =
         object : ResumableSolve {
             private val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), params)
             override val isDone: Boolean get() = search.isDone
@@ -314,13 +314,13 @@ internal class OpenPortfolio(
             override val work: Long get() = search.work
 
             override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
-                search.runSlice(global, sliceMillis, sliceNodes)?.let(::toSolveResult)
+                search.runSlice(global, sliceMillis, sliceNodes)?.let { toSolveResult(it, invocation()) }
 
             override fun close() = search.close()
         }
 
-    private fun toSolveResult(result: OpenTheoryResult): SolveResult = when (result) {
-        is OpenTheoryResult.Sat -> SolveResult.Sat(result.assignment.toSample(sourceModel), result.stats)
+    private fun toSolveResult(result: OpenTheoryResult, invocation: EngineInvocation?): SolveResult = when (result) {
+        is OpenTheoryResult.Sat -> SolveResult.Sat(result.assignment.toSample(sourceModel, invocation), result.stats)
         is OpenTheoryResult.Unsat -> SolveResult.Unsat(stats = result.stats)
         is OpenTheoryResult.Unknown -> SolveResult.Unknown(result.reason, result.stats)
     }
@@ -329,17 +329,22 @@ internal class OpenPortfolio(
         minimizer: OpenTheoryMinimizer,
         slot: PortfolioWorkerSlot,
         readBound: () -> BigInt?,
-    ): PortfolioWorker = PortfolioWorker.ofMinimize(
-        "theory/${minimizer.theoryPipeline.name.lowercase()}",
-        0,
-        resumable = { descentSlices(minimizer, workerParams(slot), readBound) },
-    ) { _, _, _, _ -> error("the descent runs only by slice") }
+    ): PortfolioWorker {
+        lateinit var worker: PortfolioWorker
+        worker = PortfolioWorker.ofMinimize(
+            "theory/${minimizer.theoryPipeline.name.lowercase()}",
+            0,
+            resumable = { descentSlices(minimizer, workerParams(slot), readBound) { worker.evidenceInvocation } },
+        ) { _, _, _, _ -> error("the descent runs only by slice") }
+        return worker
+    }
 
     // An integral descent reads the attained value directly, including beyond floating-point and 64-bit ranges.
     private fun descentSlices(
         minimizer: OpenTheoryMinimizer,
         params: TheoryParams,
         readBound: () -> BigInt?,
+        invocation: () -> EngineInvocation?,
     ): ResumableSearch = object : ResumableSearch {
         private val descent = minimizer.descent(params, readBound)
         override val isDone: Boolean get() = descent.isDone
@@ -353,14 +358,14 @@ internal class OpenPortfolio(
             onIncumbent: (MinimizeResult.WithSample) -> Unit,
         ): MinimizeResult? {
             val verdict = descent.runSlice(global, sliceMillis, sliceNodes) { assignment, value ->
-                val sample = assignment.toSample(sourceModel)
+                val sample = assignment.toSample(sourceModel, invocation())
                 val objective = value.toDouble()
                 onIncumbent(MinimizeResult.BestFound(sample, objective, TerminationReason.BudgetExhausted))
             } ?: return null
             if (verdict is OpenTheoryOptimum.Unbounded) descentVerdict.compareAndSet(null, verdict)
             return when (verdict) {
                 is OpenTheoryOptimum.Optimal -> MinimizeResult.Optimal(
-                    verdict.assignment.toSample(sourceModel),
+                    verdict.assignment.toSample(sourceModel, invocation()),
                     verdict.value.toDouble(),
                     verdict.stats,
                 )
@@ -368,7 +373,7 @@ internal class OpenPortfolio(
                 is OpenTheoryOptimum.Infeasible -> MinimizeResult.Infeasible(stats = verdict.stats)
 
                 is OpenTheoryOptimum.Unbounded -> MinimizeResult.Unbounded(
-                    verdict.witness.toSample(sourceModel),
+                    verdict.witness.toSample(sourceModel, invocation()),
                     verdict.value.toDouble(),
                     direction = emptyList(),
                     stats = verdict.stats,
@@ -403,8 +408,10 @@ internal class OpenPortfolio(
                     if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch,
                 ) { slot ->
                     val local = workerParams(slot)
-                    val adapter = slot.own(OpenExactNeighborhood(sourceModel, local, objective, preparedPlan))
-                    exactNeighborhoodWorker(
+                    lateinit var worker: PortfolioWorker
+                    val adapter = slot.own(OpenExactNeighborhood(sourceModel, local, objective, preparedPlan,
+                        invocation = { worker.evidenceInvocation }))
+                    worker = exactNeighborhoodWorker(
                         if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
                         firstArm + index,
                         objective,
@@ -420,6 +427,7 @@ internal class OpenPortfolio(
                         },
                     )
                         .bindEvidence(ModelIdentity.of(sourceModel, objective), provesResults = false)
+                    worker
                 }
             }
         }

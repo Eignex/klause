@@ -26,11 +26,52 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class OpenWitnessTest {
+    @Test
+    fun `theory conversion retains its actual invocation and execution value`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective),
+            ModelIdentity.of(source, objective), objective)
+        val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0),
+            exactReals = listOf(BigFraction.ofLong(3).reciprocal())))
+
+        val sample = assignment.toSample(source, invocation)
+
+        val certificate = assertNotNull(sample.witnessCertificate)
+        val publication = assertIs<CompletedEnginePublication.Witness>(certificate.publication)
+        assertSame(invocation, publication.invocation)
+        assertEquals(sample, publication.sample)
+        assertEquals(objective.evaluateExact(sample).toDouble(), publication.value)
+    }
+
+    @Test
+    fun `theory conversion without a runtime withholds its certificate`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0)))
+
+        val sample = assignment.toSample(source)
+
+        assertNull(sample.witnessCertificate)
+    }
+
+    @Test
+    fun `theory conversion rejects another source invocation`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val foreign = Problem(0, 0, emptyArray(), emptyArray())
+        val invocation = EngineInvocation(foreign.prepareExecutionPlan(), ModelIdentity.of(foreign))
+        val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0)))
+
+        assertFailsWith<IllegalArgumentException> { assignment.toSample(source, invocation) }
+    }
+
     @Test
     fun `a copied mixed theory witness retains its assignment and exact exchanged objective`() {
         val wide = parseBigInt("9223372036854775808")
