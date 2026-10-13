@@ -10,6 +10,7 @@ import z3
 
 from verify_nra_source_results import source_formula, exact_value, sexpr, witness_values
 from verify_source_results import expressions
+from verify_stream_source_results import check_stream
 
 
 def verify(root):
@@ -43,6 +44,7 @@ def verify(root):
         status = metadata['optimizationStatus']
         solver = z3.Solver(); solver.set(timeout=20000); solver.add(*constraints)
         cost, bound = None, None
+        publications = []
         if status == 'unsatisfiable':
             assert 'unsat' in output.splitlines() and solver.check() == z3.unsat, path
         else:
@@ -51,11 +53,21 @@ def verify(root):
                               if line.strip() and not line.startswith(';') and
                               not re.match(r'^\[\d+(?:\.\d+)?s\]\[info\]\[jfr,startup\](?: |$)', line) and
                           line.strip() not in ('sat', 'unsat', 'unknown'))
+            models = expressions(model)
+            assert models, 'missing original-source model'
+            if len(models) > 1:
+                stream = check_stream(raw, output)
+                assert len(stream['witnesses']) == len(models), 'incomplete publication stream'
+                publications = stream['witnesses']
+            model = sexpr(models[-1])
             values = witness_values(model, variables)
             substitutions = [(variables[name], value) for name, value in values.items()]
             assert all(z3.is_true(z3.simplify(z3.substitute(row, substitutions))) for row in constraints), path
             cost = exact_value(expressions('(value ' + metadata['objective'] + ')')[0][1])
             assert z3.is_true(z3.simplify(z3.substitute(objective, substitutions) == cost)), path
+            if not publications:
+                publications = [dict(objective=cost.sexpr(),
+                                     witnessSha256=hashlib.sha256(model.encode()).hexdigest())]
             if 'objectiveBound' in metadata:
                 assert metadata['objectiveBoundDirection'] == ('lower' if direction == 'minimize' else 'upper'), path
                 bound = exact_value(expressions('(value ' + metadata['objectiveBound'] + ')')[0][1])
@@ -105,6 +117,7 @@ def verify(root):
             strict=metadata.get('objectiveBoundStrict'), direction=direction,
             sourceSha256=hashlib.sha256(raw.encode()).hexdigest(), stdoutSha256=hashlib.sha256(path.read_bytes()).hexdigest(),
             witness='exact original-source checked' if cost is not None else 'none',
+            publicationCount=len(publications), publicationChecks=publications,
             boundCheck='exact original-source inequality checked' if bound is not None else 'none',
             approachCheck='exact original-source affine approach checked' if status.startswith('unattained-') else 'none',
             rayCheck='exact original-source affine ray checked' if status == 'unbounded' else 'none', exportedProof='not captured'))
