@@ -34,6 +34,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.io.PrintStream
 import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
@@ -46,6 +47,49 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModeTest {
+    @Test
+    fun `a consumer failure aborts actual source publication and leaves a later invocation usable`() {
+        val source = File.createTempFile("quadratic-output-failure", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= x 1)) (minimize (* x x)) (check-sat)")
+        }
+        val common = CommonOptions().apply { engine = "fixed"; parallel = 1 }
+        val session = SmtLibMode.newSession()
+        val solvable = session.load(source.absolutePath, common)
+        val expected = IOException("closed consumer")
+        var terminal = false
+        val failed = object : OutputProtocol by session.output(common) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                assertEquals(false, terminal)
+                throw expected
+            }
+            override fun onVerdictContext(context: VerdictContext) { terminal = true }
+        }
+        var emitted = 0
+        var completed: Verdict? = null
+        val healthy = object : OutputProtocol by session.output(common) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                emitted++
+                return true
+            }
+            override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
+                assertEquals(null, rendered)
+            }
+            override fun onComplete(verdict: Verdict) { completed = verdict }
+        }
+
+        try {
+            assertSame(expected, assertFailsWith<IOException> { SolveCore.solve(solvable, common, failed) })
+            SolveCore.solve(solvable, CommonOptions().apply { engine = "fixed"; parallel = 1 }, healthy)
+        } finally {
+            source.delete()
+        }
+
+        assertEquals(false, terminal)
+        assertEquals(1, emitted)
+        assertEquals(Verdict.OPTIMAL, completed)
+    }
+
+
     @Test
     fun `ordinary linear CLI keeps a feasible witness distinct from its strict infimum`() {
         val source = File.createTempFile("linear-cli-infimum", ".smt2").apply {
