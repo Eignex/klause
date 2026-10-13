@@ -8,12 +8,27 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialTheoryServiceTest {
+    @Test
+    fun `completed query has no further elements`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        service.invocation().use { invocation ->
+            val pending = invocation.prepareCheck()
+            var result: QfNraResult? = null
+            while (result == null) result = pending.next()
+
+            assertFalse(pending.hasNext())
+            assertFailsWith<NoSuchElementException> { pending.next() }
+        }
+    }
+
     @Test
     fun `projection continuation retains native charges and refutation`() {
         val source = SmtLibPolynomial.parse("""

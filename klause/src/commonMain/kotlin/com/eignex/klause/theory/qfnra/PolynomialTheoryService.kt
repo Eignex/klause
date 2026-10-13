@@ -108,10 +108,11 @@ internal class PolynomialTheoryInvocation(
         queries = sum(queries, 1)
         return object : Iterator<QfNraResult?> {
             private var finished = false
-            override fun hasNext(): Boolean = !finished
+            override fun hasNext(): Boolean = !closed && !finished
             @Suppress("TooGenericExceptionCaught") // query failures retain their spent native allowance
             override fun next(): QfNraResult? {
-                check(!closed && !finished) { "polynomial query is closed" }
+                check(!closed) { "polynomial query is closed" }
+                if (finished) throw NoSuchElementException("polynomial query is exhausted")
                 try {
                     val result = query.next()
                     if (result != null) {
