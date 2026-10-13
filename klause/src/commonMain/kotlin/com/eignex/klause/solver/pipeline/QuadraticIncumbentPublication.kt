@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.solver.result.QuadraticIncumbent
-import com.eignex.klause.solver.result.QuadraticOptimizationResult
 
 /** An accepted exact source incumbent in one invocation's publication order. */
 data class QuadraticIncumbentPublication(
@@ -41,14 +40,4 @@ internal class QuadraticPublicationObserver(
         throw primary
     }
 
-    fun matching(result: QuadraticOptimizationResult): QuadraticIncumbentPublication? {
-        val point = when (result) {
-            is QuadraticOptimizationResult.Optimal -> result.incumbent
-            is QuadraticOptimizationResult.UnattainedLimit -> result.incumbent
-            is QuadraticOptimizationResult.Unbounded -> result.incumbent
-            is QuadraticOptimizationResult.BestFound -> result.incumbent
-            is QuadraticOptimizationResult.Infeasible, is QuadraticOptimizationResult.Unknown -> return null
-        }
-        return latest?.takeIf { it.incumbent.sample === point.sample && it.incumbent.value === point.value }
-    }
 }

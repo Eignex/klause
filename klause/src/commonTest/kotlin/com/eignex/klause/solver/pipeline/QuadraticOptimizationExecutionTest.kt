@@ -353,7 +353,10 @@ class QuadraticOptimizationExecutionTest {
         val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x)))
         val published = mutableListOf<QuadraticIncumbentPublication>()
 
-        val execution = OpenTheoryPipeline.minimize(source, objective, PolynomialTheoryParams(),
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 0), alnsIterations = 0,
+        ))
+        val execution = OpenTheoryPipeline.minimize(source, objective, params,
             FiniteEngine.MIXED, ObjectiveSense.MINIMIZE, 4, onAccepted = { published += it })
         val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
 
