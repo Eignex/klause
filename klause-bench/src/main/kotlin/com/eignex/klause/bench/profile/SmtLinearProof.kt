@@ -8,6 +8,7 @@ import com.eignex.klause.lp.optimization.LinearPinnedRefutation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceObjective
@@ -24,20 +25,26 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.parseBigInt
 import java.io.File
 import java.security.MessageDigest
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** Capture ordinary affine SMT optimization and independently check strict limits and branch coverage. */
 object SmtLinearProof {
-    /** Write captures and independent checker results for the original MPS paths in [args] under `OUT`. */
+    /** Write captures and independent checker results for the original SMT paths in [args] under `OUT`. */
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.takeWhile { it.startsWith("--") }.associate { argument ->
@@ -45,7 +52,7 @@ object SmtLinearProof {
             require(pair.size == 2) { "Use --name=value" }
             pair[0] to pair[1]
         }
-        require(options.keys.all { it in setOf("engine", "cores", "checks", "work", "timeout") })
+        require(options.keys.all { it in setOf("engine", "cores", "checks", "work", "timeout", "condition") })
         val engine = when (options["engine"] ?: "cp") {
             "cp" -> FiniteEngine.BACKTRACK
             "fixed" -> FiniteEngine.FIXED
@@ -59,6 +66,10 @@ object SmtLinearProof {
         require(inputs.isNotEmpty()) { "Pass original SMT paths" }
         val root = File(System.getProperty("klause.workspace.root", "."))
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        val conditionBytes = options["condition"]?.let { path ->
+            File(path).let { if (it.isAbsolute) it else root.resolve(path) }.readBytes()
+        }
+        conditionBytes?.let { out.resolve("condition.json").writeBytes(it) }
         inputs.forEachIndexed { index, path ->
             val params = TheoryParams(maxLeaves = (options["checks"] ?: "1000").toLong(),
                 openWorkLimit = (options["work"] ?: "2000000").toLong(), maxDecisions = 1_000,
@@ -71,17 +82,23 @@ object SmtLinearProof {
             val minimized = requireNotNull(compiled.objective).toLinearObjective()
             val objective = if (maximize) minimized.negated() else minimized
             val sense = if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
+            val coordinates = buildMap {
+                compiled.boolVarNames.forEach { (name, id) -> put(name, SourceCoordinate(SourceCoordinate.Kind.Boolean, id)) }
+                compiled.intVarNames.forEach { (name, id) -> put(name, SourceCoordinate(SourceCoordinate.Kind.Integer, id)) }
+                compiled.realVarNames.forEach { (name, id) -> put(name, SourceCoordinate(SourceCoordinate.Kind.Real, id)) }
+            }
+            val condition = conditionBytes?.let { readCondition(it, coordinates) } ?: SourceCondition()
             val scope = SourceScope(SourceRevision(sha(bytes), "klause-ir-exact-v1"),
-                objective = SourceObjective("cost", sense))
+                condition = condition, objective = SourceObjective("cost", sense))
             val capture = requireNotNull(compiled.model.sourceProofContext(scope, objective))
             val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model, objective,
-                maximize = maximize), params, engine, cores) as OpenTheoryExecution.Optimize
+                maximize = maximize).let { if (conditionBytes == null) it else it.withLinearAuthority(capture) },
+                params, engine, cores) as OpenTheoryExecution.Optimize
             val witnessOnly = engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS
             val result = execution.result.linearResult
             require(witnessOnly || result != null) { "Complete route omitted typed linear authority" }
             if (witnessOnly) require(execution.result is OpenTheoryOptimum.Bounded)
-            require(result == null || (result.scope.condition.bools.isEmpty() &&
-                result.scope.condition.lower.isEmpty() && result.scope.condition.upper.isEmpty()))
+            require(result == null || result.scope.condition == condition)
             val terminal = result?.terminal
             require(!witnessOnly || terminal == null) { "Witness-only route published a terminal" }
             val claim = terminal?.claim
@@ -99,6 +116,7 @@ object SmtLinearProof {
             }
             val record = buildJsonObject {
                 put("sourceSHA256", sha(bytes))
+                put("conditionSHA256", conditionBytes?.let { JsonPrimitive(sha(it)) } ?: JsonNull)
                 put("maximize", maximize)
                 put("reason", (result?.reason ?: (execution.result as? OpenTheoryOptimum.Bounded)?.reason).toString())
                 put("engine", engine.id)
@@ -148,8 +166,10 @@ object SmtLinearProof {
             }
             out.resolve("$index.json").writeText("$record\n")
             val checker = root.resolve("klause-bench/tools/verify_smt_linear_proof.py")
-            val process = ProcessBuilder("python3", checker.path, out.resolve("$index.smt2").path,
-                out.resolve("$index.json").path).redirectErrorStream(true).start()
+            val command = mutableListOf("python3", checker.path, out.resolve("$index.smt2").path,
+                out.resolve("$index.json").path)
+            if (conditionBytes != null) command += out.resolve("condition.json").path
+            val process = ProcessBuilder(command).redirectErrorStream(true).start()
             val checked = process.inputStream.bufferedReader().readText()
             out.resolve("$index-check.json").writeText(checked)
             check(process.waitFor() == 0) { checked }
@@ -169,6 +189,26 @@ object SmtLinearProof {
         .joinToString("") { "%02x".format(Locale.ROOT, it) }
 
     private fun key(coordinate: SourceCoordinate): String = "${coordinate.kind}/${coordinate.id}"
+
+    private fun readCondition(bytes: ByteArray, coordinates: Map<String, SourceCoordinate>): SourceCondition {
+        val data = Json.parseToJsonElement(bytes.decodeToString()).jsonObject
+        require(data.keys.all { it in setOf("bools", "lower", "upper") })
+        val bools = data["bools"]?.jsonObject.orEmpty().map { (name, value) ->
+            val coordinate = coordinates.getValue(name)
+            require(coordinate.kind == SourceCoordinate.Kind.Boolean)
+            coordinate.id to value.jsonPrimitive.boolean
+        }.toMap()
+        fun bounds(side: String): Map<SourceCoordinate, BigFraction> =
+            data[side]?.jsonObject.orEmpty().map { (name, value) ->
+                val coordinate = coordinates.getValue(name)
+                require(coordinate.kind != SourceCoordinate.Kind.Boolean)
+                val parts = value.jsonPrimitive.content.split('/')
+                require(parts.size in 1..2)
+                coordinate to BigFraction.of(parseBigInt(parts[0]),
+                    if (parts.size == 2) parseBigInt(parts[1]) else BIG_ONE)
+            }.toMap()
+        return SourceCondition(bools, bounds("lower"), bounds("upper"))
+    }
 
     private fun coefficients(values: Map<SourceCoordinate, BigFraction>): JsonElement = buildJsonObject {
         values.forEach { (coordinate, value) -> put(key(coordinate), value.toString()) }

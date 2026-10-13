@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -17,10 +18,13 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -33,6 +37,38 @@ class LinearOptimizationExecutionTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val scope = SourceScope(SourceRevision("public-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+
+    @Test
+    fun `public linear execution preserves exact wide integer and rational condition pins`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val wide = BigFraction.of(parseBigInt("18446744073709551616"), BIG_ONE)
+        val third = BigFraction.ONE / BigFraction.ofLong(3)
+        val pins = mapOf(integer to wide, real to third)
+        val context = SourceProofContext(scope.copy(condition = SourceCondition(mapOf(0 to true), pins, pins)),
+            setOf(bool, integer, real), emptyMap(), mapOf(integer to BigFraction.ONE, real to BigFraction.ONE))
+
+        val result = OpenTheoryPipeline.optimizeLinear(context)
+
+        val optimal = assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
+        assertEquals(wide + third, assertIs<SourceValue.Rational>(optimal.value).value)
+        assertEquals(wide.num, optimal.sample.exactIntValue(0))
+        assertEquals(third, assertNotNull(optimal.sample.exactReals).single())
+        assertTrue(optimal.sample.boolValue(0))
+        assertEquals(context.scope, result.scope)
+    }
+
+    @Test
+    fun `a conditional source optimum and bound cannot be reused in the parent scope`() {
+        val parent = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
+        val restricted = SourceProofContext(scope.copy(condition = SourceCondition(
+            lower = mapOf(real to BigFraction.ONE))), parent.coordinates, parent.premises, parent.objective)
+        val result = OpenTheoryPipeline.optimizeLinear(restricted)
+
+        for (evidence in listOf(assertNotNull(result.terminal), assertNotNull(result.bound))) {
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(parent.withLinearAuthority()).verify(evidence))
+        }
+    }
 
     @Test
     fun `an omitted affine objective cannot establish a zero optimum`() {
