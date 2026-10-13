@@ -125,6 +125,13 @@ The complete source is fetched by the catalog/verifier from the
 
 ## Measurement storage
 
+The self-authored Apache-2.0 [objective-cli-v1 manifest](../../klause-bench/smoke-corpus/objective-cli-v1/manifest.json)
+fixes original mixed product, rational, algebraic, strict-limit, unbounded and
+infeasible SMT inputs. Affine and zero-square objectives retain the same source
+constraints and both directions. The
+[CLI publication probe](../../klause-bench/README.md#objective-cli-publication-probe)
+checks emitted source claims independently and preserves the original hashes.
+
 The self-authored Apache-2.0 [objective-affine-v1 sources](../../klause-bench/smoke-corpus/objective-affine-v1/manifest.json)
 retain `x*x=y`, `-1<=x<=1` and both directions of `Long.MAX_VALUE+y`. Their exact
 optima are `9223372036854775807` and `9223372036854775808`, which share a binary64
