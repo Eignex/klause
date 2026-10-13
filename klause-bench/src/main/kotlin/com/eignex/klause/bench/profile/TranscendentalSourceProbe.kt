@@ -1,6 +1,8 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -38,6 +40,7 @@ internal object TranscendentalSourceProbe {
         val timeout = (options["timeout"] ?: "10000").toLong().also { require(it >= 0) }
         val cancelWork = options["cancel-work"]?.toLong()?.also { require(it >= 0) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val captured = buildJsonArray {
             sources.forEach { entry ->
                 val source = entry.jsonObject
