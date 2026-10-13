@@ -475,6 +475,28 @@ class ProofCheckTest(unittest.TestCase):
             self.check(self.case(suite='mps-core', proven=False, objective=None,
                                  finalWitness='v x=1.00000001'), self.mps_source)
 
+    def test_complete_mps_witness_establishes_sat_when_unpinned_query_is_unknown(self):
+        solver = z3.Solver()
+        case = self.case(suite='mps-core', proven=False, objective='-1/10', finalWitness='v x=1')
+
+        with mock.patch.object(proof_check.z3, 'Solver', return_value=solver), \
+                mock.patch.object(solver, 'check', return_value=z3.unknown):
+            result = self.check(case, self.mps_source)
+
+        self.assertEqual(result['verdictCheck'], 'source sat')
+        self.assertEqual(result['witness'], 'exact source feasible')
+        self.assertEqual(result['objectiveCheck'], 'source point objective matches')
+
+    def test_mps_witness_does_not_replace_strict_improvement_exclusion(self):
+        solver = z3.Solver()
+        case = self.case(suite='mps-core', objective='-1/10', finalWitness='v x=1')
+
+        with mock.patch.object(proof_check.z3, 'Solver', return_value=solver), \
+                mock.patch.object(solver, 'check', side_effect=[z3.sat, z3.unknown]), \
+                mock.patch.object(solver, 'reason_unknown', return_value='timeout'):
+            with self.assertRaisesRegex(AssertionError, 'strictly better source objective exclusion.*unknown'):
+                self.check(case, self.mps_source)
+
     def test_recorded_command_selects_exact_mode_independently_of_arm_name(self):
         case = self.case(suite='mps-core', arm='latest-main', command='klause-cli --exact fixture.mps',
                          proven=False, objective=None, finalWitness='v x=1.00000001')
