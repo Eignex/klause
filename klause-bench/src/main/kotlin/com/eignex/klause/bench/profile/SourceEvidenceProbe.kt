@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticCoefficient
@@ -24,6 +25,7 @@ import java.io.File
 import java.security.MessageDigest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
@@ -63,6 +65,22 @@ internal object SourceEvidenceProbe {
         val out = File(requireNotNull(System.getenv("OUT")))
         out.mkdirs()
         out.resolve("source.json").writeBytes(bytes)
+        out.resolve("runtime-provenance.json").writeText(buildJsonObject {
+            put("revision", Reports.readGitSha())
+            put("javaVersion", System.getProperty("java.version"))
+            put("javaVendor", System.getProperty("java.vendor"))
+            put("processors", Runtime.getRuntime().availableProcessors())
+            put("classpath", buildJsonArray {
+                for (path in System.getProperty("java.class.path").split(File.pathSeparator)) {
+                    val file = File(path)
+                    if (file.isFile) add(buildJsonObject {
+                        put("name", file.name)
+                        put("bytes", file.length())
+                        put("sha256", hash(file.readBytes()))
+                    })
+                }
+            })
+        }.toString())
         val payload = buildJsonObject {
             put("sourceHash", scope.revision.identity)
             put("engine", engine.name)
