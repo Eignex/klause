@@ -23,7 +23,7 @@ internal class QuadraticNeighborhoodAllowance(
         nodeBudget?.exhausted() == true
 
     fun charge(nativeWork: Long) {
-        val cost = 1L + minOf(ceil(nativeWork.coerceAtLeast(0) * 0.8).toLong(), Long.MAX_VALUE - 1)
+        val cost = 1L + minOf(quadraticNativeInstructions(nativeWork), Long.MAX_VALUE - 1)
         moves += minOf(1, Long.MAX_VALUE - moves)
         instructions += minOf(cost, Long.MAX_VALUE - instructions)
         nodeBudget?.spendMoves(cost)
@@ -100,3 +100,5 @@ internal class QuadraticNeighborhoodCursor(
         sink.stop()
     }
 }
+
+internal fun quadraticNativeInstructions(work: Long): Long = ceil(work.coerceAtLeast(0) * 0.8).toLong()

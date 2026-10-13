@@ -67,6 +67,7 @@ internal class QuadraticWorkerAdapter(
     private var rootPrepared = false
     private var traversal: QuadraticTraversalCursor? = null
     private var neighborhood: QuadraticNeighborhoodCursor? = null
+    private var neighborhoodPreparationInstructions = 0L
     private var preparationWork = 0L
     private var terminal: QuadraticOptimizationResult? = null
     private var publish: ((QuadraticIncumbent) -> Unit)? = null
@@ -142,14 +143,25 @@ internal class QuadraticWorkerAdapter(
             override val completion: QuadraticOptimizationResult? get() = terminal
             override val isDone: Boolean get() = terminal != null
             override val stats: SolveStats get() = this@QuadraticWorkerAdapter.stats
-            override val work: Long get() = neighborhood?.work ?: 0L
+            override val work: Long get() = neighborhoodPreparationInstructions + minOf(neighborhood?.work ?: 0L,
+                Long.MAX_VALUE - neighborhoodPreparationInstructions)
             override val chargedInstructions: Long get() = work
             override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
                 runInstructionSlice(global, sliceMillis, sliceNodes, onIncumbent)
             override fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = run(onIncumbent) {
-                val cursor = neighborhood(adaptive)
+                val cursor = neighborhood ?: kotlin.run {
+                    val before = native.work
+                    try {
+                        neighborhood(adaptive)
+                    } finally {
+                        neighborhoodPreparationInstructions += minOf(
+                            quadraticNativeInstructions((native.work - before).coerceAtLeast(0)),
+                            Long.MAX_VALUE - neighborhoodPreparationInstructions,
+                        )
+                    }
+                }
                 val stop = native.polynomial or params.strategy.localSearch.cancellation or global
                 val segment = stop or if (sliceMillis == Long.MAX_VALUE) Cancellation.Never
                     else Cancellation.after(sliceMillis.milliseconds)
