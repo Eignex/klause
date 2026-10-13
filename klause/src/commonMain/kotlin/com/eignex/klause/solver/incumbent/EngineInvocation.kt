@@ -25,10 +25,11 @@ internal class EngineInvocation(
     sourceAssumptions: Assumptions = Assumptions.None,
     executionAssumptions: Assumptions = sourceAssumptions,
     val scope: SourceScope? = null,
+    condition: SourceCondition? = null,
 ) {
     private val sourcePins = snapshot(sourceAssumptions)
     private val executionPins = snapshot(executionAssumptions)
-    val sourceCondition: SourceCondition = sourcePins.sourceCondition()
+    val sourceCondition: SourceCondition = condition ?: sourcePins.sourceCondition()
     private val sourceWitnessCondition: SourceCondition = executionCondition(sourcePins)
     val executionCondition: SourceCondition = executionCondition(executionPins)
     val sourceObjective: LinearObjective? get() = preparedPlan.objective
@@ -41,6 +42,15 @@ internal class EngineInvocation(
         require(preparedPlan.quadraticObjective == null) { "ordinary invocation cannot replace a quadratic objective" }
         require(sourcePins.bools.keys.all { it in 0 until preparedPlan.sourceBoolCount } &&
             sourcePins.ints.keys.all { it in 0 until preparedPlan.sourceIntCount }) { "source pin is undeclared" }
+        require(sourceCondition.implies(sourcePins.sourceCondition())) { "source condition omits an original pin" }
+        require(sourceCondition.bools.keys.all { it in 0 until preparedPlan.sourceBoolCount } &&
+            (sourceCondition.lower.keys + sourceCondition.upper.keys).all { coordinate ->
+                when (coordinate.kind) {
+                    SourceCoordinate.Kind.Boolean -> false
+                    SourceCoordinate.Kind.Integer -> coordinate.id in 0 until preparedPlan.sourceIntCount
+                    SourceCoordinate.Kind.Real -> coordinate.id in 0 until preparedPlan.sourceRealCount
+                }
+            }) { "source condition references an undeclared coordinate" }
         require(model.matches(model.forObjective(executionObjective))) { "execution objective differs from its model" }
         require(scope == null || scope.condition == sourceCondition) { "capture has a different source condition" }
         require(scope == null || (scope.objective == null) == (sourceObjective == null)) {
@@ -53,9 +63,14 @@ internal class EngineInvocation(
 
     fun matches(other: EngineInvocation): Boolean = preparedPlan === other.preparedPlan &&
         model.matches(other.model) && executionObjective === other.executionObjective &&
-        sourcePins == other.sourcePins && executionPins == other.executionPins && scope == other.scope
+        sourcePins == other.sourcePins && executionPins == other.executionPins && scope == other.scope &&
+        sourceCondition == other.sourceCondition
 
     fun checkWitness(sample: Sample, cancellation: Cancellation): SourceEvidenceCheck {
+        if (sourceCondition != sourceWitnessCondition) {
+            val declared = sourceCondition.checkWitness(sample, cancellation)
+            if (declared != SourceEvidenceCheck.Checked) return declared
+        }
         val source = checkRestrictions(sample, sourcePins, sourceWitnessCondition, cancellation)
         if (source != SourceEvidenceCheck.Checked || sourcePins == executionPins) return source
         return checkRestrictions(sample, executionPins, executionCondition, cancellation)

@@ -6,6 +6,8 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
@@ -26,6 +28,32 @@ class CompletedEnginePublicationTest {
     private val model = ModelIdentity.of(source, objective)
     private val invocation = EngineInvocation(plan, model, objective)
     private val verifier = ModelEvidenceVerifier<Sample, Double>(model, CandidateVerifier.trusting())
+
+    @Test
+    fun `an exact source condition cannot authorize a root objective bound`() {
+        val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE))
+        val producer = EngineInvocation(plan, model, objective, condition = condition)
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.ObjectiveBound(producer, 2.0))
+
+        val checked = verifier.verify(ModelEvidence.Bound(model, 2.0, certificate), invocation = invocation)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `an exact conditioned source point can satisfy its root query`() {
+        val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE))
+        val producer = EngineInvocation(plan, model, objective, condition = condition)
+        val point = Sample(booleanArrayOf(), longArrayOf(2, 1))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(producer, point, 2.0))
+
+        val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(point, 2.0), certificate),
+            invocation = invocation)
+
+        assertIs<Verification.Accepted<*, *>>(checked)
+    }
 
     @Test
     fun `native witness publication retains its actual point and execution value`() {
