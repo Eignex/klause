@@ -235,15 +235,28 @@ evidence for the exact IR fixture schema `real-box-square`: one real coordinate 
 an integer-ended closed interval, objective `coefficient*x*x + constant`, and an
 explicit source sense. It accepts the source JSON bytes as its first argument and
 a `FiniteEngine` name as its second. Extra source fields and inexact endpoints are
-refused. Submit it through the configured lab client at a pinned revision:
+refused. Submit a profile specification through the configured lab client at a pinned
+revision. Include `machines: 1` and `parallel: 1` in the initial specification; changing
+machine count after submission does not retract machines already launched.
 
-```sh
-LAB_URL=https://lab.eignex.com ./deploy/lab profile \
-  com.eignex.klause.bench.profile.SourceEvidenceProbe <revision> \
-  "check original quadratic witness, bound and attainment" aws 600 \
-  '{"semantics":"klause-ir-exact-v1","kind":"real-box-square","lower":-2,"upper":3,"coefficient":1,"constant":0,"sense":"MINIMIZE"}' \
-  BACKTRACK
+```json
+{
+  "name": "source-evidence-probe",
+  "profile": {
+    "main": "com.eignex.klause.bench.profile.SourceEvidenceProbe",
+    "args": ["<exact real-box-square source JSON>", "BACKTRACK"]
+  },
+  "base": {"ref": "<revision>", "timeout": "600000"},
+  "host": "aws",
+  "machines": 1,
+  "parallel": 1
+}
 ```
+
+For example, the first argument can be
+`{"semantics":"klause-ir-exact-v1","kind":"real-box-square","lower":-2,"upper":3,"coefficient":1,"constant":0,"sense":"MINIMIZE"}`.
+Save the specification outside the repository, then use
+`LAB_URL=https://lab.eignex.com ./deploy/lab run /absolute/path/to/profile-source-evidence.json`.
 
 The probe saves original bytes and the actual result/capture payload under `$OUT`,
 then runs the packaged independent Python fractions checker in a separate process.
