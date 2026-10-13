@@ -14323,6 +14323,21 @@ final class com.eignex.klause.solver.search/SearchComponentSet { // com.eignex.k
     final fun session(kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ..., com.eignex.klause.solver.search/SearchAtomRegistry? = ..., com.eignex.klause.solver.search/SearchExecutionControls): com.eignex.klause.solver.search/SearchSession // com.eignex.klause.solver.search/SearchComponentSet.session|session(kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams;com.eignex.klause.solver.search.SearchAtomRegistry?;com.eignex.klause.solver.search.SearchExecutionControls){}[0]
 }
 
+final class com.eignex.klause.solver.search/SearchExactAlgebraicRealValue : com.eignex.klause.solver.search/TypedSearchValueKey<com.eignex.klause.arithmetic.polynomial/AlgebraicReal> { // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue|null[0]
+    constructor <init>(com.eignex.klause.ir/SourceRealId) // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.<init>|<init>(com.eignex.klause.ir.SourceRealId){}[0]
+
+    final val valueType // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.valueType|{}valueType[0]
+        final fun <get-valueType>(): kotlin.reflect/KClass<com.eignex.klause.arithmetic.polynomial/AlgebraicReal> // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.valueType.<get-valueType>|<get-valueType>(){}[0]
+    final val variable // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.variable|{}variable[0]
+        final fun <get-variable>(): com.eignex.klause.ir/SourceRealId // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.variable.<get-variable>|<get-variable>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/SourceRealId // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.component1|component1(){}[0]
+    final fun copy(com.eignex.klause.ir/SourceRealId = ...): com.eignex.klause.solver.search/SearchExactAlgebraicRealValue // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.copy|copy(com.eignex.klause.ir.SourceRealId){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchExactAlgebraicRealValue.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.solver.search/SearchExactIntValue : com.eignex.klause.solver.search/TypedSearchValueKey<com.ionspin.kotlin.bignum.integer/BigInteger> { // com.eignex.klause.solver.search/SearchExactIntValue|null[0]
     constructor <init>(com.eignex.klause.ir/SourceIntId) // com.eignex.klause.solver.search/SearchExactIntValue.<init>|<init>(com.eignex.klause.ir.SourceIntId){}[0]
 
@@ -14336,6 +14351,21 @@ final class com.eignex.klause.solver.search/SearchExactIntValue : com.eignex.kla
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchExactIntValue.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchExactIntValue.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchExactIntValue.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.search/SearchExactRealExpressionValue : com.eignex.klause.solver.search/TypedSearchValueKey<com.eignex.klause.arithmetic.real/ExactRealValue> { // com.eignex.klause.solver.search/SearchExactRealExpressionValue|null[0]
+    constructor <init>(com.eignex.klause.ir/SourceRealId) // com.eignex.klause.solver.search/SearchExactRealExpressionValue.<init>|<init>(com.eignex.klause.ir.SourceRealId){}[0]
+
+    final val valueType // com.eignex.klause.solver.search/SearchExactRealExpressionValue.valueType|{}valueType[0]
+        final fun <get-valueType>(): kotlin.reflect/KClass<com.eignex.klause.arithmetic.real/ExactRealValue> // com.eignex.klause.solver.search/SearchExactRealExpressionValue.valueType.<get-valueType>|<get-valueType>(){}[0]
+    final val variable // com.eignex.klause.solver.search/SearchExactRealExpressionValue.variable|{}variable[0]
+        final fun <get-variable>(): com.eignex.klause.ir/SourceRealId // com.eignex.klause.solver.search/SearchExactRealExpressionValue.variable.<get-variable>|<get-variable>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/SourceRealId // com.eignex.klause.solver.search/SearchExactRealExpressionValue.component1|component1(){}[0]
+    final fun copy(com.eignex.klause.ir/SourceRealId = ...): com.eignex.klause.solver.search/SearchExactRealExpressionValue // com.eignex.klause.solver.search/SearchExactRealExpressionValue.copy|copy(com.eignex.klause.ir.SourceRealId){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchExactRealExpressionValue.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchExactRealExpressionValue.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchExactRealExpressionValue.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.solver.search/SearchExactRealValue : com.eignex.klause.solver.search/TypedSearchValueKey<com.eignex.klause.simplex.exact/BigFraction> { // com.eignex.klause.solver.search/SearchExactRealValue|null[0]

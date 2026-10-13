@@ -5,7 +5,6 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.ExactWitness
-import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.objectiveUnboundedBelow
 import com.eignex.klause.lp.statesOneBranch
 import com.eignex.klause.presolve.OpenPresolveResult
@@ -15,6 +14,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
@@ -490,10 +490,11 @@ class OpenTheoryMinimizer internal constructor(
         state: OpenTheorySolveState,
     ): Boolean {
         if (rayRefusedForEveryWitness) return false
+        val point = witness.exactWitness(model.numRealVars) ?: return false
         val ray = model.objectiveUnboundedBelow(
             terms,
             coefficients,
-            witness.exactWitness(model.numRealVars),
+            point,
             (params.timeout or params.cancellation).shorten(0.5),
             state.smt::observeSourceLp,
         )
@@ -551,12 +552,16 @@ class OpenTheoryMinimizer internal constructor(
     private fun LinearObjective.valueOf(assignment: OpenTheoryAssignment): BigInt {
         var total = bigIntOf(constant)
         when (assignment) {
+            is SourceCoordinateWitness -> for (i in terms.indices) {
+                total += bigIntOf(coefficients[i]) * assignment.integer(terms[i])
+            }
+
             is OpenTheoryAssignment.Difference -> for (i in terms.indices) {
                 total += bigIntOf(coefficients[i]) * bigIntOf(assignment.sample.intValue(terms[i]))
             }
 
             is OpenTheoryAssignment.Sampled -> for (i in terms.indices) {
-                total += bigIntOf(coefficients[i]) * bigIntOf(assignment.sample.intValue(terms[i]))
+                total += bigIntOf(coefficients[i]) * assignment.sample.exactIntValue(terms[i])
             }
 
             is TranscendentalAssignment -> for (i in terms.indices) {
@@ -619,33 +624,21 @@ private fun Problem.sameDeclaredIntegerRanges(other: Problem): Boolean {
     return true
 }
 
-/**
- * A witness read as the exact point a ray certificate takes its branch at.
- *
- * The routes carry their values at different widths — a difference witness in `Long`, an exact one in
- * arbitrary precision. Linear optimization certificates require rational coordinates.
- */
-private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = when (this) {
-    is TranscendentalAssignment -> RouteWitness(
-        realColumns,
-        sample::boolValue,
-        { requireNotNull(exactRealValue(it).rational) { "linear certificates require rational real coordinates" } },
-        { BigFraction.of(sample.exactIntValue(it), BIG_ONE) },
-    )
+// Rational ray certificates cannot use an approximate or symbolic base coordinate.
+internal fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness? = when (this) {
+    is SourceCoordinateWitness -> {
+        val values = List(realColumns) { real(it).rational ?: return null }
+        RouteWitness(realColumns, ::boolValue, values::get, { integer(it).asFraction() })
+    }
 
-    is OpenTheoryAssignment.Difference -> RouteWitness(
-        realColumns,
-        { sample.boolValue(it) },
-        { (if (it < sample.numRealVars) sample.approximateRealValue(it) else 0.0).asFraction() },
-        { BigFraction.ofLong(sample.intValue(it)) },
-    )
+    is TranscendentalAssignment -> {
+        val values = List(realColumns) { exactRealValue(it).rational ?: return null }
+        RouteWitness(realColumns, sample::boolValue, values::get, { sample.exactIntValue(it).asFraction() })
+    }
 
-    is OpenTheoryAssignment.Sampled -> RouteWitness(
-        realColumns,
-        { sample.boolValue(it) },
-        { requireNotNull(sample.exactReals)[it] },
-        { BigFraction.ofLong(sample.intValue(it)) },
-    )
+    is OpenTheoryAssignment.Difference -> sample.rationalRayWitness(realColumns)
+
+    is OpenTheoryAssignment.Sampled -> sample.rationalRayWitness(realColumns)
 
     is OpenTheoryAssignment.ExactLira -> RouteWitness(
         realColumns,
@@ -654,8 +647,6 @@ private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = 
         { assignment.intValue(it).asFraction() },
     )
 
-    // A real-only route has no integer column to read, which only a constant objective may ask of it —
-    // and a constant objective descends along nothing, so no certificate is taken over this witness.
     is OpenTheoryAssignment.ExactLra -> RouteWitness(
         realColumns,
         { assignment.boolValue(it) },
@@ -663,14 +654,16 @@ private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = 
         { error("a route with no integer column cannot value an objective weighting one") },
     )
 
-    is OpenTheoryAssignment.ExactNra -> error("polynomial-real witnesses do not support rational ray certificates")
+    is OpenTheoryAssignment.ExactNra -> null
 
-    // Real columns come from the route underneath, which alone knows their width. The integer columns are
-    // the rebuild's whenever it recovered any — reading the witness under it would take their values from
-    // before the elimination.
     is OpenTheoryAssignment.Rebuilt -> base.exactWitness(realColumns)
-        .withTruth { bools[it] }
-        .let { under -> ints?.let { recovered -> under.withInts(realColumns, recovered) } ?: under }
+        ?.withTruth { bools[it] }
+        ?.let { under -> ints?.let { recovered -> under.withInts(realColumns, recovered) } ?: under }
+}
+
+private fun Sample.rationalRayWitness(realColumns: Int): ExactWitness? {
+    val values = if (realColumns == 0) emptyList() else exactReals?.takeIf { it.size == realColumns } ?: return null
+    return RouteWitness(realColumns, ::boolValue, values::get, { exactIntValue(it).asFraction() })
 }
 
 /** This witness reading its integer columns off [ints] instead, with [realColumns] reals ahead of them. */

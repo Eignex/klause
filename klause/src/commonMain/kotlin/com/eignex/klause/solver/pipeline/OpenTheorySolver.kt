@@ -149,6 +149,7 @@ sealed interface OpenTheoryAssignment {
 fun OpenTheoryAssignment.algebraicRealValue(id: Int): AlgebraicReal? = when (this) {
     is OpenTheoryAssignment.ExactNra -> assignment.realValue(id)
     is TranscendentalAssignment -> exactRealValue(id).algebraic
+    is SourceCoordinateWitness -> real(id).algebraic
     is OpenTheoryAssignment.Rebuilt -> base.algebraicRealValue(id)
     else -> null
 }
@@ -410,7 +411,7 @@ class OpenTheoryEngine internal constructor(
                 candidateHints = hints,
             )
             handedOff = true
-            return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, route, stats, state, params))
+            return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
         } finally {
             if (!handedOff) planned.close()
         }
@@ -421,23 +422,27 @@ class OpenTheoryEngine internal constructor(
         private val planned: PlannedSearch,
         private val run: SearchRun,
         private val prepared: PreparedSource,
-        private val route: ProblemPipeline,
         private val stats: SolveStatsSink,
         private val state: OpenTheorySolveState,
         private val params: TheoryParams,
     ) : AutoCloseable {
+        private val witnesses = SourceWitnessAssembler(prepared.mapping.target, prepared.source)
+
         /** The search this run drives. */
         val session: com.eignex.klause.solver.search.SearchSession get() = planned.session
 
         /** Continue the search: its verdict, or null when the node policy paused it. */
         fun advance(): OpenTheoryResult? = when (val event = run.next()) {
-            // The witness is of the prepared model, so the columns preparation eliminated are
-            // recovered before it leaves this route. Boolean ids are the source model's throughout —
-            // a source pass leaves an eliminated column in place rather than renumbering.
-            is SearchRunEvent.Satisfied -> OpenTheoryResult.Sat(
-                prepared.mapping.lift(assignment(event.model, checkNotNull(planned.theory), route)),
-                stats.finish(state, planned.session),
-            )
+            is SearchRunEvent.Satisfied -> {
+                val assignment = witnesses.assemble(event.model, prepared.mapping)
+                if (assignment != null) {
+                    OpenTheoryResult.Sat(assignment, stats.finish(state, planned.session))
+                } else if (params.timeout() || params.cancellation() || state.work.exhausted) {
+                    unknown(params.timeout(), stats = stats, state = state, session = planned.session)
+                } else {
+                    OpenTheoryResult.Unknown(TerminationReason.Unsupported, stats.finish(state, planned.session))
+                }
+            }
 
             SearchRunEvent.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
 
@@ -505,26 +510,6 @@ class OpenTheoryEngine internal constructor(
         openHints = state.hints
         stop()
         return snapshot().let { it.copy(search = it.search.mergedWith(state.progress(null))) }
-    }
-
-    private fun assignment(
-        model: com.eignex.klause.solver.search.AssembledSearchModel,
-        component: Any,
-        route: ProblemPipeline,
-    ): OpenTheoryAssignment = when (route) {
-        ProblemPipeline.DIFFERENCE_THEORY -> OpenTheoryAssignment.Difference(
-            checkNotNull(model.valueOf<Sample>(component)),
-        )
-
-        ProblemPipeline.EXACT_LRA -> OpenTheoryAssignment.ExactLra(
-            checkNotNull(model.valueOf<ExactLraAssignment>(component)),
-        )
-
-        ProblemPipeline.EXACT_LIRA -> OpenTheoryAssignment.ExactLira(
-            checkNotNull(model.valueOf<ExactLiraAssignment>(component)),
-        )
-
-        ProblemPipeline.FINITE_CP, ProblemPipeline.UNSUPPORTED_OPEN -> error("validated open theory route changed")
     }
 }
 

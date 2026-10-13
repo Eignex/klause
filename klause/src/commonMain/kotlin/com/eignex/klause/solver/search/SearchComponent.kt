@@ -579,6 +579,17 @@ data class SearchRealValue(
 class AssembledSearchModel internal constructor(values: Map<Any, Any>) {
     private val values = values.toMap()
 
+    // Registered arithmetic atoms can add Boolean keys beyond the declared source variables.
+    internal fun numericCoordinatesFit(intCount: Int, realCount: Int): Boolean = values.keys.all { key ->
+        when (key) {
+            is SearchExactIntValue -> key.variable.index in 0 until intCount
+            is SearchExactRealValue -> key.variable.index in 0 until realCount
+            is SearchExactAlgebraicRealValue -> key.variable.index in 0 until realCount
+            is SearchExactRealExpressionValue -> key.variable.index in 0 until realCount
+            else -> true
+        }
+    }
+
     /** Read the immutable value of the type associated with [key], or null when absent. */
     @Suppress("UNCHECKED_CAST")
     fun <V : Any> valueOf(key: TypedSearchValueKey<V>): V? {

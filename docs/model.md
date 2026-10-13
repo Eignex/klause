@@ -177,5 +177,11 @@ Shared search exchanges Boolean literals, semantic integer bounds and typed opaq
 theory decisions. Components can maintain private residual state through
 `SearchBrancher`, but traversal and decision levels belong to the shared session.
 `PropagationSession` remains finite-domain state. Source-keyed `SearchBoolValue`,
-`SearchIntValue` and `SearchRealValue` assignments let each component contribute
-only the values it owns.
+`SearchExactIntValue`, `SearchExactRealValue`, `SearchExactAlgebraicRealValue` and
+`SearchExactRealExpressionValue`
+assignments let each component contribute only the values it owns. Legacy untyped
+keys remain compatible. The open pipeline assembles an owned exact coordinate snapshot
+against its retained source mapping, preserving arbitrary-width integers, rational,
+algebraic and symbolic reals. Missing or multiply represented coordinates withhold
+publication. [Typed contributions](api.md#typed-contributions-and-migration) define
+the decoding and ownership boundary; assembly adds no independent proof authority.
