@@ -663,6 +663,8 @@ endpoints and rays are checked against those separate caller bytes; a conditiona
 proof cannot be checked as a parent proof by omitting or weakening its restrictions.
 `conditioned-affine.smt2` and `conditioned-affine.condition.json` exercise a Boolean
 pin, a real pin at `1/3` and an integer pin at `2^64`.
+`exact-real-pin.smt2` and its condition file exercise scoped witness-only receipts
+at `1/3`; these routes must withhold bounds and terminal claims.
 `--route=authority` isolates the public source-authority entry point with cp and one
 core. The default `--route=request` exercises ordinary request and portfolio execution;
 the output records which entry point produced the claim.
