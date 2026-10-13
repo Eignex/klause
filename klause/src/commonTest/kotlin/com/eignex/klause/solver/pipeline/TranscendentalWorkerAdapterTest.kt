@@ -82,6 +82,21 @@ class TranscendentalWorkerAdapterTest {
     }
 
     @Test
+    fun `closing a source worker retains charges and rejects another source query`() {
+        val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
+        val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
+        val result = adapter.execute()
+        val work = adapter.nativeWork
+
+        adapter.close()
+        adapter.close()
+
+        assertIs<OpenTheoryResult.Sat>(result.result)
+        assertEquals(work, adapter.nativeWork)
+        assertFailsWith<IllegalStateException> { adapter.execute() }
+    }
+
+    @Test
     fun `a published point survives close but cannot cross invocation ownership`() {
         val source = TranscendentalProblem(TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
             emptyMap(), emptyMap(), mapOf("b" to 0))

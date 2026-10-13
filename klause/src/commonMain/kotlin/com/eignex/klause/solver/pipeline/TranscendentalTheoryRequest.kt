@@ -102,7 +102,7 @@ fun OpenTheoryPipeline.execute(
         )
     } else if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
         TranscendentalPortfolioInvocation(request, params, engine, cores).execute()
-    } else TranscendentalWorkerAdapter(request.problem, params, engine).execute()
+    } else TranscendentalWorkerAdapter(request.problem, params, engine).use { it.execute() }
 }
 
 private fun TranscendentalTheoryParams.supportsInvocation(engine: FiniteEngine): Boolean {
