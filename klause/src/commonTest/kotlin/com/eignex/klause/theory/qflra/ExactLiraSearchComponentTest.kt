@@ -33,6 +33,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
@@ -40,6 +41,7 @@ import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.contribute
@@ -613,6 +615,26 @@ class ExactLiraSearchComponentTest {
                 bigIntOf(Long.MAX_VALUE) + BIG_ONE,
                 assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints.single(),
             )
+        }
+    }
+
+    @Test
+    fun `an alternate context supplies native operation controls without session casts`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
+        )
+        val controls = SearchExecutionControlAdapter(allowance = { Cancellation { true } })
+        val context = object : SearchContext by SearchSession(emptyList()) {
+            override val executionControls = controls
+        }
+
+        ExactLiraSearchComponent(model).use { component ->
+            assertIs<ComponentResult.Indeterminate>(component.initialize(context))
+
+            assertEquals(SearchStopCause.OperationAllowance, controls.stopCause)
+            assertTrue(!context.cancelled())
         }
     }
 

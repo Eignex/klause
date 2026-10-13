@@ -30,6 +30,7 @@ import com.eignex.klause.solver.search.SearchRun
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
@@ -372,7 +373,7 @@ class OpenTheoryEngine internal constructor(
         )
         var handedOff = false
         try {
-            planned.session.attachOpenTheoryWork(work)
+            planned.session.bindOpenTheoryWork(work)
             when (planned.session.initialize()) {
                 ComponentResult.Consistent -> Unit
 
@@ -383,10 +384,10 @@ class OpenTheoryEngine internal constructor(
                 ComponentResult.Indeterminate -> return OpenTheoryStart.Decided(
                     unknown(
                         params.timeout(),
-                        planned.session.checkBudgetExhausted() ||
-                            (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
+                        planned.session.checkBudgetExhausted(),
                         stats,
                         state,
+                        cause = planned.session.executionControls.stopCause,
                     ),
                 )
             }
@@ -445,11 +446,11 @@ class OpenTheoryEngine internal constructor(
 
             is SearchRunEvent.Indeterminate -> unknown(
                 params.timeout(),
-                planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted() ||
-                    (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
+                planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted(),
                 stats,
                 state,
                 planned.session,
+                planned.session.executionControls.stopCause,
             )
         }
 
@@ -473,15 +474,18 @@ class OpenTheoryEngine internal constructor(
         stats: SolveStatsSink,
         state: OpenTheorySolveState,
         session: com.eignex.klause.solver.search.SearchSession? = null,
+        cause: SearchStopCause? = null,
     ): OpenTheoryResult.Unknown {
         stats.timedOut = timedOut
         return OpenTheoryResult.Unknown(
-            if (timedOut) {
-                TerminationReason.Timeout
-            } else if (budgetExhausted || state.work.exhausted) {
-                TerminationReason.BudgetExhausted
-            } else {
-                TerminationReason.Cancelled
+            when {
+                timedOut || cause == SearchStopCause.Timeout -> TerminationReason.Timeout
+                cause == SearchStopCause.Cancelled -> TerminationReason.Cancelled
+                budgetExhausted || state.work.exhausted || cause == SearchStopCause.WorkAllowance ||
+                    cause == SearchStopCause.CheckAllowance || cause == SearchStopCause.DecisionAllowance ||
+                    cause == SearchStopCause.OperationAllowance -> TerminationReason.BudgetExhausted
+                cause == SearchStopCause.RepresentationDecline -> TerminationReason.Unsupported
+                else -> TerminationReason.Cancelled
             },
             stats.finish(state, session),
         )

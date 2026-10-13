@@ -3,6 +3,7 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.solver.pipeline.bindOpenTheoryWork
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -42,7 +43,7 @@ class SearchSessionTest {
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
             }
             val session = SearchComponentSet(listOf(component), listOf(brancher)).session()
-            session.attachOpenTheoryWork(work)
+            session.bindOpenTheoryWork(work)
 
             assertIs<SearchResult.Satisfied>(session.solve(numBoolVars = 0))
             val stats = work.snapshot()
@@ -70,7 +71,7 @@ class SearchSessionTest {
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
             }),
         )
-        session.attachOpenTheoryWork(work)
+        session.bindOpenTheoryWork(work)
 
         val result = session.solve(numBoolVars = 1)
 
@@ -684,7 +685,7 @@ class SearchSessionTest {
             }
         }
         val session = SearchComponentSet(listOf(component), listOf(brancher)).session()
-        session.attachOpenTheoryWork(work)
+        session.bindOpenTheoryWork(work)
 
         val result = session.solve(numBoolVars = 0, SearchSolveParams(maxDecisions = 1))
 

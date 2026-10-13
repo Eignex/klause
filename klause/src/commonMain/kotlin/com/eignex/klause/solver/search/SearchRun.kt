@@ -274,7 +274,10 @@ class SearchRun internal constructor(
                     decisions++
                     decisionsSinceRestart++
                     observer.onCommit(decision, session.decisionLevel)
-                    if (!decisionBudget.consume()) return Advance.Budget
+                    if (!decisionBudget.consume()) {
+                        session.markDecisionBudgetExhausted()
+                        return Advance.Budget
+                    }
                     return Advance.Expanded
                 }
 
