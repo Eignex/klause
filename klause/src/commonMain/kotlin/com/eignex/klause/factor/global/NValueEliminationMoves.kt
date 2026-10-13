@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.ChannelingSink
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.buildRepairChain
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongHashSet
 
@@ -41,7 +42,7 @@ internal class NValueEliminationMoves(
             if (parts.none { it.varId == n } && targetN != state.assignment.intValue(n)) {
                 parts += Move.IntSet(n, targetN)
             }
-            if (queue(state, parts, sink)) emitted++
+            if (queue(state, parts, sink, complete = emitted == 0)) emitted++
         }
     }
 
@@ -76,7 +77,12 @@ internal class NValueEliminationMoves(
         return parts.takeIf { it.isNotEmpty() }
     }
 
-    private fun queue(state: LocalSearchState, parts: List<Move.IntSet>, sink: MoveSink): Boolean {
+    private fun queue(
+        state: LocalSearchState,
+        parts: List<Move.IntSet>,
+        sink: MoveSink,
+        complete: Boolean,
+    ): Boolean {
         val first = parts[0]
         val coordinated = ChannelingSink(first.varId, first.newValue)
         // Counter-shifts must not resurrect the removed class or change its surviving destination.
@@ -84,20 +90,40 @@ internal class NValueEliminationMoves(
         coordinated.pin(n)
         for (i in 1 until parts.size) coordinated.add(parts[i])
         for (coordinate in parts) {
-            for (fid in state.projection.intOccurrences[coordinate.varId]) {
-                state.factors[fid].contributeChanneling(
-                    state, fid, coordinate.varId, state.assignment.intValue(coordinate.varId), coordinate.newValue,
-                    coordinated,
-                )
+            if (coordinate.varId == n) {
+                for (fid in state.projection.intOccurrences[n]) {
+                    state.factors[fid].contributeChanneling(
+                        state, fid, n, state.assignment.intValue(n), coordinate.newValue, coordinated,
+                    )
+                }
+            } else {
+                // Per-coordinate counter-shifts cannot reconcile a row's combined class drift.
+                val channeling = state.synthesizeChannelingMove(coordinate.varId, coordinate.newValue)
+                if (channeling is Move.Compound) {
+                    for (part in channeling.parts) {
+                        if (part is Move.BoolFlip) coordinated.addIndicatorFlip(part.varId)
+                    }
+                }
             }
         }
         coordinated.carryBinaryChannels(state, sink)
         val move = coordinated.toMove()
-        val complete = if (move is Move.Compound) move.parts else listOf(move)
-        if (!preservesCount(state, complete)) return false
+        val coordinatedParts = if (move is Move.Compound) move.parts else listOf(move)
+        if (!preservesCount(state, coordinatedParts)) return false
         val before = sink.size
-        sink.addCompound(complete)
+        sink.addCompound(coordinatedParts)
+        if (complete && state.cost == 0L && state.netDelta(move) > 0L) completeMove(state, move, sink)
         return sink.size > before
+    }
+
+    private fun completeMove(state: LocalSearchState, move: Move, sink: MoveSink) {
+        val repairs = MoveSink(state.assumptions)
+        repairs.setInvariants(state.invariants)
+        repairs.setOwners(state.seeding.ownerInt)
+        val parts = state.buildRepairChain(move, MAX_REPAIR_DEPTH, repairs) ?: return
+        if (parts.size > MAX_COMPLETED_PARTS || !preservesCount(state, parts)) return
+        val candidate = if (parts.size == 1) parts[0] else Move.Compound(parts)
+        if (state.netDelta(candidate) == 0L) sink.addCompound(parts)
     }
 
     private fun preservesCount(state: LocalSearchState, parts: List<Move>): Boolean {
@@ -121,5 +147,7 @@ internal class NValueEliminationMoves(
         const val MAX_MOVES = 4
         const val MAX_ATTEMPTS = 24
         const val MAX_COORDINATES = 32
+        const val MAX_REPAIR_DEPTH = 8
+        const val MAX_COMPLETED_PARTS = 128
     }
 }

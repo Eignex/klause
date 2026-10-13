@@ -309,6 +309,15 @@ indicators and binary channels. Proposals changing presence literals decline. Co
 model scoring and ordinary source publication checks remain required; NValue
 satisfaction alone establishes neither feasibility nor objective improvement.
 
+At a feasible assignment, the first elimination may also use the existing directed
+repair-chain mechanism to reconcile regressed surrounding constraints. It follows at
+most eight repair steps, protects the changed class and count coordinates, and offers
+only a complete zero-violation proposal with at most 128 primitive parts. Class
+coordinates carry indicators together; arithmetic rows reconcile their combined drift
+through repairs instead of independent per-coordinate counter-shifts. The count retains
+its ordinary channel contributions. Chain generation restores the original assignment
+and tracking state before complete objective scoring.
+
 ## Cumulative neighborhoods
 
 Cumulative integer moves update every task reading the coordinate as a start,
