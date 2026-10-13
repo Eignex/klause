@@ -820,15 +820,15 @@ on a directory's original source manifest. Pass `source=<directory>`, optional
 `out=<directory>` and `checker=none|provision`. Manifest cases name source files,
 hashes, family/encoding identities and selected CLI engines. The probe retains
 original bytes, stdout/stderr/exit, launcher/runtime provenance and per-child JFR.
-Each child uses `-p 1`, seed17, native work200000, one LS move/ALNS iteration and
-a25-second process allowance. Its actual JFR JVM arguments must retain
+Each child uses `-p 1`, seed 17, native work 200000, one LS move/ALNS iteration and
+a 25-second process allowance. Its actual JFR JVM arguments must retain
 `ActiveProcessorCount=1`. Timings include process startup, solving and delivery;
 JFR collection affects them, so they are diagnostics rather than performance claims.
 
 The [objective-cli-v1 manifest](smoke-corpus/objective-cli-v1/manifest.json) fixes
-64 outcomes: mixed product and rational objectives across all5engines, plus
+64 outcomes: mixed product and rational objectives across all five engines, plus
 algebraic, strict-limit, unbounded and infeasible controls through CP/FIXED.
-Each source objective has affine and zero-square representations in both directions.
+Paired affine and zero-square objectives preserve original constraints and direction.
 
 ```sh
 deploy/lab profile com.eignex.klause.bench.profile.ObjectiveFrontendProbe <branch> \
