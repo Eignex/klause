@@ -11,6 +11,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.theory.qfnra.QfNraParams
@@ -66,7 +68,8 @@ class PolynomialStrategyAdaptersTest {
 
         shared.service.invocation().use { invocation ->
             assertIs<SolveResult.Unsat>(PolynomialWorkerAdapter(
-                shared, invocation, PolynomialStrategyParams(), Cancellation.Never,
+                shared, invocation, PolynomialStrategyParams(),
+                EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source)), Cancellation.Never,
             ).solve(FiniteEngine.BACKTRACK))
         }
     }
@@ -84,7 +87,8 @@ class PolynomialStrategyAdaptersTest {
         shared.service.invocation().use { invocation ->
             assertIs<SolveResult.Unknown>(PolynomialWorkerAdapter(
                 shared, invocation,
-                PolynomialStrategyParams(localSearch = LocalSearchParams(maxFlips = 2)), Cancellation.Never,
+                PolynomialStrategyParams(localSearch = LocalSearchParams(maxFlips = 2)),
+                EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source)), Cancellation.Never,
             ).solve(FiniteEngine.LOCAL_SEARCH))
         }
     }
@@ -103,7 +107,9 @@ class PolynomialStrategyAdaptersTest {
         for (pin in listOf(0L, 1L, 0L)) {
             shared.service.invocation(QfNraParams()).use { invocation ->
                 val params = PolynomialStrategyParams(assumptions = Assumptions(ints = mapOf(0 to pin)))
-                val result = PolynomialWorkerAdapter(shared, invocation, params, Cancellation.Never)
+                val binding = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source),
+                    sourceAssumptions = params.assumptions)
+                val result = PolynomialWorkerAdapter(shared, invocation, params, binding, Cancellation.Never)
                     .solve(FiniteEngine.BACKTRACK)
                 if (pin == 0L) assertIs<SolveResult.Unsat>(result) else assertIs<SolveResult.Sat>(result)
             }
