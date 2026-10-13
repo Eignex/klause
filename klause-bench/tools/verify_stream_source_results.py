@@ -49,9 +49,9 @@ def check_stream(source, output, interrupted=False, minimum_witnesses=1):
         elif line.startswith('; objective='):
             assert pending_cost is None and model_lines is None, 'cost without a preceding complete witness'
             assert not terminal, 'incumbent after terminal optimization status'
-            parsed = expressions(line.split('=', 1)[1])
-            assert len(parsed) == 1, 'invalid objective value'
-            pending_cost = exact_value(parsed[0])
+            parsed = expressions('(value ' + line.split('=', 1)[1] + ')')
+            assert len(parsed) == 1 and len(parsed[0]) == 2, 'invalid objective value'
+            pending_cost = exact_value(parsed[0][1])
         elif line in ('(', '(model'):
             assert model_lines is None and pending_cost is not None, 'model without exact cost'
             assert not terminal, 'model after terminal optimization status'
