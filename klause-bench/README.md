@@ -940,6 +940,10 @@ Pass `checker=boolean` to the saved-record `SourceRecordCheck` AWS profile to ru
 this checker against the same hash-pinned `cases`/`sources` bundle. Its retained
 source checks, runtime/package versions, checker hashes and process log distinguish
 verified witnesses/objectives, independently checked proofs and unknown proof queries.
+With `captureSources=true`, omitted source payloads are resolved through the current
+corpus catalog and retained only when their original-byte hashes match the saved
+records. The source capture records resolved identities and licenses. This option
+performs source IO and independent checking without rerunning the solver.
 
 ### Exact function source controls
 

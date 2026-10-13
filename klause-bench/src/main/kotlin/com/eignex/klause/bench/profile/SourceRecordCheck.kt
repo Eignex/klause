@@ -24,10 +24,12 @@ object SourceRecordCheck {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val bundleOptions = options.keys - setOf("checker", "witnessOnly", "catalog")
+        val bundleOptions = options.keys - setOf("checker", "witnessOnly", "catalog", "captureSources")
         require(bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256")) {
             "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest> and checker=source|boolean"
         }
+        require(options["captureSources"] in listOf(null, "true", "false")) { "captureSources must be true or false" }
+
         require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
         val witnessOnly = options["witnessOnly"] == "true"
         require(options["catalog"] == null || options["catalog"] == "true")
@@ -55,7 +57,8 @@ object SourceRecordCheck {
         require(text.size <= 64 * 1024 * 1024)
         val bundle = Json.parseToJsonElement(text.decodeToString()).jsonObject
         require(bundle.keys == setOf("cases", "sources"))
-        val cases = out.resolve("cases.json").apply { writeText(bundle.getValue("cases").jsonArray.toString()) }
+        val records = bundle.getValue("cases").jsonArray
+        val cases = out.resolve("cases.json").apply { writeText(records.toString()) }
         val sources = out.resolve("sources").apply { mkdirs() }
         var sourceBytes = 0L
         for ((digest, encoded) in bundle.getValue("sources").jsonObject) {
@@ -72,6 +75,36 @@ object SourceRecordCheck {
             sources.resolve("$digest.txt").writeBytes(source)
         }
         if (options["catalog"] == "true") collectCatalogSources(bundle.getValue("cases").jsonArray, sources, out)
+        if (options["captureSources"] == "true") {
+            val captures = buildJsonObject {
+                for (case in records) {
+                    val row = case.jsonObject
+                    val record = row.getValue("record").jsonObject
+                    val digest = record.getValue("sourceHashes").jsonObject.getValue("model").jsonPrimitive.content
+                    require(digest.matches(Regex("[0-9a-f]{64}")))
+                    val retained = sources.resolve("$digest.txt")
+                    if (retained.isFile) continue
+                    val problem = row.getValue("problem").jsonObject
+                    val suite = problem.getValue("suite").jsonPrimitive.content
+                    val name = problem.getValue("problem").jsonPrimitive.content
+                    val ref = Catalog.uncapped(suite).problems.single { it.name == name }
+                    val file = CorpusFetcher.resolve(ref.source)
+                    val original = CorpusFiles.open(file).use { it.readNBytes(32 * 1024 * 1024 + 1) }
+                    require(original.size <= 32 * 1024 * 1024 && sha(original) == digest) {
+                        "Original corpus source differs from the saved record"
+                    }
+                    retained.writeBytes(original)
+                    put(digest, buildJsonObject {
+                        put("suite", suite)
+                        put("problem", name)
+                        put("source", ref.source.toString())
+                        put("license", ref.license)
+                        put("bytes", original.size)
+                    })
+                }
+            }
+            out.resolve("source-capture.json").writeText(captures.toString() + "\n")
+        }
         val log = out.resolve("checker-install.log")
         fun execute(file: File, vararg command: String, extraArguments: List<String> = emptyList()) {
             val process = ProcessBuilder(command.toList() + extraArguments).redirectErrorStream(true)
