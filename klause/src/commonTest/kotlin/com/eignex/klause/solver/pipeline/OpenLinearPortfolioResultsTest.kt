@@ -4,12 +4,19 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceObjective
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -28,6 +35,28 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class OpenLinearPortfolioResultsTest {
+    @Test
+    fun `a captured real pin retains its actual ordinary portfolio invocation`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val third = BigFraction.ofLong(3).reciprocal()
+        val coordinate = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val condition = SourceCondition(lower = mapOf(coordinate to third), upper = mapOf(coordinate to third))
+        val scope = SourceScope(SourceRevision("conditioned-source", "klause-ir-exact-v1"), condition,
+            SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val context = assertNotNull(model.sourceProofContext(scope, objective))
+        val request = OpenTheoryRequest(model, objective).withLinearAuthority(context)
+
+        val result = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(request,
+            TheoryParams(openWorkLimit = 100_000, maxFlips = 0), FiniteEngine.MIXED, 1))
+
+        val optimum = assertIs<OpenTheoryOptimum.Optimal>(result.result)
+        assertEquals(third, optimum.value)
+        assertEquals(scope, assertNotNull(optimum.linearResult).scope)
+        assertEquals(SourceValue.Rational(third), assertNotNull(result.acceptedIncumbent).value)
+    }
+
     @Test
     fun `parallel strict limits retain their typed original direction and an interior receipt`() {
         val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
