@@ -1,0 +1,7 @@
+(declare-const x Real)
+(declare-const y Real)
+(assert (= (* x x) y))
+(assert (>= x (- 1)))
+(assert (<= x 1))
+(maximize (+ 9223372036854775807 y))
+(check-sat)

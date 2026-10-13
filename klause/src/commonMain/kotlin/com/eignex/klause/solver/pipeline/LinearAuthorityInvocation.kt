@@ -170,8 +170,9 @@ internal class LinearAuthorityInvocation(
     }
 
     private fun finish(terminal: SourceEvidence?, reason: TerminationReason): LinearInvocationResult {
-        val accepted = terminal?.takeUnless { stop() }
-        val stopped = if (terminal != null && accepted == null) {
+        val cancelled = stop()
+        val accepted = terminal?.takeUnless { cancelled }
+        val stopped = if (cancelled) {
             if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled
         } else reason
         result = LinearInvocationResult(accepted, component.rootBound, incumbent, value, stopped, stats)

@@ -1,6 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
@@ -35,6 +37,20 @@ internal class SharedVarBounds(
 ) {
     private val lo = LongArray(numIntVars) { Long.MIN_VALUE }
     private val hi = LongArray(numIntVars) { Long.MAX_VALUE }
+    private var invocation: EngineInvocation? = null
+
+    fun bindInvocation(binding: EngineInvocation) = lock.withLock {
+        require(identity?.sameModel(binding.model) != false) { "integer pool belongs to another execution model" }
+        require(invocation?.matches(binding) != false) { "integer pool cannot change its runtime invocation" }
+        require(invocation != null || (lo.all { it == Long.MIN_VALUE } && hi.all { it == Long.MAX_VALUE })) {
+            "integer pool already contains unscoped bounds"
+        }
+        invocation = binding
+    }
+
+    fun publish(publication: CompletedEnginePublication.IntegerWindow, origin: Int = NO_ORIGIN) = publish(
+        publication.coordinate, publication.lower, publication.upper, origin,
+        publication.model, EvidenceCertificate.published(publication))
 
     // The arm that published each side's tightest bound; [NO_ORIGIN] while none did, or when it named none.
     private val loOrigin = IntArray(numIntVars) { NO_ORIGIN }
@@ -51,13 +67,16 @@ internal class SharedVarBounds(
         certificate: EvidenceCertificate? = null,
     ) {
         if (varId !in lo.indices) return
-        if (identity != null) {
-            if (model == null) return
-            val verifier = ModelEvidenceVerifier<Unit, Pair<Long, Long>>(identity, CandidateVerifier.trusting())
-            val verified = verifier.verify(ModelEvidence.Bound(model, lower to upper, certificate))
-            if (verified !is Verification.Accepted) return
-        }
         lock.withLock {
+            val expected = identity ?: invocation?.model?.forObjective(null)
+            if (certificate?.publication != null && invocation == null) return@withLock
+            if (expected != null) {
+                if (model == null) return@withLock
+                val verifier = ModelEvidenceVerifier<Unit, Pair<Long, Long>>(expected, CandidateVerifier.trusting())
+                val verified = verifier.verify(ModelEvidence.IntegerWindow(model, varId, lower, upper, certificate),
+                    invocation?.scope, invocation)
+                if (verified !is Verification.Accepted) return@withLock
+            }
             if (lower > lo[varId]) {
                 lo[varId] = lower
                 loOrigin[varId] = origin

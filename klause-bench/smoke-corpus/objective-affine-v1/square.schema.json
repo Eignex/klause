@@ -1,0 +1,43 @@
+{
+  "entries": {
+    "x": {
+      "$type": "float",
+      "min": -1.0,
+      "max": 1.0,
+      "buckets": 3
+    },
+    "y": {
+      "$type": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "buckets": 3
+    },
+    "square": {
+      "$type": "constraint",
+      "expr": {
+        "$type": "continuous_equality",
+        "left": {
+          "$type": "continuous_multiply",
+          "left": {
+            "$type": "continuous_affine",
+            "coefficients": {
+              "x": 1.0
+            }
+          },
+          "right": {
+            "$type": "continuous_affine",
+            "coefficients": {
+              "x": 1.0
+            }
+          }
+        },
+        "right": {
+          "$type": "continuous_affine",
+          "coefficients": {
+            "y": 1.0
+          }
+        }
+      }
+    }
+  }
+}

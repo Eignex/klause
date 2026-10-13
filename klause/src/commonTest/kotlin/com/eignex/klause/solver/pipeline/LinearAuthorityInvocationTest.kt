@@ -12,6 +12,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -151,6 +152,7 @@ class LinearAuthorityInvocationTest {
         }
 
         assertNull(result?.terminal)
+        assertEquals(TerminationReason.Cancelled, result?.reason)
         assertNotNull(result?.incumbent)
         val bound = assertIs<SourceClaim.Bound>(assertNotNull(result?.bound).claim)
         assertEquals(SourceValue.Rational(BigFraction.ONE), bound.value)

@@ -1,10 +1,13 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.closeOpenBounds
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
@@ -57,6 +60,7 @@ class OpenTheoryRequest internal constructor(
     val preparedPlan: PreparedSourcePlan = model.preparedWithComponents(
         componentPlan, objective = objective, maximize = maximize,
     ),
+    internal val linearContext: SourceProofContext? = null,
 ) {
     /** Build a request and select its source decomposition. */
     constructor(
@@ -89,7 +93,22 @@ class OpenTheoryRequest internal constructor(
         cancellation,
         budget,
         preparedPlan,
+        linearContext,
     )
+
+    /** Bind the source owner's complete exact affine premises, objective and original-coordinate semantics. */
+    fun withLinearAuthority(context: SourceProofContext): OpenTheoryRequest {
+        require(objective != null && context.affineObjectiveAvailable)
+        require(context.scope.objective?.sense == if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE)
+        val coordinates = buildSet {
+            repeat(preparedPlan.sourceBoolCount) { add(SourceCoordinate(SourceCoordinate.Kind.Boolean, it)) }
+            repeat(preparedPlan.sourceIntCount) { add(SourceCoordinate(SourceCoordinate.Kind.Integer, it)) }
+            repeat(preparedPlan.sourceRealCount) { add(SourceCoordinate(SourceCoordinate.Kind.Real, it)) }
+        }
+        require(context.coordinates == coordinates) { "linear authority requires original source coordinates" }
+        return OpenTheoryRequest(model, objective, maximize, componentPlan, presolveConfig, solutionSetSensitive,
+            presolveCancellation, presolveBudget, preparedPlan, context)
+    }
 }
 
 /** The common execution result for a complete open-model request. */
@@ -257,19 +276,22 @@ object OpenTheoryPipeline {
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
         val objective = request.minimizedObjective
         if (objective == null) return OpenTheoryExecution.Satisfy(engineFor(request).solve(params))
-        val integral = integralMinimizer(request, objective)
-        if (integral != null) return OpenTheoryExecution.Optimize(integral.minimize(params))
-        return RationalTheoryDescent(request.model, objective, params).use { descent ->
+        val context = request.linearAuthorityContext(params.cancellation or params.timeout)
+        if (context == null) {
+            val integral = integralMinimizer(request, objective)
+            if (integral != null) return OpenTheoryExecution.Optimize(integral.minimize(params))
+        }
+        return RationalTheoryDescent(request.model, objective, params, context).use { descent ->
             val result = requireNotNull(descent.runSlice(
                 params.cancellation or params.timeout, Long.MAX_VALUE, -1,
             ) { _ -> })
-            OpenTheoryExecution.Optimize(result.openOptimum(objective))
+            OpenTheoryExecution.Optimize(descent.linearResult?.openOptimum() ?: result.openOptimum(objective))
         }
     }
 
     /**
      * Whether a source-bound descent can execute [request]'s objective without leaving the admitted theories.
-     * Rational strict-improvement descent preserves proof authority but need not terminate at an unattained infimum.
+     * Complete affine source capture enables checked bounds, limits and source rays.
      */
     fun canMinimize(request: OpenTheoryRequest): Boolean = request.objective != null &&
         request.preparedPlan.capabilities.admission(ExecutionStrategy.COMPLETE, ExecutionOperation.OPTIMIZE).runnable

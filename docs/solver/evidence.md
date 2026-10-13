@@ -99,7 +99,12 @@ bound citations are translated into original premise references and checked agai
 the original context; identity Boolean/integer coverage and compatible imports retain
 their actual derivations. This checks the original claim, not an entire projection
 contract. Missing stages, source-specific derivations and unsupported coordinate
-coverage remain unavailable. Mapping normalization and verification share one allowance.
+coverage remain unavailable. Bound selection compares exact target values after every
+source objective scale and offset with the actual requested original bound. Unavailable
+local capture does not mask a later matching imported bound or refutation; an invalid
+matching proof is rejected before considering other alternatives. Imported optima retain
+their actual bound derivation. Candidate comparison, normalization and original-context
+verification share one sticky cancellation and containing allowance.
 
 `SourceResultEvidence.engineScope` records terminal admission separately from original
 derivation scope. A transformed terminal retains reduced or unknown engine scope until
@@ -138,6 +143,18 @@ known conditioned result cannot be recaptured under a different original scope.
 
 Absent affine data does not become a constant objective. Unsupported traversal,
 trajectory or approach mechanisms retain unavailable coverage.
+
+`CompletedEnginePublication` retains native root objective floors and integer windows
+for sharing during search. Each publication keeps the actual `EngineInvocation`,
+execution value or coordinate and both endpoints. Integer windows use execution
+coordinates and may be empty; they do not imply an original-coordinate mapping.
+`EvidenceCertificate.published` carries this typed publication through the existing
+admission path. Consumer pools bind their own runtime before accepting publications;
+matching a model label cannot replace that binding. Objective values, integer
+coordinates and endpoints must match the retained publication exactly. Pool binding
+and publication folding are atomic, and a pool containing unscoped deductions cannot
+acquire a different invocation. Uncaptured native deductions have explicitly
+unavailable independent derivation coverage.
 
 `CompletedEngineResult` retains an actual ordinary completed result and its source
 binding for the completion-taking worker issuance hook. `EngineInvocation` retains
