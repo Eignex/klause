@@ -79,6 +79,7 @@ internal class LpEffortLadder(
     }
 
     private val rungs = LpEffort.entries
+    private var ceiling = top
     private var current = top
     private var runEffort = top
     private var totalSolves = 0
@@ -102,6 +103,14 @@ internal class LpEffortLadder(
     /** Whether during-search cut separation runs this pass — i.e. the run rung is [LpEffort.CUTS]. */
     val cutsEnabled: Boolean get() = runEffort == LpEffort.CUTS
 
+    // Eligibility constrains effort without renewing reward windows or the re-probe clock.
+    fun setCutsSupported(supported: Boolean) {
+        ceiling = if (supported) top else minOf(top, LpEffort.BOUND)
+        current = minOf(current, ceiling)
+        runEffort = minOf(runEffort, ceiling)
+        if (probing && runEffort == current) probing = false
+    }
+
     /**
      * Call once per LP-eligible node (after the depth / cadence gates pass). Returns true when the LP
      * should run now — always while the current rung is above [LpEffort.OFF], and on the scheduled
@@ -109,7 +118,7 @@ internal class LpEffortLadder(
      * advances the re-probe clock, so call it exactly once per eligible node.
      */
     fun shouldRun(): Boolean {
-        if (current.ordinal < top.ordinal) {
+        if (current.ordinal < ceiling.ordinal) {
             sinceLastProbe++
             if (sinceLastProbe >= reprobeDelay) {
                 probing = true
