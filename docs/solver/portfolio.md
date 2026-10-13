@@ -70,7 +70,7 @@ identities: a fresh or transformed model needs its own check, even if structural
 equivalent. Polynomial worker and neighborhood completion publications retain their actual prepared
 invocation, execution assumptions, owned point and execution objective telemetry. A native
 witness check precedes that envelope; a model/kind label cannot replace the checked point.
-Polynomial and nonlinear-integer pool admission consume the native publication and checks the containing
+Polynomial and nonlinear-integer pool admission consume the native publication and check the containing
 invocation, actual point/value and both producer and consumer conditions.
 Finite real-neighborhood adapters allocate their retained queries when a worker handle
 opens, after runtime binding. Source-checked bound workers publish that actual invocation;
