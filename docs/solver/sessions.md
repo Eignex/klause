@@ -97,6 +97,11 @@ query results and work ledger remain private. Conditioned queries capture their 
 without changing the source model. The containing owner closes the invocation after
 its operation finishes.
 
+A mutable `SearchComponentSet` has one session construction attempt, consumed even
+when attachment fails. The prepared registration boundary supports independent
+openings with fresh components and atom registries. Rejecting set reuse does not
+restrict push/pop, restarts or conditioned queries within its existing session.
+
 Prepared search openings own an invocation resource registry. Factories register
 scratch resources as soon as construction succeeds, and every installed closeable
 component joins the same registry. Ownership is deduplicated by identity. Partial

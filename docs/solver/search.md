@@ -181,6 +181,14 @@ chunks. MDD preparation sharing includes the initial and accepting states; value
 relabeling prepares an index over the relabeled transition array. Reversible live
 tuples, diagram reachability and all assignment-dependent payloads remain state-owned.
 
+`SearchComponentSet` contains mutable participants and permits one session
+construction attempt. Its claim is consumed before atom attachment, including when
+construction fails; reuse rejects without touching a second registry or component
+initialization. Ordinary push/pop and conditioned runs operate within that one
+session. Repeated solves open fresh sets from prepared registrations. Direct
+`SearchSession` construction remains available to adapters that own their component
+instances and installation lifetime.
+
 Prepared factories receive an opening owner for construction-time resources.
 The invocation owns every installed closeable peer independently of its CP/theory
 compatibility accessor. Failure and terminal cleanup follow the reverse registration
