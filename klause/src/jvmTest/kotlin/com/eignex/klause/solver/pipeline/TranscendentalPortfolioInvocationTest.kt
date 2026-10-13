@@ -29,9 +29,9 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
             (assert (= (exp x) 2))
             (check-sat)
         """.trimIndent())).problem
-        val params = PolynomialTheoryParams(maximumWork = 20000, strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(maxFlips = 8, maxInstructions = 20000, randomSeed = 17),
-            alnsIterations = 8))
+        val params = PolynomialTheoryParams(maximumWork = 100000, strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 16, maxInstructions = 100000, randomSeed = 17),
+            alnsIterations = 16))
 
         val execution = source.pipelineRequest().execute(params, engine, 4)
 
@@ -50,7 +50,7 @@ class TranscendentalPortfolioInvocationTest(private val engine: FiniteEngine) {
             (assert (= (exp x) 1))
             (check-sat)
         """.trimIndent())).problem
-        val params = TranscendentalTheoryParams(maximumWork = 8000, maximumDepth = 0,
+        val params = TranscendentalTheoryParams(maximumWork = 100000, maximumDepth = 0,
             strategy = PolynomialStrategyParams(assumptions = Assumptions.None.withBool(0, false),
                 localSearch = LocalSearchParams(maxFlips = 16), alnsIterations = 16))
 

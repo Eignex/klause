@@ -156,7 +156,9 @@ class PreparedSourcePlan internal constructor(
             linear.realCoefficientValues.size > sourceRealCount || linear.intCoefficientValues.size > sourceIntCount ||
             linear.boolWeightValues.size > sourceBoolCount
         ) return false
-        if (kind == PreparedExecutionKind.NONLINEAR_INTEGER || kind == PreparedExecutionKind.TRANSCENDENTAL) return false
+        if (kind == PreparedExecutionKind.NONLINEAR_INTEGER ||
+            kind == PreparedExecutionKind.TRANSCENDENTAL
+        ) return false
         return true
     }
 
