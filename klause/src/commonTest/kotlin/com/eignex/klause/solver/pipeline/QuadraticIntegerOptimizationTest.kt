@@ -187,7 +187,7 @@ class QuadraticIntegerOptimizationTest {
                 PolynomialRealFormula.Atom(PolynomialExpression.Power(coordinate, 2), PolynomialRelation.EQ,
                     PolynomialExpression.Constant.of(parseBigInt("2"))),
                 PolynomialRealFormula.Atom(coordinate, PolynomialRelation.GE,
-                    PolynomialExpression.Constant.of(parseBigInt("0"))),
+                    PolynomialExpression.Constant.of(parseBigInt("1"))),
             )), 1, 0, mapOf("i" to 0), emptyMap(), emptyMap(),
         )
         val i = QuadraticVariable.Int(SourceIntId(0))
