@@ -10,6 +10,7 @@ import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -59,6 +60,7 @@ internal class BacktrackWorkerConfig(
         pools: SharedPools?,
     ): PortfolioWorker {
         val evidenceModel = ModelIdentity.of(problem, objective)
+        lateinit var worker: PortfolioWorker
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
         val workerLabel = "bt/${recipe.label}"
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
@@ -88,8 +90,12 @@ internal class BacktrackWorkerConfig(
                 params = params.copy(
                     objectiveLowerBoundSink = { v ->
                         meter.exported(SharingChannel.Floor, 1)
-                        val certificate = EvidenceCertificate.verified(evidenceModel, EvidenceKind.Bound)
-                        val raise = bounds.publish(v, evidenceModel, certificate)
+                        val invocation = worker.evidenceInvocation?.takeIf { worker.sharingInvocation != null }
+                        val raise = if (invocation != null) {
+                            if (v.isFinite()) bounds.publish(CompletedEnginePublication.ObjectiveBound(invocation, v))
+                            else 0.0
+                        } else bounds.publish(v, evidenceModel,
+                            EvidenceCertificate.verified(evidenceModel, EvidenceKind.Bound))
                         matchedPools.contributions.note(Contribution.Floor, index, raise)
                     },
                     objectiveLowerBoundSupplier = bounds::current,
@@ -101,7 +107,10 @@ internal class BacktrackWorkerConfig(
                 params = params.copy(
                     globalVarBoundSink = { v, lo, hi ->
                         meter.exported(SharingChannel.Bounds, 1)
-                        vb.publish(
+                        val invocation = worker.evidenceInvocation?.takeIf { worker.sharingInvocation != null }
+                        if (invocation != null) vb.publish(
+                            CompletedEnginePublication.IntegerWindow(invocation, v, lo, hi), origin = index)
+                        else vb.publish(
                             v, lo, hi, origin = index, model = evidenceModel.forObjective(null),
                             certificate = EvidenceCertificate.verified(
                                 evidenceModel.forObjective(null), EvidenceKind.Bound,
@@ -139,7 +148,7 @@ internal class BacktrackWorkerConfig(
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
             if (objective != null) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null
-        return PortfolioWorker.of(
+        worker = PortfolioWorker.of(
             workerLabel,
             armId,
             (matchedPools?.nativeProjection?.let { BacktrackSolver(problem, it) }
@@ -154,6 +163,7 @@ internal class BacktrackWorkerConfig(
             it.sharing = sharing
             it.sharingMeter = meter
         }
+        return worker
     }
 
     companion object {

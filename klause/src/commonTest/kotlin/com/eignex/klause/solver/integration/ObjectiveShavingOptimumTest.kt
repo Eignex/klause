@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.integration
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
@@ -8,14 +9,41 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.portfolio.BacktrackWorkerConfig
+import com.eignex.klause.portfolio.SharedObjectiveBound
+import com.eignex.klause.portfolio.SharedPools
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ObjectiveShavingOptimumTest {
+
+    @Test
+    fun `actual native objective shaving reaches a runtime bound pool`() {
+        val source = triangleCover()
+        val executable = source.bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+        val model = ModelIdentity.of(executable, objective)
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
+        val bounds = SharedObjectiveBound(identity = model)
+        val pools = SharedPools(null, null, bounds = bounds, identity = model)
+        val config = BacktrackWorkerConfig(BacktrackRecipe("shaving") { _, _ ->
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, objectiveShaving = true))
+        })
+        val worker = config.materialize(executable, 0, 0, 1L, 1.0, objective, null, null, null, pools)
+            .bindInvocation(invocation).bindSharingInvocation(invocation)
+
+        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+
+        assertEquals(2.0, bounds.current())
+    }
 
     /** `cost = x0+x1+x2` over {0,1}³ with the three pair-covering rows (triangle vertex cover): every
      *  solution needs ≥ 2 ones, so the minimum `cost` is 2 — but its declared domain min is 0. */
