@@ -131,7 +131,7 @@ and typed diagnostics across component callbacks.
 Built-in finite portfolios with more than one lane partition the remaining solve
 allowance over every materialized worker, including replicas. Integer division gives
 equal shares, with remainder units assigned in worker order. Sequential portfolios
-retain one shared allowance. Shared finite, open, polynomial, nonlinear-integer and quadratic invocations
+retain one shared allowance. Shared finite, open, polynomial, nonlinear-integer, quadratic and transcendental invocations
 partition the decision/move allowance over their materialized parallel slots. Complete theory work
 retains its separate native currency and reservation.
 

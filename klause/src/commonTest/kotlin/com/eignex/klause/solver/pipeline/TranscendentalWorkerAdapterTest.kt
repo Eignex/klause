@@ -82,7 +82,7 @@ class TranscendentalWorkerAdapterTest {
     }
 
     @Test
-    fun `closing a source worker retains charges and rejects another source query`() {
+    fun `closing a source worker retains its arithmetic charges`() {
         val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
         val result = adapter.execute()
@@ -93,6 +93,14 @@ class TranscendentalWorkerAdapterTest {
 
         assertIs<OpenTheoryResult.Sat>(result.result)
         assertEquals(work, adapter.nativeWork)
+    }
+
+    @Test
+    fun `a closed source worker rejects another source query`() {
+        val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
+        val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
+        adapter.close()
+
         assertFailsWith<IllegalStateException> { adapter.execute() }
     }
 
@@ -106,6 +114,7 @@ class TranscendentalWorkerAdapterTest {
         val sample = adapter.completeHandle().use { handle ->
             assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1)).assignment
         }
+        adapter.close()
         val foreign = EngineInvocation(source.prepareTranscendentalExecutionPlan(), identity)
 
         val accepted = polynomialWitnessVerifier(binding, Cancellation.Never).verify(Candidate(sample, null))
