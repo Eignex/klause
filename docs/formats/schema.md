@@ -58,10 +58,11 @@ completion cannot certify their nonlinear equalities. Shared pipeline entry poin
 route them through [shared polynomial completion](../theories/polynomial-real.md#shared-model-composition)
 beside finite factors across backtracking, local search, ALNS and mixed portfolios.
 Exact rational/algebraic witnesses retain their source coordinates. This route
-supports finite integer domains and finite-column linear objectives. Continuous
-quadratic objectives use the separate exact objective overload. Rejecting an
-equivalent real linear objective is an admission misalignment tracked in
-[#2655](https://github.com/Eignex/klause/issues/2655). Open integer domains require
+supports finite integer domains and affine objectives over original Boolean, integer
+and real coordinates. `OpenTheoryPipeline.optimize` normalizes a `LinearObjective`
+losslessly into the existing exact quadratic executor and preserves source direction,
+exact values, attainment and incomplete results. Exact quadratic objectives use their
+objective overload. Open integer domains require
 their separate theory route rather than this finite projection. [Source-aware strategy factories](../api.md#source-aware-strategy-entry-points) arrange
 shared source composition for CP and LS. The retained baked solver facades expose
 finite sessions and projections, with explicit finite-only constructor guidance.

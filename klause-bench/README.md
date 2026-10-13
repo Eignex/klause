@@ -659,6 +659,12 @@ Pass `source=<SMT file or directory>` and optionally `engines=BACKTRACK,FIXED,LO
 If the launching JVM sees a different processor count, the probe runs in a child
 JVM with `-XX:ActiveProcessorCount` and its own `objective-probe.jfr`; the lab's
 parent recording covers the wrapper. Settings record the actual execution JVM.
+`schema=<JSON SchemaDef>` selects the compiled/schema path for the same original
+polynomial real sources. Declaration names must agree; real coordinates use public
+compiled source IDs and float objective handles. Finite-grid floats, integer schema
+declarations and aliased named real coordinates decline. The captured schema bytes
+and hash accompany exact named original-source results; compiler auxiliaries are
+excluded from the original witness map.
 The source objective must be affine, with integer Boolean weights/constant fitting
 Long and real coefficients exactly representable in binary64. Other objectives
 decline rather than acquire rounded coefficients. Each execution gets fresh state,
@@ -674,6 +680,10 @@ deploy/lab profile com.eignex.klause.bench.profile.ObjectiveRepresentationProbe 
   "compare objective representations on original sources" aws 1800 \
   source=klause-bench/smoke-corpus/objective-affine-v1 checker=provision
 ```
+
+Add `schema=klause-bench/smoke-corpus/objective-affine-v1/square.schema.json` to run
+the same inputs through schema compilation and its named float objective API. Its
+declared `0<=y<=1` follows from the original source `x*x=y`, `-1<=x<=1`.
 
 The [precision fixtures](smoke-corpus/objective-affine-v1/manifest.json) distinguish
 adjacent exact objective values sharing a binary64 projection. After fetching the

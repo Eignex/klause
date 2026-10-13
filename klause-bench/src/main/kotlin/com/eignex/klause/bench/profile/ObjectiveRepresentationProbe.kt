@@ -5,18 +5,26 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.compile.CompiledSchema
+import com.eignex.klause.compile.compile
+import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.model.FloatSpec
+import com.eignex.klause.schema.BoolHandle
+import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
-import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.minimize
 import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.pipelineRequest
@@ -30,9 +38,9 @@ import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 import java.io.File
 import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.time.Duration.Companion.milliseconds
 
 internal object ObjectiveRepresentationProbe {
     @JvmStatic
@@ -43,7 +51,9 @@ internal object ObjectiveRepresentationProbe {
             parts[0] to parts[1]
         }
         require(options.keys.all {
-            it in setOf("source", "engines", "out", "work", "seed", "moves", "timeout", "checker", "processors")
+            it in setOf(
+                "source", "engines", "out", "work", "seed", "moves", "timeout", "checker", "processors", "schema",
+            )
         })
         val processors = options["processors"]?.toInt() ?: 1
         require(processors > 0)
@@ -64,6 +74,7 @@ internal object ObjectiveRepresentationProbe {
         val moves = options["moves"]?.toInt() ?: 1
         val timeout = options["timeout"]?.toLong() ?: 25000L
         require(work > 0 && moves >= 0 && timeout > 0)
+        val schemaBytes = options["schema"]?.let { File(it).readBytes() }
         Reports.writeJson(File(output, "provenance.json").path, InstalledBuild.reference)
         File(output, "settings.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
@@ -74,9 +85,24 @@ internal object ObjectiveRepresentationProbe {
             put("timeoutMs", timeout)
             put("javaCores", Runtime.getRuntime().availableProcessors())
             put("jvmOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
+            put("schemaSha256", schemaBytes?.let(::sha256))
         }.toString() + "\n")
+        val schema = schemaBytes?.toString(Charsets.UTF_8)?.let(JsonSchema::parse)
+        val compiled = schema?.compile(KlauseConfig.DEFAULT)
+        val handles = schema?.entries?.mapNotNull { (name, entry) ->
+            if (entry is FloatSpec) name to FloatHandle(name, entry.min, entry.max) else null
+        }?.toMap().orEmpty()
+        val realIds = handles.mapValues { (name, handle) ->
+            requireNotNull(compiled?.sourceRealId(handle)) {
+                "Schema float is represented by a finite grid: $name"
+            }.index
+        }
+        schemaBytes?.let {
+            File(output, "schema.json").writeBytes(it)
+            File(output, "schema-sha256.txt").writeText(sha256(it) + "\n")
+        }
         for (source in sources.sortedBy { it.path }) {
-            measure(source, output, engines, work, seed, moves, timeout)
+            measure(source, output, engines, work, seed, moves, timeout, compiled, realIds, handles)
         }
         when (options["checker"] ?: "none") {
             "none" -> Unit
@@ -133,6 +159,7 @@ internal object ObjectiveRepresentationProbe {
 
     private fun measure(
         input: File, output: File, engines: List<FiniteEngine>, work: Long, seed: Long, moves: Int, timeout: Long,
+        compiled: CompiledSchema?, realIds: Map<String, Int>, handles: Map<String, FloatHandle>,
     ) {
         val bytes = input.readBytes()
         val identity = sha256(bytes)
@@ -142,8 +169,10 @@ internal object ObjectiveRepresentationProbe {
             "Probe requires an admitted polynomial real source with an affine objective: $input"
         }
         val source = (captured.source as SmtLibInput.Polynomial).problem
-        val affine = affineObjective(source, captured.objective)
-        val request = source.pipelineRequest()
+        val original = affineObjective(source, captured.objective)
+        val affine = if (compiled == null) original else compiledObjective(compiled, source, original, realIds, handles)
+        val quadratic = if (compiled == null) captured.objective else affine.toQuadraticObjectiveSpec()
+        val request = compiled?.problem?.pipelineRequest() ?: source.pipelineRequest()
         for ((index, engine) in engines.withIndex()) {
             val encodings = if (index % 2 == 0) listOf("linear", "quadratic") else listOf("quadratic", "linear")
             for (encoding in encodings) {
@@ -158,16 +187,17 @@ internal object ObjectiveRepresentationProbe {
                 val started = System.nanoTime()
                 val execution = if (encoding == "linear") {
                     OpenTheoryPipeline.optimize(request, affine, params, engine, captured.sense)
-                } else OpenTheoryPipeline.minimize(request, captured.objective, params, engine, captured.sense)
+                } else OpenTheoryPipeline.minimize(request, quadratic, params, engine, captured.sense)
                 val elapsed = System.nanoTime() - started
                 val record = buildJsonObject {
                     put("sourceSha256", identity)
                     put("engine", engine.name)
                     put("encoding", encoding)
+                    put("entry", if (compiled == null) "polynomial-source" else "compiled-schema")
                     put("elapsedNanos", elapsed)
                     put("nativeWork", execution.nativeWork)
                     put("javaCores", Runtime.getRuntime().availableProcessors())
-                    put("result", resultRecord(execution.result, source))
+                    put("result", resultRecord(execution.result, source, compiled, realIds))
                 }
                 File(output, "$identity.${engine.name}.$encoding.json").writeText(record.toString() + "\n")
                 println("${input.name} $engine $encoding ${execution.result::class.simpleName} $elapsed ns")
@@ -205,7 +235,35 @@ internal object ObjectiveRepresentationProbe {
         return value.num.toLongExact()
     }
 
-    private fun resultRecord(result: QuadraticOptimizationResult, source: PolynomialRealProblem) = buildJsonObject {
+    private fun compiledObjective(
+        compiled: CompiledSchema, source: PolynomialRealProblem, original: LinearObjective,
+        realIds: Map<String, Int>, handles: Map<String, FloatHandle>,
+    ): LinearObjective {
+        require(realIds.keys == source.realVarNames.keys &&
+            compiled.boolVarIdByName.keys == source.boolVarNames.keys) { "Source and schema declarations differ" }
+        require(compiled.intVarIdByName.isEmpty()) { "Polynomial real source has no integer declarations" }
+        require(realIds.values.distinct().size == realIds.size) { "Schema real coordinates alias source declarations" }
+        val bools = LongArray(compiled.problem.numBoolVars)
+        val reals = DoubleArray(compiled.problem.numRealVars)
+        for ((name, id) in source.boolVarNames) {
+            bools[compiled.sourceId(BoolHandle(name)).index] = original.boolWeights[id]
+        }
+        for ((name, id) in source.realVarNames) {
+            val column = realIds.getValue(name)
+            val objective = compiled.minimize(handles.getValue(name))
+            require(column in objective.realCoefficients.indices &&
+                objective.realCoefficients.withIndex().all { (index, coefficient) ->
+                coefficient == if (index == column) 1.0 else 0.0
+            }) { "Compiled float objective differs from its named continuous source coordinate" }
+            reals[column] = original.realCoefficients[id]
+        }
+        return LinearObjective(boolWeights = bools, constant = original.constant, realCoefficients = reals)
+    }
+
+    private fun resultRecord(
+        result: QuadraticOptimizationResult, source: PolynomialRealProblem,
+        compiled: CompiledSchema?, realIds: Map<String, Int>,
+    ) = buildJsonObject {
         put("status", result::class.simpleName)
         put("sense", result.sense.name)
         put("lsMoves", result.stats.ls.moves.sum)
@@ -214,9 +272,13 @@ internal object ObjectiveRepresentationProbe {
             put("objective", scalar(result.incumbent.value))
             put("witness", buildJsonObject {
                 for ((name, id) in source.realVarNames) {
-                    put(name, scalar(requireNotNull(sample.algebraicReals)[id]))
+                    val mapped = if (compiled == null) id else realIds.getValue(name)
+                    put(name, scalar(requireNotNull(sample.algebraicReals)[mapped]))
                 }
-                for ((name, id) in source.boolVarNames) put(name, sample.boolValue(id).toString())
+                for ((name, id) in source.boolVarNames) {
+                    val mapped = compiled?.sourceId(BoolHandle(name))?.index ?: id
+                    put(name, sample.boolValue(mapped).toString())
+                }
             })
         }
         val bound = when (result) {
