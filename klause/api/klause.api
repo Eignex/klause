@@ -11102,6 +11102,7 @@ public final class com/eignex/klause/solver/pipeline/PreparedExecutionKind : jav
 	public static final field FINITE_LINEAR Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
 	public static final field NONLINEAR_INTEGER Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
 	public static final field POLYNOMIAL Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
+	public static final field TRANSCENDENTAL Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
 	public static fun values ()[Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
@@ -11439,6 +11440,8 @@ public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryRequest
 
 public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryRequestKt {
 	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;IILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
 	public static final fun pipelineRequest (Lcom/eignex/klause/ir/TranscendentalProblem;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;
 }

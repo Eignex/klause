@@ -23,11 +23,11 @@ enum class PreparedExecutionKind {
     /** Original open or wide integer polynomial coordinates remain theory-owned. */
     NONLINEAR_INTEGER,
 
-    /** Original exact real functions retain their sound incomplete source service. */
-    TRANSCENDENTAL,
-
     /** A required source component has no implemented execution adapter. */
     DECLINED,
+
+    /** Original exact real functions retain their sound incomplete source service. */
+    TRANSCENDENTAL,
 }
 
 /** Semantic responsibility of a component, independent of an engine name. */
