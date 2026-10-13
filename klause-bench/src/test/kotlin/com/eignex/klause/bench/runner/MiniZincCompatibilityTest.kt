@@ -2,9 +2,12 @@ package com.eignex.klause.bench.runner
 
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.io.File
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertNotEquals
 
 class MiniZincCompatibilityTest {
     @ParameterizedTest
@@ -33,4 +36,34 @@ class MiniZincCompatibilityTest {
     fun `infrastructure and unclassified failures cannot quarantine a source`(diagnostic: String) {
         assertNull(MiniZincCompileFailure.classify(diagnostic))
     }
+    @Test
+    fun `library identity changes when an included source changes`() {
+        val root = Files.createTempDirectory("mznlibrary").toFile()
+        try {
+            File(root, "nested").mkdirs()
+            val source = File(root, "nested/predicate.mzn").apply { writeText("predicate p() = true;") }
+            val original = MiniZincCompatibility.treeHash(root)
+
+            source.writeText("predicate p() = false;")
+
+            assertNotEquals(original, MiniZincCompatibility.treeHash(root))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `abnormal compiler exits cannot classify stale type diagnostics as source incompatibility`() {
+        val identity = MiniZincCompilerIdentity(
+            version = "test", executable = "test", executableSha256 = "test",
+            standardLibrary = "test", standardLibrarySha256 = "test",
+            solverLibrarySha256 = "test", configurationSha256 = "test",
+        )
+        val failure = MiniZincCompileFailure(
+            137, "Error: type error: undefined identifier", identity, emptyList(), 0, emptyMap(),
+        )
+
+        assertNull(failure.incompatibility)
+    }
+
 }
