@@ -85,9 +85,6 @@ class QuadraticCertificate private constructor(
             return QuadraticCertificate(model, claim, null, derivation = derivation, invocation = invocation)
         }
 
-        @Suppress("UNUSED_PARAMETER")
-        fun verified(model: ModelIdentity, scope: Any, evidence: Any, claim: QuadraticClaim): QuadraticCertificate =
-            QuadraticCertificate(model, claim, null, derivation = evidence as? SourceDerivation)
     }
 }
 
