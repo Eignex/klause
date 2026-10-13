@@ -395,7 +395,7 @@ under that workflow; do not retain a historical archive.
 
 ### CLI stream capture
 
-`com.eignex.klause.bench.tools.CliStreamCapture` runs the installed CLI as a subprocess
+`com.eignex.klause.bench.profile.CliStreamCapture` runs the installed CLI as a subprocess
 and retains original input bytes, build/runtime provenance, command, stdout, stderr,
 and a JSONL arrival record with byte offsets and subprocess liveness. Run it through
 a lab profile job on AWS. Capture settings precede `--`; the remaining arguments go
@@ -435,6 +435,11 @@ versions, and checker source hashes. `provisionChecker=true` additionally permit
 installing `python3-venv` with `sudo apt-get` when the image lacks it. Checking and
 provisioning happen outside the CLI solve budget. A failed setup is recorded once;
 later cases still capture output and record their unavailable checker outcome.
+`checkFzn=true` checks every complete FlatZinc publication with the existing independent
+flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome in
+`source-check-fzn.json`. It uses authoritative coordinate comments when supplied and
+checks the exact preceding cost against the original solve objective. Its source scope
+is `flatzinc-binary64`, as described under source validation below.
 
 ### SMT reference records
 
