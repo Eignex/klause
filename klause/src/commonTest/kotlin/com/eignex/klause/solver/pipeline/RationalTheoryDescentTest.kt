@@ -3,7 +3,11 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -53,5 +57,25 @@ class RationalTheoryDescentTest {
 
         assertIs<MinimizeResult.BestFound>(result)
         assertIs<SourceClaim.Limit>(assertNotNull(descent.linearResult?.terminal).claim)
+    }
+
+    @Test
+    fun `checked declarative witnesses enter the original source exchange`() {
+        val row = ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3)),
+            LinearOp.EQ, BigFraction.ONE)
+        val source = Problem(0, 0, emptyArray(), arrayOf(row), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        var accepted = false
+
+        RationalTheoryDescent(source, objective, TheoryParams()).use {
+            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { candidate ->
+                accepted = openWitnessVerifier(source, objective).verify(Candidate(candidate.sample,
+                    candidate.objective)) is Verification.Accepted
+            }
+        }
+
+        assertEquals(true, accepted)
     }
 }

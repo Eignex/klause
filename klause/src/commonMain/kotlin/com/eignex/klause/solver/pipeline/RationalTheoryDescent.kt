@@ -2,12 +2,23 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceResultEvidence
+import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
@@ -26,6 +37,7 @@ internal class RationalTheoryDescent(
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
     private val linear = context?.let { LinearAuthorityInvocation(it, params, external = { external()?.first }) }
+    private var witnessContext: SourceProofContext? = null
     var linearResult: LinearOptimizationResult? = null
         private set
     private val state = OpenTheorySolveState(params)
@@ -52,6 +64,7 @@ internal class RationalTheoryDescent(
             val sign = if (context?.scope?.objective?.sense == ObjectiveSense.MAXIMIZE) BigFraction.MINUS_ONE
                 else BigFraction.ONE
             val completed = invocation.runSlice(global, sliceMillis, sliceNodes) { sample, exact ->
+                attestWitness(sample, global or params.timeout or params.cancellation)
                 onIncumbent(MinimizeResult.BestFound(sample, (exact * sign).toDouble(),
                     TerminationReason.BudgetExhausted, stats))
             } ?: return null
@@ -124,6 +137,18 @@ internal class RationalTheoryDescent(
             }
         }
         return finish(if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled)
+    }
+
+    private fun attestWitness(sample: Sample, cancellation: Cancellation) {
+        val original = witnessContext ?: source.linearAuthorityContext(LinearObjective(), ObjectiveSense.MINIMIZE,
+            cancellation)?.also { witnessContext = it } ?: return
+        val evidence = SourceEvidence(original.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
+        if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(evidence, cancellation) !=
+            SourceEvidenceCheck.Checked
+        ) return
+        val result = SolveResult.Sat(sample, evidence = SourceResultEvidence(original.scope, listOf(evidence)))
+        sample.witnessCertificate = EvidenceCertificate.completed(ModelIdentity.of(source), EvidenceKind.Witness,
+            CompletedEngineResult.Solve(original.scope, result))
     }
 
     private fun finish(reason: TerminationReason): MinimizeResult {
