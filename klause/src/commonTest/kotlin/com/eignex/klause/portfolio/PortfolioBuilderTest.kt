@@ -1,13 +1,16 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
@@ -19,6 +22,19 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
+
+    @Test
+    fun `a restricted public worker cannot refute its feasible containing source`() {
+        val problem = Problem(1, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(Lit.make(0, false))))).bake()
+        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = EngineMix.BACKTRACK,
+            btEdit = { it.copy(assumptions = Assumptions(bools = mapOf(0 to true))) })
+        val workers = PortfolioBuilder.build(problem, scenario)
+
+        val result = Portfolio.thompson(workers).use { it.solve() }
+
+        assertIs<SolveResult.Unknown>(result)
+    }
 
     @Test
     fun `a portfolio local-search arm reports its phase times when requested`() {
