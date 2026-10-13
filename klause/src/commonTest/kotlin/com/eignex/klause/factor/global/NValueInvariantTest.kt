@@ -99,19 +99,21 @@ class NValueInvariantTest {
 
     @Test
     fun `class elimination respects every member domain`() {
-        val p = Problem(
-            0, 5, arrayOf(IntDomain(1, 2), IntDomain(0, 1), IntDomain(0, 0), IntDomain(0, 1), IntDomain(1, 1)),
-            arrayOf<Factor>(NValue(0, intArrayOf(1, 2, 3, 4))),
-        )
-        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
-        for ((variable, value) in listOf(0 to 2L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L)) {
-            state.assignment.setInt(variable, value)
+        for (blocked in listOf(IntDomain(0, 0), IntDomain(0, 2).excludeValue(1))) {
+            val p = Problem(
+                0, 5, arrayOf(IntDomain(1, 2), IntDomain(0, 1), blocked, IntDomain(0, 1), IntDomain(1, 1)),
+                arrayOf<Factor>(NValue(0, intArrayOf(1, 2, 3, 4))),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+            for ((variable, value) in listOf(0 to 2L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L)) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+
+            state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+
+            assertTrue(state.moveSink.list.none { it is Move.Compound && Move.IntSet(0, 1) in it.parts })
         }
-        state.recompute()
-
-        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
-
-        assertTrue(state.moveSink.list.none { it is Move.Compound && Move.IntSet(0, 1) in it.parts })
     }
 
     @Test
@@ -257,5 +259,36 @@ class NValueInvariantTest {
         assertEquals(2L, state.assignment.intValue(0))
         assertEquals(state.assignment.intValue(1), state.assignment.intValue(2))
         assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `class elimination declines a count excluded from the root domain`() {
+        val p = Problem(
+            0, 3, arrayOf(IntDomain(0, 2).excludeValue(1), IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf<Factor>(NValue(0, intArrayOf(1, 1, 2, 2))),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        for ((variable, value) in listOf(0 to 2L, 1 to 0L, 2 to 1L)) state.assignment.setInt(variable, value)
+        state.recompute()
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+
+        assertTrue(state.moveSink.list.none { it is Move.Compound && Move.IntSet(0, 1) in it.parts })
+    }
+
+    @Test
+    fun `class elimination declines classes exceeding the coordinate cap`() {
+        val p = Problem(
+            0, 67, Array(67) { IntDomain(0, 2) },
+            arrayOf<Factor>(NValue(0, IntArray(66) { it + 1 })),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        state.assignment.setInt(0, 2)
+        for (variable in 1..66) state.assignment.setInt(variable, ((variable - 1) / 33).toLong())
+        state.recompute()
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+
+        assertTrue(state.moveSink.list.none { it is Move.Compound && Move.IntSet(0, 1) in it.parts })
     }
 }
