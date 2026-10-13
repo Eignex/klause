@@ -253,7 +253,7 @@ object CompletionInitializationProfile {
             check(hash(wheel) == expected) { "reference archive hash mismatch" }
             val binary = out.resolve("reference-z3")
             ZipFile(wheel).use { archive ->
-                val entry = archive.entries().asSequence().single { it.name.endsWith(".data/scripts/z3") }
+                val entry = checkNotNull(archive.getEntry("z3_solver-4.15.3.0.data/data/bin/z3"))
                 archive.getInputStream(entry).use { input -> binary.outputStream().use { input.copyTo(it) } }
             }
             check(binary.setExecutable(true)) { "could not make reference executable" }
