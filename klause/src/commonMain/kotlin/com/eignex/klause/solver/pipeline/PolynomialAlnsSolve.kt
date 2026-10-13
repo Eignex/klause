@@ -5,12 +5,14 @@ import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 
 internal class PolynomialAlnsSolve(private val search: ResumableSearch) : InstructionSlicedSolve, ReseedGuard {
     private var result: SolveResult? = null
+    private var witness: Sample? = null
     override val canReseed: Boolean get() = false
     override val isDone: Boolean get() = result != null
     override val stats get() = search.stats
@@ -29,8 +31,8 @@ internal class PolynomialAlnsSolve(private val search: ResumableSearch) : Instru
 
     private fun advance(run: ((MinimizeResult.WithSample) -> Unit) -> MinimizeResult?): SolveResult? {
         result?.let { return it }
-        val terminal = run { candidate -> result = SolveResult.Sat(candidate.sample, candidate.stats) }
-        result = result?.let { SolveResult.Sat(requireNotNull(it.assignment), stats) }
+        val terminal = run { candidate -> witness = candidate.sample }
+        result = witness?.let { SolveResult.Sat(it, stats) }
             ?: terminal?.assignment?.let { SolveResult.Sat(it, stats) }
             ?: if (terminal != null) SolveResult.Unknown(TerminationReason.BudgetExhausted, stats) else null
         return result
