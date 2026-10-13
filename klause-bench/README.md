@@ -267,6 +267,10 @@ For example, the first argument can be
 Save the specification outside the repository, then use
 `LAB_URL=https://lab.eignex.com ./deploy/lab run /absolute/path/to/profile-source-evidence.json`.
 
+The probe recognizes a rational endpoint represented by an algebraic root only
+after exact polynomial evaluation and isolating-interval membership. Native objective
+and bound values must equal the exact original objective at that point before serialization.
+
 The probe saves original bytes and the actual result/capture payload under `$OUT`,
 then runs the packaged independent Python fractions checker in a separate process.
 `independent-check.json` records checked or unavailable coverage and source, payload

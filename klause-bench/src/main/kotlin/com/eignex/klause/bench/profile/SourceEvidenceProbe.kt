@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
@@ -92,10 +93,20 @@ internal object SourceEvidenceProbe {
             put("proofFileExport", false)
             if (captured is QuadraticOptimizationResult.Optimal) {
                 val point = captured.incumbent.sample
-                val coordinate = point.algebraicReals?.single()?.rational ?: point.exactReals?.single()
-                put("witness", requireNotNull(coordinate).toString())
-                put("value", requireNotNull(captured.incumbent.value.rational).toString())
-                put("bound", requireNotNull(captured.bound.value.rational).toString())
+                val endpoints = listOf(BigFraction.ofLong(lower), BigFraction.ZERO, BigFraction.ofLong(upper))
+                val coordinate = point.algebraicReals?.single()?.let { rationalRepresentation(it, endpoints) }
+                    ?: point.exactReals?.single()
+                val exact = requireNotNull(coordinate) { "box witness has no supported exact rational representation" }
+                val value = BigFraction.ofLong(coefficient) * exact * exact + BigFraction.ofLong(constant)
+                require(rationalRepresentation(captured.incumbent.value, listOf(value)) == value) {
+                    "native value differs from the exact original box objective"
+                }
+                require(rationalRepresentation(captured.bound.value, listOf(value)) == value) {
+                    "native bound differs from the attained original box value"
+                }
+                put("witness", exact.toString())
+                put("value", value.toString())
+                put("bound", value.toString())
                 put("strict", captured.bound.strict)
                 put("rule", "original-quadratic-box")
             }
@@ -109,6 +120,27 @@ internal object SourceEvidenceProbe {
             out.resolve("source-evidence.json").absolutePath, out.resolve("independent-check.json").absolutePath)
             .redirectErrorStream(true).redirectOutput(out.resolve("independent-checker.log")).start()
         check(process.waitFor() == 0) { "independent source checker failed" }
+    }
+
+    internal fun rationalRepresentation(value: AlgebraicReal, candidates: List<BigFraction>): BigFraction? {
+        value.rational?.let { rational -> return candidates.firstOrNull { it == rational } }
+        return rationalRoot(value.definingCoefficients, value.lowerBound, value.upperBound, candidates)
+    }
+
+    internal fun rationalRoot(
+        coefficients: List<BigFraction>,
+        lower: BigFraction,
+        upper: BigFraction,
+        candidates: List<BigFraction>,
+    ): BigFraction? = candidates.firstOrNull { candidate ->
+        if (candidate <= lower || candidate >= upper) false
+        else {
+            var evaluated = BigFraction.ZERO
+            for (coefficient in coefficients.asReversed()) {
+                evaluated = evaluated * candidate + coefficient
+            }
+            evaluated.isZero
+        }
     }
 
     private fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)

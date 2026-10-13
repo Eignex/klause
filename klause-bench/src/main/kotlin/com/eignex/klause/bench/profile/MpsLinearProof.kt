@@ -70,7 +70,8 @@ object MpsLinearProof {
             val objective = requireNotNull(compiled.objective).toLinearObjective()
             val sense = if (compiled.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
             val capture = requireNotNull(compiled.model.sourceProofContext(SourceScope(
-                SourceRevision("probe", "klause-ir-exact-v1"), objective = SourceObjective("cost", sense)), objective))
+                SourceRevision(sha(bytes), "klause-ir-exact-v1"), objective = SourceObjective("cost", sense)),
+                objective))
             val execution = OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model, objective,
                 maximize = compiled.maximize), params, engine, cores) as OpenTheoryExecution.Optimize
             val witnessOnly = engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS
