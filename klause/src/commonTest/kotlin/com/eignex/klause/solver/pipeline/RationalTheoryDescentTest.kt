@@ -178,7 +178,8 @@ class RationalTheoryDescentTest {
         val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
             realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
         val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
-        val external = Sample(booleanArrayOf(), longArrayOf(), exactReals = List(43) { BigFraction.ONE })
+        val external = Sample(booleanArrayOf(), longArrayOf(), DoubleArray(43) { 1.0 },
+            exactReals = List(43) { BigFraction.ONE })
         val values = ArrayList<BigFraction>()
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8)) {
             external to BigFraction.ONE
