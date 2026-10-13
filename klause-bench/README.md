@@ -440,6 +440,14 @@ flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome 
 `source-check-fzn.json`. It uses authoritative coordinate comments when supplied and
 checks the exact preceding cost against the original solve objective. Its source scope
 is `flatzinc-binary64`, as described under source validation below.
+`com.eignex.klause.bench.profile.SmtStreamReplay` checks saved SMT output through a
+lab profile without invoking the CLI again. Its one argument is a base64 JSON array
+of records containing `sourceRevision`, original `source` and `stdout` text, and
+their `sourceSha256`/`stdoutSha256`; optional `interrupted` and `minimumWitnesses`
+use the stream checker's controls. It verifies byte hashes before checking each
+record, preserves the original solver revision separately from checker provenance,
+and retains an outcome for every supplied record. Replay does not relabel the
+original solve or establish its output timing.
 
 ### SMT reference records
 
