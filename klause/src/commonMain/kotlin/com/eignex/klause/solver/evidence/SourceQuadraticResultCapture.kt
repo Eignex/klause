@@ -32,34 +32,30 @@ internal class SourceQuadraticResultCapture(
             else -> SourceDerivation.Unavailable("quadratic traversal or objective completion derivation not captured")
         }
         val evidence = claim?.let { payload(it, proof, point?.sample) }
-        when (result) {
-            is QuadraticOptimizationResult.Optimal -> return optimal(result, checkNotNull(evidence))
-            is QuadraticOptimizationResult.UnattainedLimit -> return QuadraticOptimizationResult.UnattainedLimit(
+        if (result is QuadraticOptimizationResult.Optimal) return optimal(result, checkNotNull(evidence))
+        if (result is QuadraticOptimizationResult.UnattainedLimit) return QuadraticOptimizationResult.UnattainedLimit(
                 result.incumbent, bound(result.bound, point?.sample),
                 certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.UnattainedLimit),
                 result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.Unbounded -> return QuadraticOptimizationResult.Unbounded(
+        if (result is QuadraticOptimizationResult.Unbounded) return QuadraticOptimizationResult.Unbounded(
                 result.incumbent, certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.Unbounded),
                 result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.Infeasible -> return QuadraticOptimizationResult.Infeasible(
+        if (result is QuadraticOptimizationResult.Infeasible) return QuadraticOptimizationResult.Infeasible(
                 certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.Infeasible),
                 result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.BestFound -> return QuadraticOptimizationResult.BestFound(
+        if (result is QuadraticOptimizationResult.BestFound) return QuadraticOptimizationResult.BestFound(
                 result.incumbent, result.bound?.let { bound(it, point?.sample) },
                 result.reason, result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.Unknown -> {
-                check(result::class == QuadraticOptimizationResult.Unknown::class) {
-                    "quadratic unknown branch received ${result::class}"
-                }
-                return QuadraticOptimizationResult.Unknown(
-                    result.bound?.let { bound(it, point?.sample) }, result.reason, result.sense, result.stats,
-                )
-            }
+        check(result is QuadraticOptimizationResult.Unknown) {
+            "quadratic capture cannot classify ${result::class}"
         }
+        return QuadraticOptimizationResult.Unknown(
+            result.bound?.let { bound(it, point?.sample) }, result.reason, result.sense, result.stats,
+        )
     }
 
     private fun optimal(
