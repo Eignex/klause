@@ -187,11 +187,21 @@ outputs, including `cases/<index>/record.json` for the offline source verifier.
 experiment rather than directly on the lab Mac, where a run competes with the lab's cases.
 A measurement no experiment expresses, such as timing a component on captured inputs, runs as
 a profile job: `lab profile <main> <ref> <description> [aws|lab] [timeout-sec] [arg...]` runs
-the class `<main>` (in `com.eignex.klause.bench.profile`, committed at `<ref>`) once under JFR, on AWS by
-default, and keeps its output and whatever it writes to `$OUT` with the job. The lab runs no
-shell scripts: the code goes in a commit. Profile jobs are not for tests, lint or other gates;
-CI runs those. Every ref the lab builds must be `main` or a branch only trusted users pushed to,
-and an experiment may not set `suite`, `problem`, `out` or `solver-seed` itself.
+the class `<main>` (directly in `com.eignex.klause.bench.profile`, committed at `<ref>`) once
+under JFR, on AWS by default, and keeps its output and whatever it writes to `$OUT` with the job.
+The lab runs no shell scripts: the code goes in a commit. Profile jobs are not for tests, lint or
+other gates; CI runs those. Every ref the lab builds must be `main` or a branch only trusted users
+pushed to, and an experiment may not set `suite`, `problem`, `out` or `solver-seed` itself.
+
+[SolveTiming](src/main/kotlin/com/eignex/klause/bench/profile/SolveTiming.kt) is the template for
+a new profile main. It solves one catalog problem `repeats` times in-process and writes each run's
+wall time and verdict to `$OUT/timings.json`; without arguments it times `opb-core`
+`sporttournament06` three times:
+
+```bash
+./deploy/lab profile com.eignex.klause.bench.profile.SolveTiming main "solve timing" aws 600 \
+  suite=dimacs-core problem=random3sat-50-200 repeats=3 timeout=10000
+```
 
 `bench.profile.CompletionInitializationProfile` measures actual internal repair consumers
 without adding a published library debug API. It generates a hybrid finite-domain and
