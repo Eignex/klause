@@ -84,6 +84,10 @@ internal class MiniZincRunner(
     private fun outputFile(fzn: File): File = File(fzn.parentFile, "${fzn.nameWithoutExtension}.ozn")
 
     private fun compile(root: File, mzn: File, dzn: File?, out: File) {
+        val sourceHashes = buildMap {
+            put("model", MiniZincCompatibility.hash(mzn))
+            if (dzn != null) put("data", MiniZincCompatibility.hash(dzn))
+        }
         val msc = File(root, "klause-mzn-lib/share/minizinc/solvers/klause.msc")
         val libDir = File(root, "klause-mzn-lib/share/minizinc/klause")
         // Compile to a unique temp, then atomically publish — concurrent compiles of the same
@@ -120,9 +124,12 @@ internal class MiniZincRunner(
                 error("minizinc compile timed out after ${timeoutSec}s for ${mzn.name}")
             }
             val output = log.readText()
+            check(sourceHashes["model"] == MiniZincCompatibility.hash(mzn) &&
+                (dzn == null || sourceHashes["data"] == MiniZincCompatibility.hash(dzn))
+            ) { "MiniZinc source changed during compilation" }
             if (proc.exitValue() != 0) {
                 throw MiniZincCompileFailure(
-                    proc.exitValue(), output, MiniZincCompatibility.compiler, cmd, System.nanoTime() - start,
+                    proc.exitValue(), output, MiniZincCompatibility.compiler, cmd, System.nanoTime() - start, sourceHashes,
                 )
             }
             require(tmp.exists()) { "minizinc compile produced no .fzn for ${mzn.name}" }

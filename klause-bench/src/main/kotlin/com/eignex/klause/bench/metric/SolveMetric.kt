@@ -311,7 +311,8 @@ internal object SolveMetric {
                     failure.incompatibility?.let { put("sourceCompilerIncompatible", it) }
                 }
             },
-            sourceHashes = runCatching { SolveEvidence.sourceHashes(ref) }.getOrDefault(emptyMap()),
+            sourceHashes = (failure as? MiniZincCompileFailure)?.sourceHashes
+                ?: runCatching { SolveEvidence.sourceHashes(ref) }.getOrDefault(emptyMap()),
             compilerIdentity = (failure as? MiniZincCompileFailure)?.compiler,
             gitSha = sha,
             timestamp = timestamp,
