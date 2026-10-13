@@ -53,7 +53,7 @@ fun Cbls(
     baseWeight: Double = 1.0,
     /** Cap on violated factors sampled per pick for candidate generation. */
     violatedSampleCount: Int = 4,
-    /** Cap on satisfied factors sampled per pick (for `proposeStructuredMoves`). */
+    /** Cap on satisfied factors sampled per pick, with one draw reserved for an elected structural global. */
     satisfiedSampleCount: Int = 4,
     /** Steps without a strict cost drop before the plateau-escape sources + raised noise engage.
      *  `0` disables escape (the stall-gated sources never fire). */
@@ -116,7 +116,7 @@ fun Cbls(
     val sources = buildList {
         add(ConfiguredSource(ViolatedRepairs(violatedSampleCount)))
         add(ConfiguredSource(Frontier(violatedSampleCount, frontierMoveCap), stallGated = true))
-        add(ConfiguredSource(SatisfiedStructured.sampled(satisfiedSampleCount)))
+        add(ConfiguredSource(SatisfiedStructured.structural(satisfiedSampleCount)))
         if (implicitStructuredCap > 0) {
             // Elected implicit globals are drawn during the infeasibility fight, not at feasibility
             // where the satisfied-structured source owns the pool, so override the phase.

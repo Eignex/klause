@@ -1,15 +1,20 @@
 package com.eignex.klause.localsearch.strategy
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CblsImplicitNeighbourhoodTest {
@@ -84,5 +89,27 @@ class CblsImplicitNeighbourhoodTest {
         owned.proposer = 0
         state.factors[0].proposeStructuredMoves(state, 0, owned)
         assertTrue(owned.list.isNotEmpty(), "the owner must still be able to move the vars it owns")
+    }
+
+    @Test
+    fun `default cbls descends through an owned global among arithmetic rows`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) },
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)) + Array<Factor>(256) {
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)
+            })
+        val state = LocalSearchState(problem.bake(), Random(7))
+        state.seedImplicitFeasible()
+        for (v in 0..2) state.assignment.setInt(v, v.toLong())
+        state.recompute()
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1, 0, 0))
+        state.shaping.objective = objective
+
+        val move = assertNotNull(Cbls().pickMove(state))
+
+        assertTrue(checkNotNull(state.objectiveDelta(objective, move)) < 0.0)
+        assertEquals(0L, state.netDelta(move))
+        state.apply(move)
+        state.recompute()
+        assertEquals(0L, state.cost)
     }
 }

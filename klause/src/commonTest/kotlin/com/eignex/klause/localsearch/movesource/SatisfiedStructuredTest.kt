@@ -9,6 +9,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class SatisfiedStructuredTest {
 
@@ -103,5 +105,55 @@ class SatisfiedStructuredTest {
                 prepare = ::seedPermutation,
             ) { s, sink -> expectedElected(s, sink) }
         }
+    }
+
+    @Test
+    fun `structural scope reaches an owned global among satisfied arithmetic rows`() {
+        val global = electedProblem()
+        val problem = Problem(0, 3, global.finiteIntDomains(), global.factors + Array<Factor>(256) {
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)
+        })
+        val state = freshState(problem, 7L)
+        seedPermutation(state)
+        val sink = MoveSink()
+        sink.setOwners(intArrayOf(0, 0, 0))
+
+        SatisfiedStructured.structural(1).generate(state, sink)
+
+        assertTrue(sink.list.isNotEmpty())
+        for (move in sink.list) assertEquals(0L, state.netDelta(move))
+        assertEquals(MoveSink.NO_PROPOSER, sink.proposer)
+    }
+
+    @Test
+    fun `structural scope retains uniform sampling without elected globals`() {
+        for (seed in longArrayOf(1L, 7L, 42L, 1234L)) {
+            assertSourceMatchesGenerator(
+                ::feasibleProblem, seed, SatisfiedStructured.structural(sampleCount),
+            ) { s, sink ->
+                expectedSampled(s, sink)
+            }
+        }
+    }
+
+    @Test
+    fun `zero structural draws emit no global moves`() {
+        val state = freshState(electedProblem(), 7L)
+        seedPermutation(state)
+        val sink = MoveSink()
+
+        SatisfiedStructured.structural(0).generate(state, sink)
+
+        assertTrue(sink.list.isEmpty())
+    }
+
+    @Test
+    fun `structural scope skips a violated elected global`() {
+        val state = freshState(electedProblem(), 7L)
+        val sink = MoveSink()
+
+        SatisfiedStructured.structural(1).generate(state, sink)
+
+        assertTrue(sink.list.isEmpty())
     }
 }

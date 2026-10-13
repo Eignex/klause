@@ -202,7 +202,7 @@ object SimulatedAnnealing {
         configurationChecking: Boolean = false,
     ): SourceDrivenStrategy = SourceDrivenStrategy(
         sources = focusedSources() + ConfiguredSource(ObjectiveSeed()) +
-            ConfiguredSource(SatisfiedStructured.sampled(satisfiedSampleCount)),
+            ConfiguredSource(SatisfiedStructured.structural(satisfiedSampleCount)),
         scoring = MoveScoring.Break,
         acceptance = AcceptanceRule.Metropolis,
         schedule = ScheduleBundle(temperature = schedule),
