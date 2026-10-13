@@ -21,7 +21,9 @@ import com.eignex.klause.solver.evidence.SourceResultCapture
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.sourceProofContext
+import com.eignex.klause.solver.evidence.sourceResultCapture
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
@@ -198,6 +200,27 @@ class CompletedEngineResultTest {
         val certificate = assertNotNull(EvidenceCertificate.completed(identity, EvidenceKind.Unbounded, completion))
 
         val checked = certificate.verifyDerivation(SourceClaim.Ray(point, mapOf(coordinate to BigFraction.ONE)), context)
+
+        assertEquals(SourceEvidenceCheck.Checked, checked)
+    }
+
+    @Test
+    fun `explicit source capture remains independently checkable on a runtime completion`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val plan = source.prepareExecutionPlan(objective)
+        val capture = assertNotNull(plan.sourceResultCapture(
+            SourceRevision("runtime-original", "klause-ir-exact-v1"), objectiveIdentity = "x"))
+        val model = ModelIdentity.of(source, objective)
+        val binding = EngineInvocation(plan, model, objective, scope = capture.context.scope)
+        val point = Sample(booleanArrayOf(), longArrayOf(1))
+        val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("int/0/lower"))
+        val result = capture.minimize(MinimizeResult.Optimal(point, 1.0), objective, "fixture-engine", proof)
+        val certificate = assertNotNull(EvidenceCertificate.completed(model, EvidenceKind.Bound,
+            CompletedEngineResult.Minimize(binding, result)))
+
+        val checked = certificate.verifyDerivation(SourceClaim.Optimal(point, SourceValue.Rational(BigFraction.ONE)),
+            capture.context)
 
         assertEquals(SourceEvidenceCheck.Checked, checked)
     }
