@@ -16,7 +16,8 @@ internal class QuadraticEngineInvocation(
     val condition: SourceCondition,
 ) {
     fun matches(other: QuadraticEngineInvocation): Boolean = when (val original = source) {
-        is QuadraticEngineSource.ExactIr -> (other.source as? QuadraticEngineSource.ExactIr)?.problem === original.problem
+        is QuadraticEngineSource.ExactIr ->
+            (other.source as? QuadraticEngineSource.ExactIr)?.problem === original.problem
         is QuadraticEngineSource.Polynomial ->
             (other.source as? QuadraticEngineSource.Polynomial)?.problem === original.problem
         is QuadraticEngineSource.NonlinearInteger ->
