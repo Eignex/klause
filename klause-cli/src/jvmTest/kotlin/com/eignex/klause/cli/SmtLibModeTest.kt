@@ -9,25 +9,29 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
-class SmtLibModeTest(private val engine: String, private val maximize: Boolean) {
+class SmtLibModeTest(private val route: String, private val engine: String, private val maximize: Boolean) {
     companion object {
         @JvmStatic
-        @Parameterized.Parameters(name = "{0} maximize={1}")
+        @Parameterized.Parameters(name = "{0} {1} maximize={2}")
         fun variants(): List<Array<Any>> {
             val engines = listOf("cp", "fixed", "mixed", "ls", "alns")
-            return engines.flatMap { engine -> listOf(false, true).map { arrayOf<Any>(engine, it) } }
+            return listOf("ordinary", "quadratic").flatMap { route ->
+                engines.flatMap { engine -> listOf(false, true).map { arrayOf<Any>(route, engine, it) } }
+            }
         }
     }
 
     @Test
-    fun `ordinary source receipts retain exact fractional coefficients and constants in either direction`() {
+    fun `source receipts retain exact objective units through ordinary and native routing`() {
         val direction = if (maximize) "maximize" else "minimize"
+        val objective = if (route == "ordinary") "(+ 7 (* 0.25 x))" else "(+ 0.3 (* 0.1 x))"
         val source = File.createTempFile("smt-source-objective", ".smt2").apply {
             writeText("(declare-const x Real) (assert (= (* 3 x) 1)) " +
-                "($direction (+ 0.3 (* 0.1 x))) (check-sat)")
+                "($direction $objective) (check-sat)")
         }
         val common = CommonOptions().apply {
             this.engine = this@SmtLibModeTest.engine
@@ -45,7 +49,8 @@ class SmtLibModeTest(private val engine: String, private val maximize: Boolean) 
             override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
                 assertFalse(terminal)
                 assertTrue("(/ 1.0 3.0)" in rendered, rendered)
-                values += assertIs<SourceValue.Rational>(objective).value
+                values += if (route == "ordinary") assertIs<SourceValue.Rational>(objective).value
+                else assertNotNull(assertIs<SourceValue.Algebraic>(objective).value.rational)
                 return true
             }
             override fun onVerdictContext(context: VerdictContext) { terminal = true }
@@ -54,13 +59,16 @@ class SmtLibModeTest(private val engine: String, private val maximize: Boolean) 
 
         try {
             val solvable = session.load(source.absolutePath, common)
-            assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
+            if (route == "ordinary") assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
+            else assertIs<SolvablePipeline.QuadraticTheory>(solvable.pipeline)
             SolveCore.solve(solvable, common, output)
         } finally {
             source.delete()
         }
 
-        assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), values)
+        val expected = if (route == "ordinary") BigFraction.ofLong(85) * BigFraction.ofLong(12).reciprocal()
+        else BigFraction.ofLong(3).reciprocal()
+        assertEquals(listOf(expected), values)
         assertTrue(terminal)
         assertEquals(if (engine == "ls" || engine == "alns") Verdict.BEST_FOUND else Verdict.OPTIMAL, completed)
     }
