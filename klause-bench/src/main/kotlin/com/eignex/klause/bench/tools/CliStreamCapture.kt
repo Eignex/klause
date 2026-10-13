@@ -50,7 +50,8 @@ internal object CliStreamCapture {
         Reports.writeJson(
             File(output, "planned.json").path,
             CapturePlan(revision, settings.sourceSha256, settings.command, settings.stopAfter,
-                settings.timeoutMs, settings.checkSmt, settings.minimumWitnesses, settings.provisionChecker, provenance),
+                settings.timeoutMs, settings.checkSmt, settings.minimumWitnesses,
+                settings.provisionChecker, provenance),
         )
         val stdout = File(output, "stdout")
         val stderr = File(output, "stderr")
