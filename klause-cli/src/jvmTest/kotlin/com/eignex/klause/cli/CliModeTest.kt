@@ -37,16 +37,52 @@ import java.io.File
 import java.io.IOException
 import java.io.PrintStream
 import java.util.zip.GZIPOutputStream
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModeTest {
+    @Test
+    fun `cancellation from the second actual arithmetic publication survives cleanup without terminal claims`() {
+        val source = File.createTempFile("quadratic-publication-cancel", ".smt2").apply {
+            writeText("(declare-const b Bool) (declare-const x Real) (assert (= x (ite b 0 1))) " +
+                "(minimize (- 7 (* x x))) (check-sat)")
+        }
+        val common = CommonOptions().apply { engine = "cp"; parallel = 1; randomSeed = 17 }
+        val session = SmtLibMode.newSession()
+        val expected = CancellationException("consumer cancelled")
+        val values = mutableListOf<BigFraction>()
+        var terminal = false
+        val output = object : OutputProtocol by session.output(common) {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                assertFalse(terminal)
+                values += assertNotNull(assertIs<SourceValue.Algebraic>(objective).value.rational)
+                if (values.size == 2) throw expected
+                return true
+            }
+            override fun onVerdictContext(context: VerdictContext) { terminal = true }
+            override fun onComplete(verdict: Verdict) = error("cancelled publication cannot emit a terminal claim")
+        }
+
+        try {
+            assertSame(expected, assertFailsWith<CancellationException> {
+                SolveCore.solve(session.load(source.absolutePath, common), common, output)
+            })
+        } finally {
+            source.delete()
+        }
+
+        assertEquals(listOf(BigFraction.ofLong(7), BigFraction.ofLong(6)), values)
+        assertFalse(terminal)
+    }
+
     @Test
     fun `a source rendering veto withholds the actual arithmetic witness and terminal proof`() {
         val source = File.createTempFile("quadratic-source-veto", ".smt2").apply {
