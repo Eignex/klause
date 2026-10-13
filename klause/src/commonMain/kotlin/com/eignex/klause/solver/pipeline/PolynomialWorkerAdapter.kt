@@ -57,7 +57,7 @@ internal class PolynomialWorkerAdapter(
                 adapter.search(adaptive, params.localSearch.randomSeed ?: 0,
                     params.localSearch.maxFlips, params.localSearch.maxInstructions ?: Long.MAX_VALUE,
                     if (adaptive) params.alnsIterations.toLong() else null, params.localSearch.nodeBudget)
-            }).bindEvidence(identity, provesResults = false)
+            }).bindEvidence(ModelIdentity.of(model.source, objective), provesResults = false)
     }
 
     private fun certified(sample: Sample): Sample = sample.also {
@@ -169,11 +169,11 @@ internal class PolynomialWorkerAdapter(
 
     fun worker(arm: Int, objective: LinearObjective?, slot: PortfolioWorkerSlot): PortfolioWorker = when (arm) {
         0 -> PortfolioWorker.of("bt+exact-nra", 0, BacktrackSolver(finite).session(), backtrackParams(), objective)
-            .bindEvidence(identity)
+            .bindEvidence(ModelIdentity.of(model.source, objective))
         1 -> neighborhood(false, objective) ?: PortfolioWorker.of(
             "ls+exact-nra", 1, localSearch().session(), localParams(), objective,
             withInstructionBudget = { p, units -> p.copy(maxInstructions = minOf(units, p.maxInstructions ?: units)) })
-            .bindEvidence(identity, provesResults = false)
+            .bindEvidence(ModelIdentity.of(model.source, objective), provesResults = false)
         2 -> neighborhood(true, objective) ?: retainedAlns(objective, slot)
         else -> error("unknown polynomial arm")
     }
@@ -187,13 +187,13 @@ internal class PolynomialWorkerAdapter(
         if (objective != null) return PortfolioWorker.ofMinimize("alns+exact-nra", 2, countsInstructions = true,
             resumable = { driver.resumable(objective, localParams()) }) { _, _, stop, instructions ->
             sequenceOf(heuristic(alnsMinimize(objective, stop, instructions)))
-        }.bindEvidence(identity, provesResults = false)
+        }.bindEvidence(ModelIdentity.of(model.source, objective), provesResults = false)
         val probeObjective = LinearObjective(intCoefficients = LongArray(finite.numIntVars) { 1L })
         return PortfolioWorker.ofSolve("alns+exact-nra", 2, countsInstructions = true,
             resumable = { PolynomialAlnsSolve(driver.resumable(probeObjective, localParams())) },
         ) { stop, instructions ->
             alns(stop, instructions)
-        }.bindEvidence(identity, provesResults = false)
+        }.bindEvidence(ModelIdentity.of(model.source, objective), provesResults = false)
     }
 
     private fun heuristic(result: SolveResult): SolveResult = when (result) {
