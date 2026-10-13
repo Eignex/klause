@@ -2,7 +2,11 @@
 
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
@@ -30,6 +34,24 @@ class SourceBoundAtomTest {
         assertEquals(false, bound.strict)
         assertEquals(bound.sourceBound, bound)
         assertEquals(bound.hashCode(), bound.sourceBound.hashCode())
+    }
+
+    @Test
+    fun `linear adapter enforces legacy predicates and retracts their scope`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(2.0))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val split = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO))
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
+
+            assertIs<ComponentCheck.Feasible>(session.check())
+        }
     }
 
     @Test

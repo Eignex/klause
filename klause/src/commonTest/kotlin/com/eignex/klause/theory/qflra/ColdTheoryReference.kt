@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow

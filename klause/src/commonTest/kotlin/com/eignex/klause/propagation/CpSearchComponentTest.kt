@@ -23,8 +23,8 @@ import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.theory.qflra.SourceBoundAtom
-import com.eignex.klause.theory.qflra.SourceBoundTerm
+import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

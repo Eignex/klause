@@ -1,5 +1,7 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.solver.search.SourceBoundTerm
+import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
