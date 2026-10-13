@@ -85,9 +85,15 @@ private fun eliminate(
         families.add(reducta)
         for (reductum in reducta) {
             arithmetic.step()
-            projected.addAll(
-                arithmetic.principalSubresultants(reductum, arithmetic.derivative(reductum, variable), variable),
+            val pending = arithmetic.preparePrincipalSubresultants(
+                reductum, arithmetic.derivative(reductum, variable), variable,
             )
+            var result: List<Polynomial>? = null
+            while (result == null) {
+                result = pending.next()
+                if (result == null) yield(null)
+            }
+            projected.addAll(result)
             yield(null)
         }
     }
@@ -96,7 +102,13 @@ private fun eliminate(
             for (a in families[left]) {
                 for (b in families[right]) {
                     arithmetic.step()
-                    projected.addAll(arithmetic.principalSubresultants(a, b, variable))
+                    val pending = arithmetic.preparePrincipalSubresultants(a, b, variable)
+                    var result: List<Polynomial>? = null
+                    while (result == null) {
+                        result = pending.next()
+                        if (result == null) yield(null)
+                    }
+                    projected.addAll(result)
                     yield(null)
                 }
             }

@@ -197,8 +197,10 @@ Polynomial complete workers defer component initialization into their retained h
 Clausal optimization with additional components uses retained preparation instead of
 opening its component root eagerly; native SAT settings and work currencies are preserved.
 Root normalization, bounded witness probing and projection retain completed phases and
-projection resultant batches across slices. A slice stops between completed native
-operations; one polynomial operation or the final cell check can overrun it. Arithmetic
+projection matrices across slices. Subresultant preparation checkpoints matrix rows,
+Bareiss cells, exact-division reductions and batches of 256 monomial products. A slice
+stops at those checkpoints; one rational operation, polynomial snapshot or the final
+cell check can overrun it. Arithmetic
 polls the solve-wide token, and every continuation retains the same native allowance.
 Unfinished initialization publishes neither a point nor a refutation. Native resource
 limits, solve-wide cancellation and component failures terminate the arm. Ordinary
