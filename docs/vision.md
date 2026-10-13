@@ -35,7 +35,6 @@ Subsystem pages describe current guarantees; linked issues track residual work.
 
 | Area | Current implementation | Remaining work |
 |---|---|---|
-| Transcendental orchestration | [Transcendental execution](theories/transcendental.md#solving-and-composition) shares source completion across strategies, but MIXED runs a quarter-budget heuristic phase before traversal and the request does not forward explicit parallelism. | [#2791](https://github.com/Eignex/klause/issues/2791) tracks integration with the shared portfolio invocation. |
 | Independent proof export | Exact numerical checks and supported source derivations are in memory. | [Proof-file support](#independently-checkable-proof-files) and a separate checker for entire original-source claims remain target capabilities. |
 
 ## Shared model breadth
