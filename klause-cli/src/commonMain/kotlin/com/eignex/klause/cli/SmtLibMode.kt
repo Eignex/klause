@@ -29,7 +29,6 @@ import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import com.eignex.klause.util.unaryMinus
 import kotlin.time.TimeSource
-import kotlin.time.TimeSource
 
 /**
  * SMT-LIB 2 front-end (`.smt2` / `.smt`; linear arithmetic and polynomial reals). Emits the SMT-LIB convention: a
@@ -358,7 +357,11 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     override fun onLinearResult(result: LinearOptimizationResult) {
         linearResult = result
-        val bound = result.bound?.claim as? SourceClaim.Bound ?: return
+        val bound = when (val claim = result.terminal?.claim) {
+            is SourceClaim.Optimal -> SourceClaim.Bound(claim.value)
+            is SourceClaim.Limit -> SourceClaim.Bound(claim.value, strict = true)
+            else -> result.bound?.claim as? SourceClaim.Bound
+        } ?: return
         val direction = if (result.scope.objective?.sense == ObjectiveSense.MINIMIZE) "lower" else "upper"
         println("; objectiveBoundDirection=$direction")
         println("; objectiveBound=${formatArithmeticObjective(bound.value)}")

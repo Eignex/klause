@@ -11,10 +11,11 @@ internal class ArithmeticPublication(private val output: OutputProtocol) {
         private set
 
     fun publish(rendered: String, objective: SourceValue): Boolean {
-        if (rendered == lastRendered && sameObjective(objective, lastObjective)) return true
-        if (!output.onArithmeticIncumbent(rendered, objective)) return false
+        val sourceValue = output.arithmeticSourceValue(objective) ?: return false
+        if (rendered == lastRendered && sameObjective(sourceValue, lastObjective)) return true
+        if (!output.onArithmeticIncumbent(rendered, sourceValue)) return false
         lastRendered = rendered
-        lastObjective = objective
+        lastObjective = sourceValue
         solutions++
         return true
     }
