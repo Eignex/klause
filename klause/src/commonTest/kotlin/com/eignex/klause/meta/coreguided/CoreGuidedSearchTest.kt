@@ -148,10 +148,10 @@ class CoreGuidedSearchTest {
         var cancelled = false
         val incumbents = mutableListOf<Long>()
         val search = CoreGuidedSearch(
-            problem, objective,
-            BacktrackParams(
-            objectiveLowerBoundSink = { if (it == 1.0) cancelled = true },
-        )
+            problem,
+            objective,
+            BacktrackParams(objectiveLowerBoundSink = { if (it == 1.0) cancelled = true }),
+            stratify = true,
         )
 
         val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {

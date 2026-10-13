@@ -293,8 +293,11 @@ Weights, negative-coefficient offsets and the accumulated lower bound use arbitr
 integers. A refuted core charges its minimum residual weight. Its violation count `s`
 is replaced by `1 + sum(k = 2..n, s >= k)` using exact reified cardinality thresholds;
 uncancelled residual weights stay active. This identity covers overlapping cores and
-cores containing thresholds from earlier rounds. Stratification changes the active
-assumptions, preserving the accumulated bound and all residual terms.
+cores containing thresholds from earlier rounds. Production core searches assume
+all positive residual terms together, so unavoidable violations can establish a
+core before a partially constrained feasibility search. The internal stratified
+variant changes active assumptions while preserving the accumulated bound and
+all residual terms.
 
 Published incumbents project away auxiliary selectors and pass the source fixpoint
 check. Optimality requires exact equality between the original objective and the
