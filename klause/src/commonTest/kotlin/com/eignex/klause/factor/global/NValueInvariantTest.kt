@@ -178,25 +178,35 @@ class NValueInvariantTest {
 
     @Test
     fun `count aliases retain the final distinct count`() {
-        val p = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            arrayOf<Factor>(NValue(0, intArrayOf(0, 0, 1, 2))),
-        )
-        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
-        for ((variable, value) in listOf(0 to 2L, 1 to 1L, 2 to 1L)) state.assignment.setInt(variable, value)
-        state.recompute()
+        for (mode in NValue.Mode.entries) {
+            val p = Problem(
+                0,
+                3,
+                Array(3) { IntDomain(0, 2) },
+                arrayOf<Factor>(NValue(0, intArrayOf(0, 0, 1, 2), mode)),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+            for ((variable, value) in listOf(0 to 2L, 1 to 1L, 2 to 1L)) state.assignment.setInt(variable, value)
+            state.recompute()
 
-        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
-        val move = state.moveSink.list.first { it is Move.IntSet && it == Move.IntSet(0, 1) }
-        assertTrue(state.moveSink.list.all { state.netDelta(it) == 0L })
-        state.apply(move)
+            state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+            val moves = state.moveSink.list.filter {
+                it == Move.IntSet(0, 1) || (it is Move.Compound && Move.IntSet(0, 1) in it.parts)
+            }
+            assertTrue(moves.isNotEmpty())
+            assertTrue(state.moveSink.list.all { state.netDelta(it) == 0L })
+            for (move in moves) {
+                for ((variable, value) in listOf(0 to 2L, 1 to 1L, 2 to 1L)) state.assignment.setInt(variable, value)
+                state.recompute()
+                state.apply(move)
 
-        assertEquals(1L, state.assignment.intValue(0))
-        assertEquals(0L, state.cost)
-        state.recompute()
-        assertEquals(0L, state.cost)
+                assertEquals(1L, state.assignment.intValue(0))
+                assertEquals(1, (0..2).map { state.assignment.intValue(it) }.distinct().size)
+                assertEquals(0L, state.cost)
+                state.recompute()
+                assertEquals(0L, state.cost)
+            }
+        }
     }
 
     @Test
