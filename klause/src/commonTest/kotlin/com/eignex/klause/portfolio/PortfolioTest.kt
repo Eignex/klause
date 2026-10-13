@@ -2056,6 +2056,36 @@ class PortfolioTest {
     }
 
     @Test
+    fun `debt only pauses do not end the auxiliary search trial`() {
+        val reached = ArrayList<Int>()
+        val search = object : ResumableSearch {
+            private var slices = 0
+            private var spent = 0L
+            override val isDone: Boolean get() = false
+            override val stats: SolveStats get() = SolveStats.EMPTY
+            override val work: Long get() = spent
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                reached += 1
+                if (slices++ >= 15) spent += sliceNodes
+                return null
+            }
+        }
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+            trackingWorker("probe", 1, search),
+        )
+
+        Portfolio.thompson(workers, reseedStaleThreshold = 0).use {
+            it.incumbentProbeArms = setOf(1)
+            it.minimize(Cancellation { reached.size >= 22 })
+        }
+
+        assertEquals(19, reached.count { it == 1 })
+        assertEquals(listOf(0, 0), reached.takeLast(2))
+    }
+
+    @Test
     fun `auxiliary trial bounds preparation that cannot enter search`() {
         val reached = ArrayList<Int>()
         val workers = listOf(
