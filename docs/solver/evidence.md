@@ -159,7 +159,8 @@ for sharing during search. Each publication keeps the actual `EngineInvocation`,
 execution value or coordinate and both endpoints. Integer windows use execution
 coordinates and may be empty; they do not imply an original-coordinate mapping.
 `EvidenceCertificate.published` carries this typed publication through the existing
-admission path. Consumer pools bind their own runtime before accepting publications;
+admission path. Certificate construction requires an actual completed result or native
+publication; a model identity and claim kind cannot issue a certificate. Consumer pools bind their own runtime before accepting publications;
 matching a model label cannot replace that binding. Objective values, integer
 coordinates and endpoints must match the retained publication exactly. Pool binding
 and publication folding are atomic, and a pool containing unscoped deductions cannot
@@ -215,7 +216,7 @@ valid cutoff; metadata alone cannot replace that check.
 `PortfolioEvidence.witness` passes a carried ordinary native publication to the model
 verifier with the containing runtime, capture scope and cancellation. Producer
 conditions and point/value matching therefore remain part of witness admission.
-Legacy witness tags supply no additional authority to its installed source checker.
+Runtime metadata supplies no source feasibility authority.
 Witness admission checks the worker's actual restrictions even when the native
 sample carries no publication certificate, alongside the containing query and
 installed source checker.
