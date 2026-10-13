@@ -93,6 +93,8 @@ before a root solve or node separation. Existing structural, circuit and explici
 requested cut paths retain their applicability. Auxiliary cut techniques keep their
 factor-based scheduling. Admission scans charge the containing work allowance and
 LP effort ledger and poll cancellation.
+The effort ladder's cut ceiling follows admission without restarting reward
+windows or re-probe counters. Unavailable separation uses the bound tier.
 Source mapping must discharge each rounding premise and retain inherited parent
 guards before root sharing. Root and node separation keep their existing round,
 depth, pool and work allowances.

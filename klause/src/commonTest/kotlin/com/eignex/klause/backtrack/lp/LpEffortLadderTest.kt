@@ -32,6 +32,34 @@ class LpEffortLadderTest {
     }
 
     @Test
+    fun `unsupported cuts follow the bound only schedule`() {
+        val bound = LpEffortLadder(top = LpEffort.BOUND, warmup = 4, window = 4, reprobeBase = 4)
+        val cuts = LpEffortLadder(top = LpEffort.CUTS, warmup = 4, window = 4, reprobeBase = 4)
+        cuts.setCutsSupported(false)
+
+        repeat(40) { node ->
+            val expected = bound.shouldRun()
+            assertEquals(expected, cuts.shouldRun())
+            assertFalse(cuts.cutsEnabled)
+            if (expected) {
+                bound.record(node % 7 == 0)
+                cuts.record(node % 7 == 0)
+            }
+        }
+    }
+
+    @Test
+    fun `changing cut support preserves the active reward window`() {
+        val ladder = LpEffortLadder(top = LpEffort.CUTS, warmup = 4, window = 4)
+        ladder.drive(3) { false }
+
+        ladder.setCutsSupported(false)
+        ladder.drive(1) { false }
+
+        assertEquals(LpEffort.OFF, ladder.rung)
+    }
+
+    @Test
     fun `a re-probe that prunes promotes the ladder back up`() {
         val c = LpEffortLadder(top = LpEffort.BOUND, warmup = 4, window = 4, reprobeBase = 4)
         repeat(4) {

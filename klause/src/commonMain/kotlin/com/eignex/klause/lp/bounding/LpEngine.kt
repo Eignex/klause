@@ -214,8 +214,8 @@ internal class LpEngine(
         root: Boolean,
     ): Boolean {
         if (cancellation()) return false
-        if (structuralCutSupport) return true
-        if (relaxation.sourceMap == null) return false
+        if (structuralCutSupport) return recordCutSupport(true)
+        if (relaxation.sourceMap == null) return recordCutSupport(false)
         val model = relaxation.model
         val exact = model.exactState?.model
         for (column in 0 until model.n) {
@@ -226,10 +226,15 @@ internal class LpEngine(
             } else {
                 noteNodeOverhead(1L)
             }
-            if (model.colContinuous[column] || exact?.column(column)?.integral == false) return false
+            if (model.colContinuous[column] || exact?.column(column)?.integral == false) return recordCutSupport(false)
             if ((column + 1) % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return false
         }
-        return !cancellation()
+        return if (cancellation()) false else recordCutSupport(true)
+    }
+
+    private fun recordCutSupport(supported: Boolean): Boolean {
+        lpLadder.setCutsSupported(supported)
+        return supported
     }
 
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
