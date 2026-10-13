@@ -85,8 +85,8 @@ internal class TranscendentalPortfolioInvocation(
         val invocation = PortfolioInvocation(plan, factories,
             PortfolioInvocationControls(parallelism = cores, seed = seed ?: 0,
                 cancellation = scope.cancellation, nodeBudget = budget, reseedStaleThreshold = 0),
-            PortfolioEvidence(identity, polynomialWitnessVerifier(binding, scope.verification))
-                .bindInvocation(binding, scope.verification)) { materialized ->
+            PortfolioEvidence(identity, polynomialWitnessVerifier(binding, scope.cancellation))
+                .bindInvocation(binding, scope.cancellation)) { materialized ->
             val complete = materialized.indices.filter { materialized[it].family == ArmFamily.Backtrack }
             PortfolioInvocationPolicy(shares = DoubleArray(materialized.size) {
                 if (it in complete) 0.75 / complete.size else 0.0
@@ -127,6 +127,4 @@ private class TranscendentalNativeScope(private val params: TranscendentalTheory
         override fun deadline() = external.deadline()
         override fun workMeter(): WorkMeter = meter
     }
-    // Native points already passed source checks; admission checks pins without renewing native allowances.
-    val verification: Cancellation = Cancellation { external() }
 }
