@@ -73,6 +73,7 @@ internal class OpenPortfolio(
     private val sourceObjective: OpenSourceObjective? = null,
     private val publication: SourcePublicationObserver? = null,
     preparedSource: PreparedSourcePlan? = null,
+    private val completeOnly: Boolean = false,
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
     private val lifetime = theoryParams.cancellation or theoryParams.timeout
@@ -401,6 +402,7 @@ internal class OpenPortfolio(
         cancellation: Cancellation,
         objective: LinearObjective?,
     ): List<PortfolioArmFactory> {
+        if (completeOnly) return emptyList()
         val route = preparedPlan.componentPlan?.theoryPipeline ?: ProblemPipeline.UNSUPPORTED_OPEN
         if (route != ProblemPipeline.UNSUPPORTED_OPEN && route != ProblemPipeline.FINITE_CP) {
             return List(localSearchArms) { index ->

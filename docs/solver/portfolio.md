@@ -400,8 +400,9 @@ Independent original-source derivation capture remains a separate contract.
 
 ## Exact theory strategy execution
 
-Polynomial and nonlinear-integer mixed invocations and parallel single-strategy requests
-use the same construction path as finite and linear open execution. Polynomial workers keep private arithmetic
+Polynomial, nonlinear-integer and linear open mixed invocations and parallel single-strategy
+requests use the same construction path as finite execution. Complete-only affine
+requests supply private complete workers without adding heuristic arms. Polynomial workers keep private arithmetic
 invocations; fallback ALNS retains its bootstrap and repairs. Nonlinear integer
 traversal retains tuple enumeration, candidate state and arithmetic work across
 slices; exact neighborhoods retain their centers and adaptive state. CLI parallelism
