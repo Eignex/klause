@@ -97,7 +97,7 @@ class PreparedSearchRegistrationTest {
     fun `prepared exact openings isolate outcomes and retain published coordinates`() {
         val source = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                doubleArrayOf(1.0), LinearOp.EQ, 1.0)),
+                doubleArrayOf(1.0), LinearOp.GE, 1.0)),
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
         prepared.prepareSource(Cancellation.Never)
