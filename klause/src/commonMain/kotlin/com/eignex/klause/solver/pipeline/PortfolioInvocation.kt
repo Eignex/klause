@@ -116,7 +116,12 @@ internal class PortfolioInvocation(
     override fun close() {
         if (closed) return
         closed = true
-        portfolio.close()
+        try {
+            portfolio.close()
+        } catch (failure: Throwable) {
+            runCatching { resources.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+            throw failure
+        }
         resources.close()
     }
 }
