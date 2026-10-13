@@ -17,6 +17,7 @@ import com.eignex.klause.portfolio.PortfolioTerminalPublication
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.evidence.checkWitness
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
@@ -47,10 +48,12 @@ internal class QuadraticPortfolioInvocation(
     private val engine: FiniteEngine,
     private val cores: Int,
     private val assumptions: Assumptions,
+    private val sourceInvocation: QuadraticEngineInvocation? =
+        plan.quadraticEngineInvocation(objective, sense, assumptions),
 ) {
     private data class Value(val source: AlgebraicReal, val minimized: AlgebraicReal)
     private val identity = ModelIdentity.of(plan.originalSource, objective)
-    private val expected = plan.quadraticEngineInvocation(objective, sense, assumptions)
+    private val expected = sourceInvocation
     private val external = params.timeout or params.cancellation
     private val verification = object : Cancellation {
         override fun isCancelled(): Boolean = external()

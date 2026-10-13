@@ -11,6 +11,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -19,6 +20,14 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceObjective
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.quadraticSourceResultCapture
+import com.eignex.klause.solver.evidence.sourceCondition
+import com.eignex.klause.solver.evidence.sourceResultCapture
+import com.eignex.klause.solver.evidence.verifySourceEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -69,9 +78,14 @@ internal object ObjectiveRepresentationProbe {
         require(options.keys.all {
             it in setOf(
                 "source", "engines", "out", "work", "seed", "moves", "timeout",
-                "checker", "processors", "schema", "conditions",
+                "checker", "processors", "schema", "conditions", "capture",
             )
         })
+        val capture = when (options["capture"] ?: "none") {
+            "none" -> false
+            "required" -> true
+            else -> error("capture must be none or required")
+        }
         val processors = options["processors"]?.toInt() ?: 1
         require(processors > 0)
         if (Runtime.getRuntime().availableProcessors() != processors) {
@@ -97,6 +111,7 @@ internal object ObjectiveRepresentationProbe {
         Reports.writeJson(File(output, "provenance.json").path, InstalledBuild.reference)
         File(output, "settings.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
+            put("capture", if (capture) "required" else "none")
             put("seed", seed)
             put("nativeWork", work)
             put("maxFlips", moves)
@@ -123,8 +138,9 @@ internal object ObjectiveRepresentationProbe {
         }
         conditionBytes?.let { File(output, "conditions.json").writeBytes(it) }
         val prepared = compiled?.let { CompiledInput(it, it.problem.pipelineRequest(), realIds, handles) }
+        require(!capture || prepared != null) { "Original IR capture requires a compiled schema" }
         for (source in sources.sortedBy { it.path }) {
-            measure(source, output, engines, work, seed, moves, timeout, prepared, conditions)
+            measure(source, output, engines, work, seed, moves, timeout, prepared, conditions, capture)
         }
         when (options["checker"] ?: "none") {
             "none" -> Unit
@@ -181,7 +197,7 @@ internal object ObjectiveRepresentationProbe {
 
     private fun measure(
         input: File, output: File, engines: List<FiniteEngine>, work: Long, seed: Long, moves: Int, timeout: Long,
-        compiled: CompiledInput?, conditions: JsonObject?,
+        compiled: CompiledInput?, conditions: JsonObject?, capture: Boolean,
     ) {
         val bytes = input.readBytes()
         val identity = sha256(bytes)
@@ -212,6 +228,9 @@ internal object ObjectiveRepresentationProbe {
                     OpenTheoryPipeline.optimize(request, affine, params, engine, captured.sense)
                 } else OpenTheoryPipeline.minimize(request, quadratic, params, engine, captured.sense)
                 val elapsed = System.nanoTime() - started
+                val scopeRecord = if (capture) captureRecord(
+                    requireNotNull(compiled), affine, quadratic, pins, identity, execution.result, encoding,
+                ) else null
                 val record = buildJsonObject {
                     put("sourceSha256", identity)
                     put("engine", engine.name)
@@ -222,10 +241,56 @@ internal object ObjectiveRepresentationProbe {
                     put("nativeWork", execution.nativeWork)
                     put("javaCores", Runtime.getRuntime().availableProcessors())
                     put("result", resultRecord(execution.result, source, compiled))
+                    if (scopeRecord != null) put("sourceCapture", scopeRecord)
                 }
                 File(output, "$identity.${engine.name}.$encoding.json").writeText(record.toString() + "\n")
                 println("${input.name} $engine $encoding ${execution.result::class.simpleName} $elapsed ns")
             }
+        }
+    }
+
+    private fun captureRecord(
+        compiled: CompiledInput, affine: LinearObjective, quadratic: QuadraticObjectiveSpec,
+        pins: Assumptions, identity: String, result: QuadraticOptimizationResult, encoding: String,
+    ): JsonObject {
+        val revision = SourceRevision(identity, "klause-ir-exact-v1")
+        val plan = compiled.request.preparedPlan.withObjective(affine, result.sense == ObjectiveSense.MAXIMIZE)
+        val capture = requireNotNull(if (encoding == "linear") plan.sourceResultCapture(revision, pins, "cost")
+            else compiled.model.problem.quadraticSourceResultCapture(
+                SourceScope(revision, pins.sourceCondition(), SourceObjective("cost", result.sense)), quadratic,
+            ))
+        val retained = capture.quadratic(result, "objective-representation-probe")
+        check(requireNotNull(retained.evidence).scope == capture.context.scope)
+        var replay = "not applicable to witness-only completion"
+        var weaker = "not applicable"
+        if (result is QuadraticOptimizationResult.Optimal) {
+            check(retained is QuadraticOptimizationResult.Optimal)
+            checkNotNull(result.certificate.derivation)
+            check(retained.certificate.derivation === result.certificate.derivation)
+            check(retained.bound.certificate.derivation === result.bound.certificate.derivation)
+            if (encoding == "linear") {
+                val replacement = requireNotNull(compiled.request.preparedPlan.withObjective(
+                    affine.copy(), result.sense == ObjectiveSense.MAXIMIZE,
+                ).sourceResultCapture(revision, pins, "cost"))
+                check(replacement.quadratic(result, "replacement-objective") === result)
+                replay = "foreign original objective rejected"
+                if (pins.sourceCondition() != Assumptions.None.sourceCondition()) {
+                    val unrestricted = requireNotNull(plan.sourceResultCapture(revision, objectiveIdentity = "cost"))
+                    check(unrestricted.quadratic(result, "weaker-condition") === result)
+                    weaker = "weaker original condition rejected"
+                }
+            }
+        }
+        val checked = retained.verifySourceEvidence(capture.context)
+        check(checked !is SourceEvidenceCheck.Rejected) { "Captured original result rejected: $checked" }
+        return buildJsonObject {
+            put("captured", true)
+            put("nativeCompletion", result is QuadraticOptimizationResult.Optimal)
+            put("copiedObjectiveReplay", replay)
+            put("weakerConditionReplay", weaker)
+            put("derivationCheck", if (checked == SourceEvidenceCheck.Checked) "checked" else "unavailable")
+            put("unavailableReason", (checked as? SourceEvidenceCheck.Unavailable)?.reason)
+            put("exportedProof", "not captured")
         }
     }
 

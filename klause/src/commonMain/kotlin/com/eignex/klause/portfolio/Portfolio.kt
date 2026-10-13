@@ -15,6 +15,7 @@ import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.CompletedEngineResult
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
@@ -221,7 +222,10 @@ class Portfolio(
             if (failure is UnsoundnessException) claim.fault = failure.message
             val verification = when (r) {
                 is SolveResult.Sat -> verifyWitness(worker, r.assignment, null)
-                is SolveResult.Unsat -> evidenceVerification?.proof(worker, EvidenceKind.Infeasible)
+                is SolveResult.Unsat -> worker.evidenceInvocation?.let { invocation ->
+                    evidenceVerification?.proof(worker, EvidenceKind.Infeasible,
+                        CompletedEngineResult.Solve(invocation, r))
+                } ?: evidenceVerification?.proof(worker, EvidenceKind.Infeasible)
                 else -> null
             }
             claim.verified(verification)
@@ -303,6 +307,7 @@ class Portfolio(
         val pending = MutableList<Candidate<MinimizeResult.WithSample, V>?>(workers.size) { null }
         val start = TimeSource.Monotonic.markNow()
         val readBound = { incumbents.bound() }
+        val observedCutoffs = arrayOfNulls<Double>(workers.size)
         // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
         val staleSegments = IntArray(workers.size)
         var callbackFailure: Throwable? = null
@@ -377,9 +382,14 @@ class Portfolio(
             claim.hadIncumbent = incumbent.current() != null
             val opening = run.handles[arm] == null
             val armToken = segmentToken(worker, run.token, claim)
+            val workerBound = {
+                val cutoff = readBound()
+                observedCutoffs[arm] = cutoff.takeIf(Double::isFinite)
+                cutoff
+            }
             val setup = TimeSource.Monotonic.markNow()
             val opened = runCatching {
-                run.handles[arm] ?: worker.newResumableSearch(readBound, armToken, incumbent.current()?.assignment)
+                run.handles[arm] ?: worker.newResumableSearch(workerBound, armToken, incumbent.current()?.assignment)
                     ?.also { run.handles[arm] = it }
             }
             val handle = opened.getOrNull()
@@ -427,7 +437,7 @@ class Portfolio(
                 // Local-search segments restart from the shared incumbent, bounded by their own counted work.
                 failure = runCatching {
                     for (r in worker.improvements(
-                        readBound,
+                        workerBound,
                         armToken,
                         warmStart = incumbent.current()?.assignment,
                         maxInstructions = instructionsOf(claim),
@@ -453,9 +463,12 @@ class Portfolio(
                 else -> null
             }
             if (proofKind != null) {
-                claim.verified(
-                    evidenceVerification?.proof(worker, proofKind, terminal?.assignment, terminal?.objectiveValue),
-                )
+                val completed = terminal?.let { actual -> worker.evidenceInvocation?.let { invocation ->
+                    CompletedEngineResult.Minimize(invocation, actual, executionCutoff = observedCutoffs[arm])
+                } }
+                claim.verified(if (completed != null) {
+                    evidenceVerification?.proof(worker, proofKind, completed)
+                } else evidenceVerification?.proof(worker, proofKind, terminal?.assignment, terminal?.objectiveValue))
             }
             run.locked {
                 val publication = if (!terminalPublished && !failed && claim.fault == null) {

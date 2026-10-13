@@ -123,7 +123,16 @@ sealed interface OpenTheoryExecution {
     data class Optimize(
         /** The optimization verdict. */
         val result: OpenTheoryOptimum,
-    ) : OpenTheoryExecution
+    ) : OpenTheoryExecution {
+        private var retainedPublication: SourceIncumbentPublication? = null
+
+        /** Latest accepted source point and exact value, separate from a terminal's private witness. */
+        val acceptedIncumbent: SourceIncumbentPublication? get() = retainedPublication
+
+        internal fun retainPublication(publication: SourceIncumbentPublication?) {
+            retainedPublication = publication
+        }
+    }
 }
 
 /** Executes an open-model request without exposing individual theory implementations to callers. */
@@ -179,8 +188,27 @@ object OpenTheoryPipeline {
         request: OpenTheoryRequest,
         params: TheoryParams = TheoryParams(),
         cores: Int = 1,
+    ): OpenTheoryExecution = executePortfolio(request, params, cores, null)
+
+    /** Run the open portfolio and observe each verified exact source improvement after installation. */
+    fun executePortfolio(
+        request: OpenTheoryRequest,
+        params: TheoryParams,
+        cores: Int,
+        onAccepted: ((SourceIncumbentPublication) -> Unit)?,
+    ): OpenTheoryExecution = observed(onAccepted) { publication ->
+        portfolioExecution(request, params, cores, sourceObjective(request, params), publication)
+    }
+
+    private fun portfolioExecution(
+        request: OpenTheoryRequest,
+        params: TheoryParams,
+        cores: Int,
+        values: OpenSourceObjective?,
+        publication: SourcePublicationObserver,
     ): OpenTheoryExecution {
-        val portfolio = OpenPortfolio(request.model, request, params, seed = params.randomSeed, lanes = cores)
+        val portfolio = OpenPortfolio(request.model, request, params, seed = params.randomSeed, lanes = cores,
+            sourceObjective = values, publication = publication)
         val stop = params.cancellation or params.timeout
         val objective = request.minimizedObjective ?: return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, integralMinimizer(request, objective), stop))
@@ -197,9 +225,25 @@ object OpenTheoryPipeline {
         objective: LinearObjective? = null,
         cores: Int = 1,
         searchesContinuousOnly: Boolean = false,
+    ): OpenTheoryExecution = observed(null) { publication ->
+        heuristicExecution(model, params, objective, cores, searchesContinuousOnly,
+            objective?.let { OpenSourceObjective(it) }, publication)
+    }
+
+    private fun heuristicExecution(
+        model: Problem,
+        params: TheoryParams,
+        objective: LinearObjective?,
+        cores: Int,
+        searchesContinuousOnly: Boolean,
+        values: OpenSourceObjective?,
+        publication: SourcePublicationObserver,
+        preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val portfolio =
-            OpenPortfolio(model, request = null, params, lanes = cores, searchesContinuousOnly = searchesContinuousOnly)
+        val prepared = preparedSource ?: model.prepareExecutionPlan(values?.original, values?.maximize ?: false)
+        val portfolio = OpenPortfolio(model, request = null, params, lanes = cores,
+            searchesContinuousOnly = searchesContinuousOnly, sourceObjective = values, publication = publication,
+            preparedSource = prepared)
         val stop = params.cancellation or params.timeout
         if (objective == null) return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizer = null, stop))
@@ -226,17 +270,40 @@ object OpenTheoryPipeline {
         params: TheoryParams,
         engine: FiniteEngine,
         cores: Int = 1,
+    ): OpenTheoryExecution = execute(request, params, engine, cores, null)
+
+    /**
+     * Observe verified exact original-source improvements. Callback failures propagate after worker cleanup;
+     * the returned optimization retains its latest accepted publication for final rendering.
+     */
+    fun execute(
+        request: OpenTheoryRequest,
+        params: TheoryParams,
+        engine: FiniteEngine,
+        cores: Int,
+        onAccepted: ((SourceIncumbentPublication) -> Unit)?,
+    ): OpenTheoryExecution = observed(onAccepted) { publication ->
+        executeObserved(request, params, engine, cores, sourceObjective(request, params), publication)
+    }
+
+    private fun executeObserved(
+        request: OpenTheoryRequest,
+        params: TheoryParams,
+        engine: FiniteEngine,
+        cores: Int,
+        values: OpenSourceObjective?,
+        publication: SourcePublicationObserver,
     ): OpenTheoryExecution {
         val operation = if (request.objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE
         if (!request.preparedPlan.capabilities.admission(engine, operation).runnable) {
             return unsupportedExecution(request.objective)
         }
         return when (engine) {
-            FiniteEngine.MIXED -> executePortfolio(request, params, cores)
-            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
+            FiniteEngine.MIXED -> portfolioExecution(request, params, cores, values, publication)
+            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> executeDirect(request, params, values, publication)
             FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> linearNeighborhoodInvocation(
                 request.model, params, request.minimizedObjective, engine == FiniteEngine.ALNS, cores,
-                request.preparedPlan,
+                request.preparedPlan, values, publication,
             )
         }
     }
@@ -259,33 +326,113 @@ object OpenTheoryPipeline {
         objective: LinearObjective?,
         engine: FiniteEngine,
         cores: Int = 1,
+    ): OpenTheoryExecution = searchWithoutTheory(model, params, objective, engine, cores, null)
+
+    /** Observe exact improvements for a heuristic-only minimized objective. */
+    fun searchWithoutTheory(
+        model: Problem,
+        params: TheoryParams,
+        objective: LinearObjective?,
+        engine: FiniteEngine,
+        cores: Int,
+        onAccepted: ((SourceIncumbentPublication) -> Unit)?,
+    ): OpenTheoryExecution = searchWithoutTheory(model, params, objective, engine, cores, false, onAccepted)
+
+    /**
+     * Search a minimized execution objective while publishing its original direction. When [maximize] is true,
+     * [objective] is the negated source objective; accepted values restore that source direction.
+     */
+    fun searchWithoutTheory(
+        model: Problem,
+        params: TheoryParams,
+        objective: LinearObjective?,
+        engine: FiniteEngine,
+        cores: Int,
+        maximize: Boolean,
+        onAccepted: ((SourceIncumbentPublication) -> Unit)?,
+    ): OpenTheoryExecution = observed(onAccepted) { publication ->
+        val values = objective?.let { OpenSourceObjective(it, if (maximize) it.negated() else it, maximize) }
+        heuristicObserved(model, params, objective, engine, cores, values, publication)
+    }
+
+    private fun heuristicObserved(
+        model: Problem,
+        params: TheoryParams,
+        objective: LinearObjective?,
+        engine: FiniteEngine,
+        cores: Int,
+        values: OpenSourceObjective?,
+        publication: SourcePublicationObserver,
     ): OpenTheoryExecution {
-        val prepared = model.preparedWithComponents(model.componentPlan(), objective = objective)
+        val prepared = model.preparedWithComponents(model.componentPlan(), objective = values?.original,
+            maximize = values?.maximize ?: false)
         val operation = if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE
         if (!prepared.capabilities.admission(engine, operation).runnable) return unsupportedExecution(objective)
         return when (engine) {
-            FiniteEngine.MIXED -> searchWithoutTheory(model, params, objective, cores)
-            FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(model, params, objective, cores,
-                searchesContinuousOnly = true)
+            FiniteEngine.MIXED -> heuristicExecution(model, params, objective, cores, false,
+                values, publication, prepared)
+            FiniteEngine.LOCAL_SEARCH -> heuristicExecution(model, params, objective, cores, true,
+                values, publication, prepared)
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> unsupportedExecution(objective)
-            FiniteEngine.ALNS -> linearNeighborhoodInvocation(model, params, objective, adaptive = true, cores)
+            FiniteEngine.ALNS -> linearNeighborhoodInvocation(model, params, objective, adaptive = true, cores,
+                preparedSource = prepared, sourceObjective = values, publication = publication)
         }
     }
 
     /** Execute [request] through its selected complete theory route. */
-    fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
+    fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution =
+        execute(request, params, null)
+
+    /** Execute the complete theory and observe its verified exact original-source improvements. */
+    fun execute(
+        request: OpenTheoryRequest,
+        params: TheoryParams,
+        onAccepted: ((SourceIncumbentPublication) -> Unit)?,
+    ): OpenTheoryExecution = observed(onAccepted) { publication ->
+        executeDirect(request, params, sourceObjective(request, params), publication)
+    }
+
+    private fun executeDirect(
+        request: OpenTheoryRequest,
+        params: TheoryParams,
+        values: OpenSourceObjective?,
+        publication: SourcePublicationObserver,
+    ): OpenTheoryExecution {
         val objective = request.minimizedObjective
         if (objective == null) return OpenTheoryExecution.Satisfy(engineFor(request).solve(params))
-        val context = request.linearAuthorityContext(params.cancellation or params.timeout)
+        val context = values?.context
         if (context == null) {
             val integral = integralMinimizer(request, objective)
-            if (integral != null) return OpenTheoryExecution.Optimize(integral.minimize(params))
+            if (integral != null) return integral.descent(params).use { descent ->
+                OpenTheoryExecution.Optimize(requireNotNull(descent.runSlice(
+                    params.cancellation or params.timeout, Long.MAX_VALUE, -1,
+                ) { assignment, _ -> values?.publish(assignment.toSample(request.model), publication) }))
+            }
         }
         return RationalTheoryDescent(request.model, objective, params, context).use { descent ->
             val result = requireNotNull(descent.runSlice(
                 params.cancellation or params.timeout, Long.MAX_VALUE, -1,
-            ) { _ -> })
-            OpenTheoryExecution.Optimize(descent.linearResult?.openOptimum() ?: result.openOptimum(objective))
+            ) { incumbent -> values?.publish(incumbent.sample, publication) })
+            val authority = descent.linearResult
+            val folded = if (authority == null) result.openOptimum(objective) else requireNotNull(values).completed(
+                authority, params.cancellation or params.timeout,
+                if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled)
+            OpenTheoryExecution.Optimize(folded)
+        }
+    }
+
+    private fun sourceObjective(request: OpenTheoryRequest, params: TheoryParams): OpenSourceObjective? =
+        request.objective?.let { original -> OpenSourceObjective(requireNotNull(request.minimizedObjective), original,
+            request.maximize, request.linearAuthorityContext(params.cancellation or params.timeout),
+            params.cancellation or params.timeout) }
+
+    private fun observed(
+        callback: ((SourceIncumbentPublication) -> Unit)?,
+        action: (SourcePublicationObserver) -> OpenTheoryExecution,
+    ): OpenTheoryExecution {
+        val publication = SourcePublicationObserver(callback)
+        return publication.execute { action(publication) }.also { execution ->
+            if (execution is OpenTheoryExecution.Optimize) execution.retainPublication(publication.latest)
         }
     }
 

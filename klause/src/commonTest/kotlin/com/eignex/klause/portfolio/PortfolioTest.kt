@@ -32,6 +32,9 @@ import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
@@ -709,6 +712,27 @@ class PortfolioTest {
         assertEquals("accepted output failure", failure.message)
         assertEquals(1, handle.closes)
         assertEquals("close failure", failure.suppressedExceptions.single().message)
+    }
+
+    @Test
+    fun `a conditional completed refutation cannot finish a weaker runtime invocation`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
+        val plan = source.prepareExecutionPlan()
+        val identity = ModelIdentity.of(source)
+        val expected = EngineInvocation(plan, identity)
+        val conditional = EngineInvocation(plan, identity,
+            executionAssumptions = Assumptions(bools = mapOf(0 to false)))
+        val worker = PortfolioWorker.ofSolve("conditional", 0) { _, _ -> SolveResult.Unsat() }
+            .bindEvidence(identity).bindInvocation(conditional)
+        val portfolio = Portfolio.thompson(listOf(worker)).also {
+            it.evidenceVerification = PortfolioEvidence(identity, finiteWitnessVerifier(source.bake(), null))
+                .bindInvocation(expected)
+        }
+
+        val result = portfolio.use { it.solve(Cancellation.Never) }
+
+        assertIs<SolveResult.Unknown>(result)
+        assertEquals(1L, result.stats.portfolio.arms.single().faults)
     }
 
     @Test

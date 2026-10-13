@@ -40,3 +40,31 @@ class QuadraticBoxResultsTest(unittest.TestCase):
                   'witness': [None], 'value': None}
 
         self.assertEqual('Unavailable', check_record(source, record)['terminalCheck'])
+
+    def test_incomplete_receipts_require_strict_original_direction_improvements(self):
+        for sense, values in [('MINIMIZE', ['2', '1']), ('MAXIMIZE', ['1', '2'])]:
+            with self.subTest(sense=sense):
+                source = json.dumps({'semantics': 'klause-ir-exact-v1', 'reals': [{'lower': '0', 'upper': '3'}],
+                                     'objective': {'sense': sense, 'constant': '0',
+                                                   'terms': [{'coefficient': '1', 'first': 0}]}}).encode()
+                record = {'sourceHash': hashlib.sha256(source).hexdigest(), 'sense': sense, 'kind': 'Bounded',
+                          'witness': [values[-1]], 'value': values[-1], 'publicationCount': 2,
+                          'acceptedVersion': 2, 'acceptedIdentityRetained': True,
+                          'publications': [{'version': index, 'witness': [value], 'value': value}
+                                           for index, value in enumerate(values, 1)]}
+
+                self.assertEqual('Checked', check_record(source, record)['witnessCheck'])
+                record['publications'][1] = dict(record['publications'][0], version=2)
+                with self.assertRaisesRegex(AssertionError, 'does not strictly improve'):
+                    check_record(source, record)
+
+    def test_an_uninstalled_final_receipt_is_rejected(self):
+        source = json.dumps({'semantics': 'klause-ir-exact-v1', 'reals': [{'lower': '0', 'upper': '3'}],
+                             'objective': {'sense': 'MINIMIZE', 'constant': '0',
+                                           'terms': [{'coefficient': '1', 'first': 0}]}}).encode()
+        record = {'sourceHash': hashlib.sha256(source).hexdigest(), 'sense': 'MINIMIZE', 'kind': 'Bounded',
+                  'witness': ['0'], 'value': '0', 'publicationCount': 1, 'acceptedVersion': 1,
+                  'acceptedIdentityRetained': True, 'publications': [{'version': 1, 'witness': ['1'], 'value': '1'}]}
+
+        with self.assertRaisesRegex(AssertionError, 'final accepted value differs'):
+            check_record(source, record)

@@ -264,3 +264,15 @@ metadata and carry no polynomial proof authority. An unchanged sample copy retai
 its source witness certificate; changing any coordinate or exact scalar list discards
 it. Polynomial pipeline strategy controls expose finite backtracking, local-search
 and ALNS effort separately from the native arithmetic allowance.
+
+Open optimization observer overloads publish `SourceIncumbentPublication` with an owned
+`Sample`, already evaluated exact original-direction `SourceValue` and invocation version.
+`OpenTheoryExecution.Optimize.acceptedIncumbent` retains the latest publication for final
+rendering, including incomplete outcomes. A terminal's private witness is separate from
+this accepted point. Captured affine objectives use their original exact coefficients and
+constant. The heuristic-only maximization overload receives a minimized execution objective
+and restores the source direction for publication. Observer exceptions propagate after
+invocation cleanup. Affine mixed results retain typed optimality, limits and integer/real
+rays in `OpenTheoryOptimum.linearResult`; incomplete execution retains independently
+checked global root bounds and the accepted source point. These fields remain separate
+from scalar telemetry and from a ray's private base.

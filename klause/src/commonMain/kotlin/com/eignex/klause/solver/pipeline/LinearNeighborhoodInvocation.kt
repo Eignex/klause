@@ -3,12 +3,12 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
-import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.TerminationReason
 
 internal fun linearNeighborhoodInvocation(
     model: Problem,
@@ -17,14 +17,18 @@ internal fun linearNeighborhoodInvocation(
     adaptive: Boolean,
     cores: Int,
     preparedSource: PreparedSourcePlan? = null,
+    sourceObjective: OpenSourceObjective? = null,
+    publication: SourcePublicationObserver? = null,
 ): OpenTheoryExecution {
     val count = cores.coerceAtLeast(1)
     val prepared = preparedSource ?: model.prepareExecutionPlan(objective)
     val source = prepared.originalSource as? Problem ?: model
     val identity = ModelIdentity.of(source, objective)
+    val binding = EngineInvocation(prepared, identity, objective, scope = sourceObjective?.context?.scope)
     val stop = params.cancellation or params.timeout
     val factories = List(count) { index ->
-        PortfolioArmFactory(prepared, index, if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch) { slot ->
+        PortfolioArmFactory(prepared, index, if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch,
+            bind = { it.bindInvocation(binding) }) { slot ->
             val local = params.copy(openWorkLimit = slot.nativeAllowance(params.openWorkLimit),
                 maxLeaves = slot.nativeAllowance(params.maxLeaves),
                 maxDecisions = slot.nativeAllowance(params.maxDecisions),
@@ -41,7 +45,9 @@ internal fun linearNeighborhoodInvocation(
     }
     val portfolio = PortfolioInvocation(prepared, factories,
         PortfolioInvocationControls(parallelism = count, workerSeed = params.randomSeed, cancellation = stop,
-            nodeBudget = params.nodeBudget), PortfolioEvidence(identity, openWitnessVerifier(source, objective)))
+            nodeBudget = params.nodeBudget),
+        PortfolioEvidence(identity, openWitnessVerifier(source, objective, sourceObjective?.context, stop))
+            .bindInvocation(binding, stop))
     return portfolio.use {
         if (objective == null) {
             val result = it.solve(stop)
@@ -53,14 +59,13 @@ internal fun linearNeighborhoodInvocation(
                 is SolveResult.Unknown -> OpenTheoryResult.Unknown(result.reason, result.stats)
             })
         }
-        val result = it.minimize(stop, null, PortfolioIncumbents.exact(objective))
-        OpenTheoryExecution.Optimize(when (result) {
-            is MinimizeResult.WithSample -> OpenTheoryOptimum.Bounded(
-                OpenTheoryAssignment.Sampled(result.sample), objective.evaluateExact(result.sample),
-                (result as? MinimizeResult.BestFound)?.reason ?: TerminationReason.BudgetExhausted, result.stats,
-            )
-            is MinimizeResult.Infeasible -> error("a heuristic neighborhood cannot refute the source")
-            is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
+        val values = sourceObjective ?: OpenSourceObjective(objective)
+        val incumbents = values.incumbents()
+        val result = it.minimize(stop, null, incumbents, onAccepted = { accepted ->
+            publication?.accepted(accepted.assignment,
+                SourceValue.Rational(accepted.objective.source), accepted.version)
         })
+        check(result !is MinimizeResult.Infeasible) { "a heuristic neighborhood cannot refute the source" }
+        OpenTheoryExecution.Optimize(values.incomplete(result, incumbents))
     }
 }

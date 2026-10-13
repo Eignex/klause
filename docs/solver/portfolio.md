@@ -37,7 +37,28 @@ same owned snapshot contract; live producer workspaces remain private. See
 [model and ownership](../model.md). Copying an unchanged assignment preserves its
 coordinates and theory acceptance. Changing coordinates requires a fresh witness check.
 The exact objective is evaluated from the carried assignment, including integers outside
-`Long`.
+`Long`. Open affine invocations capture the original owner's exact objective coefficients
+and constant once. Their exchange retains that source value separately from the minimized
+execution value used by worker cutoffs; rounded IR coefficients do not order captured
+source incumbents.
+
+`OpenTheoryPipeline.execute` and `searchWithoutTheory` observer overloads publish
+`SourceIncumbentPublication` after verified installation. The payload retains the owned
+source sample, exact original-direction `SourceValue` and invocation version. The final
+`OpenTheoryExecution.Optimize.acceptedIncumbent` retains the latest receipt independently
+of a terminal's private proof witness. Callbacks run under the existing schedule lock;
+callback failures propagate after every worker and source service has closed. Complete
+single-worker invocations observe their source-checked improvements without allocating
+portfolio replicas.
+
+Affine mixed workers retain `LinearPortfolioSearch` handles and publish checked typed
+terminals through the same scheduler hook. Scalar worker telemetry cannot establish a
+strict limit or source ray. After all workers close, the invocation folds their retained,
+already checked global root bounds with the shared original-source incumbent. Private
+branch bounds and terminals that the scheduler did not admit cannot finish the source.
+Cancellation retains completed partial bound metadata without running additional arithmetic
+or promoting an interrupted proof. A ray's private base and its exact value remain paired;
+the latest accepted point can be a different, better source incumbent.
 
 A wide exact sample exposes no finite integer array. Supported linear workers retain
 arbitrary-width coordinates through exact neighborhood completion. Windowed fallback
@@ -49,7 +70,9 @@ identities: a fresh or transformed model needs its own check, even if structural
 equivalent. Copies of unchanged exact witnesses retain their source certificate;
 coordinate changes and warm-start projections discard it. Objective changes cannot reuse
 objective bounds or unboundedness claims. Unconditional variable bounds use the model
-scope without an objective.
+scope without an objective. Finite factories bind shared root channels to the containing
+invocation and publications to the worker's actual post-edit execution assumptions.
+A conditional root floor or integer window cannot prune siblings with weaker conditions.
 
 Verification preserves three outcomes. Accepted witnesses may become incumbents;
 rejected proposals quarantine their producer without proving the model infeasible;
@@ -350,6 +373,15 @@ only authority even when a neighborhood is decided exactly. Independent source
 bounds and proofs require their own checked evidence. Unsupported components and
 operations have explicit decline causes; exhausted caller or representation
 allowances remain invocation stops.
+
+Finite, open, polynomial and nonlinear-integer ordinary portfolios bind `EngineInvocation` to the
+retained plan, actual execution model/objective and captured source/execution pins.
+Their terminal admission consumes `CompletedEngineResult` with the actual result;
+exhausted optimization also retains the last finite cutoff read by that worker.
+A conditioned or foreign completion cannot finish a weaker runtime invocation.
+Finite materializers retain the post-edit parameter assumptions before binding; a
+failed binding closes the allocated worker before the invocation unwinds slot resources.
+Independent original-source derivation capture remains a separate contract.
 
 ## Exact theory strategy execution
 

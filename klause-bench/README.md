@@ -442,6 +442,15 @@ That independent fractions checker evaluates original coordinates and objective,
 checks supported interval bounds and attainment, and withholds unsupported algebraic
 or stronger bound claims. This does not verify general quadratic rays or proof exports.
 
+`com.eignex.klause.bench.profile.OpenSourcePublicationProbe` accepts the same box JSON
+with affine terms (`coefficient`, `first`) and exercises the ordinary open pipeline's
+public accepted-incumbent callbacks. Exact captured coefficients and constant retain
+source units separately from the execution projection. Engine/lane `controls` select
+complete or heuristic paths. Saved receipts include original coordinates, values,
+versions and final identity; the same fractions checker verifies each witness and
+strict original-direction ordering. Missing typed bounds remain unavailable rather
+than acquiring proof authority from an accepted point.
+
 `com.eignex.klause.bench.profile.NraSourceCheck` checks actual saved SMT records through
 `tools/verify_nra_source_results.py`. Pass `input=<base64 UTF-8 JSON array>`; each entry
 retains `source`, its SHA-256 `hash`, `feasible`, actual `witness` and producer metadata.
@@ -453,7 +462,7 @@ dependency identities alongside the original inputs, producer revisions and repo
 `preparePython=true` explicitly provisions the pinned checker environment on an owned
 Ubuntu analysis instance; its installation and runtime identity log stays under `$OUT`.
 
-Both entry points can run as committed-code lab profiles with explicit AWS host,
+These entry points can run as committed-code lab profiles with explicit AWS host,
 one machine and one parallel command. Use the lab client with
 `LAB_URL=https://lab.eignex.com` for submission, status, remote access and retrieval.
 Build/test/lint gates remain in GitHub CI.
@@ -874,6 +883,14 @@ Use `source=klause-bench/smoke-corpus/objective-scopes-v1`,
 40-record changed-scope comparison. All coordinates are fixed by the source scope,
 so a zero heuristic move count is legitimate; exact witness, condition, result-role
 and bound checks remain required.
+
+`capture=required` on the compiled/schema path recaptures actual producer results
+through the original IR affine or quadratic capture API. Native completions must
+retain their typed derivations and reject a copied affine objective or weaker caller
+conditions. Records keep the runtime capture and replay checks separate from the
+independent original-source mathematics. Unsupported derivation coverage remains
+explicitly unavailable; these records do not export engine proofs. Capture checking
+runs outside the solver execution timer.
 
 The [precision fixtures](smoke-corpus/objective-affine-v1/manifest.json) distinguish
 adjacent exact objective values sharing a binary64 projection. After fetching the
