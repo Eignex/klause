@@ -53,7 +53,11 @@ internal class CoreGuidedWorkerConfig(
             })
         }
         worker = PortfolioWorker.of(
-            workerLabel, armId, CoreGuidedSolver(problem).session(), params, sourceObjective,
+            workerLabel,
+            armId,
+            CoreGuidedSolver(problem).session(),
+            params,
+            sourceObjective,
         ).bindEvidence(identity, provesResults = CoreGuidedSearch.scalarProofs(sourceObjective)).also {
             it.sharedPools = matched
             it.sharingMeter = meter

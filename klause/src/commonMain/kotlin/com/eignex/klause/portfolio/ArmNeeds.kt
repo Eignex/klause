@@ -70,8 +70,10 @@ internal class ProblemFacts(
             integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
                 it is Linear && it.integerConstants != null
             },
-            booleanObjective = objective?.let { CoreGuidedSearch.eligible(problem, it) &&
-                it.boolWeightValues.any { weight -> weight != 0L } } == true,
+            booleanObjective = objective?.let {
+                CoreGuidedSearch.eligible(problem, it) &&
+                    it.boolWeightValues.any { weight -> weight != 0L }
+            } == true,
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
             },

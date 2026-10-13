@@ -72,8 +72,10 @@ class PortfolioCompositionTest {
         val selected = PortfolioComposition.compose(scenario, facts)
 
         assertIs<CoreGuidedWorkerConfig>(selected.last())
-        assertEquals(PortfolioComposition.compose(scenario, ordinary).map { it.label },
-            selected.dropLast(1).map { it.label })
+        assertEquals(
+            PortfolioComposition.compose(scenario, ordinary).map { it.label },
+            selected.dropLast(1).map { it.label },
+        )
     }
 
     @Test

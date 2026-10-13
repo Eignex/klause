@@ -19,11 +19,14 @@ import kotlin.test.assertTrue
 class CoreGuidedSearchSliceTest(private val sliceWork: Long) {
     @Test
     fun `sliced weight splitting preserves the exact optimum and cumulative work`() {
-        val problem = Problem(3, 0, emptyArray(), arrayOf(
+        val problem = Problem(
+            3, 0, emptyArray(),
+            arrayOf(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
-        )).bake()
+        )
+        ).bake()
         val objective = LinearObjective(longArrayOf(-7, -2, -1), constant = 10)
         val fresh = CoreGuidedSearch(problem, objective, BacktrackParams())
         val sliced = CoreGuidedSearch(problem, objective, BacktrackParams())
