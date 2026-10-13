@@ -76,7 +76,7 @@ class QuadraticPortfolioInvocationTest {
             QuadraticNativeScope(params), FiniteEngine.LOCAL_SEARCH, 1, Assumptions.None)
             .execute { arm, _, _, _ ->
                 PortfolioWorker.ofMinimize("copied", arm) { _, _, _, _ ->
-                    MinimizeResult.BestFound(point, 2.0, TerminationReason.BudgetExhausted)
+                    sequenceOf(MinimizeResult.BestFound(point, 2.0, TerminationReason.BudgetExhausted))
                 }.bindEvidence(identity, provesResults = false)
             }
 
