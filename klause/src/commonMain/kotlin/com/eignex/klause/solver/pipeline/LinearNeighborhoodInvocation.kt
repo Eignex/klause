@@ -6,6 +6,7 @@ import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -22,9 +23,11 @@ internal fun linearNeighborhoodInvocation(
     val prepared = preparedSource ?: model.prepareExecutionPlan(objective)
     val source = prepared.originalSource as? Problem ?: model
     val identity = ModelIdentity.of(source, objective)
+    val binding = EngineInvocation(prepared, identity, objective)
     val stop = params.cancellation or params.timeout
     val factories = List(count) { index ->
-        PortfolioArmFactory(prepared, index, if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch) { slot ->
+        PortfolioArmFactory(prepared, index, if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch,
+            bind = { it.bindInvocation(binding) }) { slot ->
             val local = params.copy(openWorkLimit = slot.nativeAllowance(params.openWorkLimit),
                 maxLeaves = slot.nativeAllowance(params.maxLeaves),
                 maxDecisions = slot.nativeAllowance(params.maxDecisions),
@@ -41,7 +44,8 @@ internal fun linearNeighborhoodInvocation(
     }
     val portfolio = PortfolioInvocation(prepared, factories,
         PortfolioInvocationControls(parallelism = count, workerSeed = params.randomSeed, cancellation = stop,
-            nodeBudget = params.nodeBudget), PortfolioEvidence(identity, openWitnessVerifier(source, objective)))
+            nodeBudget = params.nodeBudget), PortfolioEvidence(identity, openWitnessVerifier(source, objective))
+            .bindInvocation(binding, stop))
     return portfolio.use {
         if (objective == null) {
             val result = it.solve(stop)

@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -76,6 +77,8 @@ class PortfolioWorker private constructor(
     internal var evidenceScope: SourceScope? = null
         private set
     internal var evidenceInvocation: EngineInvocation? = null
+        private set
+    internal var executionAssumptions: Assumptions? = null
         private set
 
     internal fun bindInvocation(invocation: EngineInvocation): PortfolioWorker = also {
@@ -235,7 +238,7 @@ class PortfolioWorker private constructor(
                 },
                 withInstructions = withInstructionBudget != null,
                 closeFn = { session.close() },
-            )
+            ).also { it.executionAssumptions = params.assumptions }
         }
 
         /**
