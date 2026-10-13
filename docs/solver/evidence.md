@@ -230,6 +230,15 @@ worker has no runtime invocation; model binding and an engine family cannot repl
 that input. Native in-search publication and remaining leaf witness migration have
 their own transport contracts.
 
+The public `PortfolioBuilder.build` and `buildExplicit` worker-list entry points
+prepare one actual finite source invocation for their operation and bind each
+worker's post-recipe execution assumptions separately. Their containing binding
+is retained on every worker, so `Portfolio.thompson` can bind its default evidence
+consumer to that shared query. Internal source factories receive the existing
+prepared plan from their caller and perform their binding there. This preserves
+source completion without a model/kind issuer or a second prepared plan inside
+the common pipeline.
+
 Runtime admission compares the actual prepared plan, execution identity/objective,
 original and execution restrictions, and optional capture scope. Execution cutoffs
 retain native minimized units separately from an optional original-source bound;
