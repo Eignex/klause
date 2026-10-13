@@ -297,7 +297,8 @@ assumptions, preserving the accumulated bound and all residual terms.
 
 Published incumbents project away auxiliary selectors and pass the source fixpoint
 check. Optimality requires exact equality between the original objective and the
-accumulated lower bound. Shared scalar floors round downward; they do not replace
+accumulated lower bound. A previously checked incumbent that matches a completed
+core bound closes optimization without another assumption query. Shared scalar floors round downward; they do not replace
 the exact internal comparison. The finite scalar terminal carrier cannot retain a
 wide exact bound separately from rounded point telemetry. Core workers with an
 objective range beyond exact binary64 integers therefore withhold source terminal
