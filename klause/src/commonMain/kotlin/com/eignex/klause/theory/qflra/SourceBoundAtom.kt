@@ -1,33 +1,32 @@
+@file:Suppress("DEPRECATION")
+
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.SearchContext
-import com.eignex.klause.solver.search.SearchIntValue
-import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchTheoryAtom
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SearchValueKey
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.rem
+import com.eignex.klause.solver.search.SourceBoundAtom as SharedSourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundLimits as SharedSourceBoundLimits
+import com.eignex.klause.solver.search.SourceBoundPredicate
+import com.eignex.klause.solver.search.SourceBoundTerm as SharedSourceBoundTerm
 
-/** One exact coefficient over an existing source integer or real variable id. */
+/** Compatibility coefficient over a source integer or real variable id. */
+@Deprecated("Use solver.search.SourceBoundTerm", ReplaceWith("SourceBoundTerm", "com.eignex.klause.solver.search.SourceBoundTerm"))
 data class SourceBoundTerm(
-    /** A [SearchIntValue] or [SearchRealValue]; other source kinds decline registration. */
+    /** Source coordinate. */
     val source: SearchValueKey,
-    /** Exact coefficient in source coordinates. */
+    /** Exact source coefficient. */
     val coefficient: BigFraction,
 )
 
-/** Bounded normalization effort for source expressions and exact thresholds. */
+/** Compatibility limits for exact source normalization. */
+@Deprecated("Use solver.search.SourceBoundLimits", ReplaceWith("SourceBoundLimits", "com.eignex.klause.solver.search.SourceBoundLimits"))
 data class SourceBoundLimits(
     /** Maximum input terms, including duplicates and zeros. */
     val maxTerms: Int = 256,
-    /** Maximum numerator or denominator bits in inputs and normalized results. */
+    /** Maximum numerator or denominator bits. */
     val maxBits: Int = 4096,
 ) {
     init {
@@ -36,47 +35,26 @@ data class SourceBoundLimits(
     }
 }
 
-/**
- * An immutable source-linear bound, independent of LP columns, transformations and finite CP domains.
- *
- * Terms are combined and sorted by source kind/id; constants are moved into [threshold]. Structural
- * equality is canonical within that convention, without identifying positive scalar multiples.
- * The caller verifies that typed source ids belong to the session's immutable source model.
- */
+/** Compatibility representation of a neutral exact source predicate. */
+@Deprecated("Use solver.search.SourceBoundAtom", ReplaceWith("SourceBoundAtom", "com.eignex.klause.solver.search.SourceBoundAtom"))
 class SourceBoundAtom private constructor(
-    private val sourceTerms: List<SourceBoundTerm>,
-    /** Exact bound on the source-linear activity. */
-    val threshold: BigFraction,
-    /** True for an upper bound; false for a lower bound. */
-    val upper: Boolean,
-    /** Whether equality at the threshold is excluded. */
-    val strict: Boolean,
-) : SearchTheoryDecision {
-    /** Source coefficients, returned as a copy to preserve registered meaning. */
-    val terms: List<SourceBoundTerm> get() = sourceTerms.toList()
+    override val sourceBound: SharedSourceBoundAtom,
+) : SourceBoundPredicate {
+    /** Exact source coefficients, copied from the immutable meaning. */
+    val terms: List<SourceBoundTerm> get() = sourceBound.terms.map { SourceBoundTerm(it.source, it.coefficient) }
+    /** Exact source threshold. */
+    val threshold: BigFraction get() = sourceBound.threshold
+    /** True for an upper bound. */
+    val upper: Boolean get() = sourceBound.upper
+    /** Whether equality is excluded. */
+    val strict: Boolean get() = sourceBound.strict
 
-    override fun equals(other: Any?): Boolean = other is SourceBoundAtom &&
-        sourceTerms == other.sourceTerms && threshold == other.threshold && upper == other.upper &&
-        strict == other.strict
+    override fun equals(other: Any?): Boolean = sourceBound == other
+    override fun hashCode(): Int = sourceBound.hashCode()
 
-    override fun hashCode(): Int = ((sourceTerms.hashCode() * 31 + threshold.hashCode()) * 31 + upper.hashCode()) *
-        31 + strict.hashCode()
-
-    /** Exact source branch constructors; unsupported inputs and resource limits decline atomically. */
+    /** Compatibility constructors retaining canonical registration and exact source semantics. */
     companion object {
-        internal fun side(terms: List<SourceBoundTerm>, threshold: BigFraction, upper: Boolean): SourceBoundAtom? {
-            val limits = SourceBoundLimits()
-            if (!threshold.fits(limits)) return null
-            return SourceBoundAtom(normalize(terms, limits) ?: return null, threshold, upper, strict = false)
-        }
-
-        /**
-         * Register `activity + constant <= floor(value)` and `activity + constant >= floor(value) + 1`.
-         *
-         * Every retained coefficient and the constant must be integral, and every retained variable
-         * must be a source integer. This syntactic lattice proof makes the alternatives exhaustive;
-         * arbitrary transformed rational terms can instead use [rationalSplit]. No narrowing occurs.
-         */
+        /** Register exhaustive adjacent integer alternatives without narrowing thresholds. */
         fun integerSplit(
             context: SearchContext,
             terms: List<SourceBoundTerm>,
@@ -84,25 +62,14 @@ class SourceBoundAtom private constructor(
             constant: BigFraction = BigFraction.ZERO,
             limits: SourceBoundLimits = SourceBoundLimits(),
         ): SearchTheoryAtom? {
-            if (!value.fits(limits) || !constant.fits(limits) || constant.den != BIG_ONE) return null
-            val normalized = normalize(terms, limits) ?: return null
-            if (normalized.any { it.source !is SearchIntValue || it.coefficient.den != BIG_ONE }) return null
-            val quotient = value.num / value.den
-            val floor = if (value.num < BIG_ZERO && value.num % value.den != BIG_ZERO) {
-                quotient - BIG_ONE
-            } else {
-                quotient
-            }
-            val upper = BigFraction.of(floor, BIG_ONE) - constant
-            val lower = upper + BigFraction.ONE
-            if (!upper.fits(limits) || !lower.fits(limits)) return null
-            return context.registerAtom(
-                SourceBoundAtom(normalized, upper, upper = true, strict = false),
-                SourceBoundAtom(normalized, lower, upper = false, strict = false),
+            if (terms.size > limits.maxTerms) return null
+            return SharedSourceBoundAtom.integerSplit(
+                compatibility(context), terms.map { SharedSourceBoundTerm(it.source, it.coefficient) }, value,
+                constant, SharedSourceBoundLimits(limits.maxTerms, limits.maxBits),
             )
         }
 
-        /** Register an exact rational upper bound and its lower complement with opposite strictness. */
+        /** Register complementary rational alternatives with opposite strictness. */
         fun rationalSplit(
             context: SearchContext,
             terms: List<SourceBoundTerm>,
@@ -111,42 +78,19 @@ class SourceBoundAtom private constructor(
             constant: BigFraction = BigFraction.ZERO,
             limits: SourceBoundLimits = SourceBoundLimits(),
         ): SearchTheoryAtom? {
-            if (!threshold.fits(limits) || !constant.fits(limits)) return null
-            val normalized = normalize(terms, limits) ?: return null
-            val shifted = threshold - constant
-            if (!shifted.fits(limits)) return null
-            return context.registerAtom(
-                SourceBoundAtom(normalized, shifted, upper = true, strict = strict),
-                SourceBoundAtom(normalized, shifted, upper = false, strict = !strict),
-            )
-        }
-
-        private fun normalize(terms: List<SourceBoundTerm>, limits: SourceBoundLimits): List<SourceBoundTerm>? {
             if (terms.size > limits.maxTerms) return null
-            val coefficients = HashMap<SearchValueKey, BigFraction>()
-            for (term in terms) {
-                val variable = when (val source = term.source) {
-                    is SearchIntValue -> source.variable
-                    is SearchRealValue -> source.variable
-                    else -> return null
-                }
-                if (variable < 0 || !term.coefficient.fits(limits)) return null
-                val sum = (coefficients[term.source] ?: BigFraction.ZERO) + term.coefficient
-                if (!sum.fits(limits)) return null
-                if (sum.isZero) coefficients.remove(term.source) else coefficients[term.source] = sum
-            }
-            return coefficients.map { SourceBoundTerm(it.key, it.value) }.sortedWith(
-                compareBy<SourceBoundTerm> { it.source is SearchRealValue }.thenBy {
-                    when (val source = it.source) {
-                        is SearchIntValue -> source.variable
-                        is SearchRealValue -> source.variable
-                        else -> error("only scalar source variables are normalized")
-                    }
-                },
+            return SharedSourceBoundAtom.rationalSplit(
+                compatibility(context), terms.map { SharedSourceBoundTerm(it.source, it.coefficient) }, threshold,
+                strict, constant, SharedSourceBoundLimits(limits.maxTerms, limits.maxBits),
             )
         }
 
-        private fun BigFraction.fits(limits: SourceBoundLimits): Boolean =
-            num.magnitudeBitLength() <= limits.maxBits && den.magnitudeBitLength() <= limits.maxBits
+        private fun compatibility(context: SearchContext): SearchContext = object : SearchContext by context {
+            override fun registerAtom(positive: SearchTheoryDecision, negative: SearchTheoryDecision): SearchTheoryAtom? =
+                context.registerAtom(
+                    SourceBoundAtom(positive as SharedSourceBoundAtom),
+                    SourceBoundAtom(negative as SharedSourceBoundAtom),
+                )
+        }
     }
 }

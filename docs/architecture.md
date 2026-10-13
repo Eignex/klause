@@ -101,7 +101,7 @@ Packages below are under `com.eignex.klause` in
 | `theory.qfnra` | Complete polynomial-real decision with exact CAD and Boolean search | Reads neutral polynomial formulas and the exact kernel; no finite domains or linear-engine state |
 | `theory.transcendental` | Sound incomplete real function source checks and relaxations | Reads neutral function formulas and numerical kernels; no finite domain state |
 | `solver.pipeline` | Source routing and one verdict surface | Selects theory once; frontends render assignments |
-| `solver.search` | Component protocol, decisions, traversal, retraction, learning and complete checks | Owns shared lifecycle across CP and theory components |
+| `solver.search` | Component protocol, exact source predicates, decisions, traversal, retraction, learning and complete checks | Owns shared lifecycle; no concrete theory, LP, propagation or backtracking dependencies |
 
 ## Boundary validation
 
