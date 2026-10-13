@@ -17,5 +17,10 @@
       "objective": "Long.MAX_VALUE + y",
       "expectedOptimum": "9223372036854775807"
     }
-  ]
+  ],
+  "schema": {
+    "file": "square.schema.json",
+    "sha256": "b6f4ca78ad4b64dcec953030b7d6ecafaa16c0305dbacb79625b5f19dae371b4",
+    "correspondence": "x*x=y, -1<=x<=1; schema y bounds 0<=y<=1 are implied by these original constraints"
+  }
 }

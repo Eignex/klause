@@ -131,6 +131,8 @@ optima are `9223372036854775807` and `9223372036854775808`, which share a binary
 projection. The manifest fixes source hashes; the
 [objective representation probe](../../klause-bench/README.md#objective-representation-probe)
 compares public entries without changing original constraints or direction.
+Its captured square schema exercises named continuous float compilation; declared
+`0<=y<=1` bounds follow from those same original source constraints.
 
 Keep generated outputs and historical campaign bundles outside the repository.
 `klause-bench` contains the active harness, current corpus fixtures, named sets
