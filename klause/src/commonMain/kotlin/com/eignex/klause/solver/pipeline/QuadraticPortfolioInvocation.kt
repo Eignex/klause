@@ -19,11 +19,9 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
-import com.eignex.klause.solver.evidence.checkWitness
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
-import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.evaluateExact
@@ -56,7 +54,7 @@ internal class QuadraticPortfolioInvocation(
     private val expected = sourceInvocation
     private val external = params.timeout or params.cancellation
     private val verification = object : Cancellation {
-        override fun isCancelled(): Boolean = external()
+        override fun isCancelled(): Boolean = native.stopped
         override fun deadline() = external.deadline()
         override fun workMeter(): WorkMeter? = native.polynomial.workMeter()
     }
@@ -103,16 +101,16 @@ internal class QuadraticPortfolioInvocation(
                 nodeBudget = params.strategy.backtrack.nodeBudget ?: params.strategy.localSearch.nodeBudget,
                 reseedStaleThreshold = 0), PortfolioEvidence(identity, CandidateVerifier { candidate ->
                 val sample = candidate.assignment
-                val certificate = sample.witnessCertificate
-                if (certificate?.kind == EvidenceKind.Witness && certificate.model.sameModel(identity) &&
-                    sample.numBoolVars == plan.sourceBoolCount && sample.numIntVars == plan.sourceIntCount &&
-                    sample.numRealVars == plan.sourceRealCount
-                ) when (val checked = requireNotNull(expected).condition.checkWitness(sample, verification)) {
+                val publication = sample.witnessCertificate?.quadraticPublication
+                if (publication == null) {
+                    Verification.Indeterminate("quadratic witness has no actual source publication")
+                } else when (val checked = witness(
+                    QuadraticIncumbent(sample, publication.incumbent.value), evaluation,
+                )) {
                     SourceEvidenceCheck.Checked -> Verification.Accepted(candidate)
                     is SourceEvidenceCheck.Rejected -> Verification.Rejected(checked.reason)
                     is SourceEvidenceCheck.Unavailable -> Verification.Indeterminate(checked.reason)
                 }
-                else Verification.Indeterminate("quadratic witness has no matching original-source check")
             })) { workers ->
             val complete = workers.indices.filter { workers[it].family == ArmFamily.Backtrack }
             PortfolioInvocationPolicy(shares = DoubleArray(workers.size) {
@@ -246,21 +244,20 @@ internal class QuadraticPortfolioInvocation(
             return Verification.Rejected("quadratic terminal has no authority for this source objective")
         }
         if (point == null) return null
-        val sample = point.sample
-        val witness = sample.witnessCertificate
-        if (witness?.kind != EvidenceKind.Witness || !witness.model.sameModel(identity) ||
-            sample.numBoolVars != plan.sourceBoolCount || sample.numIntVars != plan.sourceIntCount ||
-            sample.numRealVars != plan.sourceRealCount
-        ) return Verification.Indeterminate("quadratic terminal has no checked original-source witness")
-        when (val checked = requireNotNull(expected).condition.checkWitness(sample, terminalArithmetic)) {
+        when (val checked = witness(point, terminalArithmetic)) {
             SourceEvidenceCheck.Checked -> Unit
             is SourceEvidenceCheck.Rejected -> return Verification.Rejected(checked.reason)
             is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
         }
-        if (terminalArithmetic.compare(objective.evaluateExact(sample, terminalArithmetic), point.value) != 0) {
-            return Verification.Rejected("quadratic terminal objective differs from its source witness")
-        }
         return null
+    }
+
+    private fun witness(point: QuadraticIncumbent, arithmetic: AlgebraicArithmetic): SourceEvidenceCheck {
+        val publication = point.sample.witnessCertificate?.quadraticPublication
+            ?: return SourceEvidenceCheck.Unavailable("quadratic witness has no actual source publication")
+        return publication.verify(requireNotNull(expected), point, arithmetic) { sample ->
+            checkQuadraticSourceWitness(plan, sample, verification, limits)
+        }
     }
 
     private fun certificate(certificate: QuadraticCertificate, claim: QuadraticClaim): Verification<Unit, Unit>? {

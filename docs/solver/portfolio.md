@@ -72,6 +72,10 @@ invocation, execution assumptions, owned point and execution objective telemetry
 witness check precedes that envelope; a model/kind label cannot replace the checked point.
 Polynomial pool admission consumes the native publication and checks the containing
 invocation, actual point/value and both producer and consumer conditions.
+Quadratic workers retain their original source invocation, point and exact value in
+typed witness publications. Pool and terminal admission check both conditions and
+source feasibility under the shared native allowance; a shared point retains its
+producing publication instead of acquiring another worker's identity.
 Finite real-neighborhood adapters allocate their retained queries when a worker handle
 opens, after runtime binding. Source-checked bound workers publish that actual invocation;
 unbound low-level workers retain checked coordinates without a runtime certificate.
