@@ -10,8 +10,9 @@ reusable mechanisms. Policy chooses when to search or check; mechanisms supply
 propagation, scoring and arithmetic. Dependencies point from policy to mechanism.
 The [solver vision](vision.md) defines the intended common breadth and portfolio
 contract. [Current coverage](formats.md#solving-coverage) describes implemented limits.
-The vision's [active work](vision.md#active-work-toward-the-vision) tracks planned
-refactors; this page describes the implemented architecture.
+The vision records [current execution contracts](vision.md#current-execution-contracts)
+and [remaining work](vision.md#active-work-toward-the-vision); this page describes
+the implemented architecture.
 
 ## From source to result
 
@@ -50,7 +51,8 @@ objective units must survive preparation and reconstruction.
 [portfolios](solver/portfolio.md) define scheduling and result admission.
 [Presolve](solver/presolve.md) defines source reconstruction and phase accounting.
 [Theory services](theories.md) defines peer difference, linear integer, linear real,
-linear mixed, nonlinear integer and polynomial real contracts and their common composition boundary.
+linear mixed, nonlinear integer, polynomial real and transcendental real contracts
+and their common composition boundary.
 [LP architecture](lp/architecture.md) defines numerical ownership and consumers.
 
 ## Repository modules
@@ -80,7 +82,6 @@ Packages below are under `com.eignex.klause` in
 | `propagation` | Finite domains, explanations and incremental propagators | May use immutable arithmetic representations |
 | `arithmetic.polynomial` | Exact sparse polynomials, elimination determinants and rational real-root isolation | Only `arithmetic.polynomial`, `simplex.exact` and `util`; no model or solver state |
 | `arithmetic.quadratic` | Exact convex quadratic bounds, attainment, approach paths and improving rays | Only `arithmetic.quadratic`, `simplex.exact` and `util`; source/result scope belongs to adapters |
-| `arithmetic.transcendental` | Certified rational exp/log/sin/cos enclosures and domain-bound affine relaxations | Only `arithmetic.transcendental`, `simplex.exact` and `util`; no source or solver verdict ownership |
 | `arithmetic.transcendental` | Certified rational function enclosures and affine relaxations | Only `arithmetic.transcendental`, `simplex.exact` and `util`; source truth belongs to adapters |
 | `arithmetic.real` | Exact symbolic real values with algebraic leaves and certified comparison | Only numerical kernels and neutral controls; no source model or solver state |
 | `arithmetic.difference` | Difference constraints, extraction and non-incremental graph operations | No propagation or search state |
