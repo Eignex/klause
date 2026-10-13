@@ -590,6 +590,14 @@ installed-jar hashes remain in the profile output. Self-authored `strict-min.smt
 `smoke-corpus/linear-authority` exercise these source semantics. Boolean coverage uses
 an unconstrained declared Boolean beside a strict real row; guarded formulas are outside
 this independent parser's subset.
+`--condition=path.json` captures caller restrictions by original declaration name:
+`bools` contains Boolean pins; `lower` and `upper` contain exact integer or rational
+strings. The profile retains those bytes and their hash and passes the same file as
+the checker's optional third argument. Conditional assumptions, points, approach
+endpoints and rays are checked against those separate caller bytes; a conditional
+proof cannot be checked as a parent proof by omitting or weakening its restrictions.
+`conditioned-affine.smt2` and `conditioned-affine.condition.json` exercise a Boolean
+pin, a real pin at `1/3` and an integer pin at `2^64`.
 `admission-box.smt2` is a self-authored bounded real source beyond the numerical
 authority's column ceiling. With `--work=8` it checks the retained source witness
 from feasibility fallback; `--work=1` checks that the authority attempt cannot renew

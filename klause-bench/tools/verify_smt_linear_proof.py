@@ -129,7 +129,7 @@ def implied(row, original):
     return bound >= scale * rhs and (not strict or original_strict or bound > scale * rhs)
 
 
-def verify(source, record):
+def verify(source, record, condition_source=None):
     assert record["sourceSHA256"] == hashlib.sha256(source).hexdigest()
     declarations, source_rows, rounded, (objective, constant), maximize = parse_smt(source.decode())
     mapping = record["columns"]
@@ -137,6 +137,24 @@ def verify(source, record):
     prefixes = {"Bool": "Boolean", "Int": "Integer", "Real": "Real"}
     assert all(mapping[name].startswith(prefixes[sort] + "/") for name, sort in declarations.items())
     inverse = {coordinate: name for name, coordinate in mapping.items()}
+    condition = json.loads(condition_source) if condition_source is not None else {}
+    assert set(condition) <= {"bools", "lower", "upper"}
+    assert record.get("conditionSHA256") == (
+        hashlib.sha256(condition_source).hexdigest() if condition_source is not None else None)
+    bool_pins, assumptions = {}, {}
+    for name, pinned in condition.get("bools", {}).items():
+        assert declarations[name] == "Bool" and type(pinned) is bool
+        bool_pins[mapping[name]] = pinned
+        source_rows.extend([({name: F(1)}, F(int(pinned)), False),
+                            ({name: F(-1)}, F(-int(pinned)), False)])
+    for side in ("lower", "upper"):
+        for name, raw in condition.get(side, {}).items():
+            assert declarations[name] in {"Int", "Real"}
+            bound = number(raw)
+            upper = side == "upper"
+            sign = F(1) if upper else F(-1)
+            assumptions[mapping[name], upper] = ({mapping[name]: sign}, sign * bound, False)
+            source_rows.append(({name: sign}, sign * bound, False))
     cost = clean({coordinate: number(value) for coordinate, value in record["objective"].items()})
     assert {inverse[key]: value for key, value in cost.items()} == objective
     assert number(record["constant"]) == constant and record["maximize"] == maximize
@@ -197,6 +215,8 @@ def verify(source, record):
         sign = F(1) if maximize else F(-1)
         target = {key: sign * coefficient for key, coefficient in cost.items()}
         rhs = None if bound is None else sign * (bound - constant)
+        if rhs is not None:
+            target, rhs = substitute(target, rhs, bool_pins)
 
         def step(depth):
             nonlocal steps
@@ -247,7 +267,7 @@ def verify(source, record):
                 contradiction = not terms and (bound < 0 or bound == 0 and leaf_strict)
                 assert contradiction or (rhs is not None and terms == target and
                                          (bound < rhs or bound == rhs and (not strict or leaf_strict)))
-        coverage(proof, {}, {})
+        coverage(proof, assumptions, bool_pins)
 
     kind = record["kind"]
     if kind in {"optimal", "limit"}:
@@ -278,9 +298,11 @@ def verify(source, record):
     if global_bound is not None:
         proof_check(global_proof, number(global_bound))
     return {"sourceSHA256": record["sourceSHA256"], "claim": kind, "checked": True,
-            "checker": "smt-linear-fraction-v1", "globalBound": global_bound}
+            "conditionSHA256": record.get("conditionSHA256"),
+            "checker": "smt-linear-fraction-v2", "globalBound": global_bound}
 
 
 if __name__ == "__main__":
-    assert len(sys.argv) == 3, "usage: verify_smt_linear_proof.py original.smt2 capture.json"
-    print(json.dumps(verify(Path(sys.argv[1]).read_bytes(), json.loads(Path(sys.argv[2]).read_text()))))
+    assert len(sys.argv) in {3, 4}, "usage: verify_smt_linear_proof.py original.smt2 capture.json [condition.json]"
+    print(json.dumps(verify(Path(sys.argv[1]).read_bytes(), json.loads(Path(sys.argv[2]).read_text()),
+                            Path(sys.argv[3]).read_bytes() if len(sys.argv) == 4 else None)))
