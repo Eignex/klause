@@ -48,8 +48,8 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.BooleanBranching
-import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecisionBudget

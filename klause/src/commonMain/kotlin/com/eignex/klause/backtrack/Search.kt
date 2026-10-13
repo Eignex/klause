@@ -32,8 +32,8 @@ import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.ComponentCheck
-import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet

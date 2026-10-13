@@ -4,14 +4,14 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.TheoryComponent
-import com.eignex.klause.solver.search.PreparingSearchComponent
-import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.solver.search.completedSearchSample
+import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.util.Cancellation
 
 internal class PolynomialSearchComponent(

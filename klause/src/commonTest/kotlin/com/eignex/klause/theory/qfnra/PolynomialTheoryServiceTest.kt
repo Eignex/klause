@@ -15,6 +15,34 @@ import kotlin.test.assertTrue
 
 class PolynomialTheoryServiceTest {
     @Test
+    fun `projection continuation retains native charges and refutation`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (= y (* x x)))
+            (assert (< y 0))
+        """.trimIndent())
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val complete = service.invocation().use { assertIs<QfNraResult.Unsatisfiable>(it.check()) }
+
+        service.invocation(QfNraParams(maximumWork = complete.stats.workSpent + 1)).use { invocation ->
+            val pending = invocation.prepareCheck()
+            var result: QfNraResult? = null
+            var pauses = 0
+            while (result == null) {
+                result = pending.next()
+                if (result == null) pauses++
+            }
+
+            assertIs<QfNraResult.Unsatisfiable>(result)
+            assertTrue(pauses > 2)
+            assertEquals(complete.stats, result.stats)
+            assertEquals(complete.stats, invocation.stats)
+            assertEquals(1L, invocation.queries)
+        }
+    }
+
+    @Test
     fun `paused query retains native work without repeating preparation`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
