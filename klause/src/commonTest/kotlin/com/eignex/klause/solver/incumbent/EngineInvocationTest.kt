@@ -65,4 +65,20 @@ class EngineInvocationTest {
             assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(point, Cancellation.Never))
         }
     }
+
+    @Test
+    fun `weaker execution assumptions cannot admit a point outside the source query`() {
+        val point = Sample(booleanArrayOf(false), longArrayOf(3))
+        val variants = listOf(
+            Assumptions(bools = mapOf(0 to true)),
+            Assumptions.None.withTightenedMin(0, 4),
+            Assumptions.None.withIntHole(0, 3),
+        )
+
+        for (assumptions in variants) {
+            val binding = EngineInvocation(plan, model, objective, assumptions, Assumptions.None)
+
+            assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(point, Cancellation.Never))
+        }
+    }
 }

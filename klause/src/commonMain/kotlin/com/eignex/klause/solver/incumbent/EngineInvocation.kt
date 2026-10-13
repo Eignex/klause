@@ -29,6 +29,7 @@ internal class EngineInvocation(
     private val sourcePins = snapshot(sourceAssumptions)
     private val executionPins = snapshot(executionAssumptions)
     val sourceCondition: SourceCondition = sourcePins.sourceCondition()
+    private val sourceWitnessCondition: SourceCondition = executionCondition(sourcePins)
     val executionCondition: SourceCondition = executionCondition(executionPins)
     val sourceObjective: LinearObjective? get() = preparedPlan.objective
     val sense: ObjectiveSense get() = if (preparedPlan.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
@@ -55,9 +56,17 @@ internal class EngineInvocation(
         sourcePins == other.sourcePins && executionPins == other.executionPins && scope == other.scope
 
     fun checkWitness(sample: Sample, cancellation: Cancellation): SourceEvidenceCheck {
-        val checked = executionCondition.checkWitness(sample, cancellation)
+        val source = checkRestrictions(sample, sourcePins, sourceWitnessCondition, cancellation)
+        if (source != SourceEvidenceCheck.Checked || sourcePins == executionPins) return source
+        return checkRestrictions(sample, executionPins, executionCondition, cancellation)
+    }
+
+    private fun checkRestrictions(
+        sample: Sample, pins: Assumptions, condition: SourceCondition, cancellation: Cancellation,
+    ): SourceEvidenceCheck {
+        val checked = condition.checkWitness(sample, cancellation)
         if (checked != SourceEvidenceCheck.Checked) return checked
-        val deductions = executionPins.deductions
+        val deductions = pins.deductions
         for (i in deductions.intHoleVarIds.indices) {
             if (cancellation()) return SourceEvidenceCheck.Unavailable("runtime condition check cancelled")
             val id = deductions.intHoleVarIds[i]
