@@ -47,6 +47,27 @@ def check_record(source_bytes, record):
     if record.get('publicationCount', 0) > 0 and record['kind'] == 'Optimal':
         assert record['acceptedIdentityRetained'], 'final optimum lost accepted publication identity'
         assert record['acceptedVersion'] == record['publicationCount'], 'accepted version differs from publication order'
+    publications = record.get('publications')
+    if publications is not None:
+        assert len(publications) == record['publicationCount'], 'publication count differs'
+        standing = None
+        for version, publication in enumerate(publications, 1):
+            assert publication['version'] == version, 'publication version differs'
+            checked = check_record(source_bytes, dict(sourceHash=record['sourceHash'], sense=record['sense'],
+                                                     kind='Bounded', witness=publication['witness'],
+                                                     value=publication['value']))
+            assert checked['witnessCheck'] == 'Checked', 'publication lacks an exact source witness'
+            value = Fraction(publication['value'])
+            if standing is not None:
+                improves = value < standing if record['sense'] == 'MINIMIZE' else value > standing
+                assert improves, 'publication does not strictly improve the original objective'
+            standing = value
+        if publications:
+            assert record['acceptedIdentityRetained'], 'final result lost accepted publication identity'
+            assert record['acceptedVersion'] == len(publications), 'final accepted version differs'
+            assert Fraction(record['value']) == standing, 'final accepted value differs'
+            assert list(map(Fraction, record['witness'])) == list(map(Fraction, publications[-1]['witness'])), \
+                'final accepted witness differs'
     witness = record.get('witness')
     if witness is None or record.get('value') is None or any(value is None for value in witness):
         return {'witnessCheck': 'Unavailable', 'terminalCheck': 'Unavailable'}

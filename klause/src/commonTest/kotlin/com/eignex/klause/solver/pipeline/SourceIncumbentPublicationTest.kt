@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -79,6 +80,24 @@ class SourceIncumbentPublicationTest {
         assertTrue(value > BigFraction.ZERO && value <= BigFraction.ONE)
         assertEquals(receipt.sample.exactReals?.single(), value)
         assertIs<OpenTheoryOptimum.Bounded>(result.result)
+    }
+
+    @Test
+    fun `successive maximized improvements retain their installation order`() {
+        val model = Problem(1, 0, emptyArray(), arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val request = OpenTheoryRequest(model, LinearObjective(realCoefficients = doubleArrayOf(1.0)), maximize = true)
+        val observed = mutableListOf<SourceIncumbentPublication>()
+
+        val result = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(request,
+            TheoryParams(openWorkLimit = 1000, maxFlips = 0), FiniteEngine.BACKTRACK, 1, observed::add))
+
+        assertEquals(listOf(1L, 2L), observed.map { it.version })
+        val values = observed.map { assertIs<SourceValue.Rational>(it.value).value }
+        assertTrue(values[0] < values[1])
+        assertEquals(BigFraction.ofLong(2), values[1])
+        assertSame(observed.last(), result.acceptedIncumbent)
     }
 
     @Test

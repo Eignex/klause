@@ -57,7 +57,7 @@ internal fun FinitePipeline.portfolioExecutor(
     val factories = PortfolioBuilder.factories(problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
         profile).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, bind = { worker ->
-            worker.bindInvocation(EngineInvocation(preparedPlan, identity, objective,
+            worker.bindSharingInvocation(binding).bindInvocation(EngineInvocation(preparedPlan, identity, objective,
                 executionAssumptions = worker.executionAssumptions ?: Assumptions.None))
         }) { slot -> factory.materialize(slot.index, slot.baseSeed, slot.nodeBudget) }
     }

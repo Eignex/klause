@@ -61,7 +61,9 @@ identities: a fresh or transformed model needs its own check, even if structural
 equivalent. Copies of unchanged exact witnesses retain their source certificate;
 coordinate changes and warm-start projections discard it. Objective changes cannot reuse
 objective bounds or unboundedness claims. Unconditional variable bounds use the model
-scope without an objective.
+scope without an objective. Finite factories bind shared root channels to the containing
+invocation and publications to the worker's actual post-edit execution assumptions.
+A conditional root floor or integer window cannot prune siblings with weaker conditions.
 
 Verification preserves three outcomes. Accepted witnesses may become incumbents;
 rejected proposals quarantine their producer without proving the model infeasible;
