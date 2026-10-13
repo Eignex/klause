@@ -209,7 +209,7 @@ class ResumableMinimizeTest {
             }.iterator()
         }
         val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
-        val objective = LinearObjective(boolCoefficients = longArrayOf(1))
+        val objective = LinearObjective(boolWeights = longArrayOf(1))
         val search = BacktrackSolver(problem).resumable(objective,
             BacktrackParams(componentFactory = { listOf(component) }))
         assertEquals(0, batches)
