@@ -132,17 +132,34 @@ def source_formula(text):
     return variables, constraints
 
 
-def witness_values(witness, variables):
+def witness_values(witness, variables, allow_unused_division=False):
     parsed = expressions(witness)
     assert len(parsed) == 1, 'invalid witness envelope'
     definitions = parsed[0]
     if definitions and definitions[0] == 'model':
         definitions = definitions[1:]
     values = {}
+    unused_division_seen = False
     for definition in definitions:
-        assert len(definition) == 5 and definition[0] == 'define-fun' and definition[2] == [], 'invalid witness definition'
-        _, name, _, sort, expression = definition
+        assert isinstance(definition, list) and len(definition) == 5 and definition[0] == 'define-fun', \
+            'invalid witness definition'
+        _, name, parameters, sort, expression = definition
+        assert isinstance(name, str), 'invalid model name'
         name = symbol(name)
+        if parameters:
+            assert allow_unused_division and name == '/0' and name not in variables, \
+                'unsupported auxiliary model definition'
+            assert not unused_division_seen, 'duplicate auxiliary model definition'
+            assert isinstance(parameters, list) and len(parameters) == 2 and sort == 'Real' and all(
+                isinstance(parameter, list) and len(parameter) == 2 and
+                isinstance(parameter[0], str) and symbol(parameter[0]) and parameter[1] == 'Real'
+                for parameter in parameters
+            ), 'invalid auxiliary division signature'
+            assert symbol(parameters[0][0]) != symbol(parameters[1][0]), 'duplicate auxiliary parameter'
+            # Source admission excludes divisions whose value could depend on this completion.
+            unused_division_seen = True
+            continue
+        assert parameters == [], 'invalid witness definition'
         assert name in variables and name not in values, 'unknown or duplicate model variable'
         assert str(variables[name].sort()) == sort, 'model sort differs from source declaration'
         if sort == 'Bool':
@@ -181,7 +198,7 @@ def contains_zero_power(expression, cache):
 
 def check_witness(text, witness):
     variables, constraints = source_formula(text)
-    values = witness_values(witness, variables)
+    values = witness_values(witness, variables, allow_unused_division=True)
     model = z3.Model()
     for name, variable in variables.items():
         model.update_value(variable, values[name])
