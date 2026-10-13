@@ -103,6 +103,15 @@ retraction removes that scope. Root
 checks can substitute newly fixed columns. Disequalities re-evaluate their justified
 direction against active bounds, and complete witnesses still check source rows.
 
+Source-bound registrations pair prepared execution descriptors with component
+factories. The collection validates canonical source identity and rejects duplicate
+factor and coordinate ownership before invoking a factory. Standard CP,
+Boolean and arithmetic opening uses that collection; the traversal does not select
+concrete arithmetic routes. Factories create fresh component instances and retain
+their optional branching, model-blocking and conflict-resolution capabilities.
+Repeated opening shares read-only source data and completed projections, preserving
+the default component and branch order.
+
 ## Finite propagation
 
 Fresh presolve rebuilds retain the originating cancellation token and accounting
