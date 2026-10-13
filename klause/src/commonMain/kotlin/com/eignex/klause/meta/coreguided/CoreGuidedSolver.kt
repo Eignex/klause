@@ -5,8 +5,8 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
-import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.Session
+import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
