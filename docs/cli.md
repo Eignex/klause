@@ -111,8 +111,10 @@ without an optimization conclusion, and renders algebraic objectives with exact
 root terms. `optimizationStatus` and checked bound metadata remain terminal.
 
 `ArithmeticPublication` belongs to one CLI invocation. It suppresses repeated
-rendered witnesses with the same retained exact objective representation and
-counts successful emissions. Each arithmetic witness is flushed to stdout before
+accepted identities, or repeated rendered witnesses with the same retained exact
+objective representation, and counts successful emissions. Source refinement runs
+before identity handling, so a source veto cannot be bypassed by a duplicate token.
+Each arithmetic witness is flushed to stdout before
 publication returns; output failure propagates to the caller. Linear and quadratic
 terminal metadata is delivered separately from the incumbent, preserving checked
 bounds and nonattainment status without repeating an emitted model. Linear limits

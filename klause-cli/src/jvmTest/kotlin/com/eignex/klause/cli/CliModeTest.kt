@@ -46,6 +46,47 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModeTest {
+    @Test
+    fun `ordinary linear CLI keeps a feasible witness distinct from its strict infimum`() {
+        val source = File.createTempFile("linear-cli-infimum", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (> x 0)) (minimize (+ 5 x)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "--presolve", "off", source.absolutePath)))
+        }
+
+        assertTrue("sat" in text.lines(), text)
+        assertTrue("; optimizationStatus=unattained-infimum" in text.lines(), text)
+        assertTrue("; objectiveBound=5" in text.lines(), text)
+        assertTrue("; objectiveBoundDirection=lower" in text.lines(), text)
+        assertTrue("; objectiveBoundStrict=true" in text.lines(), text)
+        assertEquals(1, text.lines().count { it.startsWith("; objective=") }, text)
+        assertFalse("; objective=5.0" in text.lines(), text)
+        assertFalse("; optimizationStatus=optimal" in text.lines(), text)
+    }
+
+    @Test
+    fun `ordinary mixed linear CLI preserves an integer recession claim`() {
+        val source = File.createTempFile("linear-cli-integer-ray", ".smt2").apply {
+            writeText("(declare-const i Int) (declare-const x Real) " +
+                "(assert (= x (to_real i))) (minimize (+ 5 i)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "--presolve", "off", source.absolutePath)))
+        }
+
+        assertTrue("sat" in text.lines(), text)
+        assertTrue("; optimizationStatus=unbounded" in text.lines(), text)
+        assertEquals(1, text.lines().count { it.startsWith("; objective=") }, text)
+        assertTrue("(define-fun i () Int" in text || "(define-fun |i| () Int" in text, text)
+        assertTrue("(define-fun x () Real" in text || "(define-fun |x| () Real" in text, text)
+        assertFalse("; optimizationStatus=optimal" in text.lines(), text)
+    }
+
 
     @Test
     fun `public linear callbacks publish two original source improvements before cancellation`() {
