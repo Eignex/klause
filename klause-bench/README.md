@@ -1303,7 +1303,7 @@ disposing that environment. Keep generated outputs and recordings externally.
 `com.eignex.klause.bench.profile.DiffnNeighborhoodProbe` loads a saved integer
 MiniZinc witness into its compiled finite model and grades bounded structured
 Diffn moves. Pass `suite`, `problem`, original `modelHash` and `dataHash`, the exact
-integer `objective`, `draws=32` (1–256), and `values64`: a base64 JSON object of
+integer `objective`, `draws=32` (1–256), and `values64`: a base64 canonical minified JSON object of
 named integer/Boolean scalar or variable-array values. Supply all searched source
 coordinates from an independently checked witness. Conflicting aliases, changed
 sources, unsupported float coordinates and mismatched objectives decline. Root
@@ -1311,7 +1311,7 @@ pins and definitions are reconciled before scoring; a remaining nonzero complete
 cost records an incomplete/invalid compiled assignment and offers no proposals.
 
 Run it as an AWS lab profile at a trusted pinned revision. It preserves original
-model/data, compiled FlatZinc, supplied values, compiler version and installed
+model/data, compiled FlatZinc, source-variable mappings, supplied values, compiler version and installed
 build/runtime hashes. `proposals.json` records the initial objective and every
 candidate's predicted and committed complete cost, exact integer objective and
 move. Each candidate starts from the same assignment; restoration recomputes
