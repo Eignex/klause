@@ -56,10 +56,12 @@ class SourceResultCapture private constructor(
         }
         if (cancellation() || result.capturedScopes().any { it != context.scope } ||
             result.capturedInvocations().any { !accepts(it) } ||
-            result.evidence?.let { it.engineScope != context.scope } == true
+            result.capturedEvidencePackages().any { it.engineScope != context.scope }
         ) return result
         val expected = result::class
-        val captured = SourceQuadraticResultCapture(context, producer, derivation, boundDerivation).capture(result)
+        val mappings = result.capturedEvidencePackages().flatMap { it.mappings }.distinct()
+        val captured = SourceQuadraticResultCapture(context, producer, derivation, boundDerivation, mappings)
+            .capture(result)
         check(captured::class == expected) {
             "quadratic capture changed $expected to ${captured::class}; input is ${result::class}"
         }

@@ -38,8 +38,7 @@ internal fun matchSourceClaims(
         is SourceClaim.Unbounded -> second is SourceClaim.Unbounded &&
             matchSample(first.sample, second.sample, algebraic)
         is SourceClaim.Clause -> second is SourceClaim.Clause && first.literals == second.literals
-        is SourceClaim.Unbounded -> second is SourceClaim.Unbounded
-    is SourceClaim.Ray -> second is SourceClaim.Ray && first.direction == second.direction &&
+        is SourceClaim.Ray -> second is SourceClaim.Ray && first.direction == second.direction &&
             matchSample(first.sample, second.sample, algebraic)
         is SourceClaim.Consequence -> second is SourceClaim.Consequence && first.inequality == second.inequality
         SourceClaim.Refutation -> second == SourceClaim.Refutation

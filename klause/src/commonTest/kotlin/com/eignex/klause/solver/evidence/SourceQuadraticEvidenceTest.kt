@@ -25,6 +25,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class SourceQuadraticEvidenceTest {
     private val variable = QuadraticVariable.Int(SourceIntId(0))
@@ -201,5 +202,43 @@ class SourceQuadraticEvidenceTest {
 
         assertEquals(result, captured)
         assertNull(captured.evidence)
+    }
+
+    @Test
+    fun `quadratic recapture retains existing transformation payloads`() {
+        val context = assertNotNull(model.quadraticSourceProofContext(scope, objective))
+        val zero = AlgebraicArithmetic().rational(BigFraction.ZERO)
+        val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(0)), zero)
+        val identity = ModelIdentity.of(model, objective)
+        val mapping = SourceMappingEvidence(scope, null, listOf(null))
+        val evidence = SourceResultEvidence(scope, emptyList()).withMappings(scope, listOf(mapping))
+        val bound = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Bound)
+        val terminal = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Optimal)
+        val result = QuadraticOptimizationResult.Optimal(point, QuadraticObjectiveBound(zero, false, bound),
+            terminal, ObjectiveSense.MINIMIZE, SolveStats.EMPTY, evidence)
+
+        val captured = assertIs<QuadraticOptimizationResult.Optimal>(SourceResultCapture(context).quadratic(
+            result, "fixture-engine", boundDerivation = SourceQuadraticBoxDerivation))
+
+        assertSame(mapping, assertNotNull(captured.evidence).mappings.single())
+        assertSame(mapping, assertNotNull(captured.bound.certificate.evidence).mappings.single())
+    }
+
+    @Test
+    fun `quadratic recapture cannot erase withheld bound admission`() {
+        val context = assertNotNull(model.quadraticSourceProofContext(scope, objective))
+        val zero = AlgebraicArithmetic().rational(BigFraction.ZERO)
+        val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(0)), zero)
+        val identity = ModelIdentity.of(model, objective)
+        val original = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Bound)
+        val evidence = SourceResultEvidence(scope, emptyList()).withMappings(null, emptyList())
+        val bound = QuadraticCertificate.captured(original, QuadraticClaim.Bound, evidence)
+        val terminal = QuadraticCertificate.attested(identity, scope, QuadraticClaim.Optimal)
+        val result = QuadraticOptimizationResult.Optimal(point, QuadraticObjectiveBound(zero, false, bound),
+            terminal, ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+
+        val captured = SourceResultCapture(context).quadratic(result, "fixture-engine")
+
+        assertSame(result, captured)
     }
 }
