@@ -1,0 +1,231 @@
+{
+  "version": 1,
+  "license": "Apache-2.0",
+  "attribution": "Self-authored Klause original objective publication regression inputs",
+  "cases": [
+    {
+      "file": "mixed-minimize.affine.smt2",
+      "sha256": "50c49af7e06f134c985cd447461d6bab3664394eca0437ef695bd18c9ec1521b",
+      "family": "mixed-minimize",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed",
+        "ls",
+        "alns",
+        "mixed"
+      ]
+    },
+    {
+      "file": "mixed-minimize.zero-square.smt2",
+      "sha256": "46337b802bc345b031c2a0ba9e566fa190fd90d11457ca263c4e97235fbe72dd",
+      "family": "mixed-minimize",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed",
+        "ls",
+        "alns",
+        "mixed"
+      ]
+    },
+    {
+      "file": "mixed-maximize.affine.smt2",
+      "sha256": "c6b047cf998612ff74dc737e662b0430943b99a22a2972101bc2ff8e21c0ccae",
+      "family": "mixed-maximize",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed",
+        "ls",
+        "alns",
+        "mixed"
+      ]
+    },
+    {
+      "file": "mixed-maximize.zero-square.smt2",
+      "sha256": "289e8f7dc0d2d6874337992b0219c7b3bc33f981389abead438759d9c51308f8",
+      "family": "mixed-maximize",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed",
+        "ls",
+        "alns",
+        "mixed"
+      ]
+    },
+    {
+      "file": "rational-minimize.affine.smt2",
+      "sha256": "3c41fa5393f868c987bad0a3efd42259a74fa5926fa40ee43ebabf6d4c1733c5",
+      "family": "rational-minimize",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed",
+        "ls",
+        "alns",
+        "mixed"
+      ]
+    },
+    {
+      "file": "rational-minimize.zero-square.smt2",
+      "sha256": "7701c37bd850957f5a60465f5b816b91441a49c3e431fd34924fe4a51802ffa4",
+      "family": "rational-minimize",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed",
+        "ls",
+        "alns",
+        "mixed"
+      ]
+    },
+    {
+      "file": "rational-maximize.affine.smt2",
+      "sha256": "af85cd30783453697351a41f3ba872abf59ce4438eef0407f514078565197856",
+      "family": "rational-maximize",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed",
+        "ls",
+        "alns",
+        "mixed"
+      ]
+    },
+    {
+      "file": "rational-maximize.zero-square.smt2",
+      "sha256": "612bdc2408510948f620302c6719eef41b42550d77e5f8edee4709ee8e51f2b3",
+      "family": "rational-maximize",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed",
+        "ls",
+        "alns",
+        "mixed"
+      ]
+    },
+    {
+      "file": "algebraic-min.affine.smt2",
+      "sha256": "12cbc5978937aea33f7e41a2115c5a0fae69731a97ac8ab721266ca1115f79ee",
+      "family": "algebraic-min",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "algebraic-min.zero-square.smt2",
+      "sha256": "097a9c533600add2bd68d22890fc078ca0bdbeecb72824ecd366e747f2454298",
+      "family": "algebraic-min",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "algebraic-max.affine.smt2",
+      "sha256": "53c9122e8fbc2b0b77cb0ac37ddb76c26ccc4a04897a284f9b9a0a56e500ce9b",
+      "family": "algebraic-max",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "algebraic-max.zero-square.smt2",
+      "sha256": "b63118c03125616000343c92d020d5d0eb19e831518ede4e331f75bf3835c315",
+      "family": "algebraic-max",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "strict-min.affine.smt2",
+      "sha256": "7320117d3996ec10358713d2a284796285f8be5166c7ba796a6e8810868626a3",
+      "family": "strict-min",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "strict-min.zero-square.smt2",
+      "sha256": "9af5acf46237ceafbb0fcc475134d21e160fbc31efb1ce41f16c0db5c0817b34",
+      "family": "strict-min",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "strict-max.affine.smt2",
+      "sha256": "06586570b43b33791849a1c1ac8aeba617dd7ff1ae1746cac175cd85576d00bb",
+      "family": "strict-max",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "strict-max.zero-square.smt2",
+      "sha256": "abf3e66dcfb6fb3e58724449e65ad51a5d7f25fa577097fd65f396e0dc24dc75",
+      "family": "strict-max",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "unbounded-min.affine.smt2",
+      "sha256": "e8c0052e5d55f49dc5b89ce9b587ae4d39ff0410f20e081941fc3bf39945c42c",
+      "family": "unbounded-min",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "unbounded-min.zero-square.smt2",
+      "sha256": "a456e74d0e0bd90815e4419731a075068c0d73bf77ed4b240e15c041e7efe6ce",
+      "family": "unbounded-min",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "infeasible.affine.smt2",
+      "sha256": "3a1a235bd536f8c95fd5f1c551d6fc4aabb53e86bd6a575f31a63462f85376f1",
+      "family": "infeasible",
+      "encoding": "affine",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    },
+    {
+      "file": "infeasible.zero-square.smt2",
+      "sha256": "bb7271b1c16d934ced7d9f30aee1214d9772168cd961b5c50092f67599cd7012",
+      "family": "infeasible",
+      "encoding": "zero-square",
+      "engines": [
+        "cp",
+        "fixed"
+      ]
+    }
+  ]
+}
