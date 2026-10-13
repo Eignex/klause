@@ -194,6 +194,10 @@ private fun parseLinearAdmission(
         smtUnsupported("real function source requires exact function lowering")
     }
     val problem = builder.build()
+    if (builder.objectiveSpec != null && problem.model.factors.any {
+            it is ContinuousProduct || it is RealProduct
+        }
+    ) smtUnsupported("polynomial objectives require exact source capture")
     val products = problem.model.factors.any { it is Product || it is RealProduct || it is ContinuousProduct }
     val signedDeclarations = (builder.intNames.keys + builder.realNames.keys + builder.boolNames.keys).any {
         it.length > 1 && it[0] == '-' && it.drop(1).all { digit -> digit in '0'..'9' || digit == '.' }
