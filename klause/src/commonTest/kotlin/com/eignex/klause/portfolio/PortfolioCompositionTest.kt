@@ -64,6 +64,19 @@ class PortfolioCompositionTest {
     }
 
     @Test
+    fun `Boolean objective pools retain a core guided proof worker`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val ordinary = ProblemFacts.assumed(Kind.COP)
+        val facts = ProblemFacts(ordinary.profile, booleanObjective = true) { true }
+
+        val selected = PortfolioComposition.compose(scenario, facts)
+
+        assertIs<CoreGuidedWorkerConfig>(selected.last())
+        assertEquals(PortfolioComposition.compose(scenario, ordinary).map { it.label },
+            selected.dropLast(1).map { it.label })
+    }
+
+    @Test
     fun `finite mixed optimization admits selector diversity without a relaxation`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP).profile

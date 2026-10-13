@@ -5,6 +5,7 @@ import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
@@ -36,6 +37,7 @@ internal class ProblemFacts(
     val binaryIntegers: Boolean = false,
     val continuousObjective: Boolean = false,
     val integerLinear: Boolean = false,
+    val booleanObjective: Boolean = false,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -65,6 +67,8 @@ internal class ProblemFacts(
             integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
                 it is Linear && it.integerConstants != null
             },
+            booleanObjective = objective?.let { CoreGuidedSearch.eligible(problem, it) &&
+                it.boolWeightValues.any { weight -> weight != 0L } } == true,
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
             },
