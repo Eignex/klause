@@ -26,6 +26,25 @@ import kotlin.test.assertTrue
 class GlobalVarBoundSharingTest {
 
     @Test
+    fun `unbound variable shaving retains its native optimum without sharing a window`() {
+        val source = triangleCover()
+        val executable = source.bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+        val model = ModelIdentity.of(executable, objective)
+        val bounds = SharedVarBounds(4, identity = model.forObjective(null))
+        val pools = SharedPools(null, null, varBounds = bounds, identity = model)
+        val config = BacktrackWorkerConfig(BacktrackRecipe("shaving") { _, _ ->
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, variableShaving = true))
+        })
+        val worker = config.materialize(executable, 0, 0, 1L, 1.0, objective, null, null, null, pools)
+
+        val result = worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+
+        assertTrue(result is MinimizeResult.Optimal && result.objectiveValue == 2.0)
+        assertEquals(Long.MIN_VALUE, bounds.lowerOf(3))
+    }
+
+    @Test
     fun `actual native variable shaving reaches a runtime bound pool`() {
         val source = triangleCover()
         val executable = source.bake()

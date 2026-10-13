@@ -12,7 +12,6 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -94,8 +93,7 @@ internal class BacktrackWorkerConfig(
                         val raise = if (invocation != null) {
                             if (v.isFinite()) bounds.publish(CompletedEnginePublication.ObjectiveBound(invocation, v))
                             else 0.0
-                        } else bounds.publish(v, evidenceModel,
-                            EvidenceCertificate.verified(evidenceModel, EvidenceKind.Bound))
+                        } else 0.0
                         matchedPools.contributions.note(Contribution.Floor, index, raise)
                     },
                     objectiveLowerBoundSupplier = bounds::current,
@@ -110,12 +108,6 @@ internal class BacktrackWorkerConfig(
                         val invocation = worker.evidenceInvocation?.takeIf { worker.sharingInvocation != null }
                         if (invocation != null) vb.publish(
                             CompletedEnginePublication.IntegerWindow(invocation, v, lo, hi), origin = index)
-                        else vb.publish(
-                            v, lo, hi, origin = index, model = evidenceModel.forObjective(null),
-                            certificate = EvidenceCertificate.verified(
-                                evidenceModel.forObjective(null), EvidenceKind.Bound,
-                            ),
-                        )
                     },
                     globalVarLowerSupplier = vb::lowerOf,
                     globalVarUpperSupplier = vb::upperOf,
@@ -139,7 +131,7 @@ internal class BacktrackWorkerConfig(
                             val certificate = if (producer != null && consumer != null) {
                                 EvidenceCertificate.published(
                                     CompletedEnginePublication.Witness(producer, sample, value))
-                            } else EvidenceCertificate.verified(evidenceModel, EvidenceKind.Witness)
+                            } else null
                             matchedPools.offerSolution(
                                 evidenceModel, sample, value, certificate, consumer, params.cancellation,
                             )
