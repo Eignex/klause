@@ -280,3 +280,10 @@ foreign or missing terminal admission until the original claim checks.
 Capture does not implement proof file export. [Portfolio publication](portfolio.md)
 owns admission and transport; [LP certification](../lp/certification.md) owns numerical
 evidence; [presolve](presolve.md) owns reconstruction and transformation guarantees.
+
+Independent acceptance checks the original source bytes and declared semantics,
+with separately retained caller conditions and actual claims. The committed
+[benchmark source checkers](../../klause-bench/README.md#offline-source-verifier)
+check their supported affine and quadratic subsets; runtime provenance and engine
+completion remain separate from mathematical verification. Missing retained inputs
+or checker reports cannot supply that acceptance.

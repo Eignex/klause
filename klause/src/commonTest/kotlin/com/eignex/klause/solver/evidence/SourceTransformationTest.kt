@@ -27,6 +27,60 @@ class SourceTransformationTest {
     )))
 
     @Test
+    fun `a missing target coordinate image withholds projection coverage`() {
+        val mapping = SourceTransformation(sourceScope, targetScope, emptyMap(), obligations)
+
+        val checked = SourceTransformationVerifier(source, target).verify(mapping)
+
+        assertIs<SourceEvidenceCheck.Unavailable>(checked)
+    }
+
+    @Test
+    fun `integer projections withhold nonintegral coordinate images`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val original = SourceProofContext(sourceScope, setOf(integer, x), emptyMap(), mapOf(integer to BigFraction.ONE))
+        val reduced = SourceProofContext(targetScope, setOf(integer), emptyMap(), mapOf(integer to BigFraction.ONE))
+        val half = BigFraction.ofLong(2).reciprocal()
+        val images = listOf(
+            SourceAffineImage(mapOf(integer to half)),
+            SourceAffineImage(mapOf(x to BigFraction.ONE)),
+            SourceAffineImage(mapOf(integer to BigFraction.ONE), constant = half),
+        )
+
+        for (image in images) {
+            val mapping = SourceTransformation(sourceScope, targetScope, mapOf(integer to image), emptyMap())
+
+            val checked = SourceTransformationVerifier(original, reduced).verify(mapping)
+
+            assertIs<SourceEvidenceCheck.Unavailable>(checked)
+        }
+    }
+
+    @Test
+    fun `an integral affine image preserves target integer declarations`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val original = SourceProofContext(sourceScope, setOf(integer), emptyMap(), mapOf(integer to BigFraction.ONE))
+        val reduced = SourceProofContext(targetScope, setOf(integer), emptyMap(), mapOf(integer to BigFraction.ONE))
+        val image = SourceAffineImage(mapOf(integer to BigFraction.ofLong(2)), constant = BigFraction.ofLong(3))
+        val mapping = SourceTransformation(sourceScope, targetScope, mapOf(integer to image), emptyMap())
+
+        val checked = SourceTransformationVerifier(original, reduced).verify(mapping)
+
+        assertEquals(SourceEvidenceCheck.Checked, checked)
+    }
+
+    @Test
+    fun `objective projections reject nonpositive scales`() {
+        for (scale in listOf(BigFraction.ZERO, BigFraction.MINUS_ONE)) {
+            val mapping = SourceTransformation(sourceScope, targetScope, images, obligations, objectiveScale = scale)
+
+            val checked = SourceTransformationVerifier(source, target).objective(mapping)
+
+            assertIs<SourceEvidenceCheck.Rejected>(checked)
+        }
+    }
+
+    @Test
     fun `checked projection premises transfer a reduced refutation to original source`() {
         val verdict = SourceTransformationVerifier(source, target).refutation(transformation, refutation)
 
