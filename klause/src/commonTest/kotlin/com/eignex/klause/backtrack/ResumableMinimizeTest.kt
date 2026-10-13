@@ -175,6 +175,25 @@ internal object FiniteCutoffKnapsackFixture {
 
 class ResumableMinimizeTest {
     @Test
+    fun `closing an abandoned improvement stream releases additional peers`() {
+        val closed = ArrayList<Int>()
+        val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
+        val stream = solver.openImprovements(LinearObjective(boolWeights = longArrayOf(-1, -1)),
+            BacktrackParams(componentFactory = {
+                List(2) { index -> object : com.eignex.klause.solver.search.SearchComponent, AutoCloseable {
+                    override fun close() { closed += index }
+                } }
+            }))
+        assertTrue(stream.hasNext())
+        stream.next()
+
+        stream.close()
+        stream.close()
+
+        assertEquals(listOf(1, 0), closed)
+    }
+
+    @Test
     fun `optimization delivers successful deductions to its finite selector`() {
         val deductions = ArrayList<PropagationResult.Implied>()
         val base = com.eignex.klause.backtrack.selector.InputOrder

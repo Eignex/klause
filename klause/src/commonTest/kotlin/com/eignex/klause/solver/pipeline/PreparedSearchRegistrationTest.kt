@@ -11,6 +11,7 @@ import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBoolValue
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchResult
@@ -20,8 +21,76 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertSame
 
 class PreparedSearchRegistrationTest {
+    @Test
+    fun `partial factory construction releases earlier peers and scratch resources`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val closed = ArrayList<String>()
+        val primary = IllegalArgumentException("construction")
+        val cleanup = IllegalStateException("scratch cleanup")
+        val registrations = listOf(
+            PreparedSearchRegistration(source, ExecutionComponentDescriptor("first",
+                ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
+                listOf(object : SearchComponent, AutoCloseable {
+                    override fun close() { closed += "peer" }
+                })
+            },
+            PreparedSearchRegistration(source, ExecutionComponentDescriptor("second",
+                ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) { opening ->
+                opening.own(AutoCloseable { closed += "scratch"; throw cleanup })
+                throw primary
+            },
+        )
+        val prepared = PreparedSearchRegistrations(source, registrations)
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            prepared.open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null)
+        }
+
+        assertSame(primary, failure)
+        assertSame(cleanup, failure.suppressedExceptions.single())
+        assertEquals(listOf("scratch", "peer"), closed)
+    }
+
+    @Test
+    fun `failed component installation releases each constructed peer once`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        var closes = 0
+        val peer = object : SearchComponent, AutoCloseable {
+            override fun close() { closes++ }
+        }
+        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("duplicate",
+            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) { listOf(peer, peer) }
+        val prepared = PreparedSearchRegistrations(source, listOf(registration))
+
+        assertFailsWith<IllegalArgumentException> {
+            prepared.open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null)
+        }
+
+        assertEquals(1, closes)
+    }
+
+    @Test
+    fun `planned search closes every installed peer in reverse order`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val closed = ArrayList<Int>()
+        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("peers",
+            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
+            List(2) { index -> object : SearchComponent, AutoCloseable {
+                override fun close() { closed += index }
+            } }
+        }
+        val search = PreparedSearchRegistrations(source, listOf(registration))
+            .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null)
+
+        search.close()
+        search.close()
+
+        assertEquals(listOf(1, 0), closed)
+    }
+
     @Test
     fun `registered Boolean peers enforce all source clauses`() {
         val source = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(),

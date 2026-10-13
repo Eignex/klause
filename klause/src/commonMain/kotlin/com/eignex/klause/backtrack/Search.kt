@@ -37,6 +37,7 @@ import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchDecisionBudget
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchModelContinuation
 import com.eignex.klause.solver.search.SearchModelPolicy
@@ -50,8 +51,8 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
-import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
@@ -154,7 +155,8 @@ internal class CpSatisfactionTraversal(
     propagationCancellation: Cancellation = params.cancellation,
     private val slice: TraversalSlice? = null,
     projection: PropagationProblem = PropagationProblem(problem),
-) {
+) : AutoCloseable {
+    private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
     private val cp = CpSearchComponent(
         PropagationSession(
@@ -195,9 +197,13 @@ internal class CpSatisfactionTraversal(
     init {
         try {
             completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
-            completion.lpResource?.let(lpResources::add)
+            completion.lpResource?.let {
+                resources.own(it)
+                lpResources.add(it)
+            }
             val lp = if (params.lpConfig != null || params.lpPlan != LpPlan()) {
                 LpFeasibilityComponent(problem, cp, params, sink, solveContext).also {
+                    resources.own(it)
                     lpResources.add(it)
                     rootLp = it
                 }
@@ -209,6 +215,7 @@ internal class CpSatisfactionTraversal(
             completion.addTo(components)
             lp?.let { components += it.component }
             components += params.componentFactory?.invoke().orEmpty()
+            components.forEach(resources::ownComponent)
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
                 cancellation = params.cancellation,
                 learnedDb = params.sharedLearnedDb(),
@@ -329,20 +336,18 @@ internal class CpSatisfactionTraversal(
         }
     }
 
-    /** Close the LP resources; idempotent. */
-    fun close() {
+    /** Close the invocation resources; idempotent. */
+    override fun close() {
         if (closed) return
         closed = true
-        closeLpResources(lpResources)
+        resources.close()
     }
 
     /** Close after [failure], keeping it primary. */
     fun closeAfter(failure: Throwable) {
-        try {
-            close()
-        } catch (closeFailure: Throwable) {
-            failure.addSuppressed(closeFailure)
-        }
+        if (closed) return
+        closed = true
+        resources.closeAfter(failure)
     }
 }
 
@@ -360,19 +365,6 @@ private fun releaseLpResources(resources: List<LpSearchResource>) {
             resource.releasePersistentSolvers()
         } catch (releaseFailure: Throwable) {
             failure?.addSuppressed(releaseFailure) ?: run { failure = releaseFailure }
-        }
-    }
-    failure?.let { throw it }
-}
-
-@Suppress("TooGenericExceptionCaught") // all owned resources must be attempted even when close fails
-private fun closeLpResources(resources: List<LpSearchResource>) {
-    var failure: Throwable? = null
-    for (resource in resources) {
-        try {
-            resource.close()
-        } catch (closeFailure: Throwable) {
-            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
         }
     }
     failure?.let { throw it }

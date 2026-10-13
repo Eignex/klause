@@ -51,6 +51,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecisionBudget
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedConflict
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchModelContinuation
@@ -226,6 +227,9 @@ internal class ResumableMinimize(
         return exact < checkNotNull(BigFraction.ofDouble(cutoff))
     }
 
+    private val resources = SearchInvocationResources().also { owner ->
+        owner.own(AutoCloseable { sink.stop() })
+    }
     // Built once; persists across slices, so warm starts roll forward. Always constructed so the
     // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
     // is off.
@@ -237,7 +241,10 @@ internal class ResumableMinimize(
         val owner = leafSolver ?: LeafRealSolver(
             problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
             LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
-        ).also { leafSolver = it }
+        ).also {
+            resources.own(it)
+            leafSolver = it
+        }
         return owner.solve(sample, cancellation, params.toleranceCheck)
     }
 
@@ -325,7 +332,9 @@ internal class ResumableMinimize(
             sink.search.rootPropagationNanos = { it.session.rootPropagationNanos }
         }
         yield(Unit)
-        lpEngine = LpEngine(problem, objective, params.lpParams(), sink, solver.lpSolveContext, deferred = true)
+        lpEngine = resources.own(
+            LpEngine(problem, objective, params.lpParams(), sink, solver.lpSolveContext, deferred = true),
+        )
         lpEngine.preparation().forEach { yield(Unit) }
         lpEngine.lpHints = lpHints
         yield(Unit)
@@ -339,7 +348,9 @@ internal class ResumableMinimize(
         searchSession = SearchComponentSet(
             buildList {
                 add(cp)
-                addAll(params.componentFactory?.invoke().orEmpty())
+                addAll(params.componentFactory?.invoke().orEmpty().also { components ->
+                    components.forEach(resources::ownComponent)
+                })
                 if (lpEngine.lpRelaxer != null) {
                     lpEngine.cpAdapter.attach(session, feasibility = false)
                     add(lpEngine.propagator)
@@ -494,28 +505,7 @@ internal class ResumableMinimize(
         if (closed) return
         closed = true
         installation = null
-        var failure: Throwable? = null
-        try {
-            clausePrimal?.close()
-        } catch (closeFailure: Throwable) {
-            failure = closeFailure
-        }
-        try {
-            if (::lpEngine.isInitialized) lpEngine.close()
-        } catch (closeFailure: Throwable) {
-            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
-        }
-        try {
-            leafSolver?.close()
-        } catch (closeFailure: Throwable) {
-            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
-        }
-        try {
-            sink.stop()
-        } catch (closeFailure: Throwable) {
-            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
-        }
-        failure?.let { throw it }
+        resources.close()
     }
 
     // A lazy sequence can be abandoned while suspended, so it must not carry native factors across a yield.
@@ -536,11 +526,10 @@ internal class ResumableMinimize(
     }
 
     private fun closeAfter(failure: Throwable) {
-        try {
-            close()
-        } catch (closeFailure: Throwable) {
-            failure.addSuppressed(closeFailure)
-        }
+        if (closed) return
+        closed = true
+        installation = null
+        resources.closeAfter(failure)
     }
 
     /**
@@ -598,7 +587,7 @@ internal class ResumableMinimize(
                     } ?: params.solveBudgetMillis ?: 10_000L
                     clausePrimal = MonotoneClausePrimal.create(
                         solver, objective, params, runEndToken(), minOf(remaining / 2L, 5_000L).coerceAtLeast(0L),
-                    )
+                    )?.also { resources.own(it) }
                     if (clausePrimal != null) sink.search.clausalPrimalStarts++
                 }
             }
