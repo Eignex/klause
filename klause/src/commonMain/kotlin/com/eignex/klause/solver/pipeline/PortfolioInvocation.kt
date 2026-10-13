@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.portfolio.ArmFamily
+import com.eignex.klause.portfolio.AcceptedPortfolioIncumbent
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.Portfolio
@@ -110,9 +111,11 @@ internal class PortfolioInvocation(
         onImprovement: ((AttributedImprovement) -> Unit)?,
         incumbents: PortfolioIncumbents<V>,
         terminalCheck: PortfolioTerminalCheck? = null,
+        onAccepted: ((AcceptedPortfolioIncumbent<V>) -> Unit)? = null,
     ): MinimizeResult {
         check(!closed) { "portfolio invocation is closed" }
-        return portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents, terminalCheck)
+        return portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents, terminalCheck,
+            onAccepted)
     }
 
     override fun close() {

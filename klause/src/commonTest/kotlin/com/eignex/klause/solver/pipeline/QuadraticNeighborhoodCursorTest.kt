@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 class QuadraticNeighborhoodCursorTest {
     @Test
@@ -102,5 +103,26 @@ class QuadraticNeighborhoodCursorTest {
 
         assertFailsWith<IllegalStateException> { cursor.advance(Cancellation.Never, 1) }
         assertEquals(0L, allowance.instructions)
+    }
+
+    @Test
+    fun `invocation cancellation reaches an atomic repair without using the segment deadline`() {
+        val allowance = QuadraticNeighborhoodAllowance(10, 100, null)
+        var cancelled = false
+        var reached = false
+        val invocation = Cancellation { cancelled }
+        val cursor = QuadraticNeighborhoodCursor(1, false, 1, allowance, Cancellation.Never, { 0 },
+            { _, _, _ -> ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()) },
+            ExactNeighborhoodCompletion { _, stop ->
+                assertFalse(stop())
+                cancelled = true
+                reached = stop()
+                ExactNeighborhoodResult.Undecided
+            }, { false })
+
+        cursor.use { it.advance(Cancellation.Never, 100, invocation) }
+
+        assertTrue(reached)
+        assertEquals(1L, allowance.moves)
     }
 }

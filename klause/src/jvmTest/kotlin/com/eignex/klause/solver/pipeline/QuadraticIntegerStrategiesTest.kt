@@ -61,7 +61,10 @@ class QuadraticIntegerStrategiesTest(private val engine: FiniteEngine) {
             assertIs<QuadraticOptimizationResult.Optimal>(result)
         }
         else assertIs<QuadraticOptimizationResult.BestFound>(result)
-        if (engine != FiniteEngine.BACKTRACK) assertTrue(result.stats.ls.moves.sum > 0)
+        if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
+            assertTrue(result.stats.ls.moves.sum > 0)
+        }
+        if (engine == FiniteEngine.MIXED) assertEquals(3, result.stats.portfolio.arms.size)
         assertEquals(execution.polynomialStats.workSpent + execution.numericalWork, execution.nativeWork)
     }
 

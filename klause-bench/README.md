@@ -428,6 +428,36 @@ Preserve every planned identity and unsuccessful outcome in external evidence.
 
 ## Source validation
 
+### Exact source probes
+
+`com.eignex.klause.bench.profile.QuadraticSourceProbe` runs exact real box sources
+through the public quadratic API. Pass `source=<JSON>` with `semantics=klause-ir-exact-v1`,
+`reals` containing rational `lower`/`upper` declarations, and `objective` containing
+`sense`, rational `constant` and `terms` (`coefficient`, `first`, optional `second`).
+Declarations must have an exact binary64 IR projection. `controls=BACKTRACK:1,MIXED:1,MIXED:4`
+selects engine/lane pairs; `maximumWork` bounds each invocation. The probe saves
+original bytes, actual witnesses/results, source capture outcomes and hashes under
+`out` or `$OUT`, then runs `tools/verify_quadratic_box_results.py` with `python=python3`.
+That independent fractions checker evaluates original coordinates and objective,
+checks supported interval bounds and attainment, and withholds unsupported algebraic
+or stronger bound claims. This does not verify general quadratic rays or proof exports.
+
+`com.eignex.klause.bench.profile.NraSourceCheck` checks actual saved SMT records through
+`tools/verify_nra_source_results.py`. Pass `input=<base64 UTF-8 JSON array>`; each entry
+retains `source`, its SHA-256 `hash`, `feasible`, actual `witness` and producer metadata.
+The bundle checker rejects changed source bytes, ground-checks complete exact witnesses,
+compares refutations with separate queries and leaves incomplete verdicts without claims.
+Its `python` interpreter must have the pinned `tools/requirements-source-checks.txt`
+dependencies. Checking outputs remain outside the repository; retain interpreter and
+dependency identities alongside the original inputs, producer revisions and reports.
+`preparePython=true` explicitly provisions the pinned checker environment on an owned
+Ubuntu analysis instance; its installation and runtime identity log stays under `$OUT`.
+
+Both entry points can run as committed-code lab profiles with explicit AWS host,
+one machine and one parallel command. Use the lab client with
+`LAB_URL=https://lab.eignex.com` for submission, status, remote access and retrieval.
+Build/test/lint gates remain in GitHub CI.
+
 MiniZinc float runs independently check the final complete witness; integer runs
 opt in with `param=source-validation=true`. The cache retains paired FlatZinc/DZN
 `.ozn` mappings keyed by source/data and solver-library contents. Compiler outputs
@@ -812,6 +842,38 @@ It checks exact witnesses, costs, claimed global bounds, strict nonattainment an
 refutations. Approach paths, unbounded trajectories and exported proofs are explicitly
 unavailable from these records. JFR-instrumented elapsed times are diagnostics, not
 an uninstrumented performance comparison. Keep all generated records externally.
+
+### Objective CLI publication probe
+
+`com.eignex.klause.bench.profile.ObjectiveFrontendProbe` runs the installed CLI
+on a directory's original source manifest. Pass `source=<directory>`, optional
+`out=<directory>`, `work=200000` and `checker=none|provision`. Manifest cases name source files,
+hashes, family/encoding identities and selected CLI engines. The probe retains
+original bytes, stdout/stderr/exit, launcher/runtime provenance and per-child JFR.
+Each child uses `-p 1`, seed 17, the recorded native work cap, one LS move/ALNS iteration and
+a 25-second process allowance. Its actual JFR JVM arguments must retain
+`ActiveProcessorCount=1`. Timings include process startup, solving and delivery;
+JFR collection affects them, so they are diagnostics rather than performance claims.
+
+The [objective-cli-v1 manifest](smoke-corpus/objective-cli-v1/manifest.json) fixes
+64 outcomes: mixed product and rational objectives across all five engines, plus
+algebraic, strict-limit, unbounded and infeasible controls through CP/FIXED.
+Paired affine and zero-square objectives preserve original constraints and direction.
+
+```sh
+deploy/lab profile com.eignex.klause.bench.profile.ObjectiveFrontendProbe <branch> \
+  "check original objective publication through the CLI" aws 1800 \
+  source=klause-bench/smoke-corpus/objective-cli-v1 checker=provision
+```
+
+[verify_objective_frontend.py](tools/verify_objective_frontend.py) checks the complete
+manifest matrix, original hashes, exact witnesses/costs, source bound direction,
+global inequalities and strictness. Its one-variable affine controls independently
+check source approach paths and witness-anchored improving rays. Heuristics retain
+BestFound status; MIXED may finish before a heuristic move. Actual engine proof
+export is not captured. Provisioning uses pinned source-check requirements in an
+output-local environment and retains checker/package/runtime identities before
+disposing that environment. Keep generated outputs and recordings externally.
 
 ### Component-split fixtures
 

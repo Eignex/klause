@@ -359,9 +359,29 @@ invocations; fallback ALNS retains its bootstrap and repairs. Nonlinear integer
 traversal retains tuple enumeration, candidate state and arithmetic work across
 slices; exact neighborhoods retain their centers and adaptive state. CLI parallelism
 reaches these factories, and replicas keep private state and native reservations.
-Quadratic mixed execution retains the fixed phases documented in
-[quadratic strategy execution](../theories/polynomial-real.md#quadratic-strategy-execution). The vision's
-[active work](../vision.md#active-work-toward-the-vision) tracks the related refactors.
+Quadratic finite and open-integer adapters supply retained traversal and exact
+neighborhood factories to that invocation. Their exchange keeps original and
+minimized algebraic values separately. A typed terminal publication enters the
+same schedule only after source, condition, objective, authority, witness and exact
+attainment/strictness checks. Scalar worker telemetry remains incomplete; the
+accepted native result retains its optimum, strict limit or ray semantics. An accepted-incumbent
+observer receives the installed immutable assignment, its already evaluated exact
+value and a monotonic invocation version under the schedule lock. It runs only for
+strict verified exchange improvements; callback failures stop the invocation and
+remain primary through retained-handle cleanup. Quadratic route-level observers carry
+`QuadraticIncumbentPublication` with the already evaluated original-direction value.
+Final optimum folding retains the exchange's accepted assignment, value object and
+version when it attains the verified bound; scalar telemetry does not drive publication.
+The latest receipt is the publication incumbent for every termination. Limit/ray
+certificates retain their own checked witness; rendering a terminal marker must not
+re-publish that private witness as another improvement. Atomic neighborhood repairs
+retain scheduler/invocation cancellation while excluding only segment deadlines.
+Single-worker native paths use the same exact publication payload and propagate output
+failure after cleanup. FIXED ignores additional lane requests.
+Heuristic completion cannot finish a source proof. Single-engine execution retains
+its own traversal semantics; FIXED runs one lane. Exact-neighborhood preparation
+contributes to scheduler instruction coverage once; retained slices keep that charge
+separate from moves and atomic repair charges.
 
 Supported linear sources pair complete traversal with exact-coordinate local search
 and adaptive block repair, including real-only models and arbitrary-width integers.

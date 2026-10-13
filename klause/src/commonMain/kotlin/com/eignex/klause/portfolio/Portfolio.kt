@@ -296,6 +296,7 @@ class Portfolio(
         onImprovement: ((AttributedImprovement) -> Unit)?,
         incumbents: PortfolioIncumbents<V>,
         terminalCheck: PortfolioTerminalCheck? = null,
+        onAccepted: ((AcceptedPortfolioIncumbent<V>) -> Unit)? = null,
     ): MinimizeResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSearch>(workers.size))
         val incumbent = incumbents.exchange
@@ -308,6 +309,7 @@ class Portfolio(
         var unbounded: MinimizeResult.Unbounded? = null
         var exhausted = false
         var terminalPublished = false
+        var acceptedVersion = 0L
 
         // Install a strictly-improving incumbent and credit it to [claim]'s arm. Called under the run's lock, so the
         // check, the callback and the install are one step: concurrent lanes report improvements in the order they
@@ -319,6 +321,8 @@ class Portfolio(
             val worker = workers[claim.arm]
             if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
             try {
+                acceptedVersion++
+                onAccepted?.invoke(AcceptedPortfolioIncumbent(acceptedVersion, r.sample, candidate.objective))
                 onImprovement?.invoke(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r))
             } catch (failure: Throwable) {
                 callbackFailure = failure
@@ -453,9 +457,11 @@ class Portfolio(
                     evidenceVerification?.proof(worker, proofKind, terminal?.assignment, terminal?.objectiveValue),
                 )
             }
-            val publication = if (!failed && claim.fault == null) terminalCheck?.check(worker, handle) else null
-            claim.verified(publication?.verification)
             run.locked {
+                val publication = if (!terminalPublished && !failed && claim.fault == null) {
+                    terminalCheck?.check(worker, handle)
+                } else null
+                claim.verified(publication?.verification)
                 val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
                 run.record(
                     claim,

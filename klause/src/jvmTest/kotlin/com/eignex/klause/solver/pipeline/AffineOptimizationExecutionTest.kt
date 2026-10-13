@@ -73,9 +73,10 @@ class AffineOptimizationExecutionTest(
             val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result)
             assertEquals(expected, optimum.bound.value.rational)
         }
-        if (engine != FiniteEngine.BACKTRACK && engine != FiniteEngine.FIXED) {
+        if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
             assertTrue(result.stats.ls.moves.sum > 0)
         }
+        if (engine == FiniteEngine.MIXED) assertEquals(3, result.stats.portfolio.arms.size)
         assertTrue(execution.nativeWork > 0)
     }
 }

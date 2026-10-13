@@ -95,13 +95,13 @@ internal object SolveCore {
                 val execution = when (val request = pipeline.request) {
                     is QuadraticRequest.Polynomial -> OpenTheoryPipeline.minimize(
                         request.request, pipeline.objective, polynomialParams(common, deadlineCancel),
-                        engine, pipeline.sense,
+                        engine, pipeline.sense, openCores,
                     )
                     is QuadraticRequest.Integer -> {
                         val budget = takeNodeBudget(common).also { common.nodeBudget = it }
                         OpenTheoryPipeline.minimize(
                             request.request, pipeline.objective, nonlinearIntegerParams(common, deadlineCancel, budget),
-                            engine, pipeline.sense,
+                            engine, pipeline.sense, openCores,
                         )
                     }
                 }
@@ -121,7 +121,7 @@ internal object SolveCore {
                     output.begin(optimize = true, maximize = pipeline.maximize)
                     val sense = if (pipeline.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
                     val execution = OpenTheoryPipeline.optimize(
-                        pipeline.request, sourceObjective, polynomialParams, engine, sense,
+                        pipeline.request, sourceObjective, polynomialParams, engine, sense, openCores,
                     )
                     reportQuadraticOptimization(
                         execution, { pipeline.render(polynomialAssignment(it)) }, output, common.statistics,

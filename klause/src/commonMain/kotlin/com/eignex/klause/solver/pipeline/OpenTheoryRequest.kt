@@ -236,6 +236,7 @@ object OpenTheoryPipeline {
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
             FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> linearNeighborhoodInvocation(
                 request.model, params, request.minimizedObjective, engine == FiniteEngine.ALNS, cores,
+                request.preparedPlan,
             )
         }
     }

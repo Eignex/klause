@@ -1,3 +1,4 @@
+import hashlib
 import unittest
 from unittest import mock
 
@@ -9,6 +10,30 @@ import verify_nra_source_results as check
 class NraSourceCheckTest(unittest.TestCase):
     positive_sqrt_two = '(root-obj (+ (^ x 2) (- 2)) 2)'
     negative_sqrt_two = '(root-obj (+ (^ x 2) (- 2)) 1)'
+
+    def test_bundle_checks_the_actual_original_witness_and_preserves_producer(self):
+        source = '(declare-const n Int) (assert (= (* n n) 9))'
+        case = {'source': source, 'hash': hashlib.sha256(source.encode()).hexdigest(), 'feasible': True,
+                'witness': '((define-fun n () Int 3))', 'producerCommit': 'actual-producer'}
+
+        with mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+            result = check.check_bundle([case])[0]
+
+        self.assertEqual('actual-producer', result['producerCommit'])
+        self.assertEqual(1, result['assertions'])
+
+    def test_bundle_refuses_foreign_original_bytes(self):
+        with self.assertRaisesRegex(AssertionError, 'source hash mismatch'):
+            check.check_bundle([{'source': '(check-sat)', 'hash': 'foreign'}])
+
+    def test_bundle_unknown_verdict_carries_no_source_claim(self):
+        source = '(check-sat)'
+        case = {'source': source, 'hash': hashlib.sha256(source.encode()).hexdigest(), 'feasible': None}
+
+        with mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+            result = check.check_bundle([case])[0]
+
+        self.assertEqual('incomplete verdict carries no claim', result['check'])
 
     def test_irrational_coordinate_is_checked_without_a_solver_query(self):
         source = '(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0))'

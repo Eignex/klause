@@ -216,13 +216,40 @@ def compare_verdict(text, expected, timeout_ms=120000):
             'proofCertificateChecked': False}
 
 
+def check_bundle(cases, timeout_ms=120000):
+    results = []
+    for case in cases:
+        raw = case['source'].encode('utf-8')
+        assert hashlib.sha256(raw).hexdigest() == case['hash'], 'original source hash mismatch'
+        result = {key: value for key, value in case.items() if key not in ('source', 'witness')}
+        if case['feasible'] is True:
+            result.update(check_witness(case['source'], case['witness']))
+        elif case['feasible'] is False:
+            result.update(compare_verdict(case['source'], 'unsat', timeout_ms))
+        else:
+            result['check'] = 'incomplete verdict carries no claim'
+        results.append(result)
+    return results
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('source', type=pathlib.Path)
+    parser.add_argument('source', type=pathlib.Path, nargs='?')
+    parser.add_argument('--bundle', type=pathlib.Path)
     parser.add_argument('--witness', type=pathlib.Path)
     parser.add_argument('--expected', choices=('sat', 'unsat'))
     parser.add_argument('--timeout-ms', type=int, default=120000)
     args = parser.parse_args()
+    if args.bundle is not None:
+        if args.source is not None or args.witness is not None or args.expected is not None:
+            parser.error('--bundle cannot be combined with a single-source check')
+        raw = args.bundle.read_bytes()
+        print(json.dumps({'inputHash': hashlib.sha256(raw).hexdigest(),
+                          'checkerHash': hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(),
+                          'checks': check_bundle(json.loads(raw), args.timeout_ms)}, indent=2))
+        raise SystemExit(0)
+    if args.source is None:
+        parser.error('supply a source or --bundle')
     if args.witness is None and args.expected is None:
         parser.error('supply --witness or --expected')
     source_bytes = args.source.read_bytes()

@@ -3,14 +3,14 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
-import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -72,10 +72,21 @@ class PortfolioWorker private constructor(
         private set
     private var certificates: (EvidenceKind) -> EvidenceCertificate? = { null }
     private var provesSourceResults = true
+    internal val permitsSourceProofs: Boolean get() = provesSourceResults
     internal var evidenceScope: SourceScope? = null
         private set
     internal var evidenceInvocation: EngineInvocation? = null
         private set
+    internal var sharingInvocation: EngineInvocation? = null
+        private set
+
+    internal fun bindSharingInvocation(invocation: EngineInvocation): PortfolioWorker = also {
+        require(evidenceModel?.matches(invocation.model) == true) { "sharing differs from the worker model" }
+        require(sharingInvocation?.matches(invocation) != false) { "worker cannot change its sharing invocation" }
+        sharedPools?.bounds?.bindInvocation(invocation)
+        sharedPools?.varBounds?.bindInvocation(invocation)
+        sharingInvocation = invocation
+    }
 
     internal fun bindInvocation(invocation: EngineInvocation): PortfolioWorker = also {
         require(evidenceModel?.matches(invocation.model) == true) { "invocation differs from the worker model" }

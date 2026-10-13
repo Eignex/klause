@@ -23,7 +23,7 @@ internal class QuadraticNeighborhoodAllowance(
         nodeBudget?.exhausted() == true
 
     fun charge(nativeWork: Long) {
-        val cost = 1L + minOf(ceil(nativeWork.coerceAtLeast(0) * 0.8).toLong(), Long.MAX_VALUE - 1)
+        val cost = 1L + minOf(quadraticNativeInstructions(nativeWork), Long.MAX_VALUE - 1)
         moves += minOf(1, Long.MAX_VALUE - moves)
         instructions += minOf(cost, Long.MAX_VALUE - instructions)
         nodeBudget?.spendMoves(cost)
@@ -40,6 +40,8 @@ internal class QuadraticNeighborhoodCursor(
     private val propose: (Set<Int>, BigFraction, Random) -> ExactNeighborhoodCondition,
     private val completion: ExactNeighborhoodCompletion,
     private val accept: (Sample) -> Boolean,
+    private val releaseFirst: Boolean = false,
+    private val rotateSingle: Boolean = false,
 ) : AutoCloseable {
     private val random = Random(seed)
     private var radius = BigFraction.ONE
@@ -56,23 +58,30 @@ internal class QuadraticNeighborhoodCursor(
 
     init { require(coordinates >= 0) }
 
-    fun advance(segment: Cancellation, instructions: Long): Boolean {
+    fun advance(
+        segment: Cancellation, instructions: Long, invocation: Cancellation = Cancellation.Never,
+    ): Boolean {
         require(instructions >= 0)
         check(!closed) { "quadratic neighborhood cursor is closed" }
         if (isDone) return true
         val start = allowance.instructions
-        while (!segment() && !lifetime() && !isDone && allowance.instructions - start < instructions) {
+        val stop = lifetime or invocation
+        while (!segment() && !stop() && !isDone && allowance.instructions - start < instructions) {
             val operator = if (!adaptive) 0 else random.nextInt(weights.size).let { draw ->
                 if (random.nextDouble() < weights[draw] / requireNotNull(weights.maxOrNull())) draw else 2
             }
             val amount = when (operator) { 0 -> 1; 1 -> maxOf(1, coordinates / 2); else -> coordinates }
-            val released = if (allowance.moves == initialMoves) emptySet()
-                else (0 until coordinates).shuffled(random).take(amount).toSet()
+            val released = when {
+                coordinates == 0 -> emptySet()
+                rotateSingle && !adaptive -> setOf((allowance.moves % coordinates).toInt())
+                allowance.moves == initialMoves && !releaseFirst -> emptySet()
+                else -> (0 until coordinates).shuffled(random).take(amount).toSet()
+            }
             val before = nativeWork()
             val condition = propose(released, radius, random)
             // A repair and its accepted witness form one atomic segment operation.
             val result = try {
-                completion.check(condition, lifetime)
+                completion.check(condition, stop)
             } finally {
                 allowance.charge((nativeWork() - before).coerceAtLeast(0))
             }
@@ -94,3 +103,5 @@ internal class QuadraticNeighborhoodCursor(
         sink.stop()
     }
 }
+
+internal fun quadraticNativeInstructions(work: Long): Long = ceil(work.coerceAtLeast(0) * 0.8).toLong()

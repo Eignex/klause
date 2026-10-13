@@ -136,8 +136,8 @@ model or weaker invocation cannot replace it. Recapture preserves the native pay
 Native certificate construction requires its engine identity to name the same source
 object. Invocation matching compares that object, objective, direction and explicit
 conditions; it supplies no independent derivation coverage.
-The integer and branch-completion producers use these typed records; the finite
-quadratic adapter retains its compatibility factory until its consumer migration. Their source checker must justify coordinate
+The integer, branch-completion and finite quadratic producers use these typed records.
+Their source checker must justify coordinate
 bindings and complete coverage; a flat branch list is not a traversal proof. A
 known conditioned result cannot be recaptured under a different original scope.
 
@@ -155,6 +155,13 @@ coordinates and endpoints must match the retained publication exactly. Pool bind
 and publication folding are atomic, and a pool containing unscoped deductions cannot
 acquire a different invocation. Uncaptured native deductions have explicitly
 unavailable independent derivation coverage.
+
+`PortfolioWorker.bindSharingInvocation` binds the containing pool query separately
+from the worker's actual runtime. A restricted worker cannot select the containing
+query or change it after binding. Bound and integer-window callbacks on a bound
+backtrack worker retain their actual native values and coordinates in typed
+publications, including origin and contribution bookkeeping. Unbound compatibility
+traffic retains its existing engine admission path until its consumer is bound.
 
 `CompletedEngineResult` retains an actual ordinary completed result and its source
 binding for the completion-taking worker issuance hook. `EngineInvocation` retains

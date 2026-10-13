@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.integration
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
@@ -8,14 +9,41 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.portfolio.BacktrackWorkerConfig
+import com.eignex.klause.portfolio.SharedPools
+import com.eignex.klause.portfolio.SharedVarBounds
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class GlobalVarBoundSharingTest {
+
+    @Test
+    fun `actual native variable shaving reaches a runtime bound pool`() {
+        val source = triangleCover()
+        val executable = source.bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+        val model = ModelIdentity.of(executable, objective)
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
+        val bounds = SharedVarBounds(4, identity = model.forObjective(null))
+        val pools = SharedPools(null, null, varBounds = bounds, identity = model)
+        val config = BacktrackWorkerConfig(BacktrackRecipe("shaving") { _, _ ->
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, variableShaving = true))
+        })
+        val worker = config.materialize(executable, 0, 0, 1L, 1.0, objective, null, null, null, pools)
+            .bindInvocation(invocation).bindSharingInvocation(invocation)
+
+        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+
+        assertEquals(2L, bounds.lowerOf(3))
+    }
 
     private fun problem() = Problem(
         numBoolVars = 0,

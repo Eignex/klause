@@ -2,6 +2,9 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialResource
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
@@ -41,19 +44,40 @@ internal class PortfolioIncumbents<V>(
         fun algebraic(
             valueOf: (MinimizeResult.WithSample) -> AlgebraicReal?,
             arithmetic: AlgebraicArithmetic,
-        ): PortfolioIncumbents<AlgebraicReal> {
+            onResource: (PolynomialResource) -> Unit = {},
+        ): PortfolioIncumbents<AlgebraicReal> = mappedAlgebraic(valueOf, { it }, arithmetic, onResource)
+
+        fun <V> mappedAlgebraic(
+            valueOf: (MinimizeResult.WithSample) -> V?,
+            exactValue: (V) -> AlgebraicReal,
+            arithmetic: AlgebraicArithmetic,
+            onResource: (PolynomialResource) -> Unit = {},
+        ): PortfolioIncumbents<V> {
             val lock = Concurrency.Strict.lock()
+            fun <T> checked(action: () -> T): T? = try {
+                action()
+            } catch (_: PolynomialInterrupted) {
+                null
+            } catch (stop: PolynomialResourceLimit) {
+                onResource(stop.resource)
+                null
+            }
             return PortfolioIncumbents(
-                valueOf = { lock.withLock { valueOf(it) } },
-                improves = { candidate, standing -> lock.withLock { arithmetic.compare(candidate, standing) < 0 } },
-                approximateValue = { value ->
+                valueOf = { lock.withLock { checked { valueOf(it) } } },
+                improves = { candidate, standing -> lock.withLock {
+                    checked {
+                        arithmetic.compare(exactValue(candidate), exactValue(standing))
+                    }?.let { it < 0 } == true
+                } },
+                approximateValue = { item ->
+                    val value = exactValue(item)
                     value.rational?.toDouble() ?: ((value.lowerBound + value.upperBound) *
                         BigFraction.ofLong(2).reciprocal()).toDouble()
                 },
                 gain = { standing, candidate ->
-                    (standing.lowerBound - candidate.upperBound).toDouble().coerceAtLeast(0.0)
+                    (exactValue(standing).lowerBound - exactValue(candidate).upperBound).toDouble().coerceAtLeast(0.0)
                 },
-                upperBound = { roundedUpperBound(it.upperBound) },
+                upperBound = { roundedUpperBound(exactValue(it).upperBound) },
             )
         }
 

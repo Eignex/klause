@@ -1,0 +1,4 @@
+(declare-const i Int) (declare-const x Real) (declare-const y Real)
+(assert (and (>= i 0) (<= i 1))) (assert (= x 1))
+(assert (= (* (to_real i) x) y))
+(minimize (+ (/ 7 3) (/ y 10))) (check-sat)
