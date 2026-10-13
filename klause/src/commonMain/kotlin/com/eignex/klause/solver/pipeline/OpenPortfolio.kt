@@ -166,7 +166,7 @@ internal class OpenPortfolio(
         if (factories.isEmpty()) return OpenTheoryOptimum.Bounded(null, null,
             TerminationReason.Unsupported, SolveStats.EMPTY)
         val identity = ModelIdentity.of(sourceModel, objective)
-        val binding = EngineInvocation(preparedPlan, identity, objective)
+        val binding = EngineInvocation(preparedPlan, identity, objective, scope = context?.scope)
         val boundFactories = factories.map { factory ->
             PortfolioArmFactory(preparedPlan, factory.armId, factory.family,
                 bind = { it.bindInvocation(binding) }) { slot -> factory.materialize(preparedPlan, slot) }
