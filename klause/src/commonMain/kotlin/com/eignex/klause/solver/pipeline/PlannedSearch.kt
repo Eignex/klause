@@ -73,7 +73,7 @@ internal class PreparedSearchComponents(
         .filter { plan.factorOwner(it) != FactorOwner.CP }
         .mapNotNull { spec.factors[it] as? Cardinality }
 
-    private val registrations = run {
+    private val selectedRegistrations = run {
         val descriptors = spec.preparedWithComponents(plan).components
         val selected = ArrayList<PreparedSearchRegistration>(3)
         if (projection != null) {
@@ -100,8 +100,11 @@ internal class PreparedSearchComponents(
                     emptyList(), emptyList(), emptyList())
             selected += PreparedSearchRegistration(spec, descriptor, factory)
         }
-        PreparedSearchRegistrations(spec, selected)
+        selected.toList()
     }
+    private val opening = PreparedSearchRegistrations(spec, selectedRegistrations)
+
+    val registrations: List<PreparedSearchRegistration> get() = selectedRegistrations.toList()
 
     fun prepareSource(stop: Cancellation): Boolean {
         if (sourcePrepared) return true
@@ -127,5 +130,5 @@ internal class PreparedSearchComponents(
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         smtStats: SmtStatsSink? = null,
         theorySolveStop: Cancellation? = null,
-    ): PlannedSearch = registrations.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop)
+    ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop)
 }
