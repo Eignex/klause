@@ -16,7 +16,10 @@ import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
+import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 
 /** Components and session built from a [ComponentPlan]. */
 class PlannedSearch internal constructor(
@@ -61,12 +64,36 @@ internal class PreparedSearchComponents(
     private val fragment = plan.theoryFragment(spec)
     private val projection = if (plan.hasCpComponent) plan.cpProjection(spec, cpDomains) else null
     private val propagation = projection?.let { PropagationProblem(it.problem) }
+    private var exactSource: PreparedExactLiraComponentFactory? = null
+    var preparationWork: Long = 0
+        private set
+    var sourcePrepared: Boolean = false
+        private set
+
     private val boolCount = spec.numBoolVars
     private val clauses = spec.factors.filterIsInstance<Clause>()
     // CP owns its projected cardinalities; a second component would enforce them twice.
     private val cardinalities = spec.factors.indices
         .filter { plan.factorOwner(it) != FactorOwner.CP }
         .mapNotNull { spec.factors[it] as? Cardinality }
+
+    fun prepareSource(stop: Cancellation): Boolean {
+        if (sourcePrepared) return true
+        if (plan.theoryPipeline == ProblemPipeline.EXACT_LRA || plan.theoryPipeline == ProblemPipeline.EXACT_LIRA) {
+            val meter = WorkMeter { units ->
+                preparationWork += units
+                stop.charge(units)
+            }
+            val preparationStop = object : Cancellation {
+                override fun isCancelled(): Boolean = stop()
+                override fun deadline() = stop.deadline()
+                override fun workMeter(): WorkMeter = meter
+            }
+            exactSource = prepareExactLiraSource(fragment, preparationStop) ?: return false
+        }
+        sourcePrepared = true
+        return true
+    }
 
     fun open(
         maxChecks: Long = Long.MAX_VALUE,
@@ -82,7 +109,7 @@ internal class PreparedSearchComponents(
         }
         components += ClauseSearchComponent(clauses)
         if (cardinalities.isNotEmpty()) components += CardinalitySearchComponent(cardinalities)
-        val theory = plan.openTheoryComponent(fragment, smtStats, theorySolveStop)
+        val theory = plan.openTheoryComponent(fragment, smtStats, theorySolveStop, exactSource)
         if (theory != null) components += theory
         cp?.rebase()
         return PlannedSearch(

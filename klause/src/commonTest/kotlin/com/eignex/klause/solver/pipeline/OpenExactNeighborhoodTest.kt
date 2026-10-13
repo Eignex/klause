@@ -17,6 +17,7 @@ import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -255,6 +256,62 @@ class OpenExactNeighborhoodTest {
 
             assertIs<ExactNeighborhoodResult.Undecided>(sibling)
             assertEquals(spent, it.work)
+        }
+    }
+
+    @Test
+    fun `completed native source preparation survives interrupted initialization retries`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.EQ, 1.0)), numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val adapter = OpenExactNeighborhood(model, TheoryParams())
+        val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+
+        adapter.use {
+            var preparedWork = 0L
+            repeat(2) { attempt ->
+                var operations = 0L
+                val stop = object : Cancellation {
+                    private val meter = WorkMeter { units -> if (adapter.sourcePrepared) operations += units }
+                    override fun isCancelled(): Boolean = operations > 0
+                    override fun workMeter(): WorkMeter = meter
+                }
+                val result = it.check(free, stop)
+
+                assertIs<ExactNeighborhoodResult.Undecided>(result)
+                assertTrue(operations > 0)
+                assertTrue(it.sourcePrepared)
+                if (attempt == 0) preparedWork = it.preparationWork
+                else assertEquals(preparedWork, it.preparationWork)
+            }
+            val zero = mapOf(0 to BigFraction.ZERO)
+            val sibling = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+
+            assertIs<ExactNeighborhoodResult.Witness>(sibling)
+            assertTrue(preparedWork > 0)
+            assertEquals(preparedWork, it.preparationWork)
+        }
+    }
+
+    @Test
+    fun `cancelled native source preparation withholds its factory before a sibling query`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.EQ, 1.0)), numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val adapter = OpenExactNeighborhood(model, TheoryParams())
+        val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+
+        adapter.use {
+            val interrupted = it.check(free, Cancellation { it.preparationWork > 0 })
+            assertIs<ExactNeighborhoodResult.Undecided>(interrupted)
+            assertFalse(it.sourcePrepared)
+            val spent = it.preparationWork
+            val zero = mapOf(0 to BigFraction.ZERO)
+            val sibling = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
+
+            assertIs<ExactNeighborhoodResult.Witness>(sibling)
+            assertTrue(it.sourcePrepared)
+            assertTrue(it.preparationWork > spent)
         }
     }
 
