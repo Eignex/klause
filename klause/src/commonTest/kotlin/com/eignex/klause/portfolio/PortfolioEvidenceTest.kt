@@ -14,6 +14,8 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -28,6 +30,82 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class PortfolioEvidenceTest {
+
+    @Test
+    fun `portfolio admission consumes a restricted native witness publication`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val plan = source.prepareExecutionPlan(objective)
+        val model = ModelIdentity.of(source, objective)
+        val containing = EngineInvocation(plan, model, objective)
+        val producer = EngineInvocation(plan, model, objective, Assumptions(ints = mapOf(0 to 2L)))
+        val point = Sample(booleanArrayOf(), longArrayOf(2))
+        point.witnessCertificate = EvidenceCertificate.published(
+            CompletedEnginePublication.Witness(producer, point, 2.0))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
+            .bindEvidence(model).bindInvocation(producer)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
+
+        val checked = verifier.witness(worker, point, 2.0)
+
+        assertIs<Verification.Accepted<*, *>>(checked)
+    }
+
+    @Test
+    fun `portfolio admission rejects a foreign native prepared plan`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val model = ModelIdentity.of(source)
+        val containing = EngineInvocation(source.prepareExecutionPlan(), model)
+        val producer = EngineInvocation(source.prepareExecutionPlan(), model)
+        val point = Sample(booleanArrayOf(), longArrayOf(2))
+        point.witnessCertificate = EvidenceCertificate.published(
+            CompletedEnginePublication.Witness(producer, point, null))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
+            .bindEvidence(model).bindInvocation(producer)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
+
+        val checked = verifier.witness(worker, point, null)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `portfolio admission rejects a substituted native publication value`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val model = ModelIdentity.of(source, objective)
+        val binding = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
+        val point = Sample(booleanArrayOf(), longArrayOf(2))
+        point.witnessCertificate = EvidenceCertificate.published(
+            CompletedEnginePublication.Witness(binding, point, 2.0))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
+            .bindEvidence(model).bindInvocation(binding)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
+
+        val checked = verifier.witness(worker, point, 3.0)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `portfolio admission rejects a violated native producer condition`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val model = ModelIdentity.of(source)
+        val plan = source.prepareExecutionPlan()
+        val containing = EngineInvocation(plan, model)
+        val producer = EngineInvocation(plan, model, sourceAssumptions = Assumptions(ints = mapOf(0 to 1L)))
+        val point = Sample(booleanArrayOf(), longArrayOf(2))
+        point.witnessCertificate = EvidenceCertificate.published(
+            CompletedEnginePublication.Witness(producer, point, null))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
+            .bindEvidence(model).bindInvocation(producer)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
+
+        val checked = verifier.witness(worker, point, null)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
     @Test
     fun `a mismatched model witness is quarantined without proving infeasibility`() {
         val model = ModelIdentity.of(Any())

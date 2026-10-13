@@ -134,7 +134,7 @@ separate from an optional original-source revision. `Problem.quadraticSourceResu
 binds capture to that actual original object and objective; an unrelated equal-shaped
 model or weaker invocation cannot replace it. Recapture preserves the native payload.
 Native certificate construction requires its engine identity to name the same source
-object. Invocation matching compares that object, objective, direction and explicit
+object and objective. Invocation matching compares that object, objective, direction and explicit
 conditions; it supplies no independent derivation coverage. An affine prepared operation
 also retains its actual immutable `LinearObjective` when the executed quadratic
 view equals its lossless normalization and preserves its original direction.
@@ -176,6 +176,16 @@ query after those checks; its point supplies no global bound. Cancellation or
 unavailable source validation withholds admission. Uncaptured publications cannot
 gain independent source derivation coverage from their native type.
 
+`QuadraticWitnessPublication` retains the actual native quadratic invocation,
+original source point and exact objective value during search. Its checker compares
+the source object, objective and direction, matches the published point and value,
+checks both producer and consumer conditions, invokes the installed original-source
+witness checker, and evaluates the original objective exactly. A restricted point
+can satisfy a containing query after both condition checks. Generic model admission
+withholds this publication because it lacks the quadratic source checker. The native
+carrier has no independent derivation capture or invented revision; its producer and
+consumer migration remains separate from its typed transport contract.
+
 `PortfolioWorker.bindSharingInvocation` binds the containing pool query separately
 from the worker's actual runtime. A restricted worker cannot select the containing
 query or change it after binding. Bound and integer-window callbacks on a bound
@@ -186,6 +196,10 @@ Bound backtrack incumbent callbacks carry their actual witness publication throu
 the existing shared pool admission with the containing runtime and cancellation.
 The exchange's installed source checker still decides whether the point supplies a
 valid cutoff; metadata alone cannot replace that check.
+`PortfolioEvidence.witness` passes a carried ordinary native publication to the model
+verifier with the containing runtime, capture scope and cancellation. Producer
+conditions and point/value matching therefore remain part of witness admission.
+Legacy witness tags supply no additional authority to its installed source checker.
 
 `CompletedEngineResult` retains an actual ordinary completed result and its source
 binding for the completion-taking worker issuance hook. `EngineInvocation` retains
@@ -202,7 +216,7 @@ an exhausted reason without that value supplies no bound claim. Derivation check
 match the completed coordinates and ray direction, and an attained optimum is
 checked at its actual assignment. An unbounded completion's feasible point has a
 separate witness check from its ray. A scoped non-witness import requires the same
-consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance and opaque quadratic producer arguments remain
+consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance remains
 until their consumers migrate; these hooks do not assert that migration is complete.
 
 Runtime admission compares the actual prepared plan, execution identity/objective,

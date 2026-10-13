@@ -30,6 +30,7 @@ internal class EvidenceCertificate private constructor(
     val kind: EvidenceKind,
     val completion: CompletedEngineResult? = null,
     val publication: CompletedEnginePublication? = null,
+    val quadraticPublication: QuadraticWitnessPublication? = null,
 ) {
     fun verifyDerivation(
         claim: SourceClaim, context: SourceProofContext, cancellation: Cancellation = Cancellation.Never,
@@ -84,6 +85,13 @@ internal class EvidenceCertificate private constructor(
     }
 
     companion object {
+        fun published(
+            model: ModelIdentity, publication: QuadraticWitnessPublication,
+        ): EvidenceCertificate {
+            require(publication.invocation.matchesModel(model)) { "quadratic witness has another source objective" }
+            return EvidenceCertificate(model, EvidenceKind.Witness, quadraticPublication = publication)
+        }
+
         fun published(publication: CompletedEnginePublication): EvidenceCertificate =
             EvidenceCertificate(publication.model,
                 if (publication is CompletedEnginePublication.Witness) EvidenceKind.Witness else EvidenceKind.Bound,
@@ -176,6 +184,9 @@ internal class ModelEvidenceVerifier<A, V>(
         val certificate = evidence.certificate
         if (certificate != null && (!certificate.model.matches(model) || certificate.kind != evidence.kind)) {
             return Verification.Rejected("certificate belongs to a different model, objective or claim")
+        }
+        if (certificate?.quadraticPublication != null) {
+            return Verification.Indeterminate("quadratic publication requires its original-source witness checker")
         }
         val witnessPublication = certificate?.publication as? CompletedEnginePublication.Witness
         if (evidence.kind != EvidenceKind.Witness || certificate?.publication != null) {

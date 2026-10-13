@@ -18,20 +18,21 @@ internal class QuadraticEngineInvocation(
     val condition: SourceCondition,
     val affineObjective: LinearObjective? = null,
 ) {
-    fun matches(other: QuadraticEngineInvocation): Boolean = when (val original = source) {
+    fun matches(other: QuadraticEngineInvocation): Boolean = sameSourceObjective(other) && condition == other.condition
+
+    fun sameSourceObjective(other: QuadraticEngineInvocation): Boolean = when (val original = source) {
         is QuadraticEngineSource.ExactIr ->
             (other.source as? QuadraticEngineSource.ExactIr)?.problem === original.problem
         is QuadraticEngineSource.Polynomial ->
             (other.source as? QuadraticEngineSource.Polynomial)?.problem === original.problem
         is QuadraticEngineSource.NonlinearInteger ->
             (other.source as? QuadraticEngineSource.NonlinearInteger)?.problem === original.problem
-    } && objective === other.objective && affineObjective === other.affineObjective &&
-        sense == other.sense && condition == other.condition
+    } && objective === other.objective && affineObjective === other.affineObjective && sense == other.sense
 
     fun matchesModel(model: ModelIdentity): Boolean = when (val original = source) {
-        is QuadraticEngineSource.ExactIr -> model.sameModel(ModelIdentity.of(original.problem))
-        is QuadraticEngineSource.Polynomial -> model.sameModel(ModelIdentity.of(original.problem))
-        is QuadraticEngineSource.NonlinearInteger -> model.sameModel(ModelIdentity.of(original.problem))
+        is QuadraticEngineSource.ExactIr -> model.matches(ModelIdentity.of(original.problem, objective))
+        is QuadraticEngineSource.Polynomial -> model.matches(ModelIdentity.of(original.problem, objective))
+        is QuadraticEngineSource.NonlinearInteger -> model.matches(ModelIdentity.of(original.problem, objective))
     }
 }
 
