@@ -870,6 +870,29 @@ checking unknown; a feasible point receives no optimum credit without that check
 Errors are recorded per case and make the command exit unsuccessfully. The checker
 supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
 
+### Exact function source controls
+
+`com.eignex.klause.bench.profile.TranscendentalSourceProbe` runs original SMT-LIB
+function sources through the shared satisfaction dispatcher. Its `sources` argument
+is a JSON array of `{name, text}` objects. `controls` lists `ENGINE:cores` selections;
+`seeds`, `repeats`, `work`, `timeout` and optional `cancel-work` pin the repeated
+controls. Alternating control order reduces order effects. Run the committed main
+through the lab client on a pinned revision with `host=aws`; it writes `sources.json`,
+`results.json`, payload hashes and runtime settings to `$OUT`. Retain the job's
+revision/build/dependency hashes with those files. JFR profile times are diagnostic
+costs, not ordinary benchmark throughput.
+
+Check saved points against their captured source text with
+`tools/verify_transcendental_source_results.py <sources.json> <results.json>`.
+The independent ground checker uses exact rational arithmetic and explicit symbolic
+exp/log and pi identities, validates integer/Boolean declarations and strict source
+assertions, and rejects undefined log terms even under Boolean negation/disjunction.
+Conditionals check only the selected branch. Algebraic-root carriers and unsupported
+symbolic comparisons report unavailable; they are never rounded or accepted by
+residual. This checker does not verify refutations, optimization claims or exported
+proofs. Preserve unknown/decline records and check cancellation charges and portfolio
+arm segments separately from mathematical witness acceptance.
+
 ### Ground witness profile
 
 `com.eignex.klause.bench.profile.SmtWitnessValidation` evaluates retained complete
