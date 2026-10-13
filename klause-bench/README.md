@@ -939,6 +939,10 @@ The checker independently excludes better source objectives or refutes source
 constraints using the pinned Z3 dependency with a ten-second limit. A recognized
 pigeonhole subformula can establish a refutation directly. Timeout leaves proof
 checking unknown; a feasible point receives no optimum credit without that check.
+The exact `coreGuidedLowerBound` statistic is checked by excluding source objectives
+below that floor, including records without an incumbent. `checkedLowerBound` records
+only a completed independent check; an undecided floor uses `boundCheck=unknown`.
+Floor telemetry and floor checking do not establish an optimum without a matching witness.
 Errors are recorded per case and make the command exit unsuccessfully. The checker
 supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
 Pass `checker=boolean` to the saved-record `SourceRecordCheck` AWS profile to run

@@ -80,6 +80,8 @@ data class SolveStats(
     val portfolio: PortfolioStats = PortfolioStats(),
     /** Measured ALNS bootstrap and repair work, separate from its outer allowance. */
     val alns: AlnsStats = AlnsStats(),
+    /** Exact retained Boolean objective-core observations. */
+    val coreGuided: CoreGuidedStats = CoreGuidedStats(),
 ) {
     /**
      * Combine two run snapshots by delegating to each record's own merge — counters add, maxes max,
@@ -110,6 +112,7 @@ data class SolveStats(
             presolve = presolve ?: other.presolve,
             portfolio = portfolio.mergedWith(other.portfolio),
             alns = alns.mergedWith(other.alns),
+            coreGuided = coreGuided.mergedWith(other.coreGuided),
         )
     }
 

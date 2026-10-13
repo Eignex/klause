@@ -51,6 +51,30 @@ class BooleanSourceCheckTest(unittest.TestCase):
                     result = proof_check.check_cases([case], Path('.'))
                 self.assertIn('error', result[0])
 
+    def test_core_bound_disagreement_is_checked_per_record(self):
+        first = copy.deepcopy(self.case)
+        first['problem']['format'] = 'WCNF'
+        first['record'].update(finalWitness='v 000', exactObjective='3', stats={'coreGuidedLowerBound': '2'})
+        second = copy.deepcopy(first)
+        second['record']['stats']['coreGuidedLowerBound'] = '3'
+        source = 'h -1 -2 0\nh -1 -3 0\nh -2 -3 0\n1 1 0\n1 2 0\n1 3 0\n'
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check_cases([first, second], Path('.'))
+        self.assertEqual(result[0]['check']['checkedLowerBound'], 2)
+        self.assertNotIn('proof', result[0]['check'])
+        self.assertIn('source counterexample', result[1]['error'])
+
+    def test_wbo_core_bound_is_checked_without_an_incumbent(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(feasible=None, finalWitness=None, stats={'coreGuidedLowerBound': '2'})
+        source = 'soft:; [1] +1 x1 >= 1; [1] +1 x2 >= 1; [1] +1 x3 >= 1; +1 x1 +1 x2 +1 x3 <= 1;'
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check(case, Path('.'))
+        self.assertEqual(result['checkedLowerBound'], 2)
+        self.assertEqual(result['claim'], 'none')
+        self.assertNotIn('proof', result)
+
     def test_feasible_boolean_source_cannot_certify_refutation(self):
         case = copy.deepcopy(self.case)
         case['record'].update(feasible=False, proven=True, finalWitness=None)

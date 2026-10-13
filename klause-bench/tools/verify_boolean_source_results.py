@@ -181,11 +181,16 @@ def check(case, source_root):
     r = case['record']
     format_name = case['problem']['format']
     text = source(r, source_root)
+    lower = r.get('stats', {}).get('coreGuidedLowerBound')
+    if lower is not None:
+        assert re.fullmatch('-?\\d+', lower), 'invalid exact core bound'
+        lower = int(lower)
     result = {'sourceHashVerified': True, 'reportedProven': r.get('proven'), 'witness': 'absent'}
     if r.get('feasible') is None:
         assert not r.get('proven')
         result['claim'] = 'none'
-        return result
+        if lower is None:
+            return result
     weighted = format_name == 'WCNF'
     is_opb = format_name == 'OPB'
     if weighted or is_opb:
@@ -197,6 +202,8 @@ def check(case, source_root):
             return sum((c * (not values[i] if neg else values[i]) for c, i, neg in terms))
     else:
         size, clauses = cnf(text, weighted)
+    if lower is not None:
+        assert weighted or is_opb and (objective is not None or soft_rows), 'bound on a satisfaction source'
     if r['feasible'] is True:
         values = assignment(r['finalWitness'], size, is_opb, weighted)
         if is_opb:
@@ -221,16 +228,17 @@ def check(case, source_root):
         if cost is not None:
             reported = integer_objective(r)
             assert cost == reported, f'source objective mismatch: source={cost}, reported={reported}'
+            assert lower is None or lower <= cost, 'source witness refutes core bound'
         else:
             assert r.get('exactObjective') is None and r.get('objective') is None, 'source has no objective'
         result['witness'] = 'source feasible'
         result['objective'] = cost
-        if not r.get('proven'):
+        if not r.get('proven') and lower is None:
             return result
         if cost is None:
             result['proof'] = 'source satisfaction'
             return result
-    else:
+    elif r['feasible'] is False:
         assert r.get('proven')
         if not is_opb and (not weighted) and pigeonhole(clauses):
             result['proof'] = 'source pigeonhole refutation'
@@ -248,8 +256,7 @@ def check(case, source_root):
                             for weight, terms, rel, rhs in soft_rows])
         if top is not None and soft_rows:
             solver.add(soft_cost < top)
-        if r['feasible'] is True:
-            solver.add(expression(objective or []) + soft_cost < integer_objective(r))
+        source_cost = expression(objective or []) + soft_cost
     else:
         soft = []
         for weight, literals in clauses:
@@ -258,13 +265,19 @@ def check(case, source_root):
                 solver.add(clause)
             else:
                 soft.append(z3.If(clause, 0, weight))
-        if r['feasible'] is True:
-            solver.add(z3.Sum(soft) < integer_objective(r))
+        source_cost = z3.Sum(soft)
+    if r['feasible'] is True and r.get('proven'):
+        solver.add(source_cost < integer_objective(r))
+    elif lower is not None and r['feasible'] is not False:
+        solver.add(source_cost < lower)
     answer = solver.check()
     if answer == z3.unsat:
-        result['proof'] = 'strictly better source objective excluded' if r['feasible'] else 'source refutation'
+        if lower is not None:
+            result['checkedLowerBound'] = lower
+        if r.get('proven'):
+            result['proof'] = 'strictly better source objective excluded' if r['feasible'] else 'source refutation'
     elif answer == z3.unknown:
-        result['proof'] = 'unknown'
+        result['boundCheck' if lower is not None and not r.get('proven') else 'proof'] = 'unknown'
         result['reason'] = solver.reason_unknown()
     else:
         raise AssertionError('source counterexample to proof claim')
@@ -282,7 +295,8 @@ def check_cases(cases, source_root):
             reported_objective = r.get('exactObjective')
             if reported_objective is None:
                 reported_objective = r.get('objective')
-            key = (case['problem']['format'], r['sourceHashes']['model'], r.get('feasible'), r.get('proven'), r.get('finalWitness'), str(reported_objective))
+            key = (case['problem']['format'], r['sourceHashes']['model'], r.get('feasible'), r.get('proven'),
+                   r.get('finalWitness'), str(reported_objective), r.get('stats', {}).get('coreGuidedLowerBound'))
             if key not in cache:
                 cache[key] = check(case, source_root)
             checks.append({'index': case['index'], 'check': cache[key]})

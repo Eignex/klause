@@ -49,6 +49,7 @@ class CoreGuidedWorkerConfigTest {
         val paused = handle.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) { error("unfinished core") }
         assertNull(paused)
         assertEquals(listOf(1.0), floors)
+        assertEquals("1", handle.stats.coreGuided.lowerBound.toString())
         cancelled = false
         val result = assertIs<MinimizeResult.Optimal>(
             handle.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {},
@@ -56,6 +57,7 @@ class CoreGuidedWorkerConfigTest {
 
         assertEquals(listOf(1.0, 2.0), floors)
         assertEquals(2L, objective.evaluateLong(result.sample))
+        assertEquals("2", result.stats.coreGuided.lowerBound.toString())
         handle.close()
         worker.close()
     }

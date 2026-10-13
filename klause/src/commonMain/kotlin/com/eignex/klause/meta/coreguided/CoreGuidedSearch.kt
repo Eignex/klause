@@ -24,6 +24,7 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.CoreGuidedStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -76,6 +77,8 @@ internal class CoreGuidedSearch(
     private var core: IntArray? = null
     private var coreWeight = BIG_ZERO
     private var coreThreshold = 2
+    private var completedCores = 0L
+    private var largestCore = 0
 
     init {
         require(eligible(base, objective)) { "core-guided search needs a finite Boolean objective" }
@@ -83,7 +86,9 @@ internal class CoreGuidedSearch(
 
     internal val lowerBound: BigFraction get() = BigFraction.of(lower, BIG_ONE)
     override val isDone: Boolean get() = terminal != null
-    override val stats: SolveStats get() = completedStats.mergedWith(query?.stats ?: SolveStats.EMPTY)
+    override val stats: SolveStats get() = completedStats.mergedWith(query?.stats ?: SolveStats.EMPTY).copy(
+        coreGuided = CoreGuidedStats(completedCores, largestCore, lower),
+    )
     override val work: Long get() {
         val live = query?.stats?.search?.propagationWork?.sum?.toLong() ?: 0L
         val carried = (completedPropagation % PROPAGATION_WORK_PER_NODE + live % PROPAGATION_WORK_PER_NODE) /
@@ -220,6 +225,8 @@ internal class CoreGuidedSearch(
             if (residual == BIG_ZERO) weights.remove(id) else weights[id] = residual
         }
         lower += coreWeight
+        completedCores++
+        largestCore = maxOf(largestCore, selected.size)
         val current = threshold ?: coreWeight
         val maximum = maximumWeight() ?: coreWeight
         threshold = if (current < maximum) current else maximum

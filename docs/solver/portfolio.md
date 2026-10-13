@@ -317,6 +317,11 @@ nor an unfinished refutation. Core encoding checkpoints retain their cursor, and
 query propagation fractions and slice overspend carry across rounds. Containing
 decision quotas survive every query rebuild. These engine completions retain the
 ordinary in-memory proof authority; independent serialized derivations are unavailable.
+Core telemetry records completed core counts, the largest core and the exact accumulated
+floor in the original objective units. Worker snapshots of one objective invocation
+sum counts and take the maximum floor. CLI statistics preserve its integer digits;
+telemetry grants no source proof authority. The saved-record Boolean checker independently
+tests reported floors by excluding lower-cost assignments in the original source.
 
 ## Model-specific worker recipes
 
