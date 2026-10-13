@@ -117,7 +117,7 @@ object MpsLinearProof {
 
     private fun sample(sample: Sample): JsonElement = buildJsonObject {
         for (id in 0 until sample.numIntVars) put("Integer/$id", sample.exactIntValue(id).toString())
-        for (id in 0 until sample.numRealVars) put("Real/$id", sample.exactReals[id].toString())
+        for (id in 0 until sample.numRealVars) put("Real/$id", requireNotNull(sample.exactReals)[id].toString())
     }
 
     private fun array(vararg values: JsonElement): JsonElement = JsonArray(values.toList())
