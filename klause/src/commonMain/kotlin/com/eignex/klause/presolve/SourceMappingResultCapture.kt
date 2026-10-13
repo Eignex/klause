@@ -35,10 +35,7 @@ internal fun SourceMapping.captureSolve(
                 requireNotNull(captured.evidence).withMappings(capture.context.scope, listOf(mapping)))
         }
         is SolveResult.Unsat -> {
-            val proof = if (source === target) result.evidence?.derivations?.firstOrNull {
-                it.claim == SourceClaim.Refutation
-            }?.derivation ?: SourceDerivation.Unavailable("source refutation capture unavailable")
-                else mapping.project(SourceClaim.Refutation, cancellation).derivation
+            val proof = mapping.project(SourceClaim.Refutation, capture.context, cancellation).derivation
             val candidate = capture.solve(SolveResult.Unsat(stats = result.stats), producer, proof)
             val evidence = requireNotNull(candidate.evidence)
             val checked = evidence.verify(SourceClaim.Refutation, capture.context, cancellation)
@@ -114,7 +111,7 @@ private fun SourceMapping.captureOptimal(
         SourceDerivation.Unavailable("mapped objective bound capture unavailable"), cancellation)
     val claim = provisional.evidence?.derivations?.map { it.claim }
         ?.filterIsInstance<SourceClaim.Optimal>()?.firstOrNull()
-    val proof = claim?.let { mapping.project(SourceClaim.Bound(it.value), cancellation).derivation }
+    val proof = claim?.let { mapping.project(SourceClaim.Bound(it.value), capture.context, cancellation).derivation }
     val captured = if (proof == null) provisional else capture.minimize(candidate, objective, producer,
         SourceDerivation.Optimum(SourceDerivation.SourceWitness, proof), cancellation)
     val evidence = captured.evidence ?: SourceResultEvidence(capture.context.scope, listOf(

@@ -120,6 +120,29 @@ class SourceMappingResultCaptureTest {
     }
 
     @Test
+    fun `identity recapture retains a later imported refutation`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)))
+        val capture = assertNotNull(source.prepareExecutionPlan().sourceResultCapture(revision))
+        val scope = capture.context.scope
+        val proof = SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("int/0/upper")),
+            SourceDerivation.Combination.Term(BigFraction.ONE,
+                SourceDerivation.Premise("factor/0/row/0/booleans/0/side/0"))))
+        val evidence = SourceResultEvidence(scope, listOf(
+            SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Unavailable("local capture unavailable")),
+            SourceEvidence(scope, SourceClaim.Refutation,
+                SourceDerivation.Import(SourceEvidence(scope, SourceClaim.Refutation, proof)))))
+        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY)
+
+        val result = mapping.captureSolve(source, SolveResult.Unsat(evidence = evidence), capture, "fixture-mapping")
+
+        assertEquals(SourceEvidenceCheck.Checked, assertNotNull(result.evidence)
+            .verify(SourceClaim.Refutation, capture.context))
+        assertEquals(scope, assertNotNull(result.evidence).engineScope)
+    }
+
+    @Test
     fun `a mapped refutation uses justified original premises for terminal admission`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)))

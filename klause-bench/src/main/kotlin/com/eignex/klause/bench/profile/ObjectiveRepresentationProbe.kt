@@ -11,11 +11,11 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
-import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.model.FloatSpec
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.simplex.exact.BigFraction
@@ -25,6 +25,7 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
 import com.eignex.klause.solver.pipeline.minimize
 import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.pipelineRequest
@@ -39,10 +40,25 @@ import com.eignex.klause.util.toLongExact
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 
 internal object ObjectiveRepresentationProbe {
+    private data class SourceNames(
+        val reals: Map<String, Int>, val bools: Map<String, Int>, val ints: Map<String, Int> = emptyMap(),
+    )
+
+    private data class CompiledInput(
+        val model: CompiledSchema, val request: PolynomialTheoryRequest,
+        val reals: Map<String, Int>, val handles: Map<String, FloatHandle>,
+    )
+
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { argument ->
@@ -52,7 +68,8 @@ internal object ObjectiveRepresentationProbe {
         }
         require(options.keys.all {
             it in setOf(
-                "source", "engines", "out", "work", "seed", "moves", "timeout", "checker", "processors", "schema",
+                "source", "engines", "out", "work", "seed", "moves", "timeout",
+                "checker", "processors", "schema", "conditions",
             )
         })
         val processors = options["processors"]?.toInt() ?: 1
@@ -75,6 +92,8 @@ internal object ObjectiveRepresentationProbe {
         val timeout = options["timeout"]?.toLong() ?: 25000L
         require(work > 0 && moves >= 0 && timeout > 0)
         val schemaBytes = options["schema"]?.let { File(it).readBytes() }
+        val conditionBytes = options["conditions"]?.let { File(it).readBytes() }
+        val conditions = conditionBytes?.let { Json.parseToJsonElement(it.toString(Charsets.UTF_8)).jsonObject }
         Reports.writeJson(File(output, "provenance.json").path, InstalledBuild.reference)
         File(output, "settings.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
@@ -86,6 +105,7 @@ internal object ObjectiveRepresentationProbe {
             put("javaCores", Runtime.getRuntime().availableProcessors())
             put("jvmOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
             put("schemaSha256", schemaBytes?.let(::sha256))
+            put("conditionsSha256", conditionBytes?.let(::sha256))
         }.toString() + "\n")
         val schema = schemaBytes?.toString(Charsets.UTF_8)?.let(JsonSchema::parse)
         val compiled = schema?.compile(KlauseConfig.DEFAULT)
@@ -101,8 +121,10 @@ internal object ObjectiveRepresentationProbe {
             File(output, "schema.json").writeBytes(it)
             File(output, "schema-sha256.txt").writeText(sha256(it) + "\n")
         }
+        conditionBytes?.let { File(output, "conditions.json").writeBytes(it) }
+        val prepared = compiled?.let { CompiledInput(it, it.problem.pipelineRequest(), realIds, handles) }
         for (source in sources.sortedBy { it.path }) {
-            measure(source, output, engines, work, seed, moves, timeout, compiled, realIds, handles)
+            measure(source, output, engines, work, seed, moves, timeout, prepared, conditions)
         }
         when (options["checker"] ?: "none") {
             "none" -> Unit
@@ -159,20 +181,21 @@ internal object ObjectiveRepresentationProbe {
 
     private fun measure(
         input: File, output: File, engines: List<FiniteEngine>, work: Long, seed: Long, moves: Int, timeout: Long,
-        compiled: CompiledSchema?, realIds: Map<String, Int>, handles: Map<String, FloatHandle>,
+        compiled: CompiledInput?, conditions: JsonObject?,
     ) {
         val bytes = input.readBytes()
         val identity = sha256(bytes)
         File(output, "$identity.smt2").writeBytes(bytes)
         val captured = SmtLibAdmission.parse(bytes.toString(Charsets.UTF_8), Long.MIN_VALUE, Long.MAX_VALUE)
-        require(captured is SmtLibInput.Quadratic && captured.source is SmtLibInput.Polynomial) {
-            "Probe requires an admitted polynomial real source with an affine objective: $input"
-        }
-        val source = (captured.source as SmtLibInput.Polynomial).problem
+        require(captured is SmtLibInput.Quadratic) { "Probe requires an admitted exact source objective: $input" }
+        val source = sourceNames(captured.source)
+        require(compiled != null || source.ints.isEmpty()) { "Integer sources require an explicit compiled schema" }
         val original = affineObjective(source, captured.objective)
-        val affine = if (compiled == null) original else compiledObjective(compiled, source, original, realIds, handles)
+        val affine = if (compiled == null) original else compiledObjective(compiled, source, original)
         val quadratic = if (compiled == null) captured.objective else affine.toQuadraticObjectiveSpec()
-        val request = compiled?.problem?.pipelineRequest() ?: source.pipelineRequest()
+        val request = compiled?.request ?: (captured.source as SmtLibInput.Polynomial).problem.pipelineRequest()
+        val condition = conditions?.getValue(identity)?.jsonObject ?: buildJsonObject { }
+        val pins = assumptions(condition, source, compiled)
         for ((index, engine) in engines.withIndex()) {
             val encodings = if (index % 2 == 0) listOf("linear", "quadratic") else listOf("quadratic", "linear")
             for (encoding in encodings) {
@@ -181,7 +204,7 @@ internal object ObjectiveRepresentationProbe {
                     strategy = PolynomialStrategyParams(
                         backtrack = BacktrackParams(randomSeed = seed),
                         localSearch = LocalSearchParams(maxFlips = moves.toLong(), randomSeed = seed),
-                        alnsIterations = moves,
+                        alnsIterations = moves, assumptions = pins,
                     ),
                 )
                 val started = System.nanoTime()
@@ -194,10 +217,11 @@ internal object ObjectiveRepresentationProbe {
                     put("engine", engine.name)
                     put("encoding", encoding)
                     put("entry", if (compiled == null) "polynomial-source" else "compiled-schema")
+                    put("condition", condition)
                     put("elapsedNanos", elapsed)
                     put("nativeWork", execution.nativeWork)
                     put("javaCores", Runtime.getRuntime().availableProcessors())
-                    put("result", resultRecord(execution.result, source, compiled, realIds))
+                    put("result", resultRecord(execution.result, source, compiled))
                 }
                 File(output, "$identity.${engine.name}.$encoding.json").writeText(record.toString() + "\n")
                 println("${input.name} $engine $encoding ${execution.result::class.simpleName} $elapsed ns")
@@ -205,9 +229,34 @@ internal object ObjectiveRepresentationProbe {
         }
     }
 
-    private fun affineObjective(source: PolynomialRealProblem, objective: QuadraticObjectiveSpec): LinearObjective {
-        val bools = Array(source.sourceBoolCount) { BigFraction.ZERO }
-        val reals = Array(source.sourceRealCount) { BigFraction.ZERO }
+    private fun sourceNames(source: SmtLibInput): SourceNames = when (source) {
+        is SmtLibInput.Polynomial -> SourceNames(source.problem.realVarNames, source.problem.boolVarNames)
+        is SmtLibInput.NonlinearInteger -> SourceNames(
+            source.problem.realVarNames, source.problem.boolVarNames, source.problem.intVarNames,
+        )
+        else -> error("Source is not an admitted polynomial or nonlinear integer input")
+    }
+
+    private fun assumptions(condition: JsonObject, source: SourceNames, compiled: CompiledInput?): Assumptions {
+        require(condition.keys.all { it in setOf("bools", "ints") }) { "Unsupported source condition" }
+        var pins = Assumptions.None
+        for ((name, value) in condition["bools"]?.jsonObject.orEmpty()) {
+            val sourceId = source.bools.getValue(name)
+            val id = compiled?.model?.boolVarIdByName?.getValue(name) ?: sourceId
+            pins = pins.withBool(id, value.jsonPrimitive.boolean)
+        }
+        for ((name, value) in condition["ints"]?.jsonObject.orEmpty()) {
+            val sourceId = source.ints.getValue(name)
+            val id = compiled?.model?.intVarIdByName?.getValue(name) ?: sourceId
+            pins = pins.withInt(id, value.jsonPrimitive.long)
+        }
+        return pins
+    }
+
+    private fun affineObjective(source: SourceNames, objective: QuadraticObjectiveSpec): LinearObjective {
+        val bools = Array(source.bools.size) { BigFraction.ZERO }
+        val ints = Array(source.ints.size) { BigFraction.ZERO }
+        val reals = Array(source.reals.size) { BigFraction.ZERO }
         for (term in objective.terms) {
             val coefficient = BigFraction.of(term.coefficient.numerator, term.coefficient.denominator)
             if (coefficient.isZero) continue
@@ -215,12 +264,12 @@ internal object ObjectiveRepresentationProbe {
             when (val variable = term.first) {
                 is QuadraticVariable.Bool -> bools[variable.id.index] = bools[variable.id.index] + coefficient
                 is QuadraticVariable.Real -> reals[variable.id.index] = reals[variable.id.index] + coefficient
-                is QuadraticVariable.Int ->
-                    error("Pure polynomial real source contains an integer objective coordinate")
+                is QuadraticVariable.Int -> ints[variable.id.index] = ints[variable.id.index] + coefficient
             }
         }
         return LinearObjective(
             boolWeights = LongArray(bools.size) { exactLong(bools[it]) },
+            intCoefficients = LongArray(ints.size) { exactLong(ints[it]) },
             constant = exactLong(BigFraction.of(objective.constant.numerator, objective.constant.denominator)),
             realCoefficients = DoubleArray(reals.size) {
                 val value = reals[it].toDouble()
@@ -236,33 +285,33 @@ internal object ObjectiveRepresentationProbe {
     }
 
     private fun compiledObjective(
-        compiled: CompiledSchema, source: PolynomialRealProblem, original: LinearObjective,
-        realIds: Map<String, Int>, handles: Map<String, FloatHandle>,
+        compiled: CompiledInput, source: SourceNames, original: LinearObjective,
     ): LinearObjective {
-        require(realIds.keys == source.realVarNames.keys &&
-            compiled.boolVarIdByName.keys == source.boolVarNames.keys) { "Source and schema declarations differ" }
-        require(compiled.intVarIdByName.isEmpty()) { "Polynomial real source has no integer declarations" }
-        require(realIds.values.distinct().size == realIds.size) { "Schema real coordinates alias source declarations" }
-        val bools = LongArray(compiled.problem.numBoolVars)
-        val reals = DoubleArray(compiled.problem.numRealVars)
-        for ((name, id) in source.boolVarNames) {
-            bools[compiled.sourceId(BoolHandle(name)).index] = original.boolWeights[id]
+        val model = compiled.model
+        require(compiled.reals.keys == source.reals.keys && model.boolVarIdByName.keys == source.bools.keys &&
+            model.intVarIdByName.keys == source.ints.keys) { "Source and schema declarations differ" }
+        require(compiled.reals.values.distinct().size == compiled.reals.size) {
+            "Schema real coordinates alias source declarations"
         }
-        for ((name, id) in source.realVarNames) {
-            val column = realIds.getValue(name)
-            val objective = compiled.minimize(handles.getValue(name))
+        val bools = LongArray(model.problem.numBoolVars)
+        val ints = LongArray(model.problem.numIntVars)
+        val reals = DoubleArray(model.problem.numRealVars)
+        for ((name, id) in source.bools) bools[model.sourceId(BoolHandle(name)).index] = original.boolWeights[id]
+        for ((name, id) in source.ints) ints[model.intVarIdByName.getValue(name)] = original.intCoefficients[id]
+        for ((name, id) in source.reals) {
+            val column = compiled.reals.getValue(name)
+            val objective = model.minimize(compiled.handles.getValue(name))
             require(column in objective.realCoefficients.indices &&
                 objective.realCoefficients.withIndex().all { (index, coefficient) ->
-                coefficient == if (index == column) 1.0 else 0.0
-            }) { "Compiled float objective differs from its named continuous source coordinate" }
+                    coefficient == if (index == column) 1.0 else 0.0
+                }) { "Compiled float objective differs from its named continuous source coordinate" }
             reals[column] = original.realCoefficients[id]
         }
-        return LinearObjective(boolWeights = bools, constant = original.constant, realCoefficients = reals)
+        return LinearObjective(bools, ints, original.constant, reals)
     }
 
     private fun resultRecord(
-        result: QuadraticOptimizationResult, source: PolynomialRealProblem,
-        compiled: CompiledSchema?, realIds: Map<String, Int>,
+        result: QuadraticOptimizationResult, source: SourceNames, compiled: CompiledInput?,
     ) = buildJsonObject {
         put("status", result::class.simpleName)
         put("sense", result.sense.name)
@@ -271,12 +320,16 @@ internal object ObjectiveRepresentationProbe {
             val sample = result.incumbent.sample
             put("objective", scalar(result.incumbent.value))
             put("witness", buildJsonObject {
-                for ((name, id) in source.realVarNames) {
-                    val mapped = if (compiled == null) id else realIds.getValue(name)
+                for ((name, id) in source.reals) {
+                    val mapped = compiled?.reals?.getValue(name) ?: id
                     put(name, scalar(requireNotNull(sample.algebraicReals)[mapped]))
                 }
-                for ((name, id) in source.boolVarNames) {
-                    val mapped = compiled?.sourceId(BoolHandle(name))?.index ?: id
+                for ((name, id) in source.ints) {
+                    val mapped = compiled?.model?.intVarIdByName?.getValue(name) ?: id
+                    put(name, sample.exactIntValue(mapped).toString())
+                }
+                for ((name, id) in source.bools) {
+                    val mapped = compiled?.model?.sourceId(BoolHandle(name))?.index ?: id
                     put(name, sample.boolValue(mapped).toString())
                 }
             })

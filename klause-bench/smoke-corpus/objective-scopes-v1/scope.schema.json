@@ -1,0 +1,72 @@
+{
+  "entries": {
+    "b": {
+      "$type": "bool"
+    },
+    "i": {
+      "$type": "int",
+      "min": 0,
+      "max": 1
+    },
+    "j": {
+      "$type": "int",
+      "min": 0,
+      "max": 1
+    },
+    "x": {
+      "$type": "float",
+      "min": 1.0,
+      "max": 1.0,
+      "buckets": 2
+    },
+    "y": {
+      "$type": "float",
+      "min": 1.0,
+      "max": 1.0,
+      "buckets": 2
+    },
+    "distinct": {
+      "$type": "constraint",
+      "expr": {
+        "$type": "alldiff",
+        "terms": [
+          {
+            "$type": "intref",
+            "name": "i"
+          },
+          {
+            "$type": "intref",
+            "name": "j"
+          }
+        ]
+      }
+    },
+    "square": {
+      "$type": "constraint",
+      "expr": {
+        "$type": "continuous_equality",
+        "left": {
+          "$type": "continuous_multiply",
+          "left": {
+            "$type": "continuous_affine",
+            "coefficients": {
+              "x": 1.0
+            }
+          },
+          "right": {
+            "$type": "continuous_affine",
+            "coefficients": {
+              "x": 1.0
+            }
+          }
+        },
+        "right": {
+          "$type": "continuous_affine",
+          "coefficients": {
+            "y": 1.0
+          }
+        }
+      }
+    }
+  }
+}

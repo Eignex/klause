@@ -54,6 +54,11 @@ def check_record(root, path, require_incumbent):
             if z3.is_bool(variable):
                 assert text in ('true', 'false'), 'invalid Boolean coordinate'
                 value = z3.BoolVal(text == 'true')
+            elif z3.is_int(variable):
+                exact = scalar(text)
+                assert z3.is_rational_value(exact) and exact.denominator_as_long() == 1, \
+                    'integer coordinate is not exact and integral'
+                value = z3.IntVal(exact.numerator_as_long())
             else:
                 value = scalar(text)
             substitutions.append((variable, value))
