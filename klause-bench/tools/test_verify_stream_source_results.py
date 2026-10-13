@@ -4,6 +4,38 @@ from verify_stream_source_results import check_stream
 
 
 class VerifyStreamSourceResultsTest(unittest.TestCase):
+    def test_satisfaction_witnesses_check_original_assertions_without_a_cost(self):
+        root = '(root-obj (+ (^ x 2) (- 2)) 2)'
+        cases = (
+            ('(declare-const n Int) (assert (= n 18446744073709551616)) (check-sat)',
+             '(define-fun n () Int 18446744073709551616)'),
+            ('(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (check-sat)',
+             '(define-fun x () Real ' + root + ')'),
+        )
+        for source, model in cases:
+            with self.subTest(model=model):
+                result = check_stream(source, 'sat\n(\n' + model + '\n)\n')
+
+                self.assertEqual(1, len(result['witnesses']))
+                self.assertTrue(result['allOriginalAssertions'])
+                self.assertFalse(result['exactOriginalObjective'])
+                self.assertIsNone(result['direction'])
+                self.assertEqual(0, result['strictImprovements'])
+
+    def test_satisfaction_point_violating_its_source_is_rejected(self):
+        source = '(declare-const n Int) (assert (= (* n n) 4)) (check-sat)'
+        output = 'sat\n(\n(define-fun n () Int 3)\n)\n'
+
+        with self.assertRaisesRegex(AssertionError, 'original source assertion'):
+            check_stream(source, output)
+
+    def test_satisfaction_output_cannot_supply_an_optimization_cost(self):
+        source = '(declare-const n Int) (check-sat)'
+        output = '; objective=2\nsat\n(\n(define-fun n () Int 2)\n)\n'
+
+        with self.assertRaisesRegex(AssertionError, 'cost without an original objective'):
+            check_stream(source, output)
+
     def test_two_original_direction_improvements(self):
         for direction, points in (('minimize', (1, 0)), ('maximize', (0, 1))):
             with self.subTest(direction=direction):

@@ -15,11 +15,14 @@ from verify_source_results import symbol
 def source_objective(source):
     commands = expressions(source)
     objectives = [command for command in commands if command[0] in ('minimize', 'maximize')]
-    assert len(objectives) == 1 and len(objectives[0]) == 2, 'require one original objective'
-    objective = objectives[0]
+    assert len(objectives) <= 1, 'require at most one original objective'
+    objective = objectives[0] if objectives else None
     semantic_source = '\n'.join(sexpr(command) for command in commands
                                 if command[0] not in ('minimize', 'maximize', 'get-objectives'))
     variables, _ = source_formula(semantic_source)
+    if objective is None:
+        return semantic_source, variables, None, None
+    assert len(objective) == 2, 'invalid original objective'
     declarations = [command for command in commands
                     if command[0] in ('declare-const', 'declare-fun', 'define-fun')]
     names = {symbol(command[1]) for command in declarations}
@@ -45,9 +48,11 @@ def check_stream(source, output, interrupted=False, minimum_witnesses=1):
     terminal = False
     for line in output.splitlines():
         if line.startswith('; optimizationStatus='):
+            assert objective is not None, 'optimization status without an objective'
             assert not interrupted, 'terminal optimization status in interrupted output'
             terminal = True
         elif line.startswith('; objective='):
+            assert objective is not None, 'cost without an original objective'
             assert pending_cost is None and model_lines is None, 'cost without a preceding complete witness'
             assert not terminal, 'incumbent after terminal optimization status'
             value_text = line.split('=', 1)[1].strip()
@@ -58,7 +63,8 @@ def check_stream(source, output, interrupted=False, minimum_witnesses=1):
             assert len(parsed) == 1 and len(parsed[0]) == 2, 'invalid objective value'
             pending_cost = exact_value(parsed[0][1])
         elif line in ('(', '(model'):
-            assert model_lines is None and pending_cost is not None, 'model without exact cost'
+            assert model_lines is None, 'model before a preceding complete witness'
+            assert objective is None or pending_cost is not None, 'model without exact cost'
             assert not terminal, 'model after terminal optimization status'
             model_lines = [line]
         elif model_lines is not None:
@@ -67,14 +73,15 @@ def check_stream(source, output, interrupted=False, minimum_witnesses=1):
                 continue
             witness = '\n'.join(model_lines)
             check_witness(semantic_source, witness)
-            values = witness_values(witness, variables)
-            evaluated = z3.simplify(z3.substitute(objective,
-                *[(variable, values[name]) for name, variable in variables.items()]))
-            assert z3.is_true(z3.simplify(evaluated == pending_cost)), 'incorrect original objective'
-            if prior_cost is not None:
-                improvement = pending_cost < prior_cost if direction == 'minimize' else pending_cost > prior_cost
-                assert z3.is_true(z3.simplify(improvement)), 'incumbent does not strictly improve in original direction'
-            witnesses.append({'objective': pending_cost.sexpr(),
+            if objective is not None:
+                values = witness_values(witness, variables)
+                evaluated = z3.simplify(z3.substitute(objective,
+                    *[(variable, values[name]) for name, variable in variables.items()]))
+                assert z3.is_true(z3.simplify(evaluated == pending_cost)), 'incorrect original objective'
+                if prior_cost is not None:
+                    improvement = pending_cost < prior_cost if direction == 'minimize' else pending_cost > prior_cost
+                    assert z3.is_true(z3.simplify(improvement)), 'incumbent does not strictly improve in original direction'
+            witnesses.append({'objective': pending_cost.sexpr() if pending_cost is not None else None,
                               'witnessSha256': hashlib.sha256(witness.encode()).hexdigest()})
             prior_cost = pending_cost
             pending_cost = None
@@ -86,8 +93,8 @@ def check_stream(source, output, interrupted=False, minimum_witnesses=1):
         'stdoutSha256': hashlib.sha256(output.encode()).hexdigest(),
         'checker': 'z3-' + z3.get_version_string(),
         'direction': direction, 'witnesses': witnesses,
-        'allOriginalAssertions': True, 'exactOriginalObjective': True,
-        'strictImprovements': len(witnesses) - 1,
+        'allOriginalAssertions': True, 'exactOriginalObjective': objective is not None,
+        'strictImprovements': len(witnesses) - 1 if objective is not None else 0,
         'truncatedPublication': pending_cost is not None or model_lines is not None,
         'proofCertificateChecked': False,
     }
