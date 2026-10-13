@@ -55,24 +55,21 @@ class SharedPolynomialStrategyTest(private val engine: FiniteEngine) {
         kotlin.test.assertSame(source, request.preparedPlan.originalSource)
         assertTrue(request.preparedPlan.capabilities.admission(engine).runnable)
 
-        shared.service.invocation().use { invocation ->
-            val result = PolynomialStrategyAdapters(
-                shared, invocation,
-                PolynomialStrategyParams(
-                    backtrack = BacktrackParams(randomSeed = 17),
-                    localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 100),
-                    alnsIterations = 2,
-                ), Cancellation.Never,
-            ).solve(engine)
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(randomSeed = 17),
+            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 100), alnsIterations = 2,
+        ))
+        val scope = PolynomialInvocationScope(shared.service, params)
+        val result = PolynomialStrategyAdapters(request.preparedPlan, shared, scope, params.strategy,
+            Cancellation.Never, parallelism = 1).solve(engine)
 
-            val sample = assertIs<SolveResult.Sat>(result).assignment
-            assertEquals(1L, sample.intValue(0))
-            assertTrue(sample.intValue(0) != sample.intValue(1))
-            val exact = assertNotNull(sample.algebraicReals)
-            assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-2, 0, 1), exact[0]))
-            assertEquals(0, AlgebraicArithmetic().compare(exact[0], exact[1]))
-            assertTrue(invocation.stats.workSpent > 0)
-        }
+        val sample = assertIs<SolveResult.Sat>(result).assignment
+        assertEquals(1L, sample.intValue(0))
+        assertTrue(sample.intValue(0) != sample.intValue(1))
+        val exact = assertNotNull(sample.algebraicReals)
+        assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-2, 0, 1), exact[0]))
+        assertEquals(0, AlgebraicArithmetic().compare(exact[0], exact[1]))
+        assertTrue(scope.stats.workSpent > 0)
     }
 
 }
