@@ -25,6 +25,8 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.result.QuadraticIncumbent
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,6 +51,36 @@ class QuadraticWitnessPublicationTest {
     private val sourceChecker: (Sample) -> SourceEvidenceCheck = { sample ->
         SourceEvidenceVerifier(context).verify(SourceEvidence(scope, SourceClaim.Witness(sample),
             SourceDerivation.SourceWitness))
+    }
+
+    @Test
+    fun `a normalized quadratic witness preserves its actual affine objective binding`() {
+        val affine = LinearObjective(intCoefficients = longArrayOf(1))
+        val normalized = affine.toQuadraticObjectiveSpec()
+        val native = QuadraticEngineInvocation(invocation.source, normalized, invocation.sense,
+            invocation.condition, affine)
+        val candidate = point.copy(value = arithmetic.rational(BigFraction.ofLong(2)))
+
+        val checked = QuadraticWitnessPublication(native, candidate).verify(native, candidate,
+            arithmetic, sourceChecker)
+
+        assertEquals(SourceEvidenceCheck.Checked, checked)
+    }
+
+    @Test
+    fun `a quadratic witness cannot substitute an equal shaped original affine objective`() {
+        val affine = LinearObjective(intCoefficients = longArrayOf(1))
+        val normalized = affine.toQuadraticObjectiveSpec()
+        val native = QuadraticEngineInvocation(invocation.source, normalized, invocation.sense,
+            invocation.condition, affine)
+        val candidate = point.copy(value = arithmetic.rational(BigFraction.ofLong(2)))
+        val foreign = QuadraticEngineInvocation(invocation.source, normalized, invocation.sense,
+            invocation.condition, LinearObjective(intCoefficients = longArrayOf(1)))
+
+        val checked = QuadraticWitnessPublication(native, candidate).verify(foreign, candidate,
+            arithmetic, sourceChecker)
+
+        assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
 
     @Test
