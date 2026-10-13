@@ -73,84 +73,36 @@ internal object Suites {
                     Category.CSP,
                 )
             },
-            DynamicSuite(
+            archiveSuite(
                 "smtlib-qflia",
                 "SMT-LIB QF_LIA non-incremental set (fetched, full ~13k .smt2; 1/family by default)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfLia,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_LIA", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
+                ExternalCollections.smtlibQfLia, "non-incremental/QF_LIA",
+            ),
+            archiveSuite(
                 "smtlib-qflra",
                 "SMT-LIB QF_LRA non-incremental set (fetched, ~1.7k .smt2; 1/family by default)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfLra,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_LRA", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
+                ExternalCollections.smtlibQfLra, "non-incremental/QF_LRA",
+            ),
+            archiveSuite(
                 "smtlib-qfnra",
                 "SMT-LIB QF_NRA archive (fetched; membership unclassified; 1/family by default)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfNra,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_NRA", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
+                ExternalCollections.smtlibQfNra, "non-incremental/QF_NRA",
+            ),
+            archiveSuite(
                 "smtlib-qfidl",
                 "SMT-LIB QF_IDL non-incremental set (fetched, integer difference logic; 1/family by default)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfIdl,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_IDL", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
+                ExternalCollections.smtlibQfIdl, "non-incremental/QF_IDL",
+            ),
+            archiveSuite(
                 "smtlib-qfrdl",
                 "SMT-LIB QF_RDL non-incremental set (fetched, real difference logic; 1/family by default)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfRdl,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_RDL", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
-            DynamicSuite(
+                ExternalCollections.smtlibQfRdl, "non-incremental/QF_RDL",
+            ),
+            archiveSuite(
                 "smtlib-qflira",
                 "SMT-LIB QF_LIRA non-incremental set (fetched, small mixed int/real .smt2; 1/family by default)",
-                defaultPerFamily = 1,
-            ) { sel ->
-                CorpusSelection.select(
-                    ExternalCollections.smtlibQfLira,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_LIRA", "smt2"),
-                    sel,
-                    Category.CSP,
-                    format = Format.SMTLIB,
-                )
-            },
+                ExternalCollections.smtlibQfLira, "non-incremental/QF_LIRA",
+            ),
             DynamicSuite(
                 "miplib2017",
                 "MIPLIB 2017 collection (fetched per-instance, ~1065 .mps; 1/family by default)",
@@ -1143,4 +1095,13 @@ internal object ExternalCollections {
         "uuf50-218", "uuf75-325", "uuf100-430", "uuf125-538", "uuf150-645",
         "uuf175-753", "uuf200-860", "uuf225-960", "uuf250-1065",
     ).associateWith { satlibRnd(it) }
+}
+
+private fun archiveSuite(
+    id: String, description: String, collection: ExternalCollection, subDir: String,
+): DynamicSuite {
+    val layout = CorpusSelection.Layout.Flat(subDir, "smt2")
+    return DynamicSuite(id, description, defaultPerFamily = 1, sourceLayout = ArchiveSourceLayout(collection, layout)) {
+        CorpusSelection.select(collection, layout, it, Category.CSP, format = Format.SMTLIB)
+    }
 }

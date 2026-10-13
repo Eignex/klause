@@ -175,6 +175,7 @@ internal data class DynamicSuite(
     val description: String,
     /** Instances kept per family when the caller sets no cap; null keeps the whole corpus. */
     val defaultPerFamily: Int? = null,
+    val sourceLayout: ArchiveSourceLayout? = null,
     val provider: (CorpusSelection.Selection) -> List<ProblemRef>,
 )
 
@@ -216,4 +217,13 @@ internal object Catalog {
         suites.flatMap { it.problems }.filter { it.category == category }
 
     fun byTag(tag: String): List<ProblemRef> = suites.flatMap { it.problems }.filter { tag in it.tags }
+}
+
+internal data class ArchiveSourceLayout(val collection: ExternalCollection, val layout: CorpusSelection.Layout.Flat) {
+    fun member(name: String): String {
+        require(name.isNotBlank() && name.length <= 2048)
+        require(name.split('/').none { it.isEmpty() || it == "." || it == ".." })
+        require(name.none { it == '\\' || it.code < 32 || it.code == 127 })
+        return "${layout.subDir}/$name.${layout.ext}"
+    }
 }

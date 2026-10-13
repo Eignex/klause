@@ -395,6 +395,65 @@ cleanup while needed. After promoting useful results and checking all active
 consumers, delete obsolete release assets/tags, ended lab jobs and external copies
 under that workflow; do not retain a historical archive.
 
+### Original corpus source capture
+
+`com.eignex.klause.bench.profile.CorpusSourceCapture` exports original SMT archive
+members without invoking a source parser, solver, checker or solve-record cache.
+It supports the catalog's flat QF_LIA, QF_LRA, QF_NRA, QF_IDL, QF_RDL and QF_LIRA
+archive suites. Submit a committed, pinned profile main on Linux AWS with one
+`request64=<base64 UTF-8 JSON>` argument. The request is canonical compact JSON
+with `schema: "corpus-original-source-request-v1"` and a nonempty `cases` array;
+each case supplies exactly `suite`, `problem` and a nonnull lowercase 64-digit
+`expectedSha256` of the original plain bytes. Keep requests and captured payloads
+outside the repository. There is no default selection or reference-result filter.
+
+The profile retains raw and resolved requests before transfer. Archive layout and
+URL come from the same catalog declaration used by ordinary selection. The source
+worker uses HTTPS without proxy inheritance, streams tar metadata through an owned
+`zstd` decoder and copies only requested regular plain `.smt2` members. It does not
+extract an archive into the corpus cache or change the cached collection. Missing,
+compressed-inner, duplicate, unsupported and mismatched members remain failed;
+no identity or source hash is invented. Leading `./` archive prefixes are normalized;
+absolute and traversal names cannot become retained source paths.
+
+Limits are 128 cases, 48 KiB of original request, 256 MiB per downloaded archive,
+512 MiB total observed download, 8 GiB decoded archive bytes per collection,
+200,000 members, 32 MiB per source and 128 MiB total source payload. Worker
+receipts are bounded to 4 MiB each and 32 MiB in total. The Python worker retains a
+1,200-second containing watchdog, 30-second network read timeout and 2 GiB address
+space limit. The owning JVM bounds the worker to 1,230 seconds and each output
+stream to 1 MiB. Child-group cleanup includes the decoder, including when its
+Python parent has exited. Linux `setsid`, Python 3 and `zstd` are required; Python
+runs isolated without provisioning mathematical packages. Cooperative IO and OS
+cleanup can overrun a polling boundary; the containing owner kills the group and
+withholds process completeness on timeout, overflow or interrupted draining.
+
+Under `$OUT/corpus-source-capture`, each completed payload receives an indexed
+`.smt2` path only after source size/hash and complete decoder exit are checked.
+Partial source and failed archive bytes are retained with transfer/failure metadata.
+Failed HTTP reads retain bounded exception-partial bytes, account for all observed
+bytes including omitted excess, and durably record the retained prefix hash and
+primary transfer failure. Socket-buffer bytes not exposed by the read API remain
+explicitly unavailable; transfer errors never trigger retries. Copy and receipt
+IO preserve the primary failure and separately report durability/close failures.
+Decoder kill, reap, stream retirement and signal restoration are independently
+attempted; any unavailable cleanup or receipt prevents completion credit.
+A successful archive download is removed after its digest and decoder receipts are
+saved; full original source bytes remain. `capture.json` keeps every planned case
+as captured, failed or not reached, and reports no solver/parser/checker calls.
+`worker-process.json` retains true child exit, stream completion, primary failure,
+checked group/helper/reap outcomes and stop flags. `worker-cleanup.json` joins final
+registration release, hook removal and cleanup failures. Interrupted or failed
+cleanup still attempts those durable receipts and withholds completeness;
+installed-build provenance and worker hashes bind the producing code. Retrieve
+outputs with maintained lab `files`/`cat` over authenticated HTTPS. Hash equality
+establishes original-byte custody, never source satisfiability or a runtime gain.
+The retained archive/source/decoder-stream/worker-receipt limits bound only the
+profile's owned files. Harness JFR and other harness output are outside that
+ownership. The lab's 1 GiB output retrieval limit can omit files; completion credit
+requires the actual terminal inventory, `omitted.tsv` and collected payload hashes,
+not only the worker's completion flag.
+
 ### CLI stream capture
 
 `com.eignex.klause.bench.profile.CliStreamCapture` runs the installed CLI as a subprocess
