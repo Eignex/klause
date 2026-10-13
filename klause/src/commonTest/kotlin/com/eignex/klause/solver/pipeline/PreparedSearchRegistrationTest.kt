@@ -94,7 +94,7 @@ class PreparedSearchRegistrationTest {
     }
 
     @Test
-    fun `prepared exact openings isolate outcomes and retain published coordinates`() {
+    fun `prepared exact openings isolate cached outcomes`() {
         val source = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
             factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
                 doubleArrayOf(1.0), LinearOp.GE, 1.0)),
@@ -103,11 +103,10 @@ class PreparedSearchRegistrationTest {
         prepared.prepareSource(Cancellation.Never)
         val coordinate = SearchExactRealValue(SourceRealId(0))
 
-        val published = prepared.open().use { first ->
+        prepared.open().use { first ->
             assertIs<ComponentResult.Consistent>(first.session.initialize())
             assertIs<ComponentResult.Consistent>(first.session.push(SearchDecision.Bool(0)))
             assertIs<ComponentCheck.Feasible>(first.session.check())
-            val model = first.session.model()
             prepared.open().use { sibling ->
                 assertIs<ComponentResult.Consistent>(sibling.session.initialize())
                 assertIs<ComponentResult.Consistent>(sibling.session.push(SearchDecision.Bool(1)))
@@ -115,9 +114,27 @@ class PreparedSearchRegistrationTest {
 
                 assertNotEquals(BigFraction.ONE, sibling.session.model().valueOf(coordinate))
             }
-            model
+            assertIs<ComponentCheck.Feasible>(first.session.check())
+            assertEquals(BigFraction.ONE, first.session.model().valueOf(coordinate))
+        }
+    }
+
+    @Test
+    fun `published exact coordinates outlive their producer`() {
+        val source = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.GE, 1.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
+        prepared.prepareSource(Cancellation.Never)
+
+        val published = prepared.open().use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            assertIs<ComponentResult.Consistent>(search.session.push(SearchDecision.Bool(0)))
+            assertIs<ComponentCheck.Feasible>(search.session.check())
+            search.session.model()
         }
 
-        assertEquals(BigFraction.ONE, published.valueOf(coordinate))
+        assertEquals(BigFraction.ONE, published.valueOf(SearchExactRealValue(SourceRealId(0))))
     }
 }
