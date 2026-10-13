@@ -350,6 +350,25 @@ class ProofCheckTest(unittest.TestCase):
         solver.add(*constraints, variables['x'] == 2)
         self.assertEqual(solver.check(), z3.unsat)
 
+    def test_binary_mps_optimum_queries_keep_all_original_rows(self):
+        source = "NAME fixture\nROWS\n N obj\n G row\nCOLUMNS\n M1 'MARKER' 'INTORG'\n x obj 1 row 2\n y obj 1 row 3\n M2 'MARKER' 'INTEND'\nRHS\n rhs row 2\nENDATA\n"
+        case = self.case(suite='mps-core', arm='default', objective=1, finalWitness='v x=1 y=0')
+
+        result = self.check(case, source)
+
+        self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
+        with self.assertRaisesRegex(AssertionError, 'claimed source objective feasibility expected sat, got unsat'):
+            self.check(self.case(suite='mps-core', arm='default', objective=0, finalWitness=None), source)
+
+    def test_mps_query_preserves_a_nonbinary_integer_domain(self):
+        source = "NAME fixture\nROWS\n N obj\n G row\nCOLUMNS\n M1 'MARKER' 'INTORG'\n x obj 1 row 1\n M2 'MARKER' 'INTEND'\nRHS\n rhs row 2\nBOUNDS\n UI b x 3\nENDATA\n"
+        case = self.case(suite='mps-core', arm='default', objective=2, finalWitness='v x=2')
+
+        result = self.check(case, source)
+
+        self.assertEqual(result['witness'], 'exact source feasible')
+        self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
+
     def test_mps_ranges_define_exact_feasible_intervals(self):
         for kind, span, lo, hi in (('E', '2', 5, 7), ('E', '-2', 3, 5),
                                   ('L', '2', 3, 5), ('G', '-2', 5, 7)):
