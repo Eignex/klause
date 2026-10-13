@@ -24,7 +24,9 @@ internal fun linearNeighborhoodInvocation(
     val prepared = preparedSource ?: model.prepareExecutionPlan(objective)
     val source = prepared.originalSource as? Problem ?: model
     val identity = ModelIdentity.of(source, objective)
-    val binding = EngineInvocation(prepared, identity, objective, scope = sourceObjective?.context?.scope)
+    val context = sourceObjective?.context
+    val binding = EngineInvocation(prepared, identity, objective,
+        scope = context?.scope, condition = context?.scope?.condition)
     val stop = params.cancellation or params.timeout
     val factories = List(count) { index ->
         PortfolioArmFactory(prepared, index, if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch,
