@@ -162,6 +162,9 @@ object BacktrackCatalog {
         BacktrackArm.ClausalBalanced -> clausal(arm, 0.975, maxLearned = 4000)
         BacktrackArm.ClausalStable -> clausal(arm, 0.99)
         BacktrackArm.ConflictDriven -> conflictDriven()
+        BacktrackArm.CoreGuided -> BacktrackRecipe(BacktrackArm.CoreGuided.label) { seed, event ->
+            BacktrackPresets.satOptimized(randomSeed = seed, inprocess = false, onEvent = event)
+        }
         BacktrackArm.LpAggressive -> lpArm(LpEmphasis.AGGRESSIVE)
         BacktrackArm.LpDefault -> lpArm(LpEmphasis.DEFAULT)
         BacktrackArm.LpLbTree -> lpTreeSearchArm()
@@ -191,6 +194,7 @@ object BacktrackCatalog {
         BacktrackArm.ObjectiveGuided,
         BacktrackArm.ClausalBalanced,
         BacktrackArm.ClausalStable,
+        BacktrackArm.CoreGuided,
     )
     private val cspOrder = listOf(
         BacktrackArm.SatOptimized,
@@ -278,6 +282,7 @@ internal enum class BacktrackArm(val label: String, val needs: Set<ArmNeed> = em
     ClausalBalanced("clausal-balanced", setOf(ArmNeed.Clausal)),
     ClausalStable("clausal-stable", setOf(ArmNeed.Clausal)),
     ConflictDriven("conflictDriven"),
+    CoreGuided("core-guided", setOf(ArmNeed.BooleanObjective)),
     LpAggressive("lp-aggressive", setOf(ArmNeed.Relaxation(LpEmphasis.AGGRESSIVE))),
     LpDefault("lp-default", setOf(ArmNeed.Relaxation(LpEmphasis.DEFAULT))),
     LpLbTree("lp-lbtree", setOf(ArmNeed.Objective, ArmNeed.Relaxation(LpEmphasis.DEFAULT))),

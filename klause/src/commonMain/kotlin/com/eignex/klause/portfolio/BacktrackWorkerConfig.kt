@@ -65,6 +65,12 @@ internal class BacktrackWorkerConfig(
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
+        if (recipe.label == BacktrackArm.CoreGuided.label) {
+            val coreParams = params
+            return CoreGuidedWorkerConfig(params.nodeBudget) { coreParams }.materialize(
+                problem, index, armId, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, pools,
+            )
+        }
         // Shared entries name the worker's position as their origin, so replicas of one arm are credited apart.
         val sharing = HashSet<Contribution>()
         val meter = SharingMeter()

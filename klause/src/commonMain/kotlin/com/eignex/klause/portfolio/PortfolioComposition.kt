@@ -399,7 +399,9 @@ internal object PortfolioComposition {
         // Appending retains the incumbent cores and every existing worker's seed position.
         continuousLpArm(scenario, facts, arms)?.let { arms += it }
         integerLinearLpArm(scenario, facts, arms)?.let { arms += it }
-        if (scenario.kind == Kind.COP && facts.booleanObjective && scenario.btPool == null) {
+        if (scenario.kind == Kind.COP && facts.booleanObjective && scenario.btPool == null &&
+            arms.none { it.label == BacktrackArm.CoreGuided.label }
+        ) {
             arms += CoreGuidedWorkerConfig(scenario.nodeBudget, scenario.btEdit)
         }
         return arms
