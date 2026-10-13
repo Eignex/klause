@@ -351,6 +351,13 @@ bounds and proofs require their own checked evidence. Unsupported components and
 operations have explicit decline causes; exhausted caller or representation
 allowances remain invocation stops.
 
+Polynomial and nonlinear-integer ordinary portfolios bind `EngineInvocation` to the
+retained plan, actual execution model/objective and captured source/execution pins.
+Their terminal admission consumes `CompletedEngineResult` with the actual result;
+exhausted optimization also retains the last finite cutoff read by that worker.
+A conditioned or foreign completion cannot finish a weaker runtime invocation.
+Independent original-source derivation capture remains a separate contract.
+
 ## Exact theory strategy execution
 
 Polynomial and nonlinear-integer mixed invocations use the same construction path
