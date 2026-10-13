@@ -42,6 +42,11 @@ retaining learned clauses and reawakening units. Native CP clause state remains 
 contains the single traversal loop and owns frames, decisions, restarts, cancellation
 cadence and resumable/terminal state.
 
+Components obtain the invocation token, native allowance accounting and typed stop
+diagnostics from `SearchContext.executionControls`. Alternate coordinators supply
+those services through the same contract. [Resource allowances](resources.md#component-execution-controls)
+owns their units, cancellation scopes and diagnostic precedence.
+
 A conditioned run retains the decision level at which it opens. Restarts return
 to that level, and learned backjumps below it fall back to chronological traversal.
 Exhaustion is then conditional. The query owner retracts the condition after the

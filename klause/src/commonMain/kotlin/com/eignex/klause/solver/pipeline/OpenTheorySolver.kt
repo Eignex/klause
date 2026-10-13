@@ -476,7 +476,7 @@ class OpenTheoryEngine internal constructor(
         session: com.eignex.klause.solver.search.SearchSession? = null,
         cause: SearchStopCause? = null,
     ): OpenTheoryResult.Unknown {
-        stats.timedOut = timedOut
+        stats.timedOut = timedOut || cause == SearchStopCause.Timeout
         return OpenTheoryResult.Unknown(
             when {
                 timedOut || cause == SearchStopCause.Timeout -> TerminationReason.Timeout
