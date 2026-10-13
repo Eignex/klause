@@ -211,7 +211,8 @@ fun OpenTheoryPipeline.execute(
     }
     val shared = request.resolvedModel()
     val scope = PolynomialInvocationScope(shared.service, params)
-    val result = PolynomialStrategyAdapters(request.preparedPlan, shared, scope, params.strategy, stop, cores).solve(engine)
+    val result = PolynomialStrategyAdapters(request.preparedPlan, shared, scope, params.strategy, stop, cores)
+        .solve(engine)
     val stats = scope.stats
     if (stop()) {
         return incomplete(
