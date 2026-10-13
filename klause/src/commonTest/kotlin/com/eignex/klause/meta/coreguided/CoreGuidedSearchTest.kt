@@ -1,6 +1,8 @@
 package com.eignex.klause.meta.coreguided
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
@@ -14,6 +16,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +27,24 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CoreGuidedSearchTest {
+    @Test
+    fun `decision quota is retained when the objective stratum changes`() {
+        val problem = Problem(4, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(longArrayOf(-5, -1, -1, 0), constant = 7)
+        val search = CoreGuidedSearch(
+            problem,
+            objective,
+            BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, maxDecisions = 3),
+            stratify = true,
+        )
+
+        val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
+
+        val retained = assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(2L, objective.evaluateLong(retained.sample))
+        assertEquals(TerminationReason.BudgetExhausted, retained.reason)
+    }
+
     @Test
     fun `weighted overlapping cores preserve the original objective`() {
         val problem = Problem(
