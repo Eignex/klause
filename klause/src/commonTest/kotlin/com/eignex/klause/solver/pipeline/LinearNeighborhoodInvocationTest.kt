@@ -4,18 +4,55 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.plus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearNeighborhoodInvocationTest {
+    @Test
+    fun `captured neighborhood pins retain exact receipts without proof claims`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val request = OpenTheoryRequest(source, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
+        val third = BigFraction.ofLong(3).reciprocal()
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val context = SourceProofContext(original.scope.copy(condition = SourceCondition(
+            lower = mapOf(real to third), upper = mapOf(real to third))), original.coordinates,
+            original.premises, original.objective, original.objectiveConstant, original.semanticsChecker)
+
+        for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
+                request.withLinearAuthority(context), TheoryParams(openWorkLimit = 1000, maxFlips = 4,
+                    alnsIterations = 1), engine))
+
+            val bounded = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
+            val authority = assertNotNull(bounded.linearResult)
+            assertEquals(context.scope, authority.scope)
+            assertNull(authority.bound)
+            assertNull(authority.terminal)
+            val receipt = assertNotNull(execution.acceptedIncumbent)
+            assertEquals(SourceValue.Rational(third), receipt.value)
+            assertEquals(third, assertNotNull(receipt.sample.exactReals).single())
+        }
+    }
+
     @Test
     fun `linear real strategies retain the same exact source witness`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),

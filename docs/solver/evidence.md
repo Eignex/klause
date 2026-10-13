@@ -225,8 +225,8 @@ That condition must retain every explicit original pin and reference only declar
 source coordinates; an optional capture scope must contain the same condition.
 Witness admission checks it alongside original and execution assumptions. Global
 invocation matching retains the exact condition even when revision capture is absent.
-Ordinary open linear portfolios bind that condition from their retained original
-source context, so captured real windows and wide integer restrictions reach the
+Ordinary open linear portfolios and heuristic neighborhood invocations bind that
+condition from their retained original source context, so captured real windows and wide integer restrictions reach the
 same invocation used by receipt and terminal admission.
 Pins and deduced bounds, holes and sets cannot change after binding. An optional
 `SourceScope` records explicitly requested revision/semantics capture; an uncaptured
