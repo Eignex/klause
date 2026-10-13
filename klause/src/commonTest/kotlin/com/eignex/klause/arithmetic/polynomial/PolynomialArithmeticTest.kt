@@ -45,12 +45,12 @@ class PolynomialArithmeticTest {
     fun `prepared subresultants charge each native operation once`() {
         val left = arithmetic.subtract(arithmetic.power(y, 3), x)
         val right = arithmetic.subtract(arithmetic.power(y, 2), arithmetic.add(x, Polynomial.ONE))
-        val units = LongArray(2)
-        for (index in units.indices) {
+        val charges = LongArray(2)
+        for (index in charges.indices) {
             val meter = object : Cancellation, WorkMeter {
                 override fun isCancelled(): Boolean = false
                 override fun workMeter(): WorkMeter = this
-                override fun charge(amount: Long) { units[index] += amount }
+                override fun charge(units: Long) { charges[index] += units }
             }
             val counted = PolynomialArithmetic(meter)
             if (index == 0) counted.principalSubresultants(left, right, 1)
@@ -61,7 +61,7 @@ class PolynomialArithmeticTest {
             }
         }
 
-        assertEquals(units[0], units[1])
+        assertEquals(charges[0], charges[1])
     }
 
     @Test
