@@ -103,4 +103,15 @@ class SourceResultEvidenceTest {
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }
+
+    @Test
+    fun `an observed cancellation cannot be cleared by a later capture`() {
+        val supported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
+        val result = SourceResultEvidence(scope, listOf(supported, supported))
+        var polls = 0
+
+        val checked = result.verify(SourceClaim.Refutation, context, Cancellation { ++polls == 2 })
+
+        assertIs<SourceEvidenceCheck.Unavailable>(checked)
+    }
 }

@@ -58,7 +58,11 @@ class SourceResultEvidence private constructor(
         if (scope != context.scope || capturedDerivations.any { it.scope != scope }) {
             return SourceEvidenceCheck.Rejected("completed result evidence has mismatched original-source scopes")
         }
-        val limited = Cancellation { cancellation() || !allowance.consume(0) }
+        var stopped = false
+        val limited = Cancellation {
+            stopped = stopped || cancellation() || !allowance.consume(0)
+            stopped
+        }
         val verifier = SourceEvidenceVerifier(context)
         var mismatch: SourceEvidenceCheck? = null
         var unavailable: SourceEvidenceCheck.Unavailable? = null
