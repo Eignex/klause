@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
@@ -155,6 +156,7 @@ private fun probeWitness(
         formula.atoms.size > MAX_WITNESS_ATOMS
     ) return null
     var terms = 0
+    val termCounts = HashMap<Polynomial, Int>()
     val axes = ArrayList<Triple<PolynomialAtom, List<Int>, Int>>()
     for (atom in formula.atoms) {
         arithmetic.step()
@@ -168,11 +170,22 @@ private fun probeWitness(
             ) return null
         }
         terms += count
+        termCounts[atom.polynomial] = count
         repeat(count * (realCount + 1) + realCount + 1) { arithmetic.step() }
         if (atom.relation == PolynomialRelation.EQ) {
             val variables = atom.polynomial.variables.filter { it !in fixed }
             axes.add(Triple(atom, variables, count))
         }
+    }
+    val conjunctive = formula.conjunctiveAtoms(arithmetic, MAX_WITNESS_ATOMS)
+    if (conjunctive != null && conjunctive.none {
+            arithmetic.step()
+            it.relation == PolynomialRelation.EQ && !it.polynomial.isZero
+        }
+    ) {
+        return probeInequalityWitness(
+            formula, conjunctive, boolCount, realCount, arithmetic, algebraic, fixed, terms, termCounts,
+        )
     }
     var proposals = 0
     var attemptedAxes = 0
@@ -234,6 +247,121 @@ private fun probeWitness(
         }
     }
     return null
+}
+
+private fun probeInequalityWitness(
+    formula: PolynomialFormula,
+    guides: List<PolynomialAtom>,
+    boolCount: Int,
+    realCount: Int,
+    arithmetic: PolynomialArithmetic,
+    algebraic: AlgebraicArithmetic,
+    fixed: Map<Int, BigFraction>,
+    terms: Int,
+    termCounts: Map<Polynomial, Int>,
+): QfNraAssignment? {
+    repeat(terms * (realCount + 1) + realCount + 1) { arithmetic.step() }
+    val byCoordinate = Array(realCount) { ArrayList<Pair<PolynomialAtom, Int>>() }
+    for (atom in guides) {
+        arithmetic.step()
+        for (variable in atom.polynomial.variables) {
+            arithmetic.step()
+            byCoordinate[variable].add(atom to termCounts.getValue(atom.polynomial))
+        }
+    }
+    val probe = InequalityWitnessProbe(formula, boolCount, arithmetic, algebraic)
+    for (center in listOf(BigFraction.ONE, BigFraction.ZERO, BigFraction.MINUS_ONE)) {
+        val point = LinkedHashMap<Int, AlgebraicReal>()
+        for (id in 0 until realCount) {
+            arithmetic.step()
+            point[id] = algebraic.rational(fixed[id] ?: if (byCoordinate[id].isEmpty()) BigFraction.ZERO else center)
+        }
+        if (probe.exhausted) return null
+        probe.candidate(point)?.let { return it }
+        for (pass in 0 until MAX_WITNESS_PASSES) {
+            var repaired = false
+            for (variable in 0 until realCount) {
+                arithmetic.step()
+                if (probe.exhausted) return null
+                if (variable in fixed || byCoordinate[variable].isEmpty()) continue
+                val roots = probe.boundaries(byCoordinate[variable], variable, point) ?: return null
+                var best: Map<Int, AlgebraicReal>? = null
+                var bestScore = -1
+                for (cell in 0..2 * roots.size) {
+                    if (probe.exhausted) return null
+                    val root = cell / 2
+                    val coordinate = if (cell and 1 != 0) roots[root] else algebraic.rational(
+                        algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)),
+                    )
+                    repeat(realCount + 1) { arithmetic.step() }
+                    val proposed = LinkedHashMap(point)
+                    proposed[variable] = coordinate
+                    probe.candidate(proposed)?.let { return it }
+                    var score = 0
+                    for (atom in guides) {
+                        arithmetic.step()
+                        if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, proposed)))) score++
+                    }
+                    if (score > bestScore) {
+                        best = proposed
+                        bestScore = score
+                    }
+                }
+                best?.let {
+                    repeat(realCount + 1) { arithmetic.step() }
+                    point.putAll(it)
+                    repaired = true
+                }
+            }
+            if (!repaired) break
+        }
+    }
+    return null
+}
+
+private class InequalityWitnessProbe(
+    private val formula: PolynomialFormula,
+    private val boolCount: Int,
+    private val arithmetic: PolynomialArithmetic,
+    private val algebraic: AlgebraicArithmetic,
+) {
+    private var proposals = 0
+    private var queries = 0
+    val exhausted: Boolean get() = proposals == MAX_WITNESS_PROPOSALS
+
+    fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? {
+        arithmetic.step()
+        proposals++
+        return checkSample(formula, point, boolCount, arithmetic, algebraic)
+    }
+
+    fun boundaries(
+        atoms: List<Pair<PolynomialAtom, Int>>,
+        variable: Int,
+        point: Map<Int, AlgebraicReal>,
+    ): List<AlgebraicReal>? {
+        val roots = ArrayList<AlgebraicReal>()
+        for ((atom, termCount) in atoms) {
+            arithmetic.step()
+            repeat(termCount + 1) { arithmetic.step() }
+            if (atom.polynomial.degree(variable) > MAX_WITNESS_DEGREE) continue
+            if (queries == MAX_WITNESS_AXES) return null
+            queries++
+            val residual = algebraic.specialize(atom.polynomial, variable, point)
+            if (residual.isZero || residual.degree <= 0) continue
+            for (root in algebraic.roots(residual)) {
+                arithmetic.step()
+                roots.add(root)
+            }
+        }
+        roots.sortWith(Comparator { left, right -> algebraic.compare(left, right) })
+        val distinct = ArrayList<AlgebraicReal>()
+        for (root in roots) {
+            arithmetic.step()
+            if (distinct.isEmpty() || algebraic.compare(distinct.last(), root) != 0) distinct.add(root)
+        }
+        return distinct
+    }
 }
 
 private fun searchCells(

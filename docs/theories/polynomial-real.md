@@ -313,6 +313,14 @@ Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
 coordinates. Repaired points can guide later repairs even when the full check fails.
 Equalities under negation or disjunction are proposal guides, never asserted facts.
+For a conjunction of numeric inequalities and disequalities, an optional guide view
+complements directly negated atoms without changing the source formula. It excludes
+Boolean alternatives and unresolved positive equalities. Per-coordinate boundaries
+combine roots of the specialized source polynomials; root sections and rational
+interior sectors provide complete-point proposals. Negated denominator equalities
+therefore guide nonzero intervals rather than requiring a zero. Rejected points are
+ordered by the effective conjunctive relations. This path starts with a positive
+rational center, retains fixed coordinates and assigns zero to unused declarations.
 Acceptance still checks every source atom, strict relation, disequality, Boolean
 alternative and query pin with the same complete sample checker. Fixed coordinates
 remain fixed, and unused declarations retain complete coordinates.
@@ -321,7 +329,8 @@ This optional phase considers up to 32 real coordinates, 64 Boolean coordinates,
 128 atoms and 2,048 normalized terms with input coefficients up to 4,096 bits.
 Three uniform rational centers seed at most
 64 complete proposals and 32 coordinate root queries across four repair passes per
-center. Root queries admit coordinate degree at most eight. One private slice of
+center. Both proposal paths share these caps; each specialized polynomial consumes
+one root-query slot. Root queries admit coordinate degree at most eight. One private slice of
 65,536 native units is debited to the containing query's cumulative work and caller
 meter. Rejected proposals, private exhaustion and optional representation declines
 leave complete CAD available. Parent stops are latched during the phase and withhold

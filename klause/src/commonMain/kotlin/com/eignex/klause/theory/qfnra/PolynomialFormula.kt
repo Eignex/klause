@@ -24,6 +24,44 @@ internal class PolynomialFormula private constructor(
     val atoms: List<PolynomialAtom>,
     val booleanVariables: List<Int>,
 ) {
+    fun conjunctiveAtoms(arithmetic: PolynomialArithmetic, maximumAtoms: Int): List<PolynomialAtom>? {
+        val result = ArrayList<PolynomialAtom>()
+        val pending = ArrayDeque<Int>()
+        val visited = HashSet<Int>()
+        pending.addLast(root)
+        while (pending.isNotEmpty()) {
+            arithmetic.step()
+            val index = pending.removeLast()
+            if (!visited.add(index)) continue
+            when (val node = nodes[index]) {
+                is FormulaNode.Constant -> if (!node.value) return null
+                is FormulaNode.Atom -> result.add(atoms[node.atom])
+                is FormulaNode.Not -> {
+                    val child = nodes[node.child] as? FormulaNode.Atom ?: return null
+                    val atom = atoms[child.atom]
+                    result.add(PolynomialAtom(atom.polynomial, when (atom.relation) {
+                        PolynomialRelation.EQ -> PolynomialRelation.NE
+                        PolynomialRelation.NE -> PolynomialRelation.EQ
+                        PolynomialRelation.LT -> PolynomialRelation.GE
+                        PolynomialRelation.LE -> PolynomialRelation.GT
+                        PolynomialRelation.GT -> PolynomialRelation.LE
+                        PolynomialRelation.GE -> PolynomialRelation.LT
+                    }))
+                }
+                is FormulaNode.Junction -> {
+                    if (!node.conjunction) return null
+                    for (child in node.children.indices.reversed()) {
+                        arithmetic.step()
+                        pending.addLast(node.children[child])
+                    }
+                }
+                is FormulaNode.BooleanVariable -> return null
+            }
+            if (result.size > maximumAtoms) return null
+        }
+        return result
+    }
+
     fun truth(bools: IntArray, atomValues: IntArray, arithmetic: PolynomialArithmetic): Int {
         val values = IntArray(nodes.size)
         for ((index, node) in nodes.withIndex()) {
