@@ -13,15 +13,24 @@ fun interface ScoringProjectionProvider {
 }
 
 /** A scoring role coupled to its domain-sensitive implementation factory. */
-class ScoringProjection(
+class ScoringProjection internal constructor(
     /** Scoring participation offered by this implementation. */
     val capability: ScoringCapability,
     /** Authority of the score's zero-violation test; heuristic scores require source certification. */
     val assignmentCheck: AssignmentCheckCapability,
     /** Explanation when scoring is deliberately inert. */
-    val inertReason: String? = null,
+    val inertReason: String?,
     private val factory: (Array<IntDomain>?) -> Invariant,
+    internal val builtIn: Boolean,
 ) {
+    /** Allocate a private invariant, selecting exact arithmetic over the supplied move domains. */
+    constructor(
+        capability: ScoringCapability,
+        assignmentCheck: AssignmentCheckCapability,
+        inertReason: String? = null,
+        factory: (Array<IntDomain>?) -> Invariant,
+    ) : this(capability, assignmentCheck, inertReason, factory, false)
+
     init {
         require(capability != ScoringCapability.INERT ||
             (assignmentCheck != AssignmentCheckCapability.EXACT && !inertReason.isNullOrBlank())) {
@@ -46,7 +55,7 @@ object BuiltInScoringProjectionProvider : ScoringProjectionProvider {
         if (capabilities.scoring == ScoringCapability.UNSUPPORTED) return null
         return ScoringProjection(
             capabilities.scoring, capabilities.assignmentCheck, capabilities.inertReason,
-            factor::buildInvariantProjection,
+            factor::buildInvariantProjection, true,
         )
     }
 }

@@ -6,6 +6,7 @@ import json
 import platform
 import sys
 from pathlib import Path
+from fractions import Fraction
 
 
 def point(record, source):
@@ -92,11 +93,61 @@ def verify(source, controls):
             "scope": "exhaustive finite source assignments and exact integer objectives", "proofFileVerification": False}
 
 
+def verify_corners(source, controls):
+    all_points = set(itertools.product(itertools.product((False, True), repeat=source["boolCount"]),
+                                       itertools.product(*source["domains"])))
+    feasible = {assignment for assignment in all_points if accepts(source, assignment)}
+    witnesses = [point(record, source) for record in controls["inertWitnesses"]]
+    if len(witnesses) != len(set(witnesses)) or set(witnesses) != feasible:
+        raise ValueError("inert deduction differs from the original source solution set")
+    if controls["unsupported"] != "refused" or controls["uncheckable"] != "Unsupported":
+        raise ValueError("unsupported or uncheckable source produced a false complete claim")
+    real = controls["realSource"]
+    lower, upper = Fraction(real["lower"]), Fraction(real["upper"])
+    coefficient, bound = Fraction(real["coefficient"]), Fraction(real["bound"])
+    if coefficient <= 0 or lower > upper:
+        raise ValueError("unsupported real source")
+    minimum = max(lower, bound / coefficient)
+    if minimum > upper:
+        raise ValueError("real source control is infeasible")
+    modes = set()
+    for control in controls["realControls"]:
+        mode = control["mode"]
+        if mode in modes:
+            raise ValueError("duplicate real provider control")
+        modes.add(mode)
+        witness = Fraction(control["exactReal"])
+        if not minimum <= witness <= upper:
+            raise ValueError("real completion violates the original source")
+        senses = set()
+        for record in control["optimization"]:
+            maximize = record["maximize"]
+            if type(maximize) is not bool or maximize in senses:
+                raise ValueError("duplicate real objective direction")
+            senses.add(maximize)
+            value = Fraction(record["exactReal"])
+            if value != (upper if maximize else minimum) or Fraction(str(record["value"])) != value:
+                raise ValueError("real objective differs from the exact original-direction source objective")
+        if senses != {False, True}:
+            raise ValueError("missing real objective direction")
+    if modes != {"default", "omitted"}:
+        raise ValueError("missing real provider control")
+    return {"inertWitnesses": len(witnesses), "unsupported": "refused", "uncheckable": "Unsupported",
+            "realModes": sorted(modes), "realMinimum": str(minimum), "realMaximum": str(upper)}
+
+
 def main():
-    source_path, controls_path, output_path = map(Path, sys.argv[1:])
+    source_path, controls_path, output_path = map(Path, sys.argv[1:4])
     source_bytes = source_path.read_bytes()
     controls_bytes = controls_path.read_bytes()
-    result = verify(json.loads(source_bytes), json.loads(controls_bytes))
+    source = json.loads(source_bytes)
+    result = verify(source, json.loads(controls_bytes))
+    if source.get("sourceCornersRequired"):
+        if len(sys.argv) != 5:
+            raise ValueError("missing required provider corner controls")
+        corner_bytes = Path(sys.argv[4]).read_bytes()
+        result["corners"] = verify_corners(source, json.loads(corner_bytes))
+        result["cornersSha256"] = hashlib.sha256(corner_bytes).hexdigest()
     result.update({"sourceSha256": hashlib.sha256(source_bytes).hexdigest(),
                    "controlsSha256": hashlib.sha256(controls_bytes).hexdigest(),
                    "checkerSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),

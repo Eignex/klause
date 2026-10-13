@@ -6,6 +6,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.IncumbentExchange
@@ -210,5 +211,9 @@ internal fun <V> composedFixpoint(
     // Sticky across every fixpoint above: a cut one leaves the state under-propagated, so a
     // surviving assignment proves nothing.
     if (session.fixpointCancelled) return Verification.Indeterminate("propagation cancelled")
-    return Verification.Accepted(candidate)
+    return when (session.checkSelectedProjection()) {
+        ComponentCheck.Feasible -> Verification.Accepted(candidate)
+        is ComponentCheck.Infeasible -> Verification.Rejected("original source check refutes the assignment")
+        ComponentCheck.Indeterminate -> Verification.Indeterminate("original source check is unavailable or cancelled")
+    }
 }

@@ -17,7 +17,7 @@ internal class UnscoredCandidateCheck(problem: Problem) {
     private val selection = (problem as? BakedProblem)?.factorProjections
     private val factorIds = problem.factors.indices.filter {
         (selection?.capabilities(it) ?: problem.factors[it].executionCapabilities()).assignmentCheck ==
-            AssignmentCheckCapability.UNSUPPORTED
+            AssignmentCheckCapability.UNSUPPORTED || selection?.requiresOriginalScoringCheck(it) == true
     }.toIntArray()
     private val unchecked = if (factorIds.isEmpty()) null else
         problem.withFactors(Array(factorIds.size) { problem.factors[factorIds[it]] })
