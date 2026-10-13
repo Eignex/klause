@@ -11,6 +11,51 @@ import kotlin.test.assertFailsWith
 
 class ArithmeticPublicationTest {
     @Test
+    fun `an accepted identity suppresses a final source-owned equivalent representation`() {
+        var emitted = 0
+        val output = object : OutputProtocol by SmtLibOutput() {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                emitted++
+                return true
+            }
+        }
+        val publication = ArithmeticPublication(output)
+        val first = object : SourceValue.Extension {}
+        val final = object : SourceValue.Extension {}
+
+        publication.publish("first source representation", first, acceptedVersion = 1L)
+        publication.publish("equivalent final representation", final, acceptedVersion = 1L)
+
+        assertEquals(1, emitted)
+        assertEquals(1L, publication.solutions)
+    }
+
+    @Test
+    fun `source refinement can veto a repeated accepted identity`() {
+        var permitted = true
+        var emitted = 0
+        val output = object : OutputProtocol by SmtLibOutput() {
+            override fun arithmeticSourceValue(objective: SourceValue): SourceValue? =
+                if (permitted) objective else null
+
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
+                emitted++
+                return true
+            }
+        }
+        val publication = ArithmeticPublication(output)
+        val value = SourceValue.Rational(BigFraction.ONE)
+        publication.publish("x=1", value, acceptedVersion = 1L)
+        permitted = false
+
+        val accepted = publication.publish("x=1", value, acceptedVersion = 1L)
+
+        assertEquals(false, accepted)
+        assertEquals(1, emitted)
+        assertEquals(1L, publication.solutions)
+    }
+
+    @Test
     fun `a failed stdout stream aborts actual protocol publication`() {
         val output = SmtLibOutput()
         val publication = ArithmeticPublication(output)
