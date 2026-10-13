@@ -1,4 +1,4 @@
-package com.eignex.klause.bench.tools
+package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports

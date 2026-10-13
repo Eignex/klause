@@ -1,4 +1,4 @@
-package com.eignex.klause.bench.tools
+package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.BuildProvenance
 import com.eignex.klause.bench.metric.InstalledBuild
@@ -50,7 +50,7 @@ internal object CliStreamCapture {
         Reports.writeJson(
             File(output, "planned.json").path,
             CapturePlan(revision, settings.sourceSha256, settings.command, settings.stopAfter,
-                settings.timeoutMs, settings.checkSmt, settings.minimumWitnesses,
+                settings.timeoutMs, settings.checkSmt, settings.checkFzn, settings.minimumWitnesses,
                 settings.provisionChecker, provenance),
         )
         val stdout = File(output, "stdout")
@@ -89,6 +89,9 @@ internal object CliStreamCapture {
         ))
         if (settings.checkSmt) checker.check(output, settings.source, interruption.get() != null,
             settings.minimumWitnesses, settings.provisionChecker)
+        if (settings.checkFzn) Reports.writeJson(File(output, "source-check-fzn.json").path,
+            FznStreamChecker.check(settings.source.readText(), stdout.readText(), interruption.get() != null,
+                settings.minimumWitnesses))
     }
 
     private fun prepare(args: Array<String>, output: File): CaptureSettings {
@@ -96,7 +99,7 @@ internal object CliStreamCapture {
         require(separator >= 0) { "Use capture settings, --, then CLI arguments" }
         val settings = args.take(separator).associate { it.substringBefore('=') to it.substringAfter('=') }
         require(settings.keys.all { it in setOf("input", "text64", "extension", "marker", "stopAfter", "timeoutMs",
-            "checkSmt", "minimumWitnesses", "provisionChecker") })
+            "checkSmt", "checkFzn", "minimumWitnesses", "provisionChecker") })
         val extension = settings["extension"] ?: "smt2"
         require(extension in setOf("smt2", "fzn", "mps", "opb", "xml"))
         require((settings["input"] != null) != (settings["text64"] != null)) { "Supply input or text64" }
@@ -110,11 +113,13 @@ internal object CliStreamCapture {
         require(stopAfter == 0L || marker != null) { "Stopping requires a complete-output marker" }
         val command = listOf(SolverInvocation.klauseCliBin().absolutePath) + args.drop(separator + 1) + source.path
         val checkSmt = settings["checkSmt"]?.toBooleanStrict() ?: false
+        val checkFzn = settings["checkFzn"]?.toBooleanStrict() ?: false
         val provisionChecker = settings["provisionChecker"]?.toBooleanStrict() ?: false
         val minimumWitnesses = settings["minimumWitnesses"]?.toInt() ?: 1
         require(minimumWitnesses > 0 && (!checkSmt || extension == "smt2"))
+        require(!checkFzn || extension == "fzn")
         return CaptureSettings(command, source, sha256(bytes), marker, stopAfter, timeoutMs,
-            checkSmt, minimumWitnesses, provisionChecker)
+            checkSmt, checkFzn, minimumWitnesses, provisionChecker)
     }
 
     private fun capture(
@@ -163,7 +168,7 @@ internal object CliStreamCapture {
 @Serializable
 private data class CapturePlan(
     val revision: String?, val sourceSha256: String, val command: List<String>,
-    val stopAfter: Long, val timeoutMs: Long, val checkSmt: Boolean, val minimumWitnesses: Int,
+    val stopAfter: Long, val timeoutMs: Long, val checkSmt: Boolean, val checkFzn: Boolean, val minimumWitnesses: Int,
     val provisionChecker: Boolean, val build: BuildProvenance,
 )
 
@@ -183,7 +188,7 @@ private data class CaptureResult(
 
 private data class CaptureSettings(
     val command: List<String>, val source: File, val sourceSha256: String, val marker: Regex?,
-    val stopAfter: Long, val timeoutMs: Long, val checkSmt: Boolean, val minimumWitnesses: Int,
+    val stopAfter: Long, val timeoutMs: Long, val checkSmt: Boolean, val checkFzn: Boolean, val minimumWitnesses: Int,
     val provisionChecker: Boolean,
 )
 
