@@ -67,6 +67,21 @@ class Z3ReferenceTest {
     }
 
     @Test
+    fun `argument errors without stdout retain stderr and no proof`() {
+        val stderr = "ERROR: invalid parameter, unknown module '/corpus/'\n"
+
+        val r = Z3Reference.parse("", 7, cmd, stderr = stderr, exitCode = 110)
+
+        assertNull(r.feasible)
+        assertFalse(r.proven)
+        assertNull(r.objective)
+        assertEquals("error", r.stats["referenceStatus"])
+        assertEquals("110", r.stats["referenceExitCode"])
+        assertEquals(stderr, r.stats["referenceStderr"])
+        assertEquals("", r.rawOutput)
+    }
+
+    @Test
     fun `watchdog termination retains its outcome`() {
         val r = Z3Reference.parse("", 30_000, cmd, exitCode = 137, killed = true)
 

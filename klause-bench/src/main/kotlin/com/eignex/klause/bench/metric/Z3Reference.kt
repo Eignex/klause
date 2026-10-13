@@ -26,7 +26,7 @@ internal object Z3Reference {
         require(it > 0) { "z3 memory limit must be positive" }
     }
     private const val EXIT_WAIT_MS = 5_000L
-    private const val POLICY = "smt-reference-v2"
+    private const val POLICY = "smt-reference-v3"
     private val options = listOf("-model", "sat.threads=1", "parallel.enable=false", "pp.decimal=false")
 
     fun available(): Boolean = runCatching { NativeReference.available(binary.path) }.getOrDefault(false)
@@ -60,7 +60,7 @@ internal object Z3Reference {
             val identity = identity()
             val cmd = listOf(
                 binary.path, "-T:${(budget.timeoutMillis / 1000).coerceAtLeast(1)}", "-memory:$memoryMb", "-smt2",
-            ) + options + file.absolutePath
+            ) + options + "-file:${file.absolutePath}"
             val startNanos = System.nanoTime()
             val proc = ProcessBuilder(cmd).start()
             proc.outputStream.close()
