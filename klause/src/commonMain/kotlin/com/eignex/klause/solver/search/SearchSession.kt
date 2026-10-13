@@ -29,8 +29,15 @@ class SearchSession(
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         branchers: List<SearchBrancher> = emptyList(),
         atoms: SearchAtomRegistry? = null,
-    ) : this(components, maxChecks, cancellation, learnedDb, branchers, atoms,
-        SearchExecutionControlAdapter(cancellation))
+    ) : this(
+        components,
+        maxChecks,
+        cancellation,
+        learnedDb,
+        branchers,
+        atoms,
+        SearchExecutionControlAdapter(cancellation),
+    )
 
     init {
         atoms?.attach()
@@ -74,11 +81,9 @@ class SearchSession(
 
     override fun intUpperBound(variable: Int): Long? = trail.upper(variable)
 
-    override fun intLowerBoundPremise(variable: Int): SearchAtomPremise =
-        trail.lowerPremise(variable)
+    override fun intLowerBoundPremise(variable: Int): SearchAtomPremise = trail.lowerPremise(variable)
 
-    override fun intUpperBoundPremise(variable: Int): SearchAtomPremise =
-        trail.upperPremise(variable)
+    override fun intUpperBoundPremise(variable: Int): SearchAtomPremise = trail.upperPremise(variable)
 
     /** Clause-form reason for the current assignment of [variable], or null when it is a decision. */
     fun reasonFor(variable: Int): SearchExplanation? = trail.reasonFor(variable)
@@ -412,7 +417,9 @@ class SearchSession(
         for (component in components) {
             when (val result = component.check(this)) {
                 ComponentCheck.Feasible -> Unit
+
                 is ComponentCheck.Infeasible -> return result
+
                 ComponentCheck.Indeterminate -> {
                     reportRepresentationDecline()
                     return result
@@ -637,8 +644,10 @@ class SearchSession(
         nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
         lifecycle: SearchRunLifecycle = SearchRunLifecycle.None,
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
-    ): SearchRun = openRunAt(numBoolVars, params, booleanBranching, decisionBudget, observer,
-        modelContinuation, modelPolicy, nodePolicy, lifecycle, candidateHints, 0)
+    ): SearchRun = openRunAt(
+        numBoolVars, params, booleanBranching, decisionBudget, observer,
+        modelContinuation, modelPolicy, nodePolicy, lifecycle, candidateHints, 0,
+    )
 
     internal fun openConditionedRun(
         numBoolVars: Int,
@@ -647,9 +656,11 @@ class SearchSession(
         booleanBranching: BooleanBranching = BooleanBranching.SourceOrder(numBoolVars),
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
         observer: SearchRunObserver = SearchRunObserver.None,
-    ): SearchRun = openRunAt(numBoolVars, params, booleanBranching, SearchDecisionBudget.Unlimited,
+    ): SearchRun = openRunAt(
+        numBoolVars, params, booleanBranching, SearchDecisionBudget.Unlimited,
         observer, SearchModelContinuation.Chronological, SearchModelPolicy.SurfaceAll,
-        nodePolicy, SearchRunLifecycle.None, candidateHints, decisionLevel)
+        nodePolicy, SearchRunLifecycle.None, candidateHints, decisionLevel,
+    )
 
     private fun openRunAt(
         numBoolVars: Int,

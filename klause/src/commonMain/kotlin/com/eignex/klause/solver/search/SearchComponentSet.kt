@@ -35,5 +35,13 @@ class SearchComponentSet(
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         atoms: SearchAtomRegistry? = null,
         executionControls: SearchExecutionControls,
-    ): SearchSession = SearchSession(components, maxChecks, cancellation, learnedDb, branchers, atoms, executionControls)
+    ): SearchSession = SearchSession(
+        components,
+        maxChecks,
+        cancellation,
+        learnedDb,
+        branchers,
+        atoms,
+        executionControls,
+    )
 }

@@ -96,9 +96,12 @@ class SearchExecutionControlsTest {
     @Test
     fun `representation decline does not imply resource exhaustion`() {
         val controls = SearchExecutionControlAdapter()
-        val session = SearchSession(listOf(object : SearchComponent {
+        val session = SearchSession(
+            listOf(object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
-        }), executionControls = controls)
+        }),
+            executionControls = controls
+        )
 
         assertIs<SearchResult.Indeterminate>(session.solve(0))
 
@@ -108,11 +111,13 @@ class SearchExecutionControlsTest {
     @Test
     fun `injected native limits retain their typed refusal causes`() {
         for (cause in listOf(SearchStopCause.CheckAllowance, SearchStopCause.DecisionAllowance)) {
-            val controls = SearchExecutionControlAdapter(accounting = object : SearchExecutionAccounting {
+            val controls = SearchExecutionControlAdapter(
+                accounting = object : SearchExecutionAccounting {
                 override val stopCause = cause
                 override fun consumeCheck(): Boolean = false
                 override fun canCommitDecision(): Boolean = false
-            })
+            }
+            )
 
             if (cause == SearchStopCause.CheckAllowance) controls.consumeCheck() else controls.canCommitDecision()
 

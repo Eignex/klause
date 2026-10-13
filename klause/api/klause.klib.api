@@ -14440,10 +14440,11 @@ final class com.eignex.klause.solver.search/SearchSession : com.eignex.klause.so
 
     final val decisionLevel // com.eignex.klause.solver.search/SearchSession.decisionLevel|{}decisionLevel[0]
         final fun <get-decisionLevel>(): kotlin/Int // com.eignex.klause.solver.search/SearchSession.decisionLevel.<get-decisionLevel>|<get-decisionLevel>(){}[0]
-    final var executionControls // com.eignex.klause.solver.search/SearchSession.executionControls|{}executionControls[0]
-        final fun <get-executionControls>(): com.eignex.klause.solver.search/SearchExecutionControls // com.eignex.klause.solver.search/SearchSession.executionControls.<get-executionControls>|<get-executionControls>(){}[0]
     final val learnedClauseCount // com.eignex.klause.solver.search/SearchSession.learnedClauseCount|{}learnedClauseCount[0]
         final fun <get-learnedClauseCount>(): kotlin/Int // com.eignex.klause.solver.search/SearchSession.learnedClauseCount.<get-learnedClauseCount>|<get-learnedClauseCount>(){}[0]
+
+    final var executionControls // com.eignex.klause.solver.search/SearchSession.executionControls|{}executionControls[0]
+        final fun <get-executionControls>(): com.eignex.klause.solver.search/SearchExecutionControls // com.eignex.klause.solver.search/SearchSession.executionControls.<get-executionControls>|<get-executionControls>(){}[0]
 
     final fun atomLiteral(com.eignex.klause.solver.search/SearchDecision): kotlin/Int? // com.eignex.klause.solver.search/SearchSession.atomLiteral|atomLiteral(com.eignex.klause.solver.search.SearchDecision){}[0]
     final fun boolValue(kotlin/Int): kotlin/Boolean? // com.eignex.klause.solver.search/SearchSession.boolValue|boolValue(kotlin.Int){}[0]

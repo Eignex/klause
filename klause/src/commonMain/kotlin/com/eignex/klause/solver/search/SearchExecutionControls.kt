@@ -6,16 +6,22 @@ import com.eignex.klause.util.Cancellation
 enum class SearchStopCause {
     /** The invocation deadline expired. */
     Timeout,
+
     /** The invocation or lifetime token was cancelled. */
     Cancelled,
+
     /** The containing native work allowance was spent. */
     WorkAllowance,
+
     /** The containing complete-check allowance was spent. */
     CheckAllowance,
+
     /** The containing decision allowance was spent. */
     DecisionAllowance,
+
     /** A policy-owned operation allowance expired before its containing invocation. */
     OperationAllowance,
+
     /** The component could not represent or certify the residual exactly. */
     RepresentationDecline,
 }
@@ -91,10 +97,14 @@ class SearchExecutionControlAdapter(
     override fun operationAllowance(parent: Cancellation): Cancellation = allowance(parent)
 
     override fun reportStop(cause: SearchStopCause) {
-        if ((this.cause == SearchStopCause.WorkAllowance || this.cause == SearchStopCause.CheckAllowance ||
-                this.cause == SearchStopCause.DecisionAllowance) &&
+        if ((
+            this.cause == SearchStopCause.WorkAllowance || this.cause == SearchStopCause.CheckAllowance ||
+                this.cause == SearchStopCause.DecisionAllowance
+        ) &&
             (cause == SearchStopCause.OperationAllowance || cause == SearchStopCause.RepresentationDecline)
-        ) return
+        ) {
+            return
+        }
         this.cause = cause
     }
 
