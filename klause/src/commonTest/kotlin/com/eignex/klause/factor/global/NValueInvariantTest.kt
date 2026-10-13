@@ -168,6 +168,7 @@ class NValueInvariantTest {
 
         state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
         val move = state.moveSink.list.first { it is Move.IntSet && it == Move.IntSet(0, 1) }
+        assertTrue(state.moveSink.list.all { state.netDelta(it) == 0L })
         state.apply(move)
 
         assertEquals(1L, state.assignment.intValue(0))

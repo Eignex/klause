@@ -200,7 +200,7 @@ internal class NValueInvariant(
             d.forEachCandidate(state.rng) { w ->
                 if (w != v) {
                     val wBorn = s.counts.getOrDefault(w, 0) == 0
-                    if (vDies == wBorn) {
+                    if (vDies == wBorn && (xs[i] != n || nvDegree(s.distinctCount, w) == 0L)) {
                         seen++
                         if (state.rng.nextInt(seen) == 0) pick = w
                     }
