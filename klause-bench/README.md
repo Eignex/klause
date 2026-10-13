@@ -226,9 +226,12 @@ captured default opening and alternate clause propagation/scoring plus equivalen
 integer relaxation emission. It alternates control order after a warmup, records
 allocation bytes and wall nanoseconds separately for descriptor selection and
 mechanism opening, and retains the executed revision, source and classpath hashes,
-JDK, cores, seeds and budgets. Arguments are `factors=N rounds=N openings=N seed=N`;
-defaults are 128 factors, seven measured rounds, 100 openings and seed 3. Run on one
-AWS machine with `parallel: 1` and a pinned revision through a lab profile job.
+JDK, cores, seeds and budgets. Arguments are
+`factors=N rounds=N openings=N seed=N processors=N`; defaults are 128 factors,
+seven measured rounds, 100 openings, seed 3 and one processor. The probe opens a
+private measurement JVM with `ActiveProcessorCount` when the launcher's visible
+processor count differs; its JFR is `projection-provider.jfr`. Run on one AWS
+machine with `parallel: 1` and a pinned revision through a lab profile job.
 
 Its exact Boolean/integer source fixture retains every original-domain assignment.
 An independent Python process checks complete source enumeration, scoring acceptance

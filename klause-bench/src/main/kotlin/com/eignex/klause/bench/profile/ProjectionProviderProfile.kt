@@ -70,7 +70,13 @@ object ProjectionProviderProfile {
             require(parts.size == 2) { "expected key=value" }
             parts[0] to parts[1]
         }
-        require(options.keys.all { it in setOf("factors", "rounds", "openings", "seed", "out") })
+        require(options.keys.all { it in setOf("factors", "rounds", "openings", "seed", "processors", "out") })
+        val processors = options["processors"]?.toInt() ?: 1
+        require(processors in 1..16)
+        if (Runtime.getRuntime().availableProcessors() != processors) {
+            launchWithProcessors(args, options, processors)
+            return
+        }
         val factors = options["factors"]?.toInt() ?: 128
         val rounds = options["rounds"]?.toInt() ?: 7
         val openings = options["openings"]?.toInt() ?: 100
@@ -209,6 +215,25 @@ object ProjectionProviderProfile {
         out.resolve("corners.json").writeText(corners(source, seed).toString())
         checkSource(out)
         println("PROJECTION_PROFILE factors=$factors rounds=$rounds openings=$openings seed=$seed output=$out")
+    }
+
+    private fun launchWithProcessors(args: Array<String>, options: Map<String, String>, processors: Int) {
+        val out = File(options["out"] ?: System.getenv("OUT") ?: "build/projection-provider-profile")
+        require(out.mkdirs() || out.isDirectory)
+        val jvm = ManagementFactory.getRuntimeMXBean().inputArguments.filterNot {
+            it.startsWith("-XX:ActiveProcessorCount=") || it.startsWith("-XX:StartFlightRecording=")
+        }
+        val command = listOf(File(System.getProperty("java.home"), "bin/java").absolutePath) + jvm + listOf(
+            "-XX:ActiveProcessorCount=$processors",
+            "-XX:StartFlightRecording=filename=${out.resolve("projection-provider.jfr").absolutePath},settings=profile",
+            "-cp", System.getProperty("java.class.path"), ProjectionProviderProfile::class.java.name,
+        ) + args
+        val child = ProcessBuilder(command).inheritIO().start()
+        try {
+            check(child.waitFor() == 0) { "Projection probe JVM failed" }
+        } finally {
+            if (child.isAlive) child.destroyForcibly()
+        }
     }
 
     private fun source(factors: Int): Problem = Problem(2, 2, Array(2) { IntDomain(-1, 1) },
