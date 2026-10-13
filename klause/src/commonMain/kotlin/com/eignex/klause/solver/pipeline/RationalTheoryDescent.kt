@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.optimization.linearCoordinatesSupported
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
@@ -37,11 +38,16 @@ internal class RationalTheoryDescent(
         objective, ObjectiveSense.MINIMIZE, params.cancellation or params.timeout),
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
-    private val linear = context?.let { LinearAuthorityInvocation(it, params, external = { external()?.first }) }
+    private val state = OpenTheorySolveState(params)
+    private var linear = context?.let {
+        LinearAuthorityInvocation(it, params, external = { external()?.first }, state = state)
+    }
+    private var proofDeclined = false
+    private var checkedIncumbent: Sample? = null
+    private var checkedValue: BigFraction? = null
     private var witnessContext: SourceProofContext? = null
     var linearResult: LinearOptimizationResult? = null
         private set
-    private val state = OpenTheorySolveState(params)
     private var round: ResumableOpenTheory? = null
     private var incumbent: Sample? = null
     private var value: BigFraction? = null
@@ -50,7 +56,7 @@ internal class RationalTheoryDescent(
     private var closed = false
     override val isDone: Boolean get() = result != null
     override val stats: SolveStats get() = linear?.stats ?: nativeStats.copy(openTheory = state.work.snapshot(),
-        search = state.progress(null))
+        smt = state.smt.snapshot(), search = round?.progress ?: state.progress(null))
     override val work: Long get() = linear?.work ?: state.work.spent
 
     override fun runSlice(
@@ -61,6 +67,10 @@ internal class RationalTheoryDescent(
     ): MinimizeResult? {
         result?.let { return it }
         check(!closed)
+        val startWork = work
+        val deadline = if (sliceMillis == Long.MAX_VALUE) null
+            else TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
+        val endWork = if (sliceNodes < 0) Long.MAX_VALUE else work + minOf(sliceNodes, Long.MAX_VALUE - work)
         linear?.let { invocation ->
             val sign = if (context?.scope?.objective?.sense == ObjectiveSense.MAXIMIZE) BigFraction.MINUS_ONE
                 else BigFraction.ONE
@@ -73,30 +83,49 @@ internal class RationalTheoryDescent(
             val authority = LinearOptimizationResult(sourceContext.scope, completed.terminal, completed.bound,
                 completed.incumbent, completed.value, completed.reason, completed.stats)
             linearResult = authority
-            val sample = authority.incumbent
-            val exact = authority.value?.let { it * sign }
-            result = when (val claim = authority.terminal?.claim) {
-                is SourceClaim.Optimal -> MinimizeResult.Optimal(claim.sample, requireNotNull(exact).toDouble(),
-                    stats, authority.evidence)
-                SourceClaim.Refutation -> MinimizeResult.Infeasible(stats = stats, evidence = authority.evidence)
-                else -> {
-                    // Scalar worker completion cannot express a limit or a lattice ray.
-                    val reason = if (authority.terminal != null) TerminationReason.Unsupported else authority.reason
-                    sample?.let { MinimizeResult.BestFound(it, requireNotNull(exact).toDouble(), reason,
-                        stats, authority.evidence) } ?: MinimizeResult.Unknown(reason, stats, authority.evidence)
+            if (authority.terminal == null && authority.reason == TerminationReason.Unsupported &&
+                sourceContext.affineObjectiveAvailable && sourceContext.linearCoordinatesSupported()
+            ) {
+                nativeStats = completed.stats
+                checkedIncumbent = authority.incumbent
+                checkedValue = authority.value
+                incumbent = authority.incumbent
+                value = incumbent?.let(objective::evaluateExact)
+                invocation.close()
+                linear = null
+                proofDeclined = true
+            } else {
+                val sample = authority.incumbent
+                val exact = authority.value?.let { it * sign }
+                result = when (val claim = authority.terminal?.claim) {
+                    is SourceClaim.Optimal -> MinimizeResult.Optimal(claim.sample, requireNotNull(exact).toDouble(),
+                        stats, authority.evidence)
+                    SourceClaim.Refutation -> MinimizeResult.Infeasible(stats = stats, evidence = authority.evidence)
+                    else -> {
+                        // Scalar worker completion cannot express a limit or a lattice ray.
+                        val reason = if (authority.terminal != null) TerminationReason.Unsupported else authority.reason
+                        sample?.let { MinimizeResult.BestFound(it, requireNotNull(exact).toDouble(), reason,
+                            stats, authority.evidence) } ?: MinimizeResult.Unknown(reason, stats, authority.evidence)
+                    }
                 }
+                return result
             }
-            return result
         }
-        val deadline = if (sliceMillis == Long.MAX_VALUE) null
-            else TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
-        val endWork = if (sliceNodes < 0) Long.MAX_VALUE else work + minOf(sliceNodes, Long.MAX_VALUE - work)
-        var advanced = false
+        var advanced = work > startWork
         while (!(global or params.cancellation or params.timeout)()) {
+            if (!state.work.hasAllowance() || state.work.snapshot().openTheoryChecks >= params.maxLeaves) {
+                return finish(TerminationReason.BudgetExhausted)
+            }
             if (advanced && (work >= endWork || deadline?.hasPassedNow() == true)) return null
             val current = round ?: run {
-                external()?.let { (sample, exact) ->
-                    if (value == null || exact < requireNotNull(value)) { incumbent = sample; value = exact }
+                external()?.let { (sample, _) ->
+                    if (!proofDeclined || retainChecked(sample, global or params.timeout or params.cancellation)) {
+                        val exact = objective.evaluateExact(sample)
+                        if (value == null || exact < requireNotNull(value)) {
+                            incumbent = sample
+                            value = exact
+                        }
+                    }
                 }
                 val model = value?.let { source.withFactors(source.factors + objective.below(it),
                     source.impliedFactorMask?.let { mask -> mask + false }) } ?: source
@@ -123,13 +152,23 @@ internal class RationalTheoryDescent(
                     val sample = verdict.assignment.toSample(source)
                     val exact = objective.evaluateExact(sample)
                     check(value == null || exact < requireNotNull(value))
+                    val standing = checkedIncumbent
+                    if (proofDeclined && !retainChecked(sample, global or params.timeout or params.cancellation)) {
+                        return finish(if (params.timeout()) TerminationReason.Timeout
+                            else if ((global or params.cancellation)()) TerminationReason.Cancelled
+                            else TerminationReason.Unsupported)
+                    }
                     incumbent = sample
                     value = exact
-                    onIncumbent(MinimizeResult.BestFound(
-                        sample, exact.toDouble(), TerminationReason.BudgetExhausted, stats,
-                    ))
+                    attestWitness(sample, global or params.timeout or params.cancellation)
+                    if (proofDeclined) linearResult = partial(TerminationReason.BudgetExhausted)
+                    if (!proofDeclined || checkedIncumbent !== standing) {
+                        publish(MinimizeResult.BestFound(sample, exact.toDouble(),
+                            TerminationReason.BudgetExhausted, stats), onIncumbent)
+                    }
                 }
                 is OpenTheoryResult.Unsat -> {
+                    if (proofDeclined) return finish(TerminationReason.Unsupported)
                     result = incumbent?.let { MinimizeResult.Optimal(it, requireNotNull(value).toDouble(), stats) }
                         ?: MinimizeResult.Infeasible(stats = stats)
                     return result
@@ -141,6 +180,7 @@ internal class RationalTheoryDescent(
     }
 
     fun linearSnapshot(reason: TerminationReason): LinearOptimizationResult? {
+        if (proofDeclined) return partial(reason)
         linearResult?.let { return it }
         val captured = context ?: return null
         val snapshot = linear?.snapshot(reason) ?: return null
@@ -167,13 +207,49 @@ internal class RationalTheoryDescent(
             CompletedEngineResult.Solve(original.scope, result))
     }
 
+    private fun retainChecked(sample: Sample, cancellation: Cancellation): Boolean {
+        val original = requireNotNull(context)
+        val evidence = SourceEvidence(original.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
+        if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(evidence, cancellation) !=
+            SourceEvidenceCheck.Checked
+        ) return false
+        val exact = original.linearValue(sample, cancellation) ?: return false
+        val standing = checkedValue
+        val minimizes = original.scope.objective?.sense == ObjectiveSense.MINIMIZE
+        if (standing == null || if (minimizes) exact < standing else exact > standing) {
+            checkedIncumbent = sample
+            checkedValue = exact
+        }
+        return true
+    }
+
+    private fun partial(reason: TerminationReason): LinearOptimizationResult = LinearOptimizationResult(
+        requireNotNull(context).scope, null, linearResult?.bound, checkedIncumbent, checkedValue, reason, stats)
+
+    @Suppress("TooGenericExceptionCaught") // Publication failure closes the retained search before propagating.
+    private fun publish(candidate: MinimizeResult.WithSample, callback: (MinimizeResult.WithSample) -> Unit) {
+        try {
+            callback(candidate)
+        } catch (failure: Throwable) {
+            try {
+                close()
+            } catch (cleanup: Throwable) {
+                failure.addSuppressed(cleanup)
+            }
+            throw failure
+        }
+    }
+
     private fun finish(reason: TerminationReason): MinimizeResult {
-        result = incumbent?.let { MinimizeResult.BestFound(it, requireNotNull(value).toDouble(), reason, stats) }
+        if (proofDeclined) linearResult = partial(reason)
+        val sample = if (proofDeclined) checkedIncumbent else incumbent
+        result = sample?.let { MinimizeResult.BestFound(it, objective.evaluateExact(it).toDouble(), reason, stats) }
             ?: MinimizeResult.Unknown(reason, stats)
         return requireNotNull(result)
     }
 
     override fun close() {
+        if (closed) return
         if (linearResult == null) {
             linearResult = linearSnapshot(if (params.timeout()) TerminationReason.Timeout
                 else TerminationReason.Cancelled)
@@ -182,6 +258,8 @@ internal class RationalTheoryDescent(
         round?.let { pending -> nativeStats = pending.stats.copy(lp = nativeStats.lp.mergedWith(pending.stats.lp)) }
         round?.close()
         round = null
+        if (proofDeclined && result == null) linearResult = partial(if (params.timeout()) TerminationReason.Timeout
+            else TerminationReason.Cancelled)
         closed = true
     }
 }
