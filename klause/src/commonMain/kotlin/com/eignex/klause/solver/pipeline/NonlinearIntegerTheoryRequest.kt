@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.SliceBudget
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -11,6 +12,12 @@ import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnia.NonlinearIntegerParams
+import com.eignex.klause.theory.qfnia.NonlinearIntegerCursor
+import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.solver.ResumableSolve
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.theory.qfnia.NonlinearIntegerStrategy
 import com.eignex.klause.theory.qfnia.integerSeeds
 import com.eignex.klause.theory.qfnia.solveNonlinearIntegers
@@ -61,9 +68,21 @@ fun OpenTheoryPipeline.execute(
     request: NonlinearIntegerTheoryRequest,
     params: NonlinearIntegerTheoryParams = NonlinearIntegerTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
-): PolynomialTheoryExecution = NonlinearIntegerInvocation(request, params, engine).execute()
+): PolynomialTheoryExecution = execute(request, params, engine, 1)
 
-private class NonlinearIntegerInvocation(
+/** Execute a native nonlinear source using the requested mixed-portfolio lane count. */
+fun OpenTheoryPipeline.execute(
+    request: NonlinearIntegerTheoryRequest,
+    params: NonlinearIntegerTheoryParams,
+    engine: FiniteEngine,
+    cores: Int,
+): PolynomialTheoryExecution {
+    require(cores > 0)
+    return if (engine == FiniteEngine.MIXED) NonlinearIntegerPortfolio(request, params, cores).execute()
+    else NonlinearIntegerInvocation(request, params, engine).execute()
+}
+
+internal class NonlinearIntegerInvocation(
     request: NonlinearIntegerTheoryRequest,
     private val params: NonlinearIntegerTheoryParams,
     private val engine: FiniteEngine,
@@ -75,8 +94,10 @@ private class NonlinearIntegerInvocation(
         ?: polynomial.strategy.localSearch.nodeBudget
     private val started = TimeSource.Monotonic.markNow()
     private var native = QfNraStats(0, 0, 0)
-    private var resource: PolynomialTheoryResource? = null
+    var resource: PolynomialTheoryResource? = null
+        private set
     private var searchStats = SolveStats.EMPTY
+    val nativeStats: QfNraStats get() = native
     private val external = polynomial.timeout or polynomial.cancellation
     private val stop = external or Cancellation {
         polynomial.maximumWork?.let { native.workSpent >= it } == true || resource != null ||
@@ -140,12 +161,7 @@ private class NonlinearIntegerInvocation(
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> search(candidates)
             FiniteEngine.LOCAL_SEARCH -> walk(false, moves)
             FiniteEngine.ALNS -> walk(true, minOf(moves, polynomial.strategy.alnsIterations.toLong()))
-            FiniteEngine.MIXED -> {
-                search(minOf(candidates, 16), nativeCap = 4096)
-                walk(false, minOf(moves, 32))
-                walk(true, minOf(moves, polynomial.strategy.alnsIterations.toLong()))
-                if (candidates > 16) search(candidates - 16)
-            }
+            FiniteEngine.MIXED -> error("mixed execution requires the shared invocation")
         }
         val stats = searchStats.mergedWith(heuristicStats).copy(run = RunStats(
             "nonlinear-integer-${engine.id}", started.elapsedNow().inWholeMilliseconds, external(),
@@ -160,6 +176,80 @@ private class NonlinearIntegerInvocation(
             published,
             PolynomialTheoryStats(native.projectedPolynomials, native.liftedCells, native.workSpent), resource,
         )
+    }
+
+    fun worker(arm: Int, slot: PortfolioWorkerSlot): PortfolioWorker {
+        val identity = ModelIdentity.of(source)
+        if (arm == 0) return PortfolioWorker.ofSolve("bt+exact-nia", arm,
+            resumable = { retainedSearch(slot) }) { _, _ -> error("nonlinear traversal runs by slice") }
+            .bindEvidence(identity)
+        val adaptive = arm == 2
+        return exactNeighborhoodWorker(if (adaptive) "alns+exact-nia" else "ls+exact-nia", arm,
+            objective = null, lifetime = stop, timeout = polynomial.timeout, exhausted = { stop() }, open = {
+                val centers = source.integerSeeds(stop) {
+                    native = native.copy(workSpent = sum(native.workSpent, 1))
+                    external.charge(1)
+                }.mapIndexed { id, value -> pins.lower[plan.integerCoordinate(id)] ?: value }
+                ExactNeighborhood(source.boolCount, centers, this,
+                    coordinateValues = { sample ->
+                        List(sample.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) }
+                    }, adaptive = adaptive, seed = slot.seed, nodeBudget = nodeBudget,
+                    maximumMoves = minOf(params.maximumMoves, polynomial.strategy.localSearch.maxFlips,
+                        if (adaptive) polynomial.strategy.alnsIterations.toLong() else Long.MAX_VALUE),
+                    maximumInstructions = polynomial.strategy.localSearch.maxInstructions ?: Long.MAX_VALUE,
+                    nativeWork = { native.workSpent })
+            }).bindEvidence(identity, provesResults = false)
+    }
+
+    private fun retainedSearch(slot: PortfolioWorkerSlot): ResumableSolve = object : ResumableSolve {
+        private val cursor = NonlinearIntegerCursor(source, NonlinearIntegerParams(
+            arithmetic = QfNraParams(stop, polynomial.maximumWork, PolynomialLimits(
+                polynomial.maximumDenseCoefficients, polynomial.maximumMatrixCells)),
+            maximumCandidates = minOf(params.maximumCandidates, polynomial.strategy.backtrack.maxDecisions,
+                polynomial.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE),
+            strategy = NonlinearIntegerStrategy.SEARCH, seed = slot.seed,
+        ), pins)
+        private val slice: SliceBudget = SliceBudget({
+            sum(cursor.stats.candidates, cursor.stats.polynomial.workSpent)
+        }, { 0L }, { 0L })
+        private var result: SolveResult? = null
+        override val isDone: Boolean get() = result != null
+        override val stats: SolveStats get() = searchStats
+        override val work: Long get() = slice.spent()
+
+        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+            result?.let { return it }
+            if (!slice.begin(sliceMillis, sliceNodes)) return null
+            val segment = global or Cancellation { slice.expired() }
+            val before = cursor.stats.candidates
+            val offered = if (sliceNodes < 0) Long.MAX_VALUE else sliceNodes
+            val cap = minOf(offered, nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE)
+            val checked = cursor.runSlice(segment, cap)
+            native = cursor.stats.polynomial
+            searchStats = searchStats.copy(search = SearchStats(nodes = SumResult(cursor.stats.candidates.toDouble())))
+            var charged = cursor.stats.candidates - before
+            while (charged > 0) { nodeBudget?.spend(); charged-- }
+            (checked?.result as? QfNraResult.Unknown)?.resource?.let { declined ->
+                resource = when (declined) {
+                    com.eignex.klause.arithmetic.polynomial.PolynomialResource.DENSE_COEFFICIENTS ->
+                        PolynomialTheoryResource.DenseCoefficients
+                    com.eignex.klause.arithmetic.polynomial.PolynomialResource.MATRIX_CELLS ->
+                        PolynomialTheoryResource.MatrixCells
+                    com.eignex.klause.arithmetic.polynomial.PolynomialResource.DEGREE_OVERFLOW ->
+                        PolynomialTheoryResource.DegreeOverflow
+                }
+            }
+            result = when (val verdict = checked?.result) {
+                is QfNraResult.Satisfiable -> SolveResult.Sat(sample(verdict.assignment), stats)
+                is QfNraResult.Unsatisfiable -> SolveResult.Unsat(stats = stats)
+                is QfNraResult.Unknown -> SolveResult.Unknown(incompleteReason(), stats)
+                null -> if (stop() || global()) SolveResult.Unknown(incompleteReason(), stats) else null
+            }
+            slice.noteOverspend()
+            return result
+        }
+
+        override fun close() = cursor.close()
     }
 
     override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult {
@@ -260,14 +350,11 @@ private class NonlinearIntegerInvocation(
                 value.rational?.toDouble() ?: (value.lowerBound.toDouble() / 2 + value.upperBound.toDouble() / 2)
             },
             exactInts = integers, algebraicReals = reals,
-        )
+        ).also { it.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(source), EvidenceKind.Witness) }
     }
 
     private fun capture(assignment: QfNraAssignment): OpenTheoryAssignment = capture(sample(assignment))
-    private fun capture(sample: Sample): OpenTheoryAssignment = OpenTheoryAssignment.Rebuilt(
-        OpenTheoryAssignment.ExactNra(ExactNraAssignment(sample.bools, requireNotNull(sample.algebraicReals))),
-        sample.bools, Array(sample.numIntVars) { sample.exactIntValue(it) },
-    )
+    private fun capture(sample: Sample): OpenTheoryAssignment = nonlinearIntegerAssignment(sample)
     private fun incompleteReason(): TerminationReason = when {
         polynomial.timeout() -> TerminationReason.Timeout
         polynomial.cancellation() -> TerminationReason.Cancelled
@@ -275,3 +362,8 @@ private class NonlinearIntegerInvocation(
     }
     private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
 }
+
+internal fun nonlinearIntegerAssignment(sample: Sample): OpenTheoryAssignment = OpenTheoryAssignment.Rebuilt(
+    OpenTheoryAssignment.ExactNra(ExactNraAssignment(sample.bools, requireNotNull(sample.algebraicReals))),
+    sample.bools, Array(sample.numIntVars) { sample.exactIntValue(it) },
+)

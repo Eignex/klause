@@ -9,7 +9,7 @@ Execution has three parts: prepare retained workers, give them bounded slices, a
 verify their publications before sharing or returning them. Slices preserve state;
 reseeding or retiring a worker has its own lifetime and accounting rules.
 
-Finite and linear open source execution supply retained recipe factories to
+Finite, linear open, polynomial and nonlinear-integer source execution supply retained recipe factories to
 `PortfolioInvocation` with the routing plan and current executable projection. The invocation owns worker
 slots, seed offsets, parallel node quotas, scheduler controls, result verification
 and cleanup. Composed arm attribution remains distinct from materialized replica
@@ -345,14 +345,14 @@ allowances remain invocation stops.
 
 ## Exact theory strategy execution
 
-The shared harness runs linear and finite-polynomial portfolios. Nonlinear-integer
-and quadratic `MIXED` execution uses the fixed phases documented in
-[nonlinear integer arithmetic](../theories/nonlinear-integer.md#solving-and-composition)
-and [quadratic strategy execution](../theories/polynomial-real.md#quadratic-strategy-execution).
-One common portfolio construction path per invocation, with theory adapters
-supplying arms and source verification/objective contracts, is planned in
-[#2650](https://github.com/Eignex/klause/issues/2650). That work also moves fixed
-phases onto retained workers and centralizes lane and resource wiring. The vision's
+Polynomial and nonlinear-integer mixed invocations use the same construction path
+as finite and linear open execution. Polynomial workers keep private arithmetic
+invocations; fallback ALNS retains its bootstrap and repairs. Nonlinear integer
+traversal retains tuple enumeration, candidate state and arithmetic work across
+slices; exact neighborhoods retain their centers and adaptive state. CLI parallelism
+reaches these factories, and replicas keep private state and native reservations.
+Quadratic mixed execution retains the fixed phases documented in
+[quadratic strategy execution](../theories/polynomial-real.md#quadratic-strategy-execution). The vision's
 [active work](../vision.md#active-work-toward-the-vision) tracks the related refactors.
 
 Supported linear sources pair complete traversal with exact-coordinate local search
