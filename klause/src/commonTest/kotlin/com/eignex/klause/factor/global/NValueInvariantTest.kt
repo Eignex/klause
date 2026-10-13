@@ -394,6 +394,51 @@ class NValueInvariantTest {
     }
 
     @Test
+    fun `class completion reconciles a feasible merge among competing classes`() {
+        for (seed in listOf(3, 17, 41)) {
+            val p = Problem(
+                0,
+                7,
+                arrayOf(
+                    IntDomain(1, 3),
+                    IntDomain(0, 1),
+                    IntDomain(0, 1),
+                    IntDomain(0, 1),
+                    IntDomain(0, 1),
+                    IntDomain(0, 2),
+                    IntDomain(0, 2),
+                ),
+                arrayOf<Factor>(
+                    NValue(0, intArrayOf(1, 2, 3, 4, 5, 5)),
+                    Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.NE, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(2, 4), LinearOp.NE, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(5, 6), LinearOp.EQ, 0),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(p), Random(seed))
+            for ((variable, value) in listOf(0 to 3L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L, 5 to 2L, 6 to 2L)) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+            val before = state.assignment.snapshot()
+
+            state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+            val move = state.moveSink.list.first {
+                it is Move.Compound && Move.IntSet(0, 2) in it.parts && state.netDelta(it) == 0L
+            }
+            assertEquals(before, state.assignment.snapshot())
+            state.apply(move)
+
+            assertEquals(2L, state.assignment.intValue(0))
+            assertEquals(2, (1..5).map { state.assignment.intValue(it) }.distinct().size)
+            assertEquals(state.assignment.intValue(5), state.assignment.intValue(6))
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
     fun `class elimination reconciles the combined drift of a surrounding equality`() {
         val p = Problem(
             0,
