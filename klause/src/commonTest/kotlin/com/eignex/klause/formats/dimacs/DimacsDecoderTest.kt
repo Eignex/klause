@@ -59,7 +59,7 @@ class DimacsDecoderTest {
     }
 
     @Test
-    fun `nonuniform soft costs retain independent relaxation variables`() {
+    fun `nonuniform soft costs retain separate violation indicators`() {
         val decoded = Dimacs.parseWcnf("3 1 0\n7 -2 0\n").toProblem()
         val assignment = Assignment(decoded.problem.numBoolVars, 0)
         assignment.setBool(2, true)
