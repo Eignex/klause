@@ -1,12 +1,14 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -15,6 +17,7 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class NValueInvariantTest {
@@ -290,5 +293,22 @@ class NValueInvariantTest {
         state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
 
         assertTrue(state.moveSink.list.none { it is Move.Compound && Move.IntSet(0, 1) in it.parts })
+    }
+
+    @Test
+    fun `class elimination declines maintained coordinates in another class`() {
+        val p = Problem(
+            0, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 4), IntDomain(0, 16), IntDomain(0, 4)),
+            arrayOf<Factor>(NValue(0, intArrayOf(1, 2, 3)), Product(1, 1, 2)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(p.factors, p.numIntVars)).network(4, 0)
+        for ((variable, value) in listOf(0 to 2L, 1 to 2L, 2 to 4L, 3 to 4L)) state.assignment.setInt(variable, value)
+        state.recompute()
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+
+        assertTrue(state.moveSink.list.none { it is Move.Compound && Move.IntSet(0, 1) in it.parts })
+        assertEquals(0L, state.cost)
     }
 }

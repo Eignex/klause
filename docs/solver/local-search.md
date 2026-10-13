@@ -299,6 +299,8 @@ count for its equality or inequality mode. Repeated coordinates are changed once
 count aliases are checked against the final distinct values. Frozen, maintained or
 foreign-owned changed coordinates decline the whole class. Absent positions do not
 restrict a class unless they share a participating coordinate.
+Elimination declines factors reading maintained integers, since changing a searched
+input can rewrite a maintained coordinate in another class.
 
 Each call samples at most 24 class pairs and offers at most four elimination moves,
 each changing at most 32 class coordinates plus the count and its channels. Channel
