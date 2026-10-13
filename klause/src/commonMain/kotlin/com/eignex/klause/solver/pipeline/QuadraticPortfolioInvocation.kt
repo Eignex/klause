@@ -16,10 +16,9 @@ import com.eignex.klause.portfolio.PortfolioTerminalPublication
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
-import com.eignex.klause.solver.evidence.QuadraticEngineSource
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
+import com.eignex.klause.solver.evidence.checkWitness
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EvidenceKind
@@ -101,8 +100,12 @@ internal class QuadraticPortfolioInvocation(
                 val certificate = sample.witnessCertificate
                 if (certificate?.kind == EvidenceKind.Witness && certificate.model.sameModel(identity) &&
                     sample.numBoolVars == plan.sourceBoolCount && sample.numIntVars == plan.sourceIntCount &&
-                    sample.numRealVars == plan.sourceRealCount && matchesPins(sample)
-                ) Verification.Accepted(candidate)
+                    sample.numRealVars == plan.sourceRealCount
+                ) when (val checked = requireNotNull(expected).condition.checkWitness(sample, verification)) {
+                    SourceEvidenceCheck.Checked -> Verification.Accepted(candidate)
+                    is SourceEvidenceCheck.Rejected -> Verification.Rejected(checked.reason)
+                    is SourceEvidenceCheck.Unavailable -> Verification.Indeterminate(checked.reason)
+                }
                 else Verification.Indeterminate("quadratic witness has no matching original-source check")
             })) { workers ->
             val complete = workers.indices.filter { workers[it].family == ArmFamily.Backtrack }
@@ -184,22 +187,22 @@ internal class QuadraticPortfolioInvocation(
         val witness = sample.witnessCertificate
         if (witness?.kind != EvidenceKind.Witness || !witness.model.sameModel(identity) ||
             sample.numBoolVars != plan.sourceBoolCount || sample.numIntVars != plan.sourceIntCount ||
-            sample.numRealVars != plan.sourceRealCount || !matchesPins(sample)
+            sample.numRealVars != plan.sourceRealCount
         ) return Verification.Indeterminate("quadratic terminal has no checked original-source witness")
+        when (val checked = requireNotNull(expected).condition.checkWitness(sample, terminalArithmetic)) {
+            SourceEvidenceCheck.Checked -> Unit
+            is SourceEvidenceCheck.Rejected -> return Verification.Rejected(checked.reason)
+            is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
+        }
         if (terminalArithmetic.compare(objective.evaluateExact(sample, terminalArithmetic), point.value) != 0) {
             return Verification.Rejected("quadratic terminal objective differs from its source witness")
         }
         return null
     }
 
-    private fun matchesPins(sample: Sample): Boolean =
-        assumptions.bools.all { (id, value) -> sample.boolValue(id) == value } &&
-            assumptions.ints.all { (id, value) -> sample.exactIntValue(id) == bigIntOf(value) }
-
     private fun certificate(certificate: QuadraticCertificate, claim: QuadraticClaim): Verification<Unit, Unit>? {
-        val binding = certificate.invocation
         if (certificate.claim != claim || !certificate.model.matches(identity) ||
-            binding == null || !matches(binding)
+            !certificate.matchesInvocation(requireNotNull(expected))
         ) {
             return Verification.Rejected("quadratic certificate belongs to another source, condition or objective")
         }
@@ -209,20 +212,6 @@ internal class QuadraticPortfolioInvocation(
             }
         }
         return null
-    }
-
-    private fun matches(actual: QuadraticEngineInvocation): Boolean {
-        val original = requireNotNull(expected)
-        val sameSource = when (val source = original.source) {
-            is QuadraticEngineSource.ExactIr ->
-                (actual.source as? QuadraticEngineSource.ExactIr)?.problem === source.problem
-            is QuadraticEngineSource.Polynomial ->
-                (actual.source as? QuadraticEngineSource.Polynomial)?.problem === source.problem
-            is QuadraticEngineSource.NonlinearInteger ->
-                (actual.source as? QuadraticEngineSource.NonlinearInteger)?.problem === source.problem
-        }
-        return sameSource && actual.objective === objective && actual.sense == sense &&
-            actual.condition == original.condition
     }
 
     private fun beyond(value: AlgebraicReal, bound: AlgebraicReal): Boolean =
