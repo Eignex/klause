@@ -524,7 +524,7 @@ class Portfolio(
                 }
                 if (handle != null && (worker.family.observable || worker.restartingSearch) &&
                     terminal == null && !failed &&
-                    incumbent.current() != null
+                    incumbent.current() != null && run.reseedAllowed(arm)
                 ) {
                     if (claim.improved) {
                         staleSegments[arm] = 0
@@ -668,6 +668,9 @@ class Portfolio(
         fun continuePreparation(arm: Int) {
             continuingPreparation = arm
         }
+
+        fun reseedAllowed(arm: Int): Boolean = !retired[arm] &&
+            !(improving && arm in incumbentProbeArms && !productive[arm])
 
         fun revisitPreparation(arm: Int) {
             if (!improving) preparationRevisits[arm] = true
