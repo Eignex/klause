@@ -223,3 +223,10 @@ check exists; otherwise execution remains unknown. Real completion uses original
 source rows independently of a selected bounding relaxation, and published exact
 coordinates must satisfy their source relation. These checks create private state
 and retain the invocation's existing work currencies and cancellation lifetime.
+
+Coordinate projection retains the selected descriptors and binds their factories
+to remapped immutable factor data. Each factory or emitter receives that engine-view
+factor, so source variable ids cannot leak into compact CP storage. Source rewrites
+select fresh descriptors; objective overlays retain prior selections and select only
+the appended factor. `bake(selection)` keeps the captured choice through finite
+root construction instead of invoking selectors again.

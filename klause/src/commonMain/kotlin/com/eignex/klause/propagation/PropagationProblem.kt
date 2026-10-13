@@ -2,8 +2,8 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.solver.isClausal
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 

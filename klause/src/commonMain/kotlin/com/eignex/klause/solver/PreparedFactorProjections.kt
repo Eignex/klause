@@ -1,15 +1,18 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.localsearch.ScoringProjection
+import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
+import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.propagation.FactorProjectionPreparation
+import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.SelectedProjectionChecks
-import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 
 /**
  * Immutable source-associated mechanism selection. Factories are retained, never mutable workspaces;
@@ -20,10 +23,13 @@ class PreparedFactorProjections internal constructor(
     val problem: Problem,
     /** Selectors retained for a later source rewrite. */
     val providers: FactorProjectionProviders,
+    private val propagation: Array<PropagationProjection?> =
+        Array(problem.numFactors) { providers.propagation.select(problem.factors[it]) },
+    private val scoring: Array<ScoringProjection?> =
+        Array(problem.numFactors) { providers.scoring.select(problem.factors[it]) },
+    private val relaxation: Array<RelaxationProjection?> =
+        Array(problem.numFactors) { providers.relaxation.select(problem.factors[it]) },
 ) {
-    private val propagation = Array(problem.numFactors) { providers.propagation.select(problem.factors[it]) }
-    private val scoring = Array(problem.numFactors) { providers.scoring.select(problem.factors[it]) }
-    private val relaxation = Array(problem.numFactors) { providers.relaxation.select(problem.factors[it]) }
     private val declarations = Array(problem.numFactors) { id ->
         FactorExecutionCapabilities(
             propagation[id]?.capability ?: PropagationCapability.UNSUPPORTED,
@@ -54,6 +60,25 @@ class PreparedFactorProjections internal constructor(
     fun forProblem(problem: Problem): PreparedFactorProjections =
         if (this.problem === problem) this else providers.prepare(problem)
 
+    internal fun projected(view: Problem, factorIndices: IntArray): PreparedFactorProjections {
+        require(factorIndices.size == view.numFactors && factorIndices.all { it in problem.factors.indices }) {
+            "projection factor mapping differs from its prepared source"
+        }
+        return PreparedFactorProjections(view, providers,
+            Array(factorIndices.size) { propagation[factorIndices[it]] },
+            Array(factorIndices.size) { scoring[factorIndices[it]] },
+            Array(factorIndices.size) { relaxation[factorIndices[it]] })
+    }
+
+    internal fun appended(view: Problem): PreparedFactorProjections {
+        require(view.numFactors == problem.numFactors + 1)
+        val extra = view.factors.last()
+        return PreparedFactorProjections(view, providers,
+            propagation + providers.propagation.select(extra),
+            scoring + providers.scoring.select(extra),
+            relaxation + providers.relaxation.select(extra))
+    }
+
     internal fun requireSource(problem: Problem) {
         require(this.problem === problem) { "projection selection belongs to a different canonical source" }
     }
@@ -67,18 +92,19 @@ class PreparedFactorProjections internal constructor(
     internal fun requiresOriginalCheck(factorId: Int): Boolean = propagation[factorId]?.builtIn == false &&
         propagation[factorId]?.assignmentCheck != AssignmentCheckCapability.EXACT
 
-
     internal fun propagator(factorId: Int, preparation: FactorProjectionPreparation?): Propagator =
-        checkNotNull(propagation[factorId]) { "unsupported propagation route for factor $factorId" }.create(preparation)
+        checkNotNull(propagation[factorId]) { "unsupported propagation route for factor $factorId" }
+            .create(problem.factors[factorId], preparation)
 
     internal fun invariant(factorId: Int, domains: Array<IntDomain>?): Invariant =
-        checkNotNull(scoring[factorId]) { "unsupported local-search route for factor $factorId" }.create(domains)
+        checkNotNull(scoring[factorId]) { "unsupported local-search route for factor $factorId" }
+            .create(problem.factors[factorId], domains)
 
     internal fun usesBuiltInRelaxation(factorId: Int): Boolean = relaxation[factorId]?.builtIn == true ||
         (relaxation[factorId] == null &&
             problem.factors[factorId].defaultExecutionCapabilities().relaxation == RelaxationCapability.NONE)
 
     internal fun emitRelaxation(factorId: Int, builder: RelaxationBuilder, linear: LinearLpProjection?) {
-        relaxation[factorId]?.emit(builder, linear)
+        relaxation[factorId]?.emit(problem.factors[factorId], builder, linear)
     }
 }

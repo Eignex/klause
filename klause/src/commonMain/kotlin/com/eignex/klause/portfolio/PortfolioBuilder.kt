@@ -2,11 +2,11 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.InvariantNetworkPreparation
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchPreparation
-import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample

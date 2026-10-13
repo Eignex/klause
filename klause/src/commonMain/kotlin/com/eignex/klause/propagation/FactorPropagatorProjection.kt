@@ -26,7 +26,7 @@ internal fun Factor.propagatorProjection(
     provider: PropagationProjectionProvider = BuiltInPropagationProjectionProvider,
 ): Propagator = checkNotNull(provider.select(this)) {
     "unsupported propagation route for ${this::class.simpleName}; select a propagation provider"
-}.create(preparation)
+}.create(this, preparation)
 
 internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPreparation?): Propagator = when (this) {
     is AllDifferent -> AllDifferentPropagator(

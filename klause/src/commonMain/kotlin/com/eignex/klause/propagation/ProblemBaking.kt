@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -29,14 +30,24 @@ val Problem.baked: PropagationResult
  * inventing one narrows the model.
  */
 fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem =
-    bakeSelected(null, cancellation)
+    bakeSelected(null, cancellation, null)
 
 /** Bake a private finite projection using the providers selected for this invocation. */
 fun Problem.bake(providers: FactorProjectionProviders, cancellation: Cancellation = Cancellation.Never): BakedProblem =
-    bakeSelected(providers, cancellation)
+    bakeSelected(providers, cancellation, null)
 
-private fun Problem.bakeSelected(providers: FactorProjectionProviders?, cancellation: Cancellation): BakedProblem {
-    if (this is BakedProblem && (providers == null || projectionProviders === providers)) return this
+/** Bake private engine state while retaining the descriptors captured for this canonical source. */
+fun Problem.bake(selection: PreparedFactorProjections, cancellation: Cancellation = Cancellation.Never): BakedProblem {
+    selection.requireSource(this)
+    return bakeSelected(selection.providers, cancellation, selection)
+}
+
+private fun Problem.bakeSelected(
+    providers: FactorProjectionProviders?,
+    cancellation: Cancellation,
+    selection: PreparedFactorProjections?,
+): BakedProblem {
+    if (this is BakedProblem && selection == null && (providers == null || projectionProviders === providers)) return this
     return BakedProblem(
         settings = this.settings,
         numBoolVars = numBoolVars,
@@ -51,6 +62,9 @@ private fun Problem.bakeSelected(providers: FactorProjectionProviders?, cancella
         realUpper = realUpper,
         modelBounds = intBounds,
         projectionProviders = providers,
+        projectionSelection = selection?.let { captured ->
+            { target -> captured.projected(target, IntArray(numFactors) { it }) }
+        },
     )
 }
 
@@ -73,6 +87,7 @@ internal fun BakedProblem.withAppendedFactor(extra: Factor): BakedProblem = Bake
     modelBounds = intBounds,
     alreadyFolded = true,
     projectionProviders = projectionProviders,
+    projectionSelection = factorProjections?.let { captured -> { target -> captured.appended(target) } },
 )
 
 /** Run deductive propagation against [assumptions] through the propagation engine. */
@@ -120,6 +135,9 @@ internal fun BakedProblem.conditionedRoot(assumptions: Assumptions, token: Cance
         packedOpenIntHi = intBounds.openUpperBits,
         modelBounds = intBounds,
         projectionProviders = projectionProviders,
+        projectionSelection = factorProjections?.let { captured ->
+            { target -> captured.projected(target, IntArray(numFactors) { it }) }
+        },
     )
     if (token()) throw CancellationException("root preparation cancelled")
     return conditioned

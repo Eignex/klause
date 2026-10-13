@@ -19,7 +19,7 @@ class PropagationProjection internal constructor(
     val assignmentCheck: AssignmentCheckCapability,
     /** Explanation when deduction is deliberately inert. */
     val inertReason: String?,
-    private val factory: (FactorProjectionPreparation?) -> Propagator,
+    private val factory: (Factor, FactorProjectionPreparation?) -> Propagator,
     internal val builtIn: Boolean,
 ) {
     init {
@@ -29,17 +29,17 @@ class PropagationProjection internal constructor(
         }
     }
 
-    /** Factory calls must produce private mechanisms or stateless projections with owner-local payloads. */
+    /** Build from the supplied engine-view factor; variable ids may differ from the selecting source. */
     constructor(
         capability: PropagationCapability,
         assignmentCheck: AssignmentCheckCapability,
         inertReason: String? = null,
-        factory: () -> Propagator,
-    ) : this(capability, assignmentCheck, inertReason, { _ -> factory() }, false)
+        factory: (Factor) -> Propagator,
+    ) : this(capability, assignmentCheck, inertReason, { factor, _ -> factory(factor) }, false)
 
-    internal fun create(preparation: FactorProjectionPreparation?): Propagator {
+    internal fun create(factor: Factor, preparation: FactorProjectionPreparation?): Propagator {
         check(capability != PropagationCapability.UNSUPPORTED) { "unsupported propagation route" }
-        return factory(preparation).also {
+        return factory(factor, preparation).also {
             check((it === NoPropagator) == (capability == PropagationCapability.INERT)) {
                 "propagation capability disagrees with projection"
             }
@@ -54,7 +54,7 @@ object BuiltInPropagationProjectionProvider : PropagationProjectionProvider {
         if (capabilities.propagation == PropagationCapability.UNSUPPORTED) return null
         return PropagationProjection(
             capabilities.propagation, capabilities.propagationCheck, capabilities.inertReason,
-            factor::buildPropagatorProjection, true,
+            { view, preparation -> view.buildPropagatorProjection(preparation) }, true,
         )
     }
 }

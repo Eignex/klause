@@ -9,16 +9,17 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.BuiltInScoringProjectionProvider
+import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.NoInvariant
-import com.eignex.klause.localsearch.Completion
-import com.eignex.klause.localsearch.UnscoredCandidateCheck
 import com.eignex.klause.localsearch.ScoringProjection
 import com.eignex.klause.localsearch.ScoringProjectionProvider
+import com.eignex.klause.localsearch.UnscoredCandidateCheck
 import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
@@ -34,16 +35,16 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertSame
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PreparedFactorProjectionsTest {
@@ -51,8 +52,8 @@ class PreparedFactorProjectionsTest {
     fun `alternate clause deduction accepts exactly the source truth table`() {
         val source = Problem(2, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0, 2))))
         val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            val clause = factor as Clause
-            PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) {
+            PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                val clause = view as Clause
                 object : Propagator {
                     override fun propagate(state: PropagationState, factorId: Int): Boolean {
                         var free = -1
@@ -84,7 +85,7 @@ class PreparedFactorProjectionsTest {
     fun `alternate scoring preserves source acceptance and its move delta`() {
         val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0))))
         val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider {
-            ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _ ->
+            ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _, _ ->
                 object : Invariant {
                     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
                         !state.assignment.boolValue(0)
@@ -114,7 +115,7 @@ class PreparedFactorProjectionsTest {
         val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0))))
         val inert = FactorProjectionProviders(scoring = ScoringProjectionProvider {
             ScoringProjection(ScoringCapability.INERT, AssignmentCheckCapability.UNSUPPORTED,
-                "Checked by pinned source propagation.") { NoInvariant }
+                "Checked by pinned source propagation.") { _, _ -> NoInvariant }
         }).prepare(source)
         val unsupported = FactorProjectionProviders(scoring = ScoringProjectionProvider { null }).prepare(source)
 
@@ -141,7 +142,7 @@ class PreparedFactorProjectionsTest {
     fun `declared graded scoring rejects an inert scoring implementation`() {
         val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0))))
         val selected = FactorProjectionProviders(scoring = ScoringProjectionProvider {
-            ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { NoInvariant }
+            ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _, _ -> NoInvariant }
         }).prepare(source)
 
         assertFailsWith<IllegalStateException> { LocalSearchProblem(source, selected) }
@@ -151,7 +152,7 @@ class PreparedFactorProjectionsTest {
     fun `prepared factories isolate mutable sibling scores`() {
         val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0))))
         val selected = FactorProjectionProviders(scoring = ScoringProjectionProvider {
-            ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _ ->
+            ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _, _ ->
                 object : Invariant {
                     private var violated = false
                     override fun initialize(state: LocalSearchState, factorId: Int) {
@@ -201,7 +202,7 @@ class PreparedFactorProjectionsTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)))
         val selected = FactorProjectionProviders(relaxation = RelaxationProjectionProvider {
-            RelaxationProjection(RelaxationCapability.SOUND) { builder ->
+            RelaxationProjection(RelaxationCapability.SOUND) { _, builder ->
                 builder.linearRow(LinearOp.LE, intArrayOf(0), longArrayOf(2), 2)
             }
         }).prepare(source)
@@ -265,7 +266,7 @@ class PreparedFactorProjectionsTest {
         val source = Problem(2, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0, 2))))
         val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider {
             ScoringProjection(ScoringCapability.INERT, AssignmentCheckCapability.UNSUPPORTED,
-                "The original clause is checked at the pinned candidate.") { NoInvariant }
+                "The original clause is checked at the pinned candidate.") { _, _ -> NoInvariant }
         })
         val baked = source.bake(providers)
         val checker = UnscoredCandidateCheck(baked)
@@ -316,7 +317,7 @@ class PreparedFactorProjectionsTest {
     fun `inert scoring cannot declare an exact assignment check`() {
         assertFailsWith<IllegalArgumentException> {
             ScoringProjection(ScoringCapability.INERT, AssignmentCheckCapability.EXACT,
-                "No score mechanism.") { NoInvariant }
+                "No score mechanism.") { _, _ -> NoInvariant }
         }
     }
 
@@ -384,7 +385,7 @@ class PreparedFactorProjectionsTest {
             },
             scoring = ScoringProjectionProvider {
                 ScoringProjection(ScoringCapability.INERT, AssignmentCheckCapability.UNSUPPORTED,
-                    "A pinned source check validates the candidate.") { NoInvariant }
+                    "A pinned source check validates the candidate.") { _, _ -> NoInvariant }
             },
         )
         val checker = UnscoredCandidateCheck(source.bake(providers))
@@ -393,6 +394,85 @@ class PreparedFactorProjectionsTest {
             Assumptions.None, Cancellation.Never)
 
         assertTrue(result is Completion.Refuted)
+    }
+
+    @Test
+    fun `projected deduction retains its selected factory and uses mapped coordinates`() {
+        val factor = Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 1)
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(factor))
+        val selected = FactorProjectionProviders(propagation = PropagationProjectionProvider { original ->
+            if (original !== factor) null else
+                PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                    val row = view as Linear
+                    val column = row.vars.single()
+                    val bound = row.integerConstants!!.bound
+                    object : Propagator {
+                        override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                            val domain = state.intDomains[column]
+                            return domain.min != domain.max || domain.min <= bound
+                        }
+                    }
+                }
+        }).prepare(source)
+        val view = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(
+            factor.remap(VarRemap(intArrayOf(), intArrayOf(-1, -1, 0)))))
+
+        val baked = view.bake(selected.projected(view, intArrayOf(0)))
+        val witnesses = BacktrackSolver(baked).enumerate(BacktrackParams()).map { it.intValue(0) }.toSet()
+
+        assertEquals(2L, baked.rootIntDomain(0).max)
+        assertEquals(setOf(0L, 1L), witnesses)
+    }
+
+    @Test
+    fun `projected scoring retains its selected factory and uses mapped coordinates`() {
+        val factor = Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 1)
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(factor))
+        val selected = FactorProjectionProviders(scoring = ScoringProjectionProvider { original ->
+            if (original !== factor) null else
+                ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { view, _ ->
+                    val row = view as Linear
+                    val column = row.vars.single()
+                    val bound = row.integerConstants!!.bound
+                    object : Invariant {
+                        override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
+                            state.assignment.intValue(column) > bound
+                        override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+                            if (isViolated(state, factorId)) 9 else 0
+                        override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int =
+                            if (intVar == column) (if (newValue > bound) 9 else 0) - violationDegree(state, factorId)
+                            else 0
+                    }
+                }
+        }).prepare(source)
+        val view = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(
+            factor.remap(VarRemap(intArrayOf(), intArrayOf(-1, -1, 0)))))
+        val state = LocalSearchState(LocalSearchModel.open(view), Random(1),
+            projection = LocalSearchProblem(view, selected.projected(view, intArrayOf(0))))
+        state.assignment.setInt(0, 2)
+
+        state.recompute()
+
+        assertEquals(9L, state.cost)
+    }
+
+    @Test
+    fun `projected relaxation retains its selected emitter and uses mapped coordinates`() {
+        val factor = Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 1)
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(factor))
+        val selected = FactorProjectionProviders(relaxation = RelaxationProjectionProvider { original ->
+            if (original !== factor) null else RelaxationProjection(RelaxationCapability.SOUND) { view, builder ->
+                val row = view as Linear
+                builder.linearRow(row.op, row.vars, longArrayOf(3), row.integerConstants!!.bound * 3)
+            }
+        }).prepare(source)
+        val view = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(
+            factor.remap(VarRemap(intArrayOf(), intArrayOf(-1, -1, 0)))))
+
+        val relaxation = CpToLpRelaxation(view, null, projections = selected.projected(view, intArrayOf(0)))
+            .build(RootDomains(view))
+
+        assertEquals(3L, relaxation.model.rhs[0])
     }
 
 }
