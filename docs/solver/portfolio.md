@@ -322,12 +322,17 @@ probe. Binary models retain reserved LP descent for their continuous objective.
 Individual segments retain work charging and time caps; the remaining time follows the
 bandit. After the first incumbent, all scheduled time follows the bandit. Explicit
 backtrack pools and parallel lanes retain their requested scheduling. The auxiliary LP
-arm receives one base improving-phase probe if it has earned no progress credit. An
-unproductive probe retires the arm and closes its handle; retirement preserves the
-incumbent without claiming exhaustion. A witness, objective or bound improvement, root
+arm receives a bounded improving-phase trial if it has earned no progress credit.
+All initial siblings are admitted before trial continuations. Each continuation uses
+the base time/work allowance without growing the shared schedule. Four segments
+starting after preparation with fresh charged work complete the search trial;
+twelve total segments bound unfinished preparation and debt-only pauses. Work,
+fractional charges and overspend debt retain their ordinary accounting. An
+unproductive completed trial retires the arm and closes its handle; retirement
+preserves the incumbent without claiming exhaustion. A witness, objective or bound improvement, root
 deductions, or used shared contributions retain the arm under normal bandit scheduling.
 Configured LP slots do not retire under the auxiliary probe policy. An unproductive
-auxiliary improving-phase probe does not decay the retained workers' bandit or family
+auxiliary improving-phase trial does not decay the retained workers' bandit or family
 evidence, preserving their policy state when the probe is discarded.
 
 See
