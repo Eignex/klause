@@ -1,9 +1,15 @@
 package com.eignex.klause.solver.incumbent
 
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -107,6 +113,38 @@ class ModelEvidenceTest {
         val checked = verifier.verify(ModelEvidence.Infeasible(model, certificate))
 
         assertIs<Verification.Indeterminate>(checked)
+    }
+
+    @Test
+    fun `a completed runtime bound cannot authorize a different numeric publication`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val model = ModelIdentity.of(source, objective)
+        val binding = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
+        val certificate = assertNotNull(EvidenceCertificate.completed(model, EvidenceKind.Bound,
+            CompletedEngineResult.Minimize(binding, MinimizeResult.Optimal(
+                Sample(booleanArrayOf(), longArrayOf(1)), 1.0))))
+        val verifier = ModelEvidenceVerifier<Sample, Double>(model, CandidateVerifier.trusting())
+
+        val checked = verifier.verify(ModelEvidence.Bound(model, 2.0, certificate), invocation = binding)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `a completed witness cannot authorize another carried point`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
+        val model = ModelIdentity.of(source)
+        val binding = EngineInvocation(source.prepareExecutionPlan(), model)
+        val point = Sample(booleanArrayOf(), longArrayOf(1))
+        val certificate = assertNotNull(EvidenceCertificate.completed(model, EvidenceKind.Witness,
+            CompletedEngineResult.Solve(binding, SolveResult.Sat(point))))
+        val other = Sample(booleanArrayOf(), longArrayOf(2))
+        val verifier = ModelEvidenceVerifier<Sample, Unit>(model, CandidateVerifier.trusting())
+
+        val checked = verifier.verify(ModelEvidence.Witness(model, Candidate(other, Unit), certificate))
+
+        assertIs<Verification.Rejected>(checked)
     }
 
 }

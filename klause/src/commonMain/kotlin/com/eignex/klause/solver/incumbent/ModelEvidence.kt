@@ -34,6 +34,9 @@ internal class EvidenceCertificate private constructor(
         claim: SourceClaim, context: SourceProofContext, cancellation: Cancellation = Cancellation.Never,
     ): SourceEvidenceCheck {
         val completed = completion ?: return SourceEvidenceCheck.Unavailable("completed derivation capture unavailable")
+        if (completed.scope == null || completed.invocation?.hasUncapturedSourceRestrictions == true) {
+            return SourceEvidenceCheck.Unavailable("original source revision or restriction capture unavailable")
+        }
         if (completed.scope != context.scope) {
             return SourceEvidenceCheck.Rejected("engine completion has a different original-source invocation")
         }
@@ -87,12 +90,18 @@ internal class EvidenceCertificate private constructor(
                 captured.scope != completion.scope || captured.derivations.any { it.scope != completion.scope }
             } == true
             if (!completion.attests(kind) || foreignCapture) return null
+            if (completion.invocation?.model?.matches(model) == false) return null
             if (kind != EvidenceKind.Witness &&
                 completion.evidence?.let { it.engineScope != completion.scope } == true
             ) return null
-            if ((kind == EvidenceKind.Bound || kind == EvidenceKind.Unbounded) && completion.scope.objective == null) {
+            if ((kind == EvidenceKind.Bound || kind == EvidenceKind.Unbounded) &&
+                completion.scope?.objective == null && completion.invocation?.sourceObjective == null
+            ) {
                 return null
             }
+            if ((kind == EvidenceKind.Bound || kind == EvidenceKind.Unbounded) &&
+                completion.invocation?.let { it.executionObjective == null } == true
+            ) return null
             return EvidenceCertificate(model, kind, completion)
         }
 
@@ -142,7 +151,7 @@ internal class ModelEvidenceVerifier<A, V>(
     private val witnessVerifier: CandidateVerifier<A, V>,
 ) {
     fun verify(
-        evidence: ModelEvidence<A, V>, scope: SourceScope? = null,
+        evidence: ModelEvidence<A, V>, scope: SourceScope? = null, invocation: EngineInvocation? = null,
     ): Verification<ModelEvidence<A, V>, Unit> {
         if (!model.matches(evidence.model)) {
             return Verification.Rejected("evidence belongs to a different model or objective")
@@ -152,6 +161,13 @@ internal class ModelEvidenceVerifier<A, V>(
             return Verification.Rejected("certificate belongs to a different model, objective or claim")
         }
         if (evidence.kind != EvidenceKind.Witness) {
+            val completedInvocation = certificate?.completion?.invocation
+            if (invocation != null && completedInvocation != null && !invocation.matches(completedInvocation)) {
+                return Verification.Rejected("evidence belongs to a different runtime invocation")
+            }
+            if ((invocation == null) != (completedInvocation == null)) {
+                return Verification.Indeterminate("the proof consumer and completion require a runtime invocation")
+            }
             val completionScope = certificate?.completion?.scope
             if (scope != null && completionScope != null && completionScope != scope) {
                 return Verification.Rejected("evidence belongs to a different original-source invocation")
@@ -163,12 +179,28 @@ internal class ModelEvidenceVerifier<A, V>(
         if (evidence.kind != EvidenceKind.Witness && certificate == null) {
             return Verification.Indeterminate("the required ${evidence.kind.name.lowercase()} certificate is withheld")
         }
+        if (evidence is ModelEvidence.Bound && certificate?.completion != null) {
+            val actual = (certificate.completion as? CompletedEngineResult.Minimize)?.executionBound
+                ?: return Verification.Indeterminate("completion has no retained execution bound")
+            if (!actual.equals(evidence.value)) {
+                return Verification.Rejected("published bound differs from the actual engine completion")
+            }
+        }
         val candidate = when (evidence) {
             is ModelEvidence.Witness -> evidence.candidate
             is ModelEvidence.Unbounded -> evidence.candidate
             else -> null
         }
         if (candidate != null) {
+            val result = certificate?.completion
+            val completedPoint = when (result) {
+                is CompletedEngineResult.Solve -> (result.result as? SolveResult.Sat)?.assignment
+                is CompletedEngineResult.Minimize -> result.result.assignment
+                null -> null
+            }
+            if (completedPoint != null && !completedPoint.equals(candidate.assignment)) {
+                return Verification.Rejected("published point differs from the actual engine completion")
+            }
             when (val verdict = witnessVerifier.verify(candidate)) {
                 is Verification.Rejected -> return verdict
                 is Verification.Indeterminate -> return verdict
