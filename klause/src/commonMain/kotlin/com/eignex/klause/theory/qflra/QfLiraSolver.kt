@@ -49,6 +49,8 @@ import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomPremise
+import com.eignex.klause.solver.search.SearchBranchKind
+import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -147,7 +149,10 @@ class ExactLiraSearchComponent private constructor(
     private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)?,
 ) : TheoryComponent,
     SearchBrancher,
+    SearchBranchProposal,
     AutoCloseable {
+    override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
+
     constructor(
         model: Problem,
         modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,

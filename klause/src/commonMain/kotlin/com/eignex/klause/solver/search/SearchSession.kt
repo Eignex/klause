@@ -18,7 +18,8 @@ class SearchSession(
     learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
     private val branchers: List<SearchBrancher> = emptyList(),
     private val atoms: SearchAtomRegistry? = null,
-    executionControls: SearchExecutionControls,
+    executionControls: SearchExecutionControls = SearchExecutionControlAdapter(cancellation),
+    proposals: List<SearchBranchProposal>,
 ) : SearchContext,
     ClauseWatchHost {
     /** Open a session with cancellation-only controls and the existing native traversal defaults. */
@@ -38,6 +39,19 @@ class SearchSession(
         atoms,
         SearchExecutionControlAdapter(cancellation),
     )
+
+    /** Open a session with explicit execution controls and the existing proposal order. */
+    constructor(
+        components: List<SearchComponent>,
+        maxChecks: Long = Long.MAX_VALUE,
+        cancellation: Cancellation = Cancellation.Never,
+        learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+        branchers: List<SearchBrancher> = emptyList(),
+        atoms: SearchAtomRegistry? = null,
+        executionControls: SearchExecutionControls,
+    ) : this(components, maxChecks, cancellation, learnedDb, branchers, atoms, executionControls, emptyList())
+
+    private val proposals = proposals.toList()
 
     init {
         atoms?.attach()
@@ -555,14 +569,27 @@ class SearchSession(
         return AssembledSearchModel(values)
     }
 
-    /** First component-owned exhaustive split available at the current shared level. */
-    internal fun branchAlternatives(): List<SearchDecision>? {
+    internal fun branchAlternatives(kind: SearchBranchKind? = null): List<SearchDecision>? {
         singleComponent?.let { component ->
-            if (component is SearchBrancher) component.nextBranch(this)?.let { return it }
+            proposalAlternatives(component, kind)?.let { return it }
         } ?: components.forEach { component ->
-            if (component is SearchBrancher) component.nextBranch(this)?.let { return it }
+            proposalAlternatives(component, kind)?.let { return it }
         }
-        for (brancher in branchers) brancher.nextBranch(this)?.let { return it }
+        for (brancher in branchers) proposalAlternatives(brancher, kind)?.let { return it }
+        for (proposal in proposals) {
+            if (kind == null || proposal.branchKind == kind) proposal.nextBranch(this)?.let { return it }
+        }
+        return null
+    }
+
+    private fun proposalAlternatives(component: SearchComponent, kind: SearchBranchKind?): List<SearchDecision>? {
+        if (component is SearchBrancher) {
+            if (kind == null || ((component as? SearchBranchProposal)?.branchKind ?: SearchBranchKind.Finite) == kind) {
+                return component.nextBranch(this)
+            }
+        } else if (component is SearchBranchProposal && (kind == null || component.branchKind == kind)) {
+            return component.nextBranch(this)
+        }
         return null
     }
 
@@ -651,7 +678,25 @@ class SearchSession(
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
     ): SearchRun = openRunAt(
         numBoolVars, params, booleanBranching, decisionBudget, observer,
-        modelContinuation, modelPolicy, nodePolicy, lifecycle, candidateHints, 0,
+        modelContinuation, modelPolicy, nodePolicy, lifecycle, candidateHints, SearchBranchSelection.Default, 0,
+    )
+
+    /** Open a resumable traversal with independent lazy branch selection. */
+    fun openRun(
+        numBoolVars: Int,
+        params: SearchSolveParams = SearchSolveParams(),
+        booleanBranching: BooleanBranching = BooleanBranching.SourceOrder(numBoolVars),
+        decisionBudget: SearchDecisionBudget = SearchDecisionBudget.Unlimited,
+        observer: SearchRunObserver = SearchRunObserver.None,
+        modelContinuation: SearchModelContinuation = SearchModelContinuation.Chronological,
+        modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll,
+        nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
+        lifecycle: SearchRunLifecycle = SearchRunLifecycle.None,
+        candidateHints: SearchCandidateHints = SearchCandidateHints.None,
+        branchSelection: SearchBranchSelection,
+    ): SearchRun = openRunAt(
+        numBoolVars, params, booleanBranching, decisionBudget, observer,
+        modelContinuation, modelPolicy, nodePolicy, lifecycle, candidateHints, branchSelection, 0,
     )
 
     internal fun openConditionedRun(
@@ -661,10 +706,11 @@ class SearchSession(
         booleanBranching: BooleanBranching = BooleanBranching.SourceOrder(numBoolVars),
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
         observer: SearchRunObserver = SearchRunObserver.None,
+        branchSelection: SearchBranchSelection = SearchBranchSelection.Default,
     ): SearchRun = openRunAt(
         numBoolVars, params, booleanBranching, SearchDecisionBudget.Unlimited,
         observer, SearchModelContinuation.Chronological, SearchModelPolicy.SurfaceAll,
-        nodePolicy, SearchRunLifecycle.None, candidateHints, decisionLevel,
+        nodePolicy, SearchRunLifecycle.None, candidateHints, branchSelection, decisionLevel,
     )
 
     private fun openRunAt(
@@ -678,6 +724,7 @@ class SearchSession(
         nodePolicy: SearchNodePolicy,
         lifecycle: SearchRunLifecycle,
         candidateHints: SearchCandidateHints,
+        branchSelection: SearchBranchSelection,
         minimumDecisionLevel: Int,
     ): SearchRun {
         require(atoms == null || numBoolVars in 0..atoms.sourceBooleanCount) {
@@ -707,6 +754,7 @@ class SearchSession(
             modelPolicy,
             nodePolicy,
             lifecycle,
+            branchSelection,
             minimumDecisionLevel,
         )
     }
@@ -723,6 +771,7 @@ class SearchSession(
         nodePolicy = policy.nodePolicy,
         lifecycle = policy.lifecycle,
         candidateHints = policy.candidateHints,
+        branchSelection = policy.branchSelection,
     ).also { it.pauseBeforeDecision = policy.pauseBeforeDecision }
 
     internal fun blockModelAtRoot(model: AssembledSearchModel): ComponentResult {

@@ -155,6 +155,7 @@ interface SearchComponent {
  * The component selects from its private state, but the returned alternatives are public
  * [SearchDecision]s. Consequently the session, rather than a CP or theory-specific loop, owns
  * levels, propagation scheduling, retraction, cancellation, and terminal model assembly.
+ * Traversal-only extensions can supply [SearchBranchProposal] independently of this lifecycle.
  */
 interface SearchBrancher : SearchComponent {
     /**
@@ -363,6 +364,9 @@ internal interface SearchTraversalPolicy {
 
     /** Boolean branching preceding component-local splits. */
     val booleanBranching: BooleanBranching
+
+    /** Independent lazy selection of Boolean, finite and arithmetic proposals. */
+    val branchSelection: SearchBranchSelection get() = SearchBranchSelection.Default
 
     /** Shared-decision budget for this traversal. */
     val decisionBudget: SearchDecisionBudget

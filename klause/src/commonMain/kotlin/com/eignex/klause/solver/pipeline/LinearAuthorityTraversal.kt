@@ -19,6 +19,8 @@ import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBranchKind
+import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -33,7 +35,9 @@ internal class LinearAuthorityTraversal(
     private val cancellation: Cancellation,
     private val pause: () -> Boolean,
     private val onIncumbent: (Sample) -> Unit,
-) : SearchBrancher, SearchNodePolicy {
+) : SearchBrancher, SearchBranchProposal, SearchNodePolicy {
+    override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
+
     private val authority = LinearAuthority(budget)
     private val root = CoverageNode(source.scope.condition)
     private val path = arrayListOf(0 to root)

@@ -8,6 +8,8 @@ import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
+import com.eignex.klause.solver.search.SearchBranchKind
+import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -56,7 +58,9 @@ internal class QuadraticIntegerComponent(
     private val root: PolynomialCondition,
     private val step: () -> Unit,
     private val complete: (PolynomialCondition, SearchContext) -> QuadraticIntegerNode,
-) : TheoryComponent, SearchBrancher, SearchNodePolicy {
+) : TheoryComponent, SearchBrancher, SearchBranchProposal, SearchNodePolicy {
+    override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
+
     private val owner = Any()
     private val assertions = ArrayList<Pair<Int, QuadraticIntegerBound>>()
     private var current: QuadraticIntegerNode? = null

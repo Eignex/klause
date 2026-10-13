@@ -16,8 +16,15 @@ class SearchRun internal constructor(
     private val modelPolicy: SearchModelPolicy,
     private val nodePolicy: SearchNodePolicy,
     private val lifecycle: SearchRunLifecycle,
+    private val branchSelection: SearchBranchSelection,
     private val minimumDecisionLevel: Int,
 ) {
+    private val branchSources = if (branchSelection === SearchBranchSelection.Default) null else
+        object : SearchBranchSources {
+            override fun booleanAlternatives(): List<SearchDecision>? = booleanBranching.alternatives(session)
+            override fun componentAlternatives(kind: SearchBranchKind?): List<SearchDecision>? =
+                session.branchAlternatives(kind)
+        }
     private val frames = ArrayList<Frame>()
     private var decisions = 0L
     private var decisionsSinceRestart = 0L
@@ -248,8 +255,11 @@ class SearchRun internal constructor(
     }
 
     private fun alternatives(): Alternatives {
-        booleanBranching.alternatives(session)?.let { return Alternatives.Branch(it) }
-        val decisions = session.branchAlternatives()
+        val decisions = if (branchSources == null) {
+            booleanBranching.alternatives(session) ?: session.branchAlternatives()
+        } else {
+            branchSelection.alternatives(branchSources)
+        }
         return if (decisions == null) Alternatives.Leaf else Alternatives.Branch(decisions)
     }
 
