@@ -56,10 +56,12 @@ class FznStreamCheckerTest {
         }
     }
 
-    @Test
-    fun `an interrupted publication cannot carry an optimality marker`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["==========", "=====UNBOUNDED=====", "=====UNSATISFIABLE=====", "=====UNKNOWN=====",
+        "% optimizationStatus=unattained-infimum", "% optimizationStatus=unattained-supremum"])
+    fun `an interrupted publication cannot carry a terminal marker`(marker: String) {
         val source = declarations + "solve maximize i;"
-        val output = "% objective=1\ni = 1;\nx = 2;\ny = 4;\n----------\n==========\n"
+        val output = "% objective=1\ni = 1;\nx = 2;\ny = 4;\n----------\n$marker\n"
 
         assertFailsWith<IllegalArgumentException> {
             FznStreamChecker.check(source, output, interrupted = true, minimumWitnesses = 1)

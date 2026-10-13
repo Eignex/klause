@@ -439,7 +439,9 @@ later cases still capture output and record their unavailable checker outcome.
 flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome in
 `source-check-fzn.json`. It uses authoritative coordinate comments when supplied and
 checks the exact preceding cost against the original solve objective. Its source scope
-is `flatzinc-binary64`, as described under source validation below.
+is `flatzinc-binary64`, as described under source validation below. Interrupted
+captures reject verdict markers and terminal `optimizationStatus` comments, including
+unattained boundaries; these belong after invocation completion.
 `com.eignex.klause.bench.profile.SmtStreamReplay` checks saved SMT output through a
 lab profile without invoking the CLI again. Its one argument is a base64 JSON array
 of records containing `sourceRevision`, original `source` and `stdout` text, and

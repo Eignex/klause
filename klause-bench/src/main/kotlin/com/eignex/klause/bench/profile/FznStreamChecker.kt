@@ -8,8 +8,10 @@ import com.eignex.klause.bench.metric.SourceValidation
 internal object FznStreamChecker {
     fun check(source: String, output: String, interrupted: Boolean, minimumWitnesses: Int): List<SourceValidation> {
         require(minimumWitnesses > 0)
-        require(!interrupted || output.lineSequence().none { it == "==========" }) {
-            "Interrupted output carries an optimality marker"
+        require(!interrupted || output.lineSequence().none {
+            it.startsWith("=====") || it.startsWith("% optimizationStatus=")
+        }) {
+            "Interrupted output carries terminal optimization metadata"
         }
         val publications = output.split("----------").dropLast(1)
         require(publications.size >= minimumWitnesses) { "Missing complete FlatZinc publications" }
