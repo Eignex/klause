@@ -63,8 +63,9 @@ class OpenWitnessTest {
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val invocation = EngineInvocation(source.prepareExecutionPlan(objective),
             ModelIdentity.of(source, objective), objective)
+        val third = BigFraction.ofLong(3).reciprocal()
         val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0),
-            exactReals = listOf(BigFraction.ofLong(3).reciprocal())))
+            reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third)))
 
         val sample = assignment.toSample(source, invocation)
 
