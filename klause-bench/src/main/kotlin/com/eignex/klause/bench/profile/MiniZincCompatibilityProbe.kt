@@ -8,6 +8,8 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.runner.MiniZincCompileFailure
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.CorpusSelection.Selection
 import com.eignex.klause.bench.target.BenchCli
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -33,6 +35,11 @@ internal object MiniZincCompatibilityProbe {
         ).distinctBy { it.name }
         require(refs.size <= 128) { "at most 128 source identities per audit" }
         val auditedNames = refs.map { it.name }
+        val dynamic = Catalog.dynamicSuites.single { it.id == "mzn-bench-compatible-v1" }.copy(
+            provider = { selection ->
+                CorpusSelection.applySelectionBy(refs, selection) { it.family ?: it.name.substringBefore('/') }
+            },
+        )
         val repetitions = options["repeats"]?.toInt() ?: 3
         require(repetitions in 1..10)
         val failures = linkedMapOf<String, MiniZincCompileFailure>()
@@ -94,6 +101,7 @@ internal object MiniZincCompatibilityProbe {
                         add(
                             buildJsonObject {
                                 put("suite", suite)
+                                put("surface", "cli")
                                 put("seed", seed)
                                 put("elapsedNs", System.nanoTime() - start)
                                 put("filters", Reports.json.encodeToJsonElement(filters))
@@ -102,6 +110,25 @@ internal object MiniZincCompatibilityProbe {
                         )
                         if (suite == "mzn-bench-compatible-v1") check(selected.none { it.ref.name in failures })
                     }
+                    val start = System.nanoTime()
+                    val catalogue = Catalog.selected(
+                        dynamic,
+                        Selection(
+                            perFamily = (options["per-family"] ?: "1").toInt(),
+                            maxInstances = (options["max"] ?: "100").toInt(),
+                            sampleSeed = seed?.toLong(),
+                        ),
+                    ).problems
+                    add(
+                        buildJsonObject {
+                            put("suite", dynamic.id)
+                            put("surface", "catalogue")
+                            put("seed", seed)
+                            put("elapsedNs", System.nanoTime() - start)
+                            put("identities", Reports.json.encodeToJsonElement(catalogue.map { it.name }))
+                        },
+                    )
+                    check(catalogue.none { it.name in failures })
                 }
             }
             out.resolve("selections.json").writeText(selections.toString() + "\n")

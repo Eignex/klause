@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.catalog
 
+import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.LibminizincExpected
 import com.eignex.klause.bench.source.OrLibrary
@@ -52,6 +53,7 @@ internal object Suites {
                 "mzn-bench-compatible-v1",
                 "MiniZinc Challenge installed compiler compatibility selection v1 (1/family by default)",
                 defaultPerFamily = 1,
+                admit = { MiniZincCompatibility.admit("mzn-bench-compatible-v1", it) },
             ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.minizincChallenge,

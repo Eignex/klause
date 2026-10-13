@@ -175,12 +175,25 @@ internal object CorpusSelection {
 
     /** Generic family-aware selection over any item type, keyed by [family]. Reused for
      *  catalog [com.eignex.klause.bench.catalog.ProblemRef] selection in the ad-hoc CLI. */
-    fun <T> applySelectionBy(all: List<T>, sel: Selection, family: (T) -> String): List<T> {
+    fun <T> applySelectionBy(all: List<T>, sel: Selection, family: (T) -> String): List<T> =
+        applyAdmittedSelectionBy(all, sel, family) { true }
+
+    fun <T> applyAdmittedSelectionBy(
+        all: List<T>,
+        sel: Selection,
+        family: (T) -> String,
+        admit: (T) -> Boolean,
+    ): List<T> {
         val byFamily = LinkedHashMap<String, MutableList<T>>()
-        for (d in all) byFamily.getOrPut(family(d)) { mutableListOf() }.add(d)
-        val capped = byFamily.values.map { fam ->
-            val k = sel.perFamily ?: return@map fam.toList()
-            if (sel.sampleSeed != null) fam.shuffled(Random(sel.sampleSeed)).take(k) else fam.take(k)
+        for (item in all) byFamily.getOrPut(family(item)) { mutableListOf() }.add(item)
+        val capped = byFamily.values.map { members ->
+            val ordered = if (sel.perFamily != null && sel.sampleSeed != null) {
+                members.shuffled(Random(sel.sampleSeed))
+            } else {
+                members
+            }
+            val eligible = ordered.asSequence().filter(admit)
+            sel.perFamily?.let { eligible.take(it).toList() } ?: eligible.toList()
         }
         val interleaved = interleave(capped)
         return sel.maxInstances?.let { interleaved.take(it) } ?: interleaved

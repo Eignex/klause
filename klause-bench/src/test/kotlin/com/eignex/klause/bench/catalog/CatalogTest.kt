@@ -4,6 +4,8 @@ import com.eignex.klause.bench.OpbFormat
 import com.eignex.klause.bench.WcnfFormat
 import com.eignex.klause.bench.runner.InProcessRunner
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.CorpusSelection.Selection
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -112,4 +114,30 @@ class CatalogTest {
         assertEquals(0, floatTiny.numIntVars)
         assertEquals(1, floatTiny.numRealVars)
     }
+    @Test
+    fun `catalogue admission fills caps from valid identities before provider sampling`() {
+        val sources = listOf(ref("dimacs-core", "php4"), ref("dimacs-core", "php3"))
+            .map { it.copy(family = "pigeonhole") }
+        val dynamic = DynamicSuite("admission", "admission", admit = { it.name != "php4" }) { selection ->
+            CorpusSelection.applySelectionBy(sources, selection) { it.family.orEmpty() }
+        }
+
+        val selected = Catalog.selected(dynamic, Selection(perFamily = 1, maxInstances = 1))
+
+        assertEquals(listOf("php3"), selected.problems.map { it.name })
+    }
+
+    @Test
+    fun `raw identity discovery bypasses admission and provider caps`() {
+        val sources = listOf(ref("dimacs-core", "php4"), ref("dimacs-core", "php3"))
+            .map { it.copy(family = "pigeonhole") }
+        val dynamic = DynamicSuite("admission", "admission", defaultPerFamily = 1, admit = { false }) { selection ->
+            CorpusSelection.applySelectionBy(sources, selection) { it.family.orEmpty() }
+        }
+
+        val discovered = Catalog.discovered(dynamic)
+
+        assertEquals(listOf("php4", "php3"), discovered.map { it.name })
+    }
+
 }
