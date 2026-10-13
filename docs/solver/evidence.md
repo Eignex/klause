@@ -112,6 +112,8 @@ trajectory derivation; an affine `Ray` retains its explicit direction. Completed
 quadratic verification checks actual exact incumbent/bound equality, strictness and
 source objective direction. An optimum label or a strict bound alone cannot establish
 an attained optimum or approach to an unattained limit.
+An individual quadratic certificate checks its declared completion kind before using
+the retained package; unrelated derivations in that package cannot change its claim.
 
 `Problem.quadraticSourceProofContext` reuses original constraints and exact quadratic
 objective evaluation. The typed quadratic interval rule derives bounds from original

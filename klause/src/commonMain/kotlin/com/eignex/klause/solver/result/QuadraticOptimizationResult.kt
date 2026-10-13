@@ -51,6 +51,16 @@ class QuadraticCertificate private constructor(
         if (attestedScope != null && attestedScope != context.scope) {
             return SourceEvidenceCheck.Rejected("quadratic attestation belongs to a different source invocation")
         }
+        val matchingKind = when (claim) {
+            QuadraticClaim.Bound -> expected is SourceClaim.Bound
+            QuadraticClaim.Optimal -> expected is SourceClaim.Optimal || expected is SourceClaim.Bound
+            QuadraticClaim.UnattainedLimit -> expected is SourceClaim.Limit || expected is SourceClaim.Bound
+            QuadraticClaim.Unbounded -> expected is SourceClaim.Unbounded || expected is SourceClaim.Ray
+            QuadraticClaim.Infeasible -> expected == SourceClaim.Refutation
+        }
+        if (!matchingKind) {
+            return SourceEvidenceCheck.Rejected("quadratic attestation has a different mathematical claim kind")
+        }
         return evidence?.verify(expected, context, cancellation)
             ?: SourceEvidenceCheck.Unavailable("quadratic original-source derivation capture unavailable")
     }
