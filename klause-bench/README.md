@@ -576,6 +576,21 @@ linear authority; witness-only routes must withhold terminal claims. For example
 `--checks=1` on `integer-gap.mps` checks an incomplete invocation's independently
 certified global bound. These are explicit profile controls, separate from lab scheduling.
 
+`com.eignex.klause.bench.profile.SmtLinearProof` uses the same route/budget options on
+original SMT-LIB paths. [verify_smt_linear_proof.py](tools/verify_smt_linear_proof.py)
+independently parses an unguarded affine subset: numeric and Boolean declarations,
+affine inequalities/equalities, one objective and `check-sat`. Unsupported constructs
+or auxiliary coordinate mappings fail closed. Exact fractions check strict bounds,
+closure endpoints, feasible approach bases, fixed integer/Boolean approach coordinates,
+integral recession steps and both alternatives of exported integer/Boolean splits.
+Integer premise strengthening must follow exact integer rounding of an original row.
+Original source bytes, separate incumbents/values, exported premises/proofs, runtime and
+installed-jar hashes remain in the profile output. Self-authored `strict-min.smt2`,
+`strict-max.smt2`, `boolean-limit.smt2`, `integer-strict.smt2` and `mixed-ray.smt2` under
+`smoke-corpus/linear-authority` exercise these source semantics. Boolean coverage uses
+an unconstrained declared Boolean beside a strict real row; guarded formulas are outside
+this independent parser's subset.
+
 [verify_source_results.py](tools/verify_source_results.py) checks `mps-core`,
 `smtlib-core`, `miplib3` and the SMT corpus suites `smtlib-qfidl`, `smtlib-qflia`,
 `smtlib-qflira`, `smtlib-qflra` and `smtlib-qfrdl` against original sources using exact arithmetic.

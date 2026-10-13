@@ -1,0 +1,8 @@
+(set-logic QF_LIRA)
+(declare-fun i () Int)
+(declare-fun x () Real)
+(assert (>= i 0))
+(assert (>= x 0))
+(assert (>= (- (* 10 x) (to_real i)) 0))
+(minimize (- i))
+(check-sat)
