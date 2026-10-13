@@ -6,23 +6,28 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 internal class ArithmeticPublication(private val output: OutputProtocol) {
     private var lastRendered: String? = null
     private var lastObjective: SourceValue? = null
+    private var lastAcceptedVersion: Long? = null
 
     var solutions: Long = 0
         private set
 
-    fun publish(rendered: String, objective: SourceValue): Boolean {
+    fun publish(rendered: String, objective: SourceValue, acceptedVersion: Long? = null): Boolean {
         val sourceValue = output.arithmeticSourceValue(objective) ?: return false
+        if (acceptedVersion != null && acceptedVersion == lastAcceptedVersion) return true
         if (rendered == lastRendered && sameObjective(sourceValue, lastObjective)) return true
         if (!output.onArithmeticIncumbent(rendered, sourceValue)) return false
         lastRendered = rendered
         lastObjective = sourceValue
+        lastAcceptedVersion = acceptedVersion
         solutions++
         return true
     }
 
-    fun quadratic(rendered: String?, result: QuadraticOptimizationResult): Boolean {
+    fun quadratic(rendered: String?, result: QuadraticOptimizationResult, acceptedVersion: Long? = null): Boolean {
         val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
-        if (rendered != null && point != null && !publish(rendered, SourceValue.Algebraic(point.value))) return false
+        if (rendered != null && point != null &&
+            !publish(rendered, SourceValue.Algebraic(point.value), acceptedVersion)
+        ) return false
         output.onQuadraticResult(null, result)
         return true
     }
