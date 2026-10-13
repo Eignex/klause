@@ -131,6 +131,62 @@ class NraSourceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'original source assertion 0 is false'):
             check.check_witness(source, '((define-fun n () Int 99) (define-fun p () Bool true))')
 
+    def test_deep_rendering_preserves_exact_tokens_and_spacing(self):
+        variants = (
+            ('|source x|', '|source x|'),
+            ([], '()'),
+            (['and', '|source x|', ['not', 'false'], []], '(and |source x| (not false) ())'),
+        )
+        for expression, expected in variants:
+            with self.subTest(expression=expression):
+                self.assertEqual(check.sexpr(expression), expected)
+        expression = '|source x|'
+        for _ in range(2000):
+            expression = ['identity', expression]
+        self.assertEqual(check.sexpr(expression), '(identity ' * 2000 + '|source x|' + ')' * 2000)
+
+    def test_deep_original_assertion_is_checked_without_a_solver_query(self):
+        expression = '(+ ' * 1600 + 'x' + ' 0)' * 1600
+        source = '(declare-const x Int) (assert (= ' + expression + ' 3)) (assert (> x 0))'
+        witness = '((define-fun x () Int 3))'
+        with mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+            result = check.check_witness(source, witness)
+        self.assertEqual(result['coordinates'], 1)
+        self.assertEqual(result['assertions'], 2)
+
+    def test_complete_model_checks_coupled_integer_real_and_boolean_assertions(self):
+        source = '(declare-const n Int) (declare-const a Real) (declare-const b Real) ' \
+                 '(declare-const p Bool) (declare-const unused Real) ' \
+                 '(assert (= (* n n) 4)) (assert (= (* a a) (to_real n))) ' \
+                 '(assert (= b a)) (assert p) (assert (> b 0))'
+        witness = f'((define-fun n () Int 2) (define-fun a () Real {self.positive_sqrt_two}) ' \
+                  f'(define-fun b () Real {self.positive_sqrt_two}) ' \
+                  '(define-fun p () Bool true) (define-fun unused () Real (/ 1 3)))'
+        with mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+            result = check.check_witness(source, witness)
+        self.assertEqual(result['coordinates'], 5)
+        self.assertEqual(result['assertions'], 5)
+
+    def test_a_false_later_assertion_keeps_its_original_index(self):
+        source = '(declare-const n Int) (declare-const x Real) (declare-const p Bool) ' \
+                 '(assert (= n 2)) (assert (= x (/ 1 3))) (assert p) ' \
+                 '(assert (> (* (to_real n) x) 1))'
+        witness = '((define-fun n () Int 2) (define-fun x () Real (/ 1 3)) (define-fun p () Bool true))'
+        with mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')), \
+                self.assertRaisesRegex(AssertionError, 'original source assertion 3 is false'):
+            check.check_witness(source, witness)
+
+    def test_undefined_zero_powers_cannot_receive_an_arbitrary_model_value(self):
+        for expected in ('0', '1'):
+            source = '(declare-const x Real) (assert (= x 0)) (assert (= (^ x 0) ' + expected + '))'
+            with self.subTest(expected=expected), \
+                    mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')), \
+                    self.assertRaisesRegex(AssertionError, 'original source assertion 1 did not evaluate exactly'):
+                check.check_witness(source, '((define-fun x () Real 0))')
+        source = '(declare-const x Real) (assert (= x 1)) (assert (= (^ x 0) 1))'
+        with mock.patch.object(check.z3, 'Solver', side_effect=AssertionError('no query expected')):
+            self.assertEqual(check.check_witness(source, '((define-fun x () Real 1))')['assertions'], 2)
+
     def test_reference_unsat_comparison_is_not_labeled_a_proof_certificate(self):
         result = check.compare_verdict('(declare-const x Real) (assert (< (* x x) 0))', 'unsat')
         self.assertEqual(result['referenceComparison'], 'unsat')
