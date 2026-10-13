@@ -65,7 +65,7 @@ internal fun reportQuadraticOptimization(
         if (publication != null && publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN
     } else when (result) {
         is QuadraticOptimizationResult.Optimal -> Verdict.OPTIMAL
-        is QuadraticOptimizationResult.UnattainedLimit -> Verdict.SATISFIABLE
+        is QuadraticOptimizationResult.UnattainedLimit -> Verdict.BEST_FOUND
         is QuadraticOptimizationResult.Unbounded -> Verdict.UNBOUNDED
         is QuadraticOptimizationResult.Infeasible -> Verdict.UNSATISFIABLE
         is QuadraticOptimizationResult.BestFound -> Verdict.BEST_FOUND

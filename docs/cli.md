@@ -95,7 +95,8 @@ optimization report the returned incumbent after their invocation completes.
 Quadratic results additionally separate the exact incumbent objective from its
 certified `objectiveBound`, direction and strictness. Unattained boundaries report
 `unattained-infimum` or `unattained-supremum` with a feasible model distinct from
-the boundary.
+the boundary. FlatZinc retains that feasible model without the `==========`
+terminator, which would assert an attained optimum.
 See [SMT-LIB result semantics](formats/smtlib.md) for the status contract and
 [saved benchmark results](../klause-bench/README.md#saved-results) for proof credit and
 the interpretation of interrupted incumbents and unbounded witness objectives.
