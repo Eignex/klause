@@ -284,7 +284,8 @@ keep generated output outside the repository.
 
 [Suites.kt](src/main/kotlin/com/eignex/klause/bench/catalog/Suites.kt) declares
 vendored, generated, workspace and fetched inputs. Collection declarations own
-license and redistribution policy. Family sampling precedes resolution;
+license and redistribution policy. Legacy family sampling precedes resolution;
+compatibility selection checks compilation while filling family caps.
 `-Dklause.bench.shard=i/n` selects every nth chosen input before compilation-cache
 access. MiniZinc Challenge instances with data use `year/family/data` keys.
 Data-free instances use `year/family/model`, retaining the selected model's relative

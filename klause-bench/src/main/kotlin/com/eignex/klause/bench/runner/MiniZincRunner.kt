@@ -52,7 +52,7 @@ internal class MiniZincRunner(
     /** Compile [ref]'s `.mzn`(+`.dzn`) to FlatZinc and return the `.fzn` file (used by the
      *  resolve path and by the coverage / compile-audit metrics that inspect the FZN).
      *
-     *  The cache binds model/data and solver-library contents to paired FlatZinc and DZN output
+     *  The cache binds model/data, compiler identity and solver-library contents to paired FlatZinc and DZN output
      *  mappings. Each compile publishes the output mapping before the FlatZinc commit marker;
      *  concurrent compiles use unique temporary files and atomic replacement. */
     fun compileFzn(ref: ProblemRef, fresh: Boolean = false): File {
