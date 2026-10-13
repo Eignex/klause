@@ -85,7 +85,8 @@ during analysis; a repeatable receiver/offset error naming that file can require
 committing the correction and rerunning. Analysis-service failures with no project
 file in the stack can be flakes; rerun before investigating. A finding naming a
 file and rule needs investigation. Check the named symbol for Dokka translation
-failures.
+failures. The CI lint job prints Kotlin source changes on failure so formatter
+corrections can be distinguished from the committed input.
 
 Exact arithmetic and lattice tests belong to `klause`. The Native CI job tests
 these packages with the solver, then links and starts the release CLI executable.
