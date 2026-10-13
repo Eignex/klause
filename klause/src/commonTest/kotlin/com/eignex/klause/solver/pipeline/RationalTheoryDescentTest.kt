@@ -14,6 +14,9 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -25,10 +28,49 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RationalTheoryDescentTest {
+    @Test
+    fun `fallback witness publication retains the actual bound invocation`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
+            realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val context = assertNotNull(source.linearAuthorityContext(
+            objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val binding = EngineInvocation(source.prepareExecutionPlan(objective), ModelIdentity.of(source, objective),
+            objective, scope = context.scope)
+        var candidate: MinimizeResult.WithSample? = null
+
+        RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8), context,
+            publicationInvocation = binding).use {
+            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
+        }
+
+        val point = assertNotNull(candidate)
+        val publication = assertIs<CompletedEnginePublication.Witness>(
+            assertNotNull(point.sample.witnessCertificate).publication)
+        assertSame(binding, publication.invocation)
+        assertEquals(point.sample, publication.sample)
+        assertEquals(point.objective, publication.value)
+    }
+
+    @Test
+    fun `unbound fallback witness checking withholds a completion certificate`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
+            realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        var candidate: MinimizeResult.WithSample? = null
+
+        RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8)).use {
+            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { point -> candidate = point }
+        }
+
+        assertNull(assertNotNull(candidate).sample.witnessCertificate)
+    }
+
     @Test
     fun `an attained real optimum requires exclusion of strict improvements`() {
         val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,

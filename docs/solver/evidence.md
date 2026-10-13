@@ -242,8 +242,18 @@ separate witness check from its ray. A scoped non-witness import requires the sa
 consumer invocation; a scopeless consumer withholds it. Worker proof issuance requires
 the actual completed result. Ordinary scheduler admission withholds a proof when its
 worker has no runtime invocation; model binding and an engine family cannot replace
-that input. Native in-search publication and remaining leaf witness migration have
-their own transport contracts.
+that input. Ordinary theory-to-sample conversion retains a witness publication only when its
+caller supplies the actual runtime. Open exact-neighborhood factories read the bound
+worker invocation after allocation and attach the checked native point and execution
+value. Unbound conversions and low-level completion adapters retain exact coordinates
+without issuing a runtime certificate. Their native source checks remain required;
+these publications add no independent derivation coverage. Rational-descent fallback
+source checking retains its actual invocation and witness publication when bound;
+it withholds a certificate when no runtime is supplied. A canonical model produced
+by coordinate-identical bound preparation can use its retained plan while keeping
+the original source identity distinct. Low-level exact-row and wide-coordinate
+witness admission uses the original affine source checker; publication metadata
+does not bypass source feasibility.
 
 The public `PortfolioBuilder.build` and `buildExplicit` worker-list entry points
 prepare one actual finite source invocation for their operation and bind each

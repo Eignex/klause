@@ -8,7 +8,8 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
@@ -59,7 +60,11 @@ internal fun verifyOpenWitness(
     return composedFixpoint(point.bake(), Candidate(sample, Unit), cancellation)
 }
 
-internal fun OpenTheoryAssignment.toSample(model: Problem): Sample {
+internal fun OpenTheoryAssignment.toSample(model: Problem, invocation: EngineInvocation? = null): Sample {
+    require(invocation == null || ((invocation.sourceModel.sameModel(ModelIdentity.of(model)) ||
+        invocation.preparedPlan.model === model) && invocation.model.sameModel(ModelIdentity.of(model)))) {
+        "theory witness invocation has a different source"
+    }
     val ints = List(model.numIntVars) { parseBigInt(intValue(it)) }
     val reals = List(model.numRealVars) { TheoryCompletion.parseRational(realValue(it)) }
     return Sample(
@@ -68,5 +73,10 @@ internal fun OpenTheoryAssignment.toSample(model: Problem): Sample {
         reals = DoubleArray(reals.size) { reals[it].toDouble() },
         exactReals = reals,
         exactInts = ints,
-    ).also { it.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(model), EvidenceKind.Witness) }
+    ).also { sample ->
+        sample.witnessCertificate = invocation?.let { binding ->
+            EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, sample,
+                binding.executionObjective?.evaluateExact(sample)?.toDouble()))
+        }
+    }
 }

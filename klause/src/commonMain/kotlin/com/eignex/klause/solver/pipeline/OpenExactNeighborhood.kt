@@ -10,7 +10,8 @@ import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -28,6 +29,7 @@ internal class OpenExactNeighborhood(
     private val params: TheoryParams,
     private val objective: LinearObjective? = null,
     preparedSource: PreparedSourcePlan? = null,
+    private val invocation: () -> EngineInvocation? = { null },
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val prepared by lazy {
         (preparedSource ?: model.prepareExecutionPlan(objective)).prepareConditionedLinearQuery()
@@ -88,7 +90,14 @@ internal class OpenExactNeighborhood(
         if (checked !is Verification.Accepted || (params.timeout or params.cancellation or cancellation)()) {
             return ExactNeighborhoodResult.Undecided
         }
-        sample.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(model), EvidenceKind.Witness)
+        sample.witnessCertificate = invocation()?.let { binding ->
+            require(binding.model.matches(ModelIdentity.of(model, objective)) &&
+                (binding.sourceModel.sameModel(ModelIdentity.of(model)) || binding.preparedPlan.model === model)) {
+                "neighborhood witness invocation has a different source objective"
+            }
+            EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, sample,
+                binding.executionObjective?.evaluateExact(sample)?.toDouble()))
+        }
         return result
     }
 

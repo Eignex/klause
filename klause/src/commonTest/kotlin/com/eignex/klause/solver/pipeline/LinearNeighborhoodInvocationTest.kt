@@ -9,6 +9,7 @@ import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
@@ -50,6 +51,11 @@ class LinearNeighborhoodInvocationTest {
             val receipt = assertNotNull(execution.acceptedIncumbent)
             assertEquals(SourceValue.Rational(third), receipt.value)
             assertEquals(third, assertNotNull(receipt.sample.exactReals).single())
+            val certificate = assertNotNull(receipt.sample.witnessCertificate)
+            val publication = assertIs<CompletedEnginePublication.Witness>(certificate.publication)
+            assertEquals(context.scope, publication.invocation.scope)
+            assertEquals(receipt.sample, publication.sample)
+            assertEquals(third.toDouble(), publication.value)
         }
     }
 

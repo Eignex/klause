@@ -5,10 +5,12 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -20,17 +22,105 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class OpenWitnessTest {
+    @Test
+    fun `native publication metadata cannot rescue an invalid exact row witness`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)),
+            listOf(BigFraction.ofLong(3)), LinearOp.EQ, BigFraction.ONE)), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val binding = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        val sample = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        sample.witnessCertificate = EvidenceCertificate.published(
+            CompletedEnginePublication.Witness(binding, sample, null))
+
+        val checked = openWitnessVerifier(source, null).verify(Candidate(sample, null))
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `ordinary theory workers publish the retained source runtime`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val request = OpenTheoryRequest(source)
+
+        val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request,
+            TheoryParams(openWorkLimit = 1000, maxFlips = 0), FiniteEngine.MIXED, 1))
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(result.result).assignment
+        val sample = assertIs<OpenTheoryAssignment.Sampled>(assignment).sample
+        val publication = assertIs<CompletedEnginePublication.Witness>(
+            assertNotNull(sample.witnessCertificate).publication)
+        assertSame(request.preparedPlan, publication.invocation.preparedPlan)
+        assertEquals(BigFraction.ofLong(3).reciprocal(), assertNotNull(publication.sample.exactReals).single())
+        assertNull(publication.value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            publication.invocation.checkWitness(publication.sample, Cancellation.Never))
+    }
+
+    @Test
+    fun `theory conversion retains its actual invocation and execution value`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective),
+            ModelIdentity.of(source, objective), objective)
+        val third = BigFraction.ofLong(3).reciprocal()
+        val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0),
+            reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third)))
+
+        val sample = assignment.toSample(source, invocation)
+
+        val certificate = assertNotNull(sample.witnessCertificate)
+        val publication = assertIs<CompletedEnginePublication.Witness>(certificate.publication)
+        assertSame(invocation, publication.invocation)
+        assertEquals(sample, publication.sample)
+        assertEquals(objective.evaluateExact(sample).toDouble(), publication.value)
+    }
+
+    @Test
+    fun `theory conversion without a runtime withholds its certificate`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0)))
+
+        val sample = assignment.toSample(source)
+
+        assertNull(sample.witnessCertificate)
+    }
+
+    @Test
+    fun `theory conversion rejects another source invocation`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val foreign = Problem(0, 0, emptyArray(), emptyArray())
+        val originalPlan = source.prepareExecutionPlan()
+        val foreignPlan = foreign.prepareExecutionPlan()
+        val invocations = listOf(
+            EngineInvocation(foreignPlan, ModelIdentity.of(foreign)),
+            EngineInvocation(originalPlan, ModelIdentity.of(foreign)),
+            EngineInvocation(foreignPlan, ModelIdentity.of(source)),
+        )
+        val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0)))
+
+        for (invocation in invocations) {
+            assertFailsWith<IllegalArgumentException> { assignment.toSample(source, invocation) }
+        }
+    }
+
     @Test
     fun `a copied mixed theory witness retains its assignment and exact exchanged objective`() {
         val wide = parseBigInt("9223372036854775808")
