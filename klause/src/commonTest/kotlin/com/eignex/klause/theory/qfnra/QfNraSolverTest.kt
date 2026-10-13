@@ -19,6 +19,121 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `inequality repairs produce nonuniform complete points before projection`() {
+        for (relation in listOf(">", ">=")) {
+            val source = SmtLibPolynomial.parse("""
+                (declare-const x Real)
+                (declare-const y Real)
+                (assert (and ($relation x y) (> y 2) (>= (* x y) 1)))
+                (check-sat)
+            """.trimIndent())
+
+            val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, source.boolCount, source.realCount))
+
+            assertEquals(0L, result.stats.projectedPolynomials)
+            val x = result.assignment.realValue(0)
+            val y = result.assignment.realValue(1)
+            assertTrue(algebraic.compare(x, y) >= if (relation == ">") 1 else 0)
+            assertEquals(1, algebraic.signAt(RationalPolynomial.of(-2, 1), y))
+            assertTrue(algebraic.compare(algebraic.multiply(x, y), algebraic.rational(BigFraction.ONE)) >= 0)
+        }
+    }
+
+    @Test
+    fun `strict inequality repairs sample bounded interior sectors`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (assert (> (* (- x 2) (- 3 x)) 0))
+            (check-sat)
+        """.trimIndent())
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, source.boolCount, source.realCount))
+
+        assertEquals(0L, result.stats.projectedPolynomials)
+        assertEquals(1, algebraic.signAt(RationalPolynomial.of(-2, 1), result.assignment.realValue(0)))
+        assertEquals(-1, algebraic.signAt(RationalPolynomial.of(-3, 1), result.assignment.realValue(0)))
+    }
+
+    @Test
+    fun `nonstrict inequality repairs retain isolated root sections`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (assert (<= (* (- x 2) (- x 2)) 0))
+            (check-sat)
+        """.trimIndent())
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, source.boolCount, source.realCount))
+
+        assertEquals(0L, result.stats.projectedPolynomials)
+        assertEquals(BigFraction.ofLong(2), result.assignment.realValue(0).rational)
+    }
+
+    @Test
+    fun `inequality guides preserve negation Boolean pins and fixed coordinates`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const b Bool)
+            (declare-const x Real)
+            (declare-const y Real)
+            (declare-const unused Real)
+            (assert (and (not (> x 3)) (or b (> x 1)) (>= y 4)))
+            (check-sat)
+        """.trimIndent())
+        val condition = PolynomialCondition(bools = mapOf(0 to false),
+            lower = mapOf(1 to BigFraction.ofLong(4)), upper = mapOf(1 to BigFraction.ofLong(4)))
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount, condition = condition,
+        ))
+
+        assertEquals(0L, result.stats.projectedPolynomials)
+        assertEquals(false, result.assignment.boolValue(0))
+        assertEquals(3, result.assignment.realCount)
+        assertEquals(1, algebraic.signAt(RationalPolynomial.of(-1, 1), result.assignment.realValue(0)))
+        assertTrue(algebraic.signAt(RationalPolynomial.of(-3, 1), result.assignment.realValue(0)) <= 0)
+        assertEquals(BigFraction.ofLong(4), result.assignment.realValue(1).rational)
+        assertEquals(BigFraction.ZERO, result.assignment.realValue(2).rational)
+    }
+
+    @Test
+    fun `unsuccessful inequality guides leave Boolean refutation to projection`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const b Bool)
+            (declare-const x Real)
+            (assert (and (or b (> x 2)) (not b) (<= x 2)))
+            (check-sat)
+        """.trimIndent())
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertTrue(assertIs<QfNraResult.Unsatisfiable>(result).stats.projectedPolynomials > 0)
+    }
+
+    @Test
+    fun `parent cancellation withholds an inequality repair witness`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (assert (> (* (- x 2) (- 3 x)) 0))
+            (check-sat)
+        """.trimIndent())
+        val completed = assertIs<QfNraResult.Satisfiable>(
+            solveQfNra(source.formula, source.boolCount, source.realCount),
+        )
+        val limit = completed.stats.workSpent - 1
+        var spent = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= limit
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount, QfNraParams(cancellation))
+
+        val unknown = assertIs<QfNraResult.Unknown>(result)
+        assertEquals(QfNraReason.Interrupted, unknown.reason)
+        assertEquals(0L, unknown.stats.projectedPolynomials)
+        assertEquals(spent, unknown.stats.workSpent)
+    }
+
+    @Test
     fun `rational repairs capture every source coordinate before projection`() {
         val source = SmtLibPolynomial.parse("""
             (declare-const b Bool)

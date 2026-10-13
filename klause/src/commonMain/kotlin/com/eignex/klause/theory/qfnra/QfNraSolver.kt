@@ -155,6 +155,10 @@ private fun probeWitness(
         formula.atoms.size > MAX_WITNESS_ATOMS
     ) return null
     var terms = 0
+    val inequalityGuides = formula.atoms.none {
+        arithmetic.step()
+        it.relation == PolynomialRelation.EQ
+    }
     val axes = ArrayList<Triple<PolynomialAtom, List<Int>, Int>>()
     for (atom in formula.atoms) {
         arithmetic.step()
@@ -169,7 +173,9 @@ private fun probeWitness(
         }
         terms += count
         repeat(count * (realCount + 1) + realCount + 1) { arithmetic.step() }
-        if (atom.relation == PolynomialRelation.EQ) {
+        if (atom.relation == PolynomialRelation.EQ ||
+            inequalityGuides && atom.relation != PolynomialRelation.NE
+        ) {
             val variables = atom.polynomial.variables.filter { it !in fixed }
             axes.add(Triple(atom, variables, count))
         }
@@ -193,7 +199,8 @@ private fun probeWitness(
             var repaired = false
             for ((atom, variables, termCount) in axes) {
                 arithmetic.step()
-                if (algebraic.sign(algebraic.evaluate(atom.polynomial, point)) == 0) continue
+                val sign = algebraic.sign(algebraic.evaluate(atom.polynomial, point))
+                if (if (inequalityGuides) atom.holds(sign) else sign == 0) continue
                 var best: Map<Int, AlgebraicReal>? = null
                 var bestScore = -1
                 for (variable in variables) {
@@ -205,11 +212,19 @@ private fun probeWitness(
                     if (residual.isZero || residual.degree <= 0) continue
                     // An original coordinate-degree bound limits optional proposals, not kernel representation limits.
                     val roots = algebraic.roots(residual)
-                    for (root in roots) {
+                    val cells = if (inequalityGuides) 2 * roots.size + 1 else roots.size
+                    for (cell in 0 until cells) {
                         if (proposals == MAX_WITNESS_PROPOSALS) return null
+                        arithmetic.step()
+                        val coordinate = if (!inequalityGuides) roots[cell] else if (cell and 1 != 0) {
+                            roots[cell / 2]
+                        } else {
+                            val root = cell / 2
+                            algebraic.rational(algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)))
+                        }
                         repeat(realCount + 1) { arithmetic.step() }
                         val proposed = LinkedHashMap(point)
-                        proposed[variable] = root
+                        proposed[variable] = coordinate
                         candidate(proposed)?.let { return it }
                         var score = 0
                         for (comparison in formula.atoms) {

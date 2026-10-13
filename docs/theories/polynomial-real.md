@@ -309,8 +309,11 @@ and frontend routing remain caller responsibilities.
 
 Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
-coordinates. Repaired points can guide later repairs even when the full check fails.
-Equalities under negation or disjunction are proposal guides, never asserted facts.
+coordinates. When the normalized formula contains no equality atoms, inequality
+guides also propose root sections and exact rational interior sectors of the
+specialized polynomial. Disequalities do not supply repair guides. Repaired points
+can guide later repairs even when the full check fails. Guides under negation or
+disjunction are never asserted facts; their atom truth scores only order proposals.
 Acceptance still checks every source atom, strict relation, disequality, Boolean
 alternative and query pin with the same complete sample checker. Fixed coordinates
 remain fixed, and unused declarations retain complete coordinates.
