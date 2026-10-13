@@ -34,7 +34,10 @@ internal fun reportQuadraticOptimization(
     statistics: Boolean,
     routingElapsedMs: Long,
     completePool: Boolean,
-) = reportQuadraticOptimization(execution, pipeline.render, output, statistics, routingElapsedMs, completePool)
+    publication: ArithmeticPublication? = null,
+) = reportQuadraticOptimization(
+    execution, pipeline.render, output, statistics, routingElapsedMs, completePool, publication,
+)
 
 internal fun reportQuadraticOptimization(
     execution: QuadraticOptimizationExecution,
@@ -43,6 +46,7 @@ internal fun reportQuadraticOptimization(
     statistics: Boolean,
     routingElapsedMs: Long,
     completePool: Boolean,
+    publication: ArithmeticPublication? = null,
 ) {
     val result = execution.result
     val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
@@ -52,8 +56,14 @@ internal fun reportQuadraticOptimization(
         else -> null
     }
     output.onVerdictContext(VerdictContext(terminationReason = reason, completePool = completePool))
-    output.onQuadraticResult(point?.let { render(it.sample) }, result)
-    val verdict = when (result) {
+    val rendered = point?.let { render(it.sample) }
+    val accepted = if (publication == null) {
+        output.onQuadraticResult(rendered, result)
+        true
+    } else publication.quadratic(rendered, result)
+    val verdict = if (!accepted) {
+        if (publication != null && publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN
+    } else when (result) {
         is QuadraticOptimizationResult.Optimal -> Verdict.OPTIMAL
         is QuadraticOptimizationResult.UnattainedLimit -> Verdict.SATISFIABLE
         is QuadraticOptimizationResult.Unbounded -> Verdict.UNBOUNDED
@@ -63,7 +73,8 @@ internal fun reportQuadraticOptimization(
     }
     output.onComplete(verdict)
     if (statistics) {
-        output.onStatistics(result.stats, result.stats.run.wallMs + routingElapsedMs, if (point != null) 1L else 0L)
+        val solutions = publication?.solutions ?: if (point != null) 1L else 0L
+        output.onStatistics(result.stats, result.stats.run.wallMs + routingElapsedMs, solutions)
         output.onAllowanceStatistics(listOf(
             "nraWork" to execution.polynomialStats.workSpent.toString(),
             "nraProjectedPolynomials" to execution.polynomialStats.projectedPolynomials.toString(),

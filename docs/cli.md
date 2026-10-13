@@ -113,9 +113,11 @@ root terms. `optimizationStatus` and checked bound metadata remain terminal.
 `ArithmeticPublication` belongs to one CLI invocation. It suppresses repeated
 rendered witnesses with the same retained exact objective representation and
 counts successful emissions. Each arithmetic witness is flushed to stdout before
-publication returns; output failure propagates to the caller. Quadratic
+publication returns; output failure propagates to the caller. Linear and quadratic
 terminal metadata is delivered separately from the incumbent, preserving checked
-bounds and nonattainment status without repeating an emitted model. The adapter
+bounds and nonattainment status without repeating an emitted model. Linear limits
+retain their feasible incumbent separately from the unattained endpoint. MPS
+accepted objectives use original units and its exact decimal/fraction formatter. The adapter
 uses retained scalar metadata and performs no solver work or candidate admission.
 A frontend source-rendering veto emits nothing and does not advance publication
 state; it cannot suppress a later accepted rendering of the same payload.

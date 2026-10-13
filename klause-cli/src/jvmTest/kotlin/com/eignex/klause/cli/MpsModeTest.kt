@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -14,6 +15,18 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsModeTest {
+    @Test
+    fun `accepted MPS objectives retain original units and decimal formatting`() {
+        val output = MpsOutput(objectiveScale = 3L, sourceObjective = { BigFraction.ofLong(99) })
+
+        val text = capture {
+            output.onArithmeticIncumbent("v X=1/2", SourceValue.Rational(BigFraction.ONE *
+                BigFraction.ofLong(2).reciprocal()))
+        }
+
+        assertEquals("o 0.5\nv X=1/2\n", text)
+    }
+
     @Test
     fun `exact open objectives undo the MPS scale without rounding`() {
         for (sign in listOf(-1L, 1L)) {
