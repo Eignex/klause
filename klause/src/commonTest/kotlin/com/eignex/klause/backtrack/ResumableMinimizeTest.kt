@@ -40,6 +40,9 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.PreparingSearchComponent
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
@@ -191,6 +194,36 @@ class ResumableMinimizeTest {
         stream.close()
 
         assertEquals(listOf(1, 0), closed)
+    }
+
+    @Test
+    fun `Boolean objective retains component preparation before publishing`() {
+        var batches = 0
+        val component = object : PreparingSearchComponent {
+            override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+                repeat(3) {
+                    batches++
+                    yield(null)
+                }
+                yield(ComponentResult.Consistent)
+            }.iterator()
+        }
+        val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(boolCoefficients = longArrayOf(1))
+        val search = BacktrackSolver(problem).resumable(objective,
+            BacktrackParams(componentFactory = { listOf(component) }))
+        assertEquals(0, batches)
+        assertTrue(search.preparationPending)
+
+        var result: MinimizeResult? = null
+        search.use {
+            while (result == null) result = it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {
+                assertEquals(3, batches)
+            }
+        }
+
+        assertEquals(0.0, assertIs<MinimizeResult.Optimal>(result).objective)
+        assertEquals(3, batches)
     }
 
     @Test
