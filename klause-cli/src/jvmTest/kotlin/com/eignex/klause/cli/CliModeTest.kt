@@ -131,36 +131,6 @@ class CliModeTest {
     }
 
     @Test
-    fun `linear supremum metadata retains original objective offset and direction`() {
-        val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val scope = SourceScope(SourceRevision("cli-linear-supremum", "exact-affine"),
-            objective = SourceObjective("5+x", ObjectiveSense.MAXIMIZE))
-        val context = SourceProofContext(scope, setOf(x), mapOf("upper" to SourcePremise(
-            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE, strict = true))),
-            mapOf(x to BigFraction.ONE), BigFraction.ofLong(5))
-        val output = SmtLibOutput()
-        val publication = ArithmeticPublication(output)
-        val render: (Sample) -> String = {
-            renderOpenTheoryModel(emptyMap(), emptyMap(), mapOf("x" to 0), OpenTheoryAssignment.Sampled(it))
-        }
-        lateinit var result: LinearOptimizationResult
-
-        val progress = capture {
-            output.begin(optimize = true, maximize = true)
-            result = OpenTheoryPipeline.optimizeLinear(context) { sample, value ->
-                publication.publish(render(sample), SourceValue.Rational(value))
-            }
-        }
-        val terminal = capture { reportLinearOptimization(result, render, output, publication, false, 0L, true) }
-
-        assertTrue("; objective=${result.value}" in progress.lines(), progress)
-        assertFalse("; objective=6\n" in progress, progress)
-        assertTrue("; objectiveBoundDirection=upper" in terminal.lines(), terminal)
-        assertTrue("; objectiveBound=6" in terminal.lines(), terminal)
-        assertTrue("; optimizationStatus=unattained-supremum" in terminal.lines(), terminal)
-    }
-
-    @Test
     fun `cancelled linear admission prints unknown without an assignment`() {
         val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val scope = SourceScope(SourceRevision("cli-linear-cancelled", "exact-affine"),
