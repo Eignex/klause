@@ -15,13 +15,23 @@ import com.eignex.kumulant.stream.lock
 class SearchComponentSet(
     components: List<SearchComponent>,
     private val branchers: List<SearchBrancher> = emptyList(),
+    proposals: List<SearchBranchProposal>,
 ) {
+    /** Retain the installed-component and legacy brancher ordering. */
+    constructor(components: List<SearchComponent>, branchers: List<SearchBrancher> = emptyList()) :
+        this(components, branchers, emptyList())
+
+    private val proposals = proposals.toList()
     private val components = components.toList()
     private val openingLock = Concurrency.Strict.lock()
     private var claimed = false
 
     init {
         require(components.distinctBy { it }.size == components.size) { "a search component may occur once" }
+        require(proposals.distinctBy { it }.size == proposals.size) { "a search proposal may occur once" }
+        require(proposals.none { proposal -> components.any { it == proposal } || branchers.any { it == proposal } }) {
+            "a separate proposal may not also be an installed component or legacy brancher"
+        }
         require(branchers.none { it in components }) { "a brancher may not also be a search component" }
     }
 
@@ -58,6 +68,7 @@ class SearchComponentSet(
             branchers,
             atoms,
             executionControls,
+            proposals,
         )
     }
 }

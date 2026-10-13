@@ -32,6 +32,8 @@ import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
+import com.eignex.klause.solver.search.SearchBranchKind
+import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
@@ -81,7 +83,10 @@ internal class LpPropagator(
     private val onEdit: (Long) -> Unit = {},
 ) : SearchComponent,
     SearchBrancher,
+    SearchBranchProposal,
     AutoCloseable {
+    override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
+
     private var owner: LpScopedSolver? = null
     private var proofContext: SearchContext? = null
     private var modelKey: Any? = null

@@ -4,6 +4,8 @@ import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBranchKind
+import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -25,7 +27,9 @@ internal class TranscendentalSearchComponent(
     private val service: TranscendentalTheoryService,
     private val root: TranscendentalCondition = TranscendentalCondition(),
     private val maximumDepth: Int = 12,
-) : SearchBrancher {
+) : SearchBrancher, SearchBranchProposal {
+    override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
+
     val witnessKey = SearchModelKey(TranscendentalWitness::class)
     private val decisions = ArrayList<Pair<Int, TranscendentalSplit>>()
     private var outcome: TranscendentalCheckResult? = null

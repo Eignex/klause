@@ -166,6 +166,12 @@ Implement `Theory<A>` for a batch fragment-checking service and use
 brancher, blocker or conflict capabilities as needed. `TheoryComponent` retains its
 published descriptor as a deprecated marker; it adds neither behavior nor completeness.
 
+Supply `SearchBranchProposal` separately when an extension only proposes splits.
+`SearchSession.openRun` accepts an independent `SearchBranchSelection`; the existing
+overload preserves Boolean-first selection. Legacy `SearchBrancher` signatures stay
+available. [Lazy branch selection](solver/search.md#lazy-branch-selection) defines
+categories, proposal ordering and exhaustive-alternative obligations.
+
 A participating service can remain incomplete. Its unresolved batch answer uses the
 legacy `TheoryCheck.Cancelled` surface and the bridge reports indeterminate checking,
 without a witness or refutation. Decided answers apply only to the checked fragment

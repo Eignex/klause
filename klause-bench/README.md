@@ -203,10 +203,23 @@ a new profile main. It solves one catalog problem `repeats` times in-process and
 wall time and verdict to `$OUT/timings.json`; without arguments it times `opb-core`
 `sporttournament06` three times:
 
+
 ```bash
 ./deploy/lab profile com.eignex.klause.bench.profile.SolveTiming main "solve timing" aws 600 \
   suite=dimacs-core problem=random3sat-50-200 repeats=3 timeout=10000
 ```
+
+`bench.profile.SearchSelectionProfile` compares default selection with all six
+Boolean/finite/arithmetic category priorities on an original satisfaction SMT source.
+Pass `source64=<base64 source>` and `finite=<bounded integer name>`; optional
+`repeats=3 warmups=1` control alternating policy rounds. An independent finite
+proposal splits that source column while exact linear arithmetic owns source checks.
+Each opening uses a ten-second token. Original bytes, decision traces, timing,
+runtime/artifact hashes and raw exact models remain in `$OUT`. The existing pinned
+SMT stream checker validates every complete witness outside the measured span.
+These instrumented policy diagnostics provide no independent refutation proof and
+stay separate from ordinary CLI cost comparisons.
+
 
 `bench.profile.CompletionInitializationProfile` measures actual internal repair consumers
 without adding a published library debug API. It generates a hybrid finite-domain and

@@ -55,6 +55,31 @@ allowance; closing discards it. [Portfolio preparation](portfolio.md#polynomial-
 defines polynomial checkpoints and the distinction between slice suspension and
 solve-wide cancellation.
 
+### Lazy branch selection
+
+`SearchBranchProposal` supplies exhaustive, mutually exclusive alternatives without
+requiring the deductive component lifecycle. `SearchBrancher` retains its public
+component interface for compatibility. Installed and separately supplied legacy
+branchers can also implement the proposal interface to declare a category; legacy
+branchers without a category participate as finite proposals. Arithmetic built-ins
+declare arithmetic proposals. Categories describe the supplying search mechanism,
+so a finite heuristic can still propose a Boolean decision.
+
+`SearchBranchSelection.Default` consults the supplied Boolean heuristic first,
+then installed components in installation order, then separate legacy branchers,
+then independent proposals. `Priority` captures each of Boolean, finite and
+arithmetic exactly once and consults them in that order, preserving the relative
+proposal order within each category. Reading a category performs no probe. A
+selected proposal prevents later probes; null falls through and an empty list
+exhausts the residual node. Default selection retains the single-component path.
+
+Each run captures its selection policy separately from Boolean variable selection
+and model continuation. Selection changes neither component installation nor
+propagation order. The run applies every returned alternative through the same
+trail, accounting, cancellation, restart and backjump machinery. Required unknown
+checks still prevent exhaustion from becoming a refutation. Invocation scopes and
+conditioned traversal floors follow [sessions](sessions.md).
+
 A conditioned run retains the decision level at which it opens. Restarts return
 to that level, and learned backjumps below it fall back to chronological traversal.
 Exhaustion is then conditional. The query owner retracts the condition after the
