@@ -8,8 +8,8 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.lp.relaxation.lpSeed
-import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.AcceptedPortfolioIncumbent
+import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioEvidence
@@ -93,25 +93,42 @@ internal class OpenPortfolio(
         val firstLocalArm = if (request != null) 1 else 0
         val localSearch = localSearchFactories(firstLocalArm, lifetime or cancellation, objective = null)
         val factories = buildList {
-            request?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
-                theoryWorker(source, slot).bindEvidence(ModelIdentity.of(sourceModel))
-            }) }
+            request?.let { source ->
+                add(
+                    PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
+                    theoryWorker(source, slot).bindEvidence(ModelIdentity.of(sourceModel))
+                }
+                )
+            }
             addAll(localSearch)
         }
         if (factories.isEmpty()) return OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
         val identity = ModelIdentity.of(sourceModel)
         val binding = EngineInvocation(preparedPlan, identity)
         val boundFactories = factories.map { factory ->
-            PortfolioArmFactory(preparedPlan, factory.armId, factory.family,
-                bind = { it.bindInvocation(binding) }) { slot -> factory.materialize(preparedPlan, slot) }
+            PortfolioArmFactory(
+                preparedPlan,
+                factory.armId,
+                factory.family,
+                bind = { it.bindInvocation(binding) },
+            ) { slot -> factory.materialize(preparedPlan, slot) }
         }
-        val portfolio = PortfolioInvocation(preparedPlan, boundFactories,
-            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
-                nodeBudget = theoryParams.nodeBudget),
+        val portfolio = PortfolioInvocation(
+            preparedPlan,
+            boundFactories,
+            PortfolioInvocationControls(
+                parallelism = lanes,
+                seed = seed,
+                cancellation = lifetime or cancellation,
+                nodeBudget = theoryParams.nodeBudget,
+            ),
             PortfolioEvidence(identity, openWitnessVerifier(sourceModel, null))
-                .bindInvocation(binding, lifetime or cancellation)) { workers ->
-            PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = false),
-                reservedShares(workers, if (request != null) THEORY_SHARE else 0.0))
+                .bindInvocation(binding, lifetime or cancellation),
+        ) { workers ->
+            PortfolioInvocationPolicy(
+                ProblemProfile.of(model, optimizing = false),
+                reservedShares(workers, if (request != null) THEORY_SHARE else 0.0),
+            )
         }
         val result = portfolio.use { it.solve(cancellation) }
         return when (result) {
@@ -136,9 +153,13 @@ internal class OpenPortfolio(
         require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
             "the theory's descent minimizes no continuous column"
         }
-        val sourceValues = sourceObjective ?: OpenSourceObjective(objective,
-            request?.objective ?: objective, request?.maximize ?: false,
-            request?.linearAuthorityContext(stop), stop)
+        val sourceValues = sourceObjective ?: OpenSourceObjective(
+            objective,
+            request?.objective ?: objective,
+            request?.maximize ?: false,
+            request?.linearAuthorityContext(stop),
+            stop,
+        )
         val context = sourceValues.context
         val integral = minimizer.takeIf { context == null }
         val rational = request != null && integral == null
@@ -147,42 +168,76 @@ internal class OpenPortfolio(
         val incumbents = sourceValues.incumbents()
         val identity = ModelIdentity.of(sourceModel, objective)
         val binding = EngineInvocation(preparedPlan, identity, objective, scope = context?.scope)
-        val linear = context?.let { OpenLinearPortfolioResults(binding, it, sourceValues, incumbents,
-            stop, theoryParams.timeout) }
+        val linear = context?.let {
+            OpenLinearPortfolioResults(
+                binding,
+                it,
+                sourceValues,
+                incumbents,
+                stop,
+                theoryParams.timeout,
+            )
+        }
         val factories = buildList {
-            integral?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
-                descentWorker(source, slot) {
-                    incumbents.exchange.current()?.objective?.execution?.let { if (it.den == BIG_ONE) it.num else null }
-                }.bindEvidence(ModelIdentity.of(sourceModel, objective))
-            }) }
-            if (rational) add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
+            integral?.let { source ->
+                add(
+                    PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
+                    descentWorker(source, slot) {
+                        val value = incumbents.exchange.current()?.objective?.execution
+                        value?.takeIf { it.den == BIG_ONE }?.num
+                    }.bindEvidence(ModelIdentity.of(sourceModel, objective))
+                }
+                )
+            }
+            if (rational) {
+                add(
+                    PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
                 val retained = AtomicReference<LinearPortfolioSearch?>(null)
                 val worker = PortfolioWorker.ofMinimize("theory/exact-rational-descent", 0, resumable = {
                     val descent = RationalTheoryDescent(sourceModel, objective, workerParams(slot), context) {
                         incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
                     }
-                    if (linear == null) descent else {
+                    if (linear == null) {
+                        descent
+                    } else {
                         OpenLinearPortfolioSearch(LinearPortfolioSearch(descent, binding).also(retained::store))
                     }
                 }) { _, _, _, _ -> error("the rational descent runs only by slice") }
                     .bindEvidence(identity)
                 linear?.retain(worker, retained)
                 worker
-            })
+            }
+                )
+            }
             addAll(localSearch)
         }
-        if (factories.isEmpty()) return OpenTheoryOptimum.Bounded(null, null,
-            TerminationReason.Unsupported, SolveStats.EMPTY)
+        if (factories.isEmpty()) {
+            return OpenTheoryOptimum.Bounded(
+            null,
+            null,
+            TerminationReason.Unsupported,
+            SolveStats.EMPTY,
+        )
+        }
         val boundFactories = factories.map { factory ->
-            PortfolioArmFactory(preparedPlan, factory.armId, factory.family,
-                bind = { it.bindInvocation(binding) }) { slot -> factory.materialize(preparedPlan, slot) }
+            PortfolioArmFactory(
+                preparedPlan,
+                factory.armId,
+                factory.family,
+                bind = { it.bindInvocation(binding) },
+            ) { slot -> factory.materialize(preparedPlan, slot) }
         }
         val verifier = openWitnessVerifier(sourceModel, objective, context, stop)
         val evidence = PortfolioEvidence(identity, verifier).bindInvocation(binding, stop)
         val profile = ProblemProfile.of(model, optimizing = true)
         val share = if (integral != null || rational) DESCENT_SHARE else 0.0
-        val controls = PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = stop,
-            nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0)
+        val controls = PortfolioInvocationControls(
+            parallelism = lanes,
+            seed = seed,
+            cancellation = stop,
+            nodeBudget = theoryParams.nodeBudget,
+            reseedStaleThreshold = 0,
+        )
         val portfolio = PortfolioInvocation(preparedPlan, boundFactories, controls, evidence) { arms ->
             val shares = reservedShares(arms, share)
             PortfolioInvocationPolicy(profile, shares)
@@ -199,31 +254,34 @@ internal class OpenPortfolio(
         result: MinimizeResult,
         incumbents: PortfolioIncumbents<OpenIncumbentValue>,
     ): OpenTheoryOptimum = when (result) {
-            is MinimizeResult.Optimal -> {
-                val incumbent = checkNotNull(incumbents.exchange.current())
-                OpenTheoryOptimum.Optimal(assignmentOf(incumbent.assignment),
-                    incumbent.objective.execution, result.stats)
-            }
-
-            is MinimizeResult.BestFound -> {
-                val incumbent = checkNotNull(incumbents.exchange.current())
-                OpenTheoryOptimum.Bounded(
-                    assignmentOf(incumbent.assignment),
-                    incumbent.objective.execution,
-                    result.reason,
-                    result.stats,
-                )
-            }
-
-            // Only the descent finds a ray.
-            is MinimizeResult.Unbounded -> checkNotNull(descentVerdict.load()) {
-                "an unbounded verdict no descent reached"
-            }.copy(stats = result.stats)
-
-            is MinimizeResult.Infeasible -> OpenTheoryOptimum.Infeasible(result.stats)
-
-            is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
+        is MinimizeResult.Optimal -> {
+            val incumbent = checkNotNull(incumbents.exchange.current())
+            OpenTheoryOptimum.Optimal(
+                assignmentOf(incumbent.assignment),
+                incumbent.objective.execution,
+                result.stats,
+            )
         }
+
+        is MinimizeResult.BestFound -> {
+            val incumbent = checkNotNull(incumbents.exchange.current())
+            OpenTheoryOptimum.Bounded(
+                assignmentOf(incumbent.assignment),
+                incumbent.objective.execution,
+                result.reason,
+                result.stats,
+            )
+        }
+
+        // Only the descent finds a ray.
+        is MinimizeResult.Unbounded -> checkNotNull(descentVerdict.load()) {
+            "an unbounded verdict no descent reached"
+        }.copy(stats = result.stats)
+
+        is MinimizeResult.Infeasible -> OpenTheoryOptimum.Infeasible(result.stats)
+
+        is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
+    }
 
     private fun assignmentOf(sample: Sample): OpenTheoryAssignment = OpenTheoryAssignment.Sampled(sample)
 
@@ -233,12 +291,18 @@ internal class OpenPortfolio(
 
     private fun theoryWorker(request: OpenTheoryRequest, slot: PortfolioWorkerSlot): PortfolioWorker =
         PortfolioWorker.ofSolve(
-            "theory/${request.route.name.lowercase()}", 0,
+            "theory/${request.route.name.lowercase()}",
+            0,
             resumable = { theorySlices(request, workerParams(slot)) },
         ) { slice, _ ->
-            toSolveResult(decide(request, workerParams(slot).copy(
+            toSolveResult(
+                decide(
+                    request,
+                    workerParams(slot).copy(
                 cancellation = theoryParams.cancellation or slot.cancellation or slice,
-            )))
+            )
+                )
+            )
         }
 
     private fun theorySlices(request: OpenTheoryRequest, params: TheoryParams): ResumableSolve =
@@ -260,59 +324,63 @@ internal class OpenPortfolio(
         is OpenTheoryResult.Unknown -> SolveResult.Unknown(result.reason, result.stats)
     }
 
-    private fun descentWorker(minimizer: OpenTheoryMinimizer, slot: PortfolioWorkerSlot,
-        readBound: () -> BigInt?): PortfolioWorker =
-        PortfolioWorker.ofMinimize(
-            "theory/${minimizer.theoryPipeline.name.lowercase()}",
-            0,
-            resumable = { descentSlices(minimizer, workerParams(slot), readBound) },
-        ) { _, _, _, _ -> error("the descent runs only by slice") }
+    private fun descentWorker(
+        minimizer: OpenTheoryMinimizer,
+        slot: PortfolioWorkerSlot,
+        readBound: () -> BigInt?,
+    ): PortfolioWorker = PortfolioWorker.ofMinimize(
+        "theory/${minimizer.theoryPipeline.name.lowercase()}",
+        0,
+        resumable = { descentSlices(minimizer, workerParams(slot), readBound) },
+    ) { _, _, _, _ -> error("the descent runs only by slice") }
 
     // An integral descent reads the attained value directly, including beyond floating-point and 64-bit ranges.
-    private fun descentSlices(minimizer: OpenTheoryMinimizer, params: TheoryParams,
-        readBound: () -> BigInt?): ResumableSearch =
-        object : ResumableSearch {
-            private val descent = minimizer.descent(params, readBound)
-            override val isDone: Boolean get() = descent.isDone
-            override val stats: SolveStats get() = descent.stats
-            override val work: Long get() = descent.work
+    private fun descentSlices(
+        minimizer: OpenTheoryMinimizer,
+        params: TheoryParams,
+        readBound: () -> BigInt?,
+    ): ResumableSearch = object : ResumableSearch {
+        private val descent = minimizer.descent(params, readBound)
+        override val isDone: Boolean get() = descent.isDone
+        override val stats: SolveStats get() = descent.stats
+        override val work: Long get() = descent.work
 
-            override fun runSlice(
-                global: Cancellation,
-                sliceMillis: Long,
-                sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit,
-            ): MinimizeResult? {
-                val verdict = descent.runSlice(global, sliceMillis, sliceNodes) { assignment, value ->
-                    val sample = assignment.toSample(sourceModel)
-                    val objective = value.toDouble()
-                    onIncumbent(MinimizeResult.BestFound(sample, objective, TerminationReason.BudgetExhausted))
-                } ?: return null
-                if (verdict is OpenTheoryOptimum.Unbounded) descentVerdict.compareAndSet(null, verdict)
-                return when (verdict) {
-                    is OpenTheoryOptimum.Optimal -> MinimizeResult.Optimal(
-                        verdict.assignment.toSample(sourceModel),
-                        verdict.value.toDouble(),
-                        verdict.stats,
-                    )
+        override fun runSlice(
+            global: Cancellation,
+            sliceMillis: Long,
+            sliceNodes: Long,
+            onIncumbent: (MinimizeResult.WithSample) -> Unit,
+        ): MinimizeResult? {
+            val verdict = descent.runSlice(global, sliceMillis, sliceNodes) { assignment, value ->
+                val sample = assignment.toSample(sourceModel)
+                val objective = value.toDouble()
+                onIncumbent(MinimizeResult.BestFound(sample, objective, TerminationReason.BudgetExhausted))
+            } ?: return null
+            if (verdict is OpenTheoryOptimum.Unbounded) descentVerdict.compareAndSet(null, verdict)
+            return when (verdict) {
+                is OpenTheoryOptimum.Optimal -> MinimizeResult.Optimal(
+                    verdict.assignment.toSample(sourceModel),
+                    verdict.value.toDouble(),
+                    verdict.stats,
+                )
 
-                    is OpenTheoryOptimum.Infeasible -> MinimizeResult.Infeasible(stats = verdict.stats)
+                is OpenTheoryOptimum.Infeasible -> MinimizeResult.Infeasible(stats = verdict.stats)
 
-                    is OpenTheoryOptimum.Unbounded -> MinimizeResult.Unbounded(
-                        verdict.witness.toSample(sourceModel),
-                        verdict.value.toDouble(),
-                        direction = emptyList(),
-                        stats = verdict.stats,
-                    )
+                is OpenTheoryOptimum.Unbounded -> MinimizeResult.Unbounded(
+                    verdict.witness.toSample(sourceModel),
+                    verdict.value.toDouble(),
+                    direction = emptyList(),
+                    stats = verdict.stats,
+                )
 
-                    // A round that refuted the pool's bound proved the pool's incumbent optimal: nothing is left to
-                    // search, whichever arm holds it.
-                    is OpenTheoryOptimum.Bounded -> MinimizeResult.Unknown(verdict.reason, verdict.stats)
-                }
+                // A round that refuted the pool's bound proved the pool's incumbent optimal: nothing is left to
+                // search, whichever arm holds it.
+                is OpenTheoryOptimum.Bounded -> MinimizeResult.Unknown(verdict.reason, verdict.stats)
             }
-
-            override fun close() = descent.close()
         }
+
+        override fun close() = descent.close()
+    }
 
     private fun reservedShares(workers: List<PortfolioWorker>, share: Double): DoubleArray {
         val complete = workers.indices.filter { workers[it].family == ArmFamily.Backtrack }
@@ -328,15 +396,28 @@ internal class OpenPortfolio(
         if (route != ProblemPipeline.UNSUPPORTED_OPEN && route != ProblemPipeline.FINITE_CP) {
             return List(localSearchArms) { index ->
                 val adaptive = index == localSearchArms - 1 && localSearchArms > 1
-                PortfolioArmFactory(preparedPlan, firstArm + index,
-                    if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch) { slot ->
+                PortfolioArmFactory(
+                    preparedPlan,
+                    firstArm + index,
+                    if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch,
+                ) { slot ->
                     val local = workerParams(slot)
                     val adapter = slot.own(OpenExactNeighborhood(sourceModel, local, objective, preparedPlan))
-                    exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
-                        firstArm + index, objective, local.cancellation or local.timeout, timeout = local.timeout,
-                        exhausted = { adapter.exhausted }, open = { adapter.search(adaptive,
-                            slot.baseSeed + slot.index - firstArm,
-                            maximumImprovementMoves = if (adaptive) local.alnsIterations.toLong() else null) })
+                    exactNeighborhoodWorker(
+                        if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
+                        firstArm + index,
+                        objective,
+                        local.cancellation or local.timeout,
+                        timeout = local.timeout,
+                        exhausted = { adapter.exhausted },
+                        open = {
+                            adapter.search(
+                                adaptive,
+                                slot.baseSeed + slot.index - firstArm,
+                                maximumImprovementMoves = if (adaptive) local.alnsIterations.toLong() else null,
+                            )
+                        },
+                    )
                         .bindEvidence(ModelIdentity.of(sourceModel, objective), provesResults = false)
                 }
             }
@@ -346,36 +427,68 @@ internal class OpenPortfolio(
         if (!localSearchSupports(searchModel, completes = model.numRealVars > 0)) return emptyList()
         val start = model.lpSeed(searchModel.domains, cancellation or Cancellation.after(SEED_BUDGET))
         val profile = ProblemProfile.of(model, optimizing = objective != null)
-        return LocalSearchCatalog.diverse(profile.kind, localSearchArms, profile.problemClass).mapIndexed { i, recipe ->
+        val recipes = LocalSearchCatalog.diverse(profile.kind, localSearchArms, profile.problemClass)
+        return recipes.mapIndexed { i, recipe ->
             PortfolioArmFactory(preparedPlan, firstArm + i, ArmFamily.LocalSearch) { slot ->
                 val local = workerParams(slot)
                 val completion = if (model.numRealVars > 0) {
                     val theory = slot.own(TheoryCompletion(sourceModel, local, preparedPlan))
                     if (objective != null && objective.realCoefficientValues.any { it != 0.0 }) {
                         OptimizingCompletion(model, objective, theory)
-                    } else theory
-                } else null
-                val engine = LocalSearchEngine(searchModel, strategy = recipe.strategy,
-                    optimizeStrategy = recipe.optimizeStrategy, seedImplicitOnRestart = recipe.seedImplicitOnRestart,
-                    completion = completion)
-                val params = LocalSearchParams(randomSeed = slot.baseSeed + slot.index - firstArm,
-                    maxFlips = local.maxFlips, maxInstructions = local.maxInstructions,
-                    cancellation = local.cancellation or local.timeout, initialAssignment = start,
-                    nodeBudget = slot.nodeBudget)
-                val label = "ls/${recipe.label}"
-                val worker = if (objective == null) {
-                    PortfolioWorker.ofSolve(label, firstArm + i, countsInstructions = true,
-                        resumable = { engine.resumableSolve(params) }) { stop, budget ->
-                        engine.solve(params.copy(cancellation = params.cancellation or stop,
-                            maxInstructions = budget?.let { minOf(it, params.maxInstructions ?: it) }), warm = null)
+                    } else {
+                        theory
                     }
                 } else {
-                    PortfolioWorker.ofMinimize(label, firstArm + i, countsInstructions = true,
-                        resumable = { engine.resumable(objective, params) }) { _, warm, stop, budget ->
+                    null
+                }
+                val engine = LocalSearchEngine(
+                    searchModel,
+                    strategy = recipe.strategy,
+                    optimizeStrategy = recipe.optimizeStrategy,
+                    seedImplicitOnRestart = recipe.seedImplicitOnRestart,
+                    completion = completion,
+                )
+                val params = LocalSearchParams(
+                    randomSeed = slot.baseSeed + slot.index - firstArm,
+                    maxFlips = local.maxFlips,
+                    maxInstructions = local.maxInstructions,
+                    cancellation = local.cancellation or local.timeout,
+                    initialAssignment = start,
+                    nodeBudget = slot.nodeBudget,
+                )
+                val label = "ls/${recipe.label}"
+                val worker = if (objective == null) {
+                    PortfolioWorker.ofSolve(
+                        label,
+                        firstArm + i,
+                        countsInstructions = true,
+                        resumable = { engine.resumableSolve(params) },
+                    ) { stop, budget ->
+                        engine.solve(
+                            params.copy(
+                            cancellation = params.cancellation or stop,
+                            maxInstructions = budget?.let { minOf(it, params.maxInstructions ?: it) },
+                        ),
+                            warm = null
+                        )
+                    }
+                } else {
+                    PortfolioWorker.ofMinimize(
+                        label,
+                        firstArm + i,
+                        countsInstructions = true,
+                        resumable = { engine.resumable(objective, params) },
+                    ) { _, warm, stop, budget ->
                         val from = warm?.let { inWindows(it, searchModel) } ?: start
-                        engine.improvements(objective, params.copy(cancellation = params.cancellation or stop,
+                        engine.improvements(
+                            objective,
+                            params.copy(
+                            cancellation = params.cancellation or stop,
                             initialAssignment = from,
-                            maxInstructions = budget?.let { minOf(it, params.maxInstructions ?: it) }), warm = null)
+                            maxInstructions = budget?.let { minOf(it, params.maxInstructions ?: it) },
+                        ),
+                            warm = null
+                        )
                     }
                 }
                 worker.bindEvidence(ModelIdentity.of(sourceModel, objective), provesResults = false)
@@ -403,39 +516,40 @@ internal fun openWitnessVerifier(
     objective: LinearObjective?,
     context: SourceProofContext? = null,
     cancellation: Cancellation = Cancellation.Never,
-): CandidateVerifier<Sample, Double?> =
-    CandidateVerifier { candidate ->
-        val sample = candidate.assignment
-        val claimed = candidate.objective
-        val certificate = sample.witnessCertificate
-        if (certificate != null) {
-            if (!certificate.model.sameModel(ModelIdentity.of(model)) || certificate.kind != EvidenceKind.Witness) {
-                return@CandidateVerifier Verification.Rejected(
-                    "witness certificate belongs to a different model or claim",
-                )
-            }
-        }
-        if (claimed?.isNaN() == true) return@CandidateVerifier Verification.Rejected("objective is NaN")
-        if (context != null) return@CandidateVerifier context.linearWitnessVerifier(cancellation).verify(candidate)
-        if (certificate == null) {
-            when (val checked = verifyOpenWitness(model, sample)) {
-                is Verification.Rejected -> return@CandidateVerifier checked
-                is Verification.Indeterminate -> return@CandidateVerifier checked
-                is Verification.Accepted -> Unit
-            }
-        }
-        if (objective == null || claimed == null) return@CandidateVerifier Verification.Accepted(candidate)
-        val exact = objective.evaluateExact(sample)
-        val value = exact.toDouble()
-        val agrees = if (objective.realCoefficientValues.any { it != 0.0 }) {
-            abs(value - claimed) <= OBJECTIVE_TOLERANCE * maxOf(1.0, abs(value))
-        } else {
-            exact.num.abs() > bigIntOf(EXACT_DOUBLE_INTEGER) || value == claimed
-        }
-        if (agrees) Verification.Accepted(candidate) else {
-            Verification.Rejected("objective $claimed, but the assignment scores $exact")
+): CandidateVerifier<Sample, Double?> = CandidateVerifier { candidate ->
+    val sample = candidate.assignment
+    val claimed = candidate.objective
+    val certificate = sample.witnessCertificate
+    if (certificate != null) {
+        if (!certificate.model.sameModel(ModelIdentity.of(model)) || certificate.kind != EvidenceKind.Witness) {
+            return@CandidateVerifier Verification.Rejected(
+                "witness certificate belongs to a different model or claim",
+            )
         }
     }
+    if (claimed?.isNaN() == true) return@CandidateVerifier Verification.Rejected("objective is NaN")
+    if (context != null) return@CandidateVerifier context.linearWitnessVerifier(cancellation).verify(candidate)
+    if (certificate == null) {
+        when (val checked = verifyOpenWitness(model, sample)) {
+            is Verification.Rejected -> return@CandidateVerifier checked
+            is Verification.Indeterminate -> return@CandidateVerifier checked
+            is Verification.Accepted -> Unit
+        }
+    }
+    if (objective == null || claimed == null) return@CandidateVerifier Verification.Accepted(candidate)
+    val exact = objective.evaluateExact(sample)
+    val value = exact.toDouble()
+    val agrees = if (objective.realCoefficientValues.any { it != 0.0 }) {
+        abs(value - claimed) <= OBJECTIVE_TOLERANCE * maxOf(1.0, abs(value))
+    } else {
+        exact.num.abs() > bigIntOf(EXACT_DOUBLE_INTEGER) || value == claimed
+    }
+    if (agrees) {
+        Verification.Accepted(candidate)
+    } else {
+        Verification.Rejected("objective $claimed, but the assignment scores $exact")
+    }
+}
 
 // Relative slack between a local-search arm's claimed objective and the exact one when continuous terms weigh in.
 private const val OBJECTIVE_TOLERANCE = 1e-6
