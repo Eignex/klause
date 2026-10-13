@@ -3,13 +3,15 @@ package com.eignex.klause.solver.result
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.util.Cancellation
 
 /** A source claim supported by a quadratic optimization attestation. */
 enum class QuadraticClaim {
@@ -33,6 +35,9 @@ class QuadraticCertificate private constructor(
     /** Original-source evidence when capture was requested. */
     val evidence: SourceResultEvidence?,
     private val attestedScope: SourceScope? = evidence?.scope,
+    /** Retained typed engine data; unsupported original bindings withhold independent coverage. */
+    val derivation: SourceDerivation? = null,
+    internal val invocation: QuadraticEngineInvocation? = null,
 ) {
     /** Captured original revision, invocation restrictions and objective direction. */
     val scope: SourceScope? get() = attestedScope
@@ -55,13 +60,21 @@ class QuadraticCertificate private constructor(
             QuadraticCertificate(model, claim, null, scope)
 
         fun captured(
-            model: ModelIdentity, claim: QuadraticClaim, evidence: SourceResultEvidence,
-        ): QuadraticCertificate =
-            QuadraticCertificate(model, claim, evidence)
+            original: QuadraticCertificate, claim: QuadraticClaim, evidence: SourceResultEvidence,
+        ): QuadraticCertificate = QuadraticCertificate(
+            original.model, claim, evidence, derivation = original.derivation, invocation = original.invocation,
+        )
+
+        fun engine(
+            model: ModelIdentity, invocation: QuadraticEngineInvocation,
+            claim: QuadraticClaim, derivation: SourceDerivation,
+        ): QuadraticCertificate = QuadraticCertificate(
+            model, claim, null, derivation = derivation, invocation = invocation,
+        )
 
         @Suppress("UNUSED_PARAMETER")
         fun verified(model: ModelIdentity, scope: Any, evidence: Any, claim: QuadraticClaim): QuadraticCertificate =
-            QuadraticCertificate(model, claim, null)
+            QuadraticCertificate(model, claim, null, derivation = evidence as? SourceDerivation)
     }
 }
 

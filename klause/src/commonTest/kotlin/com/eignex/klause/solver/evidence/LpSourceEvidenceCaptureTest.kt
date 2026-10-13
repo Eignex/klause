@@ -128,4 +128,20 @@ class LpSourceEvidenceCaptureTest {
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
     }
 
+    @Test
+    fun `a minimized LP dual captures the original maximization upper bound`() {
+        val model = LpBuilder().apply { addVar(0, 3, cost = -1) }.build(Sense.MINIMIZE)
+        val bound = CertifiedLpBound(BigFraction.ofLong(-3),
+            assertNotNull(integerCertify(model, doubleArrayOf())))
+        val original = context(0, 3)
+        val scoped = scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE))
+        val context = SourceProofContext(scoped, original.coordinates, original.premises,
+            mapOf(x to BigFraction.ONE))
+
+        val evidence = LpSourceEvidenceCapture(context, listOf(x)).bound(model, bound)
+
+        assertEquals(SourceClaim.Bound(BigFraction.ofLong(3)), evidence.claim)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
+    }
+
 }

@@ -73,6 +73,8 @@ withhold this capture rather than relabel their source.
 coefficients into original-premise combinations. Structural coordinates retain their
 source declarations and shifts; slack coordinates retain exact row images. Every
 selected endpoint must have a compatible original premise or invocation citation.
+Certified LP values use minimized objective units; maximization capture negates the
+reported value into the original source upper bound.
 Missing cut/lowering justifications, foreign integer certificates, unsupported
 column bindings and interrupted capture remain unavailable. Numerical model labels
 and supplied multiplier values do not confer authority; the resulting source claim
@@ -98,7 +100,14 @@ an attained optimum or approach to an unattained limit.
 objective evaluation. The typed quadratic interval rule derives bounds from original
 declarations and invocation intervals through the shared exact interval arithmetic.
 Typed engine extensions retain convex, objective-image, recession, conditional and
-branch data without opaque payloads. Their source checker must justify coordinate
+branch data without opaque payloads. Completed native certificates retain those
+payloads and a typed native invocation with the actual source object, objective,
+direction and explicit original-coordinate pins. Native invocation metadata is
+separate from an optional original-source revision. `Problem.quadraticSourceResultCapture`
+binds capture to that actual original object and objective; an unrelated equal-shaped
+model or weaker invocation cannot replace it. Recapture preserves the native payload.
+The integer and branch-completion producers use these typed records; the finite
+quadratic adapter retains its compatibility factory until its consumer migration. Their source checker must justify coordinate
 bindings and complete coverage; a flat branch list is not a traversal proof. A
 known conditioned result cannot be recaptured under a different original scope.
 

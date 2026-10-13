@@ -13,16 +13,18 @@ import com.eignex.klause.arithmetic.quadratic.QuadraticStop
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.theory.qfnra.PolynomialBooleanCondition
 import com.eignex.klause.theory.qfnra.PolynomialCondition
+import com.eignex.klause.theory.qfnra.PolynomialIntegerRecession
 import com.eignex.klause.theory.qfnra.PolynomialObjectiveResult
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.theory.qfnra.QfNraParams
+import com.eignex.klause.theory.qfnra.polynomialPointFixings
 import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
-import com.eignex.klause.theory.qfnra.polynomialPointFixings
-import com.eignex.klause.theory.qfnra.PolynomialIntegerRecession
 import com.eignex.klause.theory.qfnra.tryPolynomialIntegerRecession
-import com.eignex.klause.theory.qfnra.PolynomialBooleanCondition
 import com.eignex.klause.util.Cancellation
 
 internal sealed interface QuadraticRelaxationResult {
@@ -30,9 +32,9 @@ internal sealed interface QuadraticRelaxationResult {
         val assignment: QfNraAssignment,
         val value: AlgebraicReal,
         val attained: Boolean,
-        val proof: Any,
+        val proof: SourceDerivation,
     ) : QuadraticRelaxationResult
-    data class Unbounded(val assignment: QfNraAssignment, val proof: Any) : QuadraticRelaxationResult
+    data class Unbounded(val assignment: QfNraAssignment, val proof: SourceDerivation) : QuadraticRelaxationResult
     data class Infeasible(val condition: PolynomialCondition) : QuadraticRelaxationResult
     data class Unknown(val resource: PolynomialResource? = null) : QuadraticRelaxationResult
 }
@@ -118,7 +120,9 @@ internal class QuadraticSourceRelaxation(
             }
             if (convex != null) {
                 QuadraticRelaxationResult.Minimum(
-                    convex.assignment, algebraic.rational(convex.certificate.bound.value), true, convex,
+                    convex.assignment, algebraic.rational(convex.certificate.bound.value), true,
+                    QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                        QuadraticEngineDerivation.Convex(convex)),
                 )
             } else {
                 val result = solvePolynomialObjectiveImage(
@@ -128,13 +132,18 @@ internal class QuadraticSourceRelaxation(
                 native.observe(result.stats)
                 when (result) {
                     is PolynomialObjectiveResult.Optimum -> QuadraticRelaxationResult.Minimum(
-                        result.assignment, result.value, true, result.evidence,
+                        result.assignment, result.value, true,
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
                     is PolynomialObjectiveResult.Infimum -> QuadraticRelaxationResult.Minimum(
-                        result.incumbent, result.value, false, result.evidence,
+                        result.incumbent, result.value, false,
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
                     is PolynomialObjectiveResult.Unbounded -> QuadraticRelaxationResult.Unbounded(
-                        result.incumbent, result.evidence,
+                        result.incumbent, QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
                     is PolynomialObjectiveResult.Infeasible -> QuadraticRelaxationResult.Infeasible(condition)
                     is PolynomialObjectiveResult.Unknown -> {
