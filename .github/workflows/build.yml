@@ -161,3 +161,7 @@ jobs:
 
       - name: Run linter
         run: ./gradlew --refresh-dependencies lintDocs
+
+      - name: Show linter source changes
+        if: failure()
+        run: git diff -- '*.kt'
