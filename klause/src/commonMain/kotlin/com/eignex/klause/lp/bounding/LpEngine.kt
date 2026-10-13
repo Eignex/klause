@@ -103,6 +103,11 @@ internal class LpEngine(
     private val deferred: Boolean = false,
 ) : AutoCloseable {
     private var closed = false
+    private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
+        if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) {
+            CpToLpRelaxation(problem, objective, realResidual = true, projections = null)
+        } else null
+    }
 
     // Retain the model and discrete warm-start caches; only native factor-owning solvers are released.
     @Suppress("TooGenericExceptionCaught") // cleanup must preserve arbitrary failures from owned solvers
@@ -597,7 +602,8 @@ internal class LpEngine(
         requireOpen()
         lpBackjump = null
         if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-        val relaxer = lpRelaxer ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        val relaxer = selectedSourceRelaxation ?: lpRelaxer
+            ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxation = nodeRelaxation(relaxer, session)
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val model = relaxation.model

@@ -254,3 +254,10 @@ feature gates, source attribution and the engine's closed dependency list still 
 Built-in emission retains its linear-row caches and existing gates. Custom emitters
 are rebuilt against live domains and disable retained-layout eligibility; their
 coefficients cannot be assumed independent of the current node.
+
+A selected sound relaxation supplies bounds and refutations, rather than source
+feasibility by itself. Real leaf completion retains the original built-in source
+rows, using the existing private LP owner and native allowances. Replacement real
+projections require a source-coordinate check before publication; an unavailable
+or rejected completion stays indeterminate. Omitting a selected relaxation row
+cannot remove the original source constraint from the witness check.

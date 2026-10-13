@@ -216,3 +216,10 @@ overlays, conditioned roots, local scoring and model-facing LP emission retain t
 selection. The neutral `Problem` has no engine provider field. Custom scoring
 mechanisms are prepared separately for portfolio workers; only built-in stateless
 scoring projections enter the shared preparation pool.
+
+Absent or partial selected deduction does not authorize arbitrary assignments.
+Original finite factors are checked at complete points when a built-in complete
+check exists; otherwise execution remains unknown. Real completion uses original
+source rows independently of a selected bounding relaxation, and published exact
+coordinates must satisfy their source relation. These checks create private state
+and retain the invocation's existing work currencies and cancellation lifetime.

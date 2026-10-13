@@ -12,6 +12,7 @@ import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpBranching
@@ -22,6 +23,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -769,13 +771,17 @@ private class ResidualRealComponent(
             LpVerdict.ATTAINED_OPTIMUM,
             LpVerdict.TOLERANCE_OPTIMUM,
             LpVerdict.UNBOUNDED,
-            -> ComponentCheck.Feasible.also {
-                completed = Sample(
+            -> {
+                val sample = Sample(
                     BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
                     LongArray(problem.numIntVars) { cp.session.intDomain(it).min },
                     result.reals,
                     result.exactReals,
                 )
+                if ((problem as? BakedProblem)?.factorProjections?.requiresRealSourceCheck == true &&
+                    verifyRealCoordinates(problem, sample) !is Verification.Accepted
+                ) ComponentCheck.Indeterminate
+                else ComponentCheck.Feasible.also { completed = sample }
             }
 
             LpVerdict.INFEASIBLE -> ComponentCheck.Infeasible()

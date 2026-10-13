@@ -337,7 +337,7 @@ class CpSearchComponent(
      * assignment that violates them.
      */
     override fun check(context: com.eignex.klause.solver.search.SearchContext): ComponentCheck =
-        if (session.fixpointCancelled) ComponentCheck.Indeterminate else ComponentCheck.Feasible
+        if (session.fixpointCancelled) ComponentCheck.Indeterminate else session.checkSelectedProjection()
 
     override fun blockModel(
         model: com.eignex.klause.solver.search.AssembledSearchModel,

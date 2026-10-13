@@ -467,3 +467,10 @@ provider retains native-clause eligibility and owner-local table/MDD preparation
 
 An inert descriptor requires an explicit reason and cannot claim an exact check:
 its absent mechanism needs an enforcing peer or separate source certification.
+
+Selected partial or inert finite deduction keeps an original-source check at a
+complete point. The prepared check plan is immutable; each point uses a private
+propagation state over original factors. Its work contributes to the invocation's
+CP work and time counters. If those factors have no complete original checker,
+the leaf stays indeterminate. Source-real checks remain the arithmetic completion's
+responsibility; objective overlays remain enforced by objective policy.

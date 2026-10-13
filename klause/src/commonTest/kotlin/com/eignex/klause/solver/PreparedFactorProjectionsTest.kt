@@ -33,6 +33,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
@@ -40,6 +42,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PreparedFactorProjectionsTest {
@@ -314,6 +317,48 @@ class PreparedFactorProjectionsTest {
             ScoringProjection(ScoringCapability.INERT, AssignmentCheckCapability.EXACT,
                 "No score mechanism.") { NoInvariant }
         }
+    }
+
+    @Test
+    fun `inert finite deduction retains the original source solution set`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The original source relation is checked at a complete point.") { NoPropagator }
+        })
+
+        val witnesses = BacktrackSolver(source.bake(providers)).enumerate(BacktrackParams())
+            .map { it.intValue(0) }.toSet()
+
+        assertEquals(setOf(0L, 1L), witnesses)
+    }
+
+    @Test
+    fun `an inert factor without an original source checker stays unknown`() {
+        val factor = object : Factor by Clause(intArrayOf(0)) {}
+        val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(factor))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "No complete original-source checker is available.") { NoPropagator }
+        })
+
+        val result = BacktrackSolver(source.bake(providers)).solve(BacktrackParams())
+
+        assertEquals(TerminationReason.Unsupported, assertIs<SolveResult.Unknown>(result).reason)
+    }
+
+    @Test
+    fun `omitted real relaxation rows do not weaken original source completion`() {
+        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 1L)
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(row), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val providers = FactorProjectionProviders(relaxation = RelaxationProjectionProvider { null })
+
+        val result = BacktrackSolver(source.bake(providers)).solve(BacktrackParams())
+        val point = assertIs<SolveResult.Sat>(result).assignment
+
+        assertTrue(point.exactReals!!.single() >= BigFraction.ONE)
     }
 
 }
