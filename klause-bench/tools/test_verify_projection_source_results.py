@@ -24,6 +24,11 @@ class ProjectionSourceResultsTest(unittest.TestCase):
                         for direction in (False, True)]
         self.controls = [{"mode": mode, "witnesses": [witness], "scores": copy.deepcopy(scores),
                           "optimization": copy.deepcopy(optimization)} for mode in ("default", "alternate")]
+        self.corners = {"inertWitnesses": [witness], "unsupported": "refused", "uncheckable": "Unsupported",
+                        "realSource": {"lower": "1/2", "upper": "5/2", "coefficient": "1", "bound": "3/2"},
+                        "realControls": [{"mode": mode, "exactReal": "3/2", "optimization": [
+                            {"maximize": False, "exactReal": "3/2", "value": 1.5},
+                            {"maximize": True, "exactReal": "5/2", "value": 2.5}]} for mode in ("default", "omitted")]}
 
     def test_complete_original_source_records_are_checked(self):
         result = MODULE.verify(self.source, self.controls)
@@ -49,6 +54,21 @@ class ProjectionSourceResultsTest(unittest.TestCase):
     def test_missing_provider_is_refused(self):
         with self.assertRaisesRegex(ValueError, "missing provider"):
             MODULE.verify(self.source, self.controls[:1])
+
+    def test_omitted_real_rows_still_require_original_source_feasibility(self):
+        self.corners["realControls"][1]["exactReal"] = "1/2"
+        with self.assertRaisesRegex(ValueError, "original source"):
+            MODULE.verify_corners(self.source, self.corners)
+
+    def test_rational_original_objective_directions_are_checked(self):
+        result = MODULE.verify_corners(self.source, self.corners)
+        self.assertEqual("3/2", result["realMinimum"])
+        self.assertEqual("5/2", result["realMaximum"])
+
+    def test_uncheckable_source_cannot_claim_complete_satisfaction(self):
+        self.corners["uncheckable"] = "Sat"
+        with self.assertRaisesRegex(ValueError, "false complete claim"):
+            MODULE.verify_corners(self.source, self.corners)
 
 
 if __name__ == "__main__":

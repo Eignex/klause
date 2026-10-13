@@ -6,7 +6,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
-import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.SelectedProjectionChecks
@@ -36,7 +35,8 @@ class PreparedFactorProjections internal constructor(
         )
     }
 
-    internal val nativePropagation: Boolean = providers.propagation === BuiltInPropagationProjectionProvider
+    internal val nativePropagation: Boolean = propagation.all { it?.builtIn == true }
+    internal val builtInScoring: Boolean = scoring.all { it?.builtIn == true }
     internal val builtInRelaxation: Boolean = providers.relaxation === BuiltInRelaxationProjectionProvider ||
         relaxation.indices.all(::usesBuiltInRelaxation)
 
@@ -59,6 +59,10 @@ class PreparedFactorProjections internal constructor(
     }
 
     internal fun capabilities(factorId: Int): FactorExecutionCapabilities = declarations[factorId]
+
+    internal fun requiresOriginalScoringCheck(factorId: Int): Boolean = scoring[factorId]?.builtIn == false &&
+        scoring[factorId]?.assignmentCheck == AssignmentCheckCapability.SOURCE_CERTIFICATION &&
+        problem.factors[factorId].variables.reals.isEmpty() && problem.factors[factorId] !is ObjectiveBoundFactor
 
     internal fun requiresOriginalCheck(factorId: Int): Boolean = propagation[factorId]?.builtIn == false &&
         propagation[factorId]?.assignmentCheck != AssignmentCheckCapability.EXACT

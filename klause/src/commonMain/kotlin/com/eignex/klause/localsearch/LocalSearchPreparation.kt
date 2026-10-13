@@ -15,7 +15,7 @@ internal class LocalSearchPreparation(
     private val lock: Mutex = Concurrency.Strict.lock(),
     selection: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ) {
-    val shareable: Boolean = selection == null || selection.providers.scoring === BuiltInScoringProjectionProvider
+    val shareable: Boolean = selection == null || selection.builtInScoring
     private val steps = LocalSearchProblem.preparation(problem, domains, selection)
     private var completed: LocalSearchProblem? = null
 

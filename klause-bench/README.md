@@ -232,8 +232,10 @@ AWS machine with `parallel: 1` and a pinned revision through a lab profile job.
 
 Its exact Boolean/integer source fixture retains every original-domain assignment.
 An independent Python process checks complete source enumeration, scoring acceptance
-and minimum/maximum original-direction integer objectives for both providers. These
-checks establish this finite fixture's source behavior; they export no proof file and
+and minimum/maximum original-direction integer objectives for both providers. Corner
+controls cover inert deduction, unsupported/uncheckable sources and omitted real
+relaxation rows, with exact rational source coordinates and objective directions.
+These checks establish these fixtures' source behavior; they export no proof file and
 do not certify arbitrary custom providers. Opening and allocation measurements are
 preparation diagnostics. Source checking and optimization controls occur outside the
 timed spans. `source-check.json` records the checker and input hashes; missing or

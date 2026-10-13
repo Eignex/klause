@@ -24,6 +24,7 @@ import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationProjection
@@ -359,6 +360,39 @@ class PreparedFactorProjectionsTest {
         val point = assertIs<SolveResult.Sat>(result).assignment
 
         assertTrue(point.exactReals!!.single() >= BigFraction.ONE)
+    }
+
+    @Test
+    fun `delegated built in clauses retain the native fast path`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0))))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            BuiltInPropagationProjectionProvider.select(it)
+        })
+
+        val projection = PropagationProblem(source, providers.prepare(source))
+
+        assertTrue(projection.isNativeSatEligible)
+    }
+
+    @Test
+    fun `inert scoring and deduction cannot publish a rejected source point`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0, 2))))
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider {
+                PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "Original source certification enforces the clause.") { NoPropagator }
+            },
+            scoring = ScoringProjectionProvider {
+                ScoringProjection(ScoringCapability.INERT, AssignmentCheckCapability.UNSUPPORTED,
+                    "A pinned source check validates the candidate.") { NoInvariant }
+            },
+        )
+        val checker = UnscoredCandidateCheck(source.bake(providers))
+
+        val result = checker.check(Sample(booleanArrayOf(false, false), longArrayOf()),
+            Assumptions.None, Cancellation.Never)
+
+        assertTrue(result is Completion.Refuted)
     }
 
 }

@@ -23,6 +23,7 @@ import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
+import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
@@ -34,6 +35,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.ScoringCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -204,6 +206,7 @@ object ProjectionProviderProfile {
             }
         }
         out.resolve("controls.json").writeText(controls.toString())
+        out.resolve("corners.json").writeText(corners(source, seed).toString())
         checkSource(out)
         println("PROJECTION_PROFILE factors=$factors rounds=$rounds openings=$openings seed=$seed output=$out")
     }
@@ -259,9 +262,73 @@ object ProjectionProviderProfile {
         },
     )
 
+    private fun corners(source: Problem, seed: Long): JsonObject {
+        val params = BacktrackParams(randomSeed = seed, maxDecisions = 10000, cancellation = Cancellation.after(30.seconds))
+        val inert = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "Original finite factors are checked at the complete point.") { NoPropagator }
+        })
+        val inertWitnesses = BacktrackSolver(source.bake(inert)).enumerate(params).toList()
+        val unsupported = FactorProjectionProviders(propagation = PropagationProjectionProvider { null })
+        val refused = try {
+            source.bake(unsupported)
+            false
+        } catch (_: IllegalStateException) {
+            true
+        }
+        check(refused) { "unsupported propagation was not refused" }
+        val structural = object : Factor by Clause(intArrayOf(0)) {}
+        val uncheckable = BacktrackSolver(Problem(1, 0, emptyArray(), arrayOf<Factor>(structural)).bake(inert))
+            .solve(params)
+        check(uncheckable is SolveResult.Unknown) { "uncheckable source produced a terminal claim" }
+        val row = Linear(doubleArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 1.5)
+        val realSource = Problem(0, 0, emptyArray(), arrayOf<Factor>(row), numRealVars = 1,
+            realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(2.5))
+        val realControls = buildJsonArray {
+            for ((mode, providers) in listOf("default" to FactorProjectionProviders.Default,
+                "omitted" to FactorProjectionProviders(relaxation = RelaxationProjectionProvider { null }))) {
+                val baked = realSource.bake(providers)
+                val satisfied = BacktrackSolver(baked).solve(params)
+                check(satisfied is SolveResult.Sat) { "real source was not completed: $satisfied" }
+                val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+                val optimized = buildJsonArray {
+                    for (maximize in listOf(false, true)) {
+                        val result = BacktrackSolver(baked).minimize(
+                            if (maximize) objective.negated() else objective, params,
+                        )
+                        check(result is MinimizeResult.Optimal) { "real objective did not complete: $result" }
+                        add(buildJsonObject {
+                            put("maximize", maximize)
+                            put("exactReal", checkNotNull(result.sample.exactReals).single().toString())
+                            put("value", if (maximize) -result.objectiveValue else result.objectiveValue)
+                        })
+                    }
+                }
+                add(buildJsonObject {
+                    put("mode", mode)
+                    put("exactReal", checkNotNull(satisfied.assignment.exactReals).single().toString())
+                    put("optimization", optimized)
+                })
+            }
+        }
+        return buildJsonObject {
+            put("inertWitnesses", JsonArray(inertWitnesses.map(::point)))
+            put("unsupported", "refused")
+            put("uncheckable", uncheckable.reason.toString())
+            put("realSource", buildJsonObject {
+                put("lower", "1/2")
+                put("upper", "5/2")
+                put("coefficient", "1")
+                put("bound", "3/2")
+            })
+            put("realControls", realControls)
+        }
+    }
+
     private fun sourceJson(factors: Int): JsonObject = buildJsonObject {
         put("schema", "finite-projection-controls-v1")
         put("boolCount", 2)
+        put("sourceCornersRequired", true)
         put("domains", buildJsonArray { repeat(2) { add(JsonArray(listOf(-1, 0, 1).map(::JsonPrimitive))) } })
         put("clauses", buildJsonArray { repeat((factors + 1) / 2) {
             add(JsonArray(listOf(0, 3).map(::JsonPrimitive)))
@@ -322,7 +389,8 @@ object ProjectionProviderProfile {
         ProjectionProviderProfile::class.java.getResourceAsStream("/source-evidence/check_projection_evidence.py")
             .use { checker.writeBytes(requireNotNull(it).readBytes()) }
         val process = ProcessBuilder("python3", checker.absolutePath, out.resolve("source.json").absolutePath,
-            out.resolve("controls.json").absolutePath, out.resolve("source-check.json").absolutePath)
+            out.resolve("controls.json").absolutePath, out.resolve("source-check.json").absolutePath,
+            out.resolve("corners.json").absolutePath)
             .redirectErrorStream(true).redirectOutput(out.resolve("source-check.log")).start()
         try {
             check(process.waitFor(30, TimeUnit.SECONDS)) { "source checker timed out" }
