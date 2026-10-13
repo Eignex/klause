@@ -317,6 +317,16 @@ and nonstrict zero-size semantics match the ordinary invariant. Equal-footprint
 swaps require independent position
 coordinates that do not alias dimensions.
 
+An admitted relocation can reconcile up to two decreasing scalar envelopes outside
+its Diffn scope. Discovery inspects at most 128 neighboring factor occurrences;
+completion shares per-call limits of 16,384 factor visits and row-term scans.
+Integral linear inequalities with a unit negative output coefficient supply exact
+lower targets after the geometry writes. Root-domain ceilings retain holes and
+all coordinate eligibility filters remain enforced. Overflowing long row arithmetic
+uses exact integer evaluation; unsupported negative output coefficients or exhausted
+work decline that envelope. These are private candidate values, not deductions or
+published bounds. Every resulting compound receives complete model scoring.
+
 Geometry checks only establish the proposing Diffn's satisfaction. Ordinary complete
 move scoring, definition propagation and source publication checks remain responsible
 for all other model constraints and the objective. Candidate generation consumes

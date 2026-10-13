@@ -238,7 +238,18 @@ internal class DiffnInvariant(
     /** Bounded feasible relocations and equal-footprint position swaps. */
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (n < 2 || isViolated(state, factorId)) return
-        DiffnRelocations(xs, ys, widths, heights, widthVars, heightVars, nonStrict, state, sink).propose()
+        DiffnRelocations(
+            xs,
+            ys,
+            widths,
+            heights,
+            widthVars,
+            heightVars,
+            nonStrict,
+            factorId,
+            state,
+            sink,
+        ).propose()
         var emitted = 0
         var attempts = 0
         while (emitted < DIFFN_STRUCTURED_SWAP_CAP &&

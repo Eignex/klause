@@ -10,12 +10,81 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DiffnRelocationsTest {
+    @Test
+    fun `relocations reconcile exact source lower envelopes`() {
+        for (wide in listOf(false, true)) {
+            val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
+            val rows = listOf(
+                Linear(longArrayOf(1, -1), intArrayOf(0, 4), LinearOp.LE, -2),
+                if (wide) {
+                    Linear(longArrayOf(Long.MAX_VALUE, -Long.MAX_VALUE, 1, -1),
+                        intArrayOf(5, 6, 1, 4), LinearOp.LE, -3)
+                } else {
+                    Linear(longArrayOf(1, -1), intArrayOf(1, 4), LinearOp.LE, -3)
+                },
+            )
+            val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0),
+                IntDomain(0, 20), IntDomain(2, 2), IntDomain(2, 2))
+            val problem = Problem(0, 7, domains, listOf(factor) + rows)
+            val state = LocalSearchState(LocalSearchModel.open(problem, domains), Random(43))
+            val values = longArrayOf(5, 10, 0, 0, 13, 2, 2)
+            values.forEachIndexed { v, value -> state.assignment.setInt(v, value) }
+            state.recompute()
+            val sink = MoveSink()
+
+            repeat(16) { state.factors[0].proposeStructuredMoves(state, 0, sink) }
+
+            val joint = sink.list.filterIsInstance<Move.Compound>().first {
+                it.parts.toSet() == setOf(Move.IntSet(1, 2), Move.IntSet(4, 7))
+            }
+            val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 1, 0, 0))
+            assertEquals(-6.0, state.objectiveDelta(objective, joint))
+            assertEquals(0L, state.netDelta(joint))
+            state.apply(joint)
+            state.recompute()
+            assertEquals(0L, state.cost)
+            assertEquals(7L, state.assignment.intValue(4))
+        }
+    }
+
+    @Test
+    fun `source lower envelope targets respect holes and pins`() {
+        for (pinned in listOf(false, true)) {
+            val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
+            val rows = listOf(
+                Linear(longArrayOf(1, -1), intArrayOf(0, 4), LinearOp.LE, -2),
+                Linear(longArrayOf(1, -1), intArrayOf(1, 4), LinearOp.LE, -3),
+            )
+            val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0),
+                IntDomain(0, 20).excludeValue(7))
+            val problem = Problem(0, 5, domains, listOf(factor) + rows)
+            val assumptions = Assumptions(ints = if (pinned) mapOf(4 to 13L) else emptyMap())
+            val state = LocalSearchState(LocalSearchModel.open(problem, domains), Random(47), assumptions)
+            val values = longArrayOf(5, 10, 0, 0, 13)
+            values.forEachIndexed { v, value -> state.assignment.setInt(v, value) }
+            state.recompute()
+            val sink = MoveSink(assumptions)
+
+            repeat(16) { state.factors[0].proposeStructuredMoves(state, 0, sink) }
+
+            if (pinned) {
+                assertTrue(Move.IntSet(1, 2) in sink.list)
+            } else {
+                val joint = sink.list.filterIsInstance<Move.Compound>().first {
+                    it.parts.toSet() == setOf(Move.IntSet(1, 2), Move.IntSet(4, 8))
+                }
+                assertEquals(0L, state.netDelta(joint))
+            }
+        }
+    }
+
     @Test
     fun `heterogeneous rectangles compact into free source positions`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
