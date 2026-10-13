@@ -21,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class PolynomialStrategyAdaptersTest {
     @Test
@@ -181,22 +182,25 @@ class PolynomialStrategyAdaptersTest {
     }
 
     @Test
-    fun `mixed polynomial replicas preserve original finite and algebraic coordinates`() {
+    fun `parallel polynomial replicas preserve original finite and algebraic coordinates`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
             arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)), numRealVars = 1,
             realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
         val request = source.pipelineRequest()
         val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
             backtrack = BacktrackParams(randomSeed = 17),
-            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 8), alnsIterations = 1,
+            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 64), alnsIterations = 8,
         ))
 
-        val result = OpenTheoryPipeline.execute(request, params, FiniteEngine.MIXED, 8).result
+        for (engine in listOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK,
+            FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+            val result = OpenTheoryPipeline.execute(request, params, engine, 8).result
 
-        val sat = assertIs<OpenTheoryResult.Sat>(result)
-        assertEquals("1", sat.assignment.intValue(0))
-        assertEquals(1.0, assertNotNull(sat.assignment.algebraicRealValue(0)).rational?.toDouble())
-        assertEquals(8, sat.stats.portfolio.arms.size)
+            val sat = assertIs<OpenTheoryResult.Sat>(result)
+            assertEquals("1", sat.assignment.intValue(0))
+            assertEquals(1.0, assertNotNull(sat.assignment.algebraicRealValue(0)).rational?.toDouble())
+            assertEquals(8, sat.stats.portfolio.arms.size)
+        }
     }
 
     @Test
@@ -216,6 +220,19 @@ class PolynomialStrategyAdaptersTest {
         assertEquals(1L, optimal.sample.intValue(0))
         assertEquals(2L, optimal.sample.intValue(1))
         assertEquals(4, optimal.stats.portfolio.arms.size)
+    }
+
+    @Test
+    fun `fixed polynomial execution ignores additional worker requests`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 1)),
+            arrayOf(RealProduct(0, 0, 0, 1.0, 1.0)), numRealVars = 1,
+            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), PolynomialTheoryParams(),
+            FiniteEngine.FIXED, 8).result
+
+        assertIs<OpenTheoryResult.Sat>(result)
+        assertTrue(result.stats.portfolio.arms.isEmpty())
     }
 
 }

@@ -71,7 +71,7 @@ fun OpenTheoryPipeline.execute(
     engine: FiniteEngine = FiniteEngine.MIXED,
 ): PolynomialTheoryExecution = execute(request, params, engine, 1)
 
-/** Execute a native nonlinear source using the requested mixed-portfolio lane count. */
+/** Execute a native nonlinear source using the requested lane count; FIXED retains one worker. */
 fun OpenTheoryPipeline.execute(
     request: NonlinearIntegerTheoryRequest,
     params: NonlinearIntegerTheoryParams,
@@ -79,8 +79,9 @@ fun OpenTheoryPipeline.execute(
     cores: Int,
 ): PolynomialTheoryExecution {
     require(cores > 0)
-    return if (engine == FiniteEngine.MIXED) NonlinearIntegerPortfolio(request, params, cores).execute()
-    else NonlinearIntegerInvocation(request, params, engine).execute()
+    return if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
+        NonlinearIntegerPortfolio(request, params, cores, engine).execute()
+    } else NonlinearIntegerInvocation(request, params, engine).execute()
 }
 
 internal class NonlinearIntegerInvocation(

@@ -58,7 +58,8 @@ use exact relaxed completion with checked integer candidates. A failed real
 relaxation covers only that neighborhood; integer candidate exhaustion is undecided.
 
 Mixed execution supplies retained whole-source traversal, LS and adaptive ALNS
-factories to the [common invocation](../solver/portfolio.md). Materialized workers
+factories to the [common invocation](../solver/portfolio.md). Parallel single-strategy
+requests materialize private replicas of their admitted arm; FIXED retains one worker. Materialized workers
 keep private cursors and cumulative native reservations, with explicit parallel
 lanes and stable seeds. Candidate and completed repair checks are atomic with
 respect to segment limits. A segment pause preserves state; containing native

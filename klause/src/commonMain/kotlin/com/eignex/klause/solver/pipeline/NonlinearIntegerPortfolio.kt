@@ -12,18 +12,25 @@ internal class NonlinearIntegerPortfolio(
     private val request: NonlinearIntegerTheoryRequest,
     private val params: NonlinearIntegerTheoryParams,
     private val cores: Int,
+    private val engine: FiniteEngine = FiniteEngine.MIXED,
 ) {
     fun execute(): PolynomialTheoryExecution {
         val plan = request.preparedPlan
-        if (!plan.capabilities.admission(FiniteEngine.MIXED).runnable) return PolynomialTheoryExecution(
+        if (!plan.capabilities.admission(engine).runnable) return PolynomialTheoryExecution(
             OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY), PolynomialTheoryStats())
         val polynomial = params.polynomial
         val scope = QuadraticNativeScope(polynomial)
         val identity = ModelIdentity.of(request.problem)
         val binding = EngineInvocation(plan, identity, sourceAssumptions = polynomial.strategy.assumptions)
         val workers = ArrayList<NonlinearIntegerInvocation>()
-        val families = listOf(ArmFamily.Backtrack, ArmFamily.LocalSearch, ArmFamily.Lns)
-        val factories = families.mapIndexed { arm, family ->
+        val factories = plan.capabilities.admission(engine).arms.map { strategy ->
+            val arm = when (strategy) {
+                ExecutionStrategy.COMPLETE -> 0
+                ExecutionStrategy.LOCAL_SEARCH -> 1
+                ExecutionStrategy.ALNS -> 2
+                ExecutionStrategy.MIXED -> error("admission supplies participating arms")
+            }
+            val family = when (arm) { 0 -> ArmFamily.Backtrack; 1 -> ArmFamily.LocalSearch; else -> ArmFamily.Lns }
             PortfolioArmFactory(plan, arm, family) { slot ->
                 val native = scope.worker(slot.index, polynomial.maximumWork?.let(slot::nativeAllowance))
                 val strategy = polynomial.strategy
@@ -51,11 +58,17 @@ internal class NonlinearIntegerPortfolio(
                 worker.worker(arm, slot).bindInvocation(binding)
             }
         }
+        val strategy = polynomial.strategy
+        val seed = if (engine == FiniteEngine.BACKTRACK) strategy.backtrack.randomSeed
+            else strategy.localSearch.randomSeed
+        val budget = params.nodeBudget ?: when (engine) {
+            FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> strategy.localSearch.nodeBudget
+            else -> strategy.backtrack.nodeBudget ?: strategy.localSearch.nodeBudget
+        }
         val invocation = PortfolioInvocation(plan, factories,
             PortfolioInvocationControls(parallelism = cores,
-                seed = polynomial.strategy.localSearch.randomSeed ?: 1L, cancellation = scope.polynomial,
-                nodeBudget = params.nodeBudget ?: polynomial.strategy.backtrack.nodeBudget
-                    ?: polynomial.strategy.localSearch.nodeBudget, reseedStaleThreshold = 0),
+                seed = seed ?: 1L, cancellation = scope.polynomial,
+                nodeBudget = budget, reseedStaleThreshold = 0),
             PortfolioEvidence(identity, polynomialWitnessVerifier(binding, scope.polynomial))
                 .bindInvocation(binding, scope.polynomial)) { materialized ->
             val complete = materialized.indices.filter { materialized[it].family == ArmFamily.Backtrack }
