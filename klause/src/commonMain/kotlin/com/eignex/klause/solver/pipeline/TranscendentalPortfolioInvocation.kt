@@ -75,7 +75,7 @@ internal class TranscendentalPortfolioInvocation(
                     1 -> FiniteEngine.LOCAL_SEARCH
                     else -> FiniteEngine.ALNS
                 }
-                TranscendentalWorkerAdapter(request.problem, controls, selected, binding).also { workers += it }
+                slot.own(TranscendentalWorkerAdapter(request.problem, controls, selected, binding)).also { workers += it }
                     .worker(arm)
             }
         }

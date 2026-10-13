@@ -47,13 +47,18 @@ internal class TranscendentalWorkerAdapter(
     private val params: TranscendentalTheoryParams,
     private val engine: FiniteEngine,
     private val binding: EngineInvocation? = null,
-) : ExactNeighborhoodCompletion {
+) : ExactNeighborhoodCompletion, AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
     private val external = params.timeout or params.cancellation
     private val nodeBudget = params.nodeBudget ?: params.strategy.backtrack.nodeBudget
         ?: params.strategy.localSearch.nodeBudget
-    private val service = TranscendentalTheoryService(source, external, params.maximumWork, params.maximumBits,
+    private var nativeService: TranscendentalTheoryService? = TranscendentalTheoryService(source, external, params.maximumWork, params.maximumBits,
         PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells))
+    private val service: TranscendentalTheoryService get() = checkNotNull(nativeService) {
+        "transcendental worker is closed"
+    }
+    private var closedWork = 0L
+    private var closedDecline = false
     private val stop = external or Cancellation { service.exhausted || nodeBudget?.exhausted() == true }
     private val root = assumptions()
     private var strategyStats = SolveStats.EMPTY
@@ -102,8 +107,15 @@ internal class TranscendentalWorkerAdapter(
         return TranscendentalTheoryExecution(published, service.work, service.representationDeclined)
     }
 
-    val nativeWork: Long get() = service.work
-    val representationDeclined: Boolean get() = service.representationDeclined
+    val nativeWork: Long get() = nativeService?.work ?: closedWork
+    val representationDeclined: Boolean get() = nativeService?.representationDeclined ?: closedDecline
+
+    override fun close() {
+        val current = nativeService ?: return
+        closedWork = current.work
+        closedDecline = current.representationDeclined
+        nativeService = null
+    }
 
     fun worker(arm: Int): PortfolioWorker {
         val identity = requireNotNull(binding).model
@@ -151,7 +163,7 @@ internal class TranscendentalWorkerAdapter(
         override val isDone: Boolean get() = result != null
         override val stats: SolveStats get() = SolveStats.EMPTY.copy(
             search = SearchStats(nodes = SumResult(decisions.toDouble())))
-        override val work: Long get() = service.work + minOf(decisions, Long.MAX_VALUE - service.work)
+        override val work: Long get() = nativeWork + minOf(decisions, Long.MAX_VALUE - nativeWork)
 
         override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
             result?.let { return it }
