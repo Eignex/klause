@@ -20,12 +20,20 @@ class SearchComponentSet(
         require(branchers.none { it in components }) { "a brancher may not also be a search component" }
     }
 
+    /** Create a session with the existing cancellation-only controls. */
+    fun session(
+        maxChecks: Long = Long.MAX_VALUE,
+        cancellation: Cancellation = Cancellation.Never,
+        learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+        atoms: SearchAtomRegistry? = null,
+    ): SearchSession = session(maxChecks, cancellation, learnedDb, atoms, SearchExecutionControlAdapter(cancellation))
+
     /** Create the one shared session which drives this selected component set. */
     fun session(
         maxChecks: Long = Long.MAX_VALUE,
         cancellation: Cancellation = Cancellation.Never,
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         atoms: SearchAtomRegistry? = null,
-        executionControls: SearchExecutionControls = SearchExecutionControlAdapter(cancellation),
+        executionControls: SearchExecutionControls,
     ): SearchSession = SearchSession(components, maxChecks, cancellation, learnedDb, branchers, atoms, executionControls)
 }

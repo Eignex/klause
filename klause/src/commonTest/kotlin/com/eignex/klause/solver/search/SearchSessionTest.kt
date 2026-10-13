@@ -19,8 +19,8 @@ class SearchSessionTest {
         val stop = Cancellation.after(1.seconds)
         val session = SearchSession(emptyList(), cancellation = stop)
 
-        assertTrue(session.stopToken() === stop)
-        assertTrue(session.stopToken().deadline() != null)
+        assertTrue(session.executionControls.cancellation === stop)
+        assertTrue(session.executionControls.cancellation.deadline() != null)
     }
 
     @Test

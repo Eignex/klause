@@ -18,9 +18,20 @@ class SearchSession(
     learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
     private val branchers: List<SearchBrancher> = emptyList(),
     private val atoms: SearchAtomRegistry? = null,
-    executionControls: SearchExecutionControls = SearchExecutionControlAdapter(cancellation),
+    executionControls: SearchExecutionControls,
 ) : SearchContext,
     ClauseWatchHost {
+    /** Open a session with cancellation-only controls and the existing native traversal defaults. */
+    constructor(
+        components: List<SearchComponent>,
+        maxChecks: Long = Long.MAX_VALUE,
+        cancellation: Cancellation = Cancellation.Never,
+        learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+        branchers: List<SearchBrancher> = emptyList(),
+        atoms: SearchAtomRegistry? = null,
+    ) : this(components, maxChecks, cancellation, learnedDb, branchers, atoms,
+        SearchExecutionControlAdapter(cancellation))
+
     init {
         atoms?.attach()
     }
@@ -202,10 +213,6 @@ class SearchSession(
         controlsAttached = true
     }
 
-    internal fun canCommitOpenTheoryDecision(): Boolean = executionControls.canCommitDecision()
-
-    internal fun recordOpenTheoryDecision(decision: SearchDecision): Boolean = executionControls.recordDecision(decision)
-
     override fun cancelled(): Boolean = executionControls.cancellation()
 
     private var cancellationPollRequested = false
@@ -217,8 +224,6 @@ class SearchSession(
     internal fun consumeCancellationPollRequest(): Boolean = cancellationPollRequested.also {
         cancellationPollRequested = false
     }
-
-    internal fun stopToken(): Cancellation = executionControls.cancellation
 
     /** Initialize all components at the shared root. */
     fun initialize(): ComponentResult {
