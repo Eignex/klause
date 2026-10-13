@@ -107,6 +107,8 @@ class AffineOptimizationExecutionTest(
         val arithmetic = AlgebraicArithmetic()
         for (publication in published) {
             val values = requireNotNull(publication.incumbent.sample.algebraicReals)
+            assertTrue(arithmetic.compare(values[0], arithmetic.rational(BigFraction.ofLong(-1))) >= 0)
+            assertTrue(arithmetic.compare(values[0], arithmetic.rational(BigFraction.ONE)) <= 0)
             assertEquals(0, arithmetic.compare(arithmetic.multiply(values[0], values[0]), values[1]))
             val originalValue = arithmetic.add(arithmetic.rational(BigFraction.ofLong(constant)), values[1])
             assertEquals(0, arithmetic.compare(originalValue, publication.incumbent.value))
