@@ -41,6 +41,7 @@ tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") 
             "verify_source_results.py", "requirements-source-checks.txt")
         into("smt-witness-validation")
     }
+    from("tools/capture_corpus_sources.py") { into("corpus-source-capture") }
 }
 
 // Choco installation includes its FlatZinc jar, globals library, wrapper and MiniZinc registration.
