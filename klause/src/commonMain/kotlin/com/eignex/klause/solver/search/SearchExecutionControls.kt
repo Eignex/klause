@@ -91,6 +91,10 @@ class SearchExecutionControlAdapter(
     override fun operationAllowance(parent: Cancellation): Cancellation = allowance(parent)
 
     override fun reportStop(cause: SearchStopCause) {
+        if ((this.cause == SearchStopCause.WorkAllowance || this.cause == SearchStopCause.CheckAllowance ||
+                this.cause == SearchStopCause.DecisionAllowance) &&
+            (cause == SearchStopCause.OperationAllowance || cause == SearchStopCause.RepresentationDecline)
+        ) return
         this.cause = cause
     }
 
