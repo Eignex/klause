@@ -330,7 +330,9 @@ arm receives a bounded improving-phase trial if it has earned no progress credit
 All initial siblings are admitted before trial continuations. Each continuation uses
 the base time/work allowance without growing the shared schedule. Four segments
 starting after preparation with fresh charged work complete the search trial;
-twelve segments doing preparation or fresh charged work bound the trial. Debt-only
+twelve segments doing preparation or fresh charged work bound the trial. The trial
+retains one handle and defers plateau reseeding until completion or earned progress.
+Debt-only
 pauses repay existing charges without advancing either trial counter. Work,
 fractional charges and overspend debt retain their ordinary accounting. An
 unproductive completed trial retires the arm and closes its handle; retirement

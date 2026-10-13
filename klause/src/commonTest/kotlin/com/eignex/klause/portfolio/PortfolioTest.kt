@@ -2056,6 +2056,39 @@ class PortfolioTest {
     }
 
     @Test
+    fun `auxiliary trial retains search through plateau reseeding`() {
+        var calls = 0
+        var slices = 0
+        val search = object : ResumableSearch {
+            private var closed = false
+            private var spent = 0L
+            override val isDone: Boolean get() = false
+            override val stats: SolveStats get() = SolveStats.EMPTY
+            override val work: Long get() = spent
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                check(!closed)
+                calls++
+                slices++
+                spent += sliceNodes
+                return null
+            }
+            override fun close() { closed = true }
+        }
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { calls++ }),
+            trackingWorker("probe", 1, search).also { it.restartingSearch = true },
+        )
+
+        Portfolio.thompson(workers, reseedStaleThreshold = 1).use {
+            it.incumbentProbeArms = setOf(1)
+            it.minimize(Cancellation { calls >= 7 })
+        }
+
+        assertEquals(4, slices)
+    }
+
+    @Test
     fun `debt only pauses do not end the auxiliary search trial`() {
         val reached = ArrayList<Int>()
         val search = object : ResumableSearch {
