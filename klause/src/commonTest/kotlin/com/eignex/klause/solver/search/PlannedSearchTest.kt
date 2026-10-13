@@ -17,6 +17,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.FactorOwner
 import com.eignex.klause.solver.pipeline.PreparedSearchComponents
 import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -221,8 +222,10 @@ class PlannedSearchTest {
 
     @Test
     fun `an interrupted root retains its prepared propagation projection`() {
-        val model = differenceHybridFixture()
-        val prepared = PreparedSearchComponents(model.componentPlan(), model, differenceHybridDomains())
+        val source = requireNotNull(differenceHybridFixture().prepareExecutionPlan().prepareConditionedLinearQuery())
+        val model = requireNotNull(source.model)
+        val plan = requireNotNull(source.componentPlan)
+        val prepared = PreparedSearchComponents(plan, model, plan.cpSourceDomains(model))
         var stopped = false
         val interrupted = prepared.open(cancellation = Cancellation { stopped })
         val projection = requireNotNull(interrupted.cp).session.projection
