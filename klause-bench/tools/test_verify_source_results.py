@@ -512,6 +512,28 @@ class ProofCheckTest(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'strictly better source objective exclusion.*unknown'):
                 self.check(case, self.mps_source)
 
+    def test_witness_only_check_preserves_the_unchecked_reported_proof(self):
+        solver = z3.Solver()
+        case = self.case(suite='mps-core', objective='-1/10', finalWitness='v x=1')
+
+        with mock.patch.object(proof_check, 'source', return_value=self.mps_source), \
+                mock.patch.object(proof_check.z3, 'Solver', return_value=solver), \
+                mock.patch.object(solver, 'check', side_effect=AssertionError('proof query started')):
+            result = proof_check.check([case], witness_only=True)[0]['check']
+
+        self.assertEqual(result['witness'], 'exact source feasible')
+        self.assertEqual(result['objectiveCheck'], 'source point objective matches')
+        self.assertTrue(result['reportedProven'])
+        self.assertEqual(result['verificationScope'], 'witness-only')
+        self.assertFalse(result['proofCertificateChecked'])
+        self.assertNotIn('optimalityCheck', result)
+
+    def test_witness_only_check_requires_an_actual_feasible_witness(self):
+        for updates in ({'feasible': None}, {'feasible': False}, {'finalWitness': None}):
+            with self.subTest(updates=updates):
+                with self.assertRaisesRegex(AssertionError, 'requires a reported feasible witness'):
+                    proof_check.check([self.case(**updates)], witness_only=True)
+
     def test_recorded_command_selects_exact_mode_independently_of_arm_name(self):
         case = self.case(suite='mps-core', arm='latest-main', command='klause-cli --exact fixture.mps',
                          proven=False, objective=None, finalWitness='v x=1.00000001')

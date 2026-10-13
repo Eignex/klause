@@ -853,6 +853,11 @@ It checks bundle/source identities, provisions the pinned checker dependencies,
 and retains checker logs, versions and a checked prefix on failure under `$OUT`.
 Original unknown records retain their no-claim outcome; reference agreement does
 not independently verify an exported proof.
+For a separate point check, `witnessOnly=true` forwards `--witness-only` to the
+verifier. Every record must contain a reported feasible witness. The report preserves
+`reportedProven`, marks `verificationScope=witness-only` and
+`proofCertificateChecked=false`, and omits optimality checks. The default still
+requires independent optimality and infeasibility queries.
 
 Inputs can be JSON, gzip or xz; `--records-root` selects `cases/<index>/record.json`
 instead of embedded records. SMT models must cover source sorts and satisfy all
