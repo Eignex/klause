@@ -124,15 +124,22 @@ internal object SourceEvidenceProbe {
 
     internal fun rationalRepresentation(value: AlgebraicReal, candidates: List<BigFraction>): BigFraction? {
         value.rational?.let { rational -> return candidates.firstOrNull { it == rational } }
-        return candidates.firstOrNull { candidate ->
-            if (candidate <= value.lowerBound || candidate >= value.upperBound) false
-            else {
-                var evaluated = BigFraction.ZERO
-                for (coefficient in value.definingCoefficients.asReversed()) {
-                    evaluated = evaluated * candidate + coefficient
-                }
-                evaluated.isZero
+        return rationalRoot(value.definingCoefficients, value.lowerBound, value.upperBound, candidates)
+    }
+
+    internal fun rationalRoot(
+        coefficients: List<BigFraction>,
+        lower: BigFraction,
+        upper: BigFraction,
+        candidates: List<BigFraction>,
+    ): BigFraction? = candidates.firstOrNull { candidate ->
+        if (candidate <= lower || candidate >= upper) false
+        else {
+            var evaluated = BigFraction.ZERO
+            for (coefficient in coefficients.asReversed()) {
+                evaluated = evaluated * candidate + coefficient
             }
+            evaluated.isZero
         }
     }
 
