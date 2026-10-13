@@ -13,10 +13,18 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.harvestRootCuts
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SolveStatsSink
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpAutoConfigTest {
@@ -25,16 +33,50 @@ class LpAutoConfigTest {
         Problem(0, intVars, Array(intVars) { IntDomain(0, 5) }, arrayOf(*factors))
 
     @Test
-    fun `linear structure enables the bounding stack but no cuts`() {
+    fun `linear structure enables the bounding stack and permitted cuts`() {
         val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
         val r = LpAutoConfig.recommend(p)
         assertTrue(r.bounding)
         // The bounding-stack techniques that need no extra structure ride along.
         assertTrue(r.learn)
         assertTrue(r.probe)
-        assertFalse(r.cuts)
+        assertTrue(r.cuts)
         assertFalse(r.lagrangian)
         assertFalse(r.energeticReasoning)
+    }
+
+    @Test
+    fun `ordinary linear cuts respect emphasis and technique overrides`() {
+        val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
+        for ((spec, expected) in listOf(
+            "default" to false, "default,+cuts" to true,
+            "aggressive" to true, "aggressive,-cuts" to false, "off,+cuts" to false,
+        )) {
+            assertEquals(expected, LpAutoConfig.resolve(p, LpConfig.parse(spec)).cuts, spec)
+        }
+    }
+
+    @Test
+    fun `ordinary integral root cuts retain source valid rounding proofs`() {
+        val p = problem(Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 3), intVars = 1)
+        val plan = LpAutoConfig.resolve(p, LpConfig.parse("default,+cuts"))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1))
+        val relaxer = CpToLpRelaxation(p, objective)
+        val session = PropagationSession(p)
+        val cuts = LpEngine(p, objective, LpParams(lpPlan = plan), SolveStatsSink("cuts")).use {
+            it.harvestRootCuts(relaxer, session, emptyList(), plan.gomoryEnabled, plan.mirEnabled)
+        }
+
+        assertTrue(cuts.isNotEmpty())
+        for (cut in cuts) {
+            assertTrue(cut.global)
+            assertTrue(assertNotNull(cut.provenance).rules.isNotEmpty())
+            for (point in 0L..1L) {
+                val lhs = cut.cols.indices.sumOf { cut.coeffs[it] * point }
+                assertTrue(lhs >= cut.rhs)
+            }
+            assertTrue(cut.cols.indices.sumOf { cut.coeffs[it] * 1.5 } < cut.rhs)
+        }
     }
 
     @Test
@@ -52,6 +94,7 @@ class LpAutoConfigTest {
         )
         config = KlauseConfig.DEFAULT.copy(lpCeilingTableauCells = 1L)
         assertFalse(LpAutoConfig.recommend(p.withSettings(config.problemSettings())).bounding)
+        assertFalse(LpAutoConfig.recommend(p.withSettings(config.problemSettings())).cuts)
 
     }
 

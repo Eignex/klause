@@ -84,6 +84,14 @@ withhold the proof. Cut policy considers efficacy, parallelism, orthogonality,
 age and row caps. An integer-specialized separator does not imply general
 mixed-integer coverage.
 
+Cut scheduling follows active LP bounding, the requested cost tier and the
+relaxation size guard, including ordinary linear models without global factors.
+Tableau emission checks the assembled LP's actual integral structural columns,
+exact integer row data and supported lower endpoints; continuous columns decline.
+Source mapping must discharge each rounding premise and retain inherited parent
+guards before root sharing. Root and node separation keep their existing round,
+depth, pool and work allowances.
+
 For unrounded Lagrangian bound `L`, reduced cost `d(j)` and cutoff `U`, a fixing
 allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoint.
 Use that certificate's costs and scale, round integer movement on the source
