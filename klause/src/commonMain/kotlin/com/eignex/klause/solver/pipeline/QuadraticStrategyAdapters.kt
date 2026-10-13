@@ -13,15 +13,18 @@ internal class QuadraticStrategyAdapters(
     private val native: QuadraticNativeScope,
     private val engine: FiniteEngine,
     private val cores: Int = 1,
+    private val publication: QuadraticPublicationObserver? = null,
 ) {
     fun execute(): QuadraticOptimizationResult {
         val assumptions = quadraticAssumptions(params, engine)
-        if (engine != FiniteEngine.MIXED && cores == 1) {
-            return QuadraticWorkerAdapter(request, model, objective, sense, params, native, engine).execute()
+        if (engine == FiniteEngine.FIXED || (engine != FiniteEngine.MIXED && cores == 1)) {
+            return QuadraticWorkerAdapter(request, model, objective, sense, params, native, engine).also { worker ->
+                worker.onAccepted = publication?.let { observer -> { point -> observer.accepted(point) } }
+            }.execute()
         }
         val plan = request.preparedPlan.withObjective(objective, sense)
         return QuadraticPortfolioInvocation(plan, objective, sense, params, native, engine, cores, assumptions)
-            .execute { arm, slot, scope, read ->
+            .execute(onAccepted = { publication?.accepted(it.objective, it.version) }) { arm, slot, scope, read ->
                 val controls = params.copy(maximumWork = null, cancellation = scope.polynomial,
                     strategy = params.strategy.copy(
                         backtrack = params.strategy.backtrack.copy(randomSeed = slot.seed,

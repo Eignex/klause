@@ -28,3 +28,17 @@ fun OpenTheoryPipeline.optimize(
 ): QuadraticOptimizationExecution = minimize(
     request.affineOperation(objective, sense), objective.toQuadraticObjectiveSpec(), params, engine, sense, cores,
 )
+
+/** Observe exact affine source incumbents through the quadratic publication contract. */
+fun OpenTheoryPipeline.optimize(
+    request: PolynomialTheoryRequest,
+    objective: LinearObjective,
+    params: PolynomialTheoryParams,
+    engine: FiniteEngine,
+    sense: ObjectiveSense,
+    cores: Int,
+    onAccepted: ((QuadraticIncumbentPublication) -> Unit)?,
+): QuadraticOptimizationExecution = minimize(
+    request.affineOperation(objective, sense), objective.toQuadraticObjectiveSpec(), params, engine, sense, cores,
+    onAccepted,
+)

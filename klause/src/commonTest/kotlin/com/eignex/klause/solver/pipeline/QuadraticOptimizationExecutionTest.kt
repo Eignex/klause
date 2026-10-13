@@ -27,6 +27,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 
 class QuadraticOptimizationExecutionTest {
     @Test
@@ -337,5 +338,69 @@ class QuadraticOptimizationExecutionTest {
         assertEquals(preparation, handle.chargedInstructions)
         assertEquals(nativePreparation, native.work)
         assertEquals(0.0, handle.stats.ls.moves.sum)
+    }
+
+    @Test
+    fun `parallel algebraic optimum retains its accepted publication identity`() {
+        val parsed = SmtLibPolynomial.parse(
+            "(declare-const x Real) (assert (and (= (* x x) 2) (> x 0))) (check-sat)",
+        )
+        val source = PolynomialRealProblem(
+            parsed.formula, parsed.realCount, parsed.boolCount, parsed.sourceRealCount,
+            parsed.sourceBoolCount, parsed.realVarNames, parsed.boolVarNames,
+        ).pipelineRequest()
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x)))
+        val published = mutableListOf<QuadraticIncumbentPublication>()
+
+        val execution = OpenTheoryPipeline.minimize(source, objective, PolynomialTheoryParams(),
+            FiniteEngine.MIXED, ObjectiveSense.MINIMIZE, 4, onAccepted = { published += it })
+        val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
+
+        assertEquals(1, published.size)
+        assertSame(published.single(), execution.acceptedIncumbent)
+        assertSame(published.single().incumbent.sample, result.incumbent.sample)
+        assertSame(published.single().incumbent.value, result.incumbent.value)
+        assertEquals(0, AlgebraicArithmetic().signAt(RationalPolynomial.of(-2, 0, 1), result.incumbent.value))
+    }
+
+    @Test
+    fun `a cancellation exception from exact publication is propagated after cleanup`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+        val request = source.pipelineRequest()
+        val expected = CancellationException("publication cancelled")
+
+        val failure = assertFailsWith<CancellationException> {
+            OpenTheoryPipeline.minimize(request, objective, PolynomialTheoryParams(), FiniteEngine.FIXED,
+                ObjectiveSense.MINIMIZE, 1, onAccepted = { throw expected })
+        }
+        val later = OpenTheoryPipeline.minimize(request, objective, engine = FiniteEngine.FIXED)
+
+        assertSame(expected, failure)
+        assertIs<QuadraticOptimizationResult.Optimal>(later.result)
+    }
+
+    @Test
+    fun `fixed quadratic execution ignores extra lane requests`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-2.0), realUpper = doubleArrayOf(3.0))
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+        val request = source.pipelineRequest()
+        val params = PolynomialTheoryParams()
+
+        val single = OpenTheoryPipeline.minimize(request, objective, params, FiniteEngine.FIXED,
+            ObjectiveSense.MINIMIZE, 1)
+        val extra = OpenTheoryPipeline.minimize(request, objective, params, FiniteEngine.FIXED,
+            ObjectiveSense.MINIMIZE, 4)
+
+        assertEquals(assertIs<QuadraticOptimizationResult.Optimal>(single.result).incumbent.value.rational,
+            assertIs<QuadraticOptimizationResult.Optimal>(extra.result).incumbent.value.rational)
+        assertEquals(single.nativeWork, extra.nativeWork)
+        assertEquals(single.polynomialStats, extra.polynomialStats)
+        assertTrue(extra.result.stats.portfolio.arms.isEmpty())
     }
 }

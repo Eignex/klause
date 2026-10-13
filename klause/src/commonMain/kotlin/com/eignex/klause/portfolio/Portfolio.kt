@@ -457,9 +457,11 @@ class Portfolio(
                     evidenceVerification?.proof(worker, proofKind, terminal?.assignment, terminal?.objectiveValue),
                 )
             }
-            val publication = if (!failed && claim.fault == null) terminalCheck?.check(worker, handle) else null
-            claim.verified(publication?.verification)
             run.locked {
+                val publication = if (!terminalPublished && !failed && claim.fault == null) {
+                    terminalCheck?.check(worker, handle)
+                } else null
+                claim.verified(publication?.verification)
                 val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
                 run.record(
                     claim,

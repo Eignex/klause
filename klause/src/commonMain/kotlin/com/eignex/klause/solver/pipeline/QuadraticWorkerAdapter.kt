@@ -73,6 +73,7 @@ internal class QuadraticWorkerAdapter(
     private var terminal: QuadraticOptimizationResult? = null
     private var publish: ((QuadraticIncumbent) -> Unit)? = null
     var readIncumbent: () -> QuadraticIncumbent? = { null }
+    var onAccepted: ((QuadraticIncumbent) -> Unit)? = null
     private val stats: SolveStats get() = neighborhood?.let { sink.snapshot().mergedWith(it.stats) } ?: sink.snapshot()
     private val repairCompletion = ExactNeighborhoodCompletion { condition, cancellation ->
         repairNeighborhood(condition, cancellation)
@@ -215,6 +216,7 @@ internal class QuadraticWorkerAdapter(
         if (incumbent == null || better(candidate.value, requireNotNull(incumbent).value)) {
             candidate.sample.witnessCertificate = EvidenceCertificate.verified(identity, EvidenceKind.Witness)
             incumbent = candidate
+            onAccepted?.invoke(candidate)
             publish?.invoke(candidate)
             val approximate = candidate.value.rational?.toDouble()
                 ?: (candidate.value.lowerBound.toDouble() / 2 + candidate.value.upperBound.toDouble() / 2)

@@ -34,6 +34,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.File
 import java.security.MessageDigest
+import java.util.HexFormat
 
 internal object QuadraticSourceProbe {
     @JvmStatic
@@ -136,6 +137,6 @@ internal object QuadraticSourceProbe {
         require(BigFraction.ofDouble(it) == value) { "declaration cannot be represented exactly by this IR projection" }
     }
 
-    private fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
-        .joinToString("") { "%02x".format(it) }
+    private fun hash(bytes: ByteArray): String =
+        HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
 }

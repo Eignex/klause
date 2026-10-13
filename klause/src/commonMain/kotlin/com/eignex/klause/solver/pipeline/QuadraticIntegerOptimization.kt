@@ -84,58 +84,76 @@ fun OpenTheoryPipeline.minimize(
     engine: FiniteEngine,
     sense: ObjectiveSense,
     cores: Int,
+): QuadraticOptimizationExecution = minimize(request, objective, params, engine, sense, cores, null)
+
+/** Observe verified exact native integer incumbents in invocation publication order. */
+fun OpenTheoryPipeline.minimize(
+    request: NonlinearIntegerTheoryRequest,
+    objective: QuadraticObjectiveSpec,
+    params: NonlinearIntegerTheoryParams,
+    engine: FiniteEngine,
+    sense: ObjectiveSense,
+    cores: Int,
+    onAccepted: ((QuadraticIncumbentPublication) -> Unit)?,
 ): QuadraticOptimizationExecution {
     require(cores > 0)
-    val native = QuadraticNativeScope(params.polynomial)
-    var result: QuadraticOptimizationResult = QuadraticOptimizationResult.Unknown(
-        null, native.reason(), sense, SolveStats.EMPTY,
-    )
-    if (!native.stopped) {
-        val controls = params.polynomial
-        val assumptions = quadraticAssumptions(controls, engine)
-        if (engine != FiniteEngine.MIXED && cores == 1) {
-            result = QuadraticIntegerOptimization(request.problem, objective, params, engine, sense, native,
-                request.preparedPlan).execute()
-        } else {
-            val budget = params.nodeBudget ?: controls.strategy.backtrack.nodeBudget
-                ?: controls.strategy.localSearch.nodeBudget
-            val operation = request.preparedPlan.withObjective(objective, sense)
-            val scoped = controls.copy(strategy = controls.strategy.copy(
-                backtrack = controls.strategy.backtrack.copy(nodeBudget = budget),
-                localSearch = controls.strategy.localSearch.copy(nodeBudget = budget)))
-            result = QuadraticPortfolioInvocation(operation, objective, sense, scoped, native, engine, cores,
-                assumptions)
-                .execute { arm, slot, scope, read ->
-                    val local = params.copy(nodeBudget = slot.nodeBudget,
-                        maximumCandidates = slot.nativeAllowance(params.maximumCandidates),
-                        maximumMoves = slot.heuristicAllowance(params.maximumMoves),
-                        polynomial = controls.copy(maximumWork = null, cancellation = scope.polynomial,
-                            strategy = controls.strategy.copy(
-                                backtrack = controls.strategy.backtrack.copy(randomSeed = slot.seed,
-                                    maxDecisions = slot.nativeAllowance(controls.strategy.backtrack.maxDecisions),
-                                    nodeBudget = slot.nodeBudget),
-                                localSearch = controls.strategy.localSearch.copy(randomSeed = slot.seed,
-                                    maxFlips = slot.heuristicAllowance(controls.strategy.localSearch.maxFlips),
-                                    maxInstructions = controls.strategy.localSearch.maxInstructions
-                                        ?.let(slot::heuristicAllowance), nodeBudget = slot.nodeBudget))))
-                    val selected = when (arm) {
-                        0 -> FiniteEngine.BACKTRACK
-                        1 -> FiniteEngine.LOCAL_SEARCH
-                        else -> FiniteEngine.ALNS
+    val publication = QuadraticPublicationObserver(onAccepted)
+    return publication.execute {
+        val native = QuadraticNativeScope(params.polynomial)
+        var result: QuadraticOptimizationResult = QuadraticOptimizationResult.Unknown(
+            null, native.reason(), sense, SolveStats.EMPTY,
+        )
+        if (!native.stopped) {
+            val controls = params.polynomial
+            val assumptions = quadraticAssumptions(controls, engine)
+            if (engine == FiniteEngine.FIXED || (engine != FiniteEngine.MIXED && cores == 1)) {
+                result = QuadraticIntegerOptimization(request.problem, objective, params, engine, sense, native,
+                    request.preparedPlan).also { worker ->
+                        worker.onAccepted = { point -> publication.accepted(point) }
+                    }.execute()
+            } else {
+                val budget = params.nodeBudget ?: controls.strategy.backtrack.nodeBudget
+                    ?: controls.strategy.localSearch.nodeBudget
+                val operation = request.preparedPlan.withObjective(objective, sense)
+                val scoped = controls.copy(strategy = controls.strategy.copy(
+                    backtrack = controls.strategy.backtrack.copy(nodeBudget = budget),
+                    localSearch = controls.strategy.localSearch.copy(nodeBudget = budget)))
+                result = QuadraticPortfolioInvocation(operation, objective, sense, scoped, native, engine, cores,
+                    assumptions)
+                    .execute(onAccepted = {
+                        publication.accepted(it.objective, it.version)
+                    }) { arm, slot, scope, read ->
+                        val local = params.copy(nodeBudget = slot.nodeBudget,
+                            maximumCandidates = slot.nativeAllowance(params.maximumCandidates),
+                            maximumMoves = slot.heuristicAllowance(params.maximumMoves),
+                            polynomial = controls.copy(maximumWork = null, cancellation = scope.polynomial,
+                                strategy = controls.strategy.copy(
+                                    backtrack = controls.strategy.backtrack.copy(randomSeed = slot.seed,
+                                        maxDecisions = slot.nativeAllowance(controls.strategy.backtrack.maxDecisions),
+                                        nodeBudget = slot.nodeBudget),
+                                    localSearch = controls.strategy.localSearch.copy(randomSeed = slot.seed,
+                                        maxFlips = slot.heuristicAllowance(controls.strategy.localSearch.maxFlips),
+                                        maxInstructions = controls.strategy.localSearch.maxInstructions
+                                            ?.let(slot::heuristicAllowance), nodeBudget = slot.nodeBudget))))
+                        val selected = when (arm) {
+                            0 -> FiniteEngine.BACKTRACK
+                            1 -> FiniteEngine.LOCAL_SEARCH
+                            else -> FiniteEngine.ALNS
+                        }
+                        val worker = slot.own(QuadraticIntegerOptimization(request.problem, objective, local,
+                            selected, sense, scope, request.preparedPlan))
+                        worker.readIncumbent = read
+                        worker.worker(arm)
                     }
-                    val worker = slot.own(QuadraticIntegerOptimization(request.problem, objective, local,
-                        selected, sense, scope, request.preparedPlan))
-                    worker.readIncumbent = read
-                    worker.worker(arm)
-                }
+            }
         }
+        QuadraticOptimizationExecution(
+            result, native.polynomialStats, native.numericalWork, native.work,
+            if (result is QuadraticOptimizationResult.Unknown || result is QuadraticOptimizationResult.BestFound) {
+                native.declinedResource
+            } else native.resource,
+        ).also { it.retainPublication(publication.matching(result)) }
     }
-    return QuadraticOptimizationExecution(
-        result, native.polynomialStats, native.numericalWork, native.work,
-        if (result is QuadraticOptimizationResult.Unknown || result is QuadraticOptimizationResult.BestFound) {
-            native.declinedResource
-        } else native.resource,
-    )
 }
 
 internal class QuadraticIntegerOptimization(
@@ -176,6 +194,7 @@ internal class QuadraticIntegerOptimization(
     private var terminal: QuadraticOptimizationResult? = null
     private var publish: ((QuadraticIncumbent) -> Unit)? = null
     var readIncumbent: () -> QuadraticIncumbent? = { null }
+    var onAccepted: ((QuadraticIncumbent) -> Unit)? = null
     private val stats: SolveStats get() = neighborhood?.let { sink.snapshot().mergedWith(it.stats) } ?: sink.snapshot()
 
     private fun initialize() {
@@ -620,6 +639,7 @@ internal class QuadraticIntegerOptimization(
         if (incumbent == null || better(point.value, requireNotNull(incumbent).value)) {
             point.sample.witnessCertificate = EvidenceCertificate.verified(identity, EvidenceKind.Witness)
             incumbent = point
+            onAccepted?.invoke(point)
             publish?.invoke(point)
             val approximate = point.value.rational?.toDouble()
                 ?: (point.value.lowerBound.toDouble() / 2 + point.value.upperBound.toDouble() / 2)
