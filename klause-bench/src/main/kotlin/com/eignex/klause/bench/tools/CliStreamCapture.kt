@@ -6,6 +6,7 @@ import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
@@ -22,6 +23,23 @@ internal object CliStreamCapture {
     fun main(args: Array<String>) {
         val output = File(requireNotNull(System.getenv("OUT")) { "OUT must name the capture directory" })
         output.mkdirs()
+        if (args.size == 1 && args[0].startsWith("batch64=")) {
+            val bytes = Base64.getDecoder().decode(args[0].substringAfter('='))
+            val requests = Json.decodeFromString<List<List<String>>>(bytes.toString(Charsets.UTF_8))
+            require(requests.isNotEmpty()) { "The capture batch is empty" }
+            File(output, "requests.json").writeBytes(bytes)
+            for ((index, request) in requests.withIndex()) {
+                val directory = File(output, index.toString()).apply { mkdirs() }
+                try {
+                    run(request.toTypedArray(), directory)
+                } catch (error: Exception) {
+                    Reports.writeJson(File(directory, "failure.json").path, CaptureFailure(error.toString()))
+                }
+            }
+        } else run(args, output)
+    }
+
+    private fun run(args: Array<String>, output: File) {
         val settings = prepare(args, output)
         val provenance = InstalledBuild.current
         val revision = Reports.readGitSha()
@@ -152,3 +170,6 @@ private data class CaptureResult(
 private data class CaptureSettings(
     val command: List<String>, val sourceSha256: String, val marker: Regex?, val stopAfter: Long, val timeoutMs: Long,
 )
+
+@Serializable
+private data class CaptureFailure(val error: String)

@@ -405,6 +405,10 @@ directly to the CLI, followed by the preserved input path. Supply `input=<path>`
 `stopAfter=2` forcibly terminates the subprocess after the second matching line while
 it is alive. Omitting `stopAfter` captures a normal completion. For example, SMT models
 end with a line matching `\)`, and FlatZinc solutions end with `----------`.
+To capture several cases on one provisioned instance, supply only
+`batch64=<base64 JSON array of capture argument arrays>`. It preserves `requests.json`
+and creates numbered directories for each case. A failed case records `failure.json`
+and does not skip later planned cases.
 
 `planned.json` records the requested input and settings before launch. `capture.json`
 records exit, marker count, interruption trigger, reader failure, and output hashes;
