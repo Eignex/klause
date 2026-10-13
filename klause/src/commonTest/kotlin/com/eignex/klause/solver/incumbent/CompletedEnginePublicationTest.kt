@@ -13,6 +13,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -127,6 +128,21 @@ class CompletedEnginePublicationTest {
             CompletedEnginePublication.IntegerWindow(invocation, 0, 1, 4))
 
         val checked = windows.verify(ModelEvidence.Bound(identity, 4.0, certificate), invocation = invocation)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `an attained objective cannot authorize integer windows`() {
+        val identity = model.forObjective(null)
+        val windows = ModelEvidenceVerifier<Sample, Double>(identity, CandidateVerifier.trusting())
+        val scope = SourceScope(SourceRevision("original", "klause-ir-exact-v1"),
+            objective = SourceObjective("objective", invocation.sense))
+        val certificate = assertNotNull(EvidenceCertificate.completed(identity, EvidenceKind.Bound,
+            CompletedEngineResult.Minimize(scope,
+                MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf(0, 0)), 0.0))))
+
+        val checked = windows.verify(ModelEvidence.IntegerWindow(identity, 1, 0, 0, certificate), scope)
 
         assertIs<Verification.Rejected>(checked)
     }
