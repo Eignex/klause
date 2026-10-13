@@ -2,7 +2,9 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.evidence.checkWitness
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.CompletedEngineResult
@@ -12,16 +14,21 @@ import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.util.Cancellation
 
 internal class PortfolioEvidence(
     private val model: ModelIdentity,
     private val witnessVerifier: CandidateVerifier<Sample, Double?>,
 ) {
     private var sourceScope: SourceScope? = null
+    private var scopeCancellation: Cancellation = Cancellation.Never
 
-    fun bindSourceScope(scope: SourceScope): PortfolioEvidence = also {
+    fun bindSourceScope(
+        scope: SourceScope, cancellation: Cancellation = Cancellation.Never,
+    ): PortfolioEvidence = also {
         require(sourceScope == null || sourceScope == scope) { "portfolio cannot change its source invocation" }
         sourceScope = scope
+        scopeCancellation = scopeCancellation or cancellation
     }
 
     private val verifier = ModelEvidenceVerifier(model, witnessVerifier)
@@ -29,6 +36,11 @@ internal class PortfolioEvidence(
     fun witness(worker: PortfolioWorker, sample: Sample, value: Double?): Verification<Sample, Double?> {
         val identity = worker.evidenceModel ?: return Verification.Indeterminate("worker has no model identity")
         val candidate = Candidate(sample, value)
+        when (val condition = sourceScope?.condition?.checkWitness(sample, scopeCancellation)) {
+            is SourceEvidenceCheck.Rejected -> return Verification.Rejected(condition.reason)
+            is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(condition.reason)
+            SourceEvidenceCheck.Checked, null -> Unit
+        }
         return when (val verdict = verifier.verify(ModelEvidence.Witness(identity, candidate))) {
             is Verification.Accepted -> Verification.Accepted(candidate)
             is Verification.Rejected -> verdict
