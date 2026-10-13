@@ -53,15 +53,16 @@ object SourceRecordCheck {
         val tools = root.resolve("klause-bench/tools")
         execute(log, python, "-m", "pip", "install", "-r", tools.resolve("requirements-source-checks.txt").absolutePath)
         execute(out.resolve("checker-dependencies.txt"), python, "-m", "pip", "freeze")
-        execute(out.resolve("checker.log"), python, tools.resolve("verify_source_results.py").absolutePath,
-            cases.absolutePath, "--source-root", sources.absolutePath,
-            "--progress", out.resolve("checked-prefix.jsonl").absolutePath,
-            "--output", out.resolve("source-checks.json").absolutePath)
         out.resolve("checker-tool-hashes.json").writeText(buildJsonObject {
             for (name in listOf("verify_source_results.py", "requirements-source-checks.txt")) {
                 put(name, sha(tools.resolve(name).readBytes()))
             }
         }.toString() + "\n")
+        execute(out.resolve("checker-runtime.txt"), python, "--version")
+        execute(out.resolve("checker.log"), python, tools.resolve("verify_source_results.py").absolutePath,
+            cases.absolutePath, "--source-root", sources.absolutePath,
+            "--progress", out.resolve("checked-prefix.jsonl").absolutePath,
+            "--output", out.resolve("source-checks.json").absolutePath)
         check(environment.deleteRecursively())
         println(out.resolve("source-checks.json").readText())
     }

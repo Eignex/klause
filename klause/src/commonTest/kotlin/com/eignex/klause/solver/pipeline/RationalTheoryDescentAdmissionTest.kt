@@ -27,7 +27,7 @@ class RationalTheoryDescentAdmissionTest {
 
         val candidate = assertNotNull(published)
         assertEquals(BigFraction.ZERO, objective.evaluateExact(candidate.sample))
-        assertIs<Verification.Accepted>(openWitnessVerifier(source, objective).verify(
+        assertIs<Verification.Accepted<*, *>>(openWitnessVerifier(source, objective).verify(
             Candidate(candidate.sample, candidate.objective)))
     }
 
