@@ -113,8 +113,10 @@ cause without renewing containing allowances. The traversal retains the cause of
 unresolved branches if subsequent operations clear their local diagnostics.
 Timeout and cancellation remain classified from the active token, so a resumed
 slice does not retain a previous invocation stop as lifetime cancellation.
-Cancellation and containing work
-exhaustion take precedence over a local decline. An incomplete residual remains
+Containing native allowances and cancellation take precedence over a local
+decline. Timeout takes precedence over allowances, which take precedence over
+external cancellation. A fresh traversal clears its per-run decision diagnostic;
+its native accounting retains the containing allowances. An incomplete residual remains
 unknown and cannot prove exhaustion. Open routing maps representation decline to
 `Unsupported`, operation/check/decision/work stops to `BudgetExhausted`, and keeps
 timeout and cancellation distinct. Slice pauses remain traversal lifecycle events;
