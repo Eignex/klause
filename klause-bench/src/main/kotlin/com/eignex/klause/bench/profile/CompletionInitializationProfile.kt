@@ -1,4 +1,4 @@
-package com.eignex.klause.bench.tools
+package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.factor.arithmetic.Linear
@@ -18,9 +18,11 @@ import com.eignex.klause.util.WorkMeter
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipFile
 
 /** Measures actual completion initialization retries and checks their exact source witnesses. */
 object CompletionInitializationProfile {
@@ -36,6 +38,7 @@ object CompletionInitializationProfile {
         val thread = Thread.currentThread().threadId()
         val records = ArrayList<String>()
         val witnesses = ArrayList<Sample>()
+        prepareReference(options.out)
         metadata(options, source)
         for (round in 0..options.rounds) {
             val modes = if (round % 2 == 0) listOf("retained", "fresh") else listOf("fresh", "retained")
@@ -86,6 +89,10 @@ object CompletionInitializationProfile {
         private val work = adapter.getMethod("getWork")
         private val stats = adapter.getMethod("getStats")
         private val queries = adapter.getDeclaredField("queries").apply { isAccessible = true }
+        private val prepared = adapter.methods.firstOrNull { it.name == "getSourcePrepared" }
+        private val preparationWork = adapter.methods.firstOrNull { it.name == "getPreparationWork" }
+        fun sourcePrepared(owner: Any): Boolean = prepared?.invoke(owner) as? Boolean ?: true
+        fun preparationWork(owner: Any): Long = preparationWork?.invoke(owner) as? Long ?: 0
         private val pins = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ONE,
             2 to BigFraction.ofLong(3).reciprocal(), 3 to BigFraction.ofLong(9).reciprocal())
         private val query = conditionConstructor.newInstance(emptyMap<Int, Boolean>(), pins, pins, null)
@@ -111,6 +118,7 @@ object CompletionInitializationProfile {
         var queryBytes = 0L
         var interruptedWork = 0L
         var cancelledNativeOps = 0L
+        var preparationWork = 0L
     }
 
     private fun measure(
@@ -141,31 +149,38 @@ object CompletionInitializationProfile {
                     var operations = 0L
                     var polls = 0
                     val stop = object : Cancellation {
-                        private val meter = WorkMeter { units -> operations += units }
+                        private val meter = WorkMeter { units ->
+                            if (access.sourcePrepared(owner)) operations += units
+                        }
                         override fun isCancelled(): Boolean = if (options.charged) operations > 0 else ++polls >= 3
                         override fun workMeter(): WorkMeter = meter
                     }
                     val before = access.work(owner)
+                    val preparedBefore = access.preparationWork(owner)
                     val result = query(owner, stop)
                     check(result.javaClass.simpleName == "Undecided") { "unexpected interrupted verdict" }
                     check(!options.charged || operations > 0) { "no charged native work before interruption" }
                     check(!access.ready(owner)) { "initialization completed before cancellation" }
                     measured.cancelledNativeOps += operations
                     measured.interruptedWork += access.work(owner) - before
+                    measured.preparationWork += access.preparationWork(owner) - preparedBefore
                 } finally {
                     if (retained == null) access.close(owner)
                 }
             }
             val owner = retained ?: open()
             try {
+                val preparedBefore = access.preparationWork(owner)
                 val sample = checkNotNull(access.sample(query(owner, Cancellation.Never))) {
                     "no witness after interrupted initialization"
                 }
+                measured.preparationWork += access.preparationWork(owner) - preparedBefore
                 val total = if (retained != null) access.work(owner) else measured.interruptedWork + access.work(owner)
                 val record = listOf("attempts=${options.attempts}", "openNs=${measured.openingNs}",
                     "openBytes=${measured.openingBytes}", "queryNs=${measured.queryNs}",
                     "queryBytes=${measured.queryBytes}", "interruptedWork=${measured.interruptedWork}", "work=$total",
                     "sourcePreparationWork=${access.stats(owner).smt.sourceLp.preparationWork}",
+                    "nativePreparationWork=${measured.preparationWork}",
                     "cancelledNativeOps=${measured.cancelledNativeOps}", "retainedRoots=0",
                     "unknown=${options.attempts}", "sat=1").joinToString(" ")
                 return record to sample
@@ -216,6 +231,38 @@ object CompletionInitializationProfile {
         val tool = File(CompletionInitializationProfile::class.java.protectionDomain.codeSource.location.toURI())
         check(tool.isFile) { "profile must use the installed bench jar" }
         println("TOOL ${tool.name} sha256=${hash(tool)}")
+    }
+
+    private fun prepareReference(out: File) {
+        if (System.getProperty("klause.bench.z3") != null) return
+        require(System.getProperty("os.name").startsWith("Linux") &&
+            System.getProperty("os.arch") in setOf("amd64", "x86_64")) {
+            "set klause.bench.z3 for another platform"
+        }
+        val url = "https://files.pythonhosted.org/packages/" +
+            "b9/0b/f15168475e5493ea44fa3c5e642903f05d2b870db71ad05662ed87a06976/" +
+            "z3_solver-4.15.3.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+        val expected = "a9afd9ceb290482097474d43f08415bcc1874f433189d1449f6c1508e9c68384"
+        val wheel = File.createTempFile("completion-reference-", ".whl")
+        try {
+            val connection = URI(url).toURL().openConnection().apply {
+                connectTimeout = 30_000
+                readTimeout = 30_000
+            }
+            connection.getInputStream().use { input -> wheel.outputStream().use { input.copyTo(it) } }
+            check(hash(wheel) == expected) { "reference archive hash mismatch" }
+            val binary = out.resolve("reference-z3")
+            ZipFile(wheel).use { archive ->
+                val entry = archive.entries().asSequence().single { it.name.endsWith(".data/scripts/z3") }
+                archive.getInputStream(entry).use { input -> binary.outputStream().use { input.copyTo(it) } }
+            }
+            check(binary.setExecutable(true)) { "could not make reference executable" }
+            System.setProperty("klause.bench.z3", binary.absolutePath)
+            out.resolve("reference-provenance.txt").writeText("url=$url\narchiveSha256=$expected\n" +
+                "binarySha256=${hash(binary)}\n")
+        } finally {
+            wheel.delete()
+        }
     }
 
     private fun validate(out: File, source: String, witnesses: List<Sample>) {

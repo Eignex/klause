@@ -193,14 +193,17 @@ shell scripts: the code goes in a commit. Profile jobs are not for tests, lint o
 CI runs those. Every ref the lab builds must be `main` or a branch only trusted users pushed to,
 and an experiment may not set `suite`, `problem`, `out` or `solver-seed` itself.
 
-`bench.tools.CompletionInitializationProfile` measures actual internal repair consumers
+`bench.profile.CompletionInitializationProfile` measures actual internal repair consumers
 without adding a published library debug API. It generates a hybrid finite-domain and
 scaled dense-linear source, alternates fresh/retained owners, cancels root installation,
 and checks the final exact source point with the configured Z3 executable. Use
 `rows=N attempts=N rounds=N cancel=early|charged`; defaults are 128 rows, 64 cancellation
 attempts and five measured rounds after warmup. `charged` stops after native LP work
 reaches the invocation meter; `early` stops at a fixed initial poll. A completed search
-must not be retained after an interrupted attempt. The tool writes source/pinned SMT,
+must not be retained after an interrupted attempt. Native preparation charges are recorded separately from LP interruption charges.
+On Linux x86-64, an unset `klause.bench.z3` provisions the pinned Z3 4.15.3.0
+executable from its SHA-256-checked wheel before measurement; another platform
+requires an explicitly configured reference executable. The tool writes source/pinned SMT,
 raw measurements and checker output under `out=DIR` or `$OUT`, and prints runtime,
 loaded library/tool jar and reference binary identities. Source checking and setup
 are outside the measured query spans. JFR instrumentation remains part of profile jobs;
