@@ -78,7 +78,8 @@ class CliModeTest {
             val loaded = System.nanoTime()
             assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
             try {
-                assertSame(expected, assertFailsWith<CancellationException> { SolveCore.solve(solvable, common, output) })
+                val thrown = assertFailsWith<CancellationException> { SolveCore.solve(solvable, common, output) }
+                assertSame(expected, thrown)
             } finally {
                 val solved = System.nanoTime()
                 System.err.println("ordinary cancellation phases: setupNs=${loadStarted - started} " +
