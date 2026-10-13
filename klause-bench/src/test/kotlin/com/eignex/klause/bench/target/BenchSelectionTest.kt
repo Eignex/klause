@@ -70,6 +70,7 @@ class BenchSelectionTest {
             listOf(names(selected), read),
         )
     }
+
     @Test
     fun `compiler exclusions leave room for valid siblings before family and overall caps`() {
         val candidates = listOf(
@@ -84,7 +85,8 @@ class BenchSelectionTest {
             it.ref.name != "f/broken"
         })
         val selected = com.eignex.klause.bench.source.CorpusSelection.applySelectionBy(
-            capped, com.eignex.klause.bench.source.CorpusSelection.Selection(maxInstances = 2),
+            capped,
+            com.eignex.klause.bench.source.CorpusSelection.Selection(maxInstances = 2),
         ) { it.family }
 
         assertEquals(listOf("f/valid", "g/valid"), names(selected))
@@ -105,9 +107,9 @@ class BenchSelectionTest {
     @Test
     fun `seeded compatibility selection fills caps deterministically`() {
         val candidates = (1..8).map { problem("s", "f/$it") }
-        val selections = List(2) {
-            BenchSelection.capFamilies(candidates, perFamily = 3, seed = 7, compatible = {
-                it.ref.name.substringAfter('/').toInt() % 2 == 0
+        val selections = List(2) { _ ->
+            BenchSelection.capFamilies(candidates, perFamily = 3, seed = 7, compatible = { candidate ->
+                candidate.ref.name.substringAfter('/').toInt() % 2 == 0
             })
         }
 
@@ -115,5 +117,4 @@ class BenchSelectionTest {
         assertEquals(3, selections[0].size)
         assertEquals(true, selections[0].all { it.ref.name.substringAfter('/').toInt() % 2 == 0 })
     }
-
 }

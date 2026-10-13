@@ -9,7 +9,6 @@ import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.runner.MiniZincCompileFailure
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.target.BenchCli
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -28,8 +27,10 @@ internal object MiniZincCompatibilityProbe {
         Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
         val all = Catalog.uncapped("mzn-bench-compatible-v1").problems.associateBy { it.name }
         val families = options["families"]?.split(',').orEmpty()
-        val refs = (names.map { requireNotNull(all[it]) { "unknown source $it" } } +
-            all.values.filter { it.family in families }).distinctBy { it.name }
+        val refs = (
+            names.map { requireNotNull(all[it]) { "unknown source $it" } } +
+            all.values.filter { it.family in families }
+        ).distinctBy { it.name }
         require(refs.size <= 128) { "at most 128 source identities per audit" }
         val auditedNames = refs.map { it.name }
         val repetitions = options["repeats"]?.toInt() ?: 3
@@ -42,9 +43,11 @@ internal object MiniZincCompatibilityProbe {
                     val directory = out.resolve("sources/${ref.name}").apply { mkdirs() }
                     val model = CorpusFetcher.resolve(ref.source)
                     model.copyTo(directory.resolve(model.name), overwrite = true)
-                    ref.data?.let { CorpusFetcher.resolve(it).let { data ->
-                        data.copyTo(directory.resolve(data.name), overwrite = true)
-                    } }
+                    ref.data?.let {
+                        CorpusFetcher.resolve(it).let { data ->
+                            data.copyTo(directory.resolve(data.name), overwrite = true)
+                        }
+                    }
                     model.parentFile.walkTopDown().filter { it.isFile && it.extension == "mzn" }.forEach {
                         val target = directory.resolve("includes/${it.relativeTo(model.parentFile).path}")
                         target.parentFile.mkdirs()
@@ -54,7 +57,8 @@ internal object MiniZincCompatibilityProbe {
                     val failure = MiniZincCompatibility.exclusion(ref)
                     if (failure != null) failures[ref.name] = failure
                     check(hashes == SolveEvidence.sourceHashes(ref)) { "source changed during compilation" }
-                    add(buildJsonObject {
+                    add(
+                        buildJsonObject {
                         put("problem", ref.name)
                         put("repetition", repetition)
                         put("elapsedNs", System.nanoTime() - start)
@@ -66,7 +70,8 @@ internal object MiniZincCompatibilityProbe {
                         put("diagnostic", failure?.diagnostic)
                         put("sourceHashes", Reports.json.encodeToJsonElement(hashes))
                         put("solverInvocations", 0)
-                    })
+                    }
+                    )
                 }
             }
         }
@@ -86,13 +91,15 @@ internal object MiniZincCompatibilityProbe {
                     for (suite in listOf("mzn-bench", "mzn-bench-compatible-v1")) {
                         val start = System.nanoTime()
                         val selected = BenchCli.selectProblems(filters + ("suite" to suite))
-                        add(buildJsonObject {
+                        add(
+                            buildJsonObject {
                             put("suite", suite)
                             put("seed", seed)
                             put("elapsedNs", System.nanoTime() - start)
                             put("filters", Reports.json.encodeToJsonElement(filters))
                             put("identities", buildJsonArray { selected.forEach { add(JsonPrimitive(it.ref.name)) } })
-                        })
+                        }
+                        )
                         if (suite == "mzn-bench-compatible-v1") check(selected.none { it.ref.name in failures })
                     }
                 }
@@ -111,15 +118,18 @@ internal object MiniZincCompatibilityProbe {
             check(selected.toSet() == members.filter { it.substringAfter('/') in auditedNames }.toSet())
             directory.copyRecursively(out.resolve("frozen-sets"), overwrite = true)
             check(before == MiniZincCompatibility.treeHash(directory)) { "frozen membership changed during audit" }
-            out.resolve("frozen-membership.json").writeText(buildJsonObject {
+            out.resolve("frozen-membership.json").writeText(
+                buildJsonObject {
                 put("set", set)
                 put("directorySha256", before)
                 put("originalMembers", Reports.json.encodeToJsonElement(members))
                 put("selectedMembers", Reports.json.encodeToJsonElement(selected))
-            }.toString() + "\n")
+            }.toString() + "\n"
+            )
             selected
         }.orEmpty()
-        out.resolve("summary.json").writeText(buildJsonObject {
+        out.resolve("summary.json").writeText(
+            buildJsonObject {
             put("revision", Reports.readGitSha())
             put("requested", refs.size)
             put("incompatible", failures.size)
@@ -128,7 +138,8 @@ internal object MiniZincCompatibilityProbe {
             put("repeats", repetitions)
             put("frozenSet", options["set"])
             put("frozenMembers", buildJsonArray { frozen.forEach { add(JsonPrimitive(it)) } })
-        }.toString() + "\n")
+        }.toString() + "\n"
+        )
         println(out.resolve("summary.json").readText())
     }
 }
