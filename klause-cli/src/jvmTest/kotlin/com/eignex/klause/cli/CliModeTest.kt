@@ -1687,7 +1687,9 @@ class CliModeTest {
             deleteOnExit()
         }
         val out = capture {
-            main(arrayOf("-e", "ls", "-p", "1", "-r", "17", "-a", "-s", "--param", "node-limit=1000", "-t", "10000", file.absolutePath))
+            val flags = arrayOf("-e", "ls", "-p", "1", "-r", "17", "-a", "-s")
+            val allowance = arrayOf("--param", "node-limit=1000", "-t", "10000")
+            main(flags + allowance + file.absolutePath)
         }
         val separators = out.lines().count { it == "----------" }
         val solutionsStat = Regex("solutions=(\\d+)").find(out)?.groupValues?.get(1)?.toInt()
