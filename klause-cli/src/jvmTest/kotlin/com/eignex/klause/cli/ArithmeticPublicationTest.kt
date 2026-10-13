@@ -17,8 +17,7 @@ class ArithmeticPublicationTest {
     fun `a consumer failure aborts actual source publication and leaves a later invocation usable`() {
         val start = System.nanoTime()
         val source = File.createTempFile("quadratic-output-failure", ".smt2").apply {
-            writeText("(declare-const i Int) (assert (and (>= i 0) (<= i 1))) " +
-                "(minimize (* i i)) (check-sat)")
+            writeText("(declare-const x Real) (assert (= x 1)) (minimize (* x x)) (check-sat)")
         }
         val common = CommonOptions().apply { engine = "fixed"; parallel = 1 }
         val session = SmtLibMode.newSession()
