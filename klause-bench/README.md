@@ -322,7 +322,8 @@ freezing a compatibility selection; do not redraw an existing set or reinterpret
 its old solver records.
 
 The reusable remote `MiniZincCompatibilityProbe` accepts `names=<comma-separated
-identities>`, `repeats=N`, `per-family=N` and `max=N` through `lab profile`. It retains
+identities>`, `repeats=N`, `per-family=N`, `max=N`, optional `families=<comma-separated families>`
+(up to 128 total identities), and `set=<frozen set>` through `lab profile`. It retains
 original source bytes, build/compiler provenance, fresh alternating-order compilation
 receipts, exclusion diagnostics and legacy/compatibility selections under both
 head and seeded caps. Its solver invocation count is zero; it measures compilation

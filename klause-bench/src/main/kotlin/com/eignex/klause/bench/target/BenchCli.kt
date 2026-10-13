@@ -573,6 +573,8 @@ object BenchCli {
             put("reason", failure.incompatibility)
             put("diagnostic", failure.diagnostic.take(4000))
             put("compilerExit", failure.exitCode)
+            put("compilerElapsedNs", failure.elapsedNs)
+            put("compilerCommand", Reports.json.encodeToJsonElement(failure.command))
             put("sourceHashes", Reports.json.encodeToJsonElement(SolveEvidence.sourceHashes(candidate.ref)))
             put("compilerIdentity", Reports.json.encodeToJsonElement(failure.compiler))
         })
