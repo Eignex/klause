@@ -559,3 +559,6 @@ An explicit inert score contributes no occurrences and keeps its separate source
 check obligation. Unsupported scoring refuses construction. Returning `NoInvariant`
 for a declared active role is rejected. Captured factories open private mutable
 mechanisms for sibling engines; projection selection contains no assignment payloads.
+
+An inert descriptor requires an explicit reason and cannot claim an exact check:
+its absent mechanism needs an enforcing peer or separate source certification.

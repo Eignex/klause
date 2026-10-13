@@ -31,6 +31,9 @@ class FactorProjectionProviders(
     fun prepare(problem: Problem): PreparedFactorProjections = PreparedFactorProjections(problem, this)
 
     internal fun capabilities(factor: Factor): FactorExecutionCapabilities {
+        if (propagation === BuiltInPropagationProjectionProvider && scoring === BuiltInScoringProjectionProvider &&
+            relaxation === BuiltInRelaxationProjectionProvider
+        ) return factor.defaultExecutionCapabilities()
         val deduction = propagation.select(factor)
         val score = scoring.select(factor)
         val rows = relaxation.select(factor)

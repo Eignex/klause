@@ -22,6 +22,13 @@ class ScoringProjection(
     val inertReason: String? = null,
     private val factory: (Array<IntDomain>?) -> Invariant,
 ) {
+    init {
+        require(capability != ScoringCapability.INERT ||
+            (assignmentCheck != AssignmentCheckCapability.EXACT && !inertReason.isNullOrBlank())) {
+            "inert scoring requires an enforcing peer or source certification, with an explicit reason"
+        }
+    }
+
     internal fun create(domains: Array<IntDomain>?): Invariant {
         check(capability != ScoringCapability.UNSUPPORTED) { "unsupported local-search route" }
         return factory(domains).also {

@@ -20,7 +20,11 @@ internal fun Factor.emitLpRelaxation(
     linearProjection: LinearLpProjection? = null,
     provider: RelaxationProjectionProvider = BuiltInRelaxationProjectionProvider,
 ) {
-    provider.select(this)?.emit(builder, linearProjection)
+    if (provider === BuiltInRelaxationProjectionProvider) {
+        BuiltInRelaxationProjectionProvider.emit(this, builder, linearProjection)
+    } else {
+        provider.select(this)?.emit(builder, linearProjection)
+    }
 }
 
 internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjection: LinearLpProjection?) {

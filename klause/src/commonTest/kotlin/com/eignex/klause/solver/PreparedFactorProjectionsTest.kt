@@ -15,12 +15,15 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.NoInvariant
+import com.eignex.klause.localsearch.Completion
+import com.eignex.klause.localsearch.UnscoredCandidateCheck
 import com.eignex.klause.localsearch.ScoringProjection
 import com.eignex.klause.localsearch.ScoringProjectionProvider
 import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationProjection
@@ -30,6 +33,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -246,10 +250,70 @@ class PreparedFactorProjectionsTest {
         })
 
         val baked = source.bake(providers)
-        val witnesses = BacktrackSolver(baked).samples(BacktrackParams()).map { it.intValue(0) }.toSet()
+        val witnesses = BacktrackSolver(baked).enumerate(BacktrackParams()).map { it.intValue(0) }.toSet()
 
         assertEquals(2L, baked.rootIntDomain(0).max)
         assertEquals(setOf(0L, 1L), witnesses)
+    }
+
+    @Test
+    fun `inert scoring candidates are checked against source propagation`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0, 2))))
+        val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider {
+            ScoringProjection(ScoringCapability.INERT, AssignmentCheckCapability.UNSUPPORTED,
+                "The original clause is checked at the pinned candidate.") { NoInvariant }
+        })
+        val baked = source.bake(providers)
+        val checker = UnscoredCandidateCheck(baked)
+
+        val rejected = checker.check(Sample(booleanArrayOf(false, false), longArrayOf()),
+            Assumptions.None, Cancellation.Never)
+        val accepted = checker.check(Sample(booleanArrayOf(true, false), longArrayOf()),
+            Assumptions.None, Cancellation.Never)
+
+        assertTrue(rejected is Completion.Refuted)
+        assertTrue(accepted is Completion.Witness)
+    }
+
+    @Test
+    fun `selected defaults retain exact scoring beyond machine integer sums`() {
+        val domains = Array(2) { IntDomain(Long.MAX_VALUE, Long.MAX_VALUE) }
+        val source = Problem(0, 2, domains,
+            arrayOf<Factor>(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, Long.MAX_VALUE)))
+        val selected = FactorProjectionProviders.Default.prepare(source)
+        val state = LocalSearchState(LocalSearchModel.open(source, domains), Random(1),
+            projection = LocalSearchProblem(source, selected, domains))
+        state.assignment.setInt(0, Long.MAX_VALUE)
+        state.assignment.setInt(1, Long.MAX_VALUE)
+
+        state.recompute()
+
+        assertTrue(state.cost > 0L)
+    }
+
+    @Test
+    fun `unsupported deduction refuses finite baking before source execution`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0))))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { null })
+
+        assertFailsWith<IllegalStateException> { source.bake(providers) }
+        assertTrue(PropagationSession(source).boolValue(0) == true)
+    }
+
+    @Test
+    fun `inert deduction cannot declare an exact assignment check`() {
+        assertFailsWith<IllegalArgumentException> {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.EXACT,
+                "No deduction mechanism.") { NoPropagator }
+        }
+    }
+
+    @Test
+    fun `inert scoring cannot declare an exact assignment check`() {
+        assertFailsWith<IllegalArgumentException> {
+            ScoringProjection(ScoringCapability.INERT, AssignmentCheckCapability.EXACT,
+                "No score mechanism.") { NoInvariant }
+        }
     }
 
 }
