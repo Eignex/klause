@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class RationalTheoryDescentAdmissionTest {
     @Test
@@ -44,5 +45,24 @@ class RationalTheoryDescentAdmissionTest {
         val unknown = assertIs<MinimizeResult.Unknown>(result)
         assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
         assertEquals(1L, unknown.stats.openTheory.openWork)
+    }
+
+    @Test
+    fun `numerical proof admission decline retains the portfolio slice allowance`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
+            realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        var published: MinimizeResult.WithSample? = null
+
+        RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8)).use { descent ->
+            val paused = descent.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { published = it }
+
+            assertNull(paused)
+            assertNull(published)
+            assertEquals(1L, descent.work)
+
+            descent.runSlice(Cancellation.Never, Long.MAX_VALUE, 8) { published = it }
+            assertNotNull(published)
+        }
     }
 }
