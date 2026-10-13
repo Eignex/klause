@@ -369,8 +369,10 @@ object OpenTheoryPipeline {
         val operation = if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE
         if (!prepared.capabilities.admission(engine, operation).runnable) return unsupportedExecution(objective)
         return when (engine) {
-            FiniteEngine.MIXED -> heuristicExecution(model, params, objective, cores, false, values, publication, prepared)
-            FiniteEngine.LOCAL_SEARCH -> heuristicExecution(model, params, objective, cores, true, values, publication, prepared)
+            FiniteEngine.MIXED -> heuristicExecution(model, params, objective, cores, false,
+                values, publication, prepared)
+            FiniteEngine.LOCAL_SEARCH -> heuristicExecution(model, params, objective, cores, true,
+                values, publication, prepared)
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> unsupportedExecution(objective)
             FiniteEngine.ALNS -> linearNeighborhoodInvocation(model, params, objective, adaptive = true, cores,
                 preparedSource = prepared, sourceObjective = values, publication = publication)
@@ -411,13 +413,18 @@ object OpenTheoryPipeline {
             val result = requireNotNull(descent.runSlice(
                 params.cancellation or params.timeout, Long.MAX_VALUE, -1,
             ) { incumbent -> values?.publish(incumbent.sample, publication) })
-            OpenTheoryExecution.Optimize(descent.linearResult?.openOptimum() ?: result.openOptimum(objective))
+            val authority = descent.linearResult
+            val folded = if (authority == null) result.openOptimum(objective) else requireNotNull(values).completed(
+                authority, params.cancellation or params.timeout,
+                if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled)
+            OpenTheoryExecution.Optimize(folded)
         }
     }
 
     private fun sourceObjective(request: OpenTheoryRequest, params: TheoryParams): OpenSourceObjective? =
         request.objective?.let { original -> OpenSourceObjective(requireNotNull(request.minimizedObjective), original,
-            request.maximize, request.linearAuthorityContext(params.cancellation or params.timeout)) }
+            request.maximize, request.linearAuthorityContext(params.cancellation or params.timeout),
+            params.cancellation or params.timeout) }
 
     private fun observed(
         callback: ((SourceIncumbentPublication) -> Unit)?,

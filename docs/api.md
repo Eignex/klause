@@ -272,4 +272,7 @@ rendering, including incomplete outcomes. A terminal's private witness is separa
 this accepted point. Captured affine objectives use their original exact coefficients and
 constant. The heuristic-only maximization overload receives a minimized execution objective
 and restores the source direction for publication. Observer exceptions propagate after
-invocation cleanup.
+invocation cleanup. Affine mixed results retain typed optimality, limits and integer/real
+rays in `OpenTheoryOptimum.linearResult`; incomplete execution retains independently
+checked global root bounds and the accepted source point. These fields remain separate
+from scalar telemetry and from a ray's private base.
