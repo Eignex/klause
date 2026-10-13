@@ -439,7 +439,9 @@ class PreparedFactorProjectionsTest {
                             state.assignment.intValue(column) > bound
                         override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
                             if (isViolated(state, factorId)) 9 else 0
-                        override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int =
+                        override fun deltaIfIntSet(
+                            state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long,
+                        ): Int =
                             if (intVar == column) (if (newValue > bound) 9 else 0) - violationDegree(state, factorId)
                             else 0
                     }

@@ -60,6 +60,12 @@ class PreparedFactorProjections internal constructor(
     fun forProblem(problem: Problem): PreparedFactorProjections =
         if (this.problem === problem) this else providers.prepare(problem)
 
+    internal fun forEngineView(view: Problem): PreparedFactorProjections = if (
+        view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
+        view.numRealVars == problem.numRealVars && view.numFactors == problem.numFactors &&
+        view.factors.indices.all { view.factors[it] === problem.factors[it] }
+    ) projected(view, IntArray(view.numFactors) { it }) else forProblem(view)
+
     internal fun projected(view: Problem, factorIndices: IntArray): PreparedFactorProjections {
         require(factorIndices.size == view.numFactors && factorIndices.all { it in problem.factors.indices }) {
             "projection factor mapping differs from its prepared source"
@@ -84,6 +90,25 @@ class PreparedFactorProjections internal constructor(
     }
 
     internal fun capabilities(factorId: Int): FactorExecutionCapabilities = declarations[factorId]
+
+    internal fun usesBuiltInPropagation(factorId: Int): Boolean = propagation[factorId]?.builtIn == true
+
+    internal fun usesBuiltInScoring(factorId: Int): Boolean = scoring[factorId]?.builtIn == true
+
+    internal fun replacedLast(view: Problem): PreparedFactorProjections {
+        require(view.numFactors == problem.numFactors && view.numFactors > 0)
+        val last = view.numFactors - 1
+        return PreparedFactorProjections(view, providers,
+            Array(view.numFactors) {
+                if (it == last) providers.propagation.select(view.factors[it]) else propagation[it]
+            },
+            Array(view.numFactors) {
+                if (it == last) providers.scoring.select(view.factors[it]) else scoring[it]
+            },
+            Array(view.numFactors) {
+                if (it == last) providers.relaxation.select(view.factors[it]) else relaxation[it]
+            })
+    }
 
     internal fun requiresOriginalScoringCheck(factorId: Int): Boolean = scoring[factorId]?.builtIn == false &&
         scoring[factorId]?.assignmentCheck == AssignmentCheckCapability.SOURCE_CERTIFICATION &&

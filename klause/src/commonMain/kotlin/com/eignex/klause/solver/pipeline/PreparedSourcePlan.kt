@@ -10,6 +10,9 @@ import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 
 /** Execution data selected from a source, before any mutable search state is allocated. */
@@ -128,13 +131,21 @@ class PreparedSourcePlan internal constructor(
     val quadraticObjective: QuadraticObjectiveSpec? = null,
     /** Direction of [quadraticObjective]. */
     val quadraticSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+    /** Immutable mechanism descriptors captured against [model], absent for a non-factor source. */
+    val factorProjections: PreparedFactorProjections? = componentPlan?.factorProjections
+        ?: model?.let { FactorProjectionProviders.Default.prepare(it) },
 ) {
+    internal val finiteFactorProjections: PreparedFactorProjections? = polynomialModel?.let { polynomial ->
+        factorProjections?.projected(polynomial.finite, polynomial.finiteFactorIndices.toIntArray())
+    } ?: factorProjections
+
     private val descriptions = components.toList()
     private val integerMapping = integerCoordinates.toList()
     private val realMapping = realCoordinates.toList()
 
     init {
         require(integerMapping.size == sourceIntCount && realMapping.size == sourceRealCount)
+        model?.let { factorProjections?.requireSource(it) }
     }
 
     /** Operation and strategy admission derived from this plan's installed component contracts. */
@@ -166,7 +177,7 @@ class PreparedSourcePlan internal constructor(
     fun withObjective(objective: LinearObjective, maximize: Boolean = false): PreparedSourcePlan = PreparedSourcePlan(
         originalSource, model, reboundKind(), componentPlan, polynomialModel, descriptions,
         sourceBoolCount, sourceIntCount, sourceRealCount, objective, maximize, structuralDecline(),
-        integerMapping, realMapping, operations,
+        integerMapping, realMapping, operations, factorProjections = factorProjections,
     )
 
     /** Bind an exact quadratic objective while preserving source coordinate mappings and completion. */
@@ -177,7 +188,7 @@ class PreparedSourcePlan internal constructor(
         originalSource, model, reboundKind(), componentPlan, polynomialModel, descriptions,
         sourceBoolCount, sourceIntCount, sourceRealCount, decline = structuralDecline(),
         integerCoordinates = integerMapping, realCoordinates = realMapping, operations = operations,
-        quadraticObjective = objective, quadraticSense = sense,
+        quadraticObjective = objective, quadraticSense = sense, factorProjections = factorProjections,
     )
 
     private fun structuralDecline(): PreparedPlanDecline? =
@@ -239,19 +250,32 @@ fun Problem.prepareExecutionPlan(
     preferFinite: Boolean = false,
 ): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite)
 
+/** Capture per-invocation factor mechanisms before selecting source ownership and admission. */
+fun Problem.prepareExecutionPlan(
+    providers: FactorProjectionProviders,
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
+    preferFinite: Boolean = false,
+): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite, providers)
+
 internal fun Problem.prepareExecutionPlan(
     original: Problem,
     objective: LinearObjective?,
     maximize: Boolean,
     preferFinite: Boolean,
+    providers: FactorProjectionProviders = (this as? BakedProblem)?.projectionProviders
+        ?: FactorProjectionProviders.Default,
 ): PreparedSourcePlan {
+    val projections = (this as? BakedProblem)?.factorProjections?.takeIf { it.providers === providers }
+        ?: providers.prepare(this)
     val continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true
     if (factors.any { it is ContinuousProduct } ||
         (!preferFinite && !continuousObjective && factors.any { it is RealProduct })
     ) {
-        return preparePolynomialExecutionPlan(original = original, objective = objective, maximize = maximize)
+        return preparePolynomialExecutionPlan(original = original, objective = objective, maximize = maximize,
+            providers = providers, projections = projections)
     }
-    return preparedWithComponents(componentPlan(preferFinite), original, objective, maximize)
+    return preparedWithComponents(componentPlan(projections, preferFinite), original, objective, maximize)
 }
 
 internal fun Problem.preparedWithComponents(
@@ -276,8 +300,9 @@ internal fun Problem.preparedWithComponents(
     }
     val completionNeeded = ownership.hasTheoryComponent || numRealVars != 0
     val completeSource = !completionNeeded || completion.support(ExecutionStrategy.COMPLETE).runnable
-    val finite = finiteComponentContract(finiteFactors, finiteIntegers, ownership, completeSource,
-        ownership.hasTheoryComponent && ownership.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN)
+    val finite = finiteComponentContract(finiteFactors + sharedFactors, finiteIntegers, ownership, completeSource,
+        ownership.hasTheoryComponent && ownership.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN,
+        ownership.factorProjections)
     val descriptors = listOf(
         ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteFactors,
             finiteIntegers, emptyList(), execution = finite),
@@ -303,7 +328,10 @@ internal fun Problem.preparePolynomialExecutionPlan(
     original: Any = this,
     objective: LinearObjective? = null,
     maximize: Boolean = false,
+    providers: FactorProjectionProviders = FactorProjectionProviders.Default,
+    projections: PreparedFactorProjections = providers.prepare(this),
 ): PreparedSourcePlan {
+    projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
     val polynomial = if (openInteger) null else SharedPolynomialModel.lower(this, sourceFormula, formulaForFactor)
     val cause = when {
@@ -318,7 +346,7 @@ internal fun Problem.preparePolynomialExecutionPlan(
         ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteFactors,
             boundedIntegers, emptyList(), (0 until numBoolVars).toList(),
             finiteComponentContract(finiteFactors, boundedIntegers, null, polynomial != null,
-                exactNeighborhood = false)),
+                exactNeighborhood = false, projections = projections)),
         ExecutionComponentDescriptor("polynomial-real", ComponentResponsibility.COMPLETION,
             factors.indices.filter { it !in finiteFactors }, emptyList(), (0 until numRealVars).toList(),
             execution = if (polynomial != null) checkedCompletionContract(ProcedureCompleteness.DECISION)
@@ -331,7 +359,8 @@ internal fun Problem.preparePolynomialExecutionPlan(
     val sourceReals = (original as? PolynomialRealProblem)?.sourceRealCount ?: numRealVars
     return PreparedSourcePlan(original, this,
         if (cause == null) PreparedExecutionKind.POLYNOMIAL else PreparedExecutionKind.DECLINED,
-        null, polynomial, descriptors, sourceBools, numIntVars, sourceReals, objective, maximize, cause)
+        null, polynomial, descriptors, sourceBools, numIntVars, sourceReals, objective, maximize, cause,
+        factorProjections = projections)
 }
 
 /** Preserve the original polynomial snapshot while preparing its finite and completion projections. */

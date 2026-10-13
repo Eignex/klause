@@ -338,3 +338,10 @@ namespace; use that argument for variable ids rather than a captured source fact
 Scoring also receives actual move domains. `problem.bake(selection)` retains the
 source-prepared choice through finite root construction. Coordinate projections
 bind captured choices to mapped factor data, while a source rewrite selects anew.
+
+`Problem.prepareExecutionPlan(providers, ...)` selects mechanisms for one source
+preparation. Its `factorProjections` snapshot survives objective rebinding and
+conditioned preparation. A `FinitePipelineRequest` carrying that plan applies the
+selection during deferred baking and subsequent finite engine construction. A
+complete strategy can remain admitted with exact deduction and unavailable scoring;
+a heuristic strategy needs its own supplied score and candidate-check authority.

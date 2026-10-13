@@ -1,28 +1,128 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.ScoringProjectionProvider
+import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
+    @Test
+    fun `complete admission does not require an available scorer`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
+        val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider { null })
+
+        val plan = source.prepareExecutionPlan(providers, preferFinite = true)
+
+        assertTrue(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        val local = plan.capabilities.admission(ExecutionStrategy.LOCAL_SEARCH)
+        assertFalse(local.runnable)
+        assertEquals(ExecutionDeclineCause.HEURISTIC_PROJECTION, local.declines.single().cause)
+        assertEquals(0, local.declines.single().factorIndex)
+    }
+
+    @Test
+    fun `unsupported deduction identifies its source factor during admission`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { null })
+
+        val admitted = source.prepareExecutionPlan(providers, preferFinite = true).capabilities
+            .admission(ExecutionStrategy.COMPLETE)
+
+        assertFalse(admitted.runnable)
+        assertEquals(ExecutionDeclineCause.FINITE_PROJECTION, admitted.declines.single().cause)
+        assertEquals(0, admitted.declines.single().factorIndex)
+    }
+
+    @Test
+    fun `an inert clause projection retains exact source enumeration`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The original clause is checked at a complete point.") { NoPropagator }
+        })
+        val plan = source.prepareExecutionPlan(providers, preferFinite = true)
+        val ownership = assertNotNull(plan.componentPlan)
+
+        val view = ownership.cpProjection(source, emptyMap()).problem
+        val witnesses = BacktrackSolver(view).enumerate().toList()
+
+        assertTrue(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        assertEquals(FactorOwner.CP, ownership.factorOwner(0))
+        assertEquals(listOf(true), witnesses.map { it.boolValue(0) })
+    }
+
+    @Test
+    fun `objective and conditioned plans retain selected finite deduction`() {
+        val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(
+            row, Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(), realVars = intArrayOf(0),
+                realCoeffs = doubleArrayOf(1.0), op = LinearOp.EQ, bound = 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor !== row) BuiltInPropagationProjectionProvider.select(factor)
+            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The source row is checked at a complete point.") { NoPropagator }
+        })
+        val sourcePlan = source.prepareExecutionPlan(providers, preferFinite = true)
+
+        val objective = sourcePlan.withObjective(LinearObjective(intCoefficients = longArrayOf(1)))
+        val conditioned = assertNotNull(objective.prepareConditionedLinearQuery())
+        val view = assertNotNull(conditioned.componentPlan).cpProjection(source, mapOf(0 to IntDomain(0, 2)))
+
+        assertSame(sourcePlan.factorProjections, objective.factorProjections)
+        assertSame(sourcePlan.factorProjections, conditioned.factorProjections)
+        assertEquals(IntDomain(0, 2), view.problem.rootIntDomain(0))
+    }
+
+    @Test
+    fun `polynomial finite views retain selection by original factor identity`() {
+        val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(ContinuousProduct(0, 0, 1), row),
+            numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(2.0, 4.0))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor !== row) BuiltInPropagationProjectionProvider.select(factor)
+            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The finite source row is checked at a complete point.") { NoPropagator }
+        })
+
+        val plan = source.prepareExecutionPlan(providers)
+        val finite = assertNotNull(plan.polynomialModel).finite.bake(assertNotNull(plan.finiteFactorProjections))
+
+        assertEquals(PreparedExecutionKind.POLYNOMIAL, plan.kind)
+        assertEquals(IntDomain(0, 2), finite.rootIntDomain(0))
+        assertEquals(setOf(1L, 2L), BacktrackSolver(finite).enumerate().map { it.intValue(0) }.toSet())
+    }
+
     @Test
     fun `polynomial decomposition retains original factor indices and integer embedding`() {
         val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf(

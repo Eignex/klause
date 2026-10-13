@@ -9,10 +9,16 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -22,6 +28,19 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class RootBakerTest {
+
+    @Test
+    fun `a materialized contradiction remains infeasible with inert deduction`() {
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "Original finite factors are checked at complete points.") { NoPropagator }
+        })
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0)))).bake(providers)
+
+        val result = RootBaker.provenInfeasible(source, BakeConfig.NONE)
+
+        assertIs<PropagationResult.Unsat>(result.baked)
+    }
 
     private fun bake(problem: Problem, config: BakeConfig): PropagationResult = RootBaker.bake(problem.bake(), config)
 

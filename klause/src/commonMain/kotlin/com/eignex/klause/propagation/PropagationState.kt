@@ -853,7 +853,8 @@ class PropagationState private constructor(
      */
     internal fun addMidlifeFactor(factor: Factor): Int {
         require(incremental) { "mid-life factors require an incremental PropagationState" }
-        val prop = factor.propagatorProjection()
+        val prop = factor.propagatorProjection(provider =
+            projection.selection?.providers?.propagation ?: BuiltInPropagationProjectionProvider)
         val fid = totalFactorCount
         midlife.store.add(prop)
         midlife.factors.add(factor)

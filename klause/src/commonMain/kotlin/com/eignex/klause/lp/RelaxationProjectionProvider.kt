@@ -37,6 +37,8 @@ object BuiltInRelaxationProjectionProvider : RelaxationProjectionProvider {
     override fun select(factor: Factor): RelaxationProjection? {
         val capability = factor.defaultExecutionCapabilities().relaxation
         if (capability == RelaxationCapability.NONE) return null
-        return RelaxationProjection(capability, true) { view, builder, linear -> view.buildLpRelaxation(builder, linear) }
+        return RelaxationProjection(capability, true) { view, builder, linear ->
+            view.buildLpRelaxation(builder, linear)
+        }
     }
 }

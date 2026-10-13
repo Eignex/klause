@@ -171,12 +171,14 @@ object ProjectionProviderProfile {
         out.resolve("source.json").writeText(sourceJson.toString())
         out.resolve("provenance.json").writeText(provenance(factors, rounds, openings, seed, sourceJson).toString())
         val controls = buildJsonArray {
-            for ((mode, providers) in listOf("default" to FactorProjectionProviders.Default, "alternate" to alternatives)) {
+            for ((mode, providers) in listOf("default" to FactorProjectionProviders.Default,
+                "alternate" to alternatives)) {
                 val baked = source.bake(providers)
                 val params = BacktrackParams(randomSeed = seed, maxDecisions = 10000)
                 val witnesses = BacktrackSolver(baked).enumerate(params).toList()
                 val projection = LocalSearchProblem(source, providers.prepare(source), domains)
-                val state = LocalSearchState(LocalSearchModel.open(source, domains), Random(seed), projection = projection)
+                val state = LocalSearchState(LocalSearchModel.open(source, domains), Random(seed),
+                    projection = projection)
                 val scores = buildJsonArray {
                     for (bits in 0..3) for (x in -1L..1L) for (y in -1L..1L) {
                         state.assignment.setBool(0, bits and 1 != 0)
@@ -193,8 +195,10 @@ object ProjectionProviderProfile {
                 val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
                 val optimization = buildJsonArray {
                     for (maximize in listOf(false, true)) {
-                        val result = BacktrackSolver(baked).minimize(if (maximize) objective.negated() else objective,
-                            params.copy(lpPlan = LpPlan(bounding = true), cancellation = Cancellation.after(30.seconds)))
+                        val result = BacktrackSolver(baked).minimize(
+                            if (maximize) objective.negated() else objective,
+                            params.copy(lpPlan = LpPlan(bounding = true), cancellation = Cancellation.after(30.seconds)),
+                        )
                         check(result is MinimizeResult.Optimal) { "optimization did not complete: $result" }
                         add(buildJsonObject {
                             put("maximize", maximize)
@@ -225,7 +229,8 @@ object ProjectionProviderProfile {
         }
         val command = listOf(File(System.getProperty("java.home"), "bin/java").absolutePath) + jvm + listOf(
             "-XX:ActiveProcessorCount=$processors",
-            "-XX:StartFlightRecording=filename=${out.resolve("projection-provider.jfr").absolutePath},settings=profile",
+            "-XX:StartFlightRecording=filename=${out.resolve("projection-provider.jfr").absolutePath}," +
+                "settings=profile",
             "-cp", System.getProperty("java.class.path"), ProjectionProviderProfile::class.java.name,
         ) + args
         val child = ProcessBuilder(command).inheritIO().start()
@@ -292,7 +297,8 @@ object ProjectionProviderProfile {
     )
 
     private fun corners(source: Problem, seed: Long): JsonObject {
-        val params = BacktrackParams(randomSeed = seed, maxDecisions = 10000, cancellation = Cancellation.after(30.seconds))
+        val params = BacktrackParams(randomSeed = seed, maxDecisions = 10000,
+            cancellation = Cancellation.after(30.seconds))
         val inert = FactorProjectionProviders(propagation = PropagationProjectionProvider {
             PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
                 "Original finite factors are checked at the complete point.") { NoPropagator }
