@@ -10223,6 +10223,7 @@ public final class com/eignex/klause/solver/objective/SingleIntObjective {
 
 public final class com/eignex/klause/solver/pipeline/AffineOptimizationExecutionKt {
 	public static final fun optimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static final fun optimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;I)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 	public static synthetic fun optimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 }
 
@@ -11157,6 +11158,7 @@ public final class com/eignex/klause/solver/pipeline/ProcedureCompleteness : jav
 
 public final class com/eignex/klause/solver/pipeline/QuadraticIntegerOptimizationKt {
 	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;I)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 }
 
@@ -11182,6 +11184,7 @@ public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecut
 
 public final class com/eignex/klause/solver/pipeline/QuadraticOptimizationExecutionKt {
 	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
+	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;I)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/QuadraticOptimizationExecution;
 }
 
