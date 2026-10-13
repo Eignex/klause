@@ -1,11 +1,15 @@
 package com.eignex.klause.bench.runner
 
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.io.File
 import java.security.MessageDigest
 import java.util.Locale
@@ -73,6 +77,26 @@ internal object MiniZincCompatibility {
     } catch (failure: MiniZincCompileFailure) {
         if (failure.incompatibility == null) throw failure
         failure
+    }
+
+    fun admit(suite: String, ref: ProblemRef): Boolean {
+        val failure = exclusion(ref) ?: return true
+        System.err.println(
+            buildJsonObject {
+                put("suite", suite)
+                put("problem", ref.name)
+                put("selectionPolicy", MZN_COMPATIBILITY_POLICY)
+                put("status", "source-compiler-incompatible")
+                put("reason", failure.incompatibility)
+                put("diagnostic", failure.diagnostic.take(4000))
+                put("compilerExit", failure.exitCode)
+                put("compilerElapsedNs", failure.elapsedNs)
+                put("compilerCommand", Reports.json.encodeToJsonElement(failure.command))
+                put("sourceHashes", Reports.json.encodeToJsonElement(failure.sourceHashes))
+                put("compilerIdentity", Reports.json.encodeToJsonElement(failure.compiler))
+            },
+        )
+        return false
     }
 
     fun treeHash(root: File): String {

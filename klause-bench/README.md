@@ -301,7 +301,10 @@ identity checked. Compilable siblings remain eligible. Compiler timeouts, missin
 files, crashes and unclassified errors stop selection; they cannot establish source
 incompatibility. Compilation uses seed 1 and never invokes a solver. Checks run only
 on candidates reached while filling a family cap, after source-kind filtering;
-seeded ordering remains deterministic. Compatibility preparation precedes sharding.
+seeded ordering remains deterministic. Compatibility preparation precedes sharding. Catalogue `suite` selection applies
+its admission policy before provider property/default caps as well. Raw identity
+lookup (`uncapped`, named sets and `solve-one`) bypasses admission and provider
+property caps for compatibility suites, retaining every original identity.
 
 `select` emits excluded identities as JSON lines on stderr with the reason,
 diagnostic, compiler exit, original model/data hashes and compiler/library identity.

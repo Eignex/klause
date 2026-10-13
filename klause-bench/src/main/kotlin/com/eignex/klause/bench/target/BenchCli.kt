@@ -563,25 +563,8 @@ object BenchCli {
         return selected.filterIndexed { i, _ -> i % n == idx }
     }
 
-    private fun compatible(candidate: SelectedProblem): Boolean {
-        val failure = MiniZincCompatibility.exclusion(candidate.ref) ?: return true
-        System.err.println(
-            buildJsonObject {
-                put("suite", candidate.suite)
-                put("problem", candidate.ref.name)
-                put("selectionPolicy", MZN_COMPATIBILITY_POLICY)
-                put("status", "source-compiler-incompatible")
-                put("reason", failure.incompatibility)
-                put("diagnostic", failure.diagnostic.take(4000))
-                put("compilerExit", failure.exitCode)
-                put("compilerElapsedNs", failure.elapsedNs)
-                put("compilerCommand", Reports.json.encodeToJsonElement(failure.command))
-                put("sourceHashes", Reports.json.encodeToJsonElement(failure.sourceHashes))
-                put("compilerIdentity", Reports.json.encodeToJsonElement(failure.compiler))
-            }
-        )
-        return false
-    }
+    private fun compatible(candidate: SelectedProblem): Boolean =
+        MiniZincCompatibility.admit(candidate.suite, candidate.ref)
 
     /** The problems of the named sets, restricted to [suites] when given. A set is selected whole: no suite's
      *  default per-family cap applies to it, only an explicit `per-family`. */
