@@ -179,4 +179,24 @@ class DiffnRelocationsTest {
         assertTrue(sink.list.isNotEmpty())
         assertTrue(Move.IntSet(0, Long.MIN_VALUE + 2) !in sink.list)
     }
+
+    @Test
+    fun `overflowing footprints do not appear adjacent at the largest coordinate`() {
+        val factor = Diffn(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5),
+            longArrayOf(2, 1, 1), longArrayOf(1, 1, 1))
+        val domains = arrayOf(IntDomain(Long.MAX_VALUE - 5, Long.MAX_VALUE),
+            IntDomain(Long.MAX_VALUE - 1, Long.MAX_VALUE - 1), IntDomain(Long.MAX_VALUE, Long.MAX_VALUE),
+            IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 0))
+        val problem = Problem(0, 6, domains, listOf(factor))
+        val state = LocalSearchState(LocalSearchModel.open(problem, domains), Random(41))
+        val values = longArrayOf(Long.MAX_VALUE - 5, Long.MAX_VALUE - 1, Long.MAX_VALUE, 0, 0, 0)
+        values.forEachIndexed { v, value -> state.assignment.setInt(v, value) }
+        state.recompute()
+        val sink = MoveSink()
+
+        repeat(16) { state.factors[0].proposeStructuredMoves(state, 0, sink) }
+
+        assertTrue(Move.IntSet(0, Long.MAX_VALUE - 3) in sink.list)
+        assertTrue(Move.IntSet(0, Long.MAX_VALUE) !in sink.list)
+    }
 }

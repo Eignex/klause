@@ -311,7 +311,9 @@ not preserve packing. Root-domain holes, pins, definitions and implicit owners
 filter every changed coordinate before emission. Repeated coordinates coalesce
 only when their targets agree. Geometry reads every aliased position and variable
 size at its final target, and declines moves affecting more than eight rectangles.
-Overflowing adjacency endpoints decline. Strict and nonstrict zero-size semantics
+Overflowing adjacency targets decline; geometry compares mathematical endpoints
+beyond the Long range without saturating them onto a searched coordinate. Strict
+and nonstrict zero-size semantics
 match the ordinary invariant. Equal-footprint swaps require independent position
 coordinates that do not alias dimensions.
 
