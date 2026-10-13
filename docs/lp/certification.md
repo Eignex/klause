@@ -80,10 +80,14 @@ requiring continuous coordinates to be integral. Fractional data falls back to a
 exact rational Lagrangian with 128-bit scalar admission, 250,000 work units and
 16 MiB of metered allocation. Both attempts share that allowance and cancellation;
 overflow, unsupported endpoints and interrupted checks withhold deductions.
+Ordinary clock polling uses the shared 64-call/4096-work stride; work-metered
+cancellation stays immediate and publication polls directly.
 Continuous terms use their exact finite minimizing endpoint, including strict
 interval infima/suprema, and absent sides never acquire a probe-box premise.
 Objective scale and external constants map the rational bound and reduced costs
-to minimized source units. Retained multiplier snapshots remain compatible with
+to minimized source units. Rational cutoff and fixing arithmetic charges operand word-length
+squared to the containing node work ledger; fixed-width integer fixing keeps its
+integer division lane. Retained multiplier snapshots remain compatible with
 original-source capture, whose independent premise checks still govern authority.
 
 Reduced-cost fixing changes only source integral coordinates. An integral source
