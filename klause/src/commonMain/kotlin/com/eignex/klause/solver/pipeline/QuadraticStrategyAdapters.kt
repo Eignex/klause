@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 
 internal class QuadraticStrategyAdapters(
@@ -23,7 +24,9 @@ internal class QuadraticStrategyAdapters(
             }.execute()
         }
         val plan = request.preparedPlan.withObjective(objective, sense)
-        return QuadraticPortfolioInvocation(plan, objective, sense, params, native, engine, cores, assumptions)
+        val invocation = request.preparedPlan.quadraticEngineInvocation(objective, sense, assumptions)
+        return QuadraticPortfolioInvocation(plan, objective, sense, params, native, engine, cores,
+            assumptions, invocation)
             .execute(onAccepted = { publication?.accepted(it.objective, it.version) }) { arm, slot, scope, read ->
                 val controls = params.copy(maximumWork = null, cancellation = scope.polynomial,
                     strategy = params.strategy.copy(
