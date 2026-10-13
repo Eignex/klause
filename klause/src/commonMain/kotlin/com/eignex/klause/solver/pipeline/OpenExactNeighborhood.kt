@@ -91,7 +91,8 @@ internal class OpenExactNeighborhood(
             return ExactNeighborhoodResult.Undecided
         }
         sample.witnessCertificate = invocation()?.let { binding ->
-            require(binding.model.matches(ModelIdentity.of(model, objective))) {
+            require(binding.model.matches(ModelIdentity.of(model, objective)) &&
+                binding.sourceModel.sameModel(ModelIdentity.of(model))) {
                 "neighborhood witness invocation has a different source objective"
             }
             EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, sample,

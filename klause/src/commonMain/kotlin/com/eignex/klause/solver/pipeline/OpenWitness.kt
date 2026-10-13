@@ -61,7 +61,8 @@ internal fun verifyOpenWitness(
 }
 
 internal fun OpenTheoryAssignment.toSample(model: Problem, invocation: EngineInvocation? = null): Sample {
-    require(invocation == null || invocation.sourceModel.sameModel(ModelIdentity.of(model))) {
+    require(invocation == null || (invocation.sourceModel.sameModel(ModelIdentity.of(model)) &&
+        invocation.model.sameModel(ModelIdentity.of(model)))) {
         "theory witness invocation has a different source"
     }
     val ints = List(model.numIntVars) { parseBigInt(intValue(it)) }
