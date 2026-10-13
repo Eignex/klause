@@ -1,0 +1,5 @@
+(set-logic QF_LRA)
+(declare-fun x () Real)
+(assert (= (* 3 x) 1))
+(minimize x)
+(check-sat)
