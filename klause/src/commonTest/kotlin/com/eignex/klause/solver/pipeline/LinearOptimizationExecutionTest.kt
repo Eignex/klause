@@ -11,6 +11,7 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourcePremise
@@ -18,12 +19,11 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.formats.smtlib.SmtLib
-import com.eignex.klause.lp.optimization.LinearApproach
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lp.optimization.LinearApproach
 import com.eignex.klause.lp.optimization.LinearPinnedObjective
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
 import com.eignex.klause.simplex.exact.BigFraction
@@ -23,22 +23,22 @@ import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
-import com.eignex.klause.solver.pipeline.optimizeLinear
 import com.eignex.klause.solver.pipeline.TheoryParams
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.solver.pipeline.optimizeLinear
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import java.io.File
 import java.security.MessageDigest
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -68,7 +68,7 @@ object SmtLinearProof {
             "authority" -> true
             else -> error("Unknown route")
         }
-        require(!direct || engine == FiniteEngine.BACKTRACK && cores == 1)
+        require(!direct || (engine == FiniteEngine.BACKTRACK && cores == 1))
         val inputs = args.dropWhile { it.startsWith("--") }
         require(inputs.isNotEmpty()) { "Pass original SMT paths" }
         val root = File(System.getProperty("klause.workspace.root", "."))
@@ -90,19 +90,29 @@ object SmtLinearProof {
             val objective = if (maximize) minimized.negated() else minimized
             val sense = if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
             val coordinates = buildMap {
-                compiled.boolVarNames.forEach { (name, id) -> put(name, SourceCoordinate(SourceCoordinate.Kind.Boolean, id)) }
-                compiled.intVarNames.forEach { (name, id) -> put(name, SourceCoordinate(SourceCoordinate.Kind.Integer, id)) }
-                compiled.realVarNames.forEach { (name, id) -> put(name, SourceCoordinate(SourceCoordinate.Kind.Real, id)) }
+                compiled.boolVarNames.forEach { (name, id) ->
+                    put(name, SourceCoordinate(SourceCoordinate.Kind.Boolean, id))
+                }
+                compiled.intVarNames.forEach { (name, id) ->
+                    put(name, SourceCoordinate(SourceCoordinate.Kind.Integer, id))
+                }
+                compiled.realVarNames.forEach { (name, id) ->
+                    put(name, SourceCoordinate(SourceCoordinate.Kind.Real, id))
+                }
             }
             val condition = conditionBytes?.let { readCondition(it, coordinates) } ?: SourceCondition()
             val scope = SourceScope(SourceRevision(sha(bytes), "klause-ir-exact-v1"),
                 condition = condition, objective = SourceObjective("cost", sense))
             val capture = requireNotNull(compiled.model.sourceProofContext(scope, objective))
-            val execution = if (direct) null else OpenTheoryPipeline.execute(OpenTheoryRequest(compiled.model, objective,
-                maximize = maximize).let { if (conditionBytes == null) it else it.withLinearAuthority(capture) },
-                params, engine, cores) as OpenTheoryExecution.Optimize
+            val request = OpenTheoryRequest(compiled.model, objective, maximize = maximize)
+                .let { if (conditionBytes == null) it else it.withLinearAuthority(capture) }
+            val execution = if (direct) null else {
+                OpenTheoryPipeline.execute(request, params, engine, cores) as OpenTheoryExecution.Optimize
+            }
             val witnessOnly = engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS
-            val result = if (direct) OpenTheoryPipeline.optimizeLinear(capture, params) else execution?.result?.linearResult
+            val result = if (direct) {
+                OpenTheoryPipeline.optimizeLinear(capture, params)
+            } else execution?.result?.linearResult
             require(witnessOnly || result != null) { "Complete route omitted typed linear authority" }
             if (witnessOnly) require(execution?.result is OpenTheoryOptimum.Bounded)
             require(result == null || result.scope.condition == condition)
