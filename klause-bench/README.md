@@ -267,6 +267,10 @@ For example, the first argument can be
 Save the specification outside the repository, then use
 `LAB_URL=https://lab.eignex.com ./deploy/lab run /absolute/path/to/profile-source-evidence.json`.
 
+The probe recognizes a rational endpoint represented by an algebraic root only
+after exact polynomial evaluation and isolating-interval membership. Native objective
+and bound values must equal the exact original objective at that point before serialization.
+
 The probe saves original bytes and the actual result/capture payload under `$OUT`,
 then runs the packaged independent Python fractions checker in a separate process.
 `independent-check.json` records checked or unavailable coverage and source, payload
@@ -569,10 +573,6 @@ Declarations must have an exact binary64 IR projection. `controls=BACKTRACK:1,MI
 selects engine/lane pairs; `maximumWork` bounds each invocation. The probe saves
 original bytes, actual witnesses/results, source capture outcomes and hashes under
 `out` or `$OUT`, then runs `tools/verify_quadratic_box_results.py` with `python=python3`.
-The square-box probe recognizes a rational endpoint represented by an algebraic
-root only after exact polynomial evaluation and isolating-interval membership. Native
-objective and bound values must equal that original rational value before serialization.
-
 That independent fractions checker evaluates original coordinates and objective,
 checks supported interval bounds and attainment, and withholds unsupported algebraic
 or stronger bound claims. This does not verify general quadratic rays or proof exports.
