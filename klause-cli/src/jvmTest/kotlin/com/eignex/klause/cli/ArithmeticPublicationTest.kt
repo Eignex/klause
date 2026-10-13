@@ -15,6 +15,7 @@ import kotlin.test.assertSame
 class ArithmeticPublicationTest {
     @Test
     fun `a consumer failure aborts actual source publication and leaves a later invocation usable`() {
+        val start = System.nanoTime()
         val source = File.createTempFile("quadratic-output-failure", ".smt2").apply {
             writeText("(declare-const i Int) (assert (and (>= i 0) (<= i 1))) " +
                 "(minimize (* i i)) (check-sat)")
@@ -22,6 +23,7 @@ class ArithmeticPublicationTest {
         val common = CommonOptions().apply { engine = "fixed"; parallel = 1 }
         val session = SmtLibMode.newSession()
         val solvable = session.load(source.absolutePath, common)
+        val loaded = System.nanoTime()
         val expected = IOException("closed consumer")
         var terminal = false
         val failed = object : OutputProtocol by session.output(common) {
@@ -46,7 +48,10 @@ class ArithmeticPublicationTest {
 
         try {
             assertSame(expected, assertFailsWith<IOException> { SolveCore.solve(solvable, common, failed) })
+            val failedAt = System.nanoTime()
             SolveCore.solve(solvable, CommonOptions().apply { engine = "fixed"; parallel = 1 }, healthy)
+            println("publication cleanup ns load=${loaded - start} failure=${failedAt - loaded} " +
+                "healthy=${System.nanoTime() - failedAt}")
         } finally {
             source.delete()
         }

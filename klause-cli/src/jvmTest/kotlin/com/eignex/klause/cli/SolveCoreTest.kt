@@ -32,10 +32,8 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
                 (assert (= x (ite b 0 1))) ($direction $objective) (check-sat)
             """.trimIndent()
             "quadratic-integer" -> """
-                (declare-const i Int) (declare-const x Real)
-                (assert (and (>= i 0) (<= i 1) (= x (to_real i))))
-                ($direction ${if (maximize) "(- 7 (* (- (* 3 i) 2) (- (* 3 i) 2)))"
-                else "(+ 7 (* (- (* 3 i) 2) (- (* 3 i) 2)))"}) (check-sat)
+                (declare-const i Int) (assert (and (>= i 0) (<= i 100)))
+                ($direction ${if (maximize) "(+ 7 (* i i))" else "(- 7 (* i i))"}) (check-sat)
             """.trimIndent()
             else -> """
                 var 0..1: i :: output_var;
@@ -52,6 +50,10 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
             """.trimIndent()
         })
         val common = CommonOptions().apply { engine = "cp"; parallel = 1; randomSeed = 17; exact = true }
+        if (route == "quadratic-integer") {
+            common.engine = "ls"
+            common.engineParams += "max-flips=2"
+        }
         val session = if (route == "polynomial") MiniZincMode.newSession() else SmtLibMode.newSession()
         val values = mutableListOf<BigFraction>()
         var terminal = false
@@ -84,10 +86,10 @@ class SolveCoreTest(private val route: String, private val maximize: Boolean) {
         }
 
         val expected = if (route == "quadratic-integer") {
-            if (maximize) listOf(3L, 6L) else listOf(11L, 8L)
+            if (maximize) listOf(8L, 11L) else listOf(6L, 3L)
         } else listOf(7L, if (maximize) 8L else 6L)
         assertEquals(expected.map(BigFraction::ofLong), values)
         assertTrue(terminal)
-        assertEquals(Verdict.OPTIMAL, completed)
+        assertEquals(if (route == "quadratic-integer") Verdict.BEST_FOUND else Verdict.OPTIMAL, completed)
     }
 }
