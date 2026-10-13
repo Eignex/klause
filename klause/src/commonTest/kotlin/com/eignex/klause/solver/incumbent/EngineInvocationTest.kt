@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.incumbent
 
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -15,13 +15,13 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -33,14 +33,27 @@ class EngineInvocationTest {
 
     @Test
     fun `runtime binding retains exact source real windows`() {
-        val original = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0))
+        val original = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE),
-            upper = mapOf(coordinate to BigFraction.ofLong(2)))
+        val condition = SourceCondition(
+            lower = mapOf(coordinate to BigFraction.ONE),
+            upper = mapOf(coordinate to BigFraction.ofLong(2)),
+        )
         val scope = SourceScope(SourceRevision("original", "klause-ir-exact-v1"), condition)
-        val binding = EngineInvocation(original.prepareExecutionPlan(), ModelIdentity.of(original),
-            scope = scope, condition = condition)
+        val binding = EngineInvocation(
+            original.prepareExecutionPlan(),
+            ModelIdentity.of(original),
+            scope = scope,
+            condition = condition,
+        )
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
 
         val checked = binding.checkWitness(point, Cancellation.Never)
@@ -50,17 +63,33 @@ class EngineInvocationTest {
 
     @Test
     fun `runtime binding rejects points outside exact source real windows`() {
-        val original = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0))
+        val original = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE),
-            upper = mapOf(coordinate to BigFraction.ofLong(2)))
-        val binding = EngineInvocation(original.prepareExecutionPlan(), ModelIdentity.of(original),
-            condition = condition)
+        val condition = SourceCondition(
+            lower = mapOf(coordinate to BigFraction.ONE),
+            upper = mapOf(coordinate to BigFraction.ofLong(2)),
+        )
+        val binding = EngineInvocation(
+            original.prepareExecutionPlan(),
+            ModelIdentity.of(original),
+            condition = condition,
+        )
 
         for (value in listOf(BigFraction.ZERO, BigFraction.ofLong(3))) {
-            val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble()),
-                exactReals = listOf(value))
+            val point = Sample(
+                booleanArrayOf(),
+                longArrayOf(),
+                doubleArrayOf(value.toDouble()),
+                exactReals = listOf(value),
+            )
 
             assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(point, Cancellation.Never))
         }
@@ -68,14 +97,25 @@ class EngineInvocationTest {
 
     @Test
     fun `runtime binding checks arbitrary precision integer source restrictions`() {
-        val original = Problem(0, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0),
-            Bits(1), Bits(1)), emptyArray())
+        val original = Problem(
+            0,
+            IntBounds.fromModelBounds(
+            longArrayOf(0),
+            longArrayOf(0),
+            Bits(1),
+            Bits(1),
+        ),
+            emptyArray()
+        )
         val wide = parseBigInt("9223372036854775808")
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val exact = BigFraction.of(wide, BIG_ONE)
         val condition = SourceCondition(lower = mapOf(coordinate to exact), upper = mapOf(coordinate to exact))
-        val binding = EngineInvocation(original.prepareExecutionPlan(), ModelIdentity.of(original),
-            condition = condition)
+        val binding = EngineInvocation(
+            original.prepareExecutionPlan(),
+            ModelIdentity.of(original),
+            condition = condition,
+        )
         val point = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(wide))
 
         val checked = binding.checkWitness(point, Cancellation.Never)
@@ -87,8 +127,12 @@ class EngineInvocationTest {
     fun `runtime binding rejects an integer below an arbitrary precision source bound`() {
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val lower = BigFraction.of(parseBigInt("9223372036854775808"), BIG_ONE)
-        val binding = EngineInvocation(plan, model, objective,
-            condition = SourceCondition(lower = mapOf(coordinate to lower)))
+        val binding = EngineInvocation(
+            plan,
+            model,
+            objective,
+            condition = SourceCondition(lower = mapOf(coordinate to lower)),
+        )
         val point = Sample(booleanArrayOf(false), longArrayOf(Long.MAX_VALUE))
 
         val checked = binding.checkWitness(point, Cancellation.Never)
@@ -111,8 +155,10 @@ class EngineInvocationTest {
     fun `runtime binding cannot capture a different exact source condition`() {
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE))
-        val scope = SourceScope(SourceRevision("original", "klause-ir-exact-v1"),
-            objective = SourceObjective("objective", ObjectiveSense.MINIMIZE))
+        val scope = SourceScope(
+            SourceRevision("original", "klause-ir-exact-v1"),
+            objective = SourceObjective("objective", ObjectiveSense.MINIMIZE),
+        )
 
         assertFailsWith<IllegalArgumentException> {
             EngineInvocation(plan, model, objective, scope = scope, condition = condition)
@@ -128,7 +174,14 @@ class EngineInvocationTest {
         )
 
         for (condition in conditions) {
-            assertFailsWith<IllegalArgumentException> { EngineInvocation(plan, model, objective, condition = condition) }
+            assertFailsWith<IllegalArgumentException> {
+                EngineInvocation(
+                    plan,
+                    model,
+                    objective,
+                    condition = condition,
+                )
+            }
         }
     }
 
@@ -157,11 +210,21 @@ class EngineInvocationTest {
 
     @Test
     fun `approximate real values cannot establish an exact runtime condition`() {
-        val original = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0))
+        val original = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val binding = EngineInvocation(original.prepareExecutionPlan(), ModelIdentity.of(original),
-            condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE)))
+        val binding = EngineInvocation(
+            original.prepareExecutionPlan(),
+            ModelIdentity.of(original),
+            condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE)),
+        )
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0))
 
         val checked = binding.checkWitness(point, Cancellation.Never)
