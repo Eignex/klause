@@ -15,6 +15,15 @@ internal class PolynomialProjection private constructor(private val levels: Arra
             variableCount: Int,
             arithmetic: PolynomialArithmetic,
         ): PolynomialProjection {
+            val pending = prepare(polynomials, variableCount, arithmetic)
+            while (true) pending.next()?.let { return it }
+        }
+
+        fun prepare(
+            polynomials: List<Polynomial>,
+            variableCount: Int,
+            arithmetic: PolynomialArithmetic,
+        ): Iterator<PolynomialProjection?> = sequence {
             require(variableCount >= 0)
             arithmetic.step()
             for (polynomial in polynomials) {
@@ -36,12 +45,18 @@ internal class PolynomialProjection private constructor(private val levels: Arra
                 }
                 levels[variable] = top.toList()
                 if (variable > 0) {
-                    pending = projectionFamily(lower + eliminate(top, variable, arithmetic), arithmetic)
+                    val eliminated = eliminate(top, variable, arithmetic)
+                    var projected: List<Polynomial>? = null
+                    while (projected == null) {
+                        projected = eliminated.next()
+                        if (projected == null) yield(null)
+                    }
+                    pending = projectionFamily(lower + projected, arithmetic)
                 }
             }
             arithmetic.step()
-            return PolynomialProjection(levels)
-        }
+            yield(PolynomialProjection(levels))
+        }.iterator()
     }
 }
 
@@ -59,7 +74,7 @@ private fun eliminate(
     polynomials: List<Polynomial>,
     variable: Int,
     arithmetic: PolynomialArithmetic,
-): List<Polynomial> {
+): Iterator<List<Polynomial>?> = sequence {
     val projected = mutableListOf<Polynomial>()
     val families = mutableListOf<List<Polynomial>>()
     for (polynomial in polynomials) {
@@ -73,6 +88,7 @@ private fun eliminate(
             projected.addAll(
                 arithmetic.principalSubresultants(reductum, arithmetic.derivative(reductum, variable), variable),
             )
+            yield(null)
         }
     }
     for (left in families.indices) {
@@ -81,12 +97,13 @@ private fun eliminate(
                 for (b in families[right]) {
                     arithmetic.step()
                     projected.addAll(arithmetic.principalSubresultants(a, b, variable))
+                    yield(null)
                 }
             }
         }
     }
-    return projected
-}
+    yield(projected)
+}.iterator()
 
 private fun reducta(
     polynomial: Polynomial,

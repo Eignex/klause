@@ -76,8 +76,9 @@ internal class PolynomialTheoryInvocation(
 ) : AutoCloseable {
     private var closed = false
     private var active = false
-    var stats = QfNraStats(0, 0, 0)
-        private set
+    private var completedStats = QfNraStats(0, 0, 0)
+    private var pending: QfNraQuery? = null
+    val stats: QfNraStats get() = pending?.stats?.let { combine(completedStats, it) } ?: completedStats
     var lastUnknown: QfNraResult.Unknown? = null
         private set
     var queries: Long = 0
@@ -88,33 +89,60 @@ internal class PolynomialTheoryInvocation(
         condition: PolynomialCondition = PolynomialCondition(),
         cancellation: Cancellation = Cancellation.Never,
     ): QfNraResult {
+        val query = prepareCheck(condition, cancellation)
+        while (true) query.next()?.let { return it }
+    }
+
+    fun prepareCheck(
+        condition: PolynomialCondition = PolynomialCondition(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): Iterator<QfNraResult?> {
         check(!closed) { "polynomial invocation is closed" }
         check(!active) { "polynomial invocation has an active query" }
         active = true
-        try {
-            val remaining = params.maximumWork?.let { (it - stats.workSpent).coerceAtLeast(0) }
-            val result = solveQfNra(
-                formula, boolCount, realCount,
-                params.copy(cancellation = params.cancellation or cancellation, maximumWork = remaining),
-                PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper),
-            )
-            lastUnknown = result as? QfNraResult.Unknown
-            stats = QfNraStats(
-                sum(stats.projectedPolynomials, result.stats.projectedPolynomials),
-                sum(stats.liftedCells, result.stats.liftedCells),
-                sum(stats.workSpent, result.stats.workSpent),
-            )
-            queries = sum(queries, 1)
-            return result
-        } finally {
-            active = false
+        val remaining = params.maximumWork?.let { (it - completedStats.workSpent).coerceAtLeast(0) }
+        val query = QfNraQuery(formula, boolCount, realCount,
+            params.copy(cancellation = params.cancellation or cancellation, maximumWork = remaining),
+            PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper))
+        pending = query
+        queries = sum(queries, 1)
+        return object : Iterator<QfNraResult?> {
+            private var finished = false
+            override fun hasNext(): Boolean = !finished
+            override fun next(): QfNraResult? {
+                check(!closed && !finished) { "polynomial query is closed" }
+                try {
+                    val result = query.next()
+                    if (result != null) {
+                        completedStats = combine(completedStats, result.stats)
+                        lastUnknown = result as? QfNraResult.Unknown
+                        finished = true
+                        pending = null
+                        active = false
+                    }
+                    return result
+                } catch (failure: Throwable) {
+                    completedStats = combine(completedStats, query.stats)
+                    pending = null
+                    active = false
+                    finished = true
+                    throw failure
+                }
+            }
         }
     }
 
     override fun close() {
-        check(!active) { "polynomial invocation has an active query" }
+        pending?.let { completedStats = combine(completedStats, it.stats) }
+        pending = null
+        active = false
         closed = true
     }
+
+    private fun combine(left: QfNraStats, right: QfNraStats): QfNraStats = QfNraStats(
+        sum(left.projectedPolynomials, right.projectedPolynomials),
+        sum(left.liftedCells, right.liftedCells), sum(left.workSpent, right.workSpent),
+    )
 
     private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
 }
