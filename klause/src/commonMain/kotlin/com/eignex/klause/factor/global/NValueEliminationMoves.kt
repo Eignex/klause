@@ -21,7 +21,9 @@ internal class NValueEliminationMoves(
         if (distinct < 2) return
         // A searched input can rewrite a maintained coordinate in another value class.
         val network = state.invariants
-        if (network != null && (network.isDefinedInt(n) || xs.any { network.isDefinedInt(it) })) return
+        if (network != null && (network.isDefinedInt(n) || xs.any { network.isDefinedInt(it) } ||
+                presents.any { network.isDefinedBool(Lit.variable(it)) })
+        ) return
         val targetN = countTarget(state, distinct - 1, sink) ?: return
         if (targetN != state.assignment.intValue(n) && !sink.allowsInt(n)) return
         var emitted = 0
