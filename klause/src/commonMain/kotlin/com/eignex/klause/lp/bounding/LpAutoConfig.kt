@@ -50,9 +50,10 @@ import com.eignex.klause.lp.statesBothBounds
  *    come the bounding-stack techniques that need no extra structure: per-node objective propagation,
  *    Farkas learning ([LpPlan.learn]) and the LP-rounding incumbent probe
  *    ([LpPlan.probe]).
- *  - **[LpPlan.cuts]** — an [AllDifferent] (Hall / assignment cuts),
- *    [GlobalCardinality] (occurrence sum cuts), or [PseudoBoolean] (knapsack cover cuts) is
- *    present; the cuts found are harvested once at the root into a global pool reused at every node.
+ *  - **[LpPlan.cuts]** — LP bounding is active and the cost tier permits separation.
+ *    Structural separators target their factor families; Gomory/MIR candidates require supported
+ *    integral LP columns and exact row data. Source mapping checks rounding and inherited premises
+ *    before a cut enters the shared root pool.
  *  - **[LpPlan.circuit]** — a [Circuit] is present (subtour-elimination cuts).
  *  - **[LpPlan.element]** — a constant-array [Element] is present (its convex hull).
  *  - **[LpPlan.table]** — a [Table] is present (its convex hull).
@@ -303,9 +304,9 @@ object LpAutoConfig {
         }
         val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
 
-        // Cuts run whenever LP bounding is active: the structural separators read the LP point
-        // through the revised simplex. Cut-eligible structure required.
-        val cuts = lpActive && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
+        // Tableau eligibility belongs to the assembled model's exact columns and row data;
+        // source mapping discharges rounding bounds and inherited guards before sharing a cut.
+        val cuts = lpActive && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
             bounding = base.bounding || lpActive,
