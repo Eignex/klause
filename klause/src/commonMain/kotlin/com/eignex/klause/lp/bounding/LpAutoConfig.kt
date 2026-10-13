@@ -307,6 +307,7 @@ object LpAutoConfig {
         // Tableau eligibility belongs to the assembled model's exact columns and row data;
         // source mapping discharges rounding bounds and inherited guards before sharing a cut.
         val cuts = lpActive && config.resolved(LpTechnique.CUTS)
+        val structuralCuts = cuts && (cutEligible || pseudoBoolean)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
             bounding = base.bounding || lpActive,
@@ -337,10 +338,10 @@ object LpAutoConfig {
                 (lpActive && product && config.resolved(LpTechnique.PRODUCT_MCCORMICK)),
             // Implied-bound cuts: a cut family, so requires cuts active + Boolean structure.
             impliedBoundCuts = base.impliedBoundCuts ||
-                (cuts && problem.numBoolVars > 0 && config.resolved(LpTechnique.IMPLIED_BOUND)),
-            flowCoverCuts = base.flowCoverCuts || (cuts && config.resolved(LpTechnique.FLOW_COVER)),
+                (structuralCuts && problem.numBoolVars > 0 && config.resolved(LpTechnique.IMPLIED_BOUND)),
+            flowCoverCuts = base.flowCoverCuts || (structuralCuts && config.resolved(LpTechnique.FLOW_COVER)),
             // Boolean RLT: relaxation strengthening; a no-op without 0/1 knapsack rows.
-            booleanRlt = base.booleanRlt || (cuts && config.resolved(LpTechnique.BOOLEAN_RLT)),
+            booleanRlt = base.booleanRlt || (structuralCuts && config.resolved(LpTechnique.BOOLEAN_RLT)),
             lagrangian = base.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
             energeticReasoning = base.energeticReasoning || energetic,
             // Derive the cadence only when the auto path is the one enabling the check — an

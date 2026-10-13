@@ -8,6 +8,9 @@ import com.eignex.klause.bound.LagrangianDualBound
 import com.eignex.klause.bound.SchedulingFeasibilityBound
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -168,7 +171,7 @@ internal class LpEngine(
             sink,
             solveContext,
             projections = projections,
-        )
+        ).also { it.structuralCutSupport = structuralCutSupport }
     }
 
     internal fun requireOpen() {
@@ -203,6 +206,31 @@ internal class LpEngine(
         get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L)
 
     private val auxiliarySources = LpAuxiliarySources()
+    private var structuralCutSupport = params0.lpPlan.cuts || params0.lpPlan.circuit
+
+    internal fun cutSeparationSupported(
+        relaxation: LpRelaxation,
+        cancellation: Cancellation,
+        root: Boolean,
+    ): Boolean {
+        if (cancellation()) return false
+        if (structuralCutSupport) return true
+        if (relaxation.sourceMap == null) return false
+        val model = relaxation.model
+        val exact = model.exactState?.model
+        for (column in 0 until model.n) {
+            cancellation.charge(1L)
+            if (root) {
+                chargeWork(1L)
+                sink.lp.observeOverhead(1L)
+            } else {
+                noteNodeOverhead(1L)
+            }
+            if (model.colContinuous[column] || exact?.column(column)?.integral == false) return false
+            if ((column + 1) % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return false
+        }
+        return !cancellation()
+    }
 
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
      *  ineffective-hull probe can build variants with whole families ([plan]) or individual factor
@@ -921,6 +949,16 @@ internal class LpEngine(
         params.lpConfig?.let { config ->
             val plan = with(LpAutoConfig) { prepare(problem, config, params.lpPlan) }
             params = params.copy(lpPlan = plan)
+        }
+        structuralCutSupport = structuralCutSupport || params.lpPlan.circuit
+        if (params.lpPlan.cuts && !structuralCutSupport) {
+            for ((index, factor) in problem.factors.withIndex()) {
+                if (factor is AllDifferent || factor is GlobalCardinality || factor is PseudoBoolean) {
+                    structuralCutSupport = true
+                    break
+                }
+                if ((index + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
         }
         lpRelaxer = buildRelaxer(params.lpPlan, deferred = true)
         yield(Unit)
