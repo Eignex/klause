@@ -14,6 +14,7 @@ import com.eignex.klause.util.WorkMeter
 import java.io.File
 import java.security.MessageDigest
 import java.util.HexFormat
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 import kotlinx.serialization.json.Json
@@ -59,10 +60,10 @@ internal object TranscendentalSourceProbe {
                     for (control in if (repetition % 2 == 0) controls else controls.reversed()) {
                         val engine = FiniteEngine.valueOf(control.substringBefore(':'))
                         val cores = control.substringAfter(':').toInt().also { require(it > 0) }
-                        var charged = 0L
+                        val charged = AtomicLong()
                         val cancellation = object : Cancellation {
-                            override fun isCancelled(): Boolean = cancelWork?.let { charged >= it } == true
-                            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                            override fun isCancelled(): Boolean = cancelWork?.let { charged.get() >= it } == true
+                            override fun workMeter(): WorkMeter = WorkMeter { charged.addAndGet(it) }
                         }
                         val params = PolynomialTheoryParams(maximumWork = maximumWork,
                             timeout = Cancellation.after(timeout.milliseconds), cancellation = cancellation,
@@ -87,7 +88,7 @@ internal object TranscendentalSourceProbe {
                             put("nativeScope", execution.nativeWorkScope)
                             put("nativeResource", execution.nativeResource)
                             put("nativeWork", execution.stats.workSpent)
-                            put("chargedWork", charged)
+                            put("chargedWork", charged.get())
                             put("nodes", result.stats.search.nodes.sum)
                             put("moves", result.stats.ls.moves.sum)
                             put("arms", buildJsonArray {
