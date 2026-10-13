@@ -266,11 +266,11 @@ class SearchRun internal constructor(
             val level = session.decisionLevel
             val decision = frame.decisions[frame.next++]
             if (!decision.tightens(session)) continue
-            if (!session.canCommitOpenTheoryDecision()) return Advance.Budget
+            if (!session.executionControls.canCommitDecision()) return Advance.Budget
             when (val result = session.push(decision)) {
                 ComponentResult.Consistent -> {
                     if (!session.lastPushCreatedLevel()) continue
-                    if (!session.recordOpenTheoryDecision(decision)) return Advance.Budget
+                    if (!session.executionControls.recordDecision(decision)) return Advance.Budget
                     decisions++
                     decisionsSinceRestart++
                     observer.onCommit(decision, session.decisionLevel)
