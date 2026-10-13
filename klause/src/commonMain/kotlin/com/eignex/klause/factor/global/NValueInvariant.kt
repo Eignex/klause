@@ -20,6 +20,7 @@ internal class NValueInvariant(
     private val presents: IntArray,
     private val presentNvInvFn: (LocalSearchState, Int) -> Boolean,
 ) : Invariant {
+    private val eliminationMoves = NValueEliminationMoves(n, xs, mode, presents, presentNvInvFn)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val counts = MutableLongIntMap()
@@ -208,6 +209,7 @@ internal class NValueInvariant(
             sink.addChannelingIntSet(state, xs[i], pick ?: continue)
             emitted++
         }
+        eliminationMoves.propose(state, s.distinctCount, sink)
     }
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {

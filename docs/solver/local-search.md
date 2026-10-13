@@ -290,6 +290,23 @@ Satisfied linear equalities counter-shift the first admissible partner in coeffi
 magnitude order whose coefficient divides the driving drift. Targets outside root
 domains and protected partners do not prevent later partners from absorbing the drift.
 
+## NValue neighborhoods
+
+Satisfied NValue factors supplement count-preserving coordinate moves with bounded
+value-class elimination. A proposal moves every present coordinate of one class to
+an existing value admitted by every participating root domain and reconciles the
+count for its equality or inequality mode. Repeated coordinates are changed once;
+count aliases are checked against the final distinct values. Frozen, maintained or
+foreign-owned changed coordinates decline the whole class. Absent positions do not
+restrict a class unless they share a participating coordinate.
+
+Each call samples at most 24 class pairs and offers at most four elimination moves,
+each changing at most 32 class coordinates plus the count and its channels. Channel
+contributions protect all NValue coordinates from counter-shifts and carry equality
+indicators and binary channels. Proposals changing presence literals decline. Complete
+model scoring and ordinary source publication checks remain required; NValue
+satisfaction alone establishes neither feasibility nor objective improvement.
+
 ## Cumulative neighborhoods
 
 Cumulative integer moves update every task reading the coordinate as a start,
