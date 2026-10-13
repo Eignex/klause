@@ -691,6 +691,14 @@ irrational equalities. Missing, duplicate, unknown or sort-mismatched coordinate
 are rejected. Integer coordinates must be integral and retain arbitrary precision.
 Nonpolynomial, optimization and incremental sources decline.
 
+The ground witness route permits one auxiliary `/0` model definition with two
+Real arguments and a Real result when that name is not a source coordinate.
+Source admission requires every division denominator to be a nonzero rational
+constant, so the division completion cannot affect any checked assertion. Its
+body is not installed in the checking model. All original coordinates remain
+required; duplicate or other auxiliary definitions are rejected. Scalar model
+reading without that source admission remains strict.
+
 ```sh
 python3 klause-bench/tools/verify_nra_source_results.py original.smt2 --witness model.smt2
 python3 klause-bench/tools/verify_nra_source_results.py original.smt2 --expected unsat
