@@ -8,6 +8,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
@@ -21,6 +22,32 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
+    @Test
+    fun `component preparation waits for a slice and initializes once`() {
+        var batches = 0
+        val component = object : PreparingSearchComponent {
+            override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+                repeat(3) {
+                    batches++
+                    yield(null)
+                }
+                yield(ComponentResult.Consistent)
+            }.iterator()
+        }
+        val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(
+            BacktrackParams(componentFactory = { listOf(component) }),
+        )
+        assertEquals(0, batches)
+        assertNull(search.runSlice(Cancellation.Never, 0L, 1L))
+        assertEquals(0, batches)
+
+        val verdict = search.use { runToVerdict(it, 1L) }
+
+        assertIs<SolveResult.Unsat>(verdict)
+        assertEquals(3, batches)
+    }
+
+
 
     /** Pigeons into holes, clause-encoded so propagation alone cannot settle it and the search must branch. */
     private fun pigeonhole(pigeons: Int, holes: Int): Problem {

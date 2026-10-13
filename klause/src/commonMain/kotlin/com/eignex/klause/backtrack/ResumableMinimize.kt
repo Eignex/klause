@@ -48,6 +48,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.BooleanBranching
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
@@ -390,6 +391,8 @@ internal class ResumableMinimize(
             val initializer = searchSession.prepareInitialization { component, context ->
                 if (deferredInstallation && component === cp) {
                     cp.prepareInitialization(context)
+                } else if (deferredInstallation && component is PreparingSearchComponent) {
+                    component.prepareInitialization(context)
                 } else {
                     sequenceOf(component.initialize(context)).iterator()
                 }

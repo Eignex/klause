@@ -9,6 +9,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.util.Cancellation
@@ -18,7 +19,7 @@ internal class PolynomialSearchComponent(
     private val invocation: PolynomialTheoryInvocation,
     integerColumns: Map<Int, Int> = emptyMap(),
     private val capture: ((QfNraAssignment, SearchContext) -> Sample)? = null,
-) : TheoryComponent {
+) : TheoryComponent, PreparingSearchComponent {
     private val integerColumns = integerColumns.toMap()
     val witnessKey = SearchModelKey(QfNraAssignment::class)
     private var signature: PolynomialSignature? = null
@@ -32,6 +33,26 @@ internal class PolynomialSearchComponent(
     override fun retract(decisionLevel: Int) = invalidate()
 
     override fun initialize(context: SearchContext): ComponentResult = propagate(context)
+
+    override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+        if (context.cancelled() || !context.consumeCheck()) {
+            yield(ComponentResult.Indeterminate)
+            return@sequence
+        }
+        val current = signatureOf(context)
+        val pending = invocation.prepareCheck(conditionOf(current), Cancellation { context.cancelled() })
+        var result: QfNraResult? = null
+        while (result == null) {
+            result = pending.next()
+            if (result == null) yield(null)
+        }
+        retain(current, result)
+        yield(when (result) {
+            is QfNraResult.Satisfiable -> ComponentResult.Consistent
+            is QfNraResult.Unsatisfiable -> ComponentResult.Conflict()
+            is QfNraResult.Unknown -> ComponentResult.Indeterminate
+        })
+    }.iterator()
 
     override fun propagate(context: SearchContext): ComponentResult = when (evaluate(context)) {
         is QfNraResult.Satisfiable -> ComponentResult.Consistent
@@ -62,28 +83,28 @@ internal class PolynomialSearchComponent(
 
     private fun evaluate(context: SearchContext): QfNraResult? {
         if (context.cancelled()) return null
-        val current = PolynomialSignature(
-            (0 until service.boolCount).mapNotNull { id -> context.boolValue(id)?.let { id to it } }.toMap(),
-            integerColumns.mapNotNull { (source, column) ->
-                context.intLowerBound(source)?.let { column to it }
-            }.toMap(),
-            integerColumns.mapNotNull { (source, column) ->
-                context.intUpperBound(source)?.let { column to it }
-            }.toMap(),
-        )
+        val current = signatureOf(context)
         if (signature == current) return outcome
         if (!context.consumeCheck()) return null
-        val result = invocation.check(
-            PolynomialCondition(
-                current.bools,
-                current.lower.mapValues { BigFraction.ofLong(it.value) },
-                current.upper.mapValues { BigFraction.ofLong(it.value) },
-            ),
-            Cancellation { context.cancelled() },
-        )
+        val result = invocation.check(conditionOf(current), Cancellation { context.cancelled() })
+        retain(current, result)
+        return result
+    }
+
+    private fun signatureOf(context: SearchContext): PolynomialSignature = PolynomialSignature(
+        (0 until service.boolCount).mapNotNull { id -> context.boolValue(id)?.let { id to it } }.toMap(),
+        integerColumns.mapNotNull { (source, column) -> context.intLowerBound(source)?.let { column to it } }.toMap(),
+        integerColumns.mapNotNull { (source, column) -> context.intUpperBound(source)?.let { column to it } }.toMap(),
+    )
+
+    private fun conditionOf(current: PolynomialSignature): PolynomialCondition = PolynomialCondition(
+        current.bools, current.lower.mapValues { BigFraction.ofLong(it.value) },
+        current.upper.mapValues { BigFraction.ofLong(it.value) },
+    )
+
+    private fun retain(current: PolynomialSignature, result: QfNraResult) {
         signature = current.takeUnless { result is QfNraResult.Unknown }
         outcome = result.takeUnless { it is QfNraResult.Unknown }
-        return result
     }
 
     private fun invalidate() {
