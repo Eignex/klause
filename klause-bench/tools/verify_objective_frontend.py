@@ -3,6 +3,7 @@
 import hashlib
 import json
 import pathlib
+import re
 import sys
 
 import z3
@@ -47,7 +48,8 @@ def verify(root):
         else:
             assert 'sat' in output.splitlines(), path
             model = '\n'.join(line for line in output.splitlines()
-                          if line.strip() and not line.startswith(';') and
+                              if line.strip() and not line.startswith(';') and
+                              not re.match(r'^\[\d+(?:\.\d+)?s\]\[info\]\[jfr,startup\](?: |$)', line) and
                           line.strip() not in ('sat', 'unsat', 'unknown'))
             values = witness_values(model, variables)
             substitutions = [(variables[name], value) for name, value in values.items()]
