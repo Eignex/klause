@@ -205,6 +205,12 @@ Legacy witness tags supply no additional authority to its installed source check
 binding for the completion-taking worker issuance hook. `EngineInvocation` retains
 the existing prepared plan, its original source and objective/direction, the actual
 execution model/objective identity, and owned original/execution assumption snapshots.
+Native source-context inputs can additionally supply their actual exact original
+condition, including real windows and arbitrary-precision integer restrictions.
+That condition must retain every explicit original pin and reference only declared
+source coordinates; an optional capture scope must contain the same condition.
+Witness admission checks it alongside original and execution assumptions. Global
+invocation matching retains the exact condition even when revision capture is absent.
 Pins and deduced bounds, holes and sets cannot change after binding. An optional
 `SourceScope` records explicitly requested revision/semantics capture; an uncaptured
 runtime does not invent a revision or provide independent original-source coverage.
