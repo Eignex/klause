@@ -260,8 +260,13 @@ def verify(source, record, condition_source=None):
                 assert declarations[inverse[coordinate]] == "Int"
                 threshold = number(threshold)
                 assert threshold.denominator == 1
-                coverage(below, {**assumptions, (coordinate, True): ({coordinate: F(1)}, threshold, False)}, bools, depth + 1)
-                coverage(above, {**assumptions, (coordinate, False): ({coordinate: F(-1)}, -threshold - 1, False)}, bools, depth + 1)
+                def branch(upper, rhs):
+                    key = coordinate, upper
+                    if key in assumptions:
+                        rhs = min(rhs, assumptions[key][1])
+                    return {**assumptions, key: ({coordinate: F(1) if upper else F(-1)}, rhs, False)}
+                coverage(below, branch(True, threshold), bools, depth + 1)
+                coverage(above, branch(False, -threshold - 1), bools, depth + 1)
             else:
                 terms, bound, leaf_strict = derive(proof, assumptions, bools, depth + 1)
                 contradiction = not terms and (bound < 0 or bound == 0 and leaf_strict)
