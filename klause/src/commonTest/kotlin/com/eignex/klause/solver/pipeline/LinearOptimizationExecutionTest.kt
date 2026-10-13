@@ -41,6 +41,44 @@ class LinearOptimizationExecutionTest {
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
 
     @Test
+    fun `cancelling a scoped portfolio retains its checked incumbent and conditional root bound`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val request = OpenTheoryRequest(model, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
+        val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
+        val context = SourceProofContext(original.scope.copy(condition = SourceCondition(
+            lower = mapOf(real to third))), original.coordinates, original.premises, original.objective,
+            original.objectiveConstant, original.semanticsChecker)
+
+        for (lanes in listOf(1, 4)) {
+            var cancelled = false
+            var observed: SourceIncumbentPublication? = null
+            val params = TheoryParams(openWorkLimit = 100_000, maxFlips = 0,
+                cancellation = Cancellation { cancelled })
+
+            val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
+                request.withLinearAuthority(context), params, FiniteEngine.MIXED, lanes) {
+                observed = it
+                cancelled = true
+            })
+
+            val bounded = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
+            val authority = assertNotNull(bounded.linearResult)
+            assertEquals(TerminationReason.Cancelled, bounded.reason)
+            assertEquals(context.scope, authority.scope)
+            assertNull(authority.terminal)
+            val bound = assertIs<SourceClaim.Bound>(assertNotNull(authority.bound).claim)
+            assertEquals(SourceValue.Rational(third), bound.value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                authority.evidence.verify(bound, context.withLinearAuthority()))
+            assertSame(assertNotNull(observed), execution.acceptedIncumbent)
+            assertSame(observed?.sample, authority.incumbent)
+            assertEquals(third, authority.value)
+        }
+    }
+
+    @Test
     fun `ordinary complete routes preserve captured exact coordinate pins and source receipts`() {
         val model = Problem(numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0),
