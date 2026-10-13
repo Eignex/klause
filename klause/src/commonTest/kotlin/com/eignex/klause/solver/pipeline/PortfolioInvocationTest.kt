@@ -1,6 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Session
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioWorker
@@ -80,5 +84,32 @@ class PortfolioInvocationTest {
 
         assertIs<SolveResult.Unknown>(result)
         assertFalse(entered)
+    }
+
+    @Test
+    fun `runtime binding failure closes the materialized worker before unwinding source state`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val plan = source.prepareExecutionPlan()
+        val delegate = BacktrackSolver(source.bake()).session()
+        val closed = mutableListOf<String>()
+        val session = object : Session<BacktrackParams> by delegate {
+            override fun close() {
+                closed += "worker"
+                delegate.close()
+            }
+        }
+        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
+            bind = { error("invalid runtime binding") }) { slot ->
+            slot.own(AutoCloseable { closed += "source" })
+            PortfolioWorker.of("source", 0, session, BacktrackParams())
+        }
+
+        val failure = assertFailsWith<IllegalStateException> {
+            PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(),
+                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()))
+        }
+
+        assertEquals("invalid runtime binding", failure.message)
+        assertEquals(listOf("worker", "source"), closed)
     }
 }

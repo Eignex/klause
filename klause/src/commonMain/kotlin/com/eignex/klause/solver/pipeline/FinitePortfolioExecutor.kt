@@ -18,6 +18,8 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -50,11 +52,14 @@ internal fun FinitePipeline.portfolioExecutor(
     cancellation: Cancellation,
 ): PortfolioExecutor {
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
+    val identity = ModelIdentity.of(problem, objective)
+    val binding = EngineInvocation(preparedPlan, identity, objective)
     val factories = PortfolioBuilder.factories(problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
         profile).map { factory ->
-        PortfolioArmFactory(preparedPlan, factory.armId, factory.family) { slot ->
-            factory.materialize(slot.index, slot.baseSeed, slot.nodeBudget)
-        }
+        PortfolioArmFactory(preparedPlan, factory.armId, factory.family, bind = { worker ->
+            worker.bindInvocation(EngineInvocation(preparedPlan, identity, objective,
+                executionAssumptions = worker.executionAssumptions ?: Assumptions.None))
+        }) { slot -> factory.materialize(slot.index, slot.baseSeed, slot.nodeBudget) }
     }
     return PortfolioInvocation(
         preparedPlan, factories,
@@ -65,8 +70,9 @@ internal fun FinitePipeline.portfolioExecutor(
             sliceGrowth = scenario.sliceGrowth, phaseRetention = scenario.phaseRetention,
             reseedStaleThreshold = scenario.reseedStaleThreshold,
         ),
-        PortfolioEvidence(ModelIdentity.of(problem, objective),
-            finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck)),
+        PortfolioEvidence(identity,
+            finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck))
+            .bindInvocation(binding, cancellation),
         objective, onFault,
     ) { workers ->
         val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
