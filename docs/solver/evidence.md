@@ -190,8 +190,10 @@ consumer migration remains separate from its typed transport contract.
 from the worker's actual runtime. A restricted worker cannot select the containing
 query or change it after binding. Bound and integer-window callbacks on a bound
 backtrack worker retain their actual native values and coordinates in typed
-publications, including origin and contribution bookkeeping. Unbound compatibility
-traffic retains its existing engine admission path until its consumer is bound.
+publications, including origin and contribution bookkeeping. Unbound workers withhold
+shared root deductions; their native search still retains its own bounds. An unbound
+incumbent has no native publication certificate; a model-bound pool withholds its
+admission. An unscoped exchange follows its installed source-checking contract.
 Bound backtrack incumbent callbacks carry their actual witness publication through
 the existing shared pool admission with the containing runtime and cancellation.
 The exchange's installed source checker still decides whether the point supplies a

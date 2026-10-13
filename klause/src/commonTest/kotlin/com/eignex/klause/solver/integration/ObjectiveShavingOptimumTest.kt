@@ -26,6 +26,25 @@ import kotlin.test.assertTrue
 class ObjectiveShavingOptimumTest {
 
     @Test
+    fun `unbound objective shaving retains its native optimum without sharing a floor`() {
+        val source = triangleCover()
+        val executable = source.bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+        val model = ModelIdentity.of(executable, objective)
+        val bounds = SharedObjectiveBound(identity = model)
+        val pools = SharedPools(null, null, bounds = bounds, identity = model)
+        val config = BacktrackWorkerConfig(BacktrackRecipe("shaving") { _, _ ->
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, objectiveShaving = true))
+        })
+        val worker = config.materialize(executable, 0, 0, 1L, 1.0, objective, null, null, null, pools)
+
+        val result = worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+
+        assertTrue(result is MinimizeResult.Optimal && result.objectiveValue == 2.0)
+        assertEquals(Double.NEGATIVE_INFINITY, bounds.current())
+    }
+
+    @Test
     fun `actual native objective shaving reaches a runtime bound pool`() {
         val source = triangleCover()
         val executable = source.bake()
