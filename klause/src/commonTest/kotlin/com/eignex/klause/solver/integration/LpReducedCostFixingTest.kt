@@ -12,16 +12,18 @@ import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.applySparseReducedCostFixing
 import com.eignex.klause.lp.bounding.reducedCostFixingReasons
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
-import com.eignex.klause.lp.engine.integerCertify
-import com.eignex.klause.lp.engine.ExactLpNumber
-import com.eignex.klause.lp.engine.ExactLpSide
-import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.authoritativeModel
+import com.eignex.klause.lp.engine.integerCertify
+import com.eignex.klause.lp.engine.nodeDualCertificate
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
@@ -40,6 +42,30 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpReducedCostFixingTest {
+
+    @Test
+    fun `mixed reduced cost fixing preserves continuous objective units`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray())
+        val session = PropagationSession(problem)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val source = LpBuilder().apply {
+            addVar(0L, 10L, cost = 1L)
+            addRealVar(0.25, 1.25, cost = 0.5)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf()))
+        val relaxation = LpRelaxation(
+            model, intArrayOf(0, -1), booleanArrayOf(false, false), 0L, intArrayOf(0), intArrayOf(),
+            colRealId = intArrayOf(-1, 0),
+        )
+        val sink = SolveStatsSink(backend = "mixed-fixing")
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+
+            engine.applySparseReducedCostFixing(relaxation, certificate, session, 3.0, sink)
+
+            assertEquals(IntDomain(0, 2), session.intDomain(0))
+        }
+    }
 
     @Test
     fun `retained affine fixing reasons express the cutoff in absolute source units`() {
