@@ -16,6 +16,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -139,6 +140,21 @@ internal class RationalTheoryDescent(
         return finish(if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled)
     }
 
+    fun linearSnapshot(reason: TerminationReason): LinearOptimizationResult? {
+        linearResult?.let { return it }
+        val captured = context ?: return null
+        val snapshot = linear?.snapshot(reason) ?: return null
+        return LinearOptimizationResult(captured.scope, snapshot.terminal, snapshot.bound,
+            snapshot.incumbent, snapshot.value, snapshot.reason, snapshot.stats)
+    }
+
+    fun matchesInvocation(invocation: EngineInvocation): Boolean =
+        invocation.preparedPlan.originalSource === source &&
+            invocation.model.matches(ModelIdentity.of(source, objective)) &&
+            invocation.executionObjective === objective &&
+            invocation.scope == context?.scope &&
+            invocation.executionCondition == context?.scope?.condition
+
     private fun attestWitness(sample: Sample, cancellation: Cancellation) {
         val original = witnessContext ?: source.linearAuthorityContext(LinearObjective(), ObjectiveSense.MINIMIZE,
             cancellation)?.also { witnessContext = it } ?: return
@@ -158,6 +174,10 @@ internal class RationalTheoryDescent(
     }
 
     override fun close() {
+        if (linearResult == null) {
+            linearResult = linearSnapshot(if (params.timeout()) TerminationReason.Timeout
+                else TerminationReason.Cancelled)
+        }
         linear?.close()
         round?.let { pending -> nativeStats = pending.stats.copy(lp = nativeStats.lp.mergedWith(pending.stats.lp)) }
         round?.close()
