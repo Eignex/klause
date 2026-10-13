@@ -2,8 +2,6 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.theory.qflra.SourceBoundAtom
-import com.eignex.klause.theory.qflra.SourceBoundTerm
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

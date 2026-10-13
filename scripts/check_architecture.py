@@ -29,6 +29,7 @@ FORBIDDEN = {
     "formats": ("compile", "schema", "theory"),
     "bound": ("lp.engine",),
     "solver.pipeline": ("formats",),
+    "solver.search": ("theory", "lp", "propagation", "backtrack"),
     "theory": ("propagation", "backtrack", "ir.IntDomain", "ir.intdomain"),
 }
 NAME = r"[A-Za-z_][A-Za-z_0-9]*"

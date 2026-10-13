@@ -14020,6 +14020,56 @@ public abstract interface class com/eignex/klause/solver/search/SearchUnassignLi
 public abstract interface class com/eignex/klause/solver/search/SearchValueKey {
 }
 
+public final class com/eignex/klause/solver/search/SourceBoundAtom : com/eignex/klause/solver/search/SourceBoundPredicate {
+	public static final field Companion Lcom/eignex/klause/solver/search/SourceBoundAtom$Companion;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getSourceBound ()Lcom/eignex/klause/solver/search/SourceBoundAtom;
+	public final fun getStrict ()Z
+	public final fun getTerms ()Ljava/util/List;
+	public final fun getThreshold ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getUpper ()Z
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/solver/search/SourceBoundAtom$Companion {
+	public final fun integerSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public static synthetic fun integerSplit$default (Lcom/eignex/klause/solver/search/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public final fun rationalSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZLcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public static synthetic fun rationalSplit$default (Lcom/eignex/klause/solver/search/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZLcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+}
+
+public final class com/eignex/klause/solver/search/SourceBoundLimits {
+	public fun <init> ()V
+	public fun <init> (II)V
+	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lcom/eignex/klause/solver/search/SourceBoundLimits;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/SourceBoundLimits;IIILjava/lang/Object;)Lcom/eignex/klause/solver/search/SourceBoundLimits;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxBits ()I
+	public final fun getMaxTerms ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/search/SourceBoundPredicate : com/eignex/klause/solver/search/SearchTheoryDecision {
+	public abstract fun getSourceBound ()Lcom/eignex/klause/solver/search/SourceBoundAtom;
+}
+
+public final class com/eignex/klause/solver/search/SourceBoundTerm {
+	public fun <init> (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/search/SearchValueKey;
+	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun copy (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/solver/search/SourceBoundTerm;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/SourceBoundTerm;Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SourceBoundTerm;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoefficient ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getSource ()Lcom/eignex/klause/solver/search/SearchValueKey;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class com/eignex/klause/solver/search/TheoryComponent : com/eignex/klause/solver/search/SearchComponent {
 }
 
@@ -14242,9 +14292,10 @@ public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/theory/qflra/SourceBoundAtom : com/eignex/klause/solver/search/SearchTheoryDecision {
+public final class com/eignex/klause/theory/qflra/SourceBoundAtom : com/eignex/klause/solver/search/SourceBoundPredicate {
 	public static final field Companion Lcom/eignex/klause/theory/qflra/SourceBoundAtom$Companion;
 	public fun equals (Ljava/lang/Object;)Z
+	public fun getSourceBound ()Lcom/eignex/klause/solver/search/SourceBoundAtom;
 	public final fun getStrict ()Z
 	public final fun getTerms ()Ljava/util/List;
 	public final fun getThreshold ()Lcom/eignex/klause/simplex/exact/BigFraction;

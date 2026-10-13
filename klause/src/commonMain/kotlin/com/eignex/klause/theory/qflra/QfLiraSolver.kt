@@ -49,6 +49,9 @@ import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
+import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundPredicate
+import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
@@ -482,7 +485,7 @@ class ExactLiraSearchComponent private constructor(
                             integer.upper,
                         ) ?: return ComponentResult.Indeterminate
                     } else {
-                        payload.payload as? SourceBoundAtom ?: return ComponentResult.Consistent
+                        (payload.payload as? SourceBoundPredicate)?.sourceBound ?: return ComponentResult.Consistent
                     }
                     if (context.atomLiteral(decision) == null) return ComponentResult.Indeterminate
                     if (system.sourceTerms(atom) == null) return ComponentResult.Indeterminate
@@ -1673,8 +1676,8 @@ private class DisjunctAtom(
     val fails: RegisteredTheoryDecision,
     val address: RowAddress,
 ) {
-    val row = holds.payload as? SourceBoundAtom
-    val complement = fails.payload as? SourceBoundAtom
+    val row = (holds.payload as? SourceBoundPredicate)?.sourceBound
+    val complement = (fails.payload as? SourceBoundPredicate)?.sourceBound
 }
 
 // The source branches search made. A decided disjunct restates a model row the size limits already count.
