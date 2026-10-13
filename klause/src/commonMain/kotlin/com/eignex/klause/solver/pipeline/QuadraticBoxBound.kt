@@ -2,11 +2,11 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.objective.intervalBounds
 
 internal data class QuadraticBoxBound(val lower: BigFraction, val upper: BigFraction)
 
@@ -35,30 +35,7 @@ internal fun quadraticBoxBound(
             if (lower == null || upper == null) null else lower to upper
         }
     }
-    fun fraction(value: QuadraticCoefficient) = BigFraction.of(value.numerator, value.denominator)
-    var lower = fraction(objective.constant)
-    var upper = lower
-    for (term in objective.terms) {
-        step()
-        val coefficient = fraction(term.coefficient)
-        if (coefficient == BigFraction.ZERO) continue
-        val first = range(term.first) ?: return null
-        if (first.first > first.second) return null
-        val second = term.second?.let { range(it) ?: return null }
-        if (second != null && second.first > second.second) return null
-        val values = if (second == null) listOf(first.first, first.second)
-        else if (term.first == term.second) {
-            listOf(first.first * first.first, first.second * first.second) +
-                if (first.first <= BigFraction.ZERO && first.second >= BigFraction.ZERO) listOf(BigFraction.ZERO)
-                else emptyList()
-        } else listOf(
-            first.first * second.first, first.first * second.second,
-            first.second * second.first, first.second * second.second,
-        )
-        val scaled = values.map { it * coefficient }
-        lower += scaled.reduce { left, right -> if (left < right) left else right }
-        upper += scaled.reduce { left, right -> if (left > right) left else right }
-    }
-    step()
-    return (if (sense == ObjectiveSense.MINIMIZE) lower else upper) to QuadraticBoxBound(lower, upper)
+    val bounds = objective.intervalBounds(::range, step) ?: return null
+    val value = if (sense == ObjectiveSense.MINIMIZE) bounds.first else bounds.second
+    return value to QuadraticBoxBound(bounds.first, bounds.second)
 }

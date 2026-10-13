@@ -29,7 +29,10 @@ or numerical engine identity supplies no derivation authority.
 declared source language. Unsupported semantics decline explicitly.
 `LinearSourceSemanticsChecker` checks a source consisting entirely of affine
 premises and declared coordinates, including rational and algebraic real values.
-Its premises must include all declaration bounds and source constraints. It checks
+Its premises must include all declaration bounds and source constraints. The original
+IR binder uses this complete checker for plain affine conjunctions, including wide
+integer and algebraic real witnesses. Declared integer value sets are checked as well;
+an open column acquires no invented finite value set. It checks
 invocation restrictions, strict rows, feasible bases, recession signs and objective
 improvement. Integer directions must have integral steps. Source-specific symbolic
 witness semantics belong to their source checker.
@@ -50,7 +53,8 @@ and nonattainment derivations; a strict bound alone does not establish convergen
 `SourceResultCapture` attaches optional evidence to ordinary completed satisfaction
 and minimization results. It retains source assignments and exact objective values;
 engine completion labels are captured separately. A caller can supply actual bound
-or traversal derivations. Without them, optimum/refutation coverage remains explicitly
+or traversal derivations. Capture preserves a completed result already carrying a
+different source scope; recapture cannot erase its invocation restrictions. Without them, optimum/refutation coverage remains explicitly
 unavailable. Existing workers retain their documented engine admission contract;
 this optional capture does not convert producer identity into a derivation.
 
@@ -69,6 +73,8 @@ withhold this capture rather than relabel their source.
 coefficients into original-premise combinations. Structural coordinates retain their
 source declarations and shifts; slack coordinates retain exact row images. Every
 selected endpoint must have a compatible original premise or invocation citation.
+Certified LP values use minimized objective units; maximization capture negates the
+reported value into the original source upper bound.
 Missing cut/lowering justifications, foreign integer certificates, unsupported
 column bindings and interrupted capture remain unavailable. Numerical model labels
 and supplied multiplier values do not confer authority; the resulting source claim
@@ -82,6 +88,42 @@ positive scale, matching direction and checked source equalities. A verified aff
 projection transfers only a proof using its covered premises; source-specific target
 semantic extensions remain unavailable without their own projection justification.
 Projection obligations and terminal checks share one containing verification allowance.
+
+`SourceResultCapture.quadratic` retains exact incumbent, bound, limit and unboundedness
+claims on quadratic results. General unboundedness requires a source-specific
+trajectory derivation; an affine `Ray` retains its explicit direction. Completed
+quadratic verification checks actual exact incumbent/bound equality, strictness and
+source objective direction. An optimum label or a strict bound alone cannot establish
+an attained optimum or approach to an unattained limit.
+
+`Problem.quadraticSourceProofContext` reuses original constraints and exact quadratic
+objective evaluation. The typed quadratic interval rule derives bounds from original
+declarations and invocation intervals through the shared exact interval arithmetic.
+Typed engine extensions retain convex, objective-image, recession, conditional and
+branch data without opaque payloads. Completed native certificates retain those
+payloads and a typed native invocation with the actual source object, objective,
+direction and explicit original-coordinate pins. Native invocation metadata is
+separate from an optional original-source revision. `Problem.quadraticSourceResultCapture`
+binds capture to that actual original object and objective; an unrelated equal-shaped
+model or weaker invocation cannot replace it. Recapture preserves the native payload.
+The integer and branch-completion producers use these typed records; the finite
+quadratic adapter retains its compatibility factory until its consumer migration. Their source checker must justify coordinate
+bindings and complete coverage; a flat branch list is not a traversal proof. A
+known conditioned result cannot be recaptured under a different original scope.
+
+Absent affine data does not become a constant objective. Unsupported traversal,
+trajectory or approach mechanisms retain unavailable coverage.
+
+`CompletedEngineResult` retains an actual ordinary completed result and its source
+scope for the completion-taking worker issuance hook. Matching worker identity alone
+cannot issue through that hook. Its engine admission and independent derivation check
+are separate: the latter requires actual retained evidence and an expected source
+claim. Search exhaustion must retain its actual source cutoff to attest a bound;
+an exhausted reason without that value supplies no bound claim. Derivation checks
+match the completed coordinates and ray direction, and an attained optimum is
+checked at its actual assignment. A scoped non-witness import requires the same
+consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance and opaque quadratic producer arguments remain
+until their consumers migrate; these hooks do not assert that migration is complete.
 
 Capture does not implement proof file export. [Portfolio publication](portfolio.md)
 owns admission and transport; [LP certification](../lp/certification.md) owns numerical

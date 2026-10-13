@@ -15,6 +15,12 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
+import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
+import com.eignex.klause.solver.evidence.QuadraticEngineSource
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.openPolynomial
@@ -31,8 +37,8 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
-import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -77,13 +83,6 @@ fun OpenTheoryPipeline.minimize(
     )
 }
 
-private class QuadraticIntegerProofScope(
-    val source: NonlinearIntegerProblem,
-    val objective: QuadraticObjectiveSpec,
-    val sense: ObjectiveSense,
-    val condition: PolynomialCondition,
-)
-
 internal class QuadraticIntegerOptimization(
     private val source: NonlinearIntegerProblem,
     private val objective: QuadraticObjectiveSpec,
@@ -101,7 +100,7 @@ internal class QuadraticIntegerOptimization(
     private lateinit var relaxation: QuadraticSourceRelaxation
     private val algebraic: AlgebraicArithmetic get() = relaxation.algebraic
     private lateinit var root: PolynomialCondition
-    private lateinit var scope: QuadraticIntegerProofScope
+    private lateinit var scope: QuadraticEngineInvocation
     private lateinit var identity: ModelIdentity
     private var relevantBooleans: Set<Int> = emptySet()
     private val sink = SolveStatsSink("quadratic-integer").also { it.start() }
@@ -110,10 +109,10 @@ internal class QuadraticIntegerOptimization(
     private var rootBound: QuadraticObjectiveBound? = null
     private var limit: AlgebraicReal? = null
     private var attained = false
-    private val proofs = mutableListOf<Any>()
+    private val proofs = mutableListOf<SourceDerivation>()
     private var interrupted = false
     private var neighborhoodPoint: QuadraticIncumbent? = null
-    private var globalUnbounded: Any? = null
+    private var globalUnbounded: SourceDerivation? = null
 
     fun execute(): QuadraticOptimizationResult = try {
         preparation.step()
@@ -141,8 +140,17 @@ internal class QuadraticIntegerOptimization(
         relaxation = QuadraticSourceRelaxation(
             expression.formula, canonical, source.boolCount, expression.numericCount, controls, native,
         )
-        root = source.integerBounds(assumptions(), relaxation.arithmetic)
-        scope = QuadraticIntegerProofScope(source, objective, sense, root)
+        val invocation = assumptions()
+        root = source.integerBounds(invocation, relaxation.arithmetic)
+        val coordinates = source.integerCoordinates.withIndex().associate { (id, column) ->
+            column to SourceCoordinate(SourceCoordinate.Kind.Integer, id)
+        }
+        scope = QuadraticEngineInvocation(
+            QuadraticEngineSource.NonlinearInteger(source), objective, sense,
+            SourceCondition(invocation.bools,
+                invocation.lower.mapKeys { (column, _) -> coordinates.getValue(column) },
+                invocation.upper.mapKeys { (column, _) -> coordinates.getValue(column) }),
+        )
         identity = ModelIdentity.of(source, scope)
         when (engine) {
             FiniteEngine.LOCAL_SEARCH -> { walk(false); partial() }
@@ -205,22 +213,23 @@ internal class QuadraticIntegerOptimization(
         }
         if (!exhausted || stop()) return partial()
         val best = limit
+        val coverage = QuadraticEngineDerivation.Branches(proofs)
         if (best == null) return QuadraticOptimizationResult.Infeasible(
-            certificate(proofs.toList(), QuadraticClaim.Infeasible), sense, sink.snapshot(),
+            certificate(coverage, QuadraticClaim.Infeasible), sense, sink.snapshot(),
         )
         val bound = QuadraticObjectiveBound(
-            sourceValue(best), !attained, certificate(proofs.toList(), QuadraticClaim.Bound),
+            sourceValue(best), !attained, certificate(coverage, QuadraticClaim.Bound),
         )
         if (attained) {
             check(algebraic.compare(requireNotNull(incumbent).value, bound.value) == 0)
             if (stop()) return partial()
             return QuadraticOptimizationResult.Optimal(
-                requireNotNull(incumbent), bound, certificate(proofs.toList(), QuadraticClaim.Optimal),
+                requireNotNull(incumbent), bound, certificate(coverage, QuadraticClaim.Optimal),
                 sense, sink.snapshot(),
             )
         }
         return if (stop()) partial() else QuadraticOptimizationResult.UnattainedLimit(
-            requireNotNull(incumbent), bound, certificate(proofs.toList(), QuadraticClaim.UnattainedLimit),
+            requireNotNull(incumbent), bound, certificate(coverage, QuadraticClaim.UnattainedLimit),
             sense, sink.snapshot(),
         )
     }
@@ -294,8 +303,8 @@ internal class QuadraticIntegerOptimization(
         if (relevantBooleans.any { it !in condition.bools }) return QuadraticIntegerNode.BranchBooleans
         val result = relaxation.check(condition, stop, mandatory = false)
         if (result is QuadraticRelaxationResult.Infeasible) {
-            if (global) proofs += result
-            return QuadraticIntegerNode.Empty(result)
+            if (global) proofs += QuadraticEngineDerivation.Condition(result.condition)
+            return QuadraticIntegerNode.Empty(QuadraticEngineDerivation.Condition(result.condition))
         }
         val fixed = source.integerCoordinates.all {
             condition.lower[it] != null && condition.lower[it] == condition.upper[it]
@@ -307,7 +316,7 @@ internal class QuadraticIntegerOptimization(
         }
         if (global && context.decisionLevel == 0 && result is QuadraticRelaxationResult.Minimum && !stop()) {
             rootBound = QuadraticObjectiveBound(
-                sourceValue(result.value), !result.attained, certificate(result, QuadraticClaim.Bound),
+                sourceValue(result.value), !result.attained, certificate(result.proof, QuadraticClaim.Bound),
             )
         }
         val exact = assignment?.let { point ->
@@ -321,8 +330,11 @@ internal class QuadraticIntegerOptimization(
             )
             val best = incumbent?.value?.let { if (sense == ObjectiveSense.MINIMIZE) it else algebraic.negate(it) }
             if (best != null && algebraic.compare(result.value, best) >= 0) {
-                if (global) { record(best, true, result.proof); proofs += condition }
-                return QuadraticIntegerNode.Pruned(result)
+                if (global) {
+                    record(best, true, result.proof)
+                    proofs += QuadraticEngineDerivation.Condition(condition)
+                }
+                return QuadraticIntegerNode.Pruned(result.proof)
             }
             if (fixed) {
                 check(integral) { "fixed source integer completion is fractional" }
@@ -344,13 +356,18 @@ internal class QuadraticIntegerOptimization(
                 accept(capture(candidate.assignment), heuristic = !global)
                 if (result is QuadraticRelaxationResult.Unbounded) {
                     relaxation.integerRecession(condition, candidate.assignment, source.integerCoordinates, stop)?.let {
-                        return QuadraticIntegerNode.Unbounded(candidate.assignment, it)
+                        return QuadraticIntegerNode.Unbounded(
+                            candidate.assignment, QuadraticEngineDerivation.Both(
+                                QuadraticEngineDerivation.Condition(condition), QuadraticEngineDerivation.Recession(it),
+                            ),
+                        )
                     }
                 }
                 if (result is QuadraticRelaxationResult.Minimum && integral &&
                     algebraic.compare(candidate.value, result.value) == 0
                 ) return QuadraticIntegerNode.Closed(
-                    candidate.assignment, result.value, candidate.attained, result.proof to candidate.proof,
+                    candidate.assignment, result.value, candidate.attained,
+                    QuadraticEngineDerivation.Both(result.proof, candidate.proof),
                 )
             }
             is QuadraticRelaxationResult.Unbounded -> {
@@ -397,7 +414,7 @@ internal class QuadraticIntegerOptimization(
         return QuadraticIncumbent(sample, objective.evaluateExact(sample, algebraic))
     }
 
-    private fun record(value: AlgebraicReal, closedAttained: Boolean, proof: Any) {
+    private fun record(value: AlgebraicReal, closedAttained: Boolean, proof: SourceDerivation) {
         proofs += proof
         val previous = limit
         val comparison = previous?.let { algebraic.compare(value, it) } ?: -1
@@ -422,8 +439,8 @@ internal class QuadraticIntegerOptimization(
 
     private fun sourceValue(value: AlgebraicReal): AlgebraicReal =
         if (sense == ObjectiveSense.MINIMIZE) value else algebraic.negate(value)
-    private fun certificate(proof: Any, claim: QuadraticClaim): QuadraticCertificate =
-        QuadraticCertificate.verified(identity, scope, proof, claim)
+    private fun certificate(proof: SourceDerivation, claim: QuadraticClaim): QuadraticCertificate =
+        QuadraticCertificate.engine(identity, scope, claim, proof)
 
     private fun partial(): QuadraticOptimizationResult {
         val worker = if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {

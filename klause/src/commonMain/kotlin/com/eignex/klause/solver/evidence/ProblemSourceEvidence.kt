@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.evidence
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
@@ -17,6 +18,8 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.verifyOpenWitness
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.toLongExact
 
 /** Exact explicit invocation pins in original coordinates; derived restrictions need separate justifications. */
 fun Assumptions.sourceCondition(): SourceCondition {
@@ -113,10 +116,25 @@ fun Problem.sourceProofContext(
     val restrictionChecker = LinearSourceSemanticsChecker(coordinates, premises.values.toList(), coefficients,
         BigFraction.ofLong(objective?.constant ?: 0L))
     val source = this
+    val completeAffine = source.factors.all { factor ->
+        if (factor !is Linear || factor.op == LinearOp.NE) return@all false
+        (0 until factor.size).none { Term.isBool(factor.ref(it)) }
+    }
     val checker = object : SourceSemanticsChecker {
         override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
             val pins = restrictionChecker.witness(sample, scope, cancellation)
             if (pins != SourceEvidenceCheck.Checked) return pins
+            if (completeAffine) {
+                for (id in 0 until source.numIntVars) {
+                    if (cancellation()) return SourceEvidenceCheck.Unavailable("original-source check cancelled")
+                    val domain = source.intDomainOrNull(id) ?: continue
+                    val value = sample.exactIntValue(id)
+                    if (!value.fitsLong() || value.toLongExact() !in domain) {
+                        return SourceEvidenceCheck.Rejected("original integer value is outside its declared set")
+                    }
+                }
+                return SourceEvidenceCheck.Checked
+            }
             if (source.factors.any {
                     it.variables.reals.isEmpty() &&
                         it.executionCapabilities().propagationCheck != AssignmentCheckCapability.EXACT
@@ -136,8 +154,14 @@ fun Problem.sourceProofContext(
             sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
         ): SourceEvidenceCheck = restrictionChecker.objectiveEquals(sample, value, scope, cancellation)
 
-        override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
-            SourceEvidenceCheck.Unavailable("original source recession derivation unavailable")
+        override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
+            if (!completeAffine) {
+                return SourceEvidenceCheck.Unavailable("original source recession derivation unavailable")
+            }
+            val point = witness(claim.sample, scope, cancellation)
+            if (point != SourceEvidenceCheck.Checked) return point
+            return restrictionChecker.ray(claim, scope, cancellation)
+        }
     }
     return SourceProofContext(scope, coordinates, premises, coefficients,
         BigFraction.ofLong(objective?.constant ?: 0L), checker)

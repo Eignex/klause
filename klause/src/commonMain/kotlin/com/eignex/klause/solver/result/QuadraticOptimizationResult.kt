@@ -3,7 +3,15 @@ package com.eignex.klause.solver.result
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
+import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceResultEvidence
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.util.Cancellation
 
 /** A source claim supported by a quadratic optimization attestation. */
 enum class QuadraticClaim {
@@ -19,17 +27,54 @@ enum class QuadraticClaim {
     Infeasible,
 }
 
-/** An opaque in-memory source attestation; this is not an exported proof file. */
+/** A typed optional source derivation package, distinct from the engine's completion label. */
 class QuadraticCertificate private constructor(
     internal val model: ModelIdentity,
-    internal val scope: Any,
-    internal val evidence: Any,
-    /** Claim checked by the producing source adapter. */
+    /** Mathematical completion reported by the producing engine. */
     val claim: QuadraticClaim,
+    /** Original-source evidence when capture was requested. */
+    val evidence: SourceResultEvidence?,
+    private val attestedScope: SourceScope? = evidence?.scope,
+    /** Retained typed engine data; unsupported original bindings withhold independent coverage. */
+    val derivation: SourceDerivation? = null,
+    internal val invocation: QuadraticEngineInvocation? = null,
 ) {
+    /** Captured original revision, invocation restrictions and objective direction. */
+    val scope: SourceScope? get() = attestedScope
+
+    /** Check the actual expected claim against independently supplied original-source semantics. */
+    fun verify(
+        expected: SourceClaim,
+        context: SourceProofContext,
+        cancellation: Cancellation = Cancellation.Never,
+    ): SourceEvidenceCheck {
+        if (attestedScope != null && attestedScope != context.scope) {
+            return SourceEvidenceCheck.Rejected("quadratic attestation belongs to a different source invocation")
+        }
+        return evidence?.verify(expected, context, cancellation)
+            ?: SourceEvidenceCheck.Unavailable("quadratic original-source derivation capture unavailable")
+    }
+
     internal companion object {
+        fun attested(model: ModelIdentity, scope: SourceScope, claim: QuadraticClaim): QuadraticCertificate =
+            QuadraticCertificate(model, claim, null, scope)
+
+        fun captured(
+            original: QuadraticCertificate, claim: QuadraticClaim, evidence: SourceResultEvidence,
+        ): QuadraticCertificate = QuadraticCertificate(
+            original.model, claim, evidence, derivation = original.derivation, invocation = original.invocation,
+        )
+
+        fun engine(
+            model: ModelIdentity, invocation: QuadraticEngineInvocation,
+            claim: QuadraticClaim, derivation: SourceDerivation,
+        ): QuadraticCertificate = QuadraticCertificate(
+            model, claim, null, derivation = derivation, invocation = invocation,
+        )
+
+        @Suppress("UNUSED_PARAMETER")
         fun verified(model: ModelIdentity, scope: Any, evidence: Any, claim: QuadraticClaim): QuadraticCertificate =
-            QuadraticCertificate(model, scope, evidence, claim)
+            QuadraticCertificate(model, claim, null, derivation = evidence as? SourceDerivation)
     }
 }
 
@@ -59,6 +104,9 @@ sealed interface QuadraticOptimizationResult {
     /** Finite traversal and heuristic statistics, separate from native arithmetic work. */
     val stats: SolveStats
 
+    /** Optional exact original-source claims, separate from engine completion attestations. */
+    val evidence: SourceResultEvidence?
+
     /** A result retaining a checked source incumbent. */
     sealed interface WithIncumbent : QuadraticOptimizationResult {
         /** Complete checked source assignment and exact objective. */
@@ -74,6 +122,7 @@ sealed interface QuadraticOptimizationResult {
         val certificate: QuadraticCertificate,
         override val sense: ObjectiveSense,
         override val stats: SolveStats,
+        override val evidence: SourceResultEvidence? = null,
     ) : WithIncumbent
 
     /** A proved infimum/supremum that no feasible source assignment attains. */
@@ -86,6 +135,7 @@ sealed interface QuadraticOptimizationResult {
         val certificate: QuadraticCertificate,
         override val sense: ObjectiveSense,
         override val stats: SolveStats,
+        override val evidence: SourceResultEvidence? = null,
     ) : WithIncumbent
 
     /** A source-valid proof of unlimited improvement, with a checked feasible point. */
@@ -95,6 +145,7 @@ sealed interface QuadraticOptimizationResult {
         val certificate: QuadraticCertificate,
         override val sense: ObjectiveSense,
         override val stats: SolveStats,
+        override val evidence: SourceResultEvidence? = null,
     ) : WithIncumbent
 
     /** A checked incumbent without a completed source optimum proof. */
@@ -106,6 +157,7 @@ sealed interface QuadraticOptimizationResult {
         val reason: TerminationReason,
         override val sense: ObjectiveSense,
         override val stats: SolveStats,
+        override val evidence: SourceResultEvidence? = null,
     ) : WithIncumbent
 
     /** A completed refutation covering every source branch. */
@@ -114,6 +166,7 @@ sealed interface QuadraticOptimizationResult {
         val certificate: QuadraticCertificate,
         override val sense: ObjectiveSense,
         override val stats: SolveStats,
+        override val evidence: SourceResultEvidence? = null,
     ) : QuadraticOptimizationResult
 
     /** No source incumbent or definitive optimization verdict. */
@@ -124,5 +177,6 @@ sealed interface QuadraticOptimizationResult {
         val reason: TerminationReason,
         override val sense: ObjectiveSense,
         override val stats: SolveStats,
+        override val evidence: SourceResultEvidence? = null,
     ) : QuadraticOptimizationResult
 }

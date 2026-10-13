@@ -1,8 +1,12 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
@@ -13,6 +17,13 @@ internal class PortfolioEvidence(
     private val model: ModelIdentity,
     private val witnessVerifier: CandidateVerifier<Sample, Double?>,
 ) {
+    private var sourceScope: SourceScope? = null
+
+    fun bindSourceScope(scope: SourceScope): PortfolioEvidence = also {
+        require(sourceScope == null || sourceScope == scope) { "portfolio cannot change its source invocation" }
+        sourceScope = scope
+    }
+
     private val verifier = ModelEvidenceVerifier(model, witnessVerifier)
 
     fun witness(worker: PortfolioWorker, sample: Sample, value: Double?): Verification<Sample, Double?> {
@@ -32,7 +43,41 @@ internal class PortfolioEvidence(
         value: Double? = null,
     ): Verification<Unit, Unit> {
         val identity = worker.evidenceModel ?: return Verification.Indeterminate("worker has no model identity")
-        val certificate = worker.certificateFor(kind)
+        return proof(identity, worker.certificateFor(kind), kind, sample, value)
+    }
+
+    fun proof(
+        worker: PortfolioWorker,
+        kind: EvidenceKind,
+        completion: CompletedEngineResult,
+    ): Verification<Unit, Unit> {
+        val expected = sourceScope ?: return Verification.Indeterminate("portfolio has no original-source scope")
+        if (completion.scope != expected || worker.evidenceScope != expected ||
+            completion.evidence?.scope?.let { it != expected } == true
+        ) return Verification.Rejected("completion belongs to a different original-source invocation")
+        val identity = worker.evidenceModel ?: return Verification.Indeterminate("worker has no model identity")
+        val sample = when (completion) {
+            is CompletedEngineResult.Solve -> (completion.result as? SolveResult.Sat)?.assignment
+            is CompletedEngineResult.Minimize -> completion.result.assignment
+        }
+        val value = (completion as? CompletedEngineResult.Minimize)?.result?.objectiveValue
+        if (sample != null) {
+            when (val checked = witness(worker, sample, value)) {
+                is Verification.Rejected -> return checked
+                is Verification.Indeterminate -> return checked
+                is Verification.Accepted -> Unit
+            }
+        }
+        return proof(identity, worker.certificateFor(kind, completion), kind, sample, value)
+    }
+
+    private fun proof(
+        identity: ModelIdentity,
+        certificate: EvidenceCertificate?,
+        kind: EvidenceKind,
+        sample: Sample?,
+        value: Double?,
+    ): Verification<Unit, Unit> {
         val evidence: ModelEvidence<Sample, Double?> = when (kind) {
             EvidenceKind.Bound -> ModelEvidence.Bound(identity, value, certificate)
             EvidenceKind.Infeasible -> ModelEvidence.Infeasible(identity, certificate)
@@ -41,7 +86,7 @@ internal class PortfolioEvidence(
             )
             EvidenceKind.Witness -> error("a witness is checked separately")
         }
-        return when (val verdict = verifier.verify(evidence)) {
+        return when (val verdict = verifier.verify(evidence, sourceScope)) {
             is Verification.Accepted -> Verification.Accepted(Candidate(Unit, Unit))
             is Verification.Rejected -> verdict
             is Verification.Indeterminate -> verdict

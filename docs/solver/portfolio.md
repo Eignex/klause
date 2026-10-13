@@ -55,6 +55,14 @@ attestation of the engine's check, not a serialized proof or an independent proo
 checker. Numerical proofs remain owned by their engines; a point alone never certifies a
 recession direction.
 
+Completed-result issuance can retain the actual `SolveResult` or `MinimizeResult`
+and its immutable source invocation. That hook refuses foreign scopes and completion
+kinds unsupported by the result. Its derivation verifier separately checks the actual
+requested source claim; an engine completion without captured derivations stays
+unavailable for independent proof checking. The legacy kind-only issuance remains
+pending consumer migration. [Original-source evidence](evidence.md) defines exact
+quadratic capture and its terminal verification contract.
+
 Independent proof export remains a [vision requirement](../vision.md#independently-checkable-proof-files).
 Serializing an in-memory certificate token does not provide a derivation.
 
