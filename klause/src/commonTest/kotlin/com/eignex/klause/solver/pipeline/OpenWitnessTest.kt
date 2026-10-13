@@ -89,10 +89,18 @@ class OpenWitnessTest {
     fun `theory conversion rejects another source invocation`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val foreign = Problem(0, 0, emptyArray(), emptyArray())
-        val invocation = EngineInvocation(foreign.prepareExecutionPlan(), ModelIdentity.of(foreign))
+        val originalPlan = source.prepareExecutionPlan()
+        val foreignPlan = foreign.prepareExecutionPlan()
+        val invocations = listOf(
+            EngineInvocation(foreignPlan, ModelIdentity.of(foreign)),
+            EngineInvocation(originalPlan, ModelIdentity.of(foreign)),
+            EngineInvocation(foreignPlan, ModelIdentity.of(source)),
+        )
         val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0)))
 
-        assertFailsWith<IllegalArgumentException> { assignment.toSample(source, invocation) }
+        for (invocation in invocations) {
+            assertFailsWith<IllegalArgumentException> { assignment.toSample(source, invocation) }
+        }
     }
 
     @Test
