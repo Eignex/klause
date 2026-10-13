@@ -342,6 +342,17 @@ def require_verdict(solver, expected, problem, purpose):
         raise AssertionError(f'{problem}: {purpose} expected {expected}, got {actual}{reason}')
 
 
+def source_query_solver(constraints, variables, is_smt):
+    bounds = {z3.simplify(constraint).sexpr() for constraint in constraints} if not is_smt else set()
+    binary = not is_smt and bool(variables) and all(
+        z3.is_int(variable) and z3.simplify(variable >= 0).sexpr() in bounds and
+        z3.simplify(variable <= 1).sexpr() in bounds for variable in variables.values())
+    solver = z3.SolverFor('QF_FD') if binary else z3.Solver()
+    solver.set(timeout=120000)
+    solver.add(*constraints)
+    return solver, 'finite binary' if binary else 'general'
+
+
 def check(cases, source_root=None, progress=None, witness_only=False):
     archive, results, cache, sources = [], [], {}, {}
     for case in cases:
@@ -396,9 +407,7 @@ def check(cases, source_root=None, progress=None, witness_only=False):
                 constraints, objective, variables, maximize = mps(text)
                 assert maximize == record["maximize"]
             assert reported_objective is None or objective is not None, "reported objective is absent from source"
-            solver = z3.Solver()
-            solver.set(timeout=120000)
-            solver.add(*constraints)
+            solver, result['sourceQueryEncoding'] = source_query_solver(constraints, variables, is_smt)
             if record["feasible"] is False:
                 assert record["proven"]
                 require_verdict(solver, z3.unsat, record["problem"], 'source infeasibility')
