@@ -34,17 +34,23 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.solver.search.SearchModel
+import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.plus
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -1522,6 +1528,133 @@ class ExactLiraSearchComponentTest {
         assertIs<SearchResult.Exhausted>(
             session.solve(3, SearchSolveParams(maxDecisions = 0)),
         )
+    }
+
+    @Test
+    fun `stopped exact source preparation withholds the factory and retains its charge`() {
+        var charged = 0L
+        val meter = WorkMeter { charged += it }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 20L
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        assertNull(prepareExactLiraSource(partialModel(), stop))
+        val stoppedCharge = charged
+        assertTrue(stoppedCharge >= 20L)
+        assertNull(prepareExactLiraSource(partialModel(), stop))
+        assertEquals(stoppedCharge, charged)
+    }
+
+    @Test
+    fun `prepared source opens fresh disjunction names after cancelled initialization`() {
+        val source = comparisonClauseModel(xUpper = 8)
+        var preparationExpired = false
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation { preparationExpired }))
+        preparationExpired = true
+        prepared.open().use { interrupted ->
+            val session = SearchSession(
+                listOf(interrupted), cancellation = Cancellation { true }, atoms = SearchAtomRegistry(0),
+            )
+            assertIs<ComponentResult.Indeterminate>(session.initialize())
+        }
+
+        prepared.open().use { fresh ->
+            val session = SearchSession(listOf(fresh), atoms = SearchAtomRegistry(0))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<SearchResult.Satisfied>(session.solve(0))
+        }
+    }
+
+    @Test
+    fun `prepared source opens an undecided sibling after a conflicting Boolean prefix`() {
+        val source = partialModel()
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        prepared.open().use { first ->
+            val session = SearchSession(listOf(first))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        }
+
+        prepared.open().use { sibling ->
+            val session = SearchSession(listOf(sibling))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertNull(session.boolValue(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+        }
+    }
+
+    @Test
+    fun `prepared openings contribute only the current source model callback`() {
+        val source = comparisonClauseModel(xUpper = 8)
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        val keys = List(2) { SearchModelKey(ExactLiraAssignment::class) }
+        for (index in keys.indices) {
+            prepared.open { value, model -> model.contribute(keys[index], value) }.use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val model = assertIs<SearchResult.Satisfied>(session.solve(0)).model
+                val witness = assertNotNull(model.valueOf(keys[index]))
+                assertEquals(BIG_ONE, witness.intValue(0) + witness.intValue(1))
+                assertTrue(witness.intValue(0) <= bigIntOf(8))
+                assertNull(model.valueOf(keys[1 - index]))
+            }
+        }
+    }
+
+    @Test
+    fun `legacy exact component constructors retain default and callback model assembly`() {
+        val source = comparisonClauseModel(xUpper = 8)
+        val createLegacy: (Problem, ((ExactLiraAssignment, SearchModel) -> Unit)?) -> ExactLiraSearchComponent =
+            ::ExactLiraSearchComponent
+        val key = SearchModelKey(ExactLiraAssignment::class)
+        for (callback in listOf(false, true)) {
+            val component = if (callback) {
+                createLegacy(source) { value, model -> model.contribute(key, value) }
+            } else {
+                ExactLiraSearchComponent(source)
+            }
+            component.use {
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val model = assertIs<SearchResult.Satisfied>(session.solve(0)).model
+                if (callback) assertNotNull(model.valueOf(key)) else assertNull(model.valueOf(key))
+            }
+        }
+    }
+
+    @Test
+    fun `prepared real source preserves strict bounds on fresh openings`() {
+        val source = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Linear(
+                    intVars = intArrayOf(), intCoeffs = doubleArrayOf(),
+                    realVars = intArrayOf(0), realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.GE, bound = 0.0, strict = true,
+                ),
+            ),
+        )
+        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        for (key in List(2) { SearchModelKey(ExactLiraAssignment::class) }) {
+            prepared.open { value, model -> model.contribute(key, value) }.use { component ->
+                val session = SearchSession(listOf(component))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val model = assertIs<SearchResult.Satisfied>(session.solve(0)).model
+                val value = assertNotNull(model.valueOf(key)).reals.single()
+                assertTrue(value > BigFraction.ZERO)
+                assertTrue(value <= BigFraction.ONE)
+            }
+        }
     }
 
     private fun partialModel(): Problem = Problem(
