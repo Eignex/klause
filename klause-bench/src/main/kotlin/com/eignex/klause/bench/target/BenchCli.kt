@@ -567,18 +567,18 @@ object BenchCli {
         val failure = MiniZincCompatibility.exclusion(candidate.ref) ?: return true
         System.err.println(
             buildJsonObject {
-            put("suite", candidate.suite)
-            put("problem", candidate.ref.name)
-            put("selectionPolicy", MZN_COMPATIBILITY_POLICY)
-            put("status", "source-compiler-incompatible")
-            put("reason", failure.incompatibility)
-            put("diagnostic", failure.diagnostic.take(4000))
-            put("compilerExit", failure.exitCode)
-            put("compilerElapsedNs", failure.elapsedNs)
-            put("compilerCommand", Reports.json.encodeToJsonElement(failure.command))
-            put("sourceHashes", Reports.json.encodeToJsonElement(failure.sourceHashes))
-            put("compilerIdentity", Reports.json.encodeToJsonElement(failure.compiler))
-        }
+                put("suite", candidate.suite)
+                put("problem", candidate.ref.name)
+                put("selectionPolicy", MZN_COMPATIBILITY_POLICY)
+                put("status", "source-compiler-incompatible")
+                put("reason", failure.incompatibility)
+                put("diagnostic", failure.diagnostic.take(4000))
+                put("compilerExit", failure.exitCode)
+                put("compilerElapsedNs", failure.elapsedNs)
+                put("compilerCommand", Reports.json.encodeToJsonElement(failure.command))
+                put("sourceHashes", Reports.json.encodeToJsonElement(failure.sourceHashes))
+                put("compilerIdentity", Reports.json.encodeToJsonElement(failure.compiler))
+            }
         )
         return false
     }
