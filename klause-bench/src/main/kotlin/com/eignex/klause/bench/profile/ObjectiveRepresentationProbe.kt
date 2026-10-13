@@ -1,4 +1,4 @@
-package com.eignex.klause.bench.tools
+package com.eignex.klause.bench.profile
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.backtrack.BacktrackParams
