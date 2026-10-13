@@ -3,11 +3,12 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.div
 import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.plus
 import com.eignex.klause.util.shl
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
@@ -131,14 +132,14 @@ internal class IntegerCertificate(
     private val reduced: LongArray,
     /** `N = 2ᵏ · objective` (the Lagrangian lower bound, including `model.objConstant`). */
     private val numerator: Int128,
-) {
+) : LpDeductionCertificate {
     // Row weights and endpoint support cannot be reinterpreted after a pop or an objective edit.
     private val authority = model.exactState
     private val legacyModel = model.takeIf { authority == null }
     private val legacySnapshot = legacyModel?.let(LpCapturedModel::snapshotIntegerAuthority)
     val authorityStorageUnits: Long = legacySnapshot?.integerAuthorityUnits ?: 0L
 
-    fun belongsTo(model: LpModel, observer: LpCertificationObserver? = null): Boolean {
+    override fun belongsTo(model: LpModel, observer: LpCertificationObserver?): Boolean {
         if (model.m != mult.size || model.numVars != reduced.size) return false
         if (authority != null) return model.exactState === authority
         if (model !== legacyModel) return false
@@ -147,6 +148,13 @@ internal class IntegerCertificate(
         return matches
     }
 
+    override fun exactReducedCost(col: Int): BigFraction = BigFraction.of(bigIntOf(reduced[col]), bigIntOf(scale))
+
+    override fun exactObjectiveBound(): BigFraction = BigFraction.of(
+        (bigIntOf(numerator.hi) shl 64) + bigIntOf(numerator.lo.toULong()),
+        BIG_ONE shl scaleBits,
+    )
+
     /** The scale exponent `k`: the objective is `objectiveNumerator / 2ᵏ`. Lets a caller summing several
      *  certificates' objectives bring them to a common denominator. */
     val objectiveScaleBits: Int get() = scaleBits
@@ -154,13 +162,13 @@ internal class IntegerCertificate(
     /** A copy of `N = 2ᵏ · objective` (the exact scaled objective numerator); see [objectiveScaleBits]. */
     fun objectiveNumerator(): Int128 = numerator.copy()
 
-    fun exactMultipliers(): List<BigFraction> = mult.map { BigFraction.of(bigIntOf(it), bigIntOf(scale)) }
+    override fun exactMultipliers(): List<BigFraction> = mult.map { BigFraction.of(bigIntOf(it), bigIntOf(scale)) }
 
     /** Whether row [row] carries nonzero dual weight (for non-global-row premise citation). */
-    fun dualNonzeroRow(row: Int): Boolean = mult[row] != 0L
+    override fun dualNonzeroRow(row: Int): Boolean = mult[row] != 0L
 
     /** Sign of column [col]'s reduced cost (`-1`/`0`/`+1`). */
-    fun reducedCostSign(col: Int): Int = reduced[col].let {
+    override fun reducedCostSign(col: Int): Int = reduced[col].let {
         if (it > 0L) {
             1
         } else if (it < 0L) {
@@ -172,7 +180,7 @@ internal class IntegerCertificate(
 
     /** `⌈ objective + extraConstant ⌉` as a `Long`, or null when it does not fit (the caller keeps the
      *  node / falls back). [extraConstant] is the relaxation-level objective constant the caller folds in. */
-    fun objectiveBoundCeil(extraConstant: Long): Long? {
+    override fun objectiveBoundCeil(extraConstant: Long): Long? {
         val n = numerator.copy()
         n.addProduct(extraConstant, scale)
         return n.ceilDivPow2(scaleBits)
@@ -191,7 +199,7 @@ internal class IntegerCertificate(
     }
 
     /** Whether `improvingMax ≥ objective + sourceConstant`, i.e. the fixing gap is non-negative. */
-    fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean =
+    override fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean =
         gapNumerator(improvingMax, sourceConstant).isNonNegative()
 
     /**
@@ -201,7 +209,18 @@ internal class IntegerCertificate(
      * other box term is `≥ 0`, so `|rcⱼ|·Δⱼ ≤ improvingMax − sourceConstant − objective`.
      * Null on a zero reduced cost or on overflow (the caller then skips the fix, which is sound).
      */
-    fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long? {
+    override fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? {
+        if (authority?.model?.column(col)?.integral == false) return null
+        val integer = ExactLpNumber.of(cutoff).exactLong()
+        return if (integer != null) {
+            fixSteps(col, integer, sourceConstant)
+        } else {
+            super.fixStepsAtCutoff(col, cutoff, sourceConstant)
+        }
+    }
+
+    override fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long? {
+        if (authority?.model?.column(col)?.integral == false) return null
         val dj = reduced[col]
         if (dj == 0L || dj == Long.MIN_VALUE) return null
         return gapNumerator(improvingMax, sourceConstant).floorDivPositive(if (dj < 0L) -dj else dj)
@@ -234,27 +253,34 @@ internal fun integerCertify(
     }
 }
 
-private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: Int): IntegerCertificate? {
+internal fun integerCertifyUnchecked(
+    model: LpModel, y: DoubleArray, scaleBits: Int, allowMixed: Boolean = false,
+    scan: (() -> Unit)? = null,
+): IntegerCertificate? {
     val integers = IntegerLpView.create(model) ?: return null
     val rd = roundDuals(model, y, scaleBits) ?: return null
     val m = model.m
     val n = model.n
     val scale = rd.scale
-    val mult = repairedMultipliers(integers, rd.mult, scale) ?: return null
+    val mult = repairedMultipliers(integers, rd.mult, scale, scan) ?: return null
     val acc = Int128() // N = 2ᵏ · (objective − objConstant), accumulated exactly
-    for (i in 0 until m) acc.addProduct(mult[i], integers.rhs(i) ?: return null)
+    for (i in 0 until m) {
+        scan?.invoke()
+        acc.addProduct(mult[i], integers.rhs(i) ?: return null)
+    }
     val reduced = LongArray(model.numVars)
     val dAcc = Int128() // scaled reduced cost Dⱼ = 2ᵏ·cⱼ − Σᵢ mᵢ·Aᵢⱼ, reused per column
     val dot = Int128()
     for (j in 0 until model.numVars) {
-        if (!integers.integralColumn(j)) return null
+        scan?.invoke()
+        if (!allowMixed && !integers.integralColumn(j)) return null
         dAcc.clear()
         dot.clear()
         dAcc.addProduct(integers.cost(j) ?: return null, scale) // 2ᵏ·cⱼ
         if (j >= n) {
             dot.addLong(mult[j - n]) // slack column j is the unit vector e_{j−n}
         } else {
-            if (!integers.forEachCoefficient(j) { i, a -> dot.addProduct(mult[i], a) }) return null
+            if (!integers.forEachCoefficient(j) { i, a -> scan?.invoke(); dot.addProduct(mult[i], a) }) return null
         }
         dAcc.subtract(dot)
         if (!dAcc.fitsLong()) return null // reduced cost too large to evaluate ⇒ keep node (sound)
@@ -275,9 +301,12 @@ private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: I
 // multiplier to scaledCost makes a free logical harmless, and repairs a one-sided logical only
 // when its reduced cost points toward an absent endpoint. The complete Lagrangian is evaluated
 // with the repaired vector; no tolerance or feasibility claim is involved.
-private fun repairedMultipliers(model: IntegerLpView, mult: LongArray, scale: Long): LongArray? {
+private fun repairedMultipliers(
+    model: IntegerLpView, mult: LongArray, scale: Long, scan: (() -> Unit)? = null,
+): LongArray? {
     var repaired: LongArray? = null
     for (i in 0 until model.m) {
+        scan?.invoke()
         val slack = model.n + i
         val lower = model.hasLower(slack)
         val upper = model.hasUpper(slack)
@@ -641,7 +670,7 @@ private fun scaleRange(value: BigFraction): IntRange {
 private fun IntRange.meet(other: IntRange): IntRange = maxOf(first, other.first)..minOf(last, other.last)
 
 /** Requested scale: fine enough to keep rounding loss negligible, capped by [chooseScale]. */
-private const val DEFAULT_SCALE_BITS = 40
+internal const val DEFAULT_SCALE_BITS = 40
 
 /** Hard cap on the scale exponent (must satisfy [Int128.ceilDivPow2]'s `0..62` and `1L shl k`). */
 private const val MAX_SCALE_BITS = 40

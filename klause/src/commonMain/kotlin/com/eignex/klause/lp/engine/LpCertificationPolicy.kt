@@ -36,7 +36,7 @@ internal fun certifiedTightObjectiveLowerBound(
 internal fun certifiedTightObjectiveLowerBound(
     model: LpModel,
     y: DoubleArray,
-    certificate: IntegerCertificate?,
+    certificate: LpDeductionCertificate?,
     observer: LpCertificationObserver?,
     policy: LpCertificationPolicy,
 ): Double? {

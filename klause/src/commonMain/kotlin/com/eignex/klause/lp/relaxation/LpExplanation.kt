@@ -6,8 +6,8 @@ import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.ExactLpNumber
-import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
@@ -29,7 +29,7 @@ import com.eignex.klause.util.unaryMinus
 
 /**
  * Turns LP certificates into learned-clause material over absolute variable-bound atoms, read off the
- * integer-multiplier [IntegerCertificate], which carries the reduced-cost signs
+ * integer-multiplier [LpDeductionCertificate], which carries the reduced-cost signs
  * and dual-weight rows the reasons lean on. The artifacts share one
  * shape: a set of *premises* — column bounds the certificate leans on — whose negations form clause
  * literals, with the constraint rows kept implicit. Keeping the rows implicit is what makes the
@@ -74,8 +74,13 @@ internal object LpExplanation {
      * which is what the no-entering-column argument was evaluated against.
      */
     fun premiseLit(relaxation: LpRelaxation, session: PropagationSession, col: Int, lowerSide: Boolean): Int {
-        // A continuous column's bounds are declared globals (or probe stand-ins), valid at every node.
-        if (col < relaxation.colRealId.size && relaxation.colRealId[col] >= 0) return PREMISE_NONE
+        if (col < relaxation.colRealId.size && relaxation.colRealId[col] >= 0) {
+            val bounds = relaxation.model.exactBounds(col)
+            val side = (if (lowerSide) bounds.lower else bounds.upper) ?: return PREMISE_AUX
+            val declared = relaxation.model.exactState?.baseModel?.column(col)?.bounds
+            if (declared != null && side != (if (lowerSide) declared.lower else declared.upper)) return PREMISE_AUX
+            return PREMISE_NONE
+        }
         val varId = relaxation.colVarId[col]
         if (varId < 0) return presencePremise(relaxation, session, col, lowerSide)
         val model = relaxation.model
@@ -142,7 +147,7 @@ internal object LpExplanation {
      */
     fun objectiveBoundReason(
         relaxation: LpRelaxation,
-        cert: IntegerCertificate,
+        cert: LpDeductionCertificate,
         session: PropagationSession,
         observer: LpCertificationObserver? = null,
     ): IntArray? {
@@ -288,7 +293,7 @@ internal object LpExplanation {
         lits: IntArrayList,
         seen: IntHashSet,
         relaxation: LpRelaxation,
-        cert: IntegerCertificate,
+        cert: LpDeductionCertificate,
         session: PropagationSession,
         observer: LpCertificationObserver? = null,
     ): Boolean {

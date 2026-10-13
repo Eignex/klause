@@ -74,6 +74,26 @@ arithmetic, scalar growth, storage and verification share the continuation's
 cumulative allowances, with unchanged dimension and pivot caps. Nonzero objectives
 retain closure continuation and their existing strict-refinement policy.
 
+Node deductions admit mixed structural columns under the retained exact authority.
+The integer-multiplier path evaluates integral-valued data in Int128 without
+requiring continuous coordinates to be integral. Fractional data falls back to an
+exact rational Lagrangian with 128-bit scalar admission, 250,000 work units and
+16 MiB of metered allocation. Both attempts share that allowance and cancellation;
+overflow, unsupported endpoints and interrupted checks withhold deductions.
+Continuous terms use their exact finite minimizing endpoint, including strict
+interval infima/suprema, and absent sides never acquire a probe-box premise.
+Objective scale and external constants map the rational bound and reduced costs
+to minimized source units. Retained multiplier snapshots remain compatible with
+original-source capture, whose independent premise checks still govern authority.
+
+Reduced-cost fixing changes only source integral coordinates. An integral source
+objective lattice permits a strict improving integer cutoff; other objectives use
+an enclosing rational cutoff without integer ceiling. Each fixing retains the
+other endpoint contributions and every weighted scoped row. A continuous endpoint
+that differs from its declared bound withholds a reusable CP reason; the deduction
+remains local to the numerical scope. Bounds and certificates cannot survive a
+foreign exact state, rollback or objective change.
+
 Reconstruction converts signed single-word fractions directly between
 `BigFraction` and `Frac128`; wider values use both words. Both paths retain the
 same bit checks, work charges, allocation allowance and cancellation checks.
