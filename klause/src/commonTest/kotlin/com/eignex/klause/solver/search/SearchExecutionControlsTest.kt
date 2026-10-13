@@ -6,6 +6,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -126,6 +127,16 @@ class SearchExecutionControlsTest {
             assertFalse(accepted)
 
             assertEquals(cause, controls.stopCause)
+        }
+    }
+
+    @Test
+    fun `controls cannot be replaced after component initialization`() {
+        val session = SearchSession(emptyList())
+        session.initialize()
+
+        assertFailsWith<IllegalStateException> {
+            session.attachExecutionControls(SearchExecutionControlAdapter())
         }
     }
 
