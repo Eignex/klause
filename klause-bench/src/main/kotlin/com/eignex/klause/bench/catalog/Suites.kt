@@ -43,7 +43,19 @@ internal object Suites {
             ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.minizincChallenge,
-                    CorpusSelection.Layout.MznChallengeAllYears,
+                    CorpusSelection.Layout.MznChallengeAllYears(),
+                    sel,
+                    Category.OPTIMIZATION,
+                )
+            },
+            DynamicSuite(
+                "mzn-bench-compatible-v1",
+                "MiniZinc Challenge installed compiler compatibility selection v1 (1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.minizincChallenge,
+                    CorpusSelection.Layout.MznChallengeAllYears(legacyExclusions = false),
                     sel,
                     Category.OPTIMIZATION,
                 )
