@@ -48,13 +48,19 @@ class OpenLinearPortfolioResultsTest {
         val context = assertNotNull(model.sourceProofContext(scope, objective))
         val request = OpenTheoryRequest(model, objective).withLinearAuthority(context)
 
-        val result = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(request,
-            TheoryParams(openWorkLimit = 100_000, maxFlips = 0), FiniteEngine.MIXED, 1))
+        for ((engine, cores) in listOf(FiniteEngine.MIXED to 1, FiniteEngine.BACKTRACK to 4)) {
+            val result = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(request,
+                TheoryParams(openWorkLimit = 100_000, maxFlips = 0), engine, cores))
 
-        val optimum = assertIs<OpenTheoryOptimum.Optimal>(result.result)
-        assertEquals(third, optimum.value)
-        assertEquals(scope, assertNotNull(optimum.linearResult).scope)
-        assertEquals(SourceValue.Rational(third), assertNotNull(result.acceptedIncumbent).value)
+            val optimum = assertIs<OpenTheoryOptimum.Optimal>(result.result)
+            assertEquals(third, optimum.value)
+            assertEquals(scope, assertNotNull(optimum.linearResult).scope)
+            assertEquals(SourceValue.Rational(third), assertNotNull(result.acceptedIncumbent).value)
+            if (engine == FiniteEngine.BACKTRACK) {
+                assertEquals(cores, optimum.stats.portfolio.arms.size)
+                assertEquals(0.0, optimum.stats.ls.moves.sum)
+            }
+        }
     }
 
     @Test
