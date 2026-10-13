@@ -68,7 +68,8 @@ object SmtLinearProof {
             out.resolve("$index.smt2").writeBytes(bytes)
             val compiled = SmtLib.parse(bytes.decodeToString())
             val maximize = compiled.sense == ObjectiveSense.MAXIMIZE
-            val objective = requireNotNull(compiled.objective).toLinearObjective()
+            val minimized = requireNotNull(compiled.objective).toLinearObjective()
+            val objective = if (maximize) minimized.negated() else minimized
             val sense = if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
             val scope = SourceScope(SourceRevision(sha(bytes), "klause-ir-exact-v1"),
                 objective = SourceObjective("cost", sense))
