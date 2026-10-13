@@ -20,9 +20,12 @@ object SourceRecordCheck {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("bundle", "sha256") || options.keys == setOf("input64", "sha256")) {
+        val bundleOptions = options.keys - "witnessOnly"
+        require(bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256")) {
             "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest>"
         }
+        require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
+        val witnessOnly = options["witnessOnly"] == "true"
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val root = File(System.getProperty("klause.workspace.root", "."))
         val bytes = options["input64"]?.let { encoded ->
@@ -79,7 +82,8 @@ object SourceRecordCheck {
         execute(out.resolve("checker.log"), python, tools.resolve("verify_source_results.py").absolutePath,
             cases.absolutePath, "--source-root", sources.absolutePath,
             "--progress", out.resolve("checked-prefix.jsonl").absolutePath,
-            "--output", out.resolve("source-checks.json").absolutePath)
+            "--output", out.resolve("source-checks.json").absolutePath,
+            *if (witnessOnly) arrayOf("--witness-only") else emptyArray())
         check(environment.deleteRecursively())
         println(out.resolve("source-checks.json").readText())
     }
