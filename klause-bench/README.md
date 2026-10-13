@@ -1314,12 +1314,16 @@ Run it as an AWS lab profile at a trusted pinned revision. It preserves original
 model/data, compiled FlatZinc, source-variable mappings, supplied values, compiler version and installed
 build/runtime hashes. `proposals.json` records the initial objective and every
 candidate's predicted and committed complete cost, exact integer objective and
-move. Each candidate starts from the same assignment; restoration recomputes
+move. Up to sixteen complete improving candidates retain their source assignments
+and run the existing independent MiniZinc source checker with an exact integer
+objective. Other candidates retain an explicit unchecked status. Each candidate
+starts from the same assignment; restoration recomputes
 payloads. Definition propagation and all model constraints participate in grading.
 
 This inspects a prepared neighborhood, with no solver walk or runtime-parity claim.
-Its model grades are separate from independent original-source checks; recheck any
-candidate used as a source witness. Keep raw results outside the repository and
+Its model grades are separate from independent original-source checks; only a valid
+source-check receipt supports candidate witness credit. This does not certify an
+optimum or refutation. Keep raw results outside the repository and
 pair the diagnostic with uninstrumented source-checked whole-CLI comparisons.
 
 ### Component-split fixtures

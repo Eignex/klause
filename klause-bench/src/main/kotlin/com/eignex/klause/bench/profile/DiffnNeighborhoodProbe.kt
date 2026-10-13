@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.MiniZincSourceValidation
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -128,6 +129,7 @@ object DiffnNeighborhoodProbe {
         require(initialObjective.toString() == options["objective"])
         val beforeInts = LongArray(state.problem.numIntVars) { state.assignment.intValue(it) }
         val beforeBools = BooleanArray(state.problem.numBoolVars) { state.assignment.boolValue(it) }
+        var sourceChecks = 0
         val proposals = buildJsonArray {
             if (state.cost == 0L) {
                 for ((factorId, factor) in state.problem.factors.withIndex()) {
@@ -142,6 +144,19 @@ object DiffnNeighborhoodProbe {
                             state.apply(move)
                             val cost = state.cost
                             val objective = state.assignment.intValue(objectiveVar)
+                            val improving = if (directive is SolveDirective.Maximize) {
+                                objective > initialObjective
+                            } else {
+                                objective < initialObjective
+                            }
+                            val sourceCheck = if (cost == 0L && improving && sourceChecks < SOURCE_CHECK_CAP) {
+                                val witness = renderValues(program, state, namedValues.keys) +
+                                    "_objective = $objective;\n----------\n"
+                                out.resolve("candidate-${sourceChecks++}.out").writeText(witness)
+                                MiniZincSourceValidation.validate(ref, witness, null, objective.toString())
+                            } else {
+                                null
+                            }
                             add(
                                 buildJsonObject {
                                 put("factor", factorId)
@@ -150,6 +165,9 @@ object DiffnNeighborhoodProbe {
                                 put("cost", cost)
                                 put("predictedCost", predicted)
                                 put("objective", objective.toString())
+                                put("sourceValidation", sourceCheck?.status ?: "not-checked")
+                                put("sourceValidationReason", sourceCheck?.reason ?: "not checked by this probe")
+                                put("sourceValidationScope", sourceCheck?.scope ?: "unavailable")
                                 put(
                                     "objectiveDelta",
                                     BigInteger.valueOf(objective).subtract(
@@ -241,4 +259,35 @@ object DiffnNeighborhoodProbe {
 
     private fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
         .joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 255) }
+
+    private fun renderValues(program: FlatZincProgram, state: LocalSearchState, names: Set<String>): String =
+        buildString {
+            for (name in names) {
+                append(name).append(" = ")
+                when {
+                    name in program.intVarsByName -> {
+                        append(state.assignment.intValue(program.intVarsByName.getValue(name)))
+                    }
+                    name in program.boolVarsByName -> {
+                        append(state.assignment.boolValue(program.boolVarsByName.getValue(name)))
+                    }
+                    else -> {
+                        val array = program.arraysByName.getValue(name) as FlatZincArray.Vars
+                        append('[')
+                        for ((i, v) in array.varIds.withIndex()) {
+                            if (i > 0) append(", ")
+                            if (array.elementKind == FlatZincArray.Vars.ElementKind.Int) {
+                                append(state.assignment.intValue(v))
+                            } else {
+                                append(state.assignment.boolValue(v))
+                            }
+                        }
+                        append(']')
+                    }
+                }
+                append(";\n")
+            }
+        }
+
+    private const val SOURCE_CHECK_CAP = 16
 }
