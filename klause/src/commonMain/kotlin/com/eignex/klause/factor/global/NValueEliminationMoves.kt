@@ -32,9 +32,11 @@ internal class NValueEliminationMoves(
         val targetN = countTarget(state, distinct - 1, sink) ?: return
         if (targetN != state.assignment.intValue(n) && !sink.allowsInt(n)) return
         var emitted = 0
+        var completion: Move? = null
+        var completionDelta = Long.MAX_VALUE
         val attempted = HashSet<Pair<Long, Long>>()
         repeat(MAX_ATTEMPTS) {
-            if (emitted >= MAX_MOVES) return
+            if (emitted >= MAX_MOVES) return@repeat
             val from = state.rng.nextInt(xs.size)
             val to = state.rng.nextInt(xs.size)
             if (!present(state, from) || !present(state, to)) return@repeat
@@ -46,8 +48,17 @@ internal class NValueEliminationMoves(
             if (parts.none { it.varId == n } && targetN != state.assignment.intValue(n)) {
                 parts += Move.IntSet(n, targetN)
             }
-            if (queue(state, parts, sink, emitted == 0, distinct - 1)) emitted++
+            val move = queue(state, parts, sink, distinct - 1) ?: return@repeat
+            emitted++
+            if (state.cost == 0L) {
+                val delta = state.netDelta(move)
+                if (delta > 0L && delta < completionDelta) {
+                    completion = move
+                    completionDelta = delta
+                }
+            }
         }
+        completion?.let { completeMove(state, it, sink, distinct - 1) }
     }
 
     private fun countTarget(state: LocalSearchState, distinct: Int, sink: MoveSink): Long? {
@@ -89,9 +100,8 @@ internal class NValueEliminationMoves(
         state: LocalSearchState,
         parts: List<Move.IntSet>,
         sink: MoveSink,
-        complete: Boolean,
         expectedDistinct: Int,
-    ): Boolean {
+    ): Move? {
         val first = parts[0]
         val coordinated = ChannelingSink(first.varId, first.newValue)
         // Counter-shifts must not resurrect the removed class or change its surviving destination.
@@ -123,13 +133,10 @@ internal class NValueEliminationMoves(
         coordinated.carryBinaryChannels(state, sink)
         val move = coordinated.toMove()
         val coordinatedParts = if (move is Move.Compound) move.parts else listOf(move)
-        if (!preservesCount(state, coordinatedParts, expectedDistinct)) return false
+        if (!preservesCount(state, coordinatedParts, expectedDistinct)) return null
         val before = sink.size
         sink.addCompound(coordinatedParts)
-        if (complete && state.cost == 0L && state.netDelta(move) > 0L) {
-            completeMove(state, move, sink, expectedDistinct)
-        }
-        return sink.size > before
+        return move.takeIf { sink.size > before }
     }
 
     private fun completeMove(state: LocalSearchState, move: Move, sink: MoveSink, expectedDistinct: Int) {
