@@ -175,6 +175,11 @@ supply complete exact rows, objective and original-coordinate semantics through
 `withLinearAuthority`; source preparation preserves that binding. Rounded frontend
 values do not replace the supplied source data.
 
+Complete affine capture checks declared rows through `LinearSourceSemanticsChecker`
+and checks original integer value sets separately. Exact declarative rows need no
+finite propagation projection to verify a point. Open integer columns do not acquire
+finite domains; finite value sets retain their membership constraints.
+
 `RationalTheoryDescent.linearResult` carries the retained typed completion across
 its scalar resumable interface. Attainment and refutation retain source evidence.
 A limit or full lattice ray has no scalar completion representation, so its scalar
