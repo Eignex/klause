@@ -72,6 +72,9 @@ invocation, execution assumptions, owned point and execution objective telemetry
 witness check precedes that envelope; a model/kind label cannot replace the checked point.
 Polynomial pool admission consumes the native publication and checks the containing
 invocation, actual point/value and both producer and consumer conditions.
+Finite real-neighborhood adapters allocate their retained queries when a worker handle
+opens, after runtime binding. Source-checked bound workers publish that actual invocation;
+unbound low-level workers retain checked coordinates without a runtime certificate.
 Copies of unchanged exact witnesses retain their source certificate;
 coordinate changes and warm-start projections discard it. Objective changes cannot reuse
 objective bounds or unboundedness claims. Unconditional variable bounds use the model
