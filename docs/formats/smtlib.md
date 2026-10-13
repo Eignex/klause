@@ -105,9 +105,9 @@ algebraic `root-obj` values. A decimal approximation never replaces their author
 Optimization emits `; objective=<value>` for each published incumbent in the source
 objective's direction and `; optimizationStatus=<status>` at completion, including `optimal`,
 `best-found` and `unbounded`. These comments appear without `-s`; `sat` alone
-does not establish optimality. Finite optimization streams improvements; open-theory,
-polynomial and quadratic optimization publish the returned incumbent after the
-invocation completes.
+does not establish optimality. Finite, polynomial and quadratic optimization stream
+accepted source improvements. Open-theory optimization publishes the returned
+incumbent after the invocation completes.
 Exact theory objectives use arbitrary-precision integer or reduced `numerator/denominator`
 text, including values outside `Long` and non-terminating rational values.
 Finite witnesses report objectives from certified real values and exact integer

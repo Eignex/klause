@@ -27,6 +27,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.QuadraticIncumbentPublication
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.execute
@@ -95,16 +96,22 @@ internal object SolveCore {
             is SolvablePipeline.QuadraticTheory -> {
                 if (solutionSetSensitive) usageError("all-solution enumeration is unavailable for quadratic objectives")
                 output.begin(optimize = true, maximize = pipeline.sense == ObjectiveSense.MAXIMIZE)
+                val onAccepted: (QuadraticIncumbentPublication) -> Unit = { accepted ->
+                    publication.publish(
+                        pipeline.render(accepted.incumbent.sample),
+                        SourceValue.Algebraic(accepted.incumbent.value), accepted.version,
+                    )
+                }
                 val execution = when (val request = pipeline.request) {
                     is QuadraticRequest.Polynomial -> OpenTheoryPipeline.minimize(
                         request.request, pipeline.objective, polynomialParams(common, deadlineCancel),
-                        engine, pipeline.sense, openCores,
+                        engine, pipeline.sense, openCores, onAccepted,
                     )
                     is QuadraticRequest.Integer -> {
                         val budget = takeNodeBudget(common).also { common.nodeBudget = it }
                         OpenTheoryPipeline.minimize(
                             request.request, pipeline.objective, nonlinearIntegerParams(common, deadlineCancel, budget),
-                            engine, pipeline.sense, openCores,
+                            engine, pipeline.sense, openCores, onAccepted,
                         )
                     }
                 }
@@ -126,7 +133,12 @@ internal object SolveCore {
                     val sense = if (pipeline.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
                     val execution = OpenTheoryPipeline.optimize(
                         pipeline.request, sourceObjective, polynomialParams, engine, sense, openCores,
-                    )
+                    ) { accepted ->
+                        publication.publish(
+                            pipeline.render(polynomialAssignment(accepted.incumbent.sample)),
+                            SourceValue.Algebraic(accepted.incumbent.value), accepted.version,
+                        )
+                    }
                     reportQuadraticOptimization(
                         execution, { pipeline.render(polynomialAssignment(it)) }, output, common.statistics,
                         rawSolvable.routingElapsedMs,

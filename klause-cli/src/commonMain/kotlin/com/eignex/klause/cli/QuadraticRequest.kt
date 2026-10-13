@@ -34,7 +34,7 @@ internal fun reportQuadraticOptimization(
     statistics: Boolean,
     routingElapsedMs: Long,
     completePool: Boolean,
-    publication: ArithmeticPublication? = null,
+    publication: ArithmeticPublication,
 ) = reportQuadraticOptimization(
     execution, pipeline.render, output, statistics, routingElapsedMs, completePool, publication,
 )
@@ -46,10 +46,11 @@ internal fun reportQuadraticOptimization(
     statistics: Boolean,
     routingElapsedMs: Long,
     completePool: Boolean,
-    publication: ArithmeticPublication? = null,
+    publication: ArithmeticPublication,
 ) {
     val result = execution.result
-    val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
+    val receipt = execution.acceptedIncumbent
+    val point = receipt?.incumbent ?: (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
     val reason = when (result) {
         is QuadraticOptimizationResult.BestFound -> result.reason
         is QuadraticOptimizationResult.Unknown -> result.reason
@@ -57,23 +58,20 @@ internal fun reportQuadraticOptimization(
     }
     output.onVerdictContext(VerdictContext(terminationReason = reason, completePool = completePool))
     val rendered = point?.let { render(it.sample) }
-    val accepted = if (publication == null) {
-        output.onQuadraticResult(rendered, result)
-        true
-    } else publication.quadratic(rendered, result)
+    val accepted = publication.quadratic(rendered, result, receipt?.version, point)
     val verdict = if (!accepted) {
-        if (publication != null && publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN
+        if (publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN
     } else when (result) {
         is QuadraticOptimizationResult.Optimal -> Verdict.OPTIMAL
         is QuadraticOptimizationResult.UnattainedLimit -> Verdict.BEST_FOUND
         is QuadraticOptimizationResult.Unbounded -> Verdict.UNBOUNDED
         is QuadraticOptimizationResult.Infeasible -> Verdict.UNSATISFIABLE
         is QuadraticOptimizationResult.BestFound -> Verdict.BEST_FOUND
-        is QuadraticOptimizationResult.Unknown -> Verdict.UNKNOWN
+        is QuadraticOptimizationResult.Unknown -> if (publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN
     }
     output.onComplete(verdict)
     if (statistics) {
-        val solutions = publication?.solutions ?: if (point != null) 1L else 0L
+        val solutions = publication.solutions
         output.onStatistics(result.stats, result.stats.run.wallMs + routingElapsedMs, solutions)
         output.onAllowanceStatistics(listOf(
             "nraWork" to execution.polynomialStats.workSpent.toString(),
