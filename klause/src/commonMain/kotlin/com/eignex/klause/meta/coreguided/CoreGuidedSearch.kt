@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ReseedGuard
@@ -47,7 +48,12 @@ internal class CoreGuidedSearch(
     private val params: BacktrackParams,
 ) : ResumableSearch, ReseedGuard {
     private val lifetime = params.cancellation.lifetimeCancellation()
-    private val factors = ArrayList<Factor>().apply { addAll(base.factors) }
+    private val factors = ArrayList<Factor>().apply {
+        addAll(base.factors)
+        (base.rootDeductions as? PropagationResult.Implied)?.forEachBool { id, value ->
+            add(Clause(intArrayOf(Lit.make(id, value))))
+        }
+    }
     private val weights = LinkedHashMap<Int, BigInt>()
     private var nextBool = base.numBoolVars
     private var initialIndex = 0
@@ -95,6 +101,9 @@ internal class CoreGuidedSearch(
         check(!closed) { "search is closed" }
         val token = lifetime or global
         if (token()) return null
+        if (base.rootDeductions is PropagationResult.Unsat) {
+            return finish(MinimizeResult.Infeasible(stats = stats))
+        }
         val deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         val start = work
         val repaid = if (sliceNodes < 0L) 0L else minOf(workDebt, sliceNodes)
@@ -225,6 +234,8 @@ internal class CoreGuidedSearch(
             BacktrackSolver(problem).resumableSolve(params.copy(
                 assumptions = params.assumptions.mergedWith(softPins),
                 cancellation = token,
+                maxDecisions = (minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE) -
+                    completedStats.search.nodes.sum.toLong()).coerceAtLeast(0L),
                 clauseExchange = null,
                 cutExchange = null,
             ))
