@@ -21,6 +21,13 @@ class PropagationProjection internal constructor(
     val inertReason: String?,
     private val factory: (FactorProjectionPreparation?) -> Propagator,
 ) {
+    init {
+        require(capability != PropagationCapability.INERT ||
+            (assignmentCheck != AssignmentCheckCapability.EXACT && !inertReason.isNullOrBlank())) {
+            "inert deduction requires an enforcing peer or source certification, with an explicit reason"
+        }
+    }
+
     /** Factory calls must produce private mechanisms or stateless projections with owner-local payloads. */
     constructor(
         capability: PropagationCapability,

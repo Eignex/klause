@@ -28,6 +28,12 @@ class RelaxationProjection internal constructor(
 
 /** Default relaxations, preserving linear row caches, source attribution and existing numerical gates. */
 object BuiltInRelaxationProjectionProvider : RelaxationProjectionProvider {
+    internal fun emit(factor: Factor, builder: RelaxationBuilder, linear: LinearLpProjection?) {
+        if (factor.defaultExecutionCapabilities().relaxation == RelaxationCapability.SOUND) {
+            factor.buildLpRelaxation(builder, linear)
+        }
+    }
+
     override fun select(factor: Factor): RelaxationProjection? {
         val capability = factor.defaultExecutionCapabilities().relaxation
         if (capability == RelaxationCapability.NONE) return null

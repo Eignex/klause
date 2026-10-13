@@ -100,7 +100,8 @@ def main():
     result.update({"sourceSha256": hashlib.sha256(source_bytes).hexdigest(),
                    "controlsSha256": hashlib.sha256(controls_bytes).hexdigest(),
                    "checkerSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                   "python": platform.python_version()})
+                   "python": platform.python_version(),
+                   "pythonExecutableSha256": hashlib.sha256(Path(sys.executable).read_bytes()).hexdigest()})
     output_path.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, sort_keys=True))
 

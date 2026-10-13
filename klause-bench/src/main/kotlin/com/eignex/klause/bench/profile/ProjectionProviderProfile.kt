@@ -56,6 +56,7 @@ import kotlinx.serialization.json.put
 
 /** Repeated matched projection preparation costs and exhaustive finite source controls for provider extensions. */
 object ProjectionProviderProfile {
+    // Escaping the prepared owner prevents allocation measurements from timing eliminated results.
     @Volatile
     private var retained: Any? = null
 
@@ -158,14 +159,14 @@ object ProjectionProviderProfile {
             }
         }
         out.resolve("measurements.json").writeText(measurements.toString())
-        val sourceJson = sourceJson()
+        val sourceJson = sourceJson(factors)
         out.resolve("source.json").writeText(sourceJson.toString())
         out.resolve("provenance.json").writeText(provenance(factors, rounds, openings, seed, sourceJson).toString())
         val controls = buildJsonArray {
             for ((mode, providers) in listOf("default" to FactorProjectionProviders.Default, "alternate" to alternatives)) {
                 val baked = source.bake(providers)
                 val params = BacktrackParams(randomSeed = seed, maxDecisions = 10000)
-                val witnesses = BacktrackSolver(baked).samples(params).toList()
+                val witnesses = BacktrackSolver(baked).enumerate(params).toList()
                 val projection = LocalSearchProblem(source, providers.prepare(source), domains)
                 val state = LocalSearchState(LocalSearchModel.open(source, domains), Random(seed), projection = projection)
                 val scores = buildJsonArray {
@@ -258,16 +259,18 @@ object ProjectionProviderProfile {
         },
     )
 
-    private fun sourceJson(): JsonObject = buildJsonObject {
+    private fun sourceJson(factors: Int): JsonObject = buildJsonObject {
         put("schema", "finite-projection-controls-v1")
         put("boolCount", 2)
         put("domains", buildJsonArray { repeat(2) { add(JsonArray(listOf(-1, 0, 1).map(::JsonPrimitive))) } })
-        put("clauses", buildJsonArray { add(JsonArray(listOf(0, 3).map(::JsonPrimitive))) })
-        put("linear", buildJsonArray { add(buildJsonObject {
+        put("clauses", buildJsonArray { repeat((factors + 1) / 2) {
+            add(JsonArray(listOf(0, 3).map(::JsonPrimitive)))
+        } })
+        put("linear", buildJsonArray { repeat(factors / 2) { add(buildJsonObject {
             put("coefficients", JsonArray(listOf("1", "1").map(::JsonPrimitive)))
             put("op", "GE")
             put("bound", "1")
-        }) })
+        }) } })
         put("objective", JsonArray(listOf("1", "2").map(::JsonPrimitive)))
     }
 
@@ -288,6 +291,19 @@ object ProjectionProviderProfile {
             put("optimizationTimeoutSeconds", 30)
             put("processors", Runtime.getRuntime().availableProcessors())
             put("javaVersion", System.getProperty("java.version"))
+            put("javaVendor", System.getProperty("java.vendor"))
+            put("os", "${System.getProperty("os.name")}/${System.getProperty("os.arch")}")
+            put("runtimeFiles", buildJsonArray {
+                for (relative in listOf("release", "bin/java", "lib/modules")) {
+                    val file = File(System.getProperty("java.home"), relative)
+                    check(file.isFile) { "runtime identity unavailable: $relative" }
+                    add(buildJsonObject {
+                        put("name", relative)
+                        put("bytes", file.length())
+                        put("sha256", hash(file))
+                    })
+                }
+            })
             put("jvmArguments", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
             put("classpath", buildJsonArray {
                 for (path in System.getProperty("java.class.path").split(File.pathSeparator)) {
@@ -316,6 +332,20 @@ object ProjectionProviderProfile {
         }
     }
 
-    private fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
-        .joinToString("") { "%02x".format(Locale.ROOT, it) }
+    private fun hash(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return hex(digest.digest())
+    }
+
+    private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(Locale.ROOT, it) }
+
+    private fun hash(bytes: ByteArray): String = hex(MessageDigest.getInstance("SHA-256").digest(bytes))
 }

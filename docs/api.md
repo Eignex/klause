@@ -329,3 +329,6 @@ exact checks and scoring delta consistency remain extension obligations.
 Finite facades accept `problem.bake(providers)` for invocation-specific selection.
 The baked projection carries immutable factories, and each live search allocates its
 own state. Ordinary `bake()` and existing solver constructors retain built-in defaults.
+
+An inert descriptor requires an explicit reason and cannot claim an exact check:
+its absent mechanism needs an enforcing peer or separate source certification.

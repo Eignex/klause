@@ -464,3 +464,6 @@ for the original factor, including watcher subscriptions and explanations.
 A selected custom propagation provider uses the general CP lane, including on clause
 models, so packed SAT propagation cannot bypass the replacement. The built-in
 provider retains native-clause eligibility and owner-local table/MDD preparation.
+
+An inert descriptor requires an explicit reason and cannot claim an exact check:
+its absent mechanism needs an enforcing peer or separate source certification.
