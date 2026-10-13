@@ -444,6 +444,28 @@ identity and the checked XCSP assignment when accepted, without solving again.
 
 ### Offline source verifier
 
+`com.eignex.klause.bench.tools.MpsLinearProof` accepts original MPS paths and captures the
+ordinary exact-source optimization result, original coordinate mapping, rows and derivation.
+It runs [verify_mps_linear_proof.py](tools/verify_mps_linear_proof.py) in a separate Python
+process using only standard-library exact fractions. The checker parses original unguarded
+linear MPS bytes, checks every captured premise against source rows or integral declarations,
+eliminates an exact objective auxiliary, and validates nonnegative dual combinations,
+integer branch coverage or an integral improving recession step. Unsupported source features
+and missing derivations fail closed. This checks mathematical claims rather than timings.
+The self-authored inputs in `smoke-corpus/linear-authority` cover a constant objective,
+a coupled integral/real ray and an objective coefficient beyond binary64 precision.
+
+```sh
+lab profile com.eignex.klause.bench.tools.MpsLinearProof <ref> "check exact MPS claims" aws 900 \
+  klause-bench/smoke-corpus/linear-authority/constant.mps \
+  klause-bench/smoke-corpus/linear-authority/recession.mps \
+  klause-bench/smoke-corpus/linear-authority/decimal.mps
+```
+
+The profile output retains original bytes/hashes, claim captures, checker results, installed
+jar hashes and runtime/options. Keep the lab's executed commit and setup provenance with
+those files. A failed checker or incomplete profile supplies no validated terminal claim.
+
 [verify_source_results.py](tools/verify_source_results.py) checks `mps-core`,
 `smtlib-core`, `miplib3` and the SMT corpus suites `smtlib-qfidl`, `smtlib-qflia`,
 `smtlib-qflira`, `smtlib-qflra` and `smtlib-qfrdl` against original sources using exact arithmetic.
