@@ -127,12 +127,13 @@ internal class CoreGuidedSearch(
                 return finish(MinimizeResult.Optimal(incumbent, requireNotNull(bestValue).toDouble(), stats))
             }
             if (allowance >= 0L && work - start >= allowance) return null
+            val beforeQuery = work
             val handle = query ?: try {
                 openQuery(token).also { query = it }
             } catch (_: SearchInitializationCancelled) {
                 return null
             }
-            val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
+            val remaining = if (allowance < 0L) -1L else (allowance - (beforeQuery - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
             val result = handle.runSlice(token, millis, remaining)
             if (result == null) return null

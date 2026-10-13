@@ -22,6 +22,8 @@ internal sealed interface ArmNeed {
     /** An objective: the arm steers by it, so on a satisfaction model it is a copy of its base arm. */
     data object Objective : ArmNeed
 
+    data object BooleanObjective : ArmNeed
+
     /** An LP relaxation with some technique to enable at [emphasis] under the run's `--lp` ceiling; without
      *  one the arm is a copy of the conflict-driven arm it is built on. */
     data class Relaxation(val emphasis: LpEmphasis) : ArmNeed
@@ -46,6 +48,7 @@ internal class ProblemFacts(
     fun offers(need: ArmNeed): Boolean = when (need) {
         ArmNeed.Clausal -> profile.problemClass == ProblemClass.Sat
         ArmNeed.Objective -> profile.optimizing
+        ArmNeed.BooleanObjective -> booleanObjective
         is ArmNeed.Relaxation -> relaxations.getOrPut(need.emphasis) { relaxation(need.emphasis) }
     }
 

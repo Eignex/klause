@@ -155,6 +155,9 @@ example, an LP-ceiling comparison uses the lab's configuration maps:
 `problems` takes a selection map or a list of maps, each naming `suite` or `set`.
 `base` is overlaid by each `configs` entry and crossed with optional `grid` axes.
 Configuration values are strings; `param.<name>` becomes CLI `--param <name>=<value>`.
+For Boolean objective core-search diagnostics, `engine=cp` with
+`param.bt-arm=core-guided` and `param.arms=1` isolates the retained worker.
+Use separate default-route matched runs to establish portfolio gains.
 Use immutable commit IDs for reproducible revision comparisons. Selection reference
 filters can change membership; `reference=any` keeps the benchmark selection, and
 named sets default to that policy. Record the actual planned inputs and hashes.
