@@ -11,6 +11,7 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.binarySearchInt
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.mulExact
@@ -41,7 +42,7 @@ internal class DiffnBoundCompletion(
                 for (i in row.vars.indices) {
                     val v = row.vars[i]
                     if (constants.coeffs[i] != -1L || !sink.allowsInt(v)) continue
-                    if (state.projection.intOccurrences[v].binarySearch(factorId) >= 0) continue
+                    if (state.projection.intOccurrences[v].binarySearchInt(factorId) >= 0) continue
                     if ((0 until count).any { targets[it] == v }) continue
                     targets[count++] = v
                     if (count == TARGET_CAP) break
