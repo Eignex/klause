@@ -32,30 +32,30 @@ internal class SourceQuadraticResultCapture(
             else -> SourceDerivation.Unavailable("quadratic traversal or objective completion derivation not captured")
         }
         val evidence = claim?.let { payload(it, proof, point?.sample) }
-        return when (result) {
-            is QuadraticOptimizationResult.Optimal -> QuadraticOptimizationResult.Optimal(
+        when (result) {
+            is QuadraticOptimizationResult.Optimal -> return QuadraticOptimizationResult.Optimal(
                 result.incumbent, bound(result.bound, point?.sample),
                 certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.Optimal),
                 result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.UnattainedLimit -> QuadraticOptimizationResult.UnattainedLimit(
+            is QuadraticOptimizationResult.UnattainedLimit -> return QuadraticOptimizationResult.UnattainedLimit(
                 result.incumbent, bound(result.bound, point?.sample),
                 certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.UnattainedLimit),
                 result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.Unbounded -> QuadraticOptimizationResult.Unbounded(
+            is QuadraticOptimizationResult.Unbounded -> return QuadraticOptimizationResult.Unbounded(
                 result.incumbent, certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.Unbounded),
                 result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.Infeasible -> QuadraticOptimizationResult.Infeasible(
+            is QuadraticOptimizationResult.Infeasible -> return QuadraticOptimizationResult.Infeasible(
                 certificate(result.certificate, checkNotNull(evidence), QuadraticClaim.Infeasible),
                 result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.BestFound -> QuadraticOptimizationResult.BestFound(
+            is QuadraticOptimizationResult.BestFound -> return QuadraticOptimizationResult.BestFound(
                 result.incumbent, result.bound?.let { bound(it, point?.sample) },
                 result.reason, result.sense, result.stats, evidence,
             )
-            is QuadraticOptimizationResult.Unknown -> QuadraticOptimizationResult.Unknown(
+            is QuadraticOptimizationResult.Unknown -> return QuadraticOptimizationResult.Unknown(
                 result.bound?.let { bound(it, point?.sample) }, result.reason, result.sense, result.stats,
             )
         }
