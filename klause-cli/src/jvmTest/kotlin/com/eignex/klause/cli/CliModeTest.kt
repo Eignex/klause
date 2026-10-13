@@ -48,6 +48,39 @@ import kotlin.test.assertTrue
 
 class CliModeTest {
     @Test
+    fun `a source rendering veto withholds the actual arithmetic witness and terminal proof`() {
+        val source = File.createTempFile("quadratic-source-veto", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= x 1)) (minimize (* x x)) (check-sat)")
+        }
+        val common = CommonOptions().apply { engine = "fixed"; parallel = 1 }
+        val session = SmtLibMode.newSession()
+        var checked = 0
+        var completed: Verdict? = null
+        val output = object : OutputProtocol by session.output(common) {
+            override fun arithmeticSourceValue(objective: SourceValue): SourceValue? {
+                checked++
+                return null
+            }
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean =
+                error("a rejected source rendering cannot reach publication")
+
+            override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) =
+                error("a rejected source rendering cannot justify terminal proof output")
+
+            override fun onComplete(verdict: Verdict) { completed = verdict }
+        }
+
+        try {
+            SolveCore.solve(session.load(source.absolutePath, common), common, output)
+        } finally {
+            source.delete()
+        }
+
+        assertTrue(checked > 0)
+        assertEquals(Verdict.UNKNOWN, completed)
+    }
+
+    @Test
     fun `a consumer failure aborts actual source publication and leaves a later invocation usable`() {
         val source = File.createTempFile("quadratic-output-failure", ".smt2").apply {
             writeText("(declare-const x Real) (assert (= x 1)) (minimize (* x x)) (check-sat)")
