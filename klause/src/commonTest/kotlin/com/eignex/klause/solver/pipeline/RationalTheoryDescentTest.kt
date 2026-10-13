@@ -3,11 +3,15 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
@@ -206,5 +210,27 @@ class RationalTheoryDescentTest {
             descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
         }
         descent.close()
+    }
+
+    @Test
+    fun `fallback feasibility installs the original numeric query condition`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 43,
+            realLower = DoubleArray(43), realUpper = DoubleArray(43) { 1.0 })
+        val objective = LinearObjective(realCoefficients = DoubleArray(43) { if (it == 0) 1.0 else 0.0 })
+        val original = assertNotNull(source.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            Cancellation.Never))
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val scoped = SourceProofContext(original.scope.copy(condition = SourceCondition(
+            lower = mapOf(real to BigFraction.ONE))), original.coordinates, original.premises,
+            original.objective, original.objectiveConstant, original.semanticsChecker)
+        val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8), scoped)
+
+        descent.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> } }
+
+        val partial = assertNotNull(descent.linearResult)
+        assertEquals(scoped.scope, partial.scope)
+        assertEquals(BigFraction.ONE, partial.value)
+        assertEquals(BigFraction.ONE, assertNotNull(partial.incumbent).exactReals?.get(0))
+        assertNull(partial.terminal)
     }
 }
