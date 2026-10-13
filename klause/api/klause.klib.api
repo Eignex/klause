@@ -11783,6 +11783,19 @@ final class com.eignex.klause.solver.evidence/SourceInequality { // com.eignex.k
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.evidence/SourceInequality.hashCode|hashCode(){}[0]
 }
 
+final class com.eignex.klause.solver.evidence/SourceMappingEvidence { // com.eignex.klause.solver.evidence/SourceMappingEvidence|null[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.solver.evidence/SourceResultEvidence?, kotlin.collections/List<com.eignex.klause.solver.evidence/SourceTransformation?>) // com.eignex.klause.solver.evidence/SourceMappingEvidence.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.solver.evidence.SourceResultEvidence?;kotlin.collections.List<com.eignex.klause.solver.evidence.SourceTransformation?>){}[0]
+
+    final val source // com.eignex.klause.solver.evidence/SourceMappingEvidence.source|{}source[0]
+        final fun <get-source>(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.evidence/SourceMappingEvidence.source.<get-source>|<get-source>(){}[0]
+    final val target // com.eignex.klause.solver.evidence/SourceMappingEvidence.target|{}target[0]
+        final fun <get-target>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.evidence/SourceMappingEvidence.target.<get-target>|<get-target>(){}[0]
+    final val transformations // com.eignex.klause.solver.evidence/SourceMappingEvidence.transformations|{}transformations[0]
+        final fun <get-transformations>(): kotlin.collections/List<com.eignex.klause.solver.evidence/SourceTransformation?> // com.eignex.klause.solver.evidence/SourceMappingEvidence.transformations.<get-transformations>|<get-transformations>(){}[0]
+
+    final fun verify(com.eignex.klause.solver.evidence/SourceClaim, com.eignex.klause.solver.evidence/SourceProofContext, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/SourceMappingEvidence.verify|verify(com.eignex.klause.solver.evidence.SourceClaim;com.eignex.klause.solver.evidence.SourceProofContext;com.eignex.klause.util.Cancellation){}[0]
+}
+
 final class com.eignex.klause.solver.evidence/SourceObjective { // com.eignex.klause.solver.evidence/SourceObjective|null[0]
     constructor <init>(kotlin/String, com.eignex.klause.ir/ObjectiveSense) // com.eignex.klause.solver.evidence/SourceObjective.<init>|<init>(kotlin.String;com.eignex.klause.ir.ObjectiveSense){}[0]
 
@@ -11841,6 +11854,10 @@ final class com.eignex.klause.solver.evidence/SourceResultEvidence { // com.eign
         final fun <get-attestations>(): kotlin.collections/List<com.eignex.klause.solver.evidence/SourceEngineAttestation> // com.eignex.klause.solver.evidence/SourceResultEvidence.attestations.<get-attestations>|<get-attestations>(){}[0]
     final val derivations // com.eignex.klause.solver.evidence/SourceResultEvidence.derivations|{}derivations[0]
         final fun <get-derivations>(): kotlin.collections/List<com.eignex.klause.solver.evidence/SourceEvidence> // com.eignex.klause.solver.evidence/SourceResultEvidence.derivations.<get-derivations>|<get-derivations>(){}[0]
+    final val engineScope // com.eignex.klause.solver.evidence/SourceResultEvidence.engineScope|{}engineScope[0]
+        final fun <get-engineScope>(): com.eignex.klause.solver.evidence/SourceScope? // com.eignex.klause.solver.evidence/SourceResultEvidence.engineScope.<get-engineScope>|<get-engineScope>(){}[0]
+    final val mappings // com.eignex.klause.solver.evidence/SourceResultEvidence.mappings|{}mappings[0]
+        final fun <get-mappings>(): kotlin.collections/List<com.eignex.klause.solver.evidence/SourceMappingEvidence> // com.eignex.klause.solver.evidence/SourceResultEvidence.mappings.<get-mappings>|<get-mappings>(){}[0]
     final val scope // com.eignex.klause.solver.evidence/SourceResultEvidence.scope|{}scope[0]
         final fun <get-scope>(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.evidence/SourceResultEvidence.scope.<get-scope>|<get-scope>(){}[0]
 

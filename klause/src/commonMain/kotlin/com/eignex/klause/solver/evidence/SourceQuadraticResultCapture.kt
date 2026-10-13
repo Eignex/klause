@@ -12,6 +12,7 @@ internal class SourceQuadraticResultCapture(
     private val producer: String,
     private val derivation: SourceDerivation?,
     private val boundDerivation: SourceDerivation?,
+    private val mappings: List<SourceMappingEvidence>,
 ) {
     fun capture(result: QuadraticOptimizationResult): QuadraticOptimizationResult = when (result) {
         is QuadraticOptimizationResult.Optimal -> optimal(result)
@@ -91,6 +92,7 @@ internal class SourceQuadraticResultCapture(
         }
         derivations.add(SourceEvidence(context.scope, claim, proof))
         return SourceResultEvidence(context.scope, derivations, listOf(SourceEngineAttestation(producer, claim)))
+            .withMappings(context.scope, mappings)
     }
 
     private fun bound(value: QuadraticObjectiveBound, sample: Sample?): QuadraticObjectiveBound {
@@ -186,4 +188,16 @@ internal fun QuadraticOptimizationResult.capturedInvocations(): List<QuadraticEn
         is QuadraticOptimizationResult.Unknown -> listOfNotNull(bound?.certificate)
     }
     return certificates.mapNotNull { it.invocation }
+}
+
+internal fun QuadraticOptimizationResult.capturedEvidencePackages(): List<SourceResultEvidence> {
+    val certificates = when (this) {
+        is QuadraticOptimizationResult.Optimal -> listOf(certificate, bound.certificate)
+        is QuadraticOptimizationResult.UnattainedLimit -> listOf(certificate, bound.certificate)
+        is QuadraticOptimizationResult.Unbounded -> listOf(certificate)
+        is QuadraticOptimizationResult.Infeasible -> listOf(certificate)
+        is QuadraticOptimizationResult.BestFound -> listOfNotNull(bound?.certificate)
+        is QuadraticOptimizationResult.Unknown -> listOfNotNull(bound?.certificate)
+    }
+    return listOfNotNull(capturedEvidence()) + certificates.mapNotNull { it.evidence }
 }
