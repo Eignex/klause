@@ -278,6 +278,32 @@ Solution-guided selectors retain their first descent, then adopt better verified
 incumbents when traversal resumes, without discarding their trail or learned state.
 Other pooled solution phasing retains its restart-boundary import policy.
 
+## Boolean objective core search
+
+Curated mixed finite optimization pools append a retained core-guided complete worker
+when every objective term is Boolean and the model has no continuous columns.
+Explicit backtrack pools keep their requested recipes. The worker retains the active
+assumption traversal across slices, closes it before changing the encoding, and keeps
+all source constraints and caller assumptions in every round. Auxiliary selector
+clauses and core thresholds remain private; their learned clauses never enter shared
+source clause channels.
+
+Weights, negative-coefficient offsets and the accumulated lower bound use arbitrary-precision
+integers. A refuted core charges its minimum residual weight. Its violation count `s`
+is replaced by `1 + sum(k = 2..n, s >= k)` using exact reified cardinality thresholds;
+uncancelled residual weights stay active. This identity covers overlapping cores and
+cores containing thresholds from earlier rounds. Stratification changes the active
+assumptions, preserving the accumulated bound and all residual terms.
+
+Published incumbents project away auxiliary selectors and pass the source fixpoint
+check. Optimality requires exact equality between the original objective and the
+accumulated lower bound. Shared scalar floors round downward; they do not replace
+the exact internal comparison. Cancellation publishes neither a partial encoding
+nor an unfinished refutation. Core encoding checkpoints retain their cursor, and
+query propagation fractions and slice overspend carry across rounds. Containing
+decision quotas survive every query rebuild. These engine completions retain the
+ordinary in-memory proof authority; independent serialized derivations are unavailable.
+
 ## Model-specific worker recipes
 
 These policies choose workers for particular model structures within the shared
