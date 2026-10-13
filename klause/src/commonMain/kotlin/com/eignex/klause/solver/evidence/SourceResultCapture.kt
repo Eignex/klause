@@ -30,7 +30,12 @@ class SourceResultCapture(
             "quadratic capture requires the source objective direction"
         }
         if (cancellation() || result.capturedScopes().any { it != context.scope }) return result
-        return SourceQuadraticResultCapture(context, producer, derivation, boundDerivation).capture(result)
+        val expected = result::class
+        val captured = SourceQuadraticResultCapture(context, producer, derivation, boundDerivation).capture(result)
+        check(captured::class == expected) {
+            "quadratic capture changed $expected to ${captured::class}; input is ${result::class}"
+        }
+        return captured
     }
 
     /** Capture exact source assignments and explicitly classify missing complete-search proof data. */
