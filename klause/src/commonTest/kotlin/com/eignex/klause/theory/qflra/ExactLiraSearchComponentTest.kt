@@ -61,6 +61,110 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `Boolean coefficient rows return with their opposite sibling premise`() {
+        val source = ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)
+        val factor = object : Factor by source {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                TaggedLinearRow(
+                    intArrayOf(Term.ofLit(Lit.make(0, true)), Term.ofIntVar(0)),
+                    IntegerConstants(UnitConsts(2), 0L), LinearOp.LE,
+                ),
+            ))
+        }
+        val model = Problem(numBoolVars = 2, intBounds = openBounds(),
+            factors = arrayOf(factor, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertIs<ComponentCheck.Feasible>(session.check())
+            assertEquals(BIG_ZERO, assertNotNull(session.model().valueOf<ExactLiraAssignment>(component)).ints.single())
+            session.popTo(0)
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertContentEquals(intArrayOf(Lit.make(0, false)), assertNotNull(conflict.explanation).literals)
+        }
+    }
+
+    @Test
+    fun `unselected disjunct rows remain available after a scoped alternative`() {
+        ExactLiraSearchComponent(comparisonClauseModel(xUpper = 8)).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val alternatives = assertNotNull(component.nextBranch(session))
+            assertIs<ComponentResult.Consistent>(session.push(alternatives.first()))
+            assertIs<ComponentCheck.Feasible>(session.check())
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(alternatives.last()))
+
+            assertIs<ComponentCheck.Feasible>(session.check())
+            val witness = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertTrue(witness.ints[0] <= bigIntOf(4))
+            assertTrue(witness.ints[1] <= bigIntOf(-3))
+        }
+    }
+
+    @Test
+    fun `unresolved source rows remain pending after unrelated Boolean choices`() {
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertIs<ComponentCheck.Indeterminate>(session.check())
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            session.popTo(1)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertIs<ComponentCheck.Feasible>(session.check())
+            assertTrue(assertNotNull(session.model().valueOf<ExactLiraAssignment>(component)).ints.single() >= BIG_ONE)
+        }
+    }
+
+    @Test
+    fun `installed source rows return for an opposite sibling guard`() {
+        ExactLiraSearchComponent(partialModel()).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            repeat(2) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+                assertIs<ComponentCheck.Feasible>(session.check())
+                session.popTo(0)
+
+                assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                session.popTo(0)
+            }
+        }
+    }
+
+    @Test
+    fun `root integer publications refresh source assertions after a scoped check`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentCheck.Feasible>(session.check())
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.publish(SearchDecision.IntAtLeast(0, 5)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertIs<ComponentCheck.Feasible>(session.check())
+            val witness = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertTrue(witness.ints.single() >= bigIntOf(5))
+        }
+    }
+
+    @Test
     fun `partial difference checks and complete source witnesses need no LP owner`() {
         val model = Problem(
             numBoolVars = 2,

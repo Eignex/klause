@@ -62,6 +62,19 @@ The invocation owns LP assertions, reduction caches, integer branches and candid
 assignments. The shared [linear source preparation](../solver/search.md#shared-component-search)
 factory retains only immutable row forms, source addresses and Boolean dependencies;
 each opening binds fresh callbacks, cancellation and mutable arithmetic owners.
+A bounded owner-local packed frontier retains source rows not yet installed in an LP
+scope. Non-root checks visit those rows in source order; unresolved guards, unselected
+disjunctions and disequalities remain pending. A row leaves the frontier only after
+its assertion succeeds, and retraction restores rows from the removed scopes. Root
+checks retain the full source scan for newly published fixed-coordinate substitution;
+integer bounds, source branches and disequality direction checks keep their existing
+refresh paths. Frontier preparation and visits charge the containing native allowance;
+its optional packed storage is limited to 64 KiB. Installed-row comparison and premise creation
+already skip in the full scan, so the frontier removes only those row-loop visits.
+An unsupported catalogue falls back to the full scan; interrupted preparation or
+visits withhold the current check. Frontier preparation is attempted once per owner,
+without renewing spent work. Closing releases its private storage.
+
 Finite projections own their domain state separately. A source rewrite
 or objective change needs matching reconstruction and proof scope; a retained basis
 alone cannot transfer result authority. [Resources](../solver/resources.md) and

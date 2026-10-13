@@ -161,6 +161,8 @@ class ExactLiraSearchComponent private constructor(
     private val exactForms = preparedSource.exactForms
     private val preparedRows = preparedSource.preparedRows
     private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
+    private var pendingSourceRows: PendingSourceRows? = null
+    private var sourceFrontierPreparationAttempted = false
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
@@ -306,6 +308,7 @@ class ExactLiraSearchComponent private constructor(
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) = lp.onRestart(context)
     override fun close() {
+        pendingSourceRows = null
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
     }
 
@@ -522,15 +525,23 @@ class ExactLiraSearchComponent private constructor(
 
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
+        if (!sourceFrontierPreparationAttempted) {
+            sourceFrontierPreparationAttempted = true
+            if (PendingSourceRows.supports(preparedRows.size)) {
+                pendingSourceRows = PendingSourceRows.prepare(preparedRows.size, operationStop) ?: return false
+            }
+            if (operationStop()) return false
+        }
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
-        for ((index, prepared) in preparedRows.withIndex()) {
+        fun assertRow(index: Int): Boolean {
+            val prepared = preparedRows[index]
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
-            if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
+            if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) return true
             val address = prepared.address
             val asserted = node.rowAssertions[address]
-            if (prepared.disjunction && asserted == null) continue
-            val truth = node.rowTruth(address, prepared.row, bools) ?: continue
+            if (prepared.disjunction && asserted == null) return true
+            val truth = node.rowTruth(address, prepared.row, bools) ?: return true
             val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
             val leaves = prepared.booleans.map { variable ->
                 SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
@@ -542,7 +553,15 @@ class ExactLiraSearchComponent private constructor(
             } else {
                 if (!system.assertComparison(comparison, null, premise)) return false
                 sourceAssertionLevels[index] = context.decisionLevel
+                pendingSourceRows?.asserted(index)
             }
+            return true
+        }
+        val pending = pendingSourceRows.takeIf { context.decisionLevel > 0 }
+        if (pending != null) {
+            if (!pending.visit(operationStop, ::assertRow)) return false
+        } else {
+            for (index in preparedRows.indices) if (!assertRow(index)) return false
         }
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
@@ -858,7 +877,10 @@ class ExactLiraSearchComponent private constructor(
 
     private fun retractSource(decisionLevel: Int) {
         for (index in sourceAssertionLevels.indices) {
-            if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
+            if (sourceAssertionLevels[index] > decisionLevel) {
+                sourceAssertionLevels[index] = -1
+                pendingSourceRows?.restored(index)
+            }
         }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
