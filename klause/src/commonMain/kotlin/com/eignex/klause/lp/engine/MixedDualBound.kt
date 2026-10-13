@@ -22,8 +22,91 @@ internal fun nodeDualCertificate(
     } catch (_: LpProjectionStop) {
         null
     }
+    val rows = if (certificate != null && !model.hasIntegralObjective()) {
+        try {
+            integralObjectiveRows(model, meter)
+        } catch (_: LpProjectionStop) {
+            null
+        }
+    } else {
+        null
+    }
     observer?.observe(LpCertifier.INTEGER, certificate != null, LpCertifierCost.Metered(meter.work))
-    return certificate.takeUnless { cancellation() }
+    if (cancellation()) return null
+    return if (certificate != null && rows != null) IntegralObjectiveCertificate(certificate, rows) else certificate
+}
+
+private class IntegralObjectiveCertificate(
+    private val certificate: LpDeductionCertificate,
+    private val rows: IntArray,
+) : LpDeductionCertificate by certificate {
+    override fun integralObjectiveRows(): IntArray = rows.copyOf()
+}
+
+private fun integralObjectiveRows(model: LpModel, meter: MixedCertificateMeter): IntArray? {
+    val state = model.exactState ?: return null
+    val source = state.model
+    meter.reserve(model.numVars.toLong() * 8L)
+    val costs = List(model.numVars) { meter.read(model.exactCost(it)) }
+    if ((model.n until model.numVars).any { !costs[it].isZero }) return null
+    var objective = -1
+    for (column in 0 until model.n) {
+        meter.step()
+        if (!source.column(column).integral && !costs[column].isZero) {
+            if (objective >= 0) return null
+            objective = column
+        }
+    }
+    if (objective < 0) return null
+    val candidates = ArrayList<Pair<Int, BigFraction>>()
+    model.forEachRationalColumn(objective) { row, coefficient ->
+        meter.step()
+        val slack = model.slackCol(row)
+        val bounds = model.exactBounds(slack)
+        val lower = bounds.lower
+        val upper = bounds.upper
+        if (!coefficient.isZero && lower != null && upper != null && !lower.strict && !upper.strict &&
+            lower.number.value == upper.number.value && slack < state.baseModel.numVars &&
+            bounds == state.baseModel.column(slack).bounds
+        ) {
+            if (candidates.size == 8) throw LpProjectionStop()
+            meter.reserve(64L)
+            candidates.add(row to meter.read(coefficient))
+        }
+    }
+    for ((row, coefficient) in candidates) {
+        val multiplier = meter.multiply(costs[objective], coefficient.reciprocal())
+        if (integralObjectiveAfterRow(model, costs, row, multiplier, meter)) return intArrayOf(row)
+    }
+    return null
+}
+
+private fun integralObjectiveAfterRow(
+    model: LpModel,
+    costs: List<BigFraction>,
+    row: Int,
+    multiplier: BigFraction,
+    meter: MixedCertificateMeter,
+): Boolean {
+    val source = checkNotNull(model.exactState).model
+    val scale = meter.read(source.objective.scale.value)
+    val fixed = checkNotNull(model.exactBounds(model.slackCol(row)).lower).number.value
+    var constant = meter.add(model.exactConstant(), meter.multiply(multiplier,
+        meter.add(model.exactRhs(row), fixed.negated())))
+    for (column in 0 until model.n) {
+        var cost = costs[column]
+        model.forEachRationalColumn(column) { r, value ->
+            meter.step()
+            if (r == row) cost = meter.add(cost, meter.multiply(multiplier, value).negated())
+        }
+        if (cost.isZero) continue
+        if (!source.column(column).integral ||
+            ExactLpNumber.of(meter.multiply(cost, scale.reciprocal())).exactLong() == null
+        ) return false
+        constant = meter.add(constant, meter.multiply(cost, model.exactShift(column)).negated())
+    }
+    constant = meter.add(meter.multiply(constant, scale.reciprocal()), source.objective.externalConstant.value)
+    return ExactLpNumber.of(constant).exactLong() != null
 }
 
 private fun mixedCertificate(
