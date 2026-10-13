@@ -79,7 +79,7 @@ class OpenTheoryPipelineTest {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(1.0 / 3.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val third = BigFraction.ONE / BigFraction.ofLong(3)
+        val third = BigFraction.ofLong(3).reciprocal()
         val context = SourceProofContext(SourceScope(SourceRevision("exact-source", "exact-affine"),
             objective = SourceObjective("cost", ObjectiveSense.MINIMIZE)), setOf(real),
             mapOf("lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), third.negated()))),
