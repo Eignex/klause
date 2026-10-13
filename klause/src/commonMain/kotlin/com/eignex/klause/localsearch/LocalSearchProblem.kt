@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.util.EmptyIntArray
 
@@ -38,7 +39,7 @@ class LocalSearchProblem private constructor(
         fun preparation(
             problem: Problem,
             domains: Array<IntDomain>?,
-            selection: PreparedFactorProjections? = null,
+            selection: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
         ): Iterator<LocalSearchProblem?> =
             sequence<LocalSearchProblem?> {
                 selection?.requireSource(problem)

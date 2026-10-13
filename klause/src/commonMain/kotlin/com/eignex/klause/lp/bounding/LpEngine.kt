@@ -41,6 +41,7 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
@@ -223,6 +224,7 @@ internal class LpEngine(
                 suppressedHullFactors = suppressedHullFactors,
                 auxiliarySources = auxiliarySources,
                 deferred = deferred,
+                projections = (problem as? BakedProblem)?.factorProjections,
             )
         } else {
             null

@@ -217,7 +217,7 @@ object PortfolioBuilder {
             nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
             localSearchProjection = LocalSearchPreparation(
                 problem, LocalSearchModel.of(problem).domains, concurrency.lock(),
-            ),
+            ).takeIf { it.shareable },
             localSearchInvariants = InvariantNetworkPreparation(
                 definitionalSweep, problem.numIntVars, problem.numBoolVars, concurrency.lock(),
             ),

@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -27,6 +29,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -227,4 +230,26 @@ class PreparedFactorProjectionsTest {
         assertEquals(source.factors[0].builtInExecutionCapabilities(), selected.capabilities(0))
         assertTrue(PropagationProblem(clauses, FactorProjectionProviders.Default.prepare(clauses)).isNativeSatEligible)
     }
+    @Test
+    fun `invocation providers retain source solutions with weaker root filtering`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) {
+                object : Propagator {
+                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                        val domain = state.intDomains[0]
+                        return domain.min != domain.max || domain.min <= 1
+                    }
+                }
+            }
+        })
+
+        val baked = source.bake(providers)
+        val witnesses = BacktrackSolver(baked).samples(BacktrackParams()).map { it.intValue(0) }.toSet()
+
+        assertEquals(2L, baked.rootIntDomain(0).max)
+        assertEquals(setOf(0L, 1L), witnesses)
+    }
+
 }

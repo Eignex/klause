@@ -4,6 +4,8 @@ import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.executionCapabilities
@@ -12,8 +14,10 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
 
 internal class UnscoredCandidateCheck(problem: Problem) {
+    private val selection = (problem as? BakedProblem)?.factorProjections
     private val factorIds = problem.factors.indices.filter {
-        problem.factors[it].executionCapabilities().assignmentCheck == AssignmentCheckCapability.UNSUPPORTED
+        (selection?.capabilities(it) ?: problem.factors[it].executionCapabilities()).assignmentCheck ==
+            AssignmentCheckCapability.UNSUPPORTED
     }.toIntArray()
     private val unchecked = if (factorIds.isEmpty()) null else
         problem.withFactors(Array(factorIds.size) { problem.factors[factorIds[it]] })
@@ -26,7 +30,8 @@ internal class UnscoredCandidateCheck(problem: Problem) {
         val point = source.withIntDomains(Array(source.numIntVars) {
             IntDomain(candidate.intValue(it), candidate.intValue(it))
         })
-        val checked = composedFixpoint(point, Candidate(candidate, Unit), cancellation, assumptions)
+        val selectedPoint = selection?.let { point.bake(it.providers, cancellation) } ?: point
+        val checked = composedFixpoint(selectedPoint, Candidate(candidate, Unit), cancellation, assumptions)
         if (cancellation()) return Completion.Undecided()
         return when (checked) {
             is Verification.Accepted -> Completion.Witness(candidate)
