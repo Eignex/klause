@@ -356,6 +356,7 @@ class ProofCheckTest(unittest.TestCase):
 
         result = self.check(case, source)
 
+        self.assertEqual(result['sourceQueryEncoding'], 'finite binary')
         self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
         with self.assertRaisesRegex(AssertionError, 'claimed source objective feasibility expected sat, got unsat'):
             self.check(self.case(suite='mps-core', arm='default', objective=0, finalWitness=None), source)
@@ -366,6 +367,7 @@ class ProofCheckTest(unittest.TestCase):
 
         result = self.check(case, source)
 
+        self.assertEqual(result['sourceQueryEncoding'], 'general')
         self.assertEqual(result['witness'], 'exact source feasible')
         self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
 
