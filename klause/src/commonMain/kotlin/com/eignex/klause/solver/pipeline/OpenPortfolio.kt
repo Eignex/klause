@@ -75,10 +75,11 @@ internal class OpenPortfolio(
     private val searchesContinuousOnly: Boolean = false,
     private val sourceObjective: OpenSourceObjective? = null,
     private val publication: SourcePublicationObserver? = null,
+    preparedSource: PreparedSourcePlan? = null,
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
     private val lifetime = theoryParams.cancellation or theoryParams.timeout
-    private val preparedPlan = request?.preparedPlan ?: model.prepareExecutionPlan()
+    private val preparedPlan = preparedSource ?: request?.preparedPlan ?: model.prepareExecutionPlan()
     private val sourceModel = preparedPlan.originalSource as? Problem ?: model
 
     private fun workerParams(slot: PortfolioWorkerSlot): TheoryParams = theoryParams.copy(
@@ -171,11 +172,11 @@ internal class OpenPortfolio(
             PortfolioArmFactory(preparedPlan, factory.armId, factory.family,
                 bind = { it.bindInvocation(binding) }) { slot -> factory.materialize(preparedPlan, slot) }
         }
+        val verifier = openWitnessVerifier(sourceModel, objective, context, lifetime or cancellation)
+        val evidence = PortfolioEvidence(identity, verifier).bindInvocation(binding, lifetime or cancellation)
         val portfolio = PortfolioInvocation(preparedPlan, boundFactories,
             PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = lifetime or cancellation,
-                nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0),
-            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, objective, context, lifetime or cancellation))
-                .bindInvocation(binding, lifetime or cancellation)) { workers ->
+                nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0), evidence) { workers ->
             PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = true),
                 reservedShares(workers, if (integral != null || rational) DESCENT_SHARE else 0.0))
         }

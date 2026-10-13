@@ -238,9 +238,12 @@ object OpenTheoryPipeline {
         searchesContinuousOnly: Boolean,
         values: OpenSourceObjective?,
         publication: SourcePublicationObserver,
+        preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
+        val prepared = preparedSource ?: model.prepareExecutionPlan(values?.original, values?.maximize ?: false)
         val portfolio = OpenPortfolio(model, request = null, params, lanes = cores,
-            searchesContinuousOnly = searchesContinuousOnly, sourceObjective = values, publication = publication)
+            searchesContinuousOnly = searchesContinuousOnly, sourceObjective = values, publication = publication,
+            preparedSource = prepared)
         val stop = params.cancellation or params.timeout
         if (objective == null) return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizer = null, stop))
@@ -361,15 +364,16 @@ object OpenTheoryPipeline {
         values: OpenSourceObjective?,
         publication: SourcePublicationObserver,
     ): OpenTheoryExecution {
-        val prepared = model.preparedWithComponents(model.componentPlan(), objective = objective)
+        val prepared = model.preparedWithComponents(model.componentPlan(), objective = values?.original,
+            maximize = values?.maximize ?: false)
         val operation = if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE
         if (!prepared.capabilities.admission(engine, operation).runnable) return unsupportedExecution(objective)
         return when (engine) {
-            FiniteEngine.MIXED -> heuristicExecution(model, params, objective, cores, false, values, publication)
-            FiniteEngine.LOCAL_SEARCH -> heuristicExecution(model, params, objective, cores, true, values, publication)
+            FiniteEngine.MIXED -> heuristicExecution(model, params, objective, cores, false, values, publication, prepared)
+            FiniteEngine.LOCAL_SEARCH -> heuristicExecution(model, params, objective, cores, true, values, publication, prepared)
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> unsupportedExecution(objective)
             FiniteEngine.ALNS -> linearNeighborhoodInvocation(model, params, objective, adaptive = true, cores,
-                sourceObjective = values, publication = publication)
+                preparedSource = prepared, sourceObjective = values, publication = publication)
         }
     }
 
