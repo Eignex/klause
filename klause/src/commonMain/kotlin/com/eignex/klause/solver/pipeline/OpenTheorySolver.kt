@@ -396,7 +396,10 @@ class OpenTheoryEngine internal constructor(
             )
             // Drawn here rather than beside the plan, so a root that propagation already refuted never pays
             // for a proposal no traversal would have read.
-            val hints = state.candidateHints(plan, model, cancellation)
+            val callerHints = state.candidateHints(plan, model, cancellation)
+            val hints = if (params.openBranching == OpenBranching.SourceOrder) {
+                planned.pointPhaseHints(callerHints)
+            } else callerHints
             val branching = when (params.openBranching) {
                 OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)

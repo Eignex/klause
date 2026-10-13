@@ -182,6 +182,15 @@ class SearchSession(
         return openTheoryWork?.theoryCheck() != false
     }
 
+    internal fun reserveAdvisoryWork(units: Long): Boolean {
+        require(units >= 0)
+        if (cancelled()) return false
+        val work = openTheoryWork ?: return true
+        if (units >= work.remaining()) return false
+        work.hintMoves(units)
+        return !cancelled()
+    }
+
     internal fun workExhausted(): Boolean = openTheoryWork?.exhausted == true
     internal fun checkBudgetExhausted(): Boolean = checksExhausted
     internal fun decisionBudgetExhausted(): Boolean = decisionsExhausted

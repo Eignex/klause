@@ -50,16 +50,21 @@ internal class RealDifferenceSystem private constructor(
                 potentials = normalized.takeIf { values ->
                     values.all { it in -Long.MAX_VALUE / 8L..Long.MAX_VALUE / 8L }
                 }
-                Result.Feasible { List(graph.numVars - 1) { column ->
+                Result.Feasible(graph.numVars - 1) { column ->
                     BigFraction.of(bigIntOf(result.values[column] - zero), bigIntOf(scale))
-                } }
+                }
             }
         }
     }
 
     sealed interface Result {
-        class Feasible(point: () -> List<BigFraction>) : Result {
-            val point by lazy(point)
+        class Feasible(val dimension: Int, private val valueAt: (Int) -> BigFraction) : Result {
+            val point by lazy { List(dimension, valueAt) }
+
+            fun coordinate(column: Int): BigFraction {
+                require(column in 0 until dimension)
+                return valueAt(column)
+            }
         }
         class Infeasible(val clause: IntArray?) : Result
         data object Interrupted : Result

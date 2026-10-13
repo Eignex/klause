@@ -60,11 +60,11 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
     fun theoryCheck(): Boolean = consume().also { if (it) theoryChecks++ }
 
     /**
-     * Charge the local-search moves a branch-order hint draw spent.
+     * Charge local-search moves or bounded exact-point work spent on branch-order hints.
      *
-     * The draw is the one open-route producer that spends work ahead of the traversal, so charging it is
-     * what keeps this allowance solve-wide: a hinted run and an unhinted one under the same limit do the
-     * same total work, the hinted one having given part of it to the draw. Charged against [remaining]
+     * Advisory producers spend work ahead of traversal, so charging them keeps this allowance solve-wide:
+     * a hinted run and an unhinted one under the same limit share the accounting-policy work ceiling,
+     * the hinted one having given part of it to the advisory work. Charged against [remaining]
      * so a producer that overran the allowance it was handed cannot report more spent than the sink
      * ever held, and a charge that fills the allowance marks it spent, so a run the draw ended reports
      * the budget as its reason rather than a stop it never saw.

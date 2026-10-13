@@ -11,6 +11,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
 
 /** Exact values of the mixed columns an [ExactComparison] states its terms over. */
 internal interface ExactColumnValues {
@@ -149,6 +151,42 @@ internal class ExactRowForm(
 ) {
     private val ordered = ExactOrderedTerms(terms)
 
+    internal fun pointPhase(
+        dimension: Int,
+        pointValue: (Int) -> BigFraction?,
+        booleanValue: (Int) -> Boolean?,
+        reserve: (Long, Long) -> Boolean,
+    ): Boolean? {
+        if (terms.size > 32 || booleanLiterals.size > 32 || !rhs.phaseBounded()) return null
+        var bound = rhs
+        for (k in booleanLiterals.indices) {
+            if (!reserve(1, 256)) return null
+            val value = booleanValue(Lit.variable(booleanLiterals[k])) ?: return null
+            val coefficient = booleanCoefficients[k]
+            if (!coefficient.phaseBounded()) return null
+            if (value == Lit.isPositive(booleanLiterals[k])) {
+                bound -= coefficient
+                if (!bound.phaseBounded()) return null
+            }
+        }
+        var value = BigFraction.ZERO
+        for ((column, coefficient) in terms) {
+            if (!reserve(4, 768) || column !in 0 until dimension) return null
+            val coordinate = pointValue(column) ?: return null
+            if (!coefficient.phaseBounded() || !coordinate.phaseBounded()) return null
+            val product = coefficient * coordinate
+            if (!product.phaseBounded()) return null
+            value += product
+            if (!value.phaseBounded()) return null
+        }
+        return when (relation) {
+            LinearOp.LE -> if (strict) value < bound else value <= bound
+            LinearOp.GE -> if (strict) value > bound else value >= bound
+            LinearOp.EQ -> value == bound
+            LinearOp.NE -> value != bound
+        }
+    }
+
     /** The comparison the row states when its activator holds [truth] under [booleanValue]. */
     fun comparison(truth: Boolean, booleanValue: (Int) -> Boolean): ExactComparison {
         var bound = rhs
@@ -261,3 +299,9 @@ internal fun MutableMap<Int, BigFraction>.add(column: Int, value: BigFraction) {
     val sum = (this[column] ?: BigFraction.ZERO) + value
     if (sum.isZero) remove(column) else this[column] = sum
 }
+
+private val PHASE_NUMBER_LIMIT = bigIntOf(Long.MAX_VALUE)
+private val PHASE_NUMBER_MINIMUM = bigIntOf(-Long.MAX_VALUE)
+
+private fun BigFraction.phaseBounded(): Boolean =
+    num >= PHASE_NUMBER_MINIMUM && num <= PHASE_NUMBER_LIMIT && den <= PHASE_NUMBER_LIMIT

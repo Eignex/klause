@@ -68,3 +68,14 @@ defines `supportsExactLra`.
 shares the linear checking machinery without integer branching for a pure-real source.
 [QfLraSystem](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/QfLraSystem.kt)
 owns model-facing linear assertions; the pipeline names this route `EXACT_LRA`.
+
+The complete source-order traversal may use an already produced partial real-bearing
+point to order a reified Boolean comparison. Fixed source coordinates and known
+Boolean coefficient values are read exactly. This optional guide keeps both sides
+and withholds ambiguous, unsupported or interrupted evaluation. Source row checks,
+strict feasibility and completed witness publication remain unchanged.
+
+Mixed linear points may contain fractional integer coordinates and still guide
+order. [Integer feasibility](linear-integer.md) and the complete original-source
+witness checks remain the only assignment authority; a point phase cannot establish
+integrality. Pure-integer sources keep their existing branching policy.

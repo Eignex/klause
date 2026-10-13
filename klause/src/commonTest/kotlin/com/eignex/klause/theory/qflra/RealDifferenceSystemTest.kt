@@ -16,12 +16,28 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RealDifferenceSystemTest {
+    @Test
+    fun `sparse coordinates leave the complete point lazy`() {
+        var reads = 0
+        val result = RealDifferenceSystem.Result.Feasible(4) { column ->
+            reads++
+            BigFraction.ofLong(column.toLong())
+        }
+        assertEquals(BigFraction.ofLong(3L), result.coordinate(3))
+        assertEquals(1, reads)
+        assertEquals(4, result.point.size)
+        assertEquals(5, reads)
+        assertEquals(BigFraction.ofLong(3L), result.point[3])
+        assertEquals(5, reads)
+    }
+
     @Test
     fun `strict bounds retain a rational interior witness`() {
         val model = Problem(

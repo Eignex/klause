@@ -40,7 +40,6 @@ import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.lp.sourceDoubleBoundedSplit
 import com.eignex.klause.lp.sourceEqualityRows
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.snapshotValues
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -51,6 +50,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchBrancher
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
@@ -62,6 +62,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.solver.snapshotValues
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
@@ -171,6 +172,12 @@ class ExactLiraSearchComponent private constructor(
     private var assignment: ExactLiraAssignment? = null
     private var outcome: ComponentCheck? = null
     private var candidate: List<BigFraction>? = null
+    private var phaseGraph: RealDifferenceSystem.Result.Feasible? = null
+    private var phaseRows: Map<Int, List<PreparedSourceRow>>? = null
+    private var phaseWork = 0L
+    private var phaseAllocation = 0L
+    private var phaseAnswers = 0
+    private var phaseClosed = false
     private var dirty = true
     private var sourceInstalled = false
     private var graphFirst = false
@@ -215,6 +222,87 @@ class ExactLiraSearchComponent private constructor(
     }
     private val lp: LpPropagator by lpDelegate
     private val system by lazy { LiveQfLraSystem(model, lp, exactForms) }
+
+    internal fun pointPhaseHints(): SearchCandidateHints {
+        if (phaseClosed || model.numRealVars == 0 ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy
+        ) return SearchCandidateHints.None
+        if (!reservePhaseWork(1, 128)) return SearchCandidateHints.None
+        return SearchCandidateHints(::preferredPointPhase)
+    }
+
+    private fun reservePhaseWork(work: Long, allocation: Long): Boolean {
+        if (work > 16_384L - phaseWork || allocation > 524_288L - phaseAllocation || operationStop()) return false
+        val current = context ?: return false
+        if (current is SearchSession && !current.reserveAdvisoryWork(work)) return false
+        phaseWork += work
+        phaseAllocation += allocation
+        operationStop.charge(work)
+        return !operationStop() && !current.cancelled()
+    }
+
+    private fun preferredPointPhase(variable: Int): Boolean? {
+        val current = context ?: return null
+        if (phaseClosed || variable !in bools.indices || bools[variable] != UNASSIGNED || phaseAnswers >= 64) {
+            return null
+        }
+        if ((candidate == null && phaseGraph == null) || !reservePhaseWork(1, 128)) return null
+        val previousStop = operationStop
+        operationStop = operationAllowance(parentStop)
+        val answer = try {
+            val rows = phaseRows ?: buildPhaseRows()?.also { phaseRows = it } ?: return null
+            val selected = rows[variable] ?: return null
+            val point = candidate
+            val graph = phaseGraph
+            val dimension = point?.size ?: graph?.dimension ?: return null
+            if (dimension != model.numRealVars + model.numIntVars || !reservePhaseWork(1, 64)) return null
+            var coordinates = 0
+            val valueAt: (Int) -> BigFraction? = { column ->
+                if (coordinates++ >= 64) null else {
+                    point?.get(column) ?: graph?.coordinate(column)
+                }
+            }
+            var phase: Boolean? = null
+            for (row in selected) {
+                if (!reservePhaseWork(1, 128)) return null
+                val value = row.form.pointPhase(dimension, valueAt, { id ->
+                    when (bools[id]) {
+                        TRUE -> true
+                        FALSE -> false
+                        else -> null
+                    }
+                }, ::reservePhaseWork) ?: return null
+                if (phase != null && phase != value) return null
+                phase = value
+            }
+            if (operationStop() || current.cancelled()) null else phase
+        } finally {
+            operationStop = previousStop
+        }
+        return if (parentStop() || current.cancelled()) null else answer?.also { phaseAnswers++ }
+    }
+
+    private fun buildPhaseRows(): Map<Int, List<PreparedSourceRow>>? {
+        if (!reservePhaseWork(1, 128)) return null
+        val rows = HashMap<Int, MutableList<PreparedSourceRow>>()
+        for (index in 0 until minOf(preparedRows.size, 512)) {
+            if (!reservePhaseWork(1, 0)) return null
+            val row = preparedRows[index]
+            if (row.disjunction || row.row.activator == LinearRow.ALWAYS || row.row.size > 32) continue
+            val variable = row.row.activator
+            var selected = rows[variable]
+            if (selected == null) {
+                if (rows.size >= 128) continue
+                if (!reservePhaseWork(1, 256)) return null
+                selected = ArrayList()
+                rows[variable] = selected
+            }
+            if (selected.size >= 8) continue
+            if (!reservePhaseWork(1, 16)) return null
+            selected.add(row)
+        }
+        return rows
+    }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -303,6 +391,9 @@ class ExactLiraSearchComponent private constructor(
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) = lp.onRestart(context)
     override fun close() {
+        phaseClosed = true
+        phaseGraph = null
+        phaseRows = null
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
     }
 
@@ -440,6 +531,7 @@ class ExactLiraSearchComponent private constructor(
         assignment = null
         outcome = null
         candidate = null
+        phaseGraph = null
         val wasDirty = dirty
         dirty = true
         when (decision) {
@@ -624,6 +716,7 @@ class ExactLiraSearchComponent private constructor(
         val explanation = SearchExplanation(clause)
         dirty = false
         candidate = null
+        phaseGraph = null
         assignment = null
         smtStats?.observeConflict(explanation)
         outcome = ComponentCheck.Infeasible(explanation)
@@ -648,7 +741,7 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Consistent
         }
         var checked = false
-        // Partial graph consistency needs no numerical guide; complete points still check source rows.
+        // A partial graph point only guides order; complete points still check every source row.
         if (graphFirst && node.sourceBranches.isEmpty()) {
             if (!context.consumeCheck()) return ComponentResult.Indeterminate
             checked = true
@@ -660,6 +753,7 @@ class ExactLiraSearchComponent private constructor(
                 is RealDifferenceSystem.Result.Feasible -> {
                     if (bools.any { it == UNASSIGNED }) {
                         candidate = null
+                        phaseGraph = result
                         assignment = null
                         outcome = null
                         dirty = false
@@ -868,6 +962,7 @@ class ExactLiraSearchComponent private constructor(
         assignment = null
         outcome = null
         candidate = null
+        phaseGraph = null
         dirty = true
     }
 

@@ -162,3 +162,19 @@ Proposal and instruction caps divide among heuristic workers; completion work al
 charges their instruction ledger. Zero proposal, instruction or native work
 allowance prevents a heuristic completion. Timeout and external cancellation retain
 their separate reasons.
+
+Real-bearing point-phase lookup owns cumulative optional work and modeled allocation
+limits on the component. Its index covers at most 512 prepared rows and 128 guards,
+with at most eight row descriptors per guard; unavailable tails do not imply a
+whole-source consensus. A lookup reads at most 64 coordinates, with at most
+32 arithmetic and 32 Boolean terms per comparison. Lookup issues at most 64 advisory answers.
+Work is prepaid through the shared open allowance and containing native meter,
+without changing check or decision quotas. Restart and retraction do not renew the
+16,384 work or 512 KiB modeled allocation limits. Bounded operands and intermediate
+rational values decline wider evaluation. Each graph coordinate conversion is
+charged before it is read from the existing check's potentials; the complete graph
+point remains lazy for source witness checking. A general LP point is read from
+its existing list, without copying all columns. Optional local decline leaves the required-operation
+budget state unchanged. Closing the owner releases its optional index and point
+reference. The graph result keeps one existing, dimension-bounded potential array;
+no new graph or LP solve is requested.

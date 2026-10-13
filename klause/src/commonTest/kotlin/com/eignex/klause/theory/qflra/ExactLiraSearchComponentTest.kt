@@ -25,12 +25,14 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.pointPhaseHints
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedDbParams
@@ -57,9 +59,262 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
+    @Test
+    fun `partial graph point phases preserve witness authority and both Boolean alternatives`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0), factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertNull(session.model().valueOf<ExactLraAssignment>(component))
+            assertNull(component.lpMetrics)
+            val hints = component.pointPhaseHints()
+            assertEquals(true, hints.preferredBool(0))
+            assertNull(session.boolValue(0))
+            assertIs<SearchResult.Satisfied>(session.solve(1, SearchSolveParams(maxDecisions = 1),
+                candidateHints = hints))
+            assertEquals(true, session.boolValue(0))
+            assertNull(component.lpMetrics)
+        }
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<SearchResult.Satisfied>(session.solve(1, SearchSolveParams(maxDecisions = 2),
+                candidateHints = SearchCandidateHints.ofLiterals(intArrayOf(Lit.make(0, false)))))
+            assertEquals(true, session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `an existing general LP point guides a reified real comparison`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(0), numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(0.0, 0.0), factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0),
+                    LinearOp.EQ, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertNotNull(component.lpMetrics)
+            assertNull(session.boolValue(0))
+            assertEquals(true, component.pointPhaseHints().preferredBool(0))
+            assertIs<SearchResult.Satisfied>(session.solve(1, SearchSolveParams(maxDecisions = 1),
+                candidateHints = component.pointPhaseHints()))
+        }
+    }
+
+    @Test
+    fun `caller hints retain precedence including a deliberately empty partial hint`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0), factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ))
+        model.componentPlan().search(model, emptyMap()).use { planned ->
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            val caller = SearchCandidateHints.ofLiterals(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+            assertSame(caller, planned.pointPhaseHints(caller))
+            assertNull(planned.pointPhaseHints(caller).preferredBool(0))
+        }
+    }
+
+    @Test
+    fun `retracting a source decision discards the partial point phase`() {
+        val model = Problem(numBoolVars = 2, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0), factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val hints = component.pointPhaseHints()
+            assertEquals(true, hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            session.popTo(0)
+            assertNull(hints.preferredBool(0))
+            assertIs<SearchResult.Satisfied>(session.solve(2))
+        }
+    }
+
+    @Test
+    fun `conflicting point comparisons decline an advisory phase`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0), factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertNull(component.pointPhaseHints().preferredBool(0))
+            assertNull(session.boolValue(0))
+            assertIs<SearchResult.Exhausted>(session.solve(1))
+        }
+    }
+
+    @Test
+    fun `a sparse graph phase guides a comparison in a larger real model`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(0), numRealVars = 65,
+            realLower = DoubleArray(65) { 0.0 }, realUpper = DoubleArray(65) { 0.0 }, factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(64),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val hints = component.pointPhaseHints()
+            assertEquals(true, hints.preferredBool(0))
+            assertNull(session.model().valueOf<ExactLraAssignment>(component))
+            assertIs<SearchResult.Satisfied>(session.solve(1, SearchSolveParams(maxDecisions = 1),
+                candidateHints = hints))
+            assertEquals(65, assertNotNull(session.model().valueOf<ExactLraAssignment>(component)).reals.size)
+        }
+    }
+
+    @Test
+    fun `a fractional mixed point phase keeps the integer complement available`() {
+        val model = Problem(numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+                ReifiedLinear(0, intArrayOf(2), intArrayOf(0), LinearOp.LE, 1),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val hints = component.pointPhaseHints()
+            assertEquals(true, hints.preferredBool(0))
+            assertNull(session.boolValue(0))
+            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1, candidateHints = hints))
+
+            val witness = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(false, witness.bools[0])
+            assertEquals(BIG_ONE, witness.ints.single())
+            assertEquals(BigFraction.ONE, witness.reals.single())
+        }
+    }
+
+    @Test
+    fun `point phases wait for Boolean coefficient values`() {
+        val declaration = object : Factor by ReifiedRealLinear(
+            0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0,
+        ) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(
+                listOf(
+                    TaggedLinearRow(
+                        intArrayOf(Term.ofLit(Lit.make(1, true)), Term.ofRealVar(0)),
+                        RealConstants(RealConsts(doubleArrayOf(1.0)), RealConsts(doubleArrayOf(1.0)), 0.0, false),
+                        LinearOp.LE,
+                        activator = 0,
+                    ),
+                ),
+            )
+        }
+        val model = Problem(numBoolVars = 2, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0), factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.0),
+                declaration,
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val hints = component.pointPhaseHints()
+            assertNull(hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+            assertEquals(false, hints.preferredBool(0))
+            assertIs<SearchResult.Satisfied>(session.solve(2, candidateHints = hints))
+            assertEquals(false, session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `optional point exhaustion leaves required theory checking active`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0), factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ))
+        var spent = false
+        ExactLiraSearchComponent(model).use { component ->
+            component.useOperationAllowance { parent -> Cancellation { parent() || spent } }
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val hints = component.pointPhaseHints()
+            spent = true
+            assertNull(hints.preferredBool(0))
+            assertTrue(!component.operationBudgetExhausted)
+            assertTrue(!session.cancelled())
+            spent = false
+            assertEquals(true, hints.preferredBool(0))
+            assertIs<SearchResult.Satisfied>(session.solve(1, SearchSolveParams(maxDecisions = 1),
+                candidateHints = hints))
+        }
+    }
+
+    @Test
+    fun `point answer exhaustion retains the ordinary complementary search`() {
+        val model = Problem(numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0), factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val hints = component.pointPhaseHints()
+            repeat(64) { assertEquals(true, hints.preferredBool(0)) }
+            assertNull(hints.preferredBool(0))
+            assertIs<SearchResult.Satisfied>(session.solve(1, SearchSolveParams(maxDecisions = 2),
+                candidateHints = hints))
+            assertEquals(true, session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `stopping or closing the owner withholds an existing point phase`() {
+        for (close in listOf(false, true)) {
+            val model = Problem(numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0), factors = arrayOf(
+                    ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ))
+            var stopped = false
+            val component = ExactLiraSearchComponent(model)
+            var closed = false
+            try {
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1),
+                    cancellation = Cancellation { stopped })
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val hints = component.pointPhaseHints()
+                assertEquals(true, hints.preferredBool(0))
+                if (close) {
+                    component.close()
+                    closed = true
+                } else stopped = true
+                assertNull(hints.preferredBool(0))
+                assertNull(session.boolValue(0))
+            } finally {
+                if (!closed) component.close()
+            }
+        }
+    }
+
     @Test
     fun `partial difference checks and complete source witnesses need no LP owner`() {
         val model = Problem(

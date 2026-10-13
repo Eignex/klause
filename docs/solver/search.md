@@ -399,3 +399,9 @@ from truncating an evidenced sub-millisecond measurement. The
 pipeline, declared theory and reported backend without extending search clocks.
 
 `openReductionNs` is zero when the cap is off or no reduction pass is needed.
+
+Optional real-bearing point phases use the existing unverified Boolean hint protocol.
+The complete open source-order driver may prefer a reified comparison's truth at
+an already produced exact relaxation or graph point. Supplied hints and activity
+selection retain their own behavior. Both Boolean alternatives remain exhaustive;
+a point hint is never an implication, source assignment or refutation.
