@@ -59,18 +59,18 @@ internal object MiniZincCompatibilityProbe {
                     check(hashes == SolveEvidence.sourceHashes(ref)) { "source changed during compilation" }
                     add(
                         buildJsonObject {
-                        put("problem", ref.name)
-                        put("repetition", repetition)
-                        put("elapsedNs", System.nanoTime() - start)
-                        put("compilerExit", failure?.exitCode ?: 0)
-                        put("compilerCommand", Reports.json.encodeToJsonElement(failure?.command))
-                        put("compilerElapsedNs", failure?.elapsedNs)
-                        put("status", if (failure == null) "compilable" else "source-compiler-incompatible")
-                        put("reason", failure?.incompatibility)
-                        put("diagnostic", failure?.diagnostic)
-                        put("sourceHashes", Reports.json.encodeToJsonElement(hashes))
-                        put("solverInvocations", 0)
-                    }
+                            put("problem", ref.name)
+                            put("repetition", repetition)
+                            put("elapsedNs", System.nanoTime() - start)
+                            put("compilerExit", failure?.exitCode ?: 0)
+                            put("compilerCommand", Reports.json.encodeToJsonElement(failure?.command))
+                            put("compilerElapsedNs", failure?.elapsedNs)
+                            put("status", if (failure == null) "compilable" else "source-compiler-incompatible")
+                            put("reason", failure?.incompatibility)
+                            put("diagnostic", failure?.diagnostic)
+                            put("sourceHashes", Reports.json.encodeToJsonElement(hashes))
+                            put("solverInvocations", 0)
+                        }
                     )
                 }
             }
@@ -93,12 +93,12 @@ internal object MiniZincCompatibilityProbe {
                         val selected = BenchCli.selectProblems(filters + ("suite" to suite))
                         add(
                             buildJsonObject {
-                            put("suite", suite)
-                            put("seed", seed)
-                            put("elapsedNs", System.nanoTime() - start)
-                            put("filters", Reports.json.encodeToJsonElement(filters))
-                            put("identities", buildJsonArray { selected.forEach { add(JsonPrimitive(it.ref.name)) } })
-                        }
+                                put("suite", suite)
+                                put("seed", seed)
+                                put("elapsedNs", System.nanoTime() - start)
+                                put("filters", Reports.json.encodeToJsonElement(filters))
+                                put("identities", Reports.json.encodeToJsonElement(selected.map { it.ref.name }))
+                            }
                         )
                         if (suite == "mzn-bench-compatible-v1") check(selected.none { it.ref.name in failures })
                     }
@@ -120,25 +120,25 @@ internal object MiniZincCompatibilityProbe {
             check(before == MiniZincCompatibility.treeHash(directory)) { "frozen membership changed during audit" }
             out.resolve("frozen-membership.json").writeText(
                 buildJsonObject {
-                put("set", set)
-                put("directorySha256", before)
-                put("originalMembers", Reports.json.encodeToJsonElement(members))
-                put("selectedMembers", Reports.json.encodeToJsonElement(selected))
-            }.toString() + "\n"
+                    put("set", set)
+                    put("directorySha256", before)
+                    put("originalMembers", Reports.json.encodeToJsonElement(members))
+                    put("selectedMembers", Reports.json.encodeToJsonElement(selected))
+                }.toString() + "\n"
             )
             selected
         }.orEmpty()
         out.resolve("summary.json").writeText(
             buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("requested", refs.size)
-            put("incompatible", failures.size)
-            put("compilable", refs.size - failures.size)
-            put("solverInvocations", 0)
-            put("repeats", repetitions)
-            put("frozenSet", options["set"])
-            put("frozenMembers", buildJsonArray { frozen.forEach { add(JsonPrimitive(it)) } })
-        }.toString() + "\n"
+                put("revision", Reports.readGitSha())
+                put("requested", refs.size)
+                put("incompatible", failures.size)
+                put("compilable", refs.size - failures.size)
+                put("solverInvocations", 0)
+                put("repeats", repetitions)
+                put("frozenSet", options["set"])
+                put("frozenMembers", buildJsonArray { frozen.forEach { add(JsonPrimitive(it)) } })
+            }.toString() + "\n"
         )
         println(out.resolve("summary.json").readText())
     }
