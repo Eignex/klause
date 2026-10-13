@@ -969,8 +969,9 @@ a 25-second process allowance. Its actual JFR JVM arguments must retain
 JFR collection affects them, so they are diagnostics rather than performance claims.
 
 The [objective-cli-v1 manifest](smoke-corpus/objective-cli-v1/manifest.json) fixes
-64 outcomes: mixed product and rational objectives across all five engines, plus
-algebraic, strict-limit, unbounded and infeasible controls through CP/FIXED.
+76 outcomes: mixed product and rational objectives across all five engines, plus
+algebraic, strict-limit, unbounded and infeasible controls through CP, FIXED and
+MIXED.
 Paired affine and zero-square objectives preserve original constraints and direction.
 
 ```sh
