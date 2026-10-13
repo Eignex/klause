@@ -1,11 +1,17 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
@@ -22,7 +28,11 @@ class SampleTest {
         val exact = AlgebraicArithmetic().rational(BigFraction.ofLong(2))
         val values = mutableListOf(exact)
         val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(2.0), algebraicReals = values)
-        sample.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0))
+        val runtime = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        val publication = CompletedEnginePublication.Witness(runtime, sample, null)
+        sample.witnessCertificate = EvidenceCertificate.published(publication)
         values.clear()
 
         val copied = sample.copy()
@@ -37,7 +47,11 @@ class SampleTest {
     fun `replacing approximate coordinates discards algebraic authority`() {
         val exact = AlgebraicArithmetic().rational(BigFraction.ofLong(2))
         val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(2.0), algebraicReals = listOf(exact))
-        sample.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0))
+        val runtime = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        val publication = CompletedEnginePublication.Witness(runtime, sample, null)
+        sample.witnessCertificate = EvidenceCertificate.published(publication)
 
         val changed = sample.copy(reals = doubleArrayOf(3.0))
 
@@ -81,7 +95,10 @@ class SampleTest {
         val values = mutableListOf(wide)
         val bools = booleanArrayOf(true)
         val original = Sample(bools, LongArray(0), exactInts = values)
-        original.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
+        val source = Problem(1, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), Bits(1), Bits(1)), emptyArray())
+        val runtime = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        original.witnessCertificate = EvidenceCertificate.published(
+            CompletedEnginePublication.Witness(runtime, original, null))
         values[0] = bigIntOf(0)
         bools[0] = false
         original.bools[0] = false
@@ -100,7 +117,10 @@ class SampleTest {
     @Test
     fun `changing coordinates discards theory acceptance`() {
         val sample = Sample(booleanArrayOf(false), longArrayOf(2), exactInts = listOf(bigIntOf(2)))
-        sample.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 5)), emptyArray())
+        val runtime = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
+        val publication = CompletedEnginePublication.Witness(runtime, sample, null)
+        sample.witnessCertificate = EvidenceCertificate.published(publication)
 
         val changed = sample.copy(ints = longArrayOf(3))
         val changedBoolean = sample.copy(bools = booleanArrayOf(true))

@@ -10,7 +10,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Publication
@@ -80,18 +79,25 @@ class SharedPoolsTest {
 
     @Test
     fun `an unverified or foreign incumbent cannot supply a pruning cutoff`() {
-        val model = ModelIdentity.of(Any(), Any())
-        val other = ModelIdentity.of(Any(), Any())
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
+        val foreignSource = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val model = ModelIdentity.of(source, objective)
+        val other = ModelIdentity.of(foreignSource, objective)
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
+        val foreign = EngineInvocation(foreignSource.prepareExecutionPlan(objective), other, objective)
         val exchange = IncumbentExchange.minimizing<Sample>()
         val pools = SharedPools(null, null, solutions = exchange, identity = model)
         val sample = Sample(BooleanArray(0), longArrayOf(7))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(invocation, sample, 7.0))
+        val foreignCertificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(foreign, sample, 7.0))
 
         assertIs<Publication.Indeterminate>(pools.offerSolution(model, sample, 7.0, null))
         assertIs<Publication.Rejected>(pools.offerSolution(
-            other, sample, 7.0, EvidenceCertificate.verified(other, EvidenceKind.Witness),
+            other, sample, 7.0, foreignCertificate, invocation,
         ))
         assertNull(exchange.current())
-        pools.offerSolution(model, sample, 7.0, EvidenceCertificate.verified(model, EvidenceKind.Witness))
+        pools.offerSolution(model, sample, 7.0, certificate, invocation)
 
         assertEquals(7.0, exchange.current()?.objective)
     }

@@ -3,10 +3,10 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
@@ -83,16 +83,24 @@ class SharedObjectiveBoundTest {
     }
     @Test
     fun `only a matching certified objective bound changes the shared floor`() {
-        val source = Any()
-        val model = ModelIdentity.of(source, Any())
-        val other = ModelIdentity.of(source, Any())
+        val source = Problem(0, 1, arrayOf(IntDomain(7, 9)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val otherObjective = LinearObjective(intCoefficients = longArrayOf(1))
+        val model = ModelIdentity.of(source, objective)
+        val other = ModelIdentity.of(source, otherObjective)
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
+        val foreign = EngineInvocation(source.prepareExecutionPlan(otherObjective), other, otherObjective)
         val bounds = SharedObjectiveBound(identity = model)
+        bounds.bindInvocation(invocation)
+        val wrongObjective = EvidenceCertificate.published(CompletedEnginePublication.ObjectiveBound(foreign, 7.0))
+        val point = Sample(booleanArrayOf(), longArrayOf(8))
+        val wrongKind = EvidenceCertificate.published(CompletedEnginePublication.Witness(invocation, point, 8.0))
 
-        bounds.publish(100.0, other, EvidenceCertificate.verified(other, EvidenceKind.Bound))
+        bounds.publish(7.0, other, wrongObjective)
         bounds.publish(100.0, model)
-        bounds.publish(100.0, model, EvidenceCertificate.verified(model, EvidenceKind.Infeasible))
+        bounds.publish(100.0, model, wrongKind)
         assertEquals(Double.NEGATIVE_INFINITY, bounds.current())
-        bounds.publish(7.0, model, EvidenceCertificate.verified(model, EvidenceKind.Bound))
+        bounds.publish(CompletedEnginePublication.ObjectiveBound(invocation, 7.0))
 
         assertEquals(7.0, bounds.current())
     }

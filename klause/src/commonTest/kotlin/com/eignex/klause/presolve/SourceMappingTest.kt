@@ -8,9 +8,11 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
@@ -160,8 +162,10 @@ class SourceMappingTest {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray())
         val target = source.withFactors(emptyArray())
         val mapping = SourceMapping(source, target, TransformationGuarantees.IDENTITY)
-        val certificate = EvidenceCertificate.verified(ModelIdentity.of(target), EvidenceKind.Witness)
-        val sample = Sample(BooleanArray(0), LongArray(0)).also { it.witnessCertificate = certificate }
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        val runtime = EngineInvocation(target.prepareExecutionPlan(), ModelIdentity.of(target))
+        val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(runtime, sample, null))
+        sample.witnessCertificate = certificate
 
         val reconstructed = mapping.reconstructFrom(target, sample)
 
