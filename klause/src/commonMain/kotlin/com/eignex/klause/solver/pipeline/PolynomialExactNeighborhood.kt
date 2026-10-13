@@ -7,9 +7,6 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.EvidenceKind
-import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.qfnra.PolynomialCondition
@@ -23,7 +20,8 @@ internal class PolynomialExactNeighborhood(
     private val finite: BakedProblem,
     private val fixed: Sample,
     private val assumptions: Assumptions,
-    private val objective: LinearObjective? = null,
+    private val objective: LinearObjective?,
+    private val certify: (Sample) -> Sample,
 ) : ExactNeighborhoodCompletion {
     private val integerPins = model.integerColumns.map { (id, column) ->
         column to BigFraction.ofLong(fixed.intValue(id))
@@ -49,10 +47,7 @@ internal class PolynomialExactNeighborhood(
             remap(condition.lower), remap(condition.upper),
         ), cancellation)) {
             is QfNraResult.Satisfiable -> {
-                val sample = model.capture(result.assignment, fixed.bools, fixed.ints)
-                sample.witnessCertificate = EvidenceCertificate.verified(
-                    ModelIdentity.of(model.source), EvidenceKind.Witness,
-                )
+                val sample = certify(model.capture(result.assignment, fixed.bools, fixed.ints))
                 ExactNeighborhoodResult.Witness(sample)
             }
             is QfNraResult.Unsatisfiable -> ExactNeighborhoodResult.Refuted
