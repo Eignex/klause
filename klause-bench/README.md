@@ -829,6 +829,14 @@ Use `source=klause-bench/smoke-corpus/objective-scopes-v1`,
 so a zero heuristic move count is legitimate; exact witness, condition, result-role
 and bound checks remain required.
 
+`capture=required` on the compiled/schema path recaptures actual producer results
+through the original IR affine or quadratic capture API. Native completions must
+retain their typed derivations and reject a copied affine objective or weaker caller
+conditions. Records keep the runtime capture and replay checks separate from the
+independent original-source mathematics. Unsupported derivation coverage remains
+explicitly unavailable; these records do not export engine proofs. Capture checking
+runs outside the solver execution timer.
+
 The [precision fixtures](smoke-corpus/objective-affine-v1/manifest.json) distinguish
 adjacent exact objective values sharing a binary64 projection. After fetching the
 probe output, check its original sources independently with the pinned source-check

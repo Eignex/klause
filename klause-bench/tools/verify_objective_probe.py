@@ -23,7 +23,28 @@ def checked_unsat(constraints, extra):
     assert solver.check() == z3.unsat, 'original source inequality was not established'
 
 
-def check_record(root, path, require_incumbent):
+def check_capture(payload, required):
+    capture = payload.get('sourceCapture')
+    if not required:
+        return 'not requested'
+    assert isinstance(capture, dict) and capture.get('captured') is True, 'required source capture is absent'
+    native = payload['result']['status'] == 'Optimal'
+    assert capture.get('nativeCompletion') is native, 'native capture role differs'
+    if native and payload['encoding'] == 'linear':
+        assert capture.get('copiedObjectiveReplay') == 'foreign original objective rejected', \
+            'copied original objective replay was not rejected'
+        condition = payload.get('condition', {})
+        if condition.get('bools') or condition.get('ints'):
+            assert capture.get('weakerConditionReplay') == 'weaker original condition rejected', \
+                'weaker original condition replay was not rejected'
+    assert capture.get('derivationCheck') in ('checked', 'unavailable'), 'invalid runtime derivation coverage'
+    if capture['derivationCheck'] == 'unavailable':
+        assert capture.get('unavailableReason'), 'unavailable derivation coverage lacks a reason'
+    assert capture.get('exportedProof') == 'not captured', 'runtime capture is not a proof export'
+    return 'runtime scope and replay assertions retained; no independent proof export check'
+
+
+def check_record(root, path, require_incumbent, require_capture=False):
     payload = json.loads(path.read_text())
     identity, engine, encoding = path.stem.rsplit('.', 2)
     source = root / (identity + '.smt2')
@@ -44,6 +65,7 @@ def check_record(root, path, require_incumbent):
     objective = z3.parse_smt2_string(semantic + '\n(assert (= ' + cost_name + ' ' + sexpr(syntax) + '))',
                                     decls={cost_name: cost_declaration})[-1].arg(1)
     result = payload['result']
+    runtime_capture = check_capture(payload, require_capture)
     assert result['sense'] == direction.upper(), 'original direction differs'
     witness_check = 'absent'
     if 'witness' in result:
@@ -91,7 +113,8 @@ def check_record(root, path, require_incumbent):
                 outputSha256=hashlib.sha256(path.read_bytes()).hexdigest(), witness=witness_check,
                 bound=bound_check, refutation='checked' if status == 'Infeasible' else 'absent',
                 approach='unavailable' if status == 'UnattainedLimit' else 'absent',
-                trajectory='unavailable' if status == 'Unbounded' else 'absent'), result
+                trajectory='unavailable' if status == 'Unbounded' else 'absent',
+                runtimeCapture=runtime_capture), result
 
 
 def main():
@@ -109,9 +132,12 @@ def main():
                 for encoding in ('linear', 'quadratic')}
     actual = {tuple(path.stem.rsplit('.', 2)) for path in paths}
     assert actual == expected and len(paths) == len(expected), 'incomplete or unexpected comparison matrix'
+    settings = args.root / 'settings.json'
+    mode = json.loads(settings.read_text()).get('capture', 'none') if settings.is_file() else 'none'
+    assert mode in ('none', 'required'), 'unknown capture mode'
     checks, results = [], {}
     for path in paths:
-        check, result = check_record(args.root, path, args.require_incumbent)
+        check, result = check_record(args.root, path, args.require_incumbent, mode == 'required')
         checks.append(check)
         results[tuple(path.stem.rsplit('.', 2))] = result
     for source in sources:
