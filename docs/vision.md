@@ -20,6 +20,7 @@ retaining theory-specific mechanisms and limits.
 | Strategy composition | [Portfolio invocation](solver/portfolio.md#exact-theory-strategy-execution) constructs finite, linear, polynomial, nonlinear-integer and quadratic portfolios through shared arm factories, lanes, seeds, quotas, source admission and cleanup. Workers retain private mutable state and exact objective contracts. |
 | Conditioned completion | [Linear query owners](solver/sessions.md#theory-invocation-scopes) retain prepared source decomposition, canonical CP projection, completed native row factories and initialized search across repairs. Conditions retract on every exit; interrupted mutable initialization retries from retained preparation under [cumulative allowances](solver/resources.md#native-arithmetic-allowances). Interrupted immutable preparation exports no partial factory. |
 | Strategy admission | [Prepared capabilities](solver/portfolio.md#prepared-strategy-admission) expose participating arms, supported operations, procedure completeness, claim authority and explicit declines. Direct factor mechanisms alone do not establish whole-source support; resource stops belong to the invocation. |
+| Source evidence | [Typed source-scoped evidence](solver/evidence.md) retains original premises, actual invocation and objective binding, exact claims and optional result/transformation capture. Supported derivations are checked separately from native admission; unsupported or incomplete coverage remains unavailable. |
 
 These contracts preserve finite propagation's Bool+Int boundary, private mutable
 worker state, numerical dependency boundaries and source publication checks.
@@ -34,7 +35,6 @@ Subsystem pages describe current guarantees; linked issues track residual work.
 
 | Area | Current implementation | Remaining work |
 |---|---|---|
-| Source evidence | [Typed source-scoped evidence](solver/evidence.md) retains original premises, invocation restrictions, exact claims and optional transformation justifications. Supported derivations are checked separately from engine admission; missing coverage remains unavailable. | [#2649](https://github.com/Eignex/klause/issues/2649) tracks remaining original-source derivation coverage. |
 | Transcendental orchestration | [Transcendental execution](theories/transcendental.md#solving-and-composition) shares source completion across strategies, but MIXED runs a quarter-budget heuristic phase before traversal and the request does not forward explicit parallelism. | [#2791](https://github.com/Eignex/klause/issues/2791) tracks integration with the shared portfolio invocation. |
 | Independent proof export | Exact numerical checks and supported source derivations are in memory. | [Proof-file support](#independently-checkable-proof-files) and a separate checker for entire original-source claims remain target capabilities. |
 
