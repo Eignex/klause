@@ -3,13 +3,17 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 
 internal fun LpModel.hasStrictSides(meter: RefinementMeter): Boolean {
+    val previousStage = meter.diagnostic?.stage
+    meter.diagnostic?.stage = LpRefinementStage.STRICT_ELIGIBILITY
     if (numVars > meter.limits.maxCoordinates) meter.stop(LpRefinementDecline.DIMENSION)
     meter.charge(numVars.toLong() + m)
     val source = requireNotNull(exactState).model
-    return (0 until numVars).any { column ->
+    val strict = (0 until numVars).any { column ->
         val bounds = source.column(column).bounds
         bounds.lower?.strict == true || bounds.upper?.strict == true
     } || (0 until m).any { source.row(it).strict }
+    previousStage?.let { meter.diagnostic?.stage = it }
+    return strict
 }
 
 // Auxiliary structural coordinates include source logicals; source origins are restored only on export.
