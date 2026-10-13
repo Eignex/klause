@@ -27,6 +27,7 @@ import com.eignex.klause.lp.engine.checkedLpConflict
 import com.eignex.klause.lp.engine.checkedLpWitness
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactConstant
+import com.eignex.klause.lp.engine.exactBits
 import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.finiteExactInput
@@ -712,7 +713,15 @@ internal fun LpEngine.applySparseReducedCostFixing(
         BigFraction.ofDouble(bound.nextUp()) ?: return false
     }
     val sourceConstant = relaxation.objectiveConstant
-    if (improvingMax < cert.exactObjectiveBound() + BigFraction.ofLong(sourceConstant)) return false
+    val integralCutoff = ExactLpNumber.of(improvingMax).exactLong()
+    if (integralCutoff != null) {
+        if (!cert.improvingGapNonNegative(integralCutoff, sourceConstant)) return false
+    } else {
+        val lower = cert.exactObjectiveBound()
+        val words = (maxOf(Long.SIZE_BITS, exactBits(listOf(improvingMax, lower))) + 63L) / 64L
+        noteNodeOverhead(4L * words * words)
+        if (improvingMax < lower + BigFraction.ofLong(sourceConstant)) return false
+    }
     val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending && sourceRange != null) {
         reducedCostFixingReasons(relaxation, cert, session, objectiveVar, checkNotNull(improvingMax.floorLong()),
             sink.lp.certificationObserver(LpRoute.NODE))
@@ -741,6 +750,8 @@ internal fun LpEngine.applySparseReducedCostFixing(
         }
         if (liveMin == liveMax) continue
         val sign = cert.reducedCostSign(col)
+        if (sign == 0) continue
+        noteNodeOverhead(cert.rationalFixingWork(col, improvingMax))
         val dMax = cert.fixStepsAtCutoff(col, improvingMax, sourceConstant) ?: continue
         val res = when {
             // A positive reduced cost is minimized at the certificate model's lower endpoint.
