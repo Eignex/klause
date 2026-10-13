@@ -28,7 +28,18 @@ fun OpenTheoryPipeline.minimize(
     params: PolynomialTheoryParams = PolynomialTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
     sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+): QuadraticOptimizationExecution = minimize(request, objective, params, engine, sense, 1)
+
+/** Optimize a quadratic source objective with explicit parallel lanes. */
+fun OpenTheoryPipeline.minimize(
+    request: PolynomialTheoryRequest,
+    objective: QuadraticObjectiveSpec,
+    params: PolynomialTheoryParams,
+    engine: FiniteEngine,
+    sense: ObjectiveSense,
+    cores: Int,
 ): QuadraticOptimizationExecution {
+    require(cores > 0)
     val native = QuadraticNativeScope(params)
     var result: QuadraticOptimizationResult = QuadraticOptimizationResult.Unknown(
         null, native.reason(), sense, SolveStats.EMPTY,
@@ -43,12 +54,15 @@ fun OpenTheoryPipeline.minimize(
             }) { "quadratic objective coordinate out of source range" }
         }
         result = try {
-            QuadraticStrategyAdapters(request, model, objective, sense, params, native, engine).execute()
+            QuadraticStrategyAdapters(request, model, objective, sense, params, native, engine, cores).execute()
         } catch (_: CancellationException) {
             QuadraticOptimizationResult.Unknown(null, native.reason(), sense, SolveStats.EMPTY)
         }
     }
     return QuadraticOptimizationExecution(
-        result, native.polynomialStats, native.numericalWork, native.work, native.resource,
+        result, native.polynomialStats, native.numericalWork, native.work,
+        if (result is QuadraticOptimizationResult.Unknown || result is QuadraticOptimizationResult.BestFound) {
+            native.declinedResource
+        } else native.resource,
     )
 }

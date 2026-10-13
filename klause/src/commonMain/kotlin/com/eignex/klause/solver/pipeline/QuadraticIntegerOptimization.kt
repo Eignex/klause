@@ -8,6 +8,15 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.polynomial.ceilInteger
 import com.eignex.klause.arithmetic.polynomial.exactInteger
+import com.eignex.klause.backtrack.searchWork
+import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.ReseedGuard
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.evidence.quadraticEngineInvocation
+import com.eignex.klause.solver.result.MinimizeResult
+import kotlin.time.Duration.Companion.milliseconds
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
@@ -17,9 +26,6 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
-import com.eignex.klause.solver.evidence.QuadraticEngineSource
-import com.eignex.klause.solver.evidence.SourceCondition
-import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.evaluateExact
@@ -57,8 +63,6 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.ceil
-import kotlin.random.Random
 
 /**
  * Optimize a quadratic objective over exact open integer and real source coordinates.
@@ -70,16 +74,67 @@ fun OpenTheoryPipeline.minimize(
     params: NonlinearIntegerTheoryParams = NonlinearIntegerTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
     sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+): QuadraticOptimizationExecution = minimize(request, objective, params, engine, sense, 1)
+
+/** Optimize a native integer quadratic source using explicit parallel lanes. */
+fun OpenTheoryPipeline.minimize(
+    request: NonlinearIntegerTheoryRequest,
+    objective: QuadraticObjectiveSpec,
+    params: NonlinearIntegerTheoryParams,
+    engine: FiniteEngine,
+    sense: ObjectiveSense,
+    cores: Int,
 ): QuadraticOptimizationExecution {
+    require(cores > 0)
     val native = QuadraticNativeScope(params.polynomial)
     var result: QuadraticOptimizationResult = QuadraticOptimizationResult.Unknown(
         null, native.reason(), sense, SolveStats.EMPTY,
     )
     if (!native.stopped) {
-        result = QuadraticIntegerOptimization(request.problem, objective, params, engine, sense, native).execute()
+        val controls = params.polynomial
+        val assumptions = quadraticAssumptions(controls, engine)
+        if (engine != FiniteEngine.MIXED && cores == 1) {
+            result = QuadraticIntegerOptimization(request.problem, objective, params, engine, sense, native,
+                request.preparedPlan).execute()
+        } else {
+            val budget = params.nodeBudget ?: controls.strategy.backtrack.nodeBudget
+                ?: controls.strategy.localSearch.nodeBudget
+            val operation = request.preparedPlan.withObjective(objective, sense)
+            val scoped = controls.copy(strategy = controls.strategy.copy(
+                backtrack = controls.strategy.backtrack.copy(nodeBudget = budget),
+                localSearch = controls.strategy.localSearch.copy(nodeBudget = budget)))
+            result = QuadraticPortfolioInvocation(operation, objective, sense, scoped, native, engine, cores,
+                assumptions)
+                .execute { arm, slot, scope, read ->
+                    val local = params.copy(nodeBudget = slot.nodeBudget,
+                        maximumCandidates = slot.nativeAllowance(params.maximumCandidates),
+                        maximumMoves = slot.heuristicAllowance(params.maximumMoves),
+                        polynomial = controls.copy(maximumWork = null, cancellation = scope.polynomial,
+                            strategy = controls.strategy.copy(
+                                backtrack = controls.strategy.backtrack.copy(randomSeed = slot.seed,
+                                    maxDecisions = slot.nativeAllowance(controls.strategy.backtrack.maxDecisions),
+                                    nodeBudget = slot.nodeBudget),
+                                localSearch = controls.strategy.localSearch.copy(randomSeed = slot.seed,
+                                    maxFlips = slot.heuristicAllowance(controls.strategy.localSearch.maxFlips),
+                                    maxInstructions = controls.strategy.localSearch.maxInstructions
+                                        ?.let(slot::heuristicAllowance), nodeBudget = slot.nodeBudget))))
+                    val selected = when (arm) {
+                        0 -> FiniteEngine.BACKTRACK
+                        1 -> FiniteEngine.LOCAL_SEARCH
+                        else -> FiniteEngine.ALNS
+                    }
+                    val worker = slot.own(QuadraticIntegerOptimization(request.problem, objective, local,
+                        selected, sense, scope, request.preparedPlan))
+                    worker.readIncumbent = read
+                    worker.worker(arm)
+                }
+        }
     }
     return QuadraticOptimizationExecution(
-        result, native.polynomialStats, native.numericalWork, native.work, native.resource,
+        result, native.polynomialStats, native.numericalWork, native.work,
+        if (result is QuadraticOptimizationResult.Unknown || result is QuadraticOptimizationResult.BestFound) {
+            native.declinedResource
+        } else native.resource,
     )
 }
 
@@ -90,7 +145,8 @@ internal class QuadraticIntegerOptimization(
     private val engine: FiniteEngine,
     private val sense: ObjectiveSense,
     private val native: QuadraticNativeScope,
-) {
+    private val plan: PreparedSourcePlan,
+) : AutoCloseable {
     private val controls = params.polynomial
     private val budget = params.nodeBudget ?: controls.strategy.backtrack.nodeBudget
         ?: controls.strategy.localSearch.nodeBudget
@@ -104,7 +160,6 @@ internal class QuadraticIntegerOptimization(
     private lateinit var identity: ModelIdentity
     private var relevantBooleans: Set<Int> = emptySet()
     private val sink = SolveStatsSink("quadratic-integer").also { it.start() }
-    private val random = Random(controls.strategy.localSearch.randomSeed ?: 1L)
     private var incumbent: QuadraticIncumbent? = null
     private var rootBound: QuadraticObjectiveBound? = null
     private var limit: AlgebraicReal? = null
@@ -113,8 +168,17 @@ internal class QuadraticIntegerOptimization(
     private var interrupted = false
     private var neighborhoodPoint: QuadraticIncumbent? = null
     private var globalUnbounded: SourceDerivation? = null
+    private var initialized = false
+    private var traversal: QuadraticIntegerTraversalCursor? = null
+    private var neighborhood: QuadraticNeighborhoodCursor? = null
+    private var operation: Cancellation = Cancellation.Never
+    private var terminal: QuadraticOptimizationResult? = null
+    private var publish: ((QuadraticIncumbent) -> Unit)? = null
+    var readIncumbent: () -> QuadraticIncumbent? = { null }
+    private val stats: SolveStats get() = neighborhood?.let { sink.snapshot().mergedWith(it.stats) } ?: sink.snapshot()
 
-    fun execute(): QuadraticOptimizationResult = try {
+    private fun initialize() {
+        if (initialized) return
         preparation.step()
         val expression = objective.openPolynomial(source, preparation::step)
         val booleanWork = ArrayDeque<PolynomialRealFormula>()
@@ -142,29 +206,18 @@ internal class QuadraticIntegerOptimization(
         )
         val invocation = assumptions()
         root = source.integerBounds(invocation, relaxation.arithmetic)
-        val coordinates = source.integerCoordinates.withIndex().associate { (id, column) ->
-            column to SourceCoordinate(SourceCoordinate.Kind.Integer, id)
-        }
-        scope = QuadraticEngineInvocation(
-            QuadraticEngineSource.NonlinearInteger(source), objective, sense,
-            SourceCondition(invocation.bools,
-                invocation.lower.mapKeys { (column, _) -> coordinates.getValue(column) },
-                invocation.upper.mapKeys { (column, _) -> coordinates.getValue(column) }),
-        )
-        identity = ModelIdentity.of(source, scope)
+        scope = requireNotNull(plan.quadraticEngineInvocation(objective, sense,
+            quadraticAssumptions(controls, engine)))
+        identity = ModelIdentity.of(source, objective)
+        initialized = true
+    }
+
+    fun execute(): QuadraticOptimizationResult = try {
+        initialize()
         when (engine) {
             FiniteEngine.LOCAL_SEARCH -> { walk(false); partial() }
             FiniteEngine.ALNS -> { walk(true); partial() }
-            FiniteEngine.MIXED -> {
-                try {
-                    walk(true, rounds = 2, share = 0.25)
-                } catch (_: PolynomialInterrupted) {
-                    Unit
-                } catch (_: CancellationException) {
-                    Unit
-                }
-                complete()
-            }
+            FiniteEngine.MIXED -> error("mixed execution requires the shared invocation")
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> complete()
         }
     } catch (_: PolynomialInterrupted) {
@@ -176,7 +229,127 @@ internal class QuadraticIntegerOptimization(
         interrupted = true
         partial()
     } finally {
-        sink.stop()
+        close()
+    }
+
+    fun worker(arm: Int): PortfolioWorker {
+        val model = ModelIdentity.of(source, objective)
+        return if (arm == 0) PortfolioWorker.ofMinimize("bt+exact-integer-quadratic", arm,
+            resumable = { completeHandle() }) { _, _, _, _ -> error("integer traversal runs by slice") }
+            .bindEvidence(model)
+        else PortfolioWorker.ofMinimize(if (arm == 2) "alns+exact-integer-quadratic" else "ls+exact-integer-quadratic",
+            arm, countsInstructions = true, resumable = { neighborhoodHandle(arm == 2) }) { _, _, _, _ ->
+            error("integer neighborhood runs by slice")
+        }.bindEvidence(model, provesResults = false)
+    }
+
+    private fun countedWork(): Long = native.work + minOf(sink.search.searchWork, Long.MAX_VALUE - native.work)
+
+    private fun completeHandle(): QuadraticPortfolioSearch = object : QuadraticPortfolioSearch, ReseedGuard {
+        override val canReseed: Boolean get() = false
+        override val completion: QuadraticOptimizationResult? get() = terminal
+        override val isDone: Boolean get() = terminal != null
+        override val stats: SolveStats get() = this@QuadraticIntegerOptimization.stats
+        override val work: Long get() = countedWork()
+        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+            onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = run(onIncumbent) {
+            advanceComplete(global, sliceMillis, sliceNodes)
+        }
+        override fun close() = this@QuadraticIntegerOptimization.close()
+    }
+
+    private fun advanceComplete(global: Cancellation, millis: Long, work: Long) {
+        operation = global
+        initialize()
+        readIncumbent()?.let { accept(it, heuristic = false) }
+        val stop = native.polynomial or controls.strategy.backtrack.cancellation or Cancellation {
+            operation() || budget?.exhausted() == true
+        }
+        if (stop() || params.maximumCandidates == 0L) { terminal = partial(); return }
+        val cursor: QuadraticIntegerTraversalCursor = traversal ?: kotlin.run {
+            val component = QuadraticIntegerComponent(source, root, relaxation.arithmetic::step) { node, context ->
+                sink.search.observeNode(context.decisionLevel)
+                classify(node, context, stop, global = true)
+            }
+            QuadraticIntegerTraversalCursor(source.boolCount, component, SearchSolveParams(maxDecisions = minOf(
+                params.maximumCandidates, controls.strategy.backtrack.maxDecisions,
+                controls.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE)), BooleanBranching { context ->
+                relevantBooleans.firstOrNull { it !in root.bools && context.boolValue(it) == null }?.let { id ->
+                    listOf(SearchDecision.Bool((id shl 1) or 1), SearchDecision.Bool(id shl 1))
+                }
+            }, SearchDecisionBudget {
+                if (budget?.exhausted() == true) false else { budget?.spend(); true }
+            }, stop, ::countedWork).also { traversal = it }
+        }
+        val event = cursor.advance(global, millis, work) { node ->
+            accept(capture(node.assignment), heuristic = false)
+            record(node.value, node.attained, node.proof)
+        }
+        if (event == SearchRunEvent.Paused) {
+            val ray = cursor.outcome as? QuadraticIntegerNode.Unbounded
+            if (ray != null) {
+                accept(capture(ray.assignment), heuristic = false)
+                globalUnbounded = ray.proof
+                terminal = completed(false, stop)
+            }
+        } else if (event != null) terminal = completed(event == SearchRunEvent.Exhausted, stop)
+        else if (stop()) terminal = partial()
+    }
+
+    private fun neighborhoodHandle(adaptive: Boolean): QuadraticPortfolioSearch =
+        object : QuadraticPortfolioSearch, InstructionSlicedSearch, ReseedGuard {
+            override val canReseed: Boolean get() = false
+            override val completion: QuadraticOptimizationResult? get() = terminal
+            override val isDone: Boolean get() = terminal != null
+            override val stats: SolveStats get() = this@QuadraticIntegerOptimization.stats
+            override val work: Long get() = neighborhood?.work ?: 0L
+            override val chargedInstructions: Long get() = work
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+                runInstructionSlice(global, sliceMillis, sliceNodes, onIncumbent)
+            override fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = run(onIncumbent) {
+                initialize()
+                val cursor = retainedNeighborhood(adaptive)
+                val stop = native.polynomial or controls.strategy.localSearch.cancellation or global
+                val segment = stop or if (sliceMillis == Long.MAX_VALUE) Cancellation.Never
+                    else Cancellation.after(sliceMillis.milliseconds)
+                val done = cursor.advance(segment, if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions)
+                if (done || stop()) terminal = partial()
+            }
+            override fun close() = this@QuadraticIntegerOptimization.close()
+        }
+
+    private fun run(onIncumbent: (MinimizeResult.WithSample) -> Unit, advance: () -> Unit): MinimizeResult? {
+        terminal?.let { return scalar(it) }
+        publish = { onIncumbent(quadraticScalar(it, sense, stats)) }
+        try {
+            advance()
+        } catch (_: PolynomialInterrupted) {
+            terminal = partial()
+        } catch (limited: PolynomialResourceLimit) {
+            native.decline(limited.resource)
+            terminal = partial()
+        } catch (_: CancellationException) {
+            interrupted = true
+            terminal = partial()
+        } finally {
+            publish = null
+        }
+        return terminal?.let(::scalar)
+    }
+
+    private fun scalar(result: QuadraticOptimizationResult): MinimizeResult =
+        (result as? QuadraticOptimizationResult.WithIncumbent)?.let { quadraticScalar(it.incumbent, sense, stats) }
+            ?: MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
+
+    private var closed = false
+    override fun close() {
+        if (closed) return
+        closed = true
+        try { traversal?.close() } finally {
+            try { neighborhood?.close() } finally { sink.stop() }
+        }
     }
 
     private fun assumptions(): PolynomialCondition {
@@ -206,16 +379,20 @@ internal class QuadraticIntegerOptimization(
         }
         if (stop() || params.maximumCandidates == 0L) return partial()
         val exhausted = traverse(root, stop, global = true)
+        return completed(exhausted, stop)
+    }
+
+    private fun completed(exhausted: Boolean, stop: Cancellation): QuadraticOptimizationResult {
         globalUnbounded?.let { proof ->
             if (!stop()) return QuadraticOptimizationResult.Unbounded(
-                requireNotNull(incumbent), certificate(proof, QuadraticClaim.Unbounded), sense, sink.snapshot(),
+                requireNotNull(incumbent), certificate(proof, QuadraticClaim.Unbounded), sense, stats,
             )
         }
         if (!exhausted || stop()) return partial()
         val best = limit
         val coverage = QuadraticEngineDerivation.Branches(proofs)
         if (best == null) return QuadraticOptimizationResult.Infeasible(
-            certificate(coverage, QuadraticClaim.Infeasible), sense, sink.snapshot(),
+            certificate(coverage, QuadraticClaim.Infeasible), sense, stats,
         )
         val bound = QuadraticObjectiveBound(
             sourceValue(best), !attained, certificate(coverage, QuadraticClaim.Bound),
@@ -225,12 +402,12 @@ internal class QuadraticIntegerOptimization(
             if (stop()) return partial()
             return QuadraticOptimizationResult.Optimal(
                 requireNotNull(incumbent), bound, certificate(coverage, QuadraticClaim.Optimal),
-                sense, sink.snapshot(),
+                sense, stats,
             )
         }
         return if (stop()) partial() else QuadraticOptimizationResult.UnattainedLimit(
             requireNotNull(incumbent), bound, certificate(coverage, QuadraticClaim.UnattainedLimit),
-            sense, sink.snapshot(),
+            sense, stats,
         )
     }
 
@@ -428,7 +605,9 @@ internal class QuadraticIntegerOptimization(
 
     private fun accept(point: QuadraticIncumbent, heuristic: Boolean) {
         if (incumbent == null || better(point.value, requireNotNull(incumbent).value)) {
+            point.sample.witnessCertificate = EvidenceCertificate.verified(identity, EvidenceKind.Witness)
             incumbent = point
+            publish?.invoke(point)
             val approximate = point.value.rational?.toDouble()
                 ?: (point.value.lowerBound.toDouble() / 2 + point.value.upperBound.toDouble() / 2)
             sink.ls.recordIncumbent(approximate, 0.0, sink.elapsedMs())
@@ -447,8 +626,8 @@ internal class QuadraticIntegerOptimization(
             controls.strategy.localSearch.cancellation
         } else controls.strategy.backtrack.cancellation
         val reason = if (interrupted || worker()) TerminationReason.Cancelled else native.reason()
-        return incumbent?.let { QuadraticOptimizationResult.BestFound(it, rootBound, reason, sense, sink.snapshot()) }
-            ?: QuadraticOptimizationResult.Unknown(rootBound, reason, sense, sink.snapshot())
+        return incumbent?.let { QuadraticOptimizationResult.BestFound(it, rootBound, reason, sense, stats) }
+            ?: QuadraticOptimizationResult.Unknown(rootBound, reason, sense, stats)
     }
 
     private fun intersect(
@@ -467,17 +646,12 @@ internal class QuadraticIntegerOptimization(
         )
     }
 
-    private fun walk(adaptive: Boolean, rounds: Long = Long.MAX_VALUE, share: Double = 1.0) {
+    private fun retainedNeighborhood(adaptive: Boolean): QuadraticNeighborhoodCursor {
+        neighborhood?.let { return it }
         val worker = controls.strategy.localSearch
-        val maximum = minOf(rounds, params.maximumMoves,
+        val maximum = minOf(params.maximumMoves,
             if (adaptive) controls.strategy.alnsIterations.toLong() else Long.MAX_VALUE)
-        val instructionLimit = minOf(worker.maxFlips, worker.maxInstructions ?: Long.MAX_VALUE)
-        val start = native.work
-        val allowance = controls.maximumWork?.let { ((it - start).coerceAtLeast(0) * share).toLong() }
-        val stop = native.phaseCancellation(worker.cancellation, share) or Cancellation {
-            budget?.exhausted() == true || allowance?.let { native.work - start >= it } == true
-        }
-        if (stop() || maximum == 0L || instructionLimit == 0L) return
+        val stop = native.polynomial or worker.cancellation or Cancellation { budget?.exhausted() == true }
         val seeds = source.integerSeeds(stop, relaxation.arithmetic::step).mapIndexed { id, value ->
             relaxation.arithmetic.step()
             val coordinate = source.integerCoordinates[id]
@@ -489,12 +663,9 @@ internal class QuadraticIntegerOptimization(
                 else -> value
             }
         }
-        var radius = BigFraction.ONE
-        var moves = 0L
-        var instructions = 0L
-        var stalls = 0L
-        val weights = DoubleArray(3) { 1.0 }
+        var previous: QuadraticIncumbent? = null
         val completion = ExactNeighborhoodCompletion { neighborhood, cancellation ->
+            previous = incumbent
             neighborhoodPoint = null
             fun coordinate(id: Int): Int = if (id < source.integerCoordinates.size) source.integerCoordinates[id]
                 else source.realCoordinates[id - source.integerCoordinates.size]
@@ -506,54 +677,47 @@ internal class QuadraticIntegerOptimization(
             val numeric = intersect(root, lower, upper)
             val condition = PolynomialCondition(root.bools + neighborhood.bools, numeric.lower, numeric.upper)
             traverse(condition, cancellation, global = false)
+            if (neighborhoodPoint == null) neighborhoodPoint = incumbent?.takeIf { it !== previous }
             neighborhoodPoint?.let { ExactNeighborhoodResult.Witness(it.sample) } ?: ExactNeighborhoodResult.Undecided
         }
-        while (!stop() && moves < maximum && instructions < instructionLimit) {
-            val before = native.work
-            val previous = incumbent
-            val intCount = source.integerCoordinates.size
-            val total = source.boolCount + intCount + source.realCoordinates.size
-            val operator = if (!adaptive) 0 else random.nextInt(weights.size).let { draw ->
-                if (random.nextDouble() < weights[draw] / weights.maxOrNull()!!) draw else 2
-            }
-            val amount = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
-            val released = if (!adaptive) setOf((moves % total).toInt())
-                else (0 until total).shuffled(random).take(amount).toSet()
-            val lower = mutableMapOf<Int, BigFraction>()
-            val upper = mutableMapOf<Int, BigFraction>()
-            val bools = mutableMapOf<Int, Boolean>()
-            for (id in 0 until source.boolCount) {
-                if (id !in released) {
-                    bools[id] = root.bools[id] ?: incumbent?.sample?.boolValue(id) ?: random.nextBoolean()
+        val intCount = source.integerCoordinates.size
+        val total = source.boolCount + intCount + source.realCoordinates.size
+        return QuadraticNeighborhoodCursor(total, adaptive, worker.randomSeed ?: 1L,
+            QuadraticNeighborhoodAllowance(maximum, minOf(worker.maxFlips, worker.maxInstructions ?: Long.MAX_VALUE),
+                budget), stop, { native.work }, propose = { released, radius, random ->
+                readIncumbent()?.let { accept(it, heuristic = true) }
+                val lower = mutableMapOf<Int, BigFraction>()
+                val upper = mutableMapOf<Int, BigFraction>()
+                val bools = mutableMapOf<Int, Boolean>()
+                for (id in 0 until source.boolCount) {
+                    if (id !in released) {
+                        bools[id] = root.bools[id] ?: incumbent?.sample?.boolValue(id) ?: random.nextBoolean()
+                    }
                 }
-            }
-            for (id in 0 until intCount) {
-                val center = incumbent?.sample?.exactIntValue(id)?.let { BigFraction.of(it, BIG_ONE) } ?: seeds[id]
-                val spread = if (source.boolCount + id in released) radius else BigFraction.ZERO
-                lower[id] = center - spread
-                upper[id] = center + spread
-            }
-            incumbent?.sample?.algebraicReals?.takeIf {
-                released.none { it < source.boolCount + intCount }
-            }?.forEachIndexed { id, value ->
-                val spread = if (source.boolCount + intCount + id in released) radius else BigFraction.ZERO
-                lower[intCount + id] = value.lowerBound - spread
-                upper[intCount + id] = value.upperBound + spread
-            }
-            try {
-                completion.check(ExactNeighborhoodCondition(bools, lower, upper), stop)
-            } finally {
-                moves++
-                val cost = 1L + ceil((native.work - before).coerceAtLeast(0) * 0.8).toLong()
-                instructions += minOf(cost, Long.MAX_VALUE - instructions)
-                budget?.spendMoves(cost)
-                sink.ls.recordCompletion(false, neighborhoodPoint == null)
-                sink.ls.recordWork(moves, 0, stalls)
-            }
-            val improved = incumbent !== previous
-            if (improved) radius = BigFraction.ONE else { radius += radius; stalls++ }
-            if (adaptive) weights[operator] = weights[operator] * 0.8 + if (improved) 1.0 else 0.2
-            sink.ls.recordWork(moves, 0, stalls)
-        }
+                for (id in 0 until intCount) {
+                    val center = incumbent?.sample?.exactIntValue(id)?.let { BigFraction.of(it, BIG_ONE) } ?: seeds[id]
+                    val spread = if (source.boolCount + id in released) radius else BigFraction.ZERO
+                    lower[id] = center - spread
+                    upper[id] = center + spread
+                }
+                incumbent?.sample?.algebraicReals?.takeIf {
+                    released.none { it < source.boolCount + intCount }
+                }?.forEachIndexed { id, value ->
+                    val spread = if (source.boolCount + intCount + id in released) radius else BigFraction.ZERO
+                    lower[intCount + id] = value.lowerBound - spread
+                    upper[intCount + id] = value.upperBound + spread
+                }
+                ExactNeighborhoodCondition(bools, lower, upper)
+            }, completion = completion, accept = {
+                val point = requireNotNull(neighborhoodPoint)
+                val improved = incumbent !== previous
+                accept(point, heuristic = true)
+                improved
+            }, releaseFirst = true, rotateSingle = true).also { neighborhood = it }
+    }
+
+    private fun walk(adaptive: Boolean) {
+        val cursor = retainedNeighborhood(adaptive)
+        cursor.advance(native.polynomial or controls.strategy.localSearch.cancellation, Long.MAX_VALUE)
     }
 }
