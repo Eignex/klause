@@ -1,9 +1,13 @@
 package com.eignex.klause.formats.dimacs
 
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.toLinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class DimacsDecoderTest {
     @Test
@@ -33,6 +37,16 @@ class DimacsDecoderTest {
         assignment.setBool(2, true)
 
         assertEquals(7L, objective.evaluateLong(assignment))
+    }
+
+    @Test
+    fun `a satisfied soft clause cannot carry a violation penalty`() {
+        val decoded = Dimacs.parseWcnf("p wcnf 2 3 20\n20 1 0\n5 1 2 0\n3 -1 0\n").toProblem()
+        val inflated = Assumptions(bools = mapOf(0 to true, 1 to false, 2 to true, 3 to true))
+
+        val result = decoded.problem.propagate(inflated)
+
+        assertIs<PropagationResult.Unsat>(result)
     }
 
     @Test
