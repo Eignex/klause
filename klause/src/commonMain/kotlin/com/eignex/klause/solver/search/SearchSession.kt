@@ -210,10 +210,13 @@ class SearchSession(
     }
 
     private var controlsAttached = false
+    private var initializationStarted = false
 
     internal fun attachExecutionControls(controls: SearchExecutionControls) {
         check(!controlsAttached) { "execution controls are attached once per search session" }
-        check(checks == 0L && decisionLevel == 0) { "execution controls must be bound before search" }
+        check(!initializationStarted && checks == 0L && decisionLevel == 0) {
+            "execution controls must be bound before search"
+        }
         executionControls = controls
         controlsAttached = true
     }
@@ -232,6 +235,7 @@ class SearchSession(
 
     /** Initialize all components at the shared root. */
     fun initialize(): ComponentResult {
+        initializationStarted = true
         val result = runComponents { it.initialize(this) }
         return if (result is ComponentResult.Consistent) propagate() else result
     }
@@ -239,6 +243,7 @@ class SearchSession(
     internal fun prepareInitialization(
         initialize: (SearchComponent, SearchContext) -> Iterator<ComponentResult?>,
     ): Iterator<ComponentResult?> = sequence {
+        initializationStarted = true
         for (component in components) {
             val pending = initialize(component, this@SearchSession)
             var result: ComponentResult? = null
