@@ -178,11 +178,12 @@ internal class OpenPortfolio(
         }
         val verifier = openWitnessVerifier(sourceModel, objective, context, stop)
         val evidence = PortfolioEvidence(identity, verifier).bindInvocation(binding, stop)
+        val profile = ProblemProfile.of(model, optimizing = true)
+        val share = if (integral != null || rational) DESCENT_SHARE else 0.0
         val portfolio = PortfolioInvocation(preparedPlan, boundFactories,
             PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = stop,
                 nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0), evidence) { workers ->
-            PortfolioInvocationPolicy(ProblemProfile.of(model, optimizing = true),
-                reservedShares(workers, if (integral != null || rational) DESCENT_SHARE else 0.0))
+            PortfolioInvocationPolicy(profile, reservedShares(workers, share))
         }
         val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents,
             terminalCheck = linear, onAccepted = { accepted -> publication?.accepted(accepted.assignment,
