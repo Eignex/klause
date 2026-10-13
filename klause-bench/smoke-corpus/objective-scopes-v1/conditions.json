@@ -1,0 +1,38 @@
+{
+  "53bb5c5c20edf6108b68213314eb57cf58b53fd3038c119bf7e240e14e39d4ee": {
+    "bools": {
+      "b": true
+    },
+    "ints": {
+      "i": 1,
+      "j": 0
+    }
+  },
+  "48a129d6ee6bf44430df70682a78d04d8fbe6467fd06c5381a5a6fb5c3298777": {
+    "bools": {
+      "b": false
+    },
+    "ints": {
+      "i": 0,
+      "j": 1
+    }
+  },
+  "ba11e172699d62d792b6999ab3ab6e65b49ff7c2114a751ebe3cb365e12d1e42": {
+    "bools": {
+      "b": true
+    },
+    "ints": {
+      "i": 1,
+      "j": 0
+    }
+  },
+  "310e563d574a9e3759cc7d0a260dc0d9b746c1ff954833eba0a1a8c0d9b0b558": {
+    "bools": {
+      "b": false
+    },
+    "ints": {
+      "i": 0,
+      "j": 1
+    }
+  }
+}

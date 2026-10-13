@@ -134,6 +134,13 @@ compares public entries without changing original constraints or direction.
 Its captured square schema exercises named continuous float compilation; declared
 `0<=y<=1` bounds follow from those same original source constraints.
 
+The self-authored Apache-2.0 [objective-scopes-v1 fixtures](../../klause-bench/smoke-corpus/objective-scopes-v1/manifest.json)
+retain finite integer domains, AllDifferent, fixed `x=y=1`, `x*x=y` and explicit
+Boolean/integer pins. Two scopes change the constant and pins while retaining
+separate Boolean, integer and real declaration-zero identities. Their exact costs
+are `31/2` and `27/2` in both directions. Schema and condition hashes accompany
+the immutable original source hashes; generated execution records stay external.
+
 Keep generated outputs and historical campaign bundles outside the repository.
 `klause-bench` contains the active harness, current corpus fixtures, named sets
 and reusable tools. Installed CLI solve records remain local under the ignored
