@@ -140,7 +140,8 @@ are separate: the latter requires actual retained evidence and an expected sourc
 claim. Search exhaustion must retain its actual source cutoff to attest a bound;
 an exhausted reason without that value supplies no bound claim. Derivation checks
 match the completed coordinates and ray direction, and an attained optimum is
-checked at its actual assignment. A scoped non-witness import requires the same
+checked at its actual assignment. An unbounded completion's feasible point has a
+separate witness check from its ray. A scoped non-witness import requires the same
 consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance and opaque quadratic producer arguments remain
 until their consumers migrate; these hooks do not assert that migration is complete.
 

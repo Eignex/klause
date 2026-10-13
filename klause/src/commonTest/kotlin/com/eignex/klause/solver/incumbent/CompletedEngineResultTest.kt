@@ -25,6 +25,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -122,5 +123,24 @@ class CompletedEngineResultTest {
             CompletedEngineResult.Solve(scope, result))
 
         assertNull(certificate)
+    }
+
+    @Test
+    fun `an unbounded completion checks its feasible point separately from its ray`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val scoped = SourceScope(SourceRevision("original-ir", "klause-ir-exact-v1"),
+            objective = SourceObjective("negative-x", ObjectiveSense.MINIMIZE))
+        val context = assertNotNull(model.sourceProofContext(scoped))
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0))
+        val evidence = SourceResultEvidence(scoped, listOf(SourceEvidence(scoped, SourceClaim.Witness(point),
+            SourceDerivation.SourceWitness)))
+        val result = MinimizeResult.Unbounded(point, 0.0, listOf(BigFraction.ONE), evidence = evidence)
+        val completion = CompletedEngineResult.Minimize(scoped, result)
+        val certificate = assertNotNull(EvidenceCertificate.completed(identity, EvidenceKind.Witness, completion))
+
+        val checked = certificate.verifyDerivation(SourceClaim.Witness(point), context)
+
+        assertEquals(SourceEvidenceCheck.Checked, checked)
     }
 }
