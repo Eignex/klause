@@ -5,6 +5,8 @@ import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.corpus
+import com.eignex.klause.bench.source.CorpusSelection
+import com.eignex.klause.bench.source.CorpusSelection.Selection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -84,9 +86,9 @@ class BenchSelectionTest {
             reached += it.ref.name
             it.ref.name != "f/broken"
         })
-        val selected = com.eignex.klause.bench.source.CorpusSelection.applySelectionBy(
+        val selected = CorpusSelection.applySelectionBy(
             capped,
-            com.eignex.klause.bench.source.CorpusSelection.Selection(maxInstances = 2),
+            Selection(maxInstances = 2),
         ) { it.family }
 
         assertEquals(listOf("f/valid", "g/valid"), names(selected))
