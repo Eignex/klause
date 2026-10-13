@@ -6,6 +6,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -17,6 +18,80 @@ class PolynomialProjectionTest {
     private val arithmetic = PolynomialArithmetic()
     private val x = Polynomial.variable(0)
     private val y = Polynomial.variable(1)
+
+    @Test
+    fun `satisfaction order eliminates the lower degree source coordinate first`() {
+        val polynomial = arithmetic.subtract(arithmetic.power(y, 2), x)
+
+        val order = satisfactionLiftingOrder(listOf(polynomial), 2, arithmetic)
+
+        assertEquals(listOf(1, 0), order)
+    }
+
+    @Test
+    fun `equal degree and incidence retain source lifting order`() {
+        val polynomial = arithmetic.add(x, y)
+
+        val order = satisfactionLiftingOrder(listOf(polynomial), 2, arithmetic)
+
+        assertEquals(listOf(0, 1), order)
+    }
+
+    @Test
+    fun `ordering declines oversized sparse input before term materialization`() {
+        val polynomial = Polynomial.of((0..2048).map { degree ->
+            PolynomialTerm(
+                Monomial.of(mapOf(0 to degree)), BigFraction.ONE,
+            )
+        })
+
+        val order = satisfactionLiftingOrder(listOf(polynomial), 2, arithmetic)
+
+        assertEquals(null, order)
+    }
+
+    @Test
+    fun `ordering declines coordinate spaces beyond its structural cap`() {
+        val order = satisfactionLiftingOrder(listOf(x), 33, arithmetic)
+
+        assertEquals(null, order)
+    }
+
+    @Test
+    fun `reordered projection retains boundaries in original coordinate buffers`() {
+        val polynomial = arithmetic.subtract(arithmetic.power(y, 2), x)
+        val suppliedOrder = mutableListOf(1, 0)
+
+        val projection = PolynomialProjection.compute(listOf(polynomial), 2, arithmetic, suppliedOrder)
+        suppliedOrder.reverse()
+
+        assertEquals(1, projection.liftingVariable(0))
+        assertEquals(0, projection.liftingVariable(1))
+        assertTrue(projection.polynomials(0).contains(polynomial))
+        assertTrue(projection.polynomials(1).any { projected ->
+            arithmetic.substitute(projected, 1, Polynomial.ZERO).isZero
+        })
+        assertTrue(projection.polynomials(1).all { it.variables == listOf(1) })
+    }
+
+    @Test
+    fun `projection rejects a lifting order without every original coordinate`() {
+        for (order in listOf(listOf(0), listOf(0, 0), listOf(0, 2))) {
+            assertFailsWith<IllegalArgumentException> {
+                PolynomialProjection.compute(listOf(x, y), 2, arithmetic, order)
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation while choosing an order publishes no policy result`() {
+        var polls = 0
+        val interrupted = PolynomialArithmetic(Cancellation { ++polls > 8 })
+
+        assertFailsWith<PolynomialInterrupted> {
+            satisfactionLiftingOrder(listOf(arithmetic.subtract(arithmetic.power(y, 2), x)), 2, interrupted)
+        }
+    }
 
     @Test
     fun `projection separates a change in the number of real sections`() {

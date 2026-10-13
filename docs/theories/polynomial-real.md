@@ -205,7 +205,7 @@ Results retain counts for projected polynomials, visited prefix cells and native
 work. They retain no mutable traversal, refinement or cancellation state.
 
 `QfNraParams.maximumWork` is nullable for unlimited work; zero prevents entry. One
-counted scope spans source-ID validation, normalization, projection, lifting,
+counted scope spans source-ID validation, normalization, ordering, projection, lifting,
 Boolean search and the final publication poll. Each charge reaches the caller's
 meter once, and the scope retains the caller's deadline. These native work units
 are separate from legacy open-theory policy units. A stop before publication returns
@@ -347,11 +347,28 @@ returned list do not change captured families. Immutable kernel polynomials may 
 shared. One caller-supplied arithmetic context spans construction; interruption and
 kernel resource stops propagate without publishing a partial family.
 
-Variable IDs define ascending lifting order. Construction eliminates variables in
-descending order and stores one polynomial family per declared ID, containing only
-polynomials whose main variable is that ID. Lower-variable polynomials carry through
-elimination. An absent dimension retains an empty family. The univariate family is
-the last projection level.
+The default lifting order is ascending variable ID. Construction eliminates variables in
+reverse lifting order and stores one polynomial family per original declared ID.
+Each family contains polynomials involving that coordinate and only coordinates
+earlier in the lifting order. Polynomials independent of an eliminated coordinate
+carry through elimination. An absent dimension retains an empty family. The
+univariate family belongs to the first lifting coordinate.
+
+Satisfaction completion can select an explicit lifting order before projection.
+At most 32 declared coordinates, 128 normalized atom polynomials and 2,048 sparse
+terms admit ordering. Sparse cardinality is checked without allocating term
+snapshots. Ranking eliminates coordinates with smaller maximum exponent first,
+then smaller maximum total degree of an incident term, then fewer incident terms.
+Ties retain ascending source lifting order. Larger inputs use declared ID order.
+All scoring, bounded snapshots and sorting consume the existing query arithmetic
+allowance and cancellation token; they receive no private allowance or renewed
+deadline. A containing stop remains terminal. This ordering changes traversal,
+not source IDs, formula structure, coordinate pins or kernel representation caps.
+
+Projection callers that omit an explicit order retain ascending declared ID order.
+Objective-image construction retains that order so its objective coordinate remains
+the first lifting coordinate. Its complete fiber feasibility queries may select a
+satisfaction order while preserving the original shifted coordinate IDs.
 
 For each eliminated top-variable family, the projection contains all coefficient
 polynomials, every principal subresultant coefficient of each nonconstant reductum
@@ -369,7 +386,8 @@ reducta rather than relying on a nonvanishing discriminant or leading coefficien
 
 ### Lifting and truth
 
-Traversal uses an iterative stack in ascending variable order. Each projection
+Traversal uses an iterative stack in the projection's captured lifting order.
+Stack levels are separate from original coordinate IDs. Each projection
 polynomial specializes at the exact earlier coordinates. Identically-zero
 specializations add no roots; nonzero constants also add none. Kernel isolation
 supplies every distinct real root, and exact comparison sorts and deduplicates the

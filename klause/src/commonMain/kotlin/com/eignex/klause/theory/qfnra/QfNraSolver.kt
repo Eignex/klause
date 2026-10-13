@@ -79,7 +79,8 @@ internal fun solveQfNra(
             arithmetic.step()
             it.polynomial
         }
-        val projection = PolynomialProjection.compute(polynomials, realCount, arithmetic)
+        val order = satisfactionLiftingOrder(polynomials, realCount, arithmetic)
+        val projection = PolynomialProjection.compute(polynomials, realCount, arithmetic, order)
         work.projectedPolynomials = projection.polynomialCount
         val assignment = searchCells(normalized, projection, boolCount, arithmetic, algebraic, work, fixed)
         arithmetic.step()
@@ -266,9 +267,9 @@ private fun searchCells(
         }
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
-        if (frame.variable + 1 < projection.variableCount) {
+        if (frame.level + 1 < projection.variableCount) {
             if (prefixFeasible(formula, coordinates, boolCount, arithmetic, algebraic)) {
-                frames.addLast(liftFrame(projection, frame.variable + 1, coordinates, arithmetic, algebraic, fixed))
+                frames.addLast(liftFrame(projection, frame.level + 1, coordinates, arithmetic, algebraic, fixed))
             }
         } else {
             val assignment = checkSample(formula, coordinates, boolCount, arithmetic, algebraic)
@@ -278,20 +279,26 @@ private fun searchCells(
     return null
 }
 
-private class CadFrame(val variable: Int, val roots: List<AlgebraicReal>, val fixed: AlgebraicReal? = null) {
+private class CadFrame(
+    val level: Int,
+    val variable: Int,
+    val roots: List<AlgebraicReal>,
+    val fixed: AlgebraicReal? = null,
+) {
     val cellCount: Long = if (fixed == null) 2L * roots.size + 1 else 1
     var nextCell: Long = 0
 }
 
 private fun liftFrame(
     projection: PolynomialProjection,
-    variable: Int,
+    level: Int,
     coordinates: Map<Int, AlgebraicReal>,
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     fixed: Map<Int, BigFraction>,
 ): CadFrame {
-    fixed[variable]?.let { return CadFrame(variable, emptyList(), algebraic.rational(it)) }
+    val variable = projection.liftingVariable(level)
+    fixed[variable]?.let { return CadFrame(level, variable, emptyList(), algebraic.rational(it)) }
     val roots = mutableListOf<AlgebraicReal>()
     for (polynomial in projection.polynomials(variable)) {
         arithmetic.step()
@@ -304,7 +311,7 @@ private fun liftFrame(
         arithmetic.step()
         if (distinct.isEmpty() || algebraic.compare(distinct.last(), root) != 0) distinct.add(root)
     }
-    return CadFrame(variable, distinct)
+    return CadFrame(level, variable, distinct)
 }
 
 private fun prefixFeasible(
@@ -317,8 +324,11 @@ private fun prefixFeasible(
     val atoms = IntArray(formula.atoms.size) { index ->
         arithmetic.step()
         val atom = formula.atoms[index]
-        val variable = atom.polynomial.mainVariable
-        if (variable != null && variable >= coordinates.size) PolynomialFormula.UNASSIGNED
+        val assigned = atom.polynomial.variables.all { variable ->
+            arithmetic.step()
+            variable in coordinates
+        }
+        if (!assigned) PolynomialFormula.UNASSIGNED
         else if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates)))) PolynomialFormula.TRUE
         else PolynomialFormula.FALSE
     }

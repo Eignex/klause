@@ -22,8 +22,11 @@ verdict. The package never allocates finite CP domains or reads solver state.
 `Polynomial` captures sparse `BigFraction` coefficients and immutable `Monomial`
 keys. Terms combine exactly; zero coefficients disappear. Variable IDs are
 nonnegative integers, ordered increasingly; lexicographic monomial comparison
-inspects the largest variable first. Callers remap IDs to choose an elimination
-order. Coefficient extraction uses ascending exponents; zero has degree -1 and an
+inspects the largest variable first. Coefficient extraction, differentiation and
+resultant elimination accept any selected variable ID independently of that
+monomial order. Callers can choose an elimination order while retaining original
+coordinate keys. Allocation-free sparse term cardinality supports bounded caller
+preflight before sorted term snapshots. Coefficient extraction uses ascending exponents; zero has degree -1 and an
 empty coefficient list. Derivatives, substitution and exact division retain source
 coefficient authority without floating conversion.
 

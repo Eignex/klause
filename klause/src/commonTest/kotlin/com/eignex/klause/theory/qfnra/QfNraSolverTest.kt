@@ -19,6 +19,111 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `reordered lifting publishes strict sectors in original source coordinates`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const b Bool)
+            (declare-const x Real)
+            (declare-const y Real)
+            (declare-const unused Real)
+            (assert (and b (> x 2) (< x 3) (> y 1) (< (* y y) 2)))
+            (check-sat)
+        """.trimIndent())
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, source.boolCount, source.realCount))
+
+        assertTrue(result.stats.projectedPolynomials > 0)
+        assertTrue(result.assignment.boolValue(0))
+        assertEquals(3, result.assignment.realCount)
+        assertEquals(1, algebraic.signAt(RationalPolynomial.of(-2, 1), result.assignment.realValue(0)))
+        assertEquals(-1, algebraic.signAt(RationalPolynomial.of(-3, 1), result.assignment.realValue(0)))
+        assertEquals(1, algebraic.signAt(RationalPolynomial.of(-1, 1), result.assignment.realValue(1)))
+        assertEquals(-1, algebraic.signAt(RationalPolynomial.of(-2, 0, 1), result.assignment.realValue(1)))
+        assertEquals(BigFraction.ZERO, result.assignment.realValue(2).rational)
+    }
+
+    @Test
+    fun `reordered prefix refutation waits for the actual low source coordinate`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (> x 2) (< x 2) (< (* y y) 2)))
+            (check-sat)
+        """.trimIndent())
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+        assertTrue(assertIs<QfNraResult.Unsatisfiable>(result).stats.projectedPolynomials > 0)
+    }
+
+    @Test
+    fun `reordered completion retains Boolean and exact coordinate pins`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const b Bool)
+            (declare-const x Real)
+            (declare-const y Real)
+            (declare-const k Real)
+            (assert (and (or b (> x 2)) (< x 3) (> y 1) (< (* y y) k) (not (= (* y y) 1))))
+            (check-sat)
+        """.trimIndent())
+        val condition = PolynomialCondition(bools = mapOf(0 to false),
+            lower = mapOf(2 to BigFraction.ofLong(2)), upper = mapOf(2 to BigFraction.ofLong(2)))
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount, condition = condition,
+        ))
+
+        assertTrue(result.stats.projectedPolynomials > 0)
+        assertEquals(false, result.assignment.boolValue(0))
+        assertEquals(BigFraction.ofLong(2), result.assignment.realValue(2).rational)
+        assertEquals(1, algebraic.signAt(RationalPolynomial.of(-2, 1), result.assignment.realValue(0)))
+        assertEquals(-1, algebraic.signAt(RationalPolynomial.of(-3, 1), result.assignment.realValue(0)))
+        assertEquals(1, algebraic.signAt(RationalPolynomial.of(-1, 1), result.assignment.realValue(1)))
+        assertEquals(-1, algebraic.signAt(RationalPolynomial.of(-2, 0, 1), result.assignment.realValue(1)))
+    }
+
+    @Test
+    fun `reordered cells preserve strict relation complements`() {
+        for ((relation, satisfiable) in listOf(">=" to true, "<" to false)) {
+            val source = SmtLibPolynomial.parse("""
+                (declare-const x Real)
+                (declare-const y Real)
+                (assert (and (> x 2) (< x 3) (> y 1) (< (* 4 y) 5) (not ($relation (* y y) 2))))
+                (check-sat)
+            """.trimIndent())
+
+            val result = solveQfNra(source.formula, source.boolCount, source.realCount)
+
+            assertTrue(result.stats.projectedPolynomials > 0)
+            if (satisfiable) assertIs<QfNraResult.Satisfiable>(result)
+            else assertIs<QfNraResult.Unsatisfiable>(result)
+        }
+    }
+
+    @Test
+    fun `cancellation after reordered lifting withholds a complete witness`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (> x 2) (< x 3) (> y 1) (< (* y y) 2)))
+            (check-sat)
+        """.trimIndent())
+        val completed = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, source.boolCount, source.realCount))
+        val limit = completed.stats.workSpent - 1
+        var spent = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= limit
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount, QfNraParams(cancellation))
+
+        val unknown = assertIs<QfNraResult.Unknown>(result)
+        assertEquals(QfNraReason.Interrupted, unknown.reason)
+        assertTrue(unknown.stats.liftedCells > 0)
+        assertEquals(spent, unknown.stats.workSpent)
+    }
+
+    @Test
     fun `rational repairs capture every source coordinate before projection`() {
         val source = SmtLibPolynomial.parse("""
             (declare-const b Bool)

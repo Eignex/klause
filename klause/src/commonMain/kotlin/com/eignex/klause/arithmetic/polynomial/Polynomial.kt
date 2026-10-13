@@ -46,6 +46,7 @@ internal class Monomial private constructor(private val powers: Map<Int, Int>) :
 internal data class PolynomialTerm(val monomial: Monomial, val coefficient: BigFraction)
 
 internal class Polynomial private constructor(private val coefficients: Map<Monomial, BigFraction>) {
+    val termCount: Int get() = coefficients.size
     val terms: List<PolynomialTerm> get() = coefficients.entries.sortedBy { it.key }
         .map { PolynomialTerm(it.key, it.value) }
     val isZero: Boolean get() = coefficients.isEmpty()
