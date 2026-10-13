@@ -169,7 +169,7 @@ private fun PropagationState.replayVarUndo(undoSize: Int) {
     val numBool = problem.numBoolVars
     var i = undo.size - 1
     while (i >= undoSize) {
-        when (undo.tag[i]) {
+        when (val tag = undo.tag[i]) {
             0 -> { // bool pin — prior state is always unassigned
                 val v = undo.varId[i]
                 retracting?.invoke(v)
@@ -180,46 +180,60 @@ private fun PropagationState.replayVarUndo(undoSize: Int) {
                 unassigned?.invoke(v)
             }
 
-            1 -> { // int change — restore the full recorded prior int-var state
-                val v = undo.varId[i]
-                retracting?.invoke(numBool + v)
-                boundMoves[v]?.let { it.truncateTo(it.size - 1) }
-                boundMovePriorMin[v]?.let { it.truncateTo(it.size - 1) }
-                boundMovePriorMax[v]?.let { it.truncateTo(it.size - 1) }
-                unassigned?.invoke(numBool + v)
-                intDomains[v] = requireNotNull(undo.domain[i])
-                intLevel[v] = undo.level[i]
-                intMinLevel[v] = undo.minLvl[i]
-                intMaxLevel[v] = undo.maxLvl[i]
-                intMinReason[v] = undo.minReason[i]
-                intMaxReason[v] = undo.maxReason[i]
-                intMinAntecedents[v] = undo.minAnt[i]
-                intMaxAntecedents[v] = undo.maxAnt[i]
-                // Truncate the interior-hole carve history back to its pre-mutation length so
-                // the (value, level, reason) records stay aligned with the restored domain.
-                holeHistVal[v]?.truncateTo(undo.holeHistLen[i])
-                holeHistLvl[v]?.truncateTo(undo.holeHistLen[i])
-                holeHistAnt[v]?.let { a -> while (a.size > undo.holeHistLen[i]) a.removeAt(a.size - 1) }
-                holeHistPos[v]?.truncateTo(undo.holeHistLen[i])
-            }
-
-            2 -> { // interior carve — re-insert the carved value
-                val v = undo.varId[i]
-                retracting?.invoke(numBool + v)
-                unassigned?.invoke(numBool + v)
-                intDomains[v] = intDomains[v].includeInteriorValue(undo.carved[i])
-                intLevel[v] = undo.level[i]
-                intMinLevel[v] = undo.minLvl[i]
-                intMaxLevel[v] = undo.maxLvl[i]
-                holeHistVal[v]?.truncateTo(undo.maxReason[i])
-                holeHistLvl[v]?.truncateTo(undo.maxReason[i])
-                holeHistAnt[v]?.let { a -> while (a.size > undo.maxReason[i]) a.removeAt(a.size - 1) }
-                holeHistPos[v]?.truncateTo(undo.maxReason[i])
-            }
+            1, 2 -> replayIntVarUndo(i, tag, numBool, retracting, unassigned)
 
             else -> error("unknown undo tag")
         }
         i--
+    }
+}
+
+private fun PropagationState.replayIntVarUndo(
+    i: Int,
+    tag: Int,
+    numBool: Int,
+    retracting: ((Int) -> Unit)?,
+    unassigned: ((Int) -> Unit)?,
+) {
+    when (tag) {
+        1 -> { // int change — restore the full recorded prior int-var state
+            val v = undo.varId[i]
+            retracting?.invoke(numBool + v)
+            boundMoves[v]?.let { it.truncateTo(it.size - 1) }
+            boundMovePriorMin[v]?.let { it.truncateTo(it.size - 1) }
+            boundMovePriorMax[v]?.let { it.truncateTo(it.size - 1) }
+            unassigned?.invoke(numBool + v)
+            intDomains[v] = requireNotNull(undo.domain[i])
+            intLevel[v] = undo.level[i]
+            intMinLevel[v] = undo.minLvl[i]
+            intMaxLevel[v] = undo.maxLvl[i]
+            intMinReason[v] = undo.minReason[i]
+            intMaxReason[v] = undo.maxReason[i]
+            intMinAntecedents[v] = undo.minAnt[i]
+            intMaxAntecedents[v] = undo.maxAnt[i]
+            // Truncate the interior-hole carve history back to its pre-mutation length so
+            // the (value, level, reason) records stay aligned with the restored domain.
+            holeHistVal[v]?.truncateTo(undo.holeHistLen[i])
+            holeHistLvl[v]?.truncateTo(undo.holeHistLen[i])
+            holeHistAnt[v]?.let { a -> while (a.size > undo.holeHistLen[i]) a.removeAt(a.size - 1) }
+            holeHistPos[v]?.truncateTo(undo.holeHistLen[i])
+        }
+
+        2 -> { // interior carve — re-insert the carved value
+            val v = undo.varId[i]
+            retracting?.invoke(numBool + v)
+            unassigned?.invoke(numBool + v)
+            intDomains[v] = intDomains[v].includeInteriorValue(undo.carved[i])
+            intLevel[v] = undo.level[i]
+            intMinLevel[v] = undo.minLvl[i]
+            intMaxLevel[v] = undo.maxLvl[i]
+            holeHistVal[v]?.truncateTo(undo.maxReason[i])
+            holeHistLvl[v]?.truncateTo(undo.maxReason[i])
+            holeHistAnt[v]?.let { a -> while (a.size > undo.maxReason[i]) a.removeAt(a.size - 1) }
+            holeHistPos[v]?.truncateTo(undo.maxReason[i])
+        }
+
+        else -> error("unknown undo tag")
     }
 }
 
