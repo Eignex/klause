@@ -817,10 +817,10 @@ an uninstrumented performance comparison. Keep all generated records externally.
 
 `com.eignex.klause.bench.profile.ObjectiveFrontendProbe` runs the installed CLI
 on a directory's original source manifest. Pass `source=<directory>`, optional
-`out=<directory>` and `checker=none|provision`. Manifest cases name source files,
+`out=<directory>`, `work=200000` and `checker=none|provision`. Manifest cases name source files,
 hashes, family/encoding identities and selected CLI engines. The probe retains
 original bytes, stdout/stderr/exit, launcher/runtime provenance and per-child JFR.
-Each child uses `-p 1`, seed 17, native work 200000, one LS move/ALNS iteration and
+Each child uses `-p 1`, seed 17, the recorded native work cap, one LS move/ALNS iteration and
 a 25-second process allowance. Its actual JFR JVM arguments must retain
 `ActiveProcessorCount=1`. Timings include process startup, solving and delivery;
 JFR collection affects them, so they are diagnostics rather than performance claims.

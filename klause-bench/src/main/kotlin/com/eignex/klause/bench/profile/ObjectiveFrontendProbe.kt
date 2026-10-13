@@ -22,7 +22,9 @@ internal object ObjectiveFrontendProbe {
             require(parts.size == 2) { "Use source=<fixture directory> [out=<directory>] [checker=none|provision]" }
             parts[0] to parts[1]
         }
-        require(options.keys.all { it in setOf("source", "out", "checker") })
+        require(options.keys.all { it in setOf("source", "out", "checker", "work") })
+        val work = options["work"]?.toLong() ?: 200000L
+        require(work > 0)
         val source = File(requireNotNull(options["source"]))
         val output = File(options["out"] ?: requireNotNull(System.getenv("OUT")))
         require(output.mkdirs() || output.isDirectory)
@@ -34,7 +36,7 @@ internal object ObjectiveFrontendProbe {
             put("revision", Reports.readGitSha())
             put("seed", 17)
             put("processors", 1)
-            put("nativeWork", 200000)
+            put("nativeWork", work)
             put("maxFlips", 1)
             put("alnsIterations", 1)
             put("manifestSha256", sha256(manifestBytes))
@@ -49,7 +51,7 @@ internal object ObjectiveFrontendProbe {
             for (engine in requireNotNull(case["engines"]).jsonArray) {
                 val selected = requireNotNull(engine.jsonPrimitive.contentOrNull)
                 require(selected in setOf("cp", "fixed", "ls", "alns", "mixed"))
-                runCase(captured, output, "${field("family")}.$selected.${field("encoding")}", selected)
+                runCase(captured, output, "${field("family")}.$selected.${field("encoding")}", selected, work)
             }
         }
         when (options["checker"] ?: "none") {
@@ -59,11 +61,11 @@ internal object ObjectiveFrontendProbe {
         }
     }
 
-    private fun runCase(source: File, output: File, stem: String, engine: String) {
+    private fun runCase(source: File, output: File, stem: String, engine: String, work: Long) {
         val launcher = requireNotNull(System.getenv("KLAUSE_CLI"))
         val recording = File(output, "$stem.jfr")
         val command = listOf(launcher, "-s", "-e", engine, "-p", "1", "-r", "17",
-            "--param", "max-flips=1", "--param", "alns-iterations=1", "--param", "nra-work-limit=200000",
+            "--param", "max-flips=1", "--param", "alns-iterations=1", "--param", "nra-work-limit=$work",
             source.absolutePath)
         val builder = ProcessBuilder(command).redirectOutput(File(output, "$stem.stdout"))
             .redirectError(File(output, "$stem.stderr"))
