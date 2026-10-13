@@ -107,6 +107,7 @@ internal class LpContinuationVerification(
     val conflict: BigRationalConflict?,
     val support: LpExactSupport?,
     val metrics: ExactContinuationMetrics,
+    val pointRejection: LpPointRejection? = null,
 )
 
 internal fun continueExactLp(
@@ -133,6 +134,7 @@ internal fun continueExactLp(
     )
     val capture = ContinuationBudget(captureLimits, cancellation)
     var metrics = ExactContinuationMetrics(invalidated = invalidated)
+    var pointRejection: LpPointRejection? = null
     var point: ExactLpWitness? = null
     var conflict: BigRationalConflict? = null
     var support: LpExactSupport? = null
@@ -194,6 +196,7 @@ internal fun continueExactLp(
                     ),
                 )
                 // Complete proof packages survive a later decline; scoped publication still checks cancellation.
+                pointRejection = checked.pointRejection
                 point = checked.witness
                 conflict = checked.conflict
                 support = checked.conflictSupport
@@ -259,7 +262,12 @@ internal fun continueExactLp(
         workByPhase = addContinuationCosts(metrics.workByPhase, capture.workByPhase),
         allocationByPhase = addContinuationCosts(metrics.allocationByPhase, capture.allocationByPhase),
     )
-    return LpContinuationVerification(point, conflict, support, combineContinuationMetrics(selection.metrics, metrics))
+    return LpContinuationVerification(
+        point, conflict, support, combineContinuationMetrics(selection.metrics, metrics),
+        pointRejection.takeIf {
+            metrics.phase == ContinuationPhase.VERIFY && metrics.decline == ContinuationDecline.CANDIDATE
+        },
+    )
 }
 
 // Identity admission is separately bounded; it cannot replenish retained numerical work. Its envelope is work and

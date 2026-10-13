@@ -110,6 +110,13 @@ internal class SmtStatsSink {
         continuation = continuation.mergedWith(metrics.toStats())
     }
 
+    fun observeContinuationRejection(key: String, count: Long) {
+        require(count > 0L)
+        val before = continuation.declines[key] ?: 0L
+        continuation = continuation.copy(declines = continuation.declines +
+            (key to (before + minOf(count, Long.MAX_VALUE - before))))
+    }
+
     private var conflicts = 0L
     private var explainedConflicts = 0L
     private var unexplainedConflicts = 0L

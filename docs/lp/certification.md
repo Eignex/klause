@@ -79,6 +79,26 @@ internal reorder/precision restarts. Owner-local exact factors require the same
 matrix and ordered basis. Edits still require fresh RHS, seats, costs and proof
 checks; reuse does not replenish spending.
 
+## Continuation rejection details
+
+Exact continuation records the first completed source-point comparison that
+rejects its candidate: a strict endpoint equality or an ordinary bound violation,
+separating structural columns from logical row sides. Fixed-width overflow drops
+that lane's incomplete observation; wide verification supplies the completed
+comparison. This first failure does not establish that the remaining bounds hold.
+
+SMT continuation decline keys pair that rejection with strict-refinement outcomes
+from the same certification operation. Checked numerical witnesses and conflicts,
+declined attempts, completed operations without a strict attempt, missing reports,
+observed stops and aborted operations remain distinct. Cached prior metrics cannot
+supply a new attempt. These detail counts do not increment continuation invocation
+or work totals and execute no additional numerical query or comparison.
+
+A missing report or stopped operation cannot establish that strict refinement was
+unreachable. Rejection details carry no feasible-point, source-model or refutation
+authority; the ordinary exact checks and consumer publication policy still decide
+which packages can be used.
+
 ## Farkas and recession checks
 
 For `M = [A | I]`, a Farkas contradiction requires
