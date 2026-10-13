@@ -1448,6 +1448,27 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `unconditional bounds imply an arithmetic guard with a unit reason`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertEquals(false, session.boolValue(0))
+            val reason = assertNotNull(session.reasonFor(0))
+            assertContentEquals(intArrayOf(Lit.make(0, false)), reason.literals)
+        }
+    }
+
+    @Test
     fun `active term bounds imply signed and scaled arithmetic guards`() {
         for ((comparison, expected) in listOf(
             Triple(2.0, LinearOp.GE, 2.0) to true,
@@ -1613,9 +1634,10 @@ class ExactLiraSearchComponentTest {
 
     private fun partialModel(): Problem = Problem(
         numBoolVars = 2,
-        intBounds = openBounds(),
+        intBounds = openBounds(2),
         factors = arrayOf(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
         ),
     )
