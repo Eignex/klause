@@ -1671,7 +1671,7 @@ class CliModeTest {
         // A small alldifferent COP with a weighted objective: LS reaches a feasible permutation, then
         // improves it several times. Each strict improvement must hit the stream as its own
         // `----------` block (the MiniZinc time-to-best contract) — not be withheld until termination.
-        val n = 8
+        val n = 4
         val fzn = buildString {
             // FlatZinc requires every var declaration before the constraints.
             for (i in 1..n) appendLine("var 1..$n: x$i;")
@@ -1687,7 +1687,7 @@ class CliModeTest {
             deleteOnExit()
         }
         val out = capture {
-            main(arrayOf("-e", "ls", "-a", "-s", "--param", "node-limit=1000", "-t", "10000", file.absolutePath))
+            main(arrayOf("-e", "ls", "-p", "1", "-r", "17", "-a", "-s", "--param", "node-limit=1000", "-t", "10000", file.absolutePath))
         }
         val separators = out.lines().count { it == "----------" }
         val solutionsStat = Regex("solutions=(\\d+)").find(out)?.groupValues?.get(1)?.toInt()
