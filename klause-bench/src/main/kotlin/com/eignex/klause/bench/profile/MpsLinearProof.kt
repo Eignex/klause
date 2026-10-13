@@ -22,6 +22,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import java.io.File
 import java.security.MessageDigest
+import java.util.Locale
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -31,6 +32,7 @@ import kotlinx.serialization.json.put
 
 /** Capture ordinary exact MPS optimization and check its source proof with independent rational arithmetic. */
 object MpsLinearProof {
+    /** Write captures and independent checker results for the original MPS paths in [args] under `OUT`. */
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.isNotEmpty()) { "Pass original MPS paths" }
@@ -107,7 +109,7 @@ object MpsLinearProof {
     }
 
     private fun sha(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes)
-        .joinToString("") { "%02x".format(it) }
+        .joinToString("") { "%02x".format(Locale.ROOT, it) }
 
     private fun key(coordinate: SourceCoordinate): String = "${coordinate.kind}/${coordinate.id}"
 
