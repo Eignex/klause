@@ -6,10 +6,35 @@ import pathlib
 import tempfile
 import unittest
 
-from verify_objective_probe import check_record
+from verify_objective_probe import check_capture, check_record
 
 
 class ObjectiveSourceResultsTest(unittest.TestCase):
+    def test_required_capture_cannot_be_omitted_from_an_optimal_record(self):
+        payload = dict(encoding='linear', result=dict(status='Optimal'))
+
+        with self.assertRaisesRegex(AssertionError, 'required source capture is absent'):
+            check_capture(payload, True)
+
+    def test_required_native_capture_rejects_unchecked_objective_replay(self):
+        payload = dict(encoding='linear', result=dict(status='Optimal'), sourceCapture=dict(
+            captured=True, nativeCompletion=True, copiedObjectiveReplay='not checked',
+        ))
+
+        with self.assertRaisesRegex(AssertionError, 'copied original objective replay was not rejected'):
+            check_capture(payload, True)
+
+    def test_unavailable_derivation_coverage_remains_separate_from_runtime_capture(self):
+        payload = dict(encoding='linear', result=dict(status='Optimal'), sourceCapture=dict(
+            captured=True, nativeCompletion=True, copiedObjectiveReplay='foreign original objective rejected',
+            derivationCheck='unavailable', unavailableReason='branch coverage not captured',
+            exportedProof='not captured',
+        ))
+
+        outcome = check_capture(payload, True)
+
+        self.assertEqual('runtime scope and replay assertions retained; no independent proof export check', outcome)
+
     def test_boolean_integer_and_real_coordinates_keep_their_original_sorts(self):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)

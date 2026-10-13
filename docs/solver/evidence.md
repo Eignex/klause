@@ -135,7 +135,14 @@ binds capture to that actual original object and objective; an unrelated equal-s
 model or weaker invocation cannot replace it. Recapture preserves the native payload.
 Native certificate construction requires its engine identity to name the same source
 object. Invocation matching compares that object, objective, direction and explicit
-conditions; it supplies no independent derivation coverage.
+conditions; it supplies no independent derivation coverage. An affine prepared operation
+also retains its actual immutable `LinearObjective` when the executed quadratic
+view equals its lossless normalization and preserves its original direction.
+Original affine capture requires that same objective reference, source object and
+invocation conditions. Equal-shaped replacement objectives cannot recapture an old
+native completion. Incompatible quadratic views or nonfinite affine metadata
+supply no original affine binding; explicit quadratic capture retains its own
+objective identity.
 The integer, branch-completion and finite quadratic producers use these typed records.
 Their source checker must justify coordinate
 bindings and complete coverage; a flat branch list is not a traversal proof. A

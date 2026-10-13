@@ -179,6 +179,7 @@ private class OriginalSourceBinding(
     fun matches(model: Problem, original: LinearObjective): Boolean = source === model && affine === original
 
     fun matches(invocation: QuadraticEngineInvocation): Boolean =
-        objective != null && (invocation.source as? QuadraticEngineSource.ExactIr)?.problem === source &&
-            invocation.objective === objective
+        (invocation.source as? QuadraticEngineSource.ExactIr)?.problem === source &&
+            if (affine != null) invocation.affineObjective === affine
+            else objective != null && invocation.objective === objective
 }
