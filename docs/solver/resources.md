@@ -111,6 +111,8 @@ operation allowance and representation decline. A component reports a local
 operation stop through its context; beginning another operation clears that local
 cause without renewing containing allowances. The traversal retains the cause of
 unresolved branches if subsequent operations clear their local diagnostics.
+Timeout and cancellation remain classified from the active token, so a resumed
+slice does not retain a previous invocation stop as lifetime cancellation.
 Cancellation and containing work
 exhaustion take precedence over a local decline. An incomplete residual remains
 unknown and cannot prove exhaustion. Open routing maps representation decline to
