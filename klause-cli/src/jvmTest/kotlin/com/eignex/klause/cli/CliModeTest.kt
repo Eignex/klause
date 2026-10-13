@@ -94,7 +94,7 @@ class CliModeTest {
     @Test
     fun `an ordinary source rendering veto withholds its witness and terminal metadata`() {
         val source = File.createTempFile("linear-source-veto", ".smt2").apply {
-            writeText("(declare-const x Real) (assert (= x 1)) (minimize x) (check-sat)")
+            writeText("(declare-const x Real) (assert (= x 1)) (minimize 7) (check-sat)")
         }
         val common = CommonOptions().apply { engine = "fixed"; parallel = 1; presolve = "off" }
         val session = SmtLibMode.newSession()
