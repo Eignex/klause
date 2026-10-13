@@ -13,12 +13,31 @@ data class SourceEngineAttestation(
 }
 
 /** Optional immutable evidence retained by a completed solver result. */
-class SourceResultEvidence(
+class SourceResultEvidence private constructor(
     /** Original revision, assumptions, declared semantics and objective scope. */
     val scope: SourceScope,
     derivations: List<SourceEvidence>,
-    attestations: List<SourceEngineAttestation> = emptyList(),
+    attestations: List<SourceEngineAttestation>,
+    /** Invocation admitting terminal engine completion; null withholds mapped terminal authority. */
+    val engineScope: SourceScope?,
+    mappings: List<SourceMappingEvidence>,
 ) {
+    /** Capture original-scoped claims and separate engine completion labels. */
+    constructor(
+        scope: SourceScope,
+        derivations: List<SourceEvidence>,
+        attestations: List<SourceEngineAttestation> = emptyList(),
+    ) : this(scope, derivations, attestations, scope, emptyList())
+
+    private val capturedMappings = mappings.toList()
+    /** Retained reduced-source evidence and optional transformation justifications. */
+    val mappings: List<SourceMappingEvidence> get() = capturedMappings.toList()
+
+    internal fun withMappings(
+        engineScope: SourceScope?, mappings: List<SourceMappingEvidence>,
+    ): SourceResultEvidence = SourceResultEvidence(scope, capturedDerivations, capturedAttestations,
+        engineScope, capturedMappings + mappings)
+
     private val capturedDerivations = derivations.toList()
     private val capturedAttestations = attestations.toList()
     /** Captured checkable claims; unavailable capture is represented explicitly in its derivation. */

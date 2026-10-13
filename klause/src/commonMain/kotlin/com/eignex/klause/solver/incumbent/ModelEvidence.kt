@@ -82,8 +82,13 @@ internal class EvidenceCertificate private constructor(
         fun completed(
             model: ModelIdentity, kind: EvidenceKind, completion: CompletedEngineResult,
         ): EvidenceCertificate? {
-            val foreignCapture = completion.evidence?.scope?.let { it != completion.scope } == true
+            val foreignCapture = completion.evidence?.let { captured ->
+                captured.scope != completion.scope || captured.derivations.any { it.scope != completion.scope }
+            } == true
             if (!completion.attests(kind) || foreignCapture) return null
+            if (kind != EvidenceKind.Witness &&
+                completion.evidence?.let { it.engineScope != completion.scope } == true
+            ) return null
             if ((kind == EvidenceKind.Bound || kind == EvidenceKind.Unbounded) && completion.scope.objective == null) {
                 return null
             }

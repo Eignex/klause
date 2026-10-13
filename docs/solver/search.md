@@ -182,6 +182,10 @@ Cumulative edge-finding runs in both time directions over fixed durations, deman
 capacity. Reversed deductions tighten latest starts and cite the historical integer
 bounds and definitely-present task premises. Arithmetic ranges that cannot be
 represented safely decline the reversed pass.
+Window preparation owns active-task selection and checked time coordinates.
+The edge scan borrows those task, bound, energy and demand arrays for tree
+activation and bound deductions. Forward and reversed scans retain their
+historical explanation and propagation lifetimes.
 
 ### Explanation lifetime
 

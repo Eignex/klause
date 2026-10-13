@@ -1,8 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.backtrack.composedFixpoint
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -10,17 +7,16 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.portfolio.verifyRealCoordinates
-import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
@@ -31,83 +27,64 @@ internal class OpenExactNeighborhood(
     private val model: Problem,
     private val params: TheoryParams,
     private val objective: LinearObjective? = null,
-) : ExactNeighborhoodCompletion {
-    private val state = OpenTheorySolveState(params)
-    private var nativeStats = SolveStats.EMPTY
-    val exhausted: Boolean get() = !state.work.hasAllowance() ||
-        state.work.snapshot().openTheoryChecks >= params.maxLeaves
+    preparedSource: PreparedSourcePlan? = null,
+) : ExactNeighborhoodCompletion, AutoCloseable {
+    private val prepared by lazy {
+        (preparedSource ?: model.prepareExecutionPlan(objective)).prepareConditionedLinearQuery()
+    }
+    private val queries = RetainedLinearQueries(model, params, objective, hints = { stop, state ->
+        val source = prepared
+        val plan = source?.componentPlan
+        if (plan == null) SearchCandidateHints.None
+        else state.candidateHints(plan, requireNotNull(source?.model), stop)
+    }, open = ::open)
+    val exhausted: Boolean get() = queries.exhausted
+    val work: Long get() = queries.work
+    val stats: SolveStats get() = queries.stats
+
+    init {
+        require(preparedSource == null || preparedSource.belongsTo(model)) {
+            "completion preparation belongs to a different source"
+        }
+    }
+
+    private fun open(stop: Cancellation, state: OpenTheorySolveState): PlannedSearch? {
+        val source = prepared ?: return null
+        val working = requireNotNull(source.model)
+        val plan = requireNotNull(source.componentPlan)
+        return plan.search(working, plan.cpSourceDomains(working), maxChecks = params.maxLeaves,
+            cancellation = stop, learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
+            smtStats = state.smt, theorySolveStop = stop)
+    }
+
+    fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T =
+        queries.withCondition(condition, cancellation, action)
 
     override fun check(
         condition: ExactNeighborhoodCondition,
         cancellation: Cancellation,
     ): ExactNeighborhoodResult {
-        if (cancellation() || exhausted) return ExactNeighborhoodResult.Undecided
-        if (model.numBoolVars + model.numIntVars + model.numRealVars == 0) {
-            if (condition.cutoff != null && objective != null &&
-                objective.evaluateExact(Sample(booleanArrayOf(), longArrayOf())) >= condition.cutoff
-            ) return ExactNeighborhoodResult.Refuted
-            if (!state.work.theoryCheck()) return ExactNeighborhoodResult.Undecided
-            nativeStats = nativeStats.copy(openTheory = state.work.snapshot())
-            val sample = Sample(booleanArrayOf(), longArrayOf())
-            val checked = try {
-                composedFixpoint(model.bake(cancellation), Candidate(sample, Unit), cancellation)
-            } catch (_: CancellationException) {
-                return ExactNeighborhoodResult.Undecided
+        val result = queries.check(condition, cancellation)
+        if (result !is ExactNeighborhoodResult.Witness) return result
+        if ((params.timeout or params.cancellation or cancellation)()) return ExactNeighborhoodResult.Undecided
+        val sample = result.sample
+        val checked = try {
+            if (sample.exactInts?.any { !it.fitsLong() } == true || model.factors.any { it is ExactSearchRow }) {
+                verifyRealCoordinates(model, sample)
+            } else {
+                verifyOpenWitness(model, sample)
             }
-            return when (checked) {
-                is Verification.Accepted -> {
-                    sample.witnessCertificate = EvidenceCertificate.verified(
-                        ModelIdentity.of(model), EvidenceKind.Witness,
-                    )
-                    ExactNeighborhoodResult.Witness(sample)
-                }
-                is Verification.Rejected -> ExactNeighborhoodResult.Refuted
-                is Verification.Indeterminate -> ExactNeighborhoodResult.Undecided
-            }
-        }
-        val additions = ArrayList<Factor>()
-        for ((id, value) in condition.bools) additions += Clause(intArrayOf(Lit.make(id, value)))
-        fun bounds(values: Map<Int, BigFraction>, relation: LinearOp) {
-            for ((coordinate, value) in values) {
-                val ref = if (coordinate < model.numIntVars) Term.ofIntVar(coordinate)
-                else Term.ofRealVar(coordinate - model.numIntVars)
-                additions += ExactSearchRow.of(intArrayOf(ref), listOf(BigFraction.ONE), relation, value)
-            }
-        }
-        bounds(condition.lower, LinearOp.GE)
-        bounds(condition.upper, LinearOp.LE)
-        if (objective != null && condition.cutoff != null) additions += objective.below(condition.cutoff)
-        val constrained = model.withFactors(model.factors + additions,
-            model.impliedFactorMask?.let { it + BooleanArray(additions.size) })
-        val plan = constrained.componentPlan()
-        if (plan.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN ||
-            plan.theoryPipeline == ProblemPipeline.FINITE_CP
-        ) {
+        } catch (_: CancellationException) {
             return ExactNeighborhoodResult.Undecided
         }
-        val engine = OpenTheoryEngine(constrained, plan.theoryPipeline, PresolveConfig.NONE, true,
-            Cancellation.Never, null)
-        val result = engine.solve(params.copy(cancellation = params.cancellation or cancellation,
-            maxLeaves = (params.maxLeaves - state.work.snapshot().openTheoryChecks).coerceAtLeast(0)), state)
-        nativeStats = result.stats.copy(lp = nativeStats.lp.mergedWith(result.stats.lp))
-        return when (result) {
-            is OpenTheoryResult.Sat -> {
-                val sample = result.assignment.toSample(model)
-                val checked = if (sample.exactInts?.any { !it.fitsLong() } == true ||
-                    model.factors.any { it is ExactSearchRow }
-                ) {
-                    verifyRealCoordinates(model, sample)
-                } else verifyOpenWitness(model, sample)
-                when (checked) {
-                    is Verification.Accepted -> ExactNeighborhoodResult.Witness(sample)
-                    is Verification.Rejected -> ExactNeighborhoodResult.Refuted
-                    is Verification.Indeterminate -> ExactNeighborhoodResult.Undecided
-                }
-            }
-            is OpenTheoryResult.Unsat -> ExactNeighborhoodResult.Refuted
-            is OpenTheoryResult.Unknown -> ExactNeighborhoodResult.Undecided
+        if (checked !is Verification.Accepted || (params.timeout or params.cancellation or cancellation)()) {
+            return ExactNeighborhoodResult.Undecided
         }
+        sample.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(model), EvidenceKind.Witness)
+        return result
     }
+
+    override fun close() = queries.close()
 
     fun search(
         adaptive: Boolean,
@@ -120,8 +97,8 @@ internal class OpenExactNeighborhood(
             coordinateValues = { sample -> coordinates(sample) }, adaptive = adaptive, seed = seed,
             nodeBudget = params.nodeBudget, maximumMoves = minOf(maximumMoves, params.maxFlips),
             maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
-            maximumImprovementMoves = maximumImprovementMoves, nativeWork = { state.work.spent },
-            completionStats = { nativeStats })
+            maximumImprovementMoves = maximumImprovementMoves, nativeWork = { work },
+            completionStats = { stats }, onClose = ::close)
 
     private fun coordinates(sample: Sample): List<BigFraction> =
         List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } + sample.exactReals.orEmpty()

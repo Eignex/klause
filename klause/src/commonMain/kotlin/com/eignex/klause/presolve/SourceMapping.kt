@@ -26,11 +26,12 @@ internal class SourceMapping(
     val guarantees: TransformationGuarantees,
     val rebuild: SourceRebuilds = SourceRebuilds.NONE,
     val objectiveAdjustment: ObjectiveAdjustment = ObjectiveAdjustment(),
-    private val chain: List<SourceMapping> = emptyList(),
+    chain: List<SourceMapping> = emptyList(),
     val justification: SourceTransformation? = null,
     private val lift: (Sample) -> Sample = rebuild.asSampleLift() ?: { it },
 ) {
-    val stages: List<SourceMapping> get() = chain.ifEmpty { listOf(this) }
+    private val capturedChain = chain.toList()
+    val stages: List<SourceMapping> get() = capturedChain.ifEmpty { listOf(this) }.toList()
 
     val capturedJustifications: List<SourceTransformation> get() = stages.mapNotNull { it.justification }
 
