@@ -129,7 +129,7 @@ internal object QuadraticSourceProbe {
     }
 
     private fun coefficient(text: String): QuadraticCoefficient = fraction(text).let {
-        QuadraticCoefficient.of(it.numerator, it.denominator)
+        QuadraticCoefficient.of(it.num, it.den)
     }
 
     private fun exactDouble(value: BigFraction): Double = value.toDouble().also {

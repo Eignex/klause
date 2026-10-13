@@ -450,6 +450,8 @@ compares refutations with separate queries and leaves incomplete verdicts withou
 Its `python` interpreter must have the pinned `tools/requirements-source-checks.txt`
 dependencies. Checking outputs remain outside the repository; retain interpreter and
 dependency identities alongside the original inputs, producer revisions and reports.
+`preparePython=true` explicitly provisions the pinned checker environment on an owned
+Ubuntu analysis instance; its installation and runtime identity log stays under `$OUT`.
 
 Both entry points can run as committed-code lab profiles with explicit AWS host,
 one machine and one parallel command. Use the lab client with
