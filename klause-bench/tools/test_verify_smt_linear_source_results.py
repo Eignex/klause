@@ -55,6 +55,23 @@ class SmtLinearProofTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify(BOOL_SOURCE, record)
 
+    def test_branch_only_premise_cannot_supply_a_global_bound(self):
+        record = copy.deepcopy(BOOL_RECORD)
+        record["rows"]["positive"]["guards"] = {"Boolean/0": False}
+        record["proof"] = ["row", "positive"]
+        with self.assertRaises(AssertionError):
+            verify(BOOL_SOURCE, record)
+
+    def test_guarded_boolean_declaration_premise_requires_the_matching_pin(self):
+        record = copy.deepcopy(BOOL_RECORD)
+        record["rows"]["false"] = {"coefficients": {"Boolean/0": "1"}, "rhs": "0", "strict": False,
+                                     "guards": {"Boolean/0": False}}
+        record["proof"][2] = ["sum", [["1", ["row", "positive"]], ["1", ["row", "false"]]]]
+        self.assertTrue(verify(BOOL_SOURCE, record)["checked"])
+        record["proof"][3] = ["row", "false"]
+        with self.assertRaises(AssertionError):
+            verify(BOOL_SOURCE, record)
+
     def test_negative_multiplier_cannot_supply_a_bound(self):
         record = copy.deepcopy(MIN_RECORD)
         record["proof"] = ["sum", [["-1", ["row", "positive"]]]]

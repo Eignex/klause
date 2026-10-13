@@ -100,6 +100,9 @@ def parse_smt(text):
         else:
             assert command == "check-sat" and not arguments
     assert objective is not None
+    for name, sort in declarations.items():
+        if sort == "Bool":
+            rows.extend([({name: F(-1)}, F(0), False), ({name: F(1)}, F(1), False)])
     rounded = []
     for terms, bound, strict in rows:
         if terms and all(declarations[key] == "Int" for key in terms):
@@ -137,14 +140,30 @@ def verify(source, record):
     cost = clean({coordinate: number(value) for coordinate, value in record["objective"].items()})
     assert {inverse[key]: value for key, value in cost.items()} == objective
     assert number(record["constant"]) == constant and record["maximize"] == maximize
+
+    def substitute(terms, bound, pins):
+        terms = terms.copy()
+        for coordinate, pinned in pins.items():
+            bound -= terms.pop(coordinate, F(0)) * int(pinned)
+        return terms, bound
+
     rows = {}
+    guards = {}
     for row_id, row in record["rows"].items():
         terms = clean({coordinate: number(value) for coordinate, value in row["coefficients"].items()})
-        candidate = {inverse[key]: value for key, value in terms.items()}, number(row["rhs"]), row["strict"]
+        pins = row.get("guards", {})
+        assert all(declarations[inverse[key]] == "Bool" and type(value) is bool for key, value in pins.items())
+        reduced, rhs = substitute(terms, number(row["rhs"]), pins)
+        candidate = {inverse[key]: value for key, value in reduced.items()}, rhs, row["strict"]
         assert type(row["strict"]) is bool
-        assert any(implied(candidate, original) for original in source_rows + rounded) or (
-            not terms and (candidate[1] > 0 or candidate[1] == 0 and not candidate[2])), row_id
-        rows[row_id] = terms, candidate[1], candidate[2]
+        originals = []
+        for coefficients, bound, strict in source_rows + rounded:
+            original, bound = substitute(coefficients, bound, {inverse[key]: value for key, value in pins.items()})
+            originals.append((original, bound, strict))
+        assert any(implied(candidate, original) for original in originals) or (
+            not reduced and (candidate[1] > 0 or candidate[1] == 0 and not candidate[2])), row_id
+        rows[row_id] = terms, number(row["rhs"]), candidate[2]
+        guards[row_id] = pins
 
     def point_values(point, closure=False):
         assert set(point) == set(inverse)
@@ -184,12 +203,16 @@ def verify(source, record):
             steps += 1
             assert steps <= 100_000 and depth <= 128
 
-        def derive(proof, assumptions, depth):
+        def derive(proof, assumptions, bools, depth):
             step(depth)
             kind, *arguments = proof
             if kind == "row":
                 assert len(arguments) == 1
-                return rows[arguments[0]]
+                identifier = arguments[0]
+                assert all(bools.get(key) == pinned and key in bools for key, pinned in guards[identifier].items())
+                terms, bound, strict = rows[identifier]
+                terms, bound = substitute(terms, bound, bools)
+                return terms, bound, strict
             if kind == "assume":
                 coordinate, upper = arguments
                 assert type(upper) is bool
@@ -199,7 +222,7 @@ def verify(source, record):
             for weight, child in arguments[0]:
                 weight = number(weight)
                 assert weight >= 0
-                coefficients, offset, child_strict = derive(child, assumptions, depth + 1)
+                coefficients, offset, child_strict = derive(child, assumptions, bools, depth + 1)
                 terms, bound = add(terms, coefficients, weight), bound + weight * offset
                 strict |= weight > 0 and child_strict
             return terms, bound, strict
@@ -210,8 +233,8 @@ def verify(source, record):
                 _, identifier, when_false, when_true = proof
                 coordinate = f"Boolean/{identifier}"
                 assert type(identifier) is int and coordinate in inverse and coordinate not in bools
-                coverage(when_false, assumptions, bools | {coordinate}, depth + 1)
-                coverage(when_true, assumptions, bools | {coordinate}, depth + 1)
+                coverage(when_false, assumptions, {**bools, coordinate: False}, depth + 1)
+                coverage(when_true, assumptions, {**bools, coordinate: True}, depth + 1)
             elif proof[0] == "int":
                 _, coordinate, threshold, below, above = proof
                 assert declarations[inverse[coordinate]] == "Int"
@@ -220,11 +243,11 @@ def verify(source, record):
                 coverage(below, {**assumptions, (coordinate, True): ({coordinate: F(1)}, threshold, False)}, bools, depth + 1)
                 coverage(above, {**assumptions, (coordinate, False): ({coordinate: F(-1)}, -threshold - 1, False)}, bools, depth + 1)
             else:
-                terms, bound, leaf_strict = derive(proof, assumptions, depth + 1)
+                terms, bound, leaf_strict = derive(proof, assumptions, bools, depth + 1)
                 contradiction = not terms and (bound < 0 or bound == 0 and leaf_strict)
                 assert contradiction or (rhs is not None and terms == target and
                                          (bound < rhs or bound == rhs and (not strict or leaf_strict)))
-        coverage(proof, {}, set())
+        coverage(proof, {}, {})
 
     kind = record["kind"]
     if kind in {"optimal", "limit"}:
