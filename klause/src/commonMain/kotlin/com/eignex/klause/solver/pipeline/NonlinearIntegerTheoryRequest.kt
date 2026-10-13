@@ -354,7 +354,8 @@ internal class NonlinearIntegerInvocation(
             },
             exactInts = integers, algebraicReals = reals,
         ).also { sample ->
-            sample.witnessCertificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, sample))
+            val publication = CompletedEnginePublication.Witness(binding, sample, null)
+            sample.witnessCertificate = EvidenceCertificate.published(publication)
         }
     }
 
