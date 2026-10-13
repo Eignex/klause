@@ -1,20 +1,24 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class RationalTheoryDescentTest {
     @Test
@@ -77,5 +81,26 @@ class RationalTheoryDescentTest {
         }
 
         assertEquals(true, accepted)
+    }
+
+    @Test
+    fun `closing a paused descent preserves its typed partial source result`() {
+        val open = Bits(1).also { it.set(0) }
+        val source = Problem(numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf(ExactSearchRow.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
+                LinearOp.GE, BigFraction.ZERO, strict = true)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val descent = RationalTheoryDescent(source, objective, TheoryParams())
+
+        val paused = descent.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _ -> }
+        descent.close()
+
+        assertNull(paused)
+        val partial = assertNotNull(descent.linearResult)
+        assertNull(partial.terminal)
+        assertNotNull(partial.incumbent)
+        val bound = assertIs<SourceClaim.Bound>(assertNotNull(partial.bound).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ZERO), bound.value)
     }
 }

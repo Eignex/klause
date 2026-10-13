@@ -157,4 +157,23 @@ class LinearAuthorityInvocationTest {
         val bound = assertIs<SourceClaim.Bound>(assertNotNull(result?.bound).claim)
         assertEquals(SourceValue.Rational(BigFraction.ONE), bound.value)
     }
+    @Test
+    fun `closing a paused traversal retains its checked root bound and incumbent`() {
+        val source = SourceProofContext(scope, setOf(integer), mapOf("positive" to SourcePremise(
+            SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true))),
+            mapOf(integer to BigFraction.ONE))
+        val invocation = LinearAuthorityInvocation(source, TheoryParams())
+
+        val paused = invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+        invocation.close()
+        val snapshot = invocation.snapshot(TerminationReason.Cancelled)
+
+        assertNull(paused)
+        assertNull(snapshot.terminal)
+        assertNotNull(snapshot.incumbent)
+        val bound = assertIs<SourceClaim.Bound>(assertNotNull(snapshot.bound).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ZERO), bound.value)
+        assertEquals(TerminationReason.Cancelled, snapshot.reason)
+    }
+
 }

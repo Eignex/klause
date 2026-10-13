@@ -187,6 +187,27 @@ compatibility result remains `BestFound(Unsupported)` rather than an exhausted
 optimality signal. `OpenTheoryOptimum.linearResult` exposes the actual exact terminal,
 bound and incumbent separately; its scalar objective remains in minimized units.
 
+Retained linear snapshots expose only previously checked root bounds and accepted
+incumbents. Closing a paused descent retains that partial carrier without running
+another theory check or manufacturing a terminal claim. Completed results remain
+readable after closure.
+
+`LinearPortfolioTerminal` verifies the retained handle against its worker and
+consumer `EngineInvocation`, including actual plan/model/objective references,
+original and execution conditions and captured source scope. Witness-only workers
+cannot publish a global linear terminal. Missing capture withholds independent
+acceptance; foreign runtime bindings reject. The supporting source derivation is
+then checked against the consumer-owned original context. The existing portfolio
+terminal hook owns serialized publication and retirement; the linear adapter adds
+no scheduler or claim issuer. See [portfolio publication](../solver/portfolio.md).
+
+`linearWitnessVerifier` applies the existing original-context witness checker even
+when a candidate already carries an IR witness attestation. `linearValue` evaluates
+the captured affine objective using authoritative rational coordinates and wide
+integers, in original units and direction. Uncaptured objectives and uncertified
+real coordinates decline. Neither helper issues a proof certificate; a pool's
+minimized comparison value and approximate telemetry remain separate policy.
+
 ## Tolerance recovery
 
 MPS finite-leaf tolerance recovery can obtain exact dyadic basis duals to justify
