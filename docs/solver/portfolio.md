@@ -67,7 +67,10 @@ exact incumbents or justify bounds.
 
 Portfolio evidence names its source model and objective. These are opaque in-memory
 identities: a fresh or transformed model needs its own check, even if structurally
-equivalent. Copies of unchanged exact witnesses retain their source certificate;
+equivalent. Polynomial worker and neighborhood completion publications retain their actual prepared
+invocation, execution assumptions, owned point and execution objective telemetry. A native
+witness check precedes that envelope; a model/kind label cannot replace the checked point.
+Copies of unchanged exact witnesses retain their source certificate;
 coordinate changes and warm-start projections discard it. Objective changes cannot reuse
 objective bounds or unboundedness claims. Unconditional variable bounds use the model
 scope without an objective. Finite factories bind shared root channels to the containing
