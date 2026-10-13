@@ -52,6 +52,8 @@ class PreparedFactorProjections internal constructor(
     internal fun invariant(factorId: Int, domains: Array<IntDomain>?): Invariant =
         checkNotNull(scoring[factorId]) { "unsupported local-search route for factor $factorId" }.create(domains)
 
+    internal fun usesBuiltInRelaxation(factorId: Int): Boolean = relaxation[factorId]?.builtIn != false
+
     internal fun emitRelaxation(factorId: Int, builder: RelaxationBuilder, linear: LinearLpProjection?) {
         relaxation[factorId]?.emit(builder, linear)
     }
