@@ -69,7 +69,9 @@ class NValueInvariantTest {
         for (aliases in listOf(false, true)) {
             val xs = if (aliases) intArrayOf(1, 1, 2, 2) else intArrayOf(1, 2, 3, 4)
             val p = Problem(
-                1, 6, Array(6) { IntDomain(0, 2) },
+                1,
+                6,
+                Array(6) { IntDomain(0, 2) },
                 arrayOf<Factor>(
                     NValue(0, xs),
                     Linear(intArrayOf(1, -1), intArrayOf(0, 5), LinearOp.EQ, 0),
@@ -104,7 +106,9 @@ class NValueInvariantTest {
     fun `class elimination respects every member domain`() {
         for (blocked in listOf(IntDomain(0, 0), IntDomain(0, 2).excludeValue(1))) {
             val p = Problem(
-                0, 5, arrayOf(IntDomain(1, 2), IntDomain(0, 1), blocked, IntDomain(0, 1), IntDomain(1, 1)),
+                0,
+                5,
+                arrayOf(IntDomain(1, 2), IntDomain(0, 1), blocked, IntDomain(0, 1), IntDomain(1, 1)),
                 arrayOf<Factor>(NValue(0, intArrayOf(1, 2, 3, 4))),
             )
             val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
@@ -123,7 +127,9 @@ class NValueInvariantTest {
     fun `frozen members and count block coordinated elimination`() {
         for (pins in listOf(mapOf(0 to 2L), mapOf(1 to 0L, 3 to 1L))) {
             val p = Problem(
-                0, 5, Array(5) { IntDomain(0, 2) },
+                0,
+                5,
+                Array(5) { IntDomain(0, 2) },
                 arrayOf<Factor>(NValue(0, intArrayOf(1, 2, 3, 4))),
             )
             val state = LocalSearchState(LocalSearchModel.open(p), Random(3), Assumptions(ints = pins))
@@ -140,10 +146,19 @@ class NValueInvariantTest {
     @Test
     fun `absent positions do not block elimination of their present value class`() {
         val p = Problem(
-            1, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 0), IntDomain(0, 1), IntDomain(0, 1)),
-            arrayOf<Factor>(NValue(0, intArrayOf(1, 2, 3), presents = intArrayOf(
-                Lit.make(0, true), Lit.make(0, false), Lit.make(0, false),
-            ))),
+            1,
+            4,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 0), IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf<Factor>(
+                NValue(
+                    0, intArrayOf(1, 2, 3),
+                    presents = intArrayOf(
+                Lit.make(0, true),
+                Lit.make(0, false),
+                Lit.make(0, false),
+            )
+                )
+            ),
         )
         val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
         state.assignment.setBool(0, false)
@@ -164,7 +179,9 @@ class NValueInvariantTest {
     @Test
     fun `count aliases retain the final distinct count`() {
         val p = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(NValue(0, intArrayOf(0, 0, 1, 2))),
         )
         val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
@@ -186,7 +203,9 @@ class NValueInvariantTest {
     fun `inequality modes keep an admissible count after elimination`() {
         for ((mode, count) in listOf(NValue.Mode.AtLeast to 1L, NValue.Mode.AtMost to 2L)) {
             val p = Problem(
-                0, 3, Array(3) { IntDomain(0, 2) },
+                0,
+                3,
+                Array(3) { IntDomain(0, 2) },
                 arrayOf<Factor>(NValue(0, intArrayOf(1, 1, 2, 2), mode)),
             )
             val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
@@ -195,8 +214,8 @@ class NValueInvariantTest {
 
             state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
             val move = state.moveSink.list.first { candidate ->
-                candidate is Move.Compound || candidate is Move.IntSet && candidate.newValue in 0L..1L &&
-                    state.netDelta(candidate) == 0L
+                candidate is Move.Compound || (candidate is Move.IntSet && candidate.newValue in 0L..1L &&
+                    state.netDelta(candidate) == 0L)
             }
             state.apply(move)
 
@@ -208,7 +227,9 @@ class NValueInvariantTest {
     @Test
     fun `whole model scoring rejects a class merge that violates another constraint`() {
         val p = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(
                 NValue(0, intArrayOf(1, 1, 2, 2)),
                 Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.NE, 0),
@@ -230,7 +251,9 @@ class NValueInvariantTest {
     @Test
     fun `foreign ownership blocks the entire class instead of dropping a member`() {
         val p = Problem(
-            0, 5, Array(5) { IntDomain(0, 2) },
+            0,
+            5,
+            Array(5) { IntDomain(0, 2) },
             arrayOf<Factor>(NValue(0, intArrayOf(1, 2, 3, 4))),
         )
         val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
@@ -248,7 +271,9 @@ class NValueInvariantTest {
     @Test
     fun `at most elimination preserves a frozen count that remains satisfied`() {
         val p = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(NValue(0, intArrayOf(1, 1, 2, 2), NValue.Mode.AtMost)),
         )
         val state = LocalSearchState(LocalSearchModel.open(p), Random(3), Assumptions(ints = mapOf(0 to 2L)))
@@ -267,7 +292,9 @@ class NValueInvariantTest {
     @Test
     fun `class elimination declines a count excluded from the root domain`() {
         val p = Problem(
-            0, 3, arrayOf(IntDomain(0, 2).excludeValue(1), IntDomain(0, 1), IntDomain(0, 1)),
+            0,
+            3,
+            arrayOf(IntDomain(0, 2).excludeValue(1), IntDomain(0, 1), IntDomain(0, 1)),
             arrayOf<Factor>(NValue(0, intArrayOf(1, 1, 2, 2))),
         )
         val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
@@ -282,7 +309,9 @@ class NValueInvariantTest {
     @Test
     fun `class elimination declines classes exceeding the coordinate cap`() {
         val p = Problem(
-            0, 67, Array(67) { IntDomain(0, 2) },
+            0,
+            67,
+            Array(67) { IntDomain(0, 2) },
             arrayOf<Factor>(NValue(0, IntArray(66) { it + 1 })),
         )
         val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
@@ -298,7 +327,9 @@ class NValueInvariantTest {
     @Test
     fun `class elimination declines maintained coordinates in another class`() {
         val p = Problem(
-            0, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 4), IntDomain(0, 16), IntDomain(0, 4)),
+            0,
+            4,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 4), IntDomain(0, 16), IntDomain(0, 4)),
             arrayOf<Factor>(NValue(0, intArrayOf(1, 2, 3)), Product(1, 1, 2)),
         )
         val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
@@ -315,7 +346,9 @@ class NValueInvariantTest {
     @Test
     fun `class elimination reconciles wider equality channels in one feasible proposal`() {
         val p = Problem(
-            2, 5, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 2)),
+            2,
+            5,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 2)),
             arrayOf<Factor>(
                 NValue(0, intArrayOf(1, 1, 2, 2)),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
@@ -334,8 +367,9 @@ class NValueInvariantTest {
         val before = state.assignment.snapshot()
 
         state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
-        val move = state.moveSink.list.first { it is Move.Compound && Move.IntSet(0, 1) in it.parts &&
-            state.netDelta(it) == 0L
+        val move = state.moveSink.list.first {
+            it is Move.Compound && Move.IntSet(0, 1) in it.parts &&
+                state.netDelta(it) == 0L
         }
         assertEquals(before, state.assignment.snapshot())
         assertEquals(0L, state.cost)
@@ -352,9 +386,16 @@ class NValueInvariantTest {
     @Test
     fun `class elimination reconciles the combined drift of a surrounding equality`() {
         val p = Problem(
-            0, 7, arrayOf(
-                IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),
-                IntDomain(0, 2), IntDomain(0, 4),
+            0,
+            7,
+            arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 2),
+                IntDomain(0, 4),
             ),
             arrayOf<Factor>(
                 NValue(0, intArrayOf(1, 2, 3, 4)),
@@ -370,8 +411,9 @@ class NValueInvariantTest {
         val before = state.assignment.snapshot()
 
         state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
-        val move = state.moveSink.list.first { it is Move.Compound && Move.IntSet(0, 1) in it.parts &&
-            state.netDelta(it) == 0L
+        val move = state.moveSink.list.first {
+            it is Move.Compound && Move.IntSet(0, 1) in it.parts &&
+                state.netDelta(it) == 0L
         }
         assertEquals(before, state.assignment.snapshot())
         state.apply(move)

@@ -22,9 +22,13 @@ internal class NValueEliminationMoves(
         if (distinct < 2) return
         // A searched input can rewrite a maintained coordinate in another value class.
         val network = state.invariants
-        if (network != null && (network.isDefinedInt(n) || xs.any { network.isDefinedInt(it) } ||
-                presents.any { network.isDefinedBool(Lit.variable(it)) })
-        ) return
+        if (network != null && (
+            network.isDefinedInt(n) || xs.any { network.isDefinedInt(it) } ||
+                presents.any { network.isDefinedBool(Lit.variable(it)) }
+        )
+        ) {
+            return
+        }
         val targetN = countTarget(state, distinct - 1, sink) ?: return
         if (targetN != state.assignment.intValue(n) && !sink.allowsInt(n)) return
         var emitted = 0
@@ -51,8 +55,12 @@ internal class NValueEliminationMoves(
         val domain = state.rootDomains[n]
         return when (mode) {
             NValue.Mode.Eq -> distinct.toLong().takeIf { it in domain }
+
             NValue.Mode.AtLeast -> if (current <= distinct) current else domain.floorOrNull(distinct.toLong())
-            NValue.Mode.AtMost -> if (!sink.allowsInt(n) && current >= distinct) current else {
+
+            NValue.Mode.AtMost -> if (!sink.allowsInt(n) && current >= distinct) {
+                current
+            } else {
                 domain.ceilingOrNull(distinct.toLong())
             }
         }
@@ -77,12 +85,7 @@ internal class NValueEliminationMoves(
         return parts.takeIf { it.isNotEmpty() }
     }
 
-    private fun queue(
-        state: LocalSearchState,
-        parts: List<Move.IntSet>,
-        sink: MoveSink,
-        complete: Boolean,
-    ): Boolean {
+    private fun queue(state: LocalSearchState, parts: List<Move.IntSet>, sink: MoveSink, complete: Boolean): Boolean {
         val first = parts[0]
         val coordinated = ChannelingSink(first.varId, first.newValue)
         // Counter-shifts must not resurrect the removed class or change its surviving destination.
@@ -93,7 +96,12 @@ internal class NValueEliminationMoves(
             if (coordinate.varId == n) {
                 for (fid in state.projection.intOccurrences[n]) {
                     state.factors[fid].contributeChanneling(
-                        state, fid, n, state.assignment.intValue(n), coordinate.newValue, coordinated,
+                        state,
+                        fid,
+                        n,
+                        state.assignment.intValue(n),
+                        coordinate.newValue,
+                        coordinated,
                     )
                 }
             } else {
