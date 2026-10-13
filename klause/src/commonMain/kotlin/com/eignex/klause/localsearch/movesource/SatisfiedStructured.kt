@@ -19,6 +19,8 @@ import com.eignex.klause.localsearch.MoveSink
  *    ([com.eignex.klause.localsearch.ImplicitSeeding.electedImplicit]) and keep the ones not
  *    in the maintained violated set. Iterates only the small elected set, so it stays cheap while
  *    the search is still closing violations.
+ *  - [Scope.Structural]: reserve the first of [sampleCount] draws for an elected structural
+ *    global, then sample the remaining factors uniformly. An empty elected set uses ordinary sampling.
  *
  * All scopes belong to [Phase.Feasible]: structured moves only matter once the search is at
  * `cost == 0` looking for objective-improving steps.
@@ -37,6 +39,9 @@ class SatisfiedStructured private constructor(
         /** Draw a fixed number of uniformly-random factors. */
         Sampled,
 
+        /** Sample an elected structural global before ordinary factor draws. */
+        Structural,
+
         /** Walk every factor. */
         All,
 
@@ -52,9 +57,16 @@ class SatisfiedStructured private constructor(
         val total = state.problem.numFactors
         if (total == 0) return
         when (scope) {
-            Scope.Sampled -> repeat(sampleCount) {
-                val fid = state.rng.nextInt(total)
-                if (!state.violated.contains(fid)) proposeAsOwner(state, fid, sink)
+            Scope.Sampled, Scope.Structural -> {
+                val elected = if (scope == Scope.Structural && sampleCount > 0) state.seeding.electedImplicit else null
+                repeat(sampleCount) { draw ->
+                    val fid = if (draw == 0 && elected != null && elected.isNotEmpty()) {
+                        elected[state.rng.nextInt(elected.size)]
+                    } else {
+                        state.rng.nextInt(total)
+                    }
+                    if (!state.violated.contains(fid)) proposeAsOwner(state, fid, sink)
+                }
             }
 
             Scope.All -> for (fid in 0 until total) {
@@ -95,6 +107,12 @@ class SatisfiedStructured private constructor(
         fun sampled(sampleCount: Int): SatisfiedStructured {
             require(sampleCount >= 0) { "sampleCount >= 0, got $sampleCount" }
             return SatisfiedStructured(Scope.Sampled, sampleCount)
+        }
+
+        /** Sample [sampleCount] factors, reserving one draw for the elected structural set when present. */
+        fun structural(sampleCount: Int): SatisfiedStructured {
+            require(sampleCount >= 0) { "sampleCount >= 0, got $sampleCount" }
+            return SatisfiedStructured(Scope.Structural, sampleCount)
         }
 
         /** Enumerate-all variant. */

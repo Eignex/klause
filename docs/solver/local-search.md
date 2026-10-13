@@ -141,6 +141,16 @@ selection helper applies configuration and tabu filters, supplemental scoring an
 acceptance. Generation and selection keep their existing candidate order and RNG
 cadence; this boundary adds no pool copies or scratch owners.
 
+CBLS and optimizing SA reserve the first satisfied-factor draw for an elected
+structural global, then sample the remaining factors uniformly from the model.
+The total draw cap is unchanged; zero draws perform no election, and an empty
+structural set retains uniform sampling. Election uses the existing immutable
+per-state implicit factor set without seeding or claiming coordinates. Its first
+access scans the projection once within the atomic source call. Each drawn factor
+must be satisfied and proposes with its own sink owner attribution; complete move
+scoring retains feasibility and objective authority. Explicit uniform and elected
+source scopes keep their separate selection policies.
+
 ### Element results
 
 Hinted native Element results are maintained from their indexes and selected cells.
