@@ -42,10 +42,10 @@ kotlin {
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:0.3.0")
-            implementation("com.eignex:koblas:0.1.1-20261011.054003-257") {
-                version { strictly("0.1.1-20261011.054003-257") }
+            implementation("com.eignex:koblas:0.1.1-20261013.182449-263") {
+                version { strictly("0.1.1-20261013.182449-263") }
             }
-            implementation("com.eignex:kumulant:0.3.4-20260922.073440-66")
+            implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")
             implementation("com.eignex:kpermute:1.2.0")
         }
         // BigInt is java.math.BigInteger on the JVM; native has no platform big integer to map onto.
@@ -65,17 +65,17 @@ kotlin {
 dependencies {
     constraints {
         for ((module, pinned) in mapOf(
-            "jvm" to "0.1.1-20261011.054003-260",
-            "linuxx64" to "0.1.1-20261011.054003-256",
-            "linuxarm64" to "0.1.1-20261011.054003-257",
-            "macosarm64" to "0.1.1-20261011.053716-280",
+            "jvm" to "0.1.1-20261013.182449-266",
+            "linuxx64" to "0.1.1-20261013.182449-262",
+            "linuxarm64" to "0.1.1-20261013.182449-263",
+            "macosarm64" to "0.1.1-20261013.182206-286",
         )) {
             add("commonMainImplementation", "com.eignex:koblas-$module:$pinned") {
                 version { strictly(pinned) }
             }
         }
-        for ((module, build) in mapOf("jvm" to 66, "linuxx64" to 66, "linuxarm64" to 66, "macosarm64" to 65)) {
-            val pinned = "0.3.4-20260922.073440-$build"
+        for ((module, build) in mapOf("jvm" to 67, "linuxx64" to 67, "linuxarm64" to 67, "macosarm64" to 66)) {
+            val pinned = "0.3.4-20261013.194059-$build"
             add("commonMainImplementation", "com.eignex:kumulant-$module:$pinned") {
                 version { strictly(pinned) }
             }
