@@ -7,6 +7,7 @@ import java.util.Base64
 import java.util.Locale
 import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -19,21 +20,15 @@ object SourceRecordCheck {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val parts = options.keys.filter { it.startsWith("input64.") }.sorted()
-        require(parts.size <= 8 && parts.withIndex().all { (index, name) -> name == "input64.$index" }) {
-            "Inline parts must be contiguous input64.0 through input64.7"
-        }
-        require(options.keys == setOf("bundle", "sha256") || options.keys == setOf("input64", "sha256") ||
-            (parts.isNotEmpty() && options.keys == parts.toSet() + "sha256")) {
-            "Use bundle=<https URL> or base64 gzip input64 parts, with sha256=<digest>"
+        require(options.keys == setOf("bundle", "sha256") || options.keys == setOf("input64", "sha256")) {
+            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest>"
         }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val root = File(System.getProperty("klause.workspace.root", "."))
-        val encoded = options["input64"]?.let(::listOf) ?: parts.map(options::getValue)
-        val bytes = if (encoded.isNotEmpty()) {
-            require(encoded.all { it.length <= 96 * 1024 }) { "Inline part is oversized; use a URL" }
-            Base64.getDecoder().decode(encoded.joinToString(""))
-        } else {
+        val bytes = options["input64"]?.let { encoded ->
+            require(encoded.length <= 96 * 1024) { "Inline bundle is oversized; use a URL" }
+            Base64.getDecoder().decode(encoded)
+        } ?: run {
             val url = URI(requireNotNull(options["bundle"]))
             require(url.scheme == "https" && url.userInfo == null)
             val connection = url.toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
@@ -47,10 +42,18 @@ object SourceRecordCheck {
         require(bundle.keys == setOf("cases", "sources"))
         val cases = out.resolve("cases.json").apply { writeText(bundle.getValue("cases").jsonArray.toString()) }
         val sources = out.resolve("sources").apply { mkdirs() }
+        var sourceBytes = 0L
         for ((digest, encoded) in bundle.getValue("sources").jsonObject) {
             require(digest.matches(Regex("[0-9a-f]{64}")))
-            val source = Base64.getDecoder().decode(encoded.jsonPrimitive.content)
-            require(sha(source) == digest) { "Original source identity differs" }
+            val source = if (encoded is JsonObject) {
+                require(encoded.keys == setOf("gzip64")) { "Unsupported source encoding" }
+                val compressed = Base64.getDecoder().decode(encoded.getValue("gzip64").jsonPrimitive.content)
+                GZIPInputStream(compressed.inputStream()).use { it.readNBytes(64 * 1024 * 1024 + 1) }
+            } else Base64.getDecoder().decode(encoded.jsonPrimitive.content)
+            sourceBytes += source.size
+            require(sourceBytes <= 64 * 1024 * 1024 && sha(source) == digest) {
+                "Original source size or identity differs"
+            }
             sources.resolve("$digest.txt").writeBytes(source)
         }
         val log = out.resolve("checker-install.log")
