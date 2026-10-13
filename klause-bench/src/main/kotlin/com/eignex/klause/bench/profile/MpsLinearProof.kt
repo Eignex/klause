@@ -80,7 +80,7 @@ object MpsLinearProof {
             val terminal = result?.terminal
             require(!witnessOnly || terminal == null) { "Witness-only route published a terminal" }
             val claim = terminal?.claim
-            val incumbent = result?.incumbent ?: (execution.result as? OpenTheoryOptimum.Bounded)?.assignment?.let {
+            val incumbent = result?.incumbent ?: (execution.result as? OpenTheoryOptimum.Bounded)?.incumbent?.let {
                 (it as? OpenTheoryAssignment.Sampled)?.sample
             }
             val value = result?.value ?: (execution.result as? OpenTheoryOptimum.Bounded)?.value?.let {
