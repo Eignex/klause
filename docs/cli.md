@@ -90,8 +90,8 @@ are the implementation source for supported names, aliases and help text.
 SMT-LIB optimization emits `; objective=<value>` for each published incumbent in
 the source objective's direction and `; optimizationStatus=<status>` at completion.
 These comments appear without `-s`; `sat` alone does not establish optimality.
-Finite, polynomial and quadratic optimization stream accepted improvements.
-Open-theory optimization reports the returned incumbent after its invocation completes.
+Finite, open-theory, polynomial and quadratic optimization stream accepted improvements
+before their invocation completes.
 Quadratic results additionally separate the exact incumbent objective from its
 certified `objectiveBound`, direction and strictness. Unattained boundaries report
 `unattained-infimum` or `unattained-supremum` with a feasible model distinct from
@@ -141,9 +141,8 @@ retains `best-found` status.
 Solver-control flags are common to **every** mode:
 
 - `-a` / `--all-solutions`, `-n <count>` — enumeration controls (satisfy).
-- `-i` — accepted as a no-op; finite, polynomial and quadratic optimization stream
-  improvements independently of this flag. Open-theory optimization reports its
-  returned incumbent.
+- `-i` — accepted as a no-op; finite, open-theory, polynomial and quadratic
+  optimization stream improvements independently of this flag.
 - `-f` / `--free-search` — ignore the model's search annotations. Alias for `-e cp` (the free
   backtrack portfolio); with no `-f` and no `-e`, the built-in default is `mixed`,
   overridable through `klause.engine` / `KLAUSE_ENGINE`.
