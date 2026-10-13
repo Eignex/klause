@@ -393,6 +393,37 @@ cleanup while needed. After promoting useful results and checking all active
 consumers, delete obsolete release assets/tags, ended lab jobs and external copies
 under that workflow; do not retain a historical archive.
 
+### CLI stream capture
+
+`com.eignex.klause.bench.tools.CliStreamCapture` runs the installed CLI as a subprocess
+and retains original input bytes, build/runtime provenance, command, stdout, stderr,
+and a JSONL arrival record with byte offsets and subprocess liveness. Run it through
+a lab profile job on AWS. Capture settings precede `--`; the remaining arguments go
+directly to the CLI, followed by the preserved input path. Supply `input=<path>` or
+`text64=<base64 input bytes>`, `extension=smt2|fzn|mps|opb|xml`, and optional
+`timeoutMs=60000`. `marker=<whole-line regex>` counts completed output records;
+`stopAfter=2` forcibly terminates the subprocess after the second matching line while
+it is alive. Omitting `stopAfter` captures a normal completion. For example, SMT models
+end with a line matching `\)`, and FlatZinc solutions end with `----------`.
+
+`planned.json` records the requested input and settings before launch. `capture.json`
+records exit, marker count, interruption trigger, reader failure, and output hashes;
+`arrivals.jsonl` preserves all observed lines, including terminal metadata. Marker counts
+and subprocess liveness establish output timing. Independently check each retained
+witness and exact objective against the preserved original input before treating it as
+accepted arithmetic progress. This tool does not verify source semantics or proofs.
+
+[verify_stream_source_results.py](tools/verify_stream_source_results.py) checks every
+complete SMT model and its preceding exact cost against one original optimization
+query, using the existing exact polynomial source checker. It requires strict
+improvement in the original direction and rejects duplicate final publication.
+Run `python3 klause-bench/tools/verify_stream_source_results.py input.smt2 stdout`
+with the pinned [source-check requirements](tools/requirements-source-checks.txt).
+For a hard interruption, add `--interrupted --minimum-witnesses 2`; incomplete trailing
+output is retained as truncation, while a terminal optimization status is rejected.
+These checks establish witness feasibility and objective values; they do not certify
+terminal proof claims.
+
 ### SMT reference records
 
 `solve-one backend=reference solver=z3` sends original SMT-LIB directly to Z3,
