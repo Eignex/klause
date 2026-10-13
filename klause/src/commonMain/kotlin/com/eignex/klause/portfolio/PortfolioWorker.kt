@@ -71,7 +71,6 @@ class PortfolioWorker private constructor(
 
     internal var evidenceModel: ModelIdentity? = null
         private set
-    private var certificates: (EvidenceKind) -> EvidenceCertificate? = { null }
     private var provesSourceResults = true
     internal val permitsSourceProofs: Boolean get() = provesSourceResults
     internal var evidenceScope: SourceScope? = null
@@ -118,10 +117,7 @@ class PortfolioWorker private constructor(
         require(evidenceModel?.matches(model) != false) { "worker cannot change its model or objective" }
         evidenceModel = model
         provesSourceResults = provesSourceResults && provesResults
-        certificates = { kind -> if (provesSourceResults) EvidenceCertificate.verified(model, kind) else null }
     }
-
-    internal fun certificateFor(kind: EvidenceKind): EvidenceCertificate? = certificates(kind)
 
     /**
      * Open a fresh pause/resume handle over this worker's optimisation, or `null` when the engine

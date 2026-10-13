@@ -69,16 +69,6 @@ internal class PortfolioEvidence(
     fun proof(
         worker: PortfolioWorker,
         kind: EvidenceKind,
-        sample: Sample? = null,
-        value: Double? = null,
-    ): Verification<Unit, Unit> {
-        val identity = worker.evidenceModel ?: return Verification.Indeterminate("worker has no model identity")
-        return proof(identity, worker.certificateFor(kind), kind, sample, value)
-    }
-
-    fun proof(
-        worker: PortfolioWorker,
-        kind: EvidenceKind,
         completion: CompletedEngineResult,
     ): Verification<Unit, Unit> {
         val runtime = invocation
