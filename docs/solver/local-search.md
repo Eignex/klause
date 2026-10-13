@@ -296,7 +296,9 @@ its category choice. Per-worker cursors advance the task pairs. Domains, pins an
 protect both choices, channels and durations, and the complete move is scored across
 destination resources. Start-time repairs skip absent tasks and tasks with zero duration
 or demand; present positive-footprint tasks retain neighboring and sampled targets
-outside the maximum peak. The ordinary scorer grades every affected factor; removing a
+outside the maximum peak. Per-task target emission borrows the current root domain,
+peak coordinates and move sink; neighboring, enumerated and random targets retain
+their order. The ordinary scorer grades every affected factor; removing a
 footprint does not establish that the complete assignment is feasible.
 
 ### Move ranking and plateau feedback
