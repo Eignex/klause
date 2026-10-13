@@ -95,20 +95,8 @@ class LinearSourceSemanticsChecker(
         if (sample.numRealVars > 0 && sample.exactReals == null && sample.algebraicReals == null) {
             return SourceEvidenceCheck.Unavailable("real witness lacks exact coordinates")
         }
-        if (scope.condition.bools.any { (id, value) ->
-                id !in 0 until sample.numBoolVars || sample.boolValue(id) != value
-            }
-        ) return SourceEvidenceCheck.Rejected("witness disagrees with invocation Boolean pins")
-        for ((id, value) in scope.condition.lower) {
-            if (id !in coordinates || algebraic.compare(at(sample, id, algebraic), algebraic.rational(value)) < 0) {
-                return SourceEvidenceCheck.Rejected("witness violates an invocation lower bound")
-            }
-        }
-        for ((id, value) in scope.condition.upper) {
-            if (id !in coordinates || algebraic.compare(at(sample, id, algebraic), algebraic.rational(value)) > 0) {
-                return SourceEvidenceCheck.Rejected("witness violates an invocation upper bound")
-            }
-        }
+        val condition = scope.condition.checkWitness(sample, algebraic)
+        if (condition != SourceEvidenceCheck.Checked) return condition
         for (premise in premises) {
             algebraic.arithmetic.step()
             if (!active(premise, sample)) continue
