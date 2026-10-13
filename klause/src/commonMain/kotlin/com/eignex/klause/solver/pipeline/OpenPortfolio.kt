@@ -167,7 +167,8 @@ internal class OpenPortfolio(
         val localSearch = localSearchFactories(firstLocalArm, stop, objective)
         val incumbents = sourceValues.incumbents()
         val identity = ModelIdentity.of(sourceModel, objective)
-        val binding = EngineInvocation(preparedPlan, identity, objective, scope = context?.scope)
+        val binding = EngineInvocation(preparedPlan, identity, objective,
+            scope = context?.scope, condition = context?.scope?.condition)
         val linear = context?.let {
             OpenLinearPortfolioResults(
                 binding,
