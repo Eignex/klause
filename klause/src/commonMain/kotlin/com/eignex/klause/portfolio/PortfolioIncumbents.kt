@@ -65,7 +65,9 @@ internal class PortfolioIncumbents<V>(
             return PortfolioIncumbents(
                 valueOf = { lock.withLock { checked { valueOf(it) } } },
                 improves = { candidate, standing -> lock.withLock {
-                    checked { arithmetic.compare(exactValue(candidate), exactValue(standing)) }?.let { it < 0 } == true
+                    checked {
+                        arithmetic.compare(exactValue(candidate), exactValue(standing))
+                    }?.let { it < 0 } == true
                 } },
                 approximateValue = { item ->
                     val value = exactValue(item)
