@@ -871,7 +871,7 @@ class Portfolio(
             val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
             if (unproductiveTrial) {
-                trialSegments[arm]++
+                if (claim.preparing || work > 0L) trialSegments[arm]++
                 if (!claim.preparing && work > 0L) trialSearchSegments[arm]++
             }
             if (!unproductiveTrial) {
