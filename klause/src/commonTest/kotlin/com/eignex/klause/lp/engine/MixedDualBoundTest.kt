@@ -11,6 +11,22 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `subnormal rational cutoffs retain exact integral fixing and wide arithmetic charges`() {
+        val source = LpBuilder().apply {
+            addVar(0L, 10L, cost = 1L)
+            addRealVar(0.0, 1.0, cost = 1.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf()))
+        val ordinary = assertNotNull(BigFraction.ofDouble(0.5))
+        val subnormal = assertNotNull(BigFraction.ofDouble(Double.MIN_VALUE))
+
+        assertEquals(0L, certificate.fixStepsAtCutoff(0, subnormal, 0L))
+        assertNull(certificate.fixStepsAtCutoff(1, subnormal, 0L))
+        assertTrue(certificate.rationalFixingWork(0, subnormal) > certificate.rationalFixingWork(0, ordinary))
+    }
+
+    @Test
     fun `mixed certificates use fractional continuous endpoints without rounding the objective`() {
         val source = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)

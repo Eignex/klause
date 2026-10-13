@@ -12,6 +12,12 @@ internal interface LpDeductionCertificate {
     fun objectiveBoundCeil(extraConstant: Long): Long?
     fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean
     fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long?
+    fun rationalFixingWork(col: Int, cutoff: BigFraction): Long {
+        val bits = maxOf(Long.SIZE_BITS, exactBits(listOf(cutoff, exactObjectiveBound(), exactReducedCost(col))))
+        val words = (bits.toLong() + Long.SIZE_BITS - 1L) / Long.SIZE_BITS
+        return 12L * words * words
+    }
+
     fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? {
         val reduced = exactReducedCost(col)
         if (reduced.isZero) return null
