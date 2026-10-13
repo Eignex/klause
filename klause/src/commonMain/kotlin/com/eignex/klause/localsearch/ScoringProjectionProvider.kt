@@ -53,7 +53,7 @@ object BuiltInScoringProjectionProvider : ScoringProjectionProvider {
     internal fun create(factor: Factor, domains: Array<IntDomain>?): Invariant {
         val capabilities = factor.defaultExecutionCapabilities()
         check(capabilities.scoring != ScoringCapability.UNSUPPORTED) {
-            "unsupported scoring route for ${factor::class.simpleName}"
+            "unsupported local-search route for ${factor::class.simpleName}"
         }
         return factor.buildInvariantProjection(domains).also {
             check((it === NoInvariant) == (capabilities.scoring == ScoringCapability.INERT)) {

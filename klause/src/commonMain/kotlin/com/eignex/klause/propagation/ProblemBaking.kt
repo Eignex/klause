@@ -47,7 +47,12 @@ private fun Problem.bakeSelected(
     cancellation: Cancellation,
     selection: PreparedFactorProjections?,
 ): BakedProblem {
-    if (this is BakedProblem && selection == null && (providers == null || projectionProviders === providers)) return this
+    if (this is BakedProblem) {
+        if (selection == null && (providers == null || projectionProviders === providers)) return this
+        if ((selection != null && selection === factorProjections) ||
+            (projectionProviders == null && providers === FactorProjectionProviders.Default)
+        ) return this
+    }
     return BakedProblem(
         settings = this.settings,
         numBoolVars = numBoolVars,

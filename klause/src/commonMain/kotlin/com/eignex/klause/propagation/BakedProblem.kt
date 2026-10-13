@@ -194,6 +194,8 @@ class BakedProblem private constructor(
         cancellation: Cancellation = Cancellation.Never,
         alreadyFolded: Boolean = false,
         settings: ProblemSettings = ProblemSettings(),
+        projectionProviders: FactorProjectionProviders? = null,
+        projectionSelection: ((Problem) -> PreparedFactorProjections)? = null,
     ) : this(
         settings = settings,
         numBoolVars = numBoolVars,
@@ -213,5 +215,7 @@ class BakedProblem private constructor(
         modelBounds = modelBounds,
         cancellation = cancellation,
         alreadyFolded = alreadyFolded,
+        projectionProviders = projectionProviders,
+        projectionSelection = projectionSelection,
     )
 }

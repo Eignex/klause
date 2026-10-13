@@ -126,7 +126,9 @@ sets use separate state storage, leaving reversible payloads intact; each fire c
 its previous failure, and undo discards pending failure context. The native SAT lane
 keeps its own state and leaves general CP failure storage unallocated.
 
-`FactorExecutionCapabilities` inventories each built-in family's execution routes.
+Prepared capability summaries read the selected projection descriptors. Built-in
+providers declare their existing execution routes; replacements supply their own
+filtering, scoring and check roles.
 `SOUND_FILTERING`, `BOUNDS_FILTERING` and `DOMAIN_FILTERING` describe deduction
 mechanisms; they do not promise full consistency at every size or resource limit.
 AllDifferent filtering selects its cached incremental path before the full matching

@@ -230,3 +230,12 @@ factor, so source variable ids cannot leak into compact CP storage. Source rewri
 select fresh descriptors; objective overlays retain prior selections and select only
 the appended factor. `bake(selection)` keeps the captured choice through finite
 root construction instead of invoking selectors again.
+
+`prepareExecutionPlan(providers, ...)` captures immutable projection descriptors on
+its canonical model. Component ownership and admission read that capture, including
+shared clauses whose heuristic score belongs to the finite invocation. Complete
+traversal requires an exact propagation or installed source check; scoring availability
+is a separate heuristic requirement. Inert finite deduction can use the original exact
+point checker, while missing checks remain declined. Objective and conditioned plans
+retain the capture. Compact CP and polynomial finite views bind those descriptors to
+their own factor coordinates; source factor rewrites select against rewritten data.

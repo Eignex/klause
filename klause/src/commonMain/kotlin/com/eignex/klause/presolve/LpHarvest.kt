@@ -292,6 +292,10 @@ fun lpHarvestReporting(
             // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
             packedOpenIntLo = problem.intBounds.openLowerBits,
             packedOpenIntHi = problem.intBounds.openUpperBits,
+            projectionProviders = problem.projectionProviders,
+            projectionSelection = problem.factorProjections?.let { captured ->
+                { view -> captured.forEngineView(view) }
+            },
         ),
         bakeConfig,
     )

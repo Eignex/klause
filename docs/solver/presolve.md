@@ -181,3 +181,11 @@ Composition retains each stage's justification in order; declared transformation
 guarantees do not provide independent proof coverage. Original-source witness
 checking remains required after reconstruction. See [derivation checking](evidence.md)
 for verified affine projection and objective-adjustment conditions.
+
+Finite preparation forwards its captured projection selection into the deferred root
+bake. Domain-only rebuilds retain descriptors; changed factor sets select providers
+against the rewritten model. Fresh and incremental presolve views preserve the same
+invocation provider bundle. Mid-life factors use that bundle for their private
+propagators. A materialized contradiction carries its known infeasibility even when
+selected deduction is inert. These mechanisms do not change pass ordering, source
+mappings or the guarantee required for a reduction.
