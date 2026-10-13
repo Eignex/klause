@@ -13,8 +13,8 @@ internal data class OpenIncumbentValue(val source: BigFraction, val execution: B
 
 internal class OpenSourceObjective(
     private val execution: LinearObjective,
-    private val original: LinearObjective = execution,
-    private val maximize: Boolean = false,
+    val original: LinearObjective = execution,
+    val maximize: Boolean = false,
     val context: SourceProofContext? = null,
 ) {
     fun value(sample: Sample): OpenIncumbentValue? {

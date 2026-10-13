@@ -54,7 +54,7 @@ class SourceIncumbentPublicationTest {
         val observed = mutableListOf<SourceIncumbentPublication>()
 
         val result = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.searchWithoutTheory(model,
-            TheoryParams(openWorkLimit = 1000, maxFlips = 2), objective, FiniteEngine.LOCAL_SEARCH, 1,
+            TheoryParams(openWorkLimit = 1000, maxFlips = 12), objective, FiniteEngine.LOCAL_SEARCH, 1,
             maximize = true, onAccepted = observed::add))
 
         val receipt = assertNotNull(result.acceptedIncumbent)
