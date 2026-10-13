@@ -61,7 +61,9 @@ orders source terms before registration. Unsupported source kinds, coefficient g
 term/bit limits and registry capacity decline without installing a partial pair.
 Retraction and restart preserve immutable atom meanings and Boolean names. Positive
 scalar multiples remain distinct. The linear adapter alone converts these predicates
-to LP rows and checks source ids against its source model. Deprecated linear-package
+to LP rows and checks source ids against its source model. Retained linear queries
+and LP cut-premise naming consume the neutral predicates; legacy registered payloads
+resolve through the same canonical meaning. Deprecated linear-package
 constructors share canonical equality and names through `SourceBoundPredicate`; they
 retain compatibility payload access when they create the first registration. Neither
 an atom nor its registration establishes multi-component witness agreement.
