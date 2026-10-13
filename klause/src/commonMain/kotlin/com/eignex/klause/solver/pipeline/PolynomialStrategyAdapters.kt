@@ -70,7 +70,7 @@ internal class PolynomialStrategyAdapters(
         val factories = families.mapIndexed { arm, family ->
             PortfolioArmFactory(plan, arm, family) { slot ->
                 PolynomialWorkerAdapter(model, scope.worker(slot), workerParams(slot), scope.workerCancellation(slot))
-                    .worker(arm, objective, slot).bindEvidence(identity, provesResults = arm == 0)
+                    .worker(arm, objective, slot)
             }
         }
         return PortfolioInvocation(plan, factories,
