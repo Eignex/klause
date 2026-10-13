@@ -24,7 +24,7 @@ import kotlin.test.assertIs
 class QuadraticPortfolioInvocationTest {
     @Test
     fun `conditional source refutation cannot finish a weaker quadratic invocation`() {
-        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(Lit.make(0, true))))
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
         val objective = QuadraticObjectiveSpec(emptyList())
         val plan = source.preparePolynomialExecutionPlan().withObjective(objective)
         val identity = ModelIdentity.of(source, objective)
