@@ -546,7 +546,9 @@ eliminates an exact objective auxiliary, and validates nonnegative dual combinat
 integer branch coverage or an integral improving recession step. Unsupported source features
 and missing derivations fail closed. This checks mathematical claims rather than timings.
 The self-authored inputs in `smoke-corpus/linear-authority` cover a constant objective,
-a coupled integral/real ray and an objective coefficient beyond binary64 precision.
+a coupled integral/real ray, an objective coefficient beyond binary64 precision and
+an integer gap requiring exhaustive split coverage. Separate incumbent/value and
+global-bound derivations retain their own checks; a ray base need not be the incumbent.
 
 ```sh
 lab profile com.eignex.klause.bench.profile.MpsLinearProof <ref> "check exact MPS claims" aws 900 \
@@ -558,6 +560,12 @@ lab profile com.eignex.klause.bench.profile.MpsLinearProof <ref> "check exact MP
 The profile output retains original bytes/hashes, claim captures, checker results, installed
 jar hashes and runtime/options. Keep the lab's executed commit and setup provenance with
 those files. A failed checker or incomplete profile supplies no validated terminal claim.
+Leading options select the real public route: `--engine=cp|fixed|mixed|ls|alns`,
+`--cores=N`, `--checks=N`, `--work=N` and `--timeout=MS`. Defaults are cp, one core,
+1000 checks, 2000000 work and 3000 ms per input. Complete routes must return typed
+linear authority; witness-only routes must withhold terminal claims. For example,
+`--checks=1` on `integer-gap.mps` checks an incomplete invocation's independently
+certified global bound. These are explicit profile controls, separate from lab scheduling.
 
 [verify_source_results.py](tools/verify_source_results.py) checks `mps-core`,
 `smtlib-core`, `miplib3` and the SMT corpus suites `smtlib-qfidl`, `smtlib-qflia`,
