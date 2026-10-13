@@ -27,6 +27,7 @@ internal class OpenLinearPortfolioResults(
     private val values: OpenSourceObjective,
     private val incumbents: PortfolioIncumbents<OpenIncumbentValue>,
     private val cancellation: Cancellation,
+    private val timeout: Cancellation = Cancellation.Never,
 ) : PortfolioTerminalCheck {
     private data class Accepted(val result: LinearOptimizationResult, val rayValue: BigFraction?)
     private val accepted = AtomicReference<Accepted?>(null)
@@ -68,9 +69,11 @@ internal class OpenLinearPortfolioResults(
         val terminal = accepted.load()
         val pooled = incumbents.exchange.current()
         val bound = strongestBound()
-        val reason = terminal?.result?.reason ?: when (result) {
-            is MinimizeResult.BestFound -> result.reason
-            is MinimizeResult.Unknown -> result.reason
+        val reason = terminal?.result?.reason ?: when {
+            timeout() -> TerminationReason.Timeout
+            cancellation() -> TerminationReason.Cancelled
+            result is MinimizeResult.BestFound -> result.reason
+            result is MinimizeResult.Unknown -> result.reason
             else -> TerminationReason.BudgetExhausted
         }
         val authority = LinearOptimizationResult(original.scope, terminal?.result?.terminal, bound,

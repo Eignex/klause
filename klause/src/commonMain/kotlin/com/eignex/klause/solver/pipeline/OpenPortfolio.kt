@@ -147,7 +147,7 @@ internal class OpenPortfolio(
         val identity = ModelIdentity.of(sourceModel, objective)
         val binding = EngineInvocation(preparedPlan, identity, objective, scope = context?.scope)
         val linear = context?.let { OpenLinearPortfolioResults(binding, it, sourceValues, incumbents,
-            stop) }
+            stop, theoryParams.timeout) }
         val factories = buildList {
             integral?.let { source -> add(PortfolioArmFactory(preparedPlan, 0, ArmFamily.Backtrack) { slot ->
                 descentWorker(source, slot) {
@@ -180,9 +180,9 @@ internal class OpenPortfolio(
         val evidence = PortfolioEvidence(identity, verifier).bindInvocation(binding, stop)
         val profile = ProblemProfile.of(model, optimizing = true)
         val share = if (integral != null || rational) DESCENT_SHARE else 0.0
-        val portfolio = PortfolioInvocation(preparedPlan, boundFactories,
-            PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = stop,
-                nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0), evidence) { workers ->
+        val controls = PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = stop,
+            nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0)
+        val portfolio = PortfolioInvocation(preparedPlan, boundFactories, controls, evidence) { workers ->
             PortfolioInvocationPolicy(profile, reservedShares(workers, share))
         }
         val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents,
