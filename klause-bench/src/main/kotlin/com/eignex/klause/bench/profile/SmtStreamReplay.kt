@@ -15,7 +15,7 @@ internal object SmtStreamReplay {
     fun main(args: Array<String>) {
         require(args.size == 1) { "Supply a base64 JSON array of captured SMT records" }
         val bytes = Base64.getDecoder().decode(args.single())
-        val records = Json.decodeFromString<List<CapturedSmtRecord>>(bytes.toString(Charsets.UTF_8))
+        val records = Json.decodeFromString<List<CapturedStreamRecord>>(bytes.toString(Charsets.UTF_8))
         require(records.isNotEmpty())
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         File(output, "records.json").writeBytes(bytes)
@@ -37,7 +37,7 @@ internal object SmtStreamReplay {
 }
 
 @Serializable
-private data class CapturedSmtRecord(
+internal data class CapturedStreamRecord(
     val sourceRevision: String,
     val source: String,
     val stdout: String,
@@ -48,4 +48,4 @@ private data class CapturedSmtRecord(
 )
 
 @Serializable
-private data class ReplayFailure(val error: String)
+internal data class ReplayFailure(val error: String)
