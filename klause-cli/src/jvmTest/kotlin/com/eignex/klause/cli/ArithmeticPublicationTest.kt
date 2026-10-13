@@ -21,10 +21,10 @@ class ArithmeticPublicationTest {
         }
         val publication = ArithmeticPublication(output)
         val first = object : SourceValue.Extension {}
-        val final = object : SourceValue.Extension {}
+        val equivalent = object : SourceValue.Extension {}
 
         publication.publish("first source representation", first, acceptedVersion = 1L)
-        publication.publish("equivalent final representation", final, acceptedVersion = 1L)
+        publication.publish("equivalent final representation", equivalent, acceptedVersion = 1L)
 
         assertEquals(1, emitted)
         assertEquals(1L, publication.solutions)
