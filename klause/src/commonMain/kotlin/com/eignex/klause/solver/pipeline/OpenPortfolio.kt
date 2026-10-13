@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.lp.relaxation.lpSeed
 import com.eignex.klause.portfolio.ArmFamily
+import com.eignex.klause.portfolio.AcceptedPortfolioIncumbent
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioEvidence
@@ -182,12 +183,13 @@ internal class OpenPortfolio(
         val share = if (integral != null || rational) DESCENT_SHARE else 0.0
         val controls = PortfolioInvocationControls(parallelism = lanes, seed = seed, cancellation = stop,
             nodeBudget = theoryParams.nodeBudget, reseedStaleThreshold = 0)
-        val portfolio = PortfolioInvocation(preparedPlan, boundFactories, controls, evidence) { workers ->
-            PortfolioInvocationPolicy(profile, reservedShares(workers, share))
+        fun policy(arms: List<PortfolioWorker>) = PortfolioInvocationPolicy(profile, reservedShares(arms, share))
+        val portfolio = PortfolioInvocation(preparedPlan, boundFactories, controls, evidence, policy = ::policy)
+        fun accept(point: AcceptedPortfolioIncumbent<OpenIncumbentValue>) {
+            publication?.accepted(point.assignment, SourceValue.Rational(point.objective.source), point.version)
         }
-        val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents,
-            terminalCheck = linear, onAccepted = { accepted -> publication?.accepted(accepted.assignment,
-                SourceValue.Rational(accepted.objective.source), accepted.version) }) }
+        fun run(invocation: PortfolioInvocation) = invocation.minimize(cancellation, null, incumbents, linear, ::accept)
+        val result = portfolio.use(::run)
         return linear?.fold(result) ?: optimumOf(result, incumbents)
     }
 
