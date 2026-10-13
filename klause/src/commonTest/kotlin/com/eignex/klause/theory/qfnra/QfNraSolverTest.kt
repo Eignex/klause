@@ -107,7 +107,9 @@ class QfNraSolverTest {
             (assert (and (> x 2) (< x 3) (> y 1) (< (* y y) 2)))
             (check-sat)
         """.trimIndent())
-        val completed = assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, source.boolCount, source.realCount))
+        val completed = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount,
+        ))
         val limit = completed.stats.workSpent - 1
         var spent = 0L
         val cancellation = object : Cancellation {
