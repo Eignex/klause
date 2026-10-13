@@ -638,6 +638,9 @@ original constraints. MPS points must cover every column with integral integer
 coordinates; missing, duplicate, unknown and nonfinite coordinates fail checking.
 For a complete SMT witness, the verifier pins every declared source variable and
 requires SAT under the original constraints; this also establishes source feasibility.
+Complete exact MPS witnesses establish source feasibility by direct row evaluation;
+absent or inexact witnesses retain the unpinned source query. Optimality and
+infeasibility still require their independent source queries.
 Witness pins enter an incremental scope only when later optimality queries need
 the original unpinned constraints.
 SMT records without a witness retain an unpinned source feasibility query. Query
