@@ -10606,6 +10606,7 @@ public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParam
 }
 
 public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest {
+	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public final fun getProblem ()Lcom/eignex/klause/ir/NonlinearIntegerProblem;
 }
 

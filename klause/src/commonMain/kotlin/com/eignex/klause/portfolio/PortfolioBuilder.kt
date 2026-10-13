@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.InvariantNetworkPreparation
@@ -19,14 +20,9 @@ import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
 
 /**
- * Materialises the arms a [PortfolioScenario] composes to into runnable [PortfolioWorker]s — the
- * single construction path every portfolio flows through, whatever the scenario (threads × kind ×
- * engine). The *policy* (which arms, ordering, mixed split) lives in [PortfolioComposition]; the
- * per-arm construction (which solver, objective form, bound / warm-start seam) lives in each
- * [WorkerConfig.materialize]. This builder is the thin glue: `compose` → `map { it.materialize(…) }`,
- * with no engine-specific switch.
- *
- * The returned [PortfolioWorker] list is what a [Portfolio] schedules, on one lane per core of the scenario.
+ * Supplies finite recipes and shared immutable preparation to source portfolio construction.
+ * [PortfolioComposition] selects arms; each [WorkerConfig.materialize] creates its private engine state.
+ * [build] and [buildExplicit] retain the low-level worker-list API for caller-controlled execution.
  */
 object PortfolioBuilder {
     /**
@@ -52,41 +48,47 @@ object PortfolioBuilder {
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
         profile: ProblemProfile = ProblemProfile.of(problem, scenario.kind == Kind.COP),
     ): List<PortfolioWorker> {
-        val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective)
-        val plan = PortfolioComposition.plan(scenario, facts)
-        val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
-        val composed = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
-        // Expand the composed arms to one entry per lane. A lane is a worker slot; a parallel track
-        // wants one per core, the sequential track one per arm — so laneCount is maxOf(arms, cores).
-        // When arms >= cores (every existing scenario) this is a no-op cycle that returns the composed
-        // list verbatim, so the built workers are byte-identical. Only arms < cores grows the list,
-        // cycling the composed arms so the extra lanes are seed-diversified replicas: materialize feeds
-        // each lane's index as its per-worker seed offset, exactly as diverse() wraps past the pool onto
-        // fresh seeds, so a replica of a config gets a distinct seed.
-        val laneCount = maxOf(composed.size, scenario.cores)
-        val quotas = if (scenario.cores > 1) scenario.nodeBudget?.quotas(laneCount) else null
-        val lanes = List(laneCount) { index ->
-            val config = composed[index % composed.size]
-            quotas?.let { config.withNodeBudget(it[index]) } ?: config
+        val factories = factories(problem, scenario, objective, lsObjective, definitionalSweep, onEvent, profile)
+        val count = maxOf(factories.size, scenario.cores)
+        val quotas = if (scenario.cores > 1) scenario.nodeBudget?.quotas(count) else null
+        return List(count) { index ->
+            factories[index % factories.size].materialize(
+                index, scenario.seed, quotas?.get(index) ?: scenario.nodeBudget,
+            )
         }
-        // Lane i is a replica of composed arm i % composed.size, so that is its stable arm identity:
-        // replicas of one config share an armId, distinct composed arms get distinct ones.
-        val armIds = List(laneCount) { it % composed.size }
-        return materialize(
-            problem,
-            lanes,
-            armIds,
-            scenario.seed,
-            scenario.lsLambda,
-            objective,
-            lsObjective,
-            definitionalSweep,
-            onEvent,
-            pools = poolsFor(
-                scenario, problem, definitionalSweep, objective,
-                clausePeers = lanes.count { it is BacktrackWorkerConfig } > 1,
-            ),
-        ).onEach { it.improvementOnly = it.armId >= plan.firstSolutionCount }
+    }
+
+    internal fun factories(
+        problem: BakedProblem,
+        scenario: PortfolioScenario,
+        objective: LinearObjective?,
+        lsObjective: IncrementalObjective?,
+        definitionalSweep: DefinitionalSweep?,
+        onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+        profile: ProblemProfile,
+    ): List<FinitePortfolioFactory> {
+        val plan = PortfolioComposition.plan(scenario, ProblemFacts.of(problem, profile, scenario.lpCeiling, objective))
+        val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
+        val configs = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
+        val count = maxOf(configs.size, scenario.cores)
+        val pools = poolsFor(scenario, problem, definitionalSweep, objective,
+            clausePeers = (0 until count).count { configs[it % configs.size] is BacktrackWorkerConfig } > 1)
+        return configs.mapIndexed { armId, config ->
+            val family = when (config) {
+                is BacktrackWorkerConfig -> ArmFamily.Backtrack
+                is LocalSearchWorkerConfig -> ArmFamily.LocalSearch
+                is AlnsWorkerConfig -> ArmFamily.Lns
+            }
+            FinitePortfolioFactory(armId, family) { index, seed, budget ->
+                val bounded = budget?.let(config::withNodeBudget) ?: config
+                bounded.materialize(
+                    problem, index, armId, seed, scenario.lsLambda, objective, lsObjective,
+                    definitionalSweep, onEvent, pools,
+                ).bindEvidence(ModelIdentity.of(problem, objective)).also {
+                    it.improvementOnly = armId >= plan.firstSolutionCount
+                }
+            }
+        }
     }
 
     /**
@@ -207,4 +209,12 @@ object PortfolioBuilder {
             identity = identity,
         )
     }
+}
+
+internal class FinitePortfolioFactory(
+    val armId: Int,
+    val family: ArmFamily,
+    private val create: (Int, Long, NodeBudget?) -> PortfolioWorker,
+) {
+    fun materialize(index: Int, seed: Long, nodeBudget: NodeBudget?): PortfolioWorker = create(index, seed, nodeBudget)
 }

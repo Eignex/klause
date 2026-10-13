@@ -516,7 +516,7 @@ supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
 [verify_nra_source_results.py](tools/verify_nra_source_results.py) independently
 checks complete named Int/Real/Bool models against an original polynomial SMT source.
 It reconstructs rational coordinates and `root-obj` algebraic coordinates using the
-pinned Z3 dependency, substitutes every source variable, and requires every
+pinned Z3 dependency, pins every source variable, and requires every
 original assertion and Boolean query assumption to evaluate exactly to true.
 Algebraic coordinates use integer defining polynomials and one-based distinct
 ordered real-root indices. Approximate decimal coordinates do not establish exact
@@ -530,6 +530,14 @@ python3 klause-bench/tools/verify_nra_source_results.py original.smt2 --expected
 ```
 
 `--witness` uses exact ground algebraic evaluation without a solver search query.
+All declared Int, Real and Bool coordinates, including unused ones, must occur in
+the supplied model. The checker registers those exact values once in an explicit
+model and evaluates every original assertion with model completion disabled.
+It rejects a false or unevaluated assertion at its original index; it does not
+invent missing coordinates. Source S-expressions are rendered iteratively to
+preserve their tokens and spacing at deep nesting. Assertions containing a zero
+power retain exact substitution and simplification, so undefined `0^0` cannot
+receive an arbitrary model value.
 `--expected` separately compares a bounded reference verdict and records
 `proofCertificateChecked=false`; agreement does not constitute proof-certificate
 validation. Query timeout or a reference disagreement fails the comparison. Output

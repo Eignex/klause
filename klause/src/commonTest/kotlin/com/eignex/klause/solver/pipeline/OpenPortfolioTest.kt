@@ -37,6 +37,33 @@ class OpenPortfolioTest {
     private fun optimum(execution: OpenTheoryExecution) = assertIs<OpenTheoryExecution.Optimize>(execution).result
 
     @Test
+    fun `completion retains original identity beside a bound narrowed execution model`() {
+        val original = openColumns(1, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7))
+        val working = Problem(numBoolVars = 0, factors = original.factors,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0),
+                Bits(1), Bits(1).also { it.set(0) }))
+        val plan = working.prepareExecutionPlan(original, objective = null, maximize = false, preferFinite = false)
+        val request = OpenTheoryRequest(working, componentPlan = requireNotNull(plan.componentPlan),
+            preparedPlan = plan)
+
+        val result = satisfied(OpenTheoryPipeline.executePortfolio(request, params(), cores = 4))
+
+        assertEquals("7", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(0))
+    }
+
+    @Test
+    fun `open construction materializes private replicas for requested lanes beyond its recipe count`() {
+        val model = openColumns(1, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7))
+        val request = OpenTheoryRequest(model, componentPlan = model.componentPlan())
+
+        val result = satisfied(OpenTheoryPipeline.executePortfolio(request, params(), cores = 8))
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals("7", witness.assignment.intValue(0))
+        assertEquals(8, witness.stats.portfolio.arms.size)
+    }
+
+    @Test
     fun `local search finds a witness of an open model no theory decides`() {
         // x0 = 3, x1 = 4 and x2 = x0·x1 over open columns: the product holds no theory.
         val model = openColumns(

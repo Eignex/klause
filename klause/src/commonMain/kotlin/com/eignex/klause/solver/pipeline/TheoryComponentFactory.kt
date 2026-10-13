@@ -19,8 +19,13 @@ internal fun ComponentPlan.theoryComponent(
     spec: Problem,
     smtStats: SmtStatsSink? = null,
     theorySolveStop: Cancellation? = null,
+): TheoryComponent? = openTheoryComponent(theoryFragment(spec), smtStats, theorySolveStop)
+
+internal fun ComponentPlan.openTheoryComponent(
+    fragment: Problem,
+    smtStats: SmtStatsSink? = null,
+    theorySolveStop: Cancellation? = null,
 ): TheoryComponent? {
-    val fragment = theoryFragment(spec)
     return when (theoryPipeline) {
         ProblemPipeline.DIFFERENCE_THEORY -> DifferenceSearchComponent.withRootBounds(
             fragment,

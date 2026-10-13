@@ -185,6 +185,7 @@ enum class FiniteSolveVerdict {
 internal class FiniteExecutionRequest(
     /** Prepared finite model to solve. */
     val problem: BakedProblem,
+    val preparedPlan: PreparedSourcePlan,
     /** Finite engine route selected by the frontend. */
     val engine: FiniteEngine,
     /** Whether to minimize [objective]. */
@@ -363,6 +364,7 @@ internal fun FinitePipeline.solve(
     val execution = execute(
         FiniteExecutionRequest(
             problem = preparation.executableProblem(),
+            preparedPlan = request.shape.preparedPlan,
             engine = request.engine,
             optimize = request.shape.optimize,
             objective = preparation.objective,
@@ -703,6 +705,8 @@ private fun executePortfolio(
         definitionalSweep = request.definitionalSweep,
         onEvent = request.onPortfolioEvent,
         onFault = request.onPortfolioFault,
+        preparedPlan = request.preparedPlan,
+        cancellation = request.cancellation,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

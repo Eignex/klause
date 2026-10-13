@@ -5,33 +5,63 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.stream.lock
 
-internal class QuadraticNativeScope(private val params: PolynomialTheoryParams) {
+internal class QuadraticNativeScope private constructor(
+    private val params: PolynomialTheoryParams,
+    private val ledger: Ledger,
+    private val root: QuadraticNativeScope?,
+    private val maximumWorkerWork: Long?,
+) {
+    constructor(params: PolynomialTheoryParams) : this(params, Ledger(), null, null)
+
     private val stop = params.timeout or params.cancellation
     private var polynomialWork = 0L
     private var quadraticWork = 0L
     private var projected = 0L
     private var lifted = 0L
-    var resource: PolynomialTheoryResource? = null
-        private set
-
-    val work: Long get() = sum(polynomialWork, quadraticWork)
-    val numericalWork: Long get() = quadraticWork
-    val polynomialStats: PolynomialTheoryStats get() = PolynomialTheoryStats(projected, lifted, polynomialWork)
-    val exhausted: Boolean get() = params.maximumWork?.let { work >= it } == true
-    val stopped: Boolean get() = exhausted || resource != null || stop()
+    private val workers = mutableMapOf<Int, QuadraticNativeScope>()
+    private var representationDecline: PolynomialTheoryResource? = null
+    val resource: PolynomialTheoryResource? get() = ledger.lock.withLock { representationDecline }
+    val work: Long get() = ledger.lock.withLock {
+        if (root == null) ledger.work else sum(polynomialWork, quadraticWork)
+    }
+    val numericalWork: Long get() = ledger.lock.withLock {
+        if (root == null) ledger.quadraticWork else quadraticWork
+    }
+    val polynomialStats: PolynomialTheoryStats get() = ledger.lock.withLock {
+        if (root == null) PolynomialTheoryStats(ledger.projected, ledger.lifted, ledger.polynomialWork)
+        else PolynomialTheoryStats(projected, lifted, polynomialWork)
+    }
+    val exhausted: Boolean get() = ledger.lock.withLock {
+        params.maximumWork?.let { ledger.work >= it } == true ||
+            maximumWorkerWork?.let { sum(polynomialWork, quadraticWork) >= it } == true
+    }
+    val stopped: Boolean get() = exhausted || resource != null || root?.resource != null || stop()
     val polynomial: Cancellation = Token(quadratic = false)
     val numerical: Cancellation = Token(quadratic = true)
 
-    fun phaseCancellation(worker: Cancellation, share: Double): Cancellation = (polynomial or worker).shorten(share)
+    init { require(maximumWorkerWork == null || maximumWorkerWork >= 0) }
 
-    fun observe(stats: QfNraStats) {
-        projected = sum(projected, stats.projectedPolynomials)
-        lifted = sum(lifted, stats.liftedCells)
+    fun worker(slotId: Int, maximumWork: Long? = null): QuadraticNativeScope = ledger.lock.withLock {
+        require(root == null && slotId >= 0) { "native workers belong to their containing scope" }
+        val worker = workers.getOrPut(slotId) { QuadraticNativeScope(params, ledger, this, maximumWork) }
+        require(worker.maximumWorkerWork == maximumWork) { "worker native quota cannot change" }
+        worker
     }
 
-    fun decline(resource: PolynomialResource) {
-        this.resource = when (resource) {
+    fun phaseCancellation(worker: Cancellation, share: Double): Cancellation = (polynomial or worker).shorten(share)
+
+    fun observe(stats: QfNraStats) = ledger.lock.withLock {
+        projected = sum(projected, stats.projectedPolynomials)
+        lifted = sum(lifted, stats.liftedCells)
+        ledger.projected = sum(ledger.projected, stats.projectedPolynomials)
+        ledger.lifted = sum(ledger.lifted, stats.liftedCells)
+    }
+
+    fun decline(resource: PolynomialResource) = ledger.lock.withLock {
+        representationDecline = when (resource) {
             PolynomialResource.DENSE_COEFFICIENTS -> PolynomialTheoryResource.DenseCoefficients
             PolynomialResource.MATRIX_CELLS -> PolynomialTheoryResource.MatrixCells
             PolynomialResource.DEGREE_OVERFLOW -> PolynomialTheoryResource.DegreeOverflow
@@ -50,11 +80,27 @@ internal class QuadraticNativeScope(private val params: PolynomialTheoryParams) 
         override fun workMeter(): WorkMeter = this
         override fun charge(units: Long) {
             require(units >= 0)
-            if (quadratic) quadraticWork = sum(quadraticWork, units)
-            else polynomialWork = sum(polynomialWork, units)
+            ledger.lock.withLock {
+                if (quadratic) {
+                    quadraticWork = sum(quadraticWork, units)
+                    ledger.quadraticWork = sum(ledger.quadraticWork, units)
+                } else {
+                    polynomialWork = sum(polynomialWork, units)
+                    ledger.polynomialWork = sum(ledger.polynomialWork, units)
+                }
+            }
             stop.charge(units)
         }
     }
 
-    private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
+    private class Ledger {
+        val lock = Concurrency.Strict.lock()
+        var polynomialWork = 0L
+        var quadraticWork = 0L
+        var projected = 0L
+        var lifted = 0L
+        val work: Long get() = sum(polynomialWork, quadraticWork)
+    }
 }
+
+private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)

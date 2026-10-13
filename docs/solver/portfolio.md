@@ -9,6 +9,18 @@ Execution has three parts: prepare retained workers, give them bounded slices, a
 verify their publications before sharing or returning them. Slices preserve state;
 reseeding or retiring a worker has its own lifetime and accounting rules.
 
+Finite and linear open source execution supply retained recipe factories to
+`PortfolioInvocation` with the routing plan and current executable projection. The invocation owns worker
+slots, seed offsets, parallel node quotas, scheduler controls, result verification
+and cleanup. Composed arm attribution remains distinct from materialized replica
+slots. Recipes retain their source-specific pools and reservations; mutable source
+services registered with a slot close when the invocation releases that slot.
+Open factories allocate private completion and walk state per slot, including
+replicas. Native reservations divide the complete family's allowance across its
+materialized slots. Complete-only invocations divide the whole native allowance
+among their admitted slots.
+Heuristic-only factories carry witness authority.
+
 The [solver vision](../vision.md#shared-model-breadth) requires an available
 complete-search/local-search pair for every supported model. Current admission gaps
 remain implementation limits. [Sessions](sessions.md) owns assumptions;

@@ -12,7 +12,27 @@ from verify_source_results import expressions, number, rational, smt_variables, 
 
 
 def sexpr(expression):
-    return expression if isinstance(expression, str) else '(' + ' '.join(map(sexpr, expression)) + ')'
+    if isinstance(expression, str):
+        return expression
+    parts = ['(']
+    pending = [(iter(expression), True)]
+    while pending:
+        iterator, first = pending[-1]
+        try:
+            item = next(iterator)
+        except StopIteration:
+            parts.append(')')
+            pending.pop()
+            continue
+        if not first:
+            parts.append(' ')
+        pending[-1] = (iterator, False)
+        if isinstance(item, str):
+            parts.append(item)
+        else:
+            parts.append('(')
+            pending.append((iter(item), True))
+    return ''.join(parts)
 
 
 def root_polynomial(expression):
@@ -138,12 +158,43 @@ def witness_values(witness, variables):
     return values
 
 
+def contains_zero_power(expression, cache):
+    pending = [(expression, False)]
+    while pending:
+        node, expanded = pending.pop()
+        identity = node.get_id()
+        if identity in cache:
+            continue
+        children = node.children()
+        if not expanded:
+            pending.append((node, True))
+            pending.extend((child, False) for child in children)
+            continue
+        zero_power = False
+        if node.decl().kind() == z3.Z3_OP_POWER:
+            exponent = z3.simplify(node.arg(1))
+            zero_power = (z3.is_int_value(exponent) and exponent.as_long() == 0) or \
+                (z3.is_rational_value(exponent) and exponent.as_fraction() == 0)
+        cache[identity] = zero_power or any(cache[child.get_id()] for child in children)
+    return cache[expression.get_id()]
+
+
 def check_witness(text, witness):
     variables, constraints = source_formula(text)
     values = witness_values(witness, variables)
-    replacements = [(variable, values[name]) for name, variable in variables.items()]
+    model = z3.Model()
+    for name, variable in variables.items():
+        model.update_value(variable, values[name])
+    zero_power_cache = {}
+    replacements = None
     for index, constraint in enumerate(constraints):
-        evaluated = z3.simplify(z3.substitute(constraint, *replacements))
+        if contains_zero_power(constraint, zero_power_cache):
+            # Model evaluation supplies a default for undefined zero powers even without completion.
+            if replacements is None:
+                replacements = [(variable, values[name]) for name, variable in variables.items()]
+            evaluated = z3.simplify(z3.substitute(constraint, *replacements))
+        else:
+            evaluated = z3.simplify(model.eval(constraint, model_completion=False))
         assert not z3.is_false(evaluated), f'original source assertion {index} is false'
         assert z3.is_true(evaluated), f'original source assertion {index} did not evaluate exactly'
     return {'sourceSha256': hashlib.sha256(text.encode('utf-8')).hexdigest(),

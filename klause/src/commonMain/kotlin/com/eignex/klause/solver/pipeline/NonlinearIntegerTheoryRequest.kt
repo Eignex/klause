@@ -31,7 +31,10 @@ import kotlin.time.TimeSource
 class NonlinearIntegerTheoryRequest internal constructor(
     /** Original declarations and exact polynomial source formula. */
     val problem: NonlinearIntegerProblem,
-)
+) {
+    /** Shared immutable source ownership and exact declaration-to-numeric mapping. */
+    val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan()
+}
 
 /** Select sound incomplete integer search with exact continuous completion. */
 fun NonlinearIntegerProblem.pipelineRequest(): NonlinearIntegerTheoryRequest = NonlinearIntegerTheoryRequest(this)
@@ -58,13 +61,15 @@ fun OpenTheoryPipeline.execute(
     request: NonlinearIntegerTheoryRequest,
     params: NonlinearIntegerTheoryParams = NonlinearIntegerTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
-): PolynomialTheoryExecution = NonlinearIntegerInvocation(request.problem, params, engine).execute()
+): PolynomialTheoryExecution = NonlinearIntegerInvocation(request, params, engine).execute()
 
 private class NonlinearIntegerInvocation(
-    private val source: NonlinearIntegerProblem,
+    request: NonlinearIntegerTheoryRequest,
     private val params: NonlinearIntegerTheoryParams,
     private val engine: FiniteEngine,
 ) : ExactNeighborhoodCompletion {
+    private val source = request.problem
+    private val plan = request.preparedPlan
     private val polynomial = params.polynomial
     private val nodeBudget = params.nodeBudget ?: polynomial.strategy.backtrack.nodeBudget
         ?: polynomial.strategy.localSearch.nodeBudget
@@ -84,7 +89,7 @@ private class NonlinearIntegerInvocation(
         require(assumptions.deductions.isEmpty) { "nonlinear source assumptions require explicit pins" }
         val fixed = assumptions.ints.map { (id, value) ->
             require(id in source.integerCoordinates.indices) { "nonlinear integer assumption id out of range" }
-            source.integerCoordinates[id] to BigFraction.ofLong(value)
+            plan.integerCoordinate(id) to BigFraction.ofLong(value)
         }.toMap()
         return PolynomialCondition(assumptions.bools, fixed, fixed)
     }
@@ -161,7 +166,7 @@ private class NonlinearIntegerInvocation(
         require(condition.cutoff == null) { "nonlinear integer satisfaction has no objective cutoff" }
         fun remap(values: Map<Int, BigFraction>): Map<Int, BigFraction> = values.mapKeys { (id, _) ->
             require(id in source.integerCoordinates.indices) { "nonlinear neighborhood coordinate out of range" }
-            source.integerCoordinates[id]
+            plan.integerCoordinate(id)
         }
         fun intersect(
             bounds: Map<Int, BigFraction>, fixed: Map<Int, BigFraction>, lower: Boolean,
@@ -241,8 +246,10 @@ private class NonlinearIntegerInvocation(
     }
 
     private fun sample(assignment: QfNraAssignment): Sample {
-        val integers = source.integerCoordinates.map { requireNotNull(assignment.realValue(it).rational).num }
-        val reals = source.realCoordinates.map(assignment::realValue)
+        val integers = (0 until plan.sourceIntCount).map {
+            requireNotNull(assignment.realValue(plan.integerCoordinate(it)).rational).num
+        }
+        val reals = (0 until plan.sourceRealCount).map { assignment.realValue(plan.realCoordinate(it)) }
         return Sample(
             assignment.bools,
             if (integers.all { it.fitsLong() }) {
