@@ -15,16 +15,17 @@ internal class SourceQuadraticResultCapture(
 ) {
     fun capture(result: QuadraticOptimizationResult): QuadraticOptimizationResult {
         val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.incumbent
-        val claim = when (result) {
-            is QuadraticOptimizationResult.Optimal -> SourceClaim.Optimal(result.incumbent.sample,
-                SourceValue.Algebraic(result.incumbent.value))
-            is QuadraticOptimizationResult.UnattainedLimit -> SourceClaim.Limit(result.incumbent.sample,
-                SourceValue.Algebraic(result.bound.value))
-            is QuadraticOptimizationResult.Unbounded -> SourceClaim.Unbounded(result.incumbent.sample)
-            is QuadraticOptimizationResult.Infeasible -> SourceClaim.Refutation
-            is QuadraticOptimizationResult.BestFound -> SourceClaim.Witness(result.incumbent.sample)
-            is QuadraticOptimizationResult.Unknown -> null
-        }
+        val claim: SourceClaim? = if (result is QuadraticOptimizationResult.Optimal) {
+            SourceClaim.Optimal(result.incumbent.sample, SourceValue.Algebraic(result.incumbent.value))
+        } else if (result is QuadraticOptimizationResult.UnattainedLimit) {
+            SourceClaim.Limit(result.incumbent.sample, SourceValue.Algebraic(result.bound.value))
+        } else if (result is QuadraticOptimizationResult.Unbounded) {
+            SourceClaim.Unbounded(result.incumbent.sample)
+        } else if (result is QuadraticOptimizationResult.Infeasible) {
+            SourceClaim.Refutation
+        } else if (result is QuadraticOptimizationResult.BestFound) {
+            SourceClaim.Witness(result.incumbent.sample)
+        } else null
         val proof = derivation ?: when {
             claim is SourceClaim.Witness -> SourceDerivation.SourceWitness
             claim is SourceClaim.Optimal && boundDerivation != null ->
