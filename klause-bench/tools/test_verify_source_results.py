@@ -208,6 +208,21 @@ class ProofCheckTest(unittest.TestCase):
             with self.subTest(suite=suite), self.assertRaisesRegex(ValueError, '--source-root'):
                 proof_check.check([self.case(suite=suite)])
 
+    def test_mps_corpus_sources_require_hash_matched_original_bytes(self):
+        data = self.mps_source.encode('latin-1')
+        digest = hashlib.sha256(data).hexdigest()
+        for suite in sorted(proof_check.MPS_CORPUS_SUITES):
+            with self.subTest(suite=suite), tempfile.TemporaryDirectory() as directory:
+                root = pathlib.Path(directory)
+                case = self.case(suite=suite, sourceHashes={'model': digest})
+                with self.assertRaisesRegex(ValueError, '--source-root'):
+                    proof_check.source(case, [])
+                (root / (digest + '.txt')).write_bytes(data)
+                self.assertEqual(self.mps_source, proof_check.source(case, [], root))
+                (root / (digest + '.txt')).write_bytes(data + b'\n')
+                with self.assertRaisesRegex(AssertionError, 'source hash differs'):
+                    proof_check.source(case, [], root)
+
     def test_hash_named_corpus_source_bytes_must_match_the_record(self):
         data = b'(declare-const x Int) (assert (= x 1))'
         digest = hashlib.sha256(data).hexdigest()
