@@ -285,7 +285,8 @@ object ProjectionProviderProfile {
         val uncheckable = BacktrackSolver(Problem(1, 0, emptyArray(), arrayOf<Factor>(structural)).bake(inert))
             .solve(params)
         check(uncheckable is SolveResult.Unknown) { "uncheckable source produced a terminal claim" }
-        val row = Linear(doubleArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 1.5)
+        val row = Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(), realVars = intArrayOf(0),
+            realCoeffs = doubleArrayOf(1.0), op = LinearOp.GE, bound = 1.5)
         val realSource = Problem(0, 0, emptyArray(), arrayOf<Factor>(row), numRealVars = 1,
             realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(2.5))
         val realControls = buildJsonArray {
