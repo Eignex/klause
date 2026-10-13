@@ -42,7 +42,9 @@ class LpSourceEvidenceCaptureTest {
         }.build(Sense.MINIMIZE)
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf()))
-        val bound = CertifiedLpBound(certificate.exactObjectiveBound(), dualMultipliers = certificate.exactMultipliers())
+        val bound = CertifiedLpBound(
+            certificate.exactObjectiveBound(), dualMultipliers = certificate.exactMultipliers(),
+        )
         val original = context(0L, 10L)
         val premises = original.premises + mapOf(
             "real lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), quarter.negated())),

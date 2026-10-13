@@ -202,13 +202,6 @@ internal class IntegerCertificate(
     override fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean =
         gapNumerator(improvingMax, sourceConstant).isNonNegative()
 
-    /**
-     * Max integer steps column [col] may move from its reduced-cost-minimizing endpoint before it pushes the objective
-     * past [improvingMax]: `⌊ (improvingMax − sourceConstant − objective) / |reducedCost| ⌋`.
-     * Sound for any duals because `sourceObjective = sourceConstant + y·rhs + Σₖ rcₖzₖ` and every
-     * other box term is `≥ 0`, so `|rcⱼ|·Δⱼ ≤ improvingMax − sourceConstant − objective`.
-     * Null on a zero reduced cost or on overflow (the caller then skips the fix, which is sound).
-     */
     override fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? {
         if (authority?.model?.column(col)?.integral == false) return null
         val integer = ExactLpNumber.of(cutoff).exactLong()
@@ -219,6 +212,13 @@ internal class IntegerCertificate(
         }
     }
 
+    /**
+     * Max integer steps column [col] may move from its reduced-cost-minimizing endpoint before it pushes the objective
+     * past [improvingMax]: `⌊ (improvingMax − sourceConstant − objective) / |reducedCost| ⌋`.
+     * Sound for any duals because `sourceObjective = sourceConstant + y·rhs + Σₖ rcₖzₖ` and every
+     * other box term is `≥ 0`, so `|rcⱼ|·Δⱼ ≤ improvingMax − sourceConstant − objective`.
+     * Null on a zero reduced cost or on overflow (the caller then skips the fix, which is sound).
+     */
     override fun fixSteps(col: Int, improvingMax: Long, sourceConstant: Long): Long? {
         if (authority?.model?.column(col)?.integral == false) return null
         val dj = reduced[col]
