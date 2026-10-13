@@ -351,6 +351,12 @@ def check(cases, source_root=None, progress=None, witness_only=False):
             assert record["feasible"] is True and record.get("finalWitness") is not None, \
                 "witness-only checking requires a reported feasible witness"
         exact = exact_mode(case)
+        tolerance_optimum = record.get("stats", {}).get("optimizationStatus") == "tolerance-optimum"
+        if tolerance_optimum:
+            assert case["problem"]["suite"] not in SMT_SUITES and not exact, \
+                "tolerance optimum requires default MPS semantics"
+            assert record["feasible"] is True and record["proven"] and record["kind"] == "optimize", \
+                "tolerance optimum has inconsistent result fields"
         reported_objective = record.get("exactObjective")
         if reported_objective is None:
             reported_objective = record.get("objective")
@@ -360,7 +366,7 @@ def check(cases, source_root=None, progress=None, witness_only=False):
         text = sources[source_key]
         key = (record["sourceHashes"]["model"], record["kind"], record["feasible"], str(reported_objective),
                record.get("exactObjective") is not None, record["proven"], record.get("maximize"),
-               record.get("finalWitness"), exact)
+               record.get("finalWitness"), exact, tolerance_optimum)
         if key in cache:
             results.append({"index": case["index"], "check": cache[key]})
             if progress is not None:
@@ -435,7 +441,9 @@ def check(cases, source_root=None, progress=None, witness_only=False):
                         assert accepted, "MPS point exceeds source tolerance"
                     if not exact_feasible:
                         require_verdict(solver, z3.sat, record["problem"], 'source feasibility')
-                if record["proven"] and record["kind"] == "optimize" and not witness_only:
+                if tolerance_optimum:
+                    result["toleranceOptimalityCheck"] = "unavailable: native tolerance certificate not captured"
+                elif record["proven"] and record["kind"] == "optimize" and not witness_only:
                     assert reported_objective is not None and objective is not None
                     value = rational(reported_objective)
                     if maximize:

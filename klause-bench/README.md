@@ -893,6 +893,10 @@ Claimed SAT/UNSAT require matching exact source verdicts. A proven finite optimu
 needs a feasible source objective and exclusion of every strictly better objective;
 tolerance acceptance cannot justify either optimum or infeasibility. Unknown
 records make no proof claim. Unbounded claims and unsupported constructs decline.
+An explicit default-MPS `tolerance-optimum` retains its source point, objective
+and scaled-tolerance checks separately. It receives no exact-source optimality
+credit; native tolerance-certificate verification is unavailable from saved records.
+This marker cannot weaken exact-mode or SMT checking.
 Unsupported MPS sections/bounds, distinct RHS/range/bound vectors and SMT
 function/sort declarations are rejected rather than guessed. The verifier is
 independent of paired timing analysis and Klause's internal certificates.
