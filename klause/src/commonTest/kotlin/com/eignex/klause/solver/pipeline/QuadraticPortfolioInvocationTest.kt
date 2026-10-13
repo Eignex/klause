@@ -5,6 +5,13 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.ir.QuadraticVariable
+import com.eignex.klause.ir.QuadraticCoefficient
+import com.eignex.klause.ir.QuadraticObjectiveTerm
+import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
@@ -20,6 +27,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 
 class QuadraticPortfolioInvocationTest {
     @Test
@@ -135,5 +143,51 @@ class QuadraticPortfolioInvocationTest {
         assertIs<QuadraticOptimizationResult.Unknown>(result)
         assertEquals(1, entered)
         assertEquals(1L, result.stats.portfolio.arms.single().faults)
+    }
+
+    @Test
+    fun `a ray certificate retains its private witness without republishing it over the accepted incumbent`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), x)))
+        val terminal = assertIs<QuadraticOptimizationResult.Unbounded>(OpenTheoryPipeline.minimize(
+            source.pipelineRequest(), objective, engine = FiniteEngine.BACKTRACK).result)
+        val arithmetic = AlgebraicArithmetic()
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
+            algebraicReals = listOf(arithmetic.rational(BigFraction.ofLong(2))))
+        point.witnessCertificate = terminal.incumbent.sample.witnessCertificate
+        val plan = source.preparePolynomialExecutionPlan().withObjective(objective)
+        val identity = ModelIdentity.of(source, objective)
+        val params = PolynomialTheoryParams()
+        val observer = QuadraticPublicationObserver(null)
+
+        val result = QuadraticPortfolioInvocation(plan, objective, ObjectiveSense.MINIMIZE, params,
+            QuadraticNativeScope(params), FiniteEngine.BACKTRACK, 1, Assumptions.None)
+            .execute(onAccepted = { observer.accepted(it.objective, it.version) }) { arm, _, _, _ ->
+                PortfolioWorker.ofMinimize("complete", arm, resumable = {
+                    object : QuadraticPortfolioSearch {
+                        private var done = false
+                        override val completion: QuadraticOptimizationResult? get() = if (done) terminal else null
+                        override val isDone: Boolean get() = done
+                        override val stats: SolveStats get() = SolveStats.EMPTY
+                        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                            onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult {
+                            onIncumbent(MinimizeResult.BestFound(point, -2.0, TerminationReason.BudgetExhausted))
+                            done = true
+                            return MinimizeResult.BestFound(terminal.incumbent.sample, 0.0,
+                                TerminationReason.BudgetExhausted)
+                        }
+                    }
+                }) { _, _, _, _ -> error("fixture runs by slice") }.bindEvidence(identity)
+            }
+        val execution = QuadraticOptimizationExecution(result, PolynomialTheoryStats(), 0, 0).also {
+            it.retainPublication(observer.latest)
+        }
+
+        assertSame(point, execution.acceptedIncumbent?.incumbent?.sample)
+        assertEquals(BigFraction.ofLong(-2), execution.acceptedIncumbent?.incumbent?.value?.rational)
+        assertSame(terminal.incumbent.sample, assertIs<QuadraticOptimizationResult.Unbounded>(result).incumbent.sample)
+        assertEquals(1L, execution.acceptedIncumbent?.version)
     }
 }

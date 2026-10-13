@@ -170,7 +170,8 @@ internal class QuadraticWorkerAdapter(
                 val stop = native.polynomial or params.strategy.localSearch.cancellation or global
                 val segment = stop or if (sliceMillis == Long.MAX_VALUE) Cancellation.Never
                     else Cancellation.after(sliceMillis.milliseconds)
-                val done = cursor.advance(segment, if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions)
+                val done = cursor.advance(segment,
+                    if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions, global)
                 if (done || stop()) terminal = partial()
             }
             override fun close() = this@QuadraticWorkerAdapter.close()

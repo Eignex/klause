@@ -21,7 +21,10 @@ data class QuadraticOptimizationExecution(
     val resource: PolynomialTheoryResource? = null,
 ) {
     private var retainedPublication: QuadraticIncumbentPublication? = null
-    /** Accepted publication retained by the final incumbent, when it was installed in the exchange. */
+    /**
+     * Latest accepted source publication. Render this incumbent before the terminal marker when present;
+     * a limit or ray certificate can retain a different private witness that is not a new improvement.
+     */
     val acceptedIncumbent: QuadraticIncumbentPublication? get() = retainedPublication
 
     internal fun retainPublication(publication: QuadraticIncumbentPublication?) {
@@ -86,6 +89,6 @@ fun OpenTheoryPipeline.minimize(
             if (result is QuadraticOptimizationResult.Unknown || result is QuadraticOptimizationResult.BestFound) {
                 native.declinedResource
             } else native.resource,
-        ).also { it.retainPublication(publication.matching(result)) }
+        ).also { it.retainPublication(publication.latest) }
     }
 }

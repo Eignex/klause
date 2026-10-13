@@ -58,12 +58,15 @@ internal class QuadraticNeighborhoodCursor(
 
     init { require(coordinates >= 0) }
 
-    fun advance(segment: Cancellation, instructions: Long): Boolean {
+    fun advance(
+        segment: Cancellation, instructions: Long, invocation: Cancellation = Cancellation.Never,
+    ): Boolean {
         require(instructions >= 0)
         check(!closed) { "quadratic neighborhood cursor is closed" }
         if (isDone) return true
         val start = allowance.instructions
-        while (!segment() && !lifetime() && !isDone && allowance.instructions - start < instructions) {
+        val stop = lifetime or invocation
+        while (!segment() && !stop() && !isDone && allowance.instructions - start < instructions) {
             val operator = if (!adaptive) 0 else random.nextInt(weights.size).let { draw ->
                 if (random.nextDouble() < weights[draw] / requireNotNull(weights.maxOrNull())) draw else 2
             }
@@ -78,7 +81,7 @@ internal class QuadraticNeighborhoodCursor(
             val condition = propose(released, radius, random)
             // A repair and its accepted witness form one atomic segment operation.
             val result = try {
-                completion.check(condition, lifetime)
+                completion.check(condition, stop)
             } finally {
                 allowance.charge((nativeWork() - before).coerceAtLeast(0))
             }

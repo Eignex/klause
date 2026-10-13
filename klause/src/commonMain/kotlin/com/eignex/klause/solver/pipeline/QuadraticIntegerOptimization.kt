@@ -152,7 +152,7 @@ fun OpenTheoryPipeline.minimize(
             if (result is QuadraticOptimizationResult.Unknown || result is QuadraticOptimizationResult.BestFound) {
                 native.declinedResource
             } else native.resource,
-        ).also { it.retainPublication(publication.matching(result)) }
+        ).also { it.retainPublication(publication.latest) }
     }
 }
 
@@ -345,7 +345,8 @@ internal class QuadraticIntegerOptimization(
                 val stop = native.polynomial or controls.strategy.localSearch.cancellation or global
                 val segment = stop or if (sliceMillis == Long.MAX_VALUE) Cancellation.Never
                     else Cancellation.after(sliceMillis.milliseconds)
-                val done = cursor.advance(segment, if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions)
+                val done = cursor.advance(segment,
+                    if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions, global)
                 if (done || stop()) terminal = partial()
             }
             override fun close() = this@QuadraticIntegerOptimization.close()
