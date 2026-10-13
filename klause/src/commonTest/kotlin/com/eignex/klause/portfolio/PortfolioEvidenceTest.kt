@@ -185,6 +185,53 @@ class PortfolioEvidenceTest {
     }
 
     @Test
+    fun `model binding without a runtime invocation cannot prove infeasibility`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val model = ModelIdentity.of(source)
+        val worker = PortfolioWorker.ofSolve("unbound", 0) { _, _ -> SolveResult.Unsat() }.bindEvidence(model)
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.solve() }
+
+        assertIs<SolveResult.Unknown>(result)
+        assertEquals(0L, result.stats.portfolio.arms.single().faults)
+    }
+
+    @Test
+    fun `model binding without a runtime invocation retains only an optimization witness`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val model = ModelIdentity.of(source, objective)
+        val point = Sample(booleanArrayOf(), longArrayOf(2))
+        val worker = PortfolioWorker.ofMinimize("unbound", 0) { _, _, _, _ ->
+            sequenceOf(MinimizeResult.Optimal(point, 2.0))
+        }.bindEvidence(model)
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.minimize() }
+
+        assertEquals(point, assertIs<MinimizeResult.BestFound>(result).sample)
+        assertEquals(0L, result.stats.portfolio.arms.single().faults)
+    }
+
+    @Test
+    fun `runtime bound source completion retains its optimization terminal`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val model = ModelIdentity.of(source, objective)
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
+        val point = Sample(booleanArrayOf(), longArrayOf(0))
+        val worker = PortfolioWorker.ofMinimize("bound", 0) { _, _, _, _ ->
+            sequenceOf(MinimizeResult.Optimal(point, 0.0))
+        }.bindEvidence(model).bindInvocation(invocation)
+        val portfolio = Portfolio.thompson(listOf(worker))
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(invocation)
+        portfolio.evidenceVerification = verifier
+
+        val result = portfolio.use { it.minimize() }
+
+        assertEquals(point, assertIs<MinimizeResult.Optimal>(result).sample)
+    }
+
+    @Test
     fun `exact objective ordering preserves improvements hidden by floating projection`() {
         for (real in listOf(false, true)) {
             val objective = if (real) LinearObjective(constant = 1L shl 62, realCoefficients = doubleArrayOf(-1.0))
@@ -193,15 +240,20 @@ class PortfolioEvidenceTest {
                 else Sample(booleanArrayOf(), longArrayOf(1))
             val optimum = if (real) Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
                 listOf(BigFraction.ofLong(2))) else Sample(booleanArrayOf(), longArrayOf(2))
-            val identity = ModelIdentity.of(Any(), objective)
+            val source = if (real) Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(2.0))
+            else Problem(0, 1, arrayOf(IntDomain(1, 2)), emptyArray())
+            val identity = ModelIdentity.of(source, objective)
+            val binding = EngineInvocation(source.prepareExecutionPlan(objective), identity, objective)
             val complete = PortfolioWorker.ofMinimize("bt/exact", 0) { _, _, _, _ ->
                 sequenceOf(MinimizeResult.BestFound(first, objective.evaluateExact(first).toDouble(),
                     TerminationReason.BudgetExhausted),
                     MinimizeResult.Optimal(optimum, objective.evaluateExact(optimum).toDouble()))
-            }.bindEvidence(identity)
+            }.bindEvidence(identity).bindInvocation(binding)
             val portfolio = Portfolio.thompson(listOf(complete))
             portfolio.exactLinearObjective = objective
             portfolio.evidenceVerification = PortfolioEvidence(identity, CandidateVerifier.trusting())
+                .bindInvocation(binding)
 
             val result = portfolio.use { it.minimize() }
 

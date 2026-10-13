@@ -222,8 +222,11 @@ an exhausted reason without that value supplies no bound claim. Derivation check
 match the completed coordinates and ray direction, and an attained optimum is
 checked at its actual assignment. An unbounded completion's feasible point has a
 separate witness check from its ray. A scoped non-witness import requires the same
-consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance remains
-until their consumers migrate; these hooks do not assert that migration is complete.
+consumer invocation; a scopeless consumer withholds it. Worker proof issuance requires
+the actual completed result. Ordinary scheduler admission withholds a proof when its
+worker has no runtime invocation; model binding and an engine family cannot replace
+that input. Native in-search publication and remaining leaf witness migration have
+their own transport contracts.
 
 Runtime admission compares the actual prepared plan, execution identity/objective,
 original and execution restrictions, and optional capture scope. Execution cutoffs

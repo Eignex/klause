@@ -222,10 +222,11 @@ class Portfolio(
             if (failure is UnsoundnessException) claim.fault = failure.message
             val verification = when (r) {
                 is SolveResult.Sat -> verifyWitness(worker, r.assignment, null)
-                is SolveResult.Unsat -> worker.evidenceInvocation?.let { invocation ->
-                    evidenceVerification?.proof(worker, EvidenceKind.Infeasible,
-                        CompletedEngineResult.Solve(invocation, r))
-                } ?: evidenceVerification?.proof(worker, EvidenceKind.Infeasible)
+                is SolveResult.Unsat -> evidenceVerification?.let { verifier ->
+                    worker.evidenceInvocation?.let { invocation ->
+                        verifier.proof(worker, EvidenceKind.Infeasible, CompletedEngineResult.Solve(invocation, r))
+                    } ?: Verification.Indeterminate("worker completion has no runtime invocation")
+                }
                 else -> null
             }
             claim.verified(verification)
@@ -466,9 +467,10 @@ class Portfolio(
                 val completed = terminal?.let { actual -> worker.evidenceInvocation?.let { invocation ->
                     CompletedEngineResult.Minimize(invocation, actual, executionCutoff = observedCutoffs[arm])
                 } }
-                claim.verified(if (completed != null) {
-                    evidenceVerification?.proof(worker, proofKind, completed)
-                } else evidenceVerification?.proof(worker, proofKind, terminal?.assignment, terminal?.objectiveValue))
+                claim.verified(evidenceVerification?.let { verifier ->
+                    if (completed != null) verifier.proof(worker, proofKind, completed)
+                    else Verification.Indeterminate("worker completion has no runtime invocation")
+                })
             }
             run.locked {
                 val publication = if (!terminalPublished && !failed && claim.fault == null) {
