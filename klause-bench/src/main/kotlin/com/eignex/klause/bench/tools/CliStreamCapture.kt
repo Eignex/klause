@@ -26,6 +26,7 @@ internal object CliStreamCapture {
     fun main(args: Array<String>) {
         val output = File(requireNotNull(System.getenv("OUT")) { "OUT must name the capture directory" })
         output.mkdirs()
+        val checker = SmtStreamChecker(output)
         if (args.size == 1 && args[0].startsWith("batch64=")) {
             val bytes = Base64.getDecoder().decode(args[0].substringAfter('='))
             val requests = Json.decodeFromString<List<List<String>>>(bytes.toString(Charsets.UTF_8))
@@ -34,22 +35,22 @@ internal object CliStreamCapture {
             for ((index, request) in requests.withIndex()) {
                 val directory = File(output, index.toString()).apply { mkdirs() }
                 try {
-                    run(request.toTypedArray(), directory)
+                    run(request.toTypedArray(), directory, checker)
                 } catch (error: Exception) {
                     Reports.writeJson(File(directory, "failure.json").path, CaptureFailure(error.toString()))
                 }
             }
-        } else run(args, output)
+        } else run(args, output, checker)
     }
 
-    private fun run(args: Array<String>, output: File) {
+    private fun run(args: Array<String>, output: File, checker: SmtStreamChecker) {
         val settings = prepare(args, output)
         val provenance = InstalledBuild.current
         val revision = Reports.readGitSha()
         Reports.writeJson(
             File(output, "planned.json").path,
             CapturePlan(revision, settings.sourceSha256, settings.command, settings.stopAfter,
-                settings.timeoutMs, provenance),
+                settings.timeoutMs, settings.checkSmt, settings.minimumWitnesses, settings.provisionChecker, provenance),
         )
         val stdout = File(output, "stdout")
         val stderr = File(output, "stderr")
@@ -85,13 +86,16 @@ internal object CliStreamCapture {
             stdoutSha256 = stdout.takeIf(File::isFile)?.readBytes()?.let(::sha256),
             stderrSha256 = stderr.takeIf(File::isFile)?.readBytes()?.let(::sha256),
         ))
+        if (settings.checkSmt) checker.check(output, settings.source, interruption.get() != null,
+            settings.minimumWitnesses, settings.provisionChecker)
     }
 
     private fun prepare(args: Array<String>, output: File): CaptureSettings {
         val separator = args.indexOf("--")
         require(separator >= 0) { "Use capture settings, --, then CLI arguments" }
         val settings = args.take(separator).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(settings.keys.all { it in setOf("input", "text64", "extension", "marker", "stopAfter", "timeoutMs") })
+        require(settings.keys.all { it in setOf("input", "text64", "extension", "marker", "stopAfter", "timeoutMs",
+            "checkSmt", "minimumWitnesses", "provisionChecker") })
         val extension = settings["extension"] ?: "smt2"
         require(extension in setOf("smt2", "fzn", "mps", "opb", "xml"))
         require((settings["input"] != null) != (settings["text64"] != null)) { "Supply input or text64" }
@@ -104,7 +108,12 @@ internal object CliStreamCapture {
         val marker = settings["marker"]?.let(::Regex)
         require(stopAfter == 0L || marker != null) { "Stopping requires a complete-output marker" }
         val command = listOf(SolverInvocation.klauseCliBin().absolutePath) + args.drop(separator + 1) + source.path
-        return CaptureSettings(command, sha256(bytes), marker, stopAfter, timeoutMs)
+        val checkSmt = settings["checkSmt"]?.toBooleanStrict() ?: false
+        val provisionChecker = settings["provisionChecker"]?.toBooleanStrict() ?: false
+        val minimumWitnesses = settings["minimumWitnesses"]?.toInt() ?: 1
+        require(minimumWitnesses > 0 && (!checkSmt || extension == "smt2"))
+        return CaptureSettings(command, source, sha256(bytes), marker, stopAfter, timeoutMs,
+            checkSmt, minimumWitnesses, provisionChecker)
     }
 
     private fun capture(
@@ -153,7 +162,8 @@ internal object CliStreamCapture {
 @Serializable
 private data class CapturePlan(
     val revision: String?, val sourceSha256: String, val command: List<String>,
-    val stopAfter: Long, val timeoutMs: Long, val build: BuildProvenance,
+    val stopAfter: Long, val timeoutMs: Long, val checkSmt: Boolean, val minimumWitnesses: Int,
+    val provisionChecker: Boolean, val build: BuildProvenance,
 )
 
 @Serializable
@@ -171,7 +181,9 @@ private data class CaptureResult(
 )
 
 private data class CaptureSettings(
-    val command: List<String>, val sourceSha256: String, val marker: Regex?, val stopAfter: Long, val timeoutMs: Long,
+    val command: List<String>, val source: File, val sourceSha256: String, val marker: Regex?,
+    val stopAfter: Long, val timeoutMs: Long, val checkSmt: Boolean, val minimumWitnesses: Int,
+    val provisionChecker: Boolean,
 )
 
 @Serializable

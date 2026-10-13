@@ -427,6 +427,14 @@ For a hard interruption, add `--interrupted --minimum-witnesses 2`; incomplete t
 output is retained as truncation, while a terminal optimization status is rejected.
 These checks establish witness feasibility and objective values; they do not certify
 terminal proof claims.
+`checkSmt=true` runs this check after each captured SMT case on the same profile
+instance. `minimumWitnesses=2` requires two complete checked models. The capture tool
+creates an isolated Python environment using the pinned requirements, and retains
+the checker commands, exits, stdout/stderr, timeout outcomes, Python identity, package
+versions, and checker source hashes. `provisionChecker=true` additionally permits
+installing `python3-venv` with `sudo apt-get` when the image lacks it. Checking and
+provisioning happen outside the CLI solve budget. A failed setup is recorded once;
+later cases still capture output and record their unavailable checker outcome.
 
 ### SMT reference records
 
