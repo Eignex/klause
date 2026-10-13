@@ -612,6 +612,28 @@ class ProofCheckTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.check(case, source)
 
+    def test_tolerance_optimum_keeps_point_checks_separate_from_exact_optimality(self):
+        source = self.mps_source.replace(' E row', ' G row')
+        case = self.case(suite='mps-core', arm='default', finalWitness='v x=0.99999999',
+                         exactObjective='-0.100000001', stats={'optimizationStatus': 'tolerance-optimum'})
+
+        result = self.check(case, source)
+
+        self.assertTrue(result['toleranceAccepted'])
+        self.assertEqual(result['objectiveCheck'], 'source point objective matches')
+        self.assertNotIn('optimalityCheck', result)
+        self.assertEqual(result['toleranceOptimalityCheck'],
+                         'unavailable: native tolerance certificate not captured')
+
+    def test_tolerance_optimum_cannot_weaken_exact_mode_or_smt_claims(self):
+        for suite, command in (('mps-core', 'klause-cli --exact fixture.mps'),
+                               ('smtlib-core', 'klause-cli fixture.smt2')):
+            with self.subTest(suite=suite):
+                case = self.case(suite=suite, command=command,
+                                 stats={'optimizationStatus': 'tolerance-optimum'})
+                with self.assertRaisesRegex(AssertionError, 'default MPS semantics'):
+                    self.check(case)
+
     def test_mps_exact_optimum_can_be_checked_independently_of_rounded_point(self):
         source = self.mps_source.replace(' x obj 0.1 row 1', ' x row 1\n y obj 1').replace('rhs row 1 obj 0.2', 'rhs row 1')
         result = self.check(self.case(suite='mps-core', arm='default', finalWitness='v x=1.00000001 y=0',
