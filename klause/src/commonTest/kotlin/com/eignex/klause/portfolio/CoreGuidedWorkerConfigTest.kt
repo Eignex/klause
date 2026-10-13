@@ -26,7 +26,7 @@ class CoreGuidedWorkerConfigTest {
         val objective = LinearObjective(longArrayOf(9_007_199_254_740_995L))
         val model = ModelIdentity.of(problem, objective)
         val invocation = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
-        val worker = CoreGuidedWorkerConfig().materialize(
+        val worker = BacktrackWorkerConfig.byLabel("core-guided").materialize(
             problem, 0, 0, 3L, 1.0, objective, null, null, null, null,
         ).bindInvocation(invocation)
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(invocation)

@@ -2,8 +2,8 @@ package com.eignex.klause.meta.coreguided
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
+import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -46,7 +46,8 @@ internal class CoreGuidedSearch(
     private val base: BakedProblem,
     private val objective: LinearObjective,
     private val params: BacktrackParams,
-) : ResumableSearch, ReseedGuard {
+) : ResumableSearch,
+    ReseedGuard {
     private val lifetime = params.cancellation.lifetimeCancellation()
     private val factors = ArrayList<Factor>().apply {
         addAll(base.factors)
@@ -141,6 +142,7 @@ internal class CoreGuidedSearch(
             finishQuery()
             when (result) {
                 is SolveResult.Unknown -> return finish(stopped(result.reason))
+
                 is SolveResult.Sat -> {
                     val sample = Sample(
                         BooleanArray(base.numBoolVars) { result.assignment.boolValue(it) },
@@ -155,18 +157,25 @@ internal class CoreGuidedSearch(
                     if (bestValue == null || value < requireNotNull(bestValue)) {
                         best = sample
                         bestValue = value
-                        onIncumbent(MinimizeResult.BestFound(sample, value.toDouble(), TerminationReason.BudgetExhausted))
+                        onIncumbent(
+                            MinimizeResult.BestFound(sample, value.toDouble(), TerminationReason.BudgetExhausted),
+                        )
                     }
                     if (value == lowerBound) return finish(MinimizeResult.Optimal(sample, value.toDouble(), stats))
                     val current = requireNotNull(threshold)
                     threshold = maximumWeight(current)
                     check(threshold != null) { "core objective identity differs from source objective" }
                 }
+
                 is SolveResult.Unsat -> {
                     val assumptions = result.assumptionCore
-                    val selected = if (assumptions == null) querySofts else querySofts.filter {
+                    val selected = if (assumptions == null) {
+                        querySofts
+                    } else {
+                        querySofts.filter {
                         assumptions.boolValueOrNull(it) == false
                     }.toIntArray()
+                    }
                     if (selected.isEmpty()) return finish(MinimizeResult.Infeasible(stats = stats))
                     coreWeight = selected.map { requireNotNull(weights[it]) }.reduce { a, b -> if (a < b) a else b }
                     core = selected
@@ -237,14 +246,18 @@ internal class CoreGuidedSearch(
             modelBounds = base.intBounds,
         ).bake(token)
         return try {
-            BacktrackSolver(problem).resumableSolve(params.copy(
+            BacktrackSolver(problem).resumableSolve(
+                params.copy(
                 assumptions = params.assumptions.mergedWith(softPins),
                 cancellation = token,
-                maxDecisions = (minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE) -
-                    completedStats.search.nodes.sum.toLong()).coerceAtLeast(0L),
+                maxDecisions = (
+                    minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE) -
+                    completedStats.search.nodes.sum.toLong()
+                ).coerceAtLeast(0L),
                 clauseExchange = null,
                 cutExchange = null,
-            ))
+            )
+            )
         } catch (failure: SearchInitializationCancelled) {
             completedStats = completedStats.mergedWith(failure.stats)
             completedWork += failure.work

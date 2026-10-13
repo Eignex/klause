@@ -25,7 +25,9 @@ object SourceRecordCheck {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val bundleOptions = options.keys - setOf("checker", "witnessOnly", "catalog", "captureSources")
-        require(bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256")) {
+        require(
+            bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256"),
+        ) {
             "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest> and checker=source|boolean"
         }
         require(options["captureSources"] in listOf(null, "true", "false")) { "captureSources must be true or false" }
@@ -48,7 +50,8 @@ object SourceRecordCheck {
         } ?: run {
             val url = URI(requireNotNull(options["bundle"]))
             require(url.scheme == "https" && url.userInfo == null)
-            val connection = url.toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
+            val connection = url.toURL().openConnection().apply { connectTimeout = 30_000
+                readTimeout = 30_000 }
             connection.getInputStream().use { it.readNBytes(32 * 1024 * 1024 + 1) }
         }
         require(bytes.size <= 32 * 1024 * 1024 && sha(bytes) == options["sha256"]) { "Bundle identity differs" }
@@ -106,25 +109,26 @@ object SourceRecordCheck {
             out.resolve("source-capture.json").writeText(captures.toString() + "\n")
         }
         val log = out.resolve("checker-install.log")
-        fun execute(file: File, vararg command: String, extraArguments: List<String> = emptyList()) {
-            val process = ProcessBuilder(command.toList() + extraArguments).redirectErrorStream(true)
+        fun execute(file: File, command: List<String>) {
+            val process = ProcessBuilder(command).redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(file)).start()
             check(process.waitFor() == 0) { "${command.first()} failed; see ${file.path}" }
         }
-        execute(log, "sudo", "apt-get", "update", "-qq")
-        execute(log, "sudo", "apt-get", "install", "-yq", "python3-venv")
+        execute(log, listOf("sudo", "apt-get", "update", "-qq"))
+        execute(log, listOf("sudo", "apt-get", "install", "-yq", "python3-venv"))
         val environment = out.resolve("checker-environment")
-        execute(log, "python3", "-m", "venv", environment.absolutePath)
+        execute(log, listOf("python3", "-m", "venv", environment.absolutePath))
         val python = environment.resolve("bin/python").absolutePath
         val tools = root.resolve("klause-bench/tools")
-        execute(log, python, "-m", "pip", "install", "-r", tools.resolve("requirements-source-checks.txt").absolutePath)
-        execute(out.resolve("checker-dependencies.txt"), python, "-m", "pip", "freeze")
+        execute(log, listOf(python, "-m", "pip", "install", "-r",
+            tools.resolve("requirements-source-checks.txt").absolutePath))
+        execute(out.resolve("checker-dependencies.txt"), listOf(python, "-m", "pip", "freeze"))
         out.resolve("checker-tool-hashes.json").writeText(buildJsonObject {
             for (name in listOf(checker, "requirements-source-checks.txt")) {
                 put(name, sha(tools.resolve(name).readBytes()))
             }
         }.toString() + "\n")
-        execute(out.resolve("checker-runtime.txt"), python, "--version")
+        execute(out.resolve("checker-runtime.txt"), listOf(python, "--version"))
         val extraArguments = buildList {
             if (checker == "verify_source_results.py") {
                 addAll(listOf("--progress", out.resolve("checked-prefix.jsonl").absolutePath))
@@ -132,8 +136,10 @@ object SourceRecordCheck {
             }
             addAll(listOf("--output", out.resolve("source-checks.json").absolutePath))
         }
-        execute(out.resolve("checker.log"), python, tools.resolve(checker).absolutePath,
-            cases.absolutePath, "--source-root", sources.absolutePath, extraArguments = extraArguments)
+        execute(out.resolve("checker.log"), listOf(
+            python, tools.resolve(checker).absolutePath, cases.absolutePath,
+            "--source-root", sources.absolutePath,
+        ) + extraArguments)
 
         check(environment.deleteRecursively())
         println(out.resolve("source-checks.json").readText())

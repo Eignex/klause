@@ -12,9 +12,9 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSearch
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SatisfyResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.satisfyUnderAssumptions
@@ -113,10 +113,8 @@ internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
         }
     }
 
-    internal fun resumable(
-        objective: LinearObjective,
-        params: BacktrackParams,
-    ): ResumableSearch = CoreGuidedSearch(baseProblem, objective, params)
+    internal fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
+        CoreGuidedSearch(baseProblem, objective, params)
 
     fun minimize(
         softs: List<Soft>,
