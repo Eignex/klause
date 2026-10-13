@@ -325,7 +325,13 @@ This optional phase considers up to 32 real coordinates, 64 Boolean coordinates,
 128 atoms and 2,048 normalized terms with input coefficients up to 4,096 bits.
 Three uniform rational centers seed at most
 64 complete proposals and 32 coordinate root queries across four repair passes per
-center. Root queries admit coordinate degree at most eight. One private slice of
+center. Nonlinear inequality-only probing starts with the positive center before
+zero and negative centers to avoid nullifying product coefficients during its first
+repairs. Equality and affine probing keep zero first and retain their uniform point
+construction. In nonlinear inequality probing fixed coordinates take precedence;
+coordinates absent from every normalized atom retain zero. Referenced-coordinate
+metadata includes disequalities although they supply no repair guides. Root queries
+admit coordinate degree at most eight. One private slice of
 65,536 native units is debited to the containing query's cumulative work and caller
 meter. Rejected proposals, private exhaustion and optional representation declines
 leave complete CAD available. Parent stops are latched during the phase and withhold

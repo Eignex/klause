@@ -188,6 +188,22 @@ private fun probeWitness(
     }
     // Affine relaxations leave their containing allowance for complete projection.
     if (inequalityGuides && !nonlinear) axes.clear()
+    val nonlinearInequalities = inequalityGuides && nonlinear && axes.any {
+        arithmetic.step()
+        it.second.isNotEmpty()
+    }
+    val referenced = if (nonlinearInequalities) {
+        repeat(terms * (realCount + 1) + realCount + 1) { arithmetic.step() }
+        val values = BooleanArray(realCount)
+        for (atom in formula.atoms) {
+            arithmetic.step()
+            for (variable in atom.polynomial.variables) {
+                arithmetic.step()
+                values[variable] = true
+            }
+        }
+        values
+    } else null
     var proposals = 0
     var attemptedAxes = 0
     fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? {
@@ -195,11 +211,17 @@ private fun probeWitness(
         proposals++
         return checkSample(formula, point, boolCount, arithmetic, algebraic)
     }
-    for (center in listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.MINUS_ONE)) {
+    val centers = if (nonlinearInequalities) {
+        listOf(BigFraction.ONE, BigFraction.ZERO, BigFraction.MINUS_ONE)
+    } else {
+        listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.MINUS_ONE)
+    }
+    for (center in centers) {
         val point = LinkedHashMap<Int, AlgebraicReal>()
         for (id in 0 until realCount) {
             arithmetic.step()
-            point[id] = algebraic.rational(fixed[id] ?: center)
+            val value = fixed[id] ?: if (referenced?.get(id) == false) BigFraction.ZERO else center
+            point[id] = algebraic.rational(value)
         }
         if (proposals == MAX_WITNESS_PROPOSALS) return null
         candidate(point)?.let { return it }

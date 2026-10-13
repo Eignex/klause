@@ -19,6 +19,27 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `coupled strict products find a complete witness within a small allowance`() {
+        val source = SmtLibPolynomial.parse(buildString {
+            for (id in 0 until 18) appendLine("(declare-const x$id Real)")
+            appendLine("(declare-const n Real)")
+            appendLine("(declare-const unused Real)")
+            for (id in 1 until 18) appendLine("(assert (> (* x0 x$id) 0))")
+            appendLine("(assert (distinct n 0))")
+            appendLine("(check-sat)")
+        })
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount, QfNraParams(maximumWork = 4096),
+        ))
+
+        assertEquals(0L, result.stats.projectedPolynomials)
+        assertEquals(20, result.assignment.realCount)
+        for (id in 0 until 19) assertEquals(BigFraction.ONE, result.assignment.realValue(id).rational)
+        assertEquals(BigFraction.ZERO, result.assignment.realValue(19).rational)
+    }
+
+    @Test
     fun `inequality repairs produce nonuniform complete points before projection`() {
         for (relation in listOf(">", ">=")) {
             val source = SmtLibPolynomial.parse("""
