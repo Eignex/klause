@@ -199,7 +199,8 @@ class CompletedEngineResultTest {
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val certificate = assertNotNull(EvidenceCertificate.completed(identity, EvidenceKind.Unbounded, completion))
 
-        val checked = certificate.verifyDerivation(SourceClaim.Ray(point, mapOf(coordinate to BigFraction.ONE)), context)
+        val checked = certificate.verifyDerivation(SourceClaim.Ray(point, mapOf(coordinate to BigFraction.ONE)),
+            context)
 
         assertEquals(SourceEvidenceCheck.Checked, checked)
     }

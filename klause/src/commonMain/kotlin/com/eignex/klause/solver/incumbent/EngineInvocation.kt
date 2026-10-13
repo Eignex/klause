@@ -45,7 +45,9 @@ internal class EngineInvocation(
         require(scope == null || (scope.objective == null) == (sourceObjective == null)) {
             "capture has a different source objective"
         }
-        require(scope?.objective == null || scope.objective.sense == sense) { "capture has a different source direction" }
+        require(scope?.objective == null || scope.objective.sense == sense) {
+            "capture has a different source direction"
+        }
     }
 
     fun matches(other: EngineInvocation): Boolean = preparedPlan === other.preparedPlan &&
