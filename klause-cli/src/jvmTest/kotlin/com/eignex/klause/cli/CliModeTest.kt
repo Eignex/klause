@@ -51,6 +51,7 @@ import kotlin.test.assertTrue
 class CliModeTest {
     @Test
     fun `ordinary source publication cancellation preserves its original exception without terminal claims`() {
+        val started = System.nanoTime()
         val source = File.createTempFile("linear-publication-cancel", ".smt2").apply {
             writeText("(declare-const b Bool) (declare-const x Real) " +
                 "(assert (= (* 3 x) (ite b 0 1))) (minimize (+ 7 x)) (check-sat)")
@@ -72,9 +73,17 @@ class CliModeTest {
         }
 
         try {
+            val loadStarted = System.nanoTime()
             val solvable = session.load(source.absolutePath, common)
+            val loaded = System.nanoTime()
             assertIs<SolvablePipeline.OpenTheory>(solvable.pipeline)
-            assertSame(expected, assertFailsWith<CancellationException> { SolveCore.solve(solvable, common, output) })
+            try {
+                assertSame(expected, assertFailsWith<CancellationException> { SolveCore.solve(solvable, common, output) })
+            } finally {
+                val solved = System.nanoTime()
+                System.err.println("ordinary cancellation phases: setupNs=${loadStarted - started} " +
+                    "loadNs=${loaded - loadStarted} solveNs=${solved - loaded}")
+            }
         } finally {
             source.delete()
         }
