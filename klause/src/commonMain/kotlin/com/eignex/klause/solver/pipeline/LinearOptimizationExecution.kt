@@ -1,8 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.util.Cancellation
 
@@ -21,5 +24,19 @@ fun OpenTheoryPipeline.optimizeLinear(
         val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))
         LinearOptimizationResult(context.scope, result.terminal, result.bound, result.incumbent,
             result.value, result.reason, result.stats)
+    }
+}
+
+internal fun LinearOptimizationResult.openOptimum(): OpenTheoryOptimum {
+    val sign = if (scope.objective?.sense == ObjectiveSense.MAXIMIZE) BigFraction.MINUS_ONE else BigFraction.ONE
+    val sampled = incumbent?.let { OpenTheoryAssignment.Sampled(it) }
+    val score = value?.let { it * sign }
+    return when (val claim = terminal?.claim) {
+        is SourceClaim.Optimal -> OpenTheoryOptimum.Optimal(OpenTheoryAssignment.Sampled(claim.sample),
+            (claim.value as SourceValue.Rational).value * sign, stats, this)
+        SourceClaim.Refutation -> OpenTheoryOptimum.Infeasible(stats, this)
+        is SourceClaim.Ray -> OpenTheoryOptimum.Unbounded(OpenTheoryAssignment.Sampled(claim.sample),
+            requireNotNull(score), stats, this)
+        else -> OpenTheoryOptimum.Bounded(sampled, score, reason, stats, this)
     }
 }

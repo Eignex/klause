@@ -184,7 +184,7 @@ internal object SolveCore {
                 val nonlinearBudget = takeNodeBudget(common).also { common.nodeBudget = it }
                 val nonlinearParams = nonlinearIntegerParams(common, deadlineCancel, nonlinearBudget)
                 output.begin(optimize = false, maximize = false)
-                val execution = OpenTheoryPipeline.execute(pipeline.request, nonlinearParams, engine)
+                val execution = OpenTheoryPipeline.execute(pipeline.request, nonlinearParams, engine, openCores)
                 val result = execution.result
                 output.onVerdictContext(VerdictContext(
                     terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,

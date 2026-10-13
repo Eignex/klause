@@ -187,11 +187,37 @@ outputs, including `cases/<index>/record.json` for the offline source verifier.
 experiment rather than directly on the lab Mac, where a run competes with the lab's cases.
 A measurement no experiment expresses, such as timing a component on captured inputs, runs as
 a profile job: `lab profile <main> <ref> <description> [aws|lab] [timeout-sec] [arg...]` runs
-the class `<main>` (in `com.eignex.klause.bench.profile`, committed at `<ref>`) once under JFR, on AWS by
-default, and keeps its output and whatever it writes to `$OUT` with the job. The lab runs no
-shell scripts: the code goes in a commit. Profile jobs are not for tests, lint or other gates;
-CI runs those. Every ref the lab builds must be `main` or a branch only trusted users pushed to,
-and an experiment may not set `suite`, `problem`, `out` or `solver-seed` itself.
+the class `<main>` (directly in `com.eignex.klause.bench.profile`, committed at `<ref>`) once
+under JFR, on AWS by default, and keeps its output and whatever it writes to `$OUT` with the job.
+The lab runs no shell scripts: the code goes in a commit. Profile jobs are not for tests, lint or
+other gates; CI runs those. Every ref the lab builds must be `main` or a branch only trusted users
+pushed to, and an experiment may not set `suite`, `problem`, `out` or `solver-seed` itself.
+
+[SolveTiming](src/main/kotlin/com/eignex/klause/bench/profile/SolveTiming.kt) is the template for
+a new profile main. It solves one catalog problem `repeats` times in-process and writes each run's
+wall time and verdict to `$OUT/timings.json`; without arguments it times `opb-core`
+`sporttournament06` three times:
+
+```bash
+./deploy/lab profile com.eignex.klause.bench.profile.SolveTiming main "solve timing" aws 600 \
+  suite=dimacs-core problem=random3sat-50-200 repeats=3 timeout=10000
+```
+
+`bench.profile.CompletionInitializationProfile` measures actual internal repair consumers
+without adding a published library debug API. It generates a hybrid finite-domain and
+scaled dense-linear source, alternates fresh/retained owners, cancels root installation,
+and checks the final exact source point with the configured Z3 executable. Use
+`rows=N attempts=N rounds=N cancel=early|charged`; defaults are 128 rows, 64 cancellation
+attempts and five measured rounds after warmup. `charged` stops after native LP work
+reaches the invocation meter; `early` stops at a fixed initial poll. A completed search
+must not be retained after an interrupted attempt. Native preparation charges are recorded separately from LP interruption charges.
+On Linux x86-64, an unset `klause.bench.z3` provisions the pinned Z3 4.15.3.0
+executable from its SHA-256-checked wheel before measurement; another platform
+requires an explicitly configured reference executable. The tool writes source/pinned SMT,
+raw measurements and checker output under `out=DIR` or `$OUT`, and prints runtime,
+loaded library/tool jar and reference binary identities. Source checking and setup
+are outside the measured query spans. JFR instrumentation remains part of profile jobs;
+these measurements are preparation diagnostics, not ordinary end-to-end solve timings.
 
 Cases disable result caching, alternate configurations across seeds/repetitions,
 and retain installed-build provenance when supported by the selected revision.
@@ -203,6 +229,43 @@ Lab agreement and regression confirmation remain recorded-result evidence;
 [independent source validation](#source-validation) defines stronger checks.
 `profileCli` requires AWS execution and explicit `parallel: 1`; its instrumented
 timing stays separate from ordinary comparisons.
+
+`com.eignex.klause.bench.profile.SourceEvidenceProbe` checks produced quadratic
+evidence for the exact IR fixture schema `real-box-square`: one real coordinate in
+an integer-ended closed interval, objective `coefficient*x*x + constant`, and an
+explicit source sense. It accepts the source JSON bytes as its first argument and
+a `FiniteEngine` name as its second. Extra source fields and inexact endpoints are
+refused. Submit a profile specification through the configured lab client at a pinned
+revision. Include `machines: 1` and `parallel: 1` in the initial specification; changing
+machine count after submission does not retract machines already launched.
+
+```json
+{
+  "name": "source-evidence-probe",
+  "profile": {
+    "main": "com.eignex.klause.bench.profile.SourceEvidenceProbe",
+    "args": ["<exact real-box-square source JSON>", "BACKTRACK"]
+  },
+  "base": {"ref": "<revision>", "timeout": "600000"},
+  "host": "aws",
+  "machines": 1,
+  "parallel": 1
+}
+```
+
+For example, the first argument can be
+`{"semantics":"klause-ir-exact-v1","kind":"real-box-square","lower":-2,"upper":3,"coefficient":1,"constant":0,"sense":"MINIMIZE"}`.
+Save the specification outside the repository, then use
+`LAB_URL=https://lab.eignex.com ./deploy/lab run /absolute/path/to/profile-source-evidence.json`.
+
+The probe saves original bytes and the actual result/capture payload under `$OUT`,
+then runs the packaged independent Python fractions checker in a separate process.
+`independent-check.json` records checked or unavailable coverage and source, payload
+and checker identities. `runtime-provenance.json` records the revision, JDK and
+classpath artifact hashes. An unavailable capture cannot count as checked evidence.
+This fixture checker is not general proof-file export, a verdict reference comparison
+or a performance measurement. Retrieve records with `lab files`, `cat` and `fetch`;
+keep generated output outside the repository.
 
 ## Catalog and corpus
 
@@ -444,6 +507,28 @@ identity and the checked XCSP assignment when accepted, without solving again.
 
 ### Offline source verifier
 
+`com.eignex.klause.bench.profile.MpsLinearProof` accepts original MPS paths and captures the
+ordinary exact-source optimization result, original coordinate mapping, rows and derivation.
+It runs [verify_mps_linear_proof.py](tools/verify_mps_linear_proof.py) in a separate Python
+process using only standard-library exact fractions. The checker parses original unguarded
+linear MPS bytes, checks every captured premise against source rows or integral declarations,
+eliminates an exact objective auxiliary, and validates nonnegative dual combinations,
+integer branch coverage or an integral improving recession step. Unsupported source features
+and missing derivations fail closed. This checks mathematical claims rather than timings.
+The self-authored inputs in `smoke-corpus/linear-authority` cover a constant objective,
+a coupled integral/real ray and an objective coefficient beyond binary64 precision.
+
+```sh
+lab profile com.eignex.klause.bench.profile.MpsLinearProof <ref> "check exact MPS claims" aws 900 \
+  klause-bench/smoke-corpus/linear-authority/constant.mps \
+  klause-bench/smoke-corpus/linear-authority/recession.mps \
+  klause-bench/smoke-corpus/linear-authority/decimal.mps
+```
+
+The profile output retains original bytes/hashes, claim captures, checker results, installed
+jar hashes and runtime/options. Keep the lab's executed commit and setup provenance with
+those files. A failed checker or incomplete profile supplies no validated terminal claim.
+
 [verify_source_results.py](tools/verify_source_results.py) checks `mps-core`,
 `smtlib-core`, `miplib3` and the SMT corpus suites `smtlib-qfidl`, `smtlib-qflia`,
 `smtlib-qflira`, `smtlib-qflra` and `smtlib-qfrdl` against original sources using exact arithmetic.
@@ -648,6 +733,64 @@ spending the cap. Deadline runs can reach different prefixes. Shared conflict
 counters exclude native CP analysis; matching SAT reports are not source checks.
 
 ## Focused probes
+
+### Objective representation probe
+
+`com.eignex.klause.bench.profile.ObjectiveRepresentationProbe` measures the public
+affine and exact quadratic entries on the same admitted polynomial real source.
+Pass `source=<SMT file or directory>` and optionally `engines=BACKTRACK,FIXED,LOCAL_SEARCH,ALNS,MIXED`,
+`work=200000`, `seed=17`, `moves=1`, `timeout=25000`, `out=<directory>` and
+`checker=none|existing|provision` (default `none`), with `processors=1` by default.
+If the launching JVM sees a different processor count, the probe runs in a child
+JVM with `-XX:ActiveProcessorCount` and its own `objective-probe.jfr`; the lab's
+parent recording covers the wrapper. Settings record the actual execution JVM.
+`schema=<JSON SchemaDef>` selects the compiled/schema path for the same original
+polynomial real sources. Declaration names must agree; real coordinates use public
+compiled source IDs and float objective handles. Finite-grid floats, integer schema
+declarations and aliased named real coordinates decline. The captured schema bytes
+and hash accompany exact named original-source results; compiler auxiliaries are
+excluded from the original witness map.
+The source objective must be affine, with integer Boolean weights/constant fitting
+Long and real coefficients exactly representable in binary64. Other objectives
+decline rather than acquire rounded coefficients. Each execution gets fresh state,
+the original direction and the same controls. Encoding order alternates across engines.
+Source bytes, exact rational/algebraic results, native work, heuristic moves, elapsed
+execution time, settings and installed-build/runtime hashes are retained under `out`
+or `$OUT`. Parsing and provenance capture are outside the execution timer.
+
+Run the committed main through a lab profile job on a trusted pushed branch:
+
+```sh
+deploy/lab profile com.eignex.klause.bench.profile.ObjectiveRepresentationProbe <branch> \
+  "compare objective representations on original sources" aws 1800 \
+  source=klause-bench/smoke-corpus/objective-affine-v1 checker=provision
+```
+
+Add `schema=klause-bench/smoke-corpus/objective-affine-v1/square.schema.json` to run
+the same inputs through schema compilation and its named float objective API. Its
+declared `0<=y<=1` follows from the original source `x*x=y`, `-1<=x<=1`.
+
+The [precision fixtures](smoke-corpus/objective-affine-v1/manifest.json) distinguish
+adjacent exact objective values sharing a binary64 projection. After fetching the
+probe output, check its original sources independently with the pinned source-check
+requirements and [verify_objective_probe.py](tools/verify_objective_probe.py):
+
+```sh
+python3 klause-bench/tools/verify_objective_probe.py /path/to/probe/out \
+  --require-incumbent --output /path/to/source-checks.json
+```
+
+`checker=existing` runs the independent verifier with the host's `python3`.
+`checker=provision` installs Linux `python3-venv` through sudo/apt and the pinned
+requirements into an output-local environment before running the same verifier.
+Dependency installation and verification are outside the execution timer; install
+logs, dependency versions and checker tool hashes accompany the checked records.
+
+The verifier requires both encodings for every selected engine and original source.
+It checks exact witnesses, costs, claimed global bounds, strict nonattainment and
+refutations. Approach paths, unbounded trajectories and exported proofs are explicitly
+unavailable from these records. JFR-instrumented elapsed times are diagnostics, not
+an uninstrumented performance comparison. Keep all generated records externally.
 
 ### Component-split fixtures
 

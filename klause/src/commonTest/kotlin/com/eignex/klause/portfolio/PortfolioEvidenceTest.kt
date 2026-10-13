@@ -1,6 +1,9 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -12,9 +15,11 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.CompletedEngineResult
 import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -246,6 +251,42 @@ class PortfolioEvidenceTest {
         val completion = CompletedEngineResult.Minimize(scope, MinimizeResult.Optimal(point, 0.0))
 
         val checked = verifier.proof(worker, EvidenceKind.Bound, completion)
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `a completed runtime optimum needs no invented source revision`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val plan = source.prepareExecutionPlan(objective)
+        val model = ModelIdentity.of(source, objective)
+        val binding = EngineInvocation(plan, model, objective)
+        val point = Sample(booleanArrayOf(), longArrayOf(1))
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
+            .bindEvidence(model).bindInvocation(binding)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
+
+        val checked = verifier.proof(worker, EvidenceKind.Bound,
+            CompletedEngineResult.Minimize(binding, MinimizeResult.Optimal(point, 1.0)))
+
+        assertIs<Verification.Accepted<*, *>>(checked)
+    }
+
+    @Test
+    fun `a runtime completion cannot cross an execution assumption boundary`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray())
+        val plan = source.prepareExecutionPlan()
+        val model = ModelIdentity.of(source)
+        val binding = EngineInvocation(plan, model)
+        val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }
+            .bindEvidence(model).bindInvocation(binding)
+        val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
+        val conditional = EngineInvocation(plan, model,
+            executionAssumptions = Assumptions(bools = mapOf(0 to true)))
+
+        val checked = verifier.proof(worker, EvidenceKind.Infeasible,
+            CompletedEngineResult.Solve(conditional, SolveResult.Unsat()))
 
         assertIs<Verification.Rejected>(checked)
     }

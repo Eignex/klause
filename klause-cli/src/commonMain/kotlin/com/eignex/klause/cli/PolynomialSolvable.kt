@@ -22,8 +22,8 @@ internal fun polynomialSolvable(
     request: PolynomialTheoryRequest,
     render: (OpenTheoryAssignment) -> String,
     admissionElapsedMs: Long,
-): Solvable = exactTheorySolvable(ExactTheorySatisfactionRequest { params, engine, _ ->
-    OpenTheoryPipeline.execute(request, params, engine)
+): Solvable = exactTheorySolvable(ExactTheorySatisfactionRequest { params, engine, cores ->
+    OpenTheoryPipeline.execute(request, params, engine, cores)
 }, render, admissionElapsedMs, pipelineName = "polynomial-theory", declaredTheoryRoute = "exact_nra")
 
 internal fun polynomialSolvable(
@@ -32,8 +32,8 @@ internal fun polynomialSolvable(
     routingElapsedMs: Long = 0,
 ): Solvable = sourceSolvable(
     if (route.objective == null) SolvablePipeline.ExactTheorySatisfaction(
-        ExactTheorySatisfactionRequest { params, engine, _ ->
-            OpenTheoryPipeline.execute(route.request, params, engine)
+        ExactTheorySatisfactionRequest { params, engine, cores ->
+            OpenTheoryPipeline.execute(route.request, params, engine, cores)
         }, render, pipelineName = "polynomial-theory", declaredTheoryRoute = "exact_nra",
     ) else SolvablePipeline.PolynomialTheory(route.request, render, route.objective, route.maximize), routingElapsedMs,
 )

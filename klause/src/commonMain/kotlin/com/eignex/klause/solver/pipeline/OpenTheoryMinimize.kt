@@ -19,6 +19,7 @@ import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
@@ -38,16 +39,16 @@ import kotlin.time.TimeSource
 /**
  * What an optimizing open-model route answers.
  *
- * An integer route states an [Optimal] because an integer optimum, where one exists over a feasible
- * bounded-below model, is attained. A route over the reals needs a case this does not carry: an
- * objective may approach a greatest lower bound it never reaches, and reporting that as optimal would
- * name a value no assignment achieves. An open model needs one more: an objective may be bounded by
- * nothing at all, which is [Unbounded] and is not a bound on anything.
+ * [linearResult] retains exact source bounds, unattained limits and full lattice rays independently of
+ * the incumbent. Scalar values use minimized units; linear evidence uses the original objective direction.
  */
 sealed interface OpenTheoryOptimum {
 
     /** Statistics collected while optimizing. */
     val stats: SolveStats
+
+    /** Checked original-source linear authority, when this invocation used the affine adapter. */
+    val linearResult: LinearOptimizationResult? get() = null
 
     /** An assignment, and a proof that nothing feasible lies below [value]. */
     data class Optimal(
@@ -56,39 +57,44 @@ sealed interface OpenTheoryOptimum {
         /** Its objective value. */
         val value: BigFraction,
         override val stats: SolveStats,
+        override val linearResult: LinearOptimizationResult? = null,
     ) : OpenTheoryOptimum
 
     /** The model has no feasible assignment, at any objective value. */
-    data class Infeasible(override val stats: SolveStats) : OpenTheoryOptimum
+    data class Infeasible(
+        override val stats: SolveStats,
+        override val linearResult: LinearOptimizationResult? = null,
+    ) : OpenTheoryOptimum
 
     /**
      * The model is feasible and its objective descends without limit, so it has no optimum.
      *
      * [witness] proves the model feasible and [value] is what the objective takes on it. Neither is a
-     * bound: the certificate is a ray of the model along which the objective strictly decreases, so every
-     * value below [value] is attained too.
+     * bound: a feasible ray supplies arbitrarily low objective values while preserving source integrality.
      */
     data class Unbounded(
         /** An assignment proving the model feasible. */
         val witness: OpenTheoryAssignment,
-        /** The objective value at [witness]; every value below it is attained as well. */
+        /** The objective value at [witness], distinct from the arbitrarily improving ray values. */
         val value: BigFraction,
         override val stats: SolveStats,
+        override val linearResult: LinearOptimizationResult? = null,
     ) : OpenTheoryOptimum
 
     /**
-     * The budget stopped the descent. [incumbent] is the best assignment proved feasible, so the optimum
-     * is at or below [value]; no bound under it was refuted. Both are null when nothing was proved
-     * feasible, which says only that the run ran out — not that the model is infeasible.
+     * A checked incumbent without an attained optimum. [value] is its objective, not a limiting value.
+     * [linearResult] may retain a separate checked limit or bound. Both incumbent fields are null when
+     * nothing was proved feasible, which does not establish infeasibility.
      */
     data class Bounded(
         /** Best assignment proved feasible, or null when none was. */
         val incumbent: OpenTheoryAssignment?,
         /** Objective value of [incumbent], or null when there is none. */
         val value: BigFraction?,
-        /** Why the descent stopped before an optimum proof. */
+        /** Completion or interruption reason, separate from any typed linear claim. */
         val reason: TerminationReason,
         override val stats: SolveStats,
+        override val linearResult: LinearOptimizationResult? = null,
     ) : OpenTheoryOptimum
 }
 

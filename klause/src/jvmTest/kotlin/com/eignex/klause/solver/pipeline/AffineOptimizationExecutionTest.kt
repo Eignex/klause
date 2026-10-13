@@ -25,12 +25,17 @@ class AffineOptimizationExecutionTest(
     private val engine: FiniteEngine,
     private val sense: ObjectiveSense,
     private val affine: Boolean,
+    private val constant: Long,
 ) {
     companion object {
         @JvmStatic
-        @Parameterized.Parameters(name = "{0} {1} affine={2}")
+        @Parameterized.Parameters(name = "{0} {1} affine={2} constant={3}")
         fun variants(): List<Array<Any>> = FiniteEngine.entries.flatMap { engine ->
-            ObjectiveSense.entries.flatMap { sense -> listOf(true, false).map { arrayOf<Any>(engine, sense, it) } }
+            ObjectiveSense.entries.flatMap { sense ->
+                listOf(true, false).flatMap { affine ->
+                    listOf(7L, Long.MAX_VALUE).map { arrayOf<Any>(engine, sense, affine, it) }
+                }
+            }
         }
     }
 
@@ -39,19 +44,20 @@ class AffineOptimizationExecutionTest(
         val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
             realLower = doubleArrayOf(-1.0, Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(1.0, Double.POSITIVE_INFINITY))
-        val expected = BigFraction.ofLong(if (sense == ObjectiveSense.MINIMIZE) 7 else 8)
+        val expected = BigFraction.ofLong(constant) +
+            if (sense == ObjectiveSense.MINIMIZE) BigFraction.ZERO else BigFraction.ONE
         val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
             localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17), alnsIterations = 1,
         ))
 
         val execution = if (affine) OpenTheoryPipeline.optimize(
             source.pipelineRequest(),
-            LinearObjective(constant = 7, realCoefficients = doubleArrayOf(0.0, 1.0)),
+            LinearObjective(constant = constant, realCoefficients = doubleArrayOf(0.0, 1.0)),
             params, engine, sense,
         ) else OpenTheoryPipeline.minimize(
             source.pipelineRequest(), QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(
                 QuadraticCoefficient.ONE, QuadraticVariable.Real(SourceRealId(1)),
-            )), QuadraticCoefficient.ofLong(7)), params, engine, sense,
+            )), QuadraticCoefficient.ofLong(constant)), params, engine, sense,
         )
 
         val result = assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result)

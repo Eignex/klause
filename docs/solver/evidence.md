@@ -140,7 +140,13 @@ Absent affine data does not become a constant objective. Unsupported traversal,
 trajectory or approach mechanisms retain unavailable coverage.
 
 `CompletedEngineResult` retains an actual ordinary completed result and its source
-scope for the completion-taking worker issuance hook. Matching worker identity alone
+binding for the completion-taking worker issuance hook. `EngineInvocation` retains
+the existing prepared plan, its original source and objective/direction, the actual
+execution model/objective identity, and owned original/execution assumption snapshots.
+Pins and deduced bounds, holes and sets cannot change after binding. An optional
+`SourceScope` records explicitly requested revision/semantics capture; an uncaptured
+runtime does not invent a revision or provide independent original-source coverage.
+Matching worker identity alone
 cannot issue through that hook. Its engine admission and independent derivation check
 are separate: the latter requires actual retained evidence and an expected source
 claim. Search exhaustion must retain its actual source cutoff to attest a bound;
@@ -150,6 +156,13 @@ checked at its actual assignment. An unbounded completion's feasible point has a
 separate witness check from its ray. A scoped non-witness import requires the same
 consumer invocation; a scopeless consumer withholds it. Legacy kind-only worker issuance and opaque quadratic producer arguments remain
 until their consumers migrate; these hooks do not assert that migration is complete.
+
+Runtime admission compares the actual prepared plan, execution identity/objective,
+original and execution restrictions, and optional capture scope. Execution cutoffs
+retain native minimized units separately from an optional original-source bound;
+missing conversion withholds independent source checking. The published execution
+bound and point must match the retained completion. Mapping capture still withholds
+foreign or missing terminal admission until the original claim checks.
 
 Capture does not implement proof file export. [Portfolio publication](portfolio.md)
 owns admission and transport; [LP certification](../lp/certification.md) owns numerical

@@ -1,39 +1,17 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.composedFixpoint
-import com.eignex.klause.localsearch.CandidateCompletion
-import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.meta.alns.Alns
-import com.eignex.klause.meta.alns.BacktrackRepair
-import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
-import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.propagation.conditionedRoot
-import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.theory.qfnra.PolynomialCondition
-import com.eignex.klause.theory.qfnra.PolynomialSearchComponent
-import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
-import com.eignex.klause.theory.qfnra.QfNraReason
-import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 
 /** Finite strategy controls for polynomial satisfaction and finite-objective optimization. */
@@ -51,178 +29,59 @@ data class PolynomialStrategyParams(
 }
 
 internal class PolynomialStrategyAdapters(
+    private val plan: PreparedSourcePlan,
     private val model: SharedPolynomialModel,
-    private val invocation: PolynomialTheoryInvocation,
+    private val scope: PolynomialInvocationScope,
     private val params: PolynomialStrategyParams,
-    cancellation: Cancellation,
+    private val cancellation: Cancellation,
+    private val parallelism: Int,
 ) {
-    private val cancellation = cancellation or Cancellation {
-        invocation.workExhausted || invocation.lastUnknown?.reason == QfNraReason.ResourceLimit
-    }
-    private val finite: BakedProblem = model.finite.bake(this.cancellation)
-    private val identity = ModelIdentity.of(model.source)
-    private val fixed = if (params.assumptions.isEmpty) finite.fixedDiscreteSample() else {
-        finite.conditionedRoot(params.assumptions, this.cancellation).fixedDiscreteSample()
+    fun solve(engine: FiniteEngine): SolveResult = if (engine == FiniteEngine.MIXED) {
+        portfolio().use { it.solve(cancellation) }
+    } else standalone(engine) { it.solve(engine) }
+
+    fun minimize(objective: LinearObjective, engine: FiniteEngine): MinimizeResult =
+        if (engine == FiniteEngine.MIXED) {
+            portfolio(objective).use { it.minimize(cancellation) }
+        } else standalone(engine) { it.minimize(objective, engine) }
+
+    private fun <T> standalone(engine: FiniteEngine, action: (PolynomialWorkerAdapter) -> T): T {
+        val complete = engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.FIXED
+        val budget = if (complete) params.backtrack.nodeBudget else params.localSearch.nodeBudget
+        return PortfolioInvocationResources(1, 1, params.localSearch.randomSeed ?: 0,
+            cancellation, budget, if (complete) setOf(0) else emptySet()).use { resources ->
+            val slot = resources.slots.single()
+            action(PolynomialWorkerAdapter(model, scope.worker(slot), params, scope.workerCancellation(slot)))
+        }
     }
 
-    private fun neighborhood(adaptive: Boolean, objective: LinearObjective? = null): PortfolioWorker? {
-        val point = fixed ?: return null
-        val adapter = PolynomialExactNeighborhood(model, invocation, finite, point, params.assumptions, objective)
-        return exactNeighborhoodWorker(if (adaptive) "alns+exact-nra-neighborhood" else "ls+exact-nra-neighborhood",
-            if (adaptive) 2 else 1, objective, cancellation or params.localSearch.cancellation,
-            exhausted = { cancellation() }, open = {
-                adapter.search(adaptive, params.localSearch.randomSeed ?: 0,
-                    params.localSearch.maxFlips, params.localSearch.maxInstructions ?: Long.MAX_VALUE,
-                    if (adaptive) params.alnsIterations.toLong() else null, params.localSearch.nodeBudget)
-            }).bindEvidence(identity, provesResults = false)
-    }
-
-    private fun certified(sample: Sample): Sample = sample.also {
-        it.witnessCertificate = EvidenceCertificate.verified(identity, EvidenceKind.Witness)
-    }
-
-    private fun backtrackParams(): BacktrackParams = params.backtrack.withAssumptions(params.assumptions).copy(
-        cancellation = params.backtrack.cancellation or cancellation,
-        componentFactory = {
-            params.backtrack.componentFactory?.invoke().orEmpty() + PolynomialSearchComponent(
-                model.service, invocation, model.integerColumns,
-            ) { assignment, context ->
-                certified(model.capture(
-                    assignment,
-                    BooleanArray(model.source.numBoolVars) { requireNotNull(context.boolValue(it)) },
-                    LongArray(model.source.numIntVars) { id ->
-                        val value = requireNotNull(context.intLowerBound(id))
-                        check(value == context.intUpperBound(id))
-                        value
-                    },
-                ))
-            }
-        },
+    private fun workerParams(slot: PortfolioWorkerSlot): PolynomialStrategyParams = params.copy(
+        backtrack = params.backtrack.copy(randomSeed = slot.seed,
+            maxDecisions = slot.nativeAllowance(params.backtrack.maxDecisions), nodeBudget = slot.nodeBudget),
+        localSearch = params.localSearch.copy(randomSeed = slot.seed,
+            maxFlips = slot.heuristicAllowance(params.localSearch.maxFlips),
+            maxInstructions = params.localSearch.maxInstructions?.let(slot::heuristicAllowance),
+            nodeBudget = slot.nodeBudget),
     )
 
-    private fun localParams(): LocalSearchParams = params.localSearch.withAssumptions(params.assumptions).copy(
-        cancellation = params.localSearch.cancellation or cancellation,
-    )
-
-    private var refutedCondition: PolynomialCondition? = null
-
-    private val completion = CandidateCompletion { candidate, stop ->
-        when (composedFixpoint(finite, Candidate(candidate, Unit), cancellation or stop, params.assumptions)) {
-            is Verification.Rejected -> return@CandidateCompletion Completion.Refuted(work = 1)
-            is Verification.Indeterminate -> return@CandidateCompletion Completion.Undecided(work = 1)
-            is Verification.Accepted -> Unit
-        }
-        val pins = model.integerColumns.map { (id, column) -> column to BigFraction.ofLong(candidate.intValue(id)) }
-            .toMap()
-        val condition = PolynomialCondition(
-            (0 until model.source.numBoolVars).associateWith(candidate::boolValue), pins, pins,
-        )
-        val query = if (!stop() && condition == refutedCondition) QfNraResult.Unsatisfiable(QfNraStats(0, 0, 0))
-        else invocation.check(condition, stop)
-        when (query) {
-            is QfNraResult.Satisfiable -> Completion.Witness(
-                certified(model.capture(query.assignment, candidate.bools, candidate.ints)), work = 1,
-            )
-            is QfNraResult.Unsatisfiable -> {
-                refutedCondition = condition
-                Completion.Refuted(work = 1)
+    private fun portfolio(objective: LinearObjective? = null): PortfolioInvocation {
+        val identity = ModelIdentity.of(model.source, objective)
+        val families = listOf(ArmFamily.Backtrack, ArmFamily.LocalSearch, ArmFamily.Lns)
+        val factories = families.mapIndexed { arm, family ->
+            PortfolioArmFactory(plan, arm, family) { slot ->
+                PolynomialWorkerAdapter(model, scope.worker(slot), workerParams(slot), scope.workerCancellation(slot))
+                    .worker(arm, objective, slot)
             }
-            is QfNraResult.Unknown -> Completion.Undecided(work = 1)
         }
-    }
-
-    private fun localSearch(): LocalSearchSolver = LocalSearchSolver(finite, completion = completion)
-
-    fun solve(engine: FiniteEngine): SolveResult = when (engine) {
-        FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> BacktrackSolver(finite).solve(backtrackParams())
-        FiniteEngine.LOCAL_SEARCH -> neighborhood(false)?.solve(cancellation, params.localSearch.maxInstructions)
-            ?: heuristic(localSearch().solve(localParams()))
-        FiniteEngine.ALNS -> neighborhood(true)?.solve(cancellation, params.localSearch.maxInstructions)
-            ?: alns(cancellation)
-        FiniteEngine.MIXED -> portfolio().use { it.solve(cancellation) }
-    }
-
-    fun minimize(objective: LinearObjective, engine: FiniteEngine): MinimizeResult {
-        require(objective.realCoefficientValues.none { it != 0.0 }) {
-            "polynomial optimization requires a finite objective"
-        }
-        return when (engine) {
-            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> BacktrackSolver(finite).minimize(objective, backtrackParams())
-            FiniteEngine.LOCAL_SEARCH -> neighborhood(false, objective)?.improvements(
-                { Double.POSITIVE_INFINITY }, cancellation, null, params.localSearch.maxInstructions,
-            )?.last() ?: heuristic(localSearch().minimize(objective, localParams()))
-            FiniteEngine.ALNS -> neighborhood(true, objective)?.improvements(
-                { Double.POSITIVE_INFINITY }, cancellation, null, params.localSearch.maxInstructions,
-            )?.last() ?: heuristic(alnsMinimize(objective, cancellation))
-            FiniteEngine.MIXED -> portfolio(objective).use { it.minimize(cancellation) }
-        }
-    }
-
-    private fun alns(stop: Cancellation, instructions: Long? = null): SolveResult {
-        val objective = LinearObjective(intCoefficients = LongArray(finite.numIntVars) { 1L })
-        val result = alnsMinimize(objective, stop, instructions)
-        return result.assignment?.let { SolveResult.Sat(it, result.stats) }
-            ?: SolveResult.Unknown(TerminationReason.BudgetExhausted, result.stats)
-    }
-
-    private fun alnsMinimize(
-        objective: LinearObjective,
-        stop: Cancellation,
-        instructions: Long? = null,
-    ): MinimizeResult {
-        val inner = localSearch()
-        return inner.session().use { session ->
-            val alns = Alns(
-                inner, session = session,
-                backtrack = BacktrackSolver(finite), backtrackParams = backtrackParams(),
-                repairOperators = BacktrackRepair.Defaults, maxIterations = params.alnsIterations,
-            )
-            val local = localParams().copy(cancellation = cancellation or stop,
-                maxInstructions = instructions?.let { minOf(it, params.localSearch.maxInstructions ?: it) }
-                    ?: params.localSearch.maxInstructions)
-            alns.minimize(objective, local)
-        }
-    }
-
-    private fun portfolio(objective: LinearObjective? = null): Portfolio {
-        val bt = PortfolioWorker.of("bt+exact-nra", 0, BacktrackSolver(finite).session(), backtrackParams(), objective)
-            .bindEvidence(identity)
-        val ls = neighborhood(false, objective) ?: PortfolioWorker.of(
-            "ls+exact-nra", 1, localSearch().session(), localParams(), objective,
-            withInstructionBudget = { p, units -> p.copy(maxInstructions = minOf(units, p.maxInstructions ?: units)) })
-            .bindEvidence(identity, provesResults = false)
-        val alns = neighborhood(true, objective) ?: if (objective == null) {
-            PortfolioWorker.ofSolve("alns+exact-nra", 2, countsInstructions = true,
-                solve = { stop, instructions -> alns(stop, instructions) })
-        } else {
-            PortfolioWorker.ofMinimize("alns+exact-nra", 2, countsInstructions = true,
-                improvements = { _, _, stop, instructions ->
-                    sequenceOf(heuristic(alnsMinimize(objective, stop, instructions)))
-                })
-        }.bindEvidence(identity, provesResults = false)
-        val portfolio = Portfolio.thompson(listOf(bt, ls, alns))
-        portfolio.exactLinearObjective = objective
-        portfolio.evidenceVerification = PortfolioEvidence(identity, CandidateVerifier { candidate ->
-            val certificate = candidate.assignment.witnessCertificate
-            if (certificate?.kind == EvidenceKind.Witness && certificate.model.sameModel(identity)) {
-                Verification.Accepted(candidate)
-            } else {
-                Verification.Indeterminate("polynomial source witness has no matching exact certificate")
-            }
-        })
-        return portfolio
-    }
-
-    private fun heuristic(result: SolveResult): SolveResult = when (result) {
-        is SolveResult.Unsat -> SolveResult.Unknown(TerminationReason.BudgetExhausted, result.stats)
-        else -> result
-    }
-
-    private fun heuristic(result: MinimizeResult): MinimizeResult = when (result) {
-        is MinimizeResult.Optimal -> MinimizeResult.BestFound(
-            result.sample, result.objective, TerminationReason.BudgetExhausted, result.stats,
-        )
-        is MinimizeResult.Infeasible -> MinimizeResult.Unknown(TerminationReason.BudgetExhausted, result.stats)
-        else -> result
+        return PortfolioInvocation(plan, factories,
+            PortfolioInvocationControls(parallelism = parallelism,
+                seed = params.localSearch.randomSeed ?: 0, cancellation = cancellation,
+                nodeBudget = params.backtrack.nodeBudget ?: params.localSearch.nodeBudget, reseedStaleThreshold = 0),
+            PortfolioEvidence(identity, CandidateVerifier { candidate ->
+                val certificate = candidate.assignment.witnessCertificate
+                if (certificate?.kind == EvidenceKind.Witness &&
+                    certificate.model.sameModel(ModelIdentity.of(model.source))) Verification.Accepted(candidate)
+                else Verification.Indeterminate("polynomial source witness has no matching exact certificate")
+            }), objective)
     }
 }

@@ -1,7 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.arithmetic.polynomial.PolynomialResource
-import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.SolveResult
@@ -12,8 +10,6 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
-import com.eignex.klause.theory.qfnra.QfNraParams
-import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.util.Cancellation
 
 /** A polynomial request composing exact continuous constraints with finite factors. */
@@ -131,7 +127,17 @@ fun OpenTheoryPipeline.minimize(
     objective: LinearObjective,
     params: PolynomialTheoryParams = PolynomialTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
+): PolynomialOptimizationExecution = minimize(request, objective, params, engine, 1)
+
+/** Optimize a finite polynomial objective using the requested mixed-portfolio lane count. */
+fun OpenTheoryPipeline.minimize(
+    request: PolynomialTheoryRequest,
+    objective: LinearObjective,
+    params: PolynomialTheoryParams,
+    engine: FiniteEngine,
+    cores: Int,
 ): PolynomialOptimizationExecution {
+    require(cores > 0)
     val stop = params.timeout or params.cancellation
     val operation = request.preparedPlan.withObjective(objective)
     if (objective.realCoefficientValues.any { it != 0.0 } ||
@@ -141,20 +147,16 @@ fun OpenTheoryPipeline.minimize(
             PolynomialTheoryStats())
     }
     val shared = request.resolvedModel()
-    val invocation = shared.service.invocation(QfNraParams(
-        stop, params.maximumWork,
-        PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),
-    ))
-    val completed = invocation.use {
-        PolynomialStrategyAdapters(shared, it, params.strategy, stop).minimize(objective, engine)
-    }
+    val scope = PolynomialInvocationScope(shared.service, params)
+    val completed = PolynomialStrategyAdapters(operation, shared, scope, params.strategy, stop, cores)
+        .minimize(objective, engine)
     val result = when (completed) {
         is MinimizeResult.Optimal -> completed.copy(sample = request.capture(completed.sample))
         is MinimizeResult.BestFound -> completed.copy(sample = request.capture(completed.sample))
         is MinimizeResult.Unbounded -> completed.copy(sample = request.capture(completed.sample))
         else -> completed
     }
-    val nativeStopped = invocation.workExhausted || invocation.lastUnknown?.reason == QfNraReason.ResourceLimit
+    val nativeStopped = scope.stopped
     val reason = when {
         params.timeout() -> TerminationReason.Timeout
         stop() -> TerminationReason.Cancelled
@@ -164,10 +166,7 @@ fun OpenTheoryPipeline.minimize(
         is MinimizeResult.WithSample -> MinimizeResult.BestFound(result.sample, result.objective, reason, result.stats)
         else -> MinimizeResult.Unknown(reason, result.stats)
     }
-    val native = invocation.stats
-    return PolynomialOptimizationExecution(published, PolynomialTheoryStats(
-        native.projectedPolynomials, native.liftedCells, native.workSpent,
-    ))
+    return PolynomialOptimizationExecution(published, scope.stats)
 }
 
 private fun PolynomialTheoryRequest.capture(sample: Sample): Sample = Sample(
@@ -184,7 +183,16 @@ fun OpenTheoryPipeline.execute(
     request: PolynomialTheoryRequest,
     params: PolynomialTheoryParams = PolynomialTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
+): PolynomialTheoryExecution = execute(request, params, engine, 1)
+
+/** Execute a polynomial source using the requested mixed-portfolio lane count. */
+fun OpenTheoryPipeline.execute(
+    request: PolynomialTheoryRequest,
+    params: PolynomialTheoryParams,
+    engine: FiniteEngine,
+    cores: Int,
 ): PolynomialTheoryExecution {
+    require(cores > 0)
     val stop = params.timeout or params.cancellation
     fun incomplete(
         reason: TerminationReason,
@@ -202,17 +210,10 @@ fun OpenTheoryPipeline.execute(
         return incomplete(TerminationReason.Unsupported, PolynomialTheoryStats(), SolveStats.EMPTY)
     }
     val shared = request.resolvedModel()
-    val invocation = shared.service.invocation(QfNraParams(
-        stop, params.maximumWork,
-        PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),
-    ))
-    val result = invocation.use { PolynomialStrategyAdapters(shared, it, params.strategy, stop).solve(engine) }
-    val native = invocation.stats
-    val stats = PolynomialTheoryStats(
-        native.projectedPolynomials,
-        native.liftedCells,
-        native.workSpent,
-    )
+    val scope = PolynomialInvocationScope(shared.service, params)
+    val result = PolynomialStrategyAdapters(request.preparedPlan, shared, scope, params.strategy, stop, cores)
+        .solve(engine)
+    val stats = scope.stats
     if (stop()) {
         return incomplete(
             if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled, stats, result.stats,
@@ -241,18 +242,13 @@ fun OpenTheoryPipeline.execute(
         }
         is SolveResult.Unsat -> PolynomialTheoryExecution(OpenTheoryResult.Unsat(result.stats), stats)
         is SolveResult.Unknown -> incomplete(
-            if (invocation.workExhausted || invocation.lastUnknown?.reason == QfNraReason.ResourceLimit) {
+            if (scope.stopped) {
                 TerminationReason.BudgetExhausted
             } else result.reason,
             stats,
             result.stats,
         ).copy(
-            resource = when (invocation.lastUnknown?.resource) {
-                PolynomialResource.DENSE_COEFFICIENTS -> PolynomialTheoryResource.DenseCoefficients
-                PolynomialResource.MATRIX_CELLS -> PolynomialTheoryResource.MatrixCells
-                PolynomialResource.DEGREE_OVERFLOW -> PolynomialTheoryResource.DegreeOverflow
-                null -> null
-            },
+            resource = scope.resource,
         )
     }
 }

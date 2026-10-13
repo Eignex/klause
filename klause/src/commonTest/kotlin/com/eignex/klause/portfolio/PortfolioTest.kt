@@ -31,6 +31,8 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
@@ -58,6 +60,7 @@ import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -2149,4 +2152,53 @@ class PortfolioTest {
         assertEquals(1, slices)
         assertTrue(checkNotNull(requestedMillis) <= checkNotNull(remainingMillis) + 1L)
     }
+    @Test
+    fun `accepted native terminal ends the shared schedule without manufacturing scalar optimality`() {
+        var siblingEntered = false
+        var accepted = 0
+        val complete = trackingWorker("complete", 0,
+            TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.BudgetExhausted)))
+        val sibling = trackingWorker("sibling", 1,
+            TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.BudgetExhausted),
+                onRun = { siblingEntered = true }))
+        val checker = PortfolioTerminalCheck { worker, _ ->
+            if (worker.armId == 0) PortfolioTerminalPublication(Verification.Accepted(Candidate(Unit, Unit))) {
+                accepted++
+            } else null
+        }
+
+        val result = Portfolio.thompson(listOf(complete, sibling)).use {
+            it.minimize(Cancellation.Never, null, PortfolioIncumbents.floating(), checker)
+        }
+
+        assertIs<MinimizeResult.Unknown>(result)
+        assertEquals(1, accepted)
+        assertFalse(siblingEntered)
+    }
+
+    @Test
+    fun `rejected native terminal quarantines its producer and admits its sibling`() {
+        var siblingEntered = false
+        var accepted = false
+        val complete = trackingWorker("foreign", 0,
+            TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.BudgetExhausted)))
+        val sibling = trackingWorker("sibling", 1,
+            TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.BudgetExhausted),
+                onRun = { siblingEntered = true }))
+        val checker = PortfolioTerminalCheck { worker, _ ->
+            if (worker.armId == 0) PortfolioTerminalPublication(Verification.Rejected("foreign source scope")) {
+                accepted = true
+            } else null
+        }
+
+        val result = Portfolio.thompson(listOf(complete, sibling)).use {
+            it.minimize(Cancellation.Never, null, PortfolioIncumbents.floating(), checker)
+        }
+
+        assertIs<MinimizeResult.Unknown>(result)
+        assertEquals(true, siblingEntered)
+        assertFalse(accepted)
+        assertEquals(1L, result.stats.portfolio.arms.first().faults)
+    }
+
 }

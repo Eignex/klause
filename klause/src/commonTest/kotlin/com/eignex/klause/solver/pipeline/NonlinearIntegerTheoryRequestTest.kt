@@ -195,4 +195,19 @@ class NonlinearIntegerTheoryRequestTest {
         assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
         assertEquals(0L, execution.stats.workSpent)
     }
+    @Test
+    fun `parallel nonlinear integer workers preserve the original source coordinates`() {
+        val input = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
+            "(declare-const x Int) (declare-const y Int) (assert (= x 3)) (assert (= (* x y) 21))",
+        ))
+        val request = input.problem.pipelineRequest()
+
+        val execution = OpenTheoryPipeline.execute(request, NonlinearIntegerTheoryParams(), FiniteEngine.MIXED, 4)
+
+        val sat = assertIs<OpenTheoryResult.Sat>(execution.result)
+        assertEquals("3", sat.assignment.intValue(0))
+        assertEquals("7", sat.assignment.intValue(1))
+        assertEquals(4, sat.stats.portfolio.arms.size)
+    }
+
 }

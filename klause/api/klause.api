@@ -10612,6 +10612,7 @@ public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryReque
 
 public final class com/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequestKt {
 	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 	public static final fun pipelineRequest (Lcom/eignex/klause/ir/NonlinearIntegerProblem;)Lcom/eignex/klause/solver/pipeline/NonlinearIntegerTheoryRequest;
 }
@@ -10762,19 +10763,23 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryMinimizer {
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
+	public fun getLinearResult ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
+	public final fun component5 ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getIncumbent ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public fun getLinearResult ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
@@ -10782,26 +10787,36 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded :
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$DefaultImpls {
+	public static fun getLinearResult (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;)Lcom/eignex/klause/solver/result/LinearOptimizationResult;
+}
+
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
+	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible;
 	public fun equals (Ljava/lang/Object;)Z
+	public fun getLinearResult ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public final fun component4 ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public fun getLinearResult ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
 	public fun hashCode ()I
@@ -10809,13 +10824,16 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal :
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
+	public final fun component4 ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
 	public fun equals (Ljava/lang/Object;)Z
+	public fun getLinearResult ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun getWitness ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
@@ -10847,6 +10865,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryRequest {
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public final fun getRoute ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public final fun withLinearAuthority (Lcom/eignex/klause/solver/evidence/SourceProofContext;)Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;
 	public final fun withPresolve (Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;
 	public static synthetic fun withPresolve$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;
 }
@@ -10994,8 +11013,10 @@ public final class com/eignex/klause/solver/pipeline/PolynomialTheoryRequest {
 
 public final class com/eignex/klause/solver/pipeline/PolynomialTheoryRequestKt {
 	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
 	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/PolynomialOptimizationExecution;
+	public static final fun minimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/PolynomialOptimizationExecution;
 	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialOptimizationExecution;
 	public static final fun pipelineRequest (Lcom/eignex/klause/ir/PolynomialRealProblem;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;
 	public static final fun pipelineRequest (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryRequest;

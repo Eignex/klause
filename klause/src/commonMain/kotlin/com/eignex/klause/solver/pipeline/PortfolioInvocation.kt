@@ -9,6 +9,7 @@ import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -108,9 +109,10 @@ internal class PortfolioInvocation(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
         incumbents: PortfolioIncumbents<V>,
+        terminalCheck: PortfolioTerminalCheck? = null,
     ): MinimizeResult {
         check(!closed) { "portfolio invocation is closed" }
-        return portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents)
+        return portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents, terminalCheck)
     }
 
     override fun close() {

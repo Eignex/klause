@@ -99,7 +99,7 @@ its operation finishes.
 
 Internal conditioned linear query owners retain one private prepared search and
 native work ledger. Canonical CP projection, its immutable propagator indexes and
-theory fragments remain prepared
+theory fragments and completed exact-linear source factories remain prepared
 when an interrupted installation needs fresh mutable components. Every fresh
 component set owns separate propagation, clause, arithmetic and atom-registry state.
 Each query captures Boolean pins, exact rational coordinate

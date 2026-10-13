@@ -10,6 +10,7 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.incumbent.CompletedEngineResult
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -73,15 +74,29 @@ class PortfolioWorker private constructor(
     private var provesSourceResults = true
     internal var evidenceScope: SourceScope? = null
         private set
+    internal var evidenceInvocation: EngineInvocation? = null
+        private set
+
+    internal fun bindInvocation(invocation: EngineInvocation): PortfolioWorker = also {
+        require(evidenceModel?.matches(invocation.model) == true) { "invocation differs from the worker model" }
+        require(evidenceInvocation?.matches(invocation) != false) { "worker cannot change its runtime invocation" }
+        require(evidenceScope == null || evidenceScope == invocation.scope) { "worker has a different capture scope" }
+        evidenceInvocation = invocation
+        invocation.scope?.let { bindSourceScope(it) }
+    }
 
     internal fun bindSourceScope(scope: SourceScope): PortfolioWorker = also {
         require(evidenceScope == null || evidenceScope == scope) { "worker cannot change its source invocation" }
+        require(evidenceInvocation == null || evidenceInvocation?.scope == scope) { "worker has another runtime scope" }
         evidenceScope = scope
     }
 
     internal fun certificateFor(kind: EvidenceKind, completion: CompletedEngineResult): EvidenceCertificate? {
         val model = evidenceModel ?: return null
         if (!provesSourceResults || evidenceScope != completion.scope) return null
+        val runtime = evidenceInvocation
+        if (runtime != null && completion.invocation?.let { runtime.matches(it) } != true) return null
+        if ((evidenceInvocation == null) != (completion.invocation == null)) return null
         return EvidenceCertificate.completed(model, kind, completion)
     }
 
