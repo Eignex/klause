@@ -30,8 +30,10 @@ internal class MiniZincCompileFailure(
     val exitCode: Int,
     val diagnostic: String,
     val compiler: MiniZincCompilerIdentity,
+    val command: List<String>,
+    val elapsedNs: Long,
 ) : IllegalArgumentException("minizinc compile failed (exit $exitCode): ${diagnostic.take(4000)}") {
-    val incompatibility: String? = classify(diagnostic)
+    val incompatibility: String? = if (exitCode == 1) classify(diagnostic) else null
 
     companion object {
         fun classify(diagnostic: String): String? = when {

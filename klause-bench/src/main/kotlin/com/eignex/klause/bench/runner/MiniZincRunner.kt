@@ -110,6 +110,7 @@ internal class MiniZincRunner(
             if (dzn != null) add(dzn.absolutePath)
         }
         val log = File.createTempFile("${out.nameWithoutExtension}-", ".log", out.parentFile)
+        val start = System.nanoTime()
         val proc = ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(log).start()
         try {
             val finished = proc.waitFor(timeoutSec.toLong(), TimeUnit.SECONDS)
@@ -120,7 +121,9 @@ internal class MiniZincRunner(
             }
             val output = log.readText()
             if (proc.exitValue() != 0) {
-                throw MiniZincCompileFailure(proc.exitValue(), output, MiniZincCompatibility.compiler)
+                throw MiniZincCompileFailure(
+                    proc.exitValue(), output, MiniZincCompatibility.compiler, cmd, System.nanoTime() - start,
+                )
             }
             require(tmp.exists()) { "minizinc compile produced no .fzn for ${mzn.name}" }
             require(tmpOzn.length() > 0) { "minizinc compile produced no output mapping" }

@@ -26,7 +26,11 @@ internal object MiniZincCompatibilityProbe {
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.current)
         Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
         val all = Catalog.uncapped("mzn-bench-compatible-v1").problems.associateBy { it.name }
-        val refs = names.map { requireNotNull(all[it]) { "unknown source $it" } }
+        val families = options["families"]?.split(',').orEmpty()
+        val refs = (names.map { requireNotNull(all[it]) { "unknown source $it" } } +
+            all.values.filter { it.family in families }).distinctBy { it.name }
+        require(refs.size <= 128) { "at most 128 source identities per audit" }
+        val auditedNames = refs.map { it.name }
         val repetitions = options["repeats"]?.toInt() ?: 3
         require(repetitions in 1..10)
         val failures = linkedMapOf<String, MiniZincCompileFailure>()
@@ -54,6 +58,8 @@ internal object MiniZincCompatibilityProbe {
                         put("repetition", repetition)
                         put("elapsedNs", System.nanoTime() - start)
                         put("compilerExit", failure?.exitCode ?: 0)
+                        put("compilerCommand", failure?.command?.let { Reports.json.encodeToJsonElement(it) })
+                        put("compilerElapsedNs", failure?.elapsedNs)
                         put("status", if (failure == null) "compilable" else "source-compiler-incompatible")
                         put("reason", failure?.incompatibility)
                         put("diagnostic", failure?.diagnostic)
@@ -71,7 +77,7 @@ internal object MiniZincCompatibilityProbe {
             val selections = buildJsonArray {
                 for (seed in listOf(null, "1", "7")) {
                     val filters = buildMap {
-                        put("name", names.joinToString(","))
+                        put("name", auditedNames.joinToString(","))
                         put("per-family", options["per-family"] ?: "1")
                         put("max", options["max"] ?: "100")
                         if (seed != null) put("seed", seed)
@@ -95,6 +101,10 @@ internal object MiniZincCompatibilityProbe {
             System.setErr(original)
             exclusions.close()
         }
+        val frozen = options["set"]?.let { set ->
+            BenchCli.selectProblems(mapOf("set" to set, "name" to auditedNames.joinToString(",")))
+                .map { "${it.suite}/${it.ref.name}" }
+        }.orEmpty()
         out.resolve("summary.json").writeText(buildJsonObject {
             put("revision", Reports.readGitSha())
             put("requested", refs.size)
@@ -102,6 +112,8 @@ internal object MiniZincCompatibilityProbe {
             put("compilable", refs.size - failures.size)
             put("solverInvocations", 0)
             put("repeats", repetitions)
+            put("frozenSet", options["set"])
+            put("frozenMembers", buildJsonArray { frozen.forEach { add(JsonPrimitive(it)) } })
         }.toString() + "\n")
         println(out.resolve("summary.json").readText())
     }

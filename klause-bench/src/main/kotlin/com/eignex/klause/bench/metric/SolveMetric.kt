@@ -6,6 +6,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.runner.MiniZincCompileFailure
 import com.eignex.klause.bench.runner.MiniZincCompilerIdentity
 import com.eignex.klause.bench.runner.ResolvedProblem
@@ -306,6 +307,7 @@ internal object SolveMetric {
                 put((if (declined(failure)) "unsupported" else "loadError"), reason)
                 if (failure is MiniZincCompileFailure) {
                     put("compilerExit", failure.exitCode.toString())
+                    put("compilerElapsedNs", failure.elapsedNs.toString())
                     failure.incompatibility?.let { put("sourceCompilerIncompatible", it) }
                 }
             },
@@ -367,7 +369,7 @@ internal object SolveMetric {
                 .copy(
                     validationPolicy = policy,
                     compilerIdentity = if (entry.ref.format == Format.MINIZINC) {
-                        com.eignex.klause.bench.runner.MiniZincCompatibility.compiler
+                        MiniZincCompatibility.compiler
                     } else {
                         null
                     },
