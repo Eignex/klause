@@ -144,6 +144,18 @@ known conditioned result cannot be recaptured under a different original scope.
 Absent affine data does not become a constant objective. Unsupported traversal,
 trajectory or approach mechanisms retain unavailable coverage.
 
+`CompletedEnginePublication` retains native root objective floors and integer windows
+for sharing during search. Each publication keeps the actual `EngineInvocation`,
+execution value or coordinate and both endpoints. Integer windows use execution
+coordinates and may be empty; they do not imply an original-coordinate mapping.
+`EvidenceCertificate.published` carries this typed publication through the existing
+admission path. Consumer pools bind their own runtime before accepting publications;
+matching a model label cannot replace that binding. Objective values, integer
+coordinates and endpoints must match the retained publication exactly. Pool binding
+and publication folding are atomic, and a pool containing unscoped deductions cannot
+acquire a different invocation. Uncaptured native deductions have explicitly
+unavailable independent derivation coverage.
+
 `CompletedEngineResult` retains an actual ordinary completed result and its source
 binding for the completion-taking worker issuance hook. `EngineInvocation` retains
 the existing prepared plan, its original source and objective/direction, the actual
