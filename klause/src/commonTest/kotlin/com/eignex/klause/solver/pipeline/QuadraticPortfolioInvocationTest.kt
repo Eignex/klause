@@ -34,6 +34,30 @@ import kotlin.test.assertSame
 
 class QuadraticPortfolioInvocationTest {
     @Test
+    fun `a foreign containing source invocation cannot start quadratic workers`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val foreign = Problem(0, 0, emptyArray(), emptyArray())
+        val objective = QuadraticObjectiveSpec(emptyList())
+        val plan = source.preparePolynomialExecutionPlan().withObjective(objective)
+        val invocation = requireNotNull(foreign.preparePolynomialExecutionPlan().quadraticEngineInvocation(
+            objective, ObjectiveSense.MINIMIZE, Assumptions.None,
+        ))
+        val params = PolynomialTheoryParams()
+        var entered = 0
+
+        val result = QuadraticPortfolioInvocation(plan, objective, ObjectiveSense.MINIMIZE, params,
+            QuadraticNativeScope(params), FiniteEngine.MIXED, 1, Assumptions.None, invocation)
+            .execute { _, _, _, _ ->
+                entered++
+                error("foreign invocation constructed a worker")
+            }
+
+        assertIs<QuadraticOptimizationResult.Unknown>(result)
+        assertEquals(TerminationReason.Unsupported, result.reason)
+        assertEquals(0, entered)
+    }
+
+    @Test
     fun `a copied native publication cannot admit a different quadratic point`() {
         val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
