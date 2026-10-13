@@ -221,6 +221,24 @@ loaded library/tool jar and reference binary identities. Source checking and set
 are outside the measured query spans. JFR instrumentation remains part of profile jobs;
 these measurements are preparation diagnostics, not ordinary end-to-end solve timings.
 
+`bench.profile.ProjectionProviderProfile` compares direct built-in projection opening,
+captured default opening and alternate clause propagation/scoring plus equivalent
+integer relaxation emission. It alternates control order after a warmup, records
+allocation bytes and wall nanoseconds separately for descriptor selection and
+mechanism opening, and retains the executed revision, source and classpath hashes,
+JDK, cores, seeds and budgets. Arguments are `factors=N rounds=N openings=N seed=N`;
+defaults are 128 factors, seven measured rounds, 100 openings and seed 3. Run on one
+AWS machine with `parallel: 1` and a pinned revision through a lab profile job.
+
+Its exact Boolean/integer source fixture retains every original-domain assignment.
+An independent Python process checks complete source enumeration, scoring acceptance
+and minimum/maximum original-direction integer objectives for both providers. These
+checks establish this finite fixture's source behavior; they export no proof file and
+do not certify arbitrary custom providers. Opening and allocation measurements are
+preparation diagnostics. Source checking and optimization controls occur outside the
+timed spans. `source-check.json` records the checker and input hashes; missing or
+failed checking cannot count as parity evidence.
+
 Cases disable result caching, alternate configurations across seeds/repetitions,
 and retain installed-build provenance when supported by the selected revision.
 XCSP3 references accept only `cp-sat`; `solve-one backend=reference solver=cp-sat`

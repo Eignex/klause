@@ -1257,7 +1257,7 @@ internal class CpToLpRelaxation(
                 if (realResidual && !touchesReals(factor)) continue
                 currentFactorId = factorId
                 currentEmissionRoute = 0L
-                if (gated && factor is ReifiedRealLinear) {
+                if (gated && factor is ReifiedRealLinear && projections?.usesBuiltInRelaxation(factorId) != false) {
                     emitGatedReified(factor)
                     attributeRows(factorId)
                     continue
