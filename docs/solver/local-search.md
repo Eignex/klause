@@ -301,6 +301,25 @@ peak coordinates and move sink; neighboring, enumerated and random targets retai
 their order. The ordinary scorer grades every affected factor; removing a
 footprint does not establish that the complete assignment is feasible.
 
+## Diffn neighborhoods
+
+Satisfied Diffn layouts offer up to four adjacency, boundary compaction and paired
+reordering/translation moves, alongside equal-footprint swaps. Relocations sample
+at most eight rectangles and check at most 24 nonempty admissible targets. Joint
+moves apply both positions before checking geometry; their independent writes need
+not preserve packing. Root-domain holes, pins, definitions and implicit owners
+filter every changed coordinate before emission. Repeated coordinates coalesce
+only when their targets agree. Geometry reads every aliased position and variable
+size at its final target, and declines moves affecting more than eight rectangles.
+Overflowing adjacency endpoints decline. Strict and nonstrict zero-size semantics
+match the ordinary invariant. Equal-footprint swaps require independent position
+coordinates that do not alias dimensions.
+
+Geometry checks only establish the proposing Diffn's satisfaction. Ordinary complete
+move scoring, definition propagation and source publication checks remain responsible
+for all other model constraints and the objective. Candidate generation consumes
+bounded work within an atomic factor call; it adds no search instruction allowance.
+
 ### Move ranking and plateau feedback
 
 During infeasibility, weighted and raw move ranking interpolates Cumulative overloads
