@@ -21,6 +21,7 @@ import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.sourceProofContext
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -131,8 +132,9 @@ class CompletedEngineResultTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val scoped = SourceScope(SourceRevision("original-ir", "klause-ir-exact-v1"),
             objective = SourceObjective("negative-x", ObjectiveSense.MINIMIZE))
-        val context = assertNotNull(model.sourceProofContext(scoped))
-        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
+        val context = assertNotNull(model.sourceProofContext(scoped, objective))
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
         val evidence = SourceResultEvidence(scoped, listOf(SourceEvidence(scoped, SourceClaim.Witness(point),
             SourceDerivation.SourceWitness)))
         val result = MinimizeResult.Unbounded(point, 0.0, listOf(BigFraction.ONE), evidence = evidence)
