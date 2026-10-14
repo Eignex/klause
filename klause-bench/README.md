@@ -242,7 +242,9 @@ these measurements are preparation diagnostics, not ordinary end-to-end solve ti
 `bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
 explicit registered linear peers over original real, wide-integer, strict and guarded
 sources. Pass `repeats=N warmups=N cases=<comma-separated names>`; defaults are three
-measured rounds and one warmup. Modes alternate in each round on the same process.
+measured rounds and one warmup. The launcher starts a measured JVM with `-Xmx3g`,
+Serial GC and one active processor, retaining its command and actual runtime options.
+Modes alternate in each round in that JVM.
 Each fresh invocation has a ten-second deadline and retains source/output hashes,
 exact immutable witnesses, native work charges, attempted complete checks (including
 a refused check), stop cause and runtime/library provenance under `$OUT`. SAT streams
