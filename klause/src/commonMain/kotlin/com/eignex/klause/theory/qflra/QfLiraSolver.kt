@@ -337,27 +337,32 @@ class ExactLiraSearchComponent private constructor(
             }
             val point = ArrayList<BigFraction>(model.numRealVars + model.numIntVars)
             for (variable in 0 until model.numRealVars) {
-                if (operationStop()) return ComponentCheck.Indeterminate
+                if (operationStop()) return coordinateDeclined(context)
                 val id = SourceRealId(variable)
                 if (values.valueOf(SearchExactAlgebraicRealValue(id)) != null ||
                     values.valueOf(SearchExactRealExpressionValue(id)) != null
-                ) return ComponentCheck.Indeterminate
-                point += values.valueOf(SearchExactRealValue(id)) ?: return ComponentCheck.Indeterminate
+                ) return coordinateDeclined(context)
+                point += values.valueOf(SearchExactRealValue(id)) ?: return coordinateDeclined(context)
             }
             for (variable in 0 until model.numIntVars) {
-                if (operationStop()) return ComponentCheck.Indeterminate
+                if (operationStop()) return coordinateDeclined(context)
                 point += values.valueOf(SearchExactIntValue(SourceIntId(variable)))?.asFraction()
-                    ?: return ComponentCheck.Indeterminate
+                    ?: return coordinateDeclined(context)
             }
-            if (!point.admittedSourcePoint()) return ComponentCheck.Indeterminate
-            val rows = reduction.sourceRows(bools, node, lpStop) ?: return ComponentCheck.Indeterminate
+            if (!point.admittedSourcePoint()) return coordinateDeclined(context)
+            val rows = reduction.sourceRows(bools, node, lpStop) ?: return coordinateDeclined(context)
             lpStop.charge(rows.sumOf { it.columns.size.toLong() + 1L })
             if (!operationStop() && point.satisfiesSourceRows(rows, lpStop) && !operationStop()) {
                 ComponentCheck.Feasible
-            } else ComponentCheck.Indeterminate
+            } else if (operationStop()) ComponentCheck.Indeterminate else coordinateDeclined(context)
         } finally {
             endOperation(context)
         }
+    }
+
+    private fun coordinateDeclined(context: SearchContext): ComponentCheck {
+        context.executionControls.reportStop(SearchStopCause.RepresentationDecline)
+        return ComponentCheck.Indeterminate
     }
 
     private fun agreementDeclined(context: SearchContext): ComponentResult {

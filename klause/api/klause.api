@@ -14376,6 +14376,25 @@ public final class com/eignex/klause/solver/search/SourceBoundTerm {
 	public fun toString ()Ljava/lang/String;
 }
 
+public abstract interface class com/eignex/klause/solver/search/SourceCoordinateAgreement {
+	public abstract fun checkSourceCoordinates (Lcom/eignex/klause/solver/search/AssembledSearchModel;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
+	public abstract fun shareSourcePredicates (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
+}
+
+public final class com/eignex/klause/solver/search/SourceCoordinateAgreementComponent : com/eignex/klause/solver/search/SearchComponent {
+	public fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function0;Z)V
+	public synthetic fun <init> (Ljava/util/List;Lkotlin/jvm/functions/Function0;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
+	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
+	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun getRetainsOwnExplanations ()Z
+	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
+	public fun onRestart (Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun propagate (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
+	public fun reasonFor (I)Lcom/eignex/klause/solver/search/SearchExplanation;
+	public fun retract (I)V
+}
+
 public abstract interface class com/eignex/klause/solver/search/TheoryComponent : com/eignex/klause/solver/search/SearchComponent {
 }
 
@@ -14568,11 +14587,12 @@ public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com/eignex/klause/solver/search/SearchBranchProposal, com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/TheoryComponent, java/lang/AutoCloseable {
+public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com/eignex/klause/solver/search/SearchBranchProposal, com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/SourceCoordinateAgreement, com/eignex/klause/solver/search/TheoryComponent, java/lang/AutoCloseable {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function2;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
+	public fun checkSourceCoordinates (Lcom/eignex/klause/solver/search/AssembledSearchModel;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun close ()V
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
 	public fun getBranchKind ()Lcom/eignex/klause/solver/search/SearchBranchKind;
@@ -14583,6 +14603,7 @@ public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com
 	public fun propagate (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun reasonFor (I)Lcom/eignex/klause/solver/search/SearchExplanation;
 	public fun retract (I)V
+	public fun shareSourcePredicates (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLraAssignment {

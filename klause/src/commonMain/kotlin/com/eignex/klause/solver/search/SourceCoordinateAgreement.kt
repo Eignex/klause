@@ -34,7 +34,11 @@ class SourceCoordinateAgreementComponent(
     }
 
     override fun propagate(context: SearchContext): ComponentResult {
-        if (!supported || context.cancelled()) return ComponentResult.Indeterminate
+        if (context.cancelled()) return ComponentResult.Indeterminate
+        if (!supported) {
+            context.executionControls.reportStop(SearchStopCause.RepresentationDecline)
+            return ComponentResult.Indeterminate
+        }
         for (participant in participants) {
             val result = participant.shareSourcePredicates(context)
             if (result != ComponentResult.Consistent) return result
@@ -43,19 +47,26 @@ class SourceCoordinateAgreementComponent(
     }
 
     override fun check(context: SearchContext): ComponentCheck {
-        if (!supported || context.cancelled()) return ComponentCheck.Indeterminate
+        if (context.cancelled()) return ComponentCheck.Indeterminate
+        if (!supported) return declined(context)
         val model = try {
             snapshot()
         } catch (_: IllegalArgumentException) {
-            return ComponentCheck.Indeterminate
+            return declined(context)
         } catch (_: IllegalStateException) {
-            return ComponentCheck.Indeterminate
+            return declined(context)
         }
         for (participant in participants) {
             if (participant.checkSourceCoordinates(model, context) != ComponentCheck.Feasible) {
-                return ComponentCheck.Indeterminate
+                return declined(context)
             }
         }
         return if (context.cancelled()) ComponentCheck.Indeterminate else ComponentCheck.Feasible
+    }
+    private fun declined(context: SearchContext): ComponentCheck {
+        if (!context.cancelled() && context.executionControls.stopCause == null) {
+            context.executionControls.reportStop(SearchStopCause.RepresentationDecline)
+        }
+        return ComponentCheck.Indeterminate
     }
 }

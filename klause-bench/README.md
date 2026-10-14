@@ -239,6 +239,18 @@ loaded library/tool jar and reference binary identities. Source checking and set
 are outside the measured query spans. JFR instrumentation remains part of profile jobs;
 these measurements are preparation diagnostics, not ordinary end-to-end solve timings.
 
+`bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
+explicit registered linear peers over original real, wide-integer, strict and guarded
+sources. Pass `repeats=N warmups=N cases=<comma-separated names>`; defaults are three
+measured rounds and one warmup. Modes alternate in each round on the same process.
+Each fresh invocation has a ten-second deadline and retains source/output hashes,
+exact immutable witnesses, native work charges, attempted complete checks (including
+a refused check), stop cause and runtime/library provenance under `$OUT`. SAT streams
+are independently checked against the original SMT source after timing. The zero-check
+control must remain unknown; conflicting source equations are analytic UNSAT controls
+and do not receive an independent proof check. JFR and construction are included in
+these diagnostic timings; they are not ordinary CLI throughput measurements.
+
 `bench.profile.PublishedAbiSnapshot` captures compiler-generated JVM and Kotlin/Native
 published API declarations from the profile job's pinned checkout. It runs
 `:klause:updateKotlinAbi` remotely, retains both exact dumps, the generation log and

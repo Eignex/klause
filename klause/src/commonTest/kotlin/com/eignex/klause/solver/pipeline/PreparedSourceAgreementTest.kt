@@ -1,5 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
+import com.eignex.klause.arithmetic.real.ExactRealExpression
+import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntBounds
@@ -8,11 +13,15 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.search.AssembledSearchModel
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExactAlgebraicRealValue
 import com.eignex.klause.solver.search.SearchExactIntValue
+import com.eignex.klause.solver.search.SearchExactRealExpressionValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchResult
@@ -21,6 +30,7 @@ import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -244,5 +254,52 @@ class PreparedSourceAgreementTest {
 
                 assertIs<SearchResult.Indeterminate>(result)
             }
+    }
+
+    @Test
+    fun `rational peers decline algebraic and symbolic authoritative coordinates`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(4.0))
+        val arithmetic = AlgebraicArithmetic(PolynomialArithmetic())
+        val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        val coordinates: List<Map<Any, Any>> = listOf(
+            mapOf(SearchExactAlgebraicRealValue(SourceRealId(0)) to root),
+            mapOf(SearchExactRealExpressionValue(SourceRealId(0)) to ExactRealValue(ExactRealExpression.Pi)),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchComponentSet(listOf(component)).session()
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentCheck.Feasible>(session.check())
+
+            for (values in coordinates) {
+                val result = component.checkSourceCoordinates(AssembledSearchModel(values), session)
+
+                assertIs<ComponentCheck.Indeterminate>(result)
+            }
+        }
+    }
+
+    @Test
+    fun `coordinate checks retain cancellation from the containing native meter`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        var armed = false
+        var cancelled = false
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = cancelled
+            override fun workMeter(): WorkMeter = WorkMeter { if (armed) cancelled = true }
+        }
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchComponentSet(listOf(component)).session(cancellation = stop)
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentCheck.Feasible>(session.check())
+            val point = AssembledSearchModel(mapOf(SearchExactRealValue(SourceRealId(0)) to BigFraction.ZERO))
+            armed = true
+
+            val result = component.checkSourceCoordinates(point, session)
+
+            assertTrue(cancelled)
+            assertIs<ComponentCheck.Indeterminate>(result)
+        }
     }
 }
