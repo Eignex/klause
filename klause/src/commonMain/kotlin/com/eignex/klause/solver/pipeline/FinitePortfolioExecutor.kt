@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
+import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
@@ -11,6 +12,7 @@ import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.portfolio.continuousMajority
 import com.eignex.klause.portfolio.finiteWitnessVerifier
@@ -80,12 +82,22 @@ internal fun FinitePipeline.portfolioExecutor(
             continuousLpShares(scenario, profile, workers.map { it.label }, objective,
                 problem.continuousMajority, problem.binaryIntegers)
         } else proofShares
+        val reserved = if (shares.isEmpty()) booleanIncumbentShares(workers) else shares
         val probes = if (scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
             scenario.btPool == null && scenario.lsPool == null
         ) workers.indices.filter { arm -> arm >= scenario.arms && workers[arm].label == "bt/lp-default" }.toSet()
         else emptySet()
-        PortfolioInvocationPolicy(profile, shares, reserveBeforeIncumbentOnly = true, probes = probes)
+        PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes)
     }
+}
+
+internal fun booleanIncumbentShares(workers: List<PortfolioWorker>): DoubleArray {
+    if (workers.none { it.auxiliaryProof }) return DoubleArray(0)
+    val complete = workers.indices.filter { workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof }
+    if (complete.isEmpty()) return DoubleArray(0)
+    val families = workers.map { it.family }.distinct().size
+    val share = 1.0 / families / complete.size
+    return DoubleArray(workers.size).also { shares -> complete.forEach { shares[it] = share } }
 }
 
 /** Creates the fixed finite-domain solver over [problem]. */

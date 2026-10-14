@@ -283,8 +283,13 @@ Other pooled solution phasing retains its restart-boundary import policy.
 Curated mixed finite optimization pools append a retained core-guided complete worker
 when every objective term is Boolean and the model has no continuous columns.
 On one lane with another complete worker, the automatically appended core worker
-joins after the first checked incumbent, or after the original initial pool retires. Sibling complete and heuristic
-workers retain their initial coverage, seed positions and family policy. The deferred
+joins after the first checked incumbent and after each ordinary complete worker has
+spent one base of charged work, or after the original initial pool retires. Unspent
+work offers and debt repayments do not establish that coverage. Sibling complete and heuristic
+workers retain their initial coverage, seed positions and family policy. Before the
+first witness, ordinary complete siblings reserve one family share of elapsed time,
+split equally; that reservation ends at the first checked incumbent. Existing source
+reservations keep priority. The deferred
 core worker receives one base slice of cumulative native work and at most two seconds
 of active time for its whole lifetime, including construction, preparation and query
 reopens. Its bounded continuations use base slices after ordinary initial admission
