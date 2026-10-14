@@ -12,6 +12,7 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
@@ -163,8 +164,15 @@ class ProductCompilationTest {
                     constraint float_eq(z, 4.0); solve satisfy;""",
                 exactFloats = exact,
             )
-            val problem = program.problem
+            val plan = program.problem.prepareExecutionPlan()
+            val canonical = assertNotNull(plan.model)
+            val projection = assertNotNull(plan.componentPlan).cpProjection(canonical, emptyMap())
+            val problem = projection.problem
             val product = problem.factors.filterIsInstance<Product>().single()
+            val original = program.problem.factors.filterIsInstance<Product>().single()
+            assertEquals(plan.integerCoordinate(original.a), projection.sourceId(product.a))
+            assertEquals(plan.integerCoordinate(original.b), projection.sourceId(product.b))
+            assertEquals(plan.integerCoordinate(original.result), projection.sourceId(product.result))
             assertEquals(product.a, product.b)
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
             for (id in 0 until problem.numIntVars) state.assignment.setInt(id, state.rootDomains[id].min)
