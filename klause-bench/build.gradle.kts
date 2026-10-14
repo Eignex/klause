@@ -78,9 +78,19 @@ val checkNativeVmSignatures = tasks.register<Exec>("checkNativeVmSignatures") {
         "tools/native_vm_demangler.py", "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
 }
 
+val checkNativeVmSymbolQueries = tasks.register<Exec>("checkNativeVmSymbolQueries") {
+    group = "verification"
+    description = "Test bounded source query groups and captured signature scope."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_native_vm_symbol_queries.py")
+    inputs.files("tools/read_native_vm_symbols.py", "tools/read_native_vm_signatures.py",
+        "tools/test_native_vm_symbol_queries.py", "tools/native_vm_demangler.py",
+        "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
-        checkNativeVmDemangler, checkNativeVmSignatures)
+        checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
