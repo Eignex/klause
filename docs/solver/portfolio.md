@@ -456,15 +456,15 @@ initial LP admission under ordinary family scheduling, allowing incumbent worker
 compete for initial time while LP can earn progress credit before the improving-phase
 probe. Binary models retain reserved LP descent for their continuous objective.
 Individual segments retain work charging and time caps; the remaining time follows the
-bandit. After the first incumbent, all scheduled time follows the bandit. Explicit
-backtrack pools and parallel lanes retain their requested scheduling. The auxiliary LP
-arm receives one base improving-phase probe if it has earned no progress credit. An
-unproductive probe retires the arm and closes its handle; retirement preserves the
-incumbent without claiming exhaustion. A witness, objective or bound improvement, root
-deductions, or used shared contributions retain the arm under normal bandit scheduling.
-Configured LP slots do not retire under the auxiliary probe policy. An unproductive
-auxiliary improving-phase probe does not decay the retained workers' bandit or family
-evidence, preserving their policy state when the probe is discarded.
+bandit. After the first incumbent, the auxiliary LP arm receives a
+[bounded evaluation](#auxiliary-incumbent-evaluation) if it has earned no progress
+credit; remaining time follows the bandit. Explicit backtrack pools and parallel lanes
+retain their requested scheduling. An unproductive trial retires the arm and closes
+its handle, preserving the incumbent without claiming exhaustion. A witness, objective
+or bound improvement, root deductions, or used shared contributions retain the arm
+under normal bandit scheduling. Configured LP slots do not retire under the auxiliary
+policy. An unproductive auxiliary trial does not decay the retained workers' bandit
+or family evidence.
 
 See
 [SliceBudget](../../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)

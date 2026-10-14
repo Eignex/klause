@@ -2289,7 +2289,9 @@ class PortfolioTest {
             }
 
             assertIs<MinimizeResult.BestFound>(result)
-            assertEquals(if (productive) listOf(0) + List(14) { 1 } else listOf(0) + List(12) { 1 } + listOf(0, 0), reached)
+            val expected = if (productive) listOf(0) + List(14) { 1 }
+            else listOf(0) + List(12) { 1 } + listOf(0, 0)
+            assertEquals(expected, reached)
         }
     }
 
