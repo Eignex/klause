@@ -105,3 +105,10 @@ disjunctions, Boolean arithmetic beyond shared clauses/cardinalities, and mixed
 integer/real models retain the exact LP route. Overridden LP certification policies
 retain the LP route because graph evidence has no LP certifier identity. No finite CP
 domains are created by this graph.
+
+Complete selected encodings also retain Boolean-only source relations. The shared
+Boolean participant enforces its own clauses; difference-component relations outside
+that ownership pass an exact Boolean-row check before graph witness publication.
+An admitted edge fragment alone cannot authorize omitting that Boolean enforcement.
+Source value-set membership remains required for contributed integer coordinates;
+a bound-hull point outside a declared set supplies no witness or refutation.

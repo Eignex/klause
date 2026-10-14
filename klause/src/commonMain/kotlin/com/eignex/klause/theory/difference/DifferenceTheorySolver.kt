@@ -16,6 +16,7 @@ import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.util.Cancellation
 
 /** Complete open integer difference-logic solver. */
 class DifferenceTheorySolver(
@@ -38,6 +39,11 @@ class DifferenceTheorySolver(
 
     override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Sample> {
         if (!context.consumeCheck()) return TheoryCheck.Cancelled
+        when (encoded.checkDifferenceBooleans(bools, Cancellation { context.cancelled() })) {
+            false -> return TheoryCheck.Infeasible()
+            null -> return TheoryCheck.Cancelled
+            true -> Unit
+        }
         val values = if (fragment == null) {
             unconstrainedValues()
         } else {

@@ -25,6 +25,7 @@ import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.Cancellation
 
 /** Incremental difference-logic search component. */
 class DifferenceSearchComponent private constructor(
@@ -93,6 +94,11 @@ class DifferenceSearchComponent private constructor(
         if (!context.consumeCheck() || context.cancelled()) return ComponentCheck.Indeterminate
         val bools = BooleanArray(model.numBoolVars) { variable ->
             context.boolValue(variable) ?: return ComponentCheck.Indeterminate
+        }
+        when (model.checkDifferenceBooleans(bools, Cancellation { context.cancelled() })) {
+            false -> return ComponentCheck.Infeasible()
+            null -> return ComponentCheck.Indeterminate
+            true -> Unit
         }
         val fragment = fragment(context)
         val values = if (fragment == null) {

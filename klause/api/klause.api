@@ -14812,8 +14812,8 @@ public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com/eignex/klause/solver/search/SearchBranchProposal, com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/SourceCoordinateAgreement, com/eignex/klause/solver/search/TheoryComponent, java/lang/AutoCloseable {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;Lkotlin/jvm/functions/Function2;[I)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;Lkotlin/jvm/functions/Function2;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[ILkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[ILkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function2;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
