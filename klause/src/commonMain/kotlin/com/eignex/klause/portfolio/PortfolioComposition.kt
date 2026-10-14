@@ -121,7 +121,7 @@ data class PortfolioScenario(
     val phaseRetention: Double = Portfolio.DEFAULT_PHASE_RETENTION,
     /**
      * Non-improving segments before an observable arm reseeds; scheduled restarting backtrack arms count
-     * equivalent full-work segments. Whole lanes count each positive-work return. Zero disables reseeding.
+     * equivalent base work segments. Whole lanes count each positive-work return. Zero disables reseeding.
      * Complete search without a restart schedule retains its traversal across tighter incumbent cutoffs.
      */
     val reseedStaleThreshold: Int = 3,
