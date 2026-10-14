@@ -8,6 +8,7 @@ internal interface LpDeductionCertificate {
     fun exactReducedCost(col: Int): BigFraction
     fun exactObjectiveBound(): BigFraction
     fun integralObjectiveRows(): IntArray? = null
+    fun usesRationalArithmetic(): Boolean = false
     fun dualNonzeroRow(row: Int): Boolean
     fun reducedCostSign(col: Int): Int
     fun objectiveBoundCeil(extraConstant: Long): Long?

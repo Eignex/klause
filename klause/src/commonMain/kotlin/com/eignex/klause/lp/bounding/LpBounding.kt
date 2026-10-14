@@ -589,7 +589,7 @@ internal fun LpEngine.sparseSafePrune(
                 certified = it != null,
                 continuousDecline = it == null && boundRel.model.hasContinuous,
                 numericDecline = it == null && !boundRel.model.hasContinuous,
-                rationalFallback = false,
+                rationalFallback = it?.usesRationalArithmetic() == true,
                 rows = boundRel.model.m,
             )
         }
