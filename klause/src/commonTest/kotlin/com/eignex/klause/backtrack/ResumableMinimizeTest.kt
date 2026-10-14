@@ -658,16 +658,20 @@ class ResumableMinimizeTest {
         val fixture = UnresolvedRealLeafFixture(true)
         fixture.acceptProof = { _, _ -> true }
         val offered = ArrayList<Sample>()
+        val nodesAtPublication = ArrayList<Double>()
         val params = fixture.params.copy(maxDecisions = 0L,
             lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
 
         fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
+            search.runSlice(Cancellation.Never, 1000L, 100_000L) {
+                offered += it.sample
+                nodesAtPublication += search.stats.search.nodes.sum
+            }
             val sample = offered.single()
             assertEquals(1L, sample.ints.single())
             assertEquals(0.5, sample.reals.single())
             assertEquals(BigFraction.ofDouble(0.5), sample.exactReals?.single())
-            assertEquals(0.0, search.stats.search.nodes.sum)
+            assertEquals(listOf(0.0), nodesAtPublication)
             assertTrue(search.stats.lp.standaloneWorkOps.sum > 0.0)
         }
         assertEquals(fixture.opened, fixture.closed)
@@ -685,6 +689,27 @@ class ResumableMinimizeTest {
             search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
         }
 
+        assertTrue(offered.isEmpty())
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `mixed rounding cannot publish after completion cancellation`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        var cancelled = false
+        fixture.acceptProof = { leaf, _ ->
+            if (leaf > 0) cancelled = true
+            true
+        }
+        val offered = ArrayList<Sample>()
+        val params = fixture.params.copy(maxDecisions = 0L,
+            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
+
+        fixture.solver.resumable(fixture.objective, params).use { search ->
+            search.runSlice(Cancellation { cancelled }, 1000L, 100_000L) { offered += it.sample }
+        }
+
+        assertTrue(fixture.visited > 0)
         assertTrue(offered.isEmpty())
         assertEquals(fixture.opened, fixture.closed)
     }
