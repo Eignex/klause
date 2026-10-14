@@ -286,8 +286,9 @@ On one lane with another complete worker, the automatically appended core worker
 joins after the first checked incumbent and after each ordinary complete worker has
 spent one base of charged work since the latest checked improvement, or after the
 original initial pool retires. Every improvement renews that sibling search window,
-including after the core service has started; its private state and lifetime limits
-survive the pause. Unspent
+including after the core service has started. A charged core turn also renews that
+window before its next continuation; private state and lifetime limits survive the
+pause. Unspent
 work offers and debt repayments do not establish that coverage. Sibling complete and heuristic
 workers retain their initial coverage, seed positions and family policy. Before the
 first witness, ordinary complete siblings reserve one family share of elapsed time,
