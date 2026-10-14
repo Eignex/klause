@@ -17,6 +17,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
@@ -276,6 +277,33 @@ class EncoderTest {
         assertEquals(listOf(IntVariableOwner.CP, IntVariableOwner.CP), (0..1).map(plan::intOwner))
         assertEquals(listOf(FactorOwner.CP, FactorOwner.CP), (0..1).map(plan::factorOwner))
         assertTrue((0..1).all(plan::factorEncoded))
+    }
+
+    @Test
+    fun `an enforcing encoder peer completes finite filtering without a duplicate source checker`() {
+        val relation = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1) {
+            override fun remap(mapping: VarRemap): Factor {
+                require(mapping.int(0) == 0)
+                return this
+            }
+        }
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(relation))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The mandatory arithmetic peer enforces the complete source relation.") { NoPropagator }
+        })
+        val prepared = source.prepareExecutionPlan(providers)
+        val plan = assertNotNull(prepared.componentPlan)
+
+        val result = plan.search(source, plan.cpSourceDomains(source)).use {
+            assertIs<ComponentResult.Consistent>(it.session.initialize())
+            it.session.solve(source.numBoolVars)
+        }
+
+        assertTrue(prepared.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        assertEquals(FactorOwner.CP, plan.factorOwner(0))
+        assertTrue(plan.factorEncoded(0))
+        assertIs<SearchResult.Satisfied>(result)
     }
 
     @Test

@@ -57,6 +57,14 @@ class CpSearchComponent(
     internal var propagationObserver: ((PropagationResult.Implied) -> Unit)? = null
     internal var cascadeConflictObserver: ((PropagationResult.Unsat) -> Unit)? = null
     private var sharedContext: com.eignex.klause.solver.search.SearchContext? = null
+    private var sourceChecks = session.projection.selection?.originalChecks
+
+    internal fun useEnforcingPeers(factorIds: Set<Int>) {
+        check(sharedContext == null)
+        if (sourceChecks == null || factorIds.isEmpty()) return
+        val selection = session.projection.selection ?: return
+        sourceChecks = SelectedProjectionChecks(selection, factorIds)
+    }
 
     /** Where conflicts this component cannot learn from are counted; null counts nothing. */
     internal var conflictStats: ConflictAnalysisStatsSink? = null
@@ -337,7 +345,7 @@ class CpSearchComponent(
      * assignment that violates them.
      */
     override fun check(context: com.eignex.klause.solver.search.SearchContext): ComponentCheck =
-        if (session.fixpointCancelled) ComponentCheck.Indeterminate else session.checkSelectedProjection()
+        if (session.fixpointCancelled) ComponentCheck.Indeterminate else session.checkSelectedProjection(sourceChecks)
 
     override fun blockModel(
         model: com.eignex.klause.solver.search.AssembledSearchModel,

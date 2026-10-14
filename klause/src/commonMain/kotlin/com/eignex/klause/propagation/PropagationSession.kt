@@ -67,8 +67,9 @@ class PropagationSession private constructor(
         pbLearning: Boolean = false,
     ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection)
 
-    internal fun checkSelectedProjection(): ComponentCheck =
-        projection.selection?.originalChecks?.check(this, cancellation) ?: ComponentCheck.Feasible
+    internal fun checkSelectedProjection(
+        checks: SelectedProjectionChecks? = projection.selection?.originalChecks,
+    ): ComponentCheck = checks?.check(this, cancellation) ?: ComponentCheck.Feasible
 
     internal fun recordProjectionCheck(checker: PropagationSession) {
         state.work += checker.work

@@ -599,3 +599,9 @@ and exact fixed values; the finite owner retains hole membership. Numeric contri
 come only from the declared coordinate owner. An isolated arithmetic service with a
 point outside a source value set withholds that witness instead of treating its bound
 hull as the source. Retraction invalidates both peers' scoped outcomes.
+
+A composed finite registration omits duplicate original point checks for factors
+whose mandatory arithmetic peer installs a complete enforcing encoding. The
+finite adapter still rejects interrupted fixpoints, and every arithmetic check
+must succeed before the shared leaf is accepted. This policy belongs to that
+registration; standalone finite projections retain their original check obligations.
