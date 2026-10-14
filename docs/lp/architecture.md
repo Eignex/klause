@@ -126,7 +126,7 @@ a cancelled optional root phase contributes only completed certified deductions.
 `lp-variable-shaving` and `lp-prune-hulls` are explicit backtrack overrides;
 `lp-root-cuts=false` disables root harvesting while retaining node separation.
 Curated satisfaction pools require `lp-root-cuts=true` to enable harvesting.
-Finite optimization adapters may supply a remaining native-work cap for optional
+Finite optimization adapters behind a finite external cutoff may supply a remaining native-work cap for optional
 node queries. The LP owner combines it with its persistent effort allowance without
 renewing either scope. A capped query that cannot certify a bound supplies no pruning
 authority. Retained owner construction and required leaf completion retain their
