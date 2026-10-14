@@ -882,7 +882,8 @@ records passed; the final JSON output is written only after the whole batch succ
 Each solver query has a 120-second allowance; source parsing and witness construction
 are outside that query allowance and require an enclosing job budget.
 Exact MPS queries use Z3's finite-domain solver when every original integer
-column has normalized zero/one bounds. An exact pseudo-Boolean representation
+column has normalized zero/one bounds and nonzero objective weights are uniform.
+Unequal objective weights retain the original arithmetic query. An exact pseudo-Boolean representation
 preserves each source predicate and objective comparison, clearing rational
 coefficient denominators and handling strict thresholds on the integer lattice.
 Unsupported expressions or weights beyond the pseudo-Boolean API width keep the
