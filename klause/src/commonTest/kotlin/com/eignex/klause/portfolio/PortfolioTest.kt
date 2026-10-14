@@ -2456,7 +2456,9 @@ class PortfolioTest {
             it.runTimeSource = clock
         }
 
-        portfolio.use { it.minimize(Cancellation { reached.count { arm -> arm == 1 } >= 3 && reached.takeLast(2) == listOf(0, 0) }) }
+        portfolio.use { it.minimize(Cancellation {
+            reached.count { arm -> arm == 1 } >= 3 && reached.takeLast(2) == listOf(0, 0)
+        }) }
 
         assertEquals(3, reached.count { it == 1 })
         assertEquals(listOf(0, 0), reached.takeLast(2))
@@ -2511,7 +2513,9 @@ class PortfolioTest {
             it.runTimeSource = clock
         }
 
-        portfolio.use { it.minimize(Cancellation { reached.count { arm -> arm == 1 } >= 8 && reached.takeLast(2) == listOf(0, 0) }) }
+        portfolio.use { it.minimize(Cancellation {
+            reached.count { arm -> arm == 1 } >= 8 && reached.takeLast(2) == listOf(0, 0)
+        }) }
 
         assertEquals(8, reached.count { it == 1 })
         assertEquals(listOf(0, 0), reached.takeLast(2))
