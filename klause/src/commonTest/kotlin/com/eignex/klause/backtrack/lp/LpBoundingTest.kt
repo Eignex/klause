@@ -46,6 +46,41 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `directly integral mixed fixing excludes equal incumbents when the objective range exceeds Long`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, Long.MAX_VALUE / 2L + 1L)),
+            arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.GE, 0.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(2L))
+        val sink = SolveStatsSink(backend = "integral-cutoff")
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 4.0,
+                sink, Cancellation.Never, -1, true)
+
+            assertFalse(result.prune)
+            assertEquals(IntDomain(0, 1), session.intDomain(0))
+        }
+    }
+
+    @Test
+    fun `directly integral mixed bounds prune equal incumbents when the objective range exceeds Long`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(1, Long.MAX_VALUE / 2L + 1L)),
+            arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
+                LinearOp.GE, 0.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(2L))
+        val sink = SolveStatsSink(backend = "integral-cutoff")
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 2.0,
+                sink, Cancellation.Never, -1, true)
+
+            assertTrue(result.prune)
+        }
+    }
+
+    @Test
     fun `fixing retains a permitted far endpoint`() {
         for (sign in listOf(-1L, 1L)) for (realCost in listOf(0.0, 0.5)) {
             val maximum = if (sign > 0L) 6.0 else 0.0
