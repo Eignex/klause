@@ -11,6 +11,51 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `cancellation at admission withholds an additional objective certificate`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val r = addRealVar(0.0, 4.0, cost = 1.0)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(-4.0, 1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        var cancelled = false
+        var published = false
+        val observer = object : LpCertificationObserver {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                cancelled = true
+            }
+            override fun observeExactInput(accepted: Boolean) = Unit
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
+        }
+
+        val certificate = nodeDualCertificate(model, doubleArrayOf(0.0), Cancellation { cancelled }, observer,
+            onObjectiveCertificate = { published = true })
+
+        assertNull(certificate)
+        assertFalse(published)
+    }
+
+    @Test
+    fun `objective equality certificates fix coordinates with zero LP reduced cost`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val z = addVar(0L, 1L)
+            val r = addRealVar(1.0, 100.0, cost = 1.0)
+            addRealRow(intArrayOf(x, z, r), doubleArrayOf(-4.0, -1.0, 1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        var objectiveCertificate: LpDeductionCertificate? = null
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
+            onObjectiveCertificate = { objectiveCertificate = it }))
+
+        assertEquals(BigFraction.ONE, certificate.exactObjectiveBound())
+        assertEquals(BigFraction.ZERO, certificate.exactReducedCost(0))
+        assertEquals(0L, assertNotNull(objectiveCertificate).fixSteps(0, 1L, 0L))
+        assertEquals(BigFraction.ZERO, objectiveCertificate?.exactReducedCost(2))
+    }
+
+    @Test
     fun `defining equalities expose integral reduced costs at a degenerate continuous objective seat`() {
         for (sign in listOf(-1.0, 1.0)) {
             val source = LpBuilder().apply {
@@ -87,9 +132,12 @@ class MixedDualBoundTest {
             List(source.numVars) { if (it == source.n) slack.copy(bounds = bounds) else source.column(it) },
         )).toWorkingModel())
 
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0)))
+        var published = false
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
+            onObjectiveCertificate = { published = true }))
 
         assertNull(certificate.integralObjectiveRows())
+        assertFalse(published)
     }
 
     @Test
