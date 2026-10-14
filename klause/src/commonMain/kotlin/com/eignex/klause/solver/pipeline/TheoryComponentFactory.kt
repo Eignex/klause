@@ -53,8 +53,8 @@ internal fun ComponentPlan.theoryComponentFactory(
         opening: SearchComponentOpening,
         contribution: (ExactLiraAssignment, SearchModel) -> Unit,
     ): List<SearchComponent> = listOf(
-        (preparedSource()?.open(contribution, cpIntVars) ?: ExactLiraSearchComponent(
-            fragment, fragment.selectedFactorProjections(), contribution, cpIntVars,
+        (preparedSource()?.open(cpIntVars, contribution) ?: ExactLiraSearchComponent(
+            fragment, fragment.selectedFactorProjections(), cpIntVars, contribution,
         )).also { component ->
             opening.ownComponent(component)
             component.useSolveStop(opening.theorySolveStop)

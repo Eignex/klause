@@ -44,6 +44,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PreparedExecutionKind
 import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.polynomialRequest
 import com.eignex.klause.util.Cancellation

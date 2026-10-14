@@ -49,21 +49,28 @@ internal fun PreparedFactorProjections.installLinearFactor(
     cancellation: Cancellation = Cancellation.Never,
 ): EncodedTheoryFactor? {
     val source = problem.factors[index]
-    val encoding = LinearTheoryEncoding(target, index, integerPins, booleanPins, cancellation)
+    val sourceIndex = (source as? EncodedTheoryFactor)?.attribution?.sourceFactorIndex ?: index
+    val encoding = LinearTheoryEncoding(target, sourceIndex, integerPins, booleanPins, cancellation)
     if (encoder(index, target).install(source, encoding) != null) return null
     val form = encoding.form ?: return null
+    val booleans = source.boolVars.toSet()
+    val integers = source.intVars.toSet()
+    val reals = source.variables.reals.toSet()
     require(form.rows.all { row ->
-        (row.activator == LinearRow.ALWAYS || row.activator in source.boolVars) &&
+        (row.activator == LinearRow.ALWAYS || row.activator in booleans) &&
             (0 until row.size).all { term ->
                 val ref = row.ref(term)
                 when {
-                    Term.isInt(ref) -> Term.intVar(ref) in source.intVars
-                    Term.isReal(ref) -> Term.realVar(ref) in source.variables.reals
-                    else -> (Term.lit(ref) ushr 1) in source.boolVars
+                    Term.isInt(ref) -> Term.intVar(ref) in integers
+                    Term.isReal(ref) -> Term.realVar(ref) in reals
+                    else -> (Term.lit(ref) ushr 1) in booleans
                 }
             }
     }) { "an encoding must retain the source factor's coordinate membership" }
-    return EncodedTheoryFactor(source, form, EncodingAttribution(index,
+    if (source is EncodedTheoryFactor && form === source.linearForm &&
+        integerPins.isEmpty() && booleanPins.isEmpty()
+    ) return source
+    return EncodedTheoryFactor(source, form, EncodingAttribution(sourceIndex,
         source.boolVars.map(::SourceBoolId), source.intVars.map(::SourceIntId),
         source.variables.reals.map(::SourceRealId), integerConditions = integerPins,
         booleanConditions = booleanPins))

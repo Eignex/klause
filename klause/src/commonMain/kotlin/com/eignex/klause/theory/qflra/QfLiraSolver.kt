@@ -172,14 +172,14 @@ class ExactLiraSearchComponent private constructor(
     constructor(
         model: Problem,
         modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
-    ) : this(model, model.selectedFactorProjections(), modelContribution)
+    ) : this(model, model.selectedFactorProjections(), modelContribution = modelContribution)
 
     /** Open private exact state from the selected whole source relations. */
     constructor(
         model: Problem,
         projections: PreparedFactorProjections,
-        modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
         finiteIntegerVariables: IntArray = intArrayOf(),
+        modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
     ) : this(legacyExactLiraSource(requireNotNull(projections.linearTheoryModel(EncodingTarget.LINEAR)) {
         "unsupported selected exact linear encoding"
     }.also { projections.requireSource(model) }), modelContribution, finiteIntegerVariables.copyOf())
@@ -1028,7 +1028,11 @@ internal class PreparedExactLiraComponentFactory(
 ) {
     fun open(
         modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
-        finiteIntegerVariables: IntArray = intArrayOf(),
+    ): ExactLiraSearchComponent = openComponent(modelContribution, intArrayOf())
+
+    fun open(
+        finiteIntegerVariables: IntArray,
+        modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
     ): ExactLiraSearchComponent = openComponent(modelContribution, finiteIntegerVariables.copyOf())
 }
 
