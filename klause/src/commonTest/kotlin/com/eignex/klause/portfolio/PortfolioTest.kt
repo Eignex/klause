@@ -216,6 +216,42 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 class PortfolioTest {
 
     @Test
+    fun `proof continuations keep base work and receive a family deadline`() {
+        var ordinaryVisits = 0
+        val complete = trackingWorker("complete", 0, ScriptedSearch({ false }) { ordinaryVisits++ })
+        val finder = trackingWorker("finder", 1, ScriptedSearch({ it == 0 }) { ordinaryVisits++ }).also {
+            it.family = ArmFamily.LocalSearch
+        }
+        val quiet = List(2) { index ->
+            trackingWorker("quiet$index", index + 2, ScriptedSearch({ false }) { ordinaryVisits++ }).also {
+                it.family = ArmFamily.LocalSearch
+            }
+        }
+        val offers = ArrayList<Pair<Long, Long>>()
+        val proofBase = ScriptedSearch({ false }) {}
+        val proof = object : ResumableSearch by proofBase {
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                offers += sliceMillis to sliceNodes
+                proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                return if (offers.size == 2) MinimizeResult.Unknown(TerminationReason.BudgetExhausted) else null
+            }
+        }
+        val workers = listOf(complete, finder) + quiet + trackingWorker("proof", 4, proof).also {
+            it.auxiliaryProof = true
+            it.improvementOnly = true
+        }
+
+        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+            it.minimize(Cancellation.after(1.seconds) or Cancellation { offers.size >= 2 || ordinaryVisits >= 16 })
+        }
+
+        assertEquals(2, offers.size)
+        assertEquals(listOf(5_000L, 5_000L), offers.map { it.second })
+        assertTrue(offers[1].first > offers[0].first * 1.5)
+    }
+
+    @Test
     fun `supplemental proof continuations wait for fresh sibling work`() {
         for (improvesAfterAdmission in listOf(false, true)) {
             var completeVisits = 0

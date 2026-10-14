@@ -753,14 +753,15 @@ class Portfolio(
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
-            val probing = probe != null || workers[arm].auxiliaryProof ||
+            val probing = probe != null ||
                 (improving && arm in incumbentProbeArms && !productive[arm])
+            val baseAllowance = probing || revisit != null || workers[arm].auxiliaryProof
             busy[arm] = true
             Claim(
                 arm,
                 probing,
-                if (probing || revisit != null) baseSliceMillis else slice,
-                if (probing || revisit != null) baseSliceWork else sliceWork,
+                if (baseAllowance) baseSliceMillis else slice,
+                if (baseAllowance) baseSliceWork else sliceWork,
                 whole = dedicated,
                 probeCount = eligible.count { !workers[it].auxiliaryProof }.coerceAtLeast(1),
                 preparationRevisit = revisit != null,
@@ -904,7 +905,7 @@ class Portfolio(
             log.record(arm, work, claim.started.elapsedNow().inWholeMilliseconds, reward, failed)
             if (failed && failure != null && failure !is UnsoundnessException) log.failure(arm, failure, phase)
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
-            if (!claim.probing && !claim.preparationRevisit) {
+            if (!claim.probing && !claim.preparationRevisit && !workers[arm].auxiliaryProof) {
                 slice = grow(slice, maxSliceMillis)
                 sliceWork = grow(sliceWork, maxSliceWork)
             }

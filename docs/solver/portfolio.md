@@ -299,7 +299,9 @@ of cumulative active time for its whole lifetime, including construction, prepar
 reopens. Its bounded continuations use base slices after ordinary initial admission
 without drawing from or aging the ordinary family/arm policy. Ordinary initial probes
 retain their deadline division and the shared allowance ladder does not grow for
-these continuations. The proof service retains separate progress and reward rates;
+these continuations. Only the proof service's first turn uses the per-arm probe deadline;
+continuations use the ordinary per-family remaining-time share. The cumulative active-time
+bound still applies. The proof service retains separate progress and reward rates;
 its checked floors, actual work/time and contribution counts remain visible. Reaching that allowance returns a budget stop
 with completed checked floors retained; it supplies no exhaustion proof. Parallel
 pools admit the core worker immediately. Explicit backtrack pools keep their requested recipes; `core-guided` selects
