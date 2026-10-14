@@ -21,7 +21,8 @@ internal class CoreGuidedWorkerConfig(
     private val edit: ((BacktrackParams) -> BacktrackParams)? = null,
 ) : WorkerConfig {
     override val label: String get() = "core-guided"
-    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, edit)
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
+        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, edit)
 
     internal fun withWorkLimit(work: Long): CoreGuidedWorkerConfig =
         CoreGuidedWorkerConfig(nodeBudget, work, 2_000L, edit)
