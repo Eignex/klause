@@ -60,7 +60,7 @@ internal class TranscendentalPortfolioInvocation(
         }
         val assumptions = backend.mergedWith(params.strategy.assumptions)
         val binding = EngineInvocation(plan, identity, sourceAssumptions = assumptions)
-        val scope = TranscendentalNativeScope(params)
+        val scope = TranscendentalNativeScope(params, cores)
         val workers = ArrayList<TranscendentalWorkerAdapter>()
         val factories = plan.capabilities.admission(engine).arms.map { strategy ->
             val arm = when (strategy) {
@@ -162,8 +162,8 @@ internal class TranscendentalPortfolioInvocation(
     }
 }
 
-private class TranscendentalNativeScope(private val params: TranscendentalTheoryParams) {
-    private val lock = Concurrency.Strict.lock()
+private class TranscendentalNativeScope(private val params: TranscendentalTheoryParams, cores: Int) {
+    private val lock = (if (cores > 1) Concurrency.Strict else Concurrency.None).lock()
     private var charged = 0L
     private val external = params.timeout or params.cancellation
     val work: Long get() = lock.withLock { charged }

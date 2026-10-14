@@ -71,14 +71,16 @@ exported transcendental proof checker.
 Each pipeline call captures its source conditions and creates fresh mutable theory
 and strategy state. A shared invocation plan owns its source coordinate mapping and
 satisfaction-only capabilities. Every materialized slot owns its service and retained
-traversal or neighborhood; no native workspace crosses workers. Checked publication
+traversal or neighborhood; its native service opens on first use, and closing an
+unused worker prevents later opening. No native workspace crosses workers. Checked publication
 envelopes retain that actual invocation and immutable symbolic coordinates. A fresh
 invocation plan prevents a point checked under another call's strict real restrictions
 from being admitted by identity alone.
 
 One cumulative native meter covers enclosure, algebraic,
 relaxation and source-check work. Queries, repairs, branches and retractions do not
-renew it. Parallel aggregation serializes charges to the containing caller meter.
+renew it. Parallel aggregation serializes charges to the containing caller meter; a
+single lane charges directly without a synchronization lock.
 The complete family reserves three quarters of a finite native allowance, and LS/ALNS
 split the remainder. Complete-only and heuristic-only invocations divide the whole
 allowance among their materialized slots; unused reservations are not transferred.
