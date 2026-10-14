@@ -52,7 +52,15 @@ val checkNativeVmLoadedModule = tasks.register<Exec>("checkNativeVmLoadedModule"
         "tools/test_native_vm_loaded_module.py")
 }
 
-tasks.named("check") { dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule) }
+val checkNativeVmSymbols = tasks.register<Exec>("checkNativeVmSymbols") {
+    group = "verification"
+    description = "Test bounded native VM symbol records and incomplete captures."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_read_native_vm_symbols.py")
+    inputs.files("tools/read_native_vm_symbols.py", "tools/test_read_native_vm_symbols.py")
+}
+
+tasks.named("check") { dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols) }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
