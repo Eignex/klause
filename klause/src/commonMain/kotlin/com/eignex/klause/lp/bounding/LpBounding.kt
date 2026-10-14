@@ -16,6 +16,8 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPhaseTimer
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.acceptNullable
@@ -681,31 +683,46 @@ internal fun LpEngine.sparseSafePrune(
     // an attained LP optimum. A declared objective ceiling also bounds feasible points before an incumbent.
     if (canFix && cert != null &&
         !cancellation() &&
-        applySparseReducedCostFixing(
-            boundRel,
-            cert,
-            session,
-            bound,
-            sink,
-            objectiveVar,
-            objectiveAscending,
-            learn,
-            cancellation,
-            objectiveCeiling,
-        )
+        observeNodeFixing(sink, "PRIMARY_FIXING") {
+            applySparseReducedCostFixing(boundRel, cert, session, bound, sink, objectiveVar,
+                objectiveAscending, learn, cancellation, objectiveCeiling)
+        }
     ) {
         return LpNodeOutcome(true, null)
     }
-    if (canFix && cert != null) for (candidate in additionalCertificates) {
+    if (canFix && cert != null) for ((index, candidate) in additionalCertificates.withIndex()) {
         if (cancellation()) return LpNodeOutcome(false, optimalBasis)
         val additional = solveContext.certificationPolicy.acceptNullable(LpCertifier.INTEGER, candidate) ?: continue
-        if (applySparseReducedCostFixing(boundRel, additional, session, bound, sink, objectiveVar,
-            objectiveAscending, learn, cancellation, objectiveCeiling)
-        ) {
+        val stage = if (index == 0) "SECONDARY_FIXING" else "TERTIARY_FIXING"
+        if (observeNodeFixing(sink, stage) {
+            applySparseReducedCostFixing(boundRel, additional, session, bound, sink, objectiveVar,
+                objectiveAscending, learn, cancellation, objectiveCeiling)
+        }) {
             return LpNodeOutcome(true, null)
         }
     }
     return LpNodeOutcome(false, optimalBasis)
+}
+
+private inline fun observeNodeFixing(sink: SolveStatsSink, stage: String, body: () -> Boolean): Boolean {
+    val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.NODE), LpSolvePhase.NODE_DEDUCTION)
+    val before = sink.lp.fixed.read().sum
+    var returned = false
+    var conflict = false
+    try {
+        conflict = body()
+        returned = true
+        return conflict
+    } finally {
+        val fixes = (sink.lp.fixed.read().sum - before).toInt()
+        val outcome = when {
+            !returned -> "FAILED"
+            conflict -> "CONFLICT"
+            fixes > 0 -> "FIXED"
+            else -> "NONE"
+        }
+        timer.finish("${stage}_$outcome", steps = fixes)
+    }
 }
 
 /**
