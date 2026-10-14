@@ -114,15 +114,16 @@ class LpEngineInjectionTest {
 
         engine.use {
             it.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
-            for ((offered, expected) in listOf(null to 15_000L, 30_000L to 15_000L, 500L to 500L, 0L to 1L)) {
+            for ((offered, expected) in listOf(null to null, 30_000L to 15_000L, 500L to 500L, 0L to 1L)) {
                 allowance = offered
-                assertEquals(expected, it.nodeWorkBudget())
+                assertEquals(15_000L, it.nodeWorkBudget())
+                assertEquals(expected, it.nodeQueryWorkBudget())
             }
         }
     }
 
     @Test
-    fun `optional node construction receives the offered native work cap`() {
+    fun `optional node queries receive the offered cap after retained construction`() {
         val problem = boundedProblem()
         val factory = RecordingLpEngineFactory()
         val engine = LpEngine(
@@ -137,7 +138,8 @@ class LpEngineInjectionTest {
         val pruned = engine.use { it.pruneNode(PropagationSession(problem), 1.5, -1, true) }
 
         assertFalse(pruned)
-        assertEquals(500L, factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit)
+        assertEquals(0L, factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit)
+        assertEquals(500L, assertNotNull(factory.floatAllowances.single()).work)
     }
 
     @Test
@@ -309,11 +311,12 @@ class LpEngineInjectionTest {
             LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, componentSplit = false)),
             SolveStatsSink(backend = "leaf-work"),
             LpSolveContext(factory, decline),
+            nodeWorkAllowance = { 1L },
         )
 
         engine.use { it.leafCertify(PropagationSession(problem)) }
 
-        assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > 0L)
+        assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > 1L)
     }
 
     @Test
