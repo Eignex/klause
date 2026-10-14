@@ -383,6 +383,7 @@ class Portfolio(
         }
 
         run.execute { claim ->
+            val evaluationStarted = runTimeSource.markNow()
             val arm = claim.arm
             val worker = workers[arm]
             claim.hadIncumbent = incumbent.current() != null
@@ -478,6 +479,7 @@ class Portfolio(
                     else Verification.Indeterminate("worker completion has no runtime invocation")
                 })
             }
+            claim.trialTime = evaluationStarted.elapsedNow()
             run.locked {
                 val publication = if (!terminalPublished && !failed && claim.fault == null) {
                     terminalCheck?.check(worker, handle)
@@ -609,6 +611,7 @@ class Portfolio(
 
         var hadIncumbent = false
         var preparing = false
+        var trialTime = Duration.ZERO
         var improved = false
         var foundFirst = false
 
@@ -661,6 +664,8 @@ class Portfolio(
         private val productive = BooleanArray(workers.size)
         private val trialPreparationSegments = IntArray(workers.size)
         private val trialSearchWork = LongArray(workers.size)
+        private val trialSearchTime = Array(workers.size) { Duration.ZERO }
+        private val trialTimeLimit = baseSliceMillis.milliseconds * AUXILIARY_SEARCH_ALLOWANCES
         private val trialWorkLimit = baseSliceWork.coerceAtMost(Long.MAX_VALUE / AUXILIARY_SEARCH_ALLOWANCES) *
             AUXILIARY_SEARCH_ALLOWANCES
         private val preparationRevisits = BooleanArray(workers.size)
@@ -912,8 +917,9 @@ class Portfolio(
                 !failed && claim.fault == null
             if (unproductiveTrial) {
                 if (claim.preparing) trialPreparationSegments[arm]++
-                if (!claim.preparing && work > 0L) {
-                    trialSearchWork[arm] += minOf(work, trialWorkLimit - trialSearchWork[arm])
+                if (!claim.preparing) {
+                    trialSearchTime[arm] += claim.trialTime
+                    if (work > 0L) trialSearchWork[arm] += minOf(work, trialWorkLimit - trialSearchWork[arm])
                 }
             }
             if (!unproductiveTrial && !workers[arm].auxiliaryProof) {
@@ -938,6 +944,7 @@ class Portfolio(
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
             if (unproductiveTrial && (trialSearchWork[arm] >= trialWorkLimit ||
+                    trialSearchTime[arm] >= trialTimeLimit ||
                     trialPreparationSegments[arm] >= AUXILIARY_PREPARATION_SEGMENTS)
             ) retire(arm)
         }

@@ -2389,6 +2389,27 @@ class PortfolioTest {
     }
 
     @Test
+    fun `auxiliary search without charged work has a bounded time trial`() {
+        val clock = TestTimeSource()
+        val reached = ArrayList<Int>()
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+            trackingWorker("probe", 1, TrackingResumableSearch(null, onRun = {
+                reached += 1
+                clock += 3_000.milliseconds
+            })),
+        )
+        val portfolio = Portfolio.thompson(workers, reseedStaleThreshold = 0).also {
+            it.incumbentProbeArms = setOf(1)
+            it.runTimeSource = clock
+        }
+
+        portfolio.use { it.minimize(Cancellation { reached.size >= 6 }) }
+
+        assertEquals(listOf(0, 1, 1, 1, 0, 0), reached)
+    }
+
+    @Test
     fun `debt only pauses do not end the auxiliary search trial`() {
         val reached = ArrayList<Int>()
         val search = object : ResumableSearch {
