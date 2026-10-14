@@ -36,6 +36,7 @@ import com.eignex.klause.util.parseBigInt
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -50,6 +51,11 @@ internal object SourceAgreementProfile {
         require(repeats in 1..100 && warmups in 0..10)
         val selected = options["cases"]?.split(',')?.toSet()
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        if (System.getenv("KLAUSE_AGREEMENT_MEASURED_JVM") != "1") {
+            launchMeasuredJvm(args, output)
+            return
+        }
+        require(Runtime.getRuntime().availableProcessors() == 1)
         val cases = cases().filter { selected == null || it.name in selected }
         require(cases.isNotEmpty() && (selected == null || cases.map { it.name }.toSet() == selected))
         output.resolve("provenance.json").writeText(buildJsonObject {
@@ -77,6 +83,27 @@ internal object SourceAgreementProfile {
                 }
             }
         }
+    }
+
+    private fun launchMeasuredJvm(args: Array<String>, output: File) {
+        val command = arrayListOf(
+            File(System.getProperty("java.home"), "bin/java").path,
+            "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
+            "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
+            "-XX:StartFlightRecording=filename=${output.resolve("measured-profile.jfr")},settings=profile,dumponexit=true",
+        )
+        for (name in listOf("klause.workspace.root", "klause.bench.corpusCache")) {
+            System.getProperty(name)?.let { command += "-D$name=$it" }
+        }
+        command += listOf("-cp", System.getProperty("java.class.path"), javaClass.name)
+        command += args
+        output.resolve("launcher.json").writeText(buildJsonObject {
+            put("parentProcessors", Runtime.getRuntime().availableProcessors())
+            put("command", buildJsonArray { command.forEach { add(JsonPrimitive(it)) } })
+        }.toString())
+        val builder = ProcessBuilder(command).inheritIO()
+        builder.environment()["KLAUSE_AGREEMENT_MEASURED_JVM"] = "1"
+        check(builder.start().waitFor() == 0) { "Measured agreement JVM failed" }
     }
 
     private fun run(
