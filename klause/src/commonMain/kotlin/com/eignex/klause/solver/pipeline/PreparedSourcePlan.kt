@@ -2,7 +2,6 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealProduct
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -331,7 +330,6 @@ internal fun Problem.preparedWithComponents(
 
 internal fun Problem.preparePolynomialExecutionPlan(
     sourceFormula: PolynomialRealFormula? = null,
-    formulaForFactor: (Factor) -> PolynomialRealFormula? = { null },
     original: Any = this,
     objective: LinearObjective? = null,
     maximize: Boolean = false,
@@ -341,7 +339,7 @@ internal fun Problem.preparePolynomialExecutionPlan(
     projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
     val polynomial = if (openInteger) null else
-        SharedPolynomialModel.lower(this, sourceFormula, formulaForFactor, projections)
+        SharedPolynomialModel.lower(this, sourceFormula, projections)
     val cause = when {
         openInteger -> PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER
         polynomial == null -> PreparedPlanDecline.POLYNOMIAL_ENCODING
