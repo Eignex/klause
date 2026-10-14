@@ -53,6 +53,7 @@ internal class CoreGuidedSearch(
     private val objective: LinearObjective,
     private val params: BacktrackParams,
     private val stratify: Boolean = false,
+    private val maximumWork: Long? = null,
 ) : ResumableSearch,
     ReseedGuard {
     private val lifetime = params.cancellation.lifetimeCancellation()
@@ -93,6 +94,7 @@ internal class CoreGuidedSearch(
     private class ThresholdTail(val literals: IntArray, val minimum: Int, val weight: BigInt)
 
     init {
+        require(maximumWork == null || maximumWork >= 0L) { "core work limit must be nonnegative" }
         require(eligible(base, objective)) { "core-guided search needs a finite Boolean objective" }
     }
 
@@ -108,6 +110,7 @@ internal class CoreGuidedSearch(
         return addWork(addWork(completedWork, query?.work ?: 0L),
             addWork(preparationVisits / PROPAGATION_WORK_PER_NODE, carried))
     }
+    private val workExhausted: Boolean get() = maximumWork?.let { work >= it } == true
     override val initialWork: Long = work
     override val canReseed: Boolean get() = false
     override val preparationPending: Boolean
@@ -127,11 +130,15 @@ internal class CoreGuidedSearch(
         if (base.rootDeductions is PropagationResult.Unsat) {
             return finish(MinimizeResult.Infeasible(stats = stats))
         }
+        if (workExhausted) return finish(stopped(TerminationReason.BudgetExhausted))
         val deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         val start = work
         val repaid = if (sliceNodes < 0L) 0L else minOf(workDebt, sliceNodes)
         workDebt -= repaid
-        val allowance = if (sliceNodes < 0L) -1L else sliceNodes - repaid
+        val offered = if (sliceNodes < 0L) -1L else sliceNodes - repaid
+        val remainingWork = maximumWork?.let { (it - work).coerceAtLeast(0L) }
+        val allowance = if (remainingWork == null) offered else if (offered < 0L) remainingWork
+        else minOf(offered, remainingWork)
         if (allowance == 0L) return null
         val preparation = object : Cancellation {
             private val meter = object : RootWorkMeter {
@@ -147,7 +154,7 @@ internal class CoreGuidedSearch(
         try {
             return advance(token, preparation, deadline, start, allowance, onIncumbent)
         } finally {
-            if (allowance >= 0L) workDebt = addWork(workDebt, (work - start - allowance).coerceAtLeast(0L))
+            if (offered >= 0L) workDebt = addWork(workDebt, (work - start - offered).coerceAtLeast(0L))
         }
     }
 
@@ -175,11 +182,13 @@ internal class CoreGuidedSearch(
             if (incumbent != null && bestValue == lowerBound) {
                 return finish(MinimizeResult.Optimal(incumbent, requireNotNull(bestValue).toDouble(), stats))
             }
-            if (allowance >= 0L && work - start >= allowance) return null
+            if (allowance >= 0L && work - start >= allowance) {
+                return if (workExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
+            }
             val handle = query ?: try {
                 openQuery(preparation.withLifetime(lifetime)).also { query = it }
             } catch (_: SearchInitializationCancelled) {
-                return null
+                return if (workExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
             val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
@@ -187,7 +196,9 @@ internal class CoreGuidedSearch(
             if (result == null) return null
             val paused = result is SolveResult.Unknown && result.reason == TerminationReason.Cancelled && !token()
             finishQuery(keepModel = paused)
-            if (paused) return null
+            if (paused) {
+                return if (workExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
+            }
             when (result) {
                 is SolveResult.Unknown -> return finish(stopped(result.reason))
 
@@ -236,7 +247,7 @@ internal class CoreGuidedSearch(
                 }
             }
         }
-        return null
+        return if (workExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
     }
 
     private fun prepareObjective() {

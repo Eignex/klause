@@ -284,7 +284,10 @@ Curated mixed finite optimization pools append a retained core-guided complete w
 when every objective term is Boolean and the model has no continuous columns.
 On one lane with another complete worker, the automatically appended core worker
 joins after the first checked incumbent, or after the original initial pool retires. Sibling complete and heuristic
-workers retain their initial coverage, seed positions and family policy. Parallel
+workers retain their initial coverage, seed positions and family policy. The deferred
+core worker receives one base slice of cumulative native work for its whole lifetime,
+including preparation and query reopens. Reaching that allowance returns a budget stop
+with completed checked floors retained; it supplies no exhaustion proof. Parallel
 pools admit the core worker immediately. Explicit backtrack pools keep their requested recipes; `core-guided` selects
 this objective-only mechanism directly. The worker retains the active
 assumption traversal across slices, closes it before changing the encoding, and keeps
