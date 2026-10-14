@@ -2290,7 +2290,7 @@ class PortfolioTest {
 
             assertIs<MinimizeResult.BestFound>(result)
             val expected = if (productive) listOf(0) + List(14) { 1 }
-            else listOf(0) + List(12) { 1 } + listOf(0, 0)
+            else listOf(0) + List(6) { 1 } + List(8) { 0 }
             assertEquals(expected, reached)
         }
     }
@@ -2356,7 +2356,8 @@ class PortfolioTest {
             it.minimize(Cancellation { calls >= 15 })
         }
 
-        assertEquals(12, slices)
+        assertEquals(60_000L, search.work)
+        assertTrue(slices > 1)
     }
 
     @Test
@@ -2439,7 +2440,7 @@ class PortfolioTest {
                 it.minimize(Cancellation { reached.size >= 30 })
             }
 
-            assertEquals(27, reached.count { it == 1 })
+            assertEquals(60_000L, search.work)
             assertEquals(listOf(0, 0), reached.takeLast(2))
         }
     }
@@ -2544,6 +2545,31 @@ class PortfolioTest {
 
             assertEquals(listOf(7L, if (charged) 21L else 7L), allowances)
         }
+    }
+
+    @Test
+    fun `auxiliary continuation uses grown allowances clipped to remaining trial work`() {
+        val allowances = ArrayList<Long>()
+        var finderSlices = 0
+        val probe = ScriptedSearch({ false }) {}
+        val observed = object : ResumableSearch by probe {
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                allowances += sliceNodes
+                return probe.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+            }
+        }
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { finderSlices++ }),
+            trackingWorker("probe", 1, observed),
+        )
+
+        Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = 21, reseedStaleThreshold = 0).use {
+            it.incumbentProbeArms = setOf(1)
+            it.minimize(Cancellation { finderSlices >= 2 })
+        }
+
+        assertEquals(listOf(7L, 7L, 10L, 15L, 21L, 21L, 3L), allowances)
     }
 
     @Test
