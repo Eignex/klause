@@ -51,6 +51,11 @@ an interrupted cell supplies only a lower bound and cannot support either. This
 implementation can still visit many full witnesses of one projection and retains the
 per-cell decision budget.
 
+Fixed Product operands reduce to exact linear equalities. Negating a minimum signed
+word coefficient uses the wide integer row representation; aliased result and remaining
+operand positions combine their exact coefficients before construction. Coordinate
+remapping retains that combined row and the original source-check obligation.
+
 ## Rebuild ownership
 
 [PresolveShared.rebuildProblem](../../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveShared.kt)

@@ -1,6 +1,8 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -166,7 +168,11 @@ class ProductCompilationTest {
             assertEquals(product.a, product.b)
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
             for (id in 0 until problem.numIntVars) state.assignment.setInt(id, state.rootDomains[id].min)
-            for (id in 0 until problem.numBoolVars) state.assignment.setBool(id, true)
+            for (clause in problem.factors.filterIsInstance<Clause>()) {
+                if (clause.literals.size != 1) continue
+                val literal = clause.literals.single()
+                state.assignment.setBool(Lit.variable(literal), Lit.isPositive(literal))
+            }
             state.assignment.setInt(product.a, 2)
             state.assignment.setInt(product.result, 4)
             state.recompute()
