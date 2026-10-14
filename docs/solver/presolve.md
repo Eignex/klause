@@ -207,3 +207,10 @@ participation. Narrowing an open side to a proved finite declaration can create 
 finite choice owner; needing arithmetic or exact source coefficients cannot promote
 unrelated finite declarations. Original value sets, reconstruction and assertion
 premises remain authoritative after an encoding is selected.
+
+Pipeline routing retains completed arithmetic preparation when bound proving returns
+the identical source model, captured projections and objective metadata. It polls the
+containing stop before reuse; an observed stop keeps an explicit resource decline.
+A changed model prepares ownership against the proved declarations, and finite-lane
+selection still prepares its finite ownership separately. Reuse retains only completed
+immutable preparation, with no renewed allowance or mutable invocation state.

@@ -87,6 +87,45 @@ class UnplaceableColumnTest {
     }
 
     @Test
+    fun `a stop after unchanged bounds cannot reuse runnable preparation`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(
+            Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(), realVars = intArrayOf(0),
+                realCoeffs = doubleArrayOf(1.0), op = LinearOp.EQ, bound = 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        for (once in listOf(false, true)) for ((objective, maximize) in listOf(
+            null to false,
+            LinearObjective(realCoefficients = doubleArrayOf(1.0), constant = 7) to true,
+        )) {
+            var stopped = false
+            var stopObserved = false
+
+            val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
+                objective = objective,
+                maximize = maximize,
+                routePureRealToTheory = true,
+                boundCancellation = Cancellation {
+                    val answer = stopped
+                    if (answer) stopObserved = true
+                    if (once) stopped = false
+                    answer
+                },
+                onLpStats = { stopped = true },
+            ))
+
+            assertTrue(stopObserved)
+            assertEquals(PreparedExecutionKind.DECLINED, route.preparedPlan.kind)
+            assertEquals(PreparedPlanDecline.RESOURCE, route.preparedPlan.decline)
+            assertNull(route.preparedPlan.componentPlan)
+            assertSame(model, route.problem)
+            assertSame(model, route.preparedPlan.originalSource)
+            assertSame(model, route.preparedPlan.model)
+            assertSame(objective, route.preparedPlan.objective)
+            assertEquals(maximize, route.preparedPlan.maximize)
+            assertNotNull(route.preparedPlan.factorProjections).requireSource(model)
+        }
+    }
+
+    @Test
     fun `a refuted model is decided rather than declined for the column it could not place`() {
         // AllDifferent leaves column 1 unplaceable while it is open, and the two rows cross over its
         // range. Deciding the model is the stronger answer, so the refusal must not win the race.
@@ -136,12 +175,23 @@ class UnplaceableColumnTest {
             ),
         )
 
-        val route = model.pipelineRoute()
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 1, 0), constant = 7)
+
+        val route = model.pipelineRoute(objective = objective, maximize = true)
 
         val planned = assertIs<SourceProblemRoute.OpenTheory>(route, "the bounded column leaves nothing unplaceable")
         kotlin.test.assertSame(model, planned.preparedPlan.originalSource)
-        assertEquals(5L, assertNotNull(planned.preparedPlan.model).intBounds.upper(1))
+        val bounded = assertNotNull(planned.preparedPlan.model)
+        val ownership = assertNotNull(planned.preparedPlan.componentPlan)
+        assertTrue(bounded !== model)
+        assertEquals(5L, bounded.intBounds.upper(1))
         assertEquals(false, model.intBounds.hasUpper(1))
+        assertEquals(IntVariableOwner.CP, ownership.intOwner(1))
+        assertEquals(IntVariableOwner.THEORY, ownership.intOwner(2))
+        ownership.requireSource(bounded)
+        assertNotNull(planned.preparedPlan.factorProjections).requireSource(bounded)
+        assertSame(objective, planned.preparedPlan.objective)
+        assertTrue(planned.preparedPlan.maximize)
     }
 
     @Test
