@@ -18,7 +18,7 @@ internal class NValueEliminationMoves(
     private val presents: IntArray,
     private val present: (LocalSearchState, Int) -> Boolean,
 ) {
-    fun propose(state: LocalSearchState, distinct: Int, sink: MoveSink) {
+    fun propose(state: LocalSearchState, factorId: Int, distinct: Int, sink: MoveSink) {
         if (distinct < 2) return
         // A searched input can rewrite a maintained coordinate in another value class.
         val network = state.invariants
@@ -34,6 +34,7 @@ internal class NValueEliminationMoves(
         var emitted = 0
         var completion: Move? = null
         var completionDelta = Long.MAX_VALUE
+        val canComplete = state.cost == 0L || (state.violated.size == 1 && state.violated.contains(factorId))
         val attempted = HashSet<Pair<Long, Long>>()
         repeat(MAX_ATTEMPTS) {
             if (emitted >= MAX_MOVES) return@repeat
@@ -50,9 +51,9 @@ internal class NValueEliminationMoves(
             }
             val move = queue(state, parts, sink, distinct - 1) ?: return@repeat
             emitted++
-            if (state.cost == 0L) {
+            if (canComplete) {
                 val delta = state.netDelta(move)
-                if (delta > 0L && delta < completionDelta) {
+                if (delta >= 0L && (state.cost > 0L || delta > 0L) && delta < completionDelta) {
                     completion = move
                     completionDelta = delta
                 }
