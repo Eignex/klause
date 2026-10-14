@@ -668,7 +668,7 @@ class Portfolio(
         private val trialSearchWork = LongArray(workers.size)
         private val trialSearchTime = Array(workers.size) { Duration.ZERO }
         private val trialTimeLimit = baseSliceMillis.milliseconds * AUXILIARY_SEARCH_TIME_ALLOWANCES
-        private val trialWorkLimit = baseSliceWork.coerceAtMost(Long.MAX_VALUE / AUXILIARY_SEARCH_WORK_ALLOWANCES) *
+        private val trialWorkLimit = maxSliceWork.coerceAtMost(Long.MAX_VALUE / AUXILIARY_SEARCH_WORK_ALLOWANCES) *
             AUXILIARY_SEARCH_WORK_ALLOWANCES
         private val preparationRevisits = BooleanArray(workers.size)
         private var continuingPreparation = -1

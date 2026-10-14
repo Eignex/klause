@@ -204,7 +204,7 @@ the retained policy's random stream after every initial sibling has been admitte
 Explicit minimum shares retain precedence. Ordinary retained-worker segments advance
 the shared allowance ladder; an unproductive trial preserves it even when charging
 fresh work. Search work after
-preparation is capped at twelve base work allowances and four base time allowances;
+preparation is capped at twelve maximum work allowances and four base time allowances;
 atomic overspend consumes the trial instead of buying additional fresh segments.
 The separate time cap bounds a handle that reports no charged work. Charged debt
 repayment grants no fresh work and does not consume that work allowance. Preparation
