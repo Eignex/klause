@@ -52,8 +52,8 @@ for index, row in enumerate(json.loads((out / "request.json").read_text())):
         solver = CPM_ortools(model)
         if mode == "native-pins":
             for var, native in solver._varmap.items():
-                if var.name in assignment:
-                    solver.ort_model.add(native == assignment[var.name])
+                if var in assignment:
+                    solver.ort_model.add(native == assignment[var])
         (out / f"{index}-{mode}.cpmodel").write_text(str(solver.ort_model.proto))
         options = {"cp_model_use_sat_presolve": False} if mode == "no-sat-presolve" else {}
         solved = solver.solve(time_limit=10, num_workers=1, random_seed=1, log_search_progress=True, **options)
