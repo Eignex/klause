@@ -125,8 +125,8 @@ objective-defining equality. Its integral affine costs can bound a coordinate
 whose reduced cost vanishes in the stronger LP certificate. The strongest bound
 continues to govern pruning; both complete certificates may supply local fixing.
 This candidate shares the same work/allocation allowance and endpoint checks,
-and retains the defining row and its scoped premises. Publication follows the
-final cancellation check and certification policy admission.
+and retains the defining row and its scoped premises. Candidate publication follows the
+final cancellation check; each consumer also applies certification policy admission.
 For a nonintegral objective, node pruning compares the exact certified bound in
 minimized source units with an enclosing rational incumbent cutoff. It uses the
 unrounded objective without an integer objective atom, so the prune has no
