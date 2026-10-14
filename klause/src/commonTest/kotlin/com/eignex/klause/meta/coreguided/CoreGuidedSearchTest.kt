@@ -40,6 +40,35 @@ import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
     @Test
+    fun `initial residual query retains the captured source projection and root deductions`() {
+        val hard = Clause(intArrayOf(Lit.make(0, true)))
+        val source = Problem(1, 0, emptyArray(), arrayOf(hard))
+        val observedModels = mutableListOf<Problem>()
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
+                object : Propagator by delegate {
+                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                        observedModels += state.problem
+                        return delegate.propagate(state, factorId)
+                    }
+                }
+            }
+        })
+        val baked = source.bake(providers.prepare(source))
+        val objective = LinearObjective(longArrayOf(-1))
+        observedModels.clear()
+
+        val result = CoreGuidedSolver(baked).minimize(objective, BacktrackParams(nativeSat = false))
+
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertTrue(optimal.sample.boolValue(0))
+        assertEquals(-1L, objective.evaluateLong(optimal.sample))
+        assertTrue(observedModels.isNotEmpty())
+        assertTrue(observedModels.all { it === baked })
+    }
+
+    @Test
     fun `private assumption traversal resumes across decision work pauses`() {
         val problem = Problem(5, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(0, true))),

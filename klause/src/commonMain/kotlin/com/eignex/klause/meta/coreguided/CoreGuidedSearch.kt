@@ -70,6 +70,7 @@ internal class CoreGuidedSearch(
             add(Clause(intArrayOf(Lit.make(id, value))))
         }
     }
+    private val initialFactorCount = factors.size
     private val weights = LinkedHashMap<Int, BigInt>()
     private val tails = HashMap<Int, ThresholdTail>()
     private var nextBool = base.numBoolVars
@@ -372,6 +373,8 @@ internal class CoreGuidedSearch(
     }
 
     private fun bakeQuery(token: Cancellation): BakedProblem {
+        // Residual assumptions do not change the immutable source projection or its root deductions.
+        if (nextBool == base.numBoolVars && factors.size == initialFactorCount) return base
         val problem = Problem(
             settings = base.settings,
             numBoolVars = nextBool,
