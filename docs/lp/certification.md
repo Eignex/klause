@@ -97,9 +97,10 @@ checks; reuse does not replenish spending.
 `LpDeductionCertificate` exposes exact source-objective bounds, reduced costs,
 owned multiplier snapshots and movement limits for integral coordinates.
 `IntegerCertificate` implements this interface while retaining its concrete
-certificate fields and integer certification entry points. The mixed operations
-are internal numerical calls; node bounding uses its integer certificate path.
-The integer-specific lower-bound policy retains its integral-objective gate.
+certificate fields and integer certification entry points. Node bounding invokes
+mixed operations when exact authority contains continuous declarations; integer
+models retain integer certification. The integer-specific lower-bound policy
+retains its integral-objective gate.
 
 `nodeDualCertificate` checks a supplied dual vector against an `LpExactState`.
 Integral-valued data admits Int128 evaluation even when structural declarations
@@ -117,6 +118,14 @@ source objective expression, a blended vector or an equality eliminating its
 continuous term. An objective lattice requires exact declared integrality or a
 checked defining equality; its row remains part of the support. Additional
 candidates share the same allowance and return complete certificates separately.
+A finite minimizing endpoint also permits a candidate that cancels its nonzero
+continuous reduced cost through an active singleton-continuous row. Logical
+endpoint signs must remain supported, and the complete adjusted vector is checked
+again. At most eight row adjustments are tried, returning one completed candidate.
+This candidate can expose an integral fixing direction even when the original
+certificate already has valid finite endpoint support. An equality-derived
+candidate takes precedence; otherwise finite-endpoint cancellation precedes a
+blended candidate. The operation returns at most three complete certificates.
 
 `mixedRowBounds` projects active mixed rows onto integral structural coordinates.
 Each interval projection cites the exact minimizing or maximizing side of every
@@ -141,14 +150,28 @@ interpretation withhold it. Certificate identity binds all deductions to their
 exact state; pop, bound changes and objective edits prevent reuse across states.
 The caller owns applying consequences and retracting them with their scope.
 
+Node bounding uses the strongest completed certificate for pruning and can use
+weaker certificates for independent conditional fixings. Exact rational cutoff
+gaps and endpoint movements remain in minimized source units. A directly integral
+source objective supplies its native lattice for mixed models; pure integer CP
+models retain their separate Long objective-range guard. Continuous coordinates
+remain outside CP fixing targets. Objective certification and fixing precede row
+projection under the shared allowance. Feasibility queries without an objective
+operation can still apply row bounds. Root row projection considers all mixed
+rows; during search it considers rows incident to narrowed integer endpoints or
+Boolean pins. The CP trail retracts deductions with their supporting branches.
+
 Mixed operations share 128-bit scalar admission, 250,000 work units and 16 MiB of
 metered allocation. Failed attempts retain their charges. Ordinary cancellation
 polls use a 64-call/4096-work stride; work-metered cancellation is immediate and
 publication polls directly. Resource decline can retain completed independent
 projections; cancellation discards unpublished deductions. `NODE_DEDUCTION`
-phase outcomes describe these numerical attempts and their work. They add no
-LP solve, cut, search policy or publication authority. Source-evidence capture
-still requires original premises and a complete multiplier snapshot.
+phase outcomes describe these numerical attempts and their work. Outcome-specific
+entries overlap the aggregate deduction phase and must not be summed with it.
+`NODE_ROW_FIXING` records actual row consequences separately from objective-relative
+fixing. These operations add no LP solve, cut or publication authority.
+Source-evidence capture still requires original premises and a complete multiplier
+snapshot.
 
 ## Continuation rejection details
 

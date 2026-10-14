@@ -21,6 +21,7 @@ import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -44,6 +45,38 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpExplanationTest {
+    @Test
+    fun `finite endpoint cancellation reasons require scoped row premises`() {
+        for (backed in listOf(false, true)) {
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
+                arrayOf(Linear(intArrayOf(0), doubleArrayOf(-2.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 0.0)),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+            val session = PropagationSession(problem)
+            session.pinBool(0, true)
+            val source = LpBuilder().apply {
+                val x = addVar(0L, 1L)
+                val r = addRealVar(0.0, 2.0, cost = 1.0)
+                addRow(intArrayOf(x, r), longArrayOf(-2L, 1L), Relation.GE, 0L)
+            }.build(Sense.MINIMIZE)
+            source.rowGlobal[0] = false
+            if (backed) source.rowPremises[0] = LpRowPremises(
+                intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(Lit.make(0, true)),
+            )
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+            val additional = ArrayList<LpDeductionCertificate>()
+            assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
+                onAdditionalCertificate = { additional.add(it) }))
+            val certificate = additional.first { it.exactReducedCost(0).signum() > 0 }
+            val relaxation = LpRelaxation(model, intArrayOf(0, -1), booleanArrayOf(false, false), 0L,
+                intArrayOf(0), intArrayOf(), colRealId = intArrayOf(-1, 0))
+
+            val reason = LpExplanation.objectiveBoundReason(relaxation, certificate, session)
+
+            assertEquals(if (backed) true else null, reason?.contains(Lit.make(0, false)))
+        }
+    }
+
     @Test
     fun `row residue reasons cite the prior target endpoint`() {
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
