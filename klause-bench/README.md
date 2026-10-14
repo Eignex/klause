@@ -1372,6 +1372,17 @@ Check `cases.json` with the independent original-source checker. Profile timings
 explicit mode comparisons are diagnostic; use ordinary matched whole-CLI runs for
 default-route performance claims.
 
+With `conditional=1..32`, the probe instead ranks unpinned unit source flips by
+their objective delta and starts a fresh native CBLS satisfaction walk for each
+selected target. It preserves the prepared model's effective root pins, holds the
+target flipped, and reconciles its unary definitions. Each walk stops at feasibility,
+the counted `work` or `timeout` limit, or a missing move. It uses the public state
+and strategy kernel without engine restarts or further propagation. Rows report
+remaining hard cost, pin preservation, setup and search times, and actual moves;
+only feasible rows carry original witnesses. A repaired target may worsen other
+objective terms, so strict improvements are measured against the original point.
+This conditional diagnostic does not measure whole-engine or default behavior.
+
 ### Objective representation probe
 
 `com.eignex.klause.bench.profile.ObjectiveRepresentationProbe` measures the public
