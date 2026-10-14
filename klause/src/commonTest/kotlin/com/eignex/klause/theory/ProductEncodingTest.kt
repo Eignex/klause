@@ -44,8 +44,9 @@ class ProductEncodingTest {
                     mapOf(0 to BigFraction.ofLong(x), 1 to BigFraction.ofLong(y)))
                 val signs = normalized.atoms.map { atom ->
                     assertTrue(atom.polynomial.variables.isEmpty())
-                    (atom.polynomial.terms.singleOrNull()?.coefficient ?: BigFraction.ZERO)
+                    val sign = (atom.polynomial.terms.singleOrNull()?.coefficient ?: BigFraction.ZERO)
                         .compareTo(BigFraction.ZERO)
+                    if (atom.holds(sign)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
                 }.toIntArray()
 
                 val truth = normalized.truth(intArrayOf(), signs, arithmetic)
@@ -70,8 +71,9 @@ class ProductEncodingTest {
                 mapOf(0 to BigFraction.ofLong(x), integer to BigFraction.ofLong(k)))
             val signs = normalized.atoms.map { atom ->
                 assertTrue(atom.polynomial.variables.isEmpty())
-                (atom.polynomial.terms.singleOrNull()?.coefficient ?: BigFraction.ZERO)
+                val sign = (atom.polynomial.terms.singleOrNull()?.coefficient ?: BigFraction.ZERO)
                     .compareTo(BigFraction.ZERO)
+                if (atom.holds(sign)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
             }.toIntArray()
 
             val truth = normalized.truth(intArrayOf(), signs, arithmetic)

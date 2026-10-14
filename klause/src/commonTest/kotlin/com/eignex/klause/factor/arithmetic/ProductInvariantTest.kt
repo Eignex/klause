@@ -119,6 +119,7 @@ class ProductInvariantTest {
                     arrayOf<Factor>(Product(a, b, result)))
                 val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
                 state.assignment.setInt(0, old)
+                state.assignment.setInt(1, -1)
                 state.recompute()
                 val before = state.cost
                 val predicted = state.netDelta(Move.IntSet(0, target))
@@ -140,6 +141,7 @@ class ProductInvariantTest {
             val assumptions = if (frozen) Assumptions.None.withInt(0, 2L) else Assumptions.None
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1), assumptions)
             state.assignment.setInt(0, 2)
+            state.assignment.setInt(1, 8)
             state.recompute()
 
             state.factors[0].proposeRepairMoves(state, 0, state.moveSink)

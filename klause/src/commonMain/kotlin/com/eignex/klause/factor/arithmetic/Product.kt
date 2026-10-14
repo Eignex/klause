@@ -14,6 +14,11 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.unaryMinus
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
@@ -46,10 +51,18 @@ class Product(
         }
     }
 
-    private fun fixOperand(c: Long, other: Int): FactorReduction = if (c == 0L) {
-        Rewrite(listOf(Linear(longArrayOf(1L), intArrayOf(result), LinearOp.EQ, 0L)))
-    } else {
-        Rewrite(listOf(Linear(longArrayOf(1L, -c), intArrayOf(result, other), LinearOp.EQ, 0L)))
+    private fun fixOperand(c: Long, other: Int): FactorReduction = when (c) {
+        0L -> Rewrite(listOf(Linear(longArrayOf(1L), intArrayOf(result), LinearOp.EQ, 0L)))
+        Long.MIN_VALUE -> {
+            val coefficient = -bigIntOf(c)
+            val row = if (other == result) {
+                Linear(intArrayOf(result), arrayOf(BIG_ONE + coefficient), LinearOp.EQ, BIG_ZERO)
+            } else {
+                Linear(intArrayOf(result, other), arrayOf(BIG_ONE, coefficient), LinearOp.EQ, BIG_ZERO)
+            }
+            Rewrite(listOf(row))
+        }
+        else -> Rewrite(listOf(Linear(longArrayOf(1L, -c), intArrayOf(result, other), LinearOp.EQ, 0L)))
     }
 
     /** Multiplication is commutative, so the operands [a] and [b] are a multiset; [result] is positional. */
