@@ -96,7 +96,10 @@ completed coordinate certificates. An exact comparison of the existing endpoint'
 row contribution with the residual skips division and source-coordinate reconstruction
 when the projection cannot tighten that endpoint. Strict equality retains the same
 admission rule. It shares the 128-bit scalar admission,
-250,000 work and 16 MiB allocation allowance with subsequent objective candidates.
+250,000 work and 16 MiB allocation allowance with objective candidates.
+Objective certification, pruning and fixing precede optional row deductions so
+row scanning cannot consume their remaining allowance. When no objective operation
+is requested, the row pass runs before returning the feasibility result.
 Cancellation discards unpublished projections; resource decline can retain completed
 ones. The consumer charges row work and rounding to the containing LP ledger.
 Each certificate retains its exact-state identity, row and endpoint support. Bound

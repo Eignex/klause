@@ -122,8 +122,10 @@ do not require an incumbent, add no LP query or cut row, and leave continuous
 coordinates with the numerical owner. Root queries consider all mixed rows;
 search queries restrict the pass to rows touched by narrowed finite endpoints
 or Boolean pins, with every retained consequence following the CP trail.
-Certification and the subsequent node
-objective candidates share the same cumulative allowance. The CP consumer owns
+Objective candidates and row certification share the same cumulative allowance;
+objective certification, pruning and fixing precede the optional row pass.
+Feasibility queries without an objective operation still run that pass.
+The CP consumer owns
 the resulting domain changes and explanations; see [certification](certification.md).
 
 Objective changes retract dependent bounds, cuts and clauses. If dependent
