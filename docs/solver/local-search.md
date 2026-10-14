@@ -301,10 +301,12 @@ foreign-owned changed coordinates decline the whole class. Absent positions do n
 restrict a class unless they share a participating coordinate.
 Elimination declines factors reading maintained integers or presence literals, since
 changing a searched input can rewrite another class or its presence.
-Count-decreasing repairs use the same bounded operator when a lowered count leaves
-repeated classes to reconcile, including objective bounds pursued as constraints.
+Count-decreasing repairs use the same bounded operator when NValue is the sole
+violation and a lowered count leaves repeated classes to reconcile, including
+objective bounds pursued as constraints.
 
-Each call samples at most 24 class pairs and offers at most four elimination moves,
+Each call samples at most 24 pairs over distinct present classes, filtering destinations
+by a representative root domain before whole-class admission, and offers at most four elimination moves,
 each changing at most 32 class coordinates plus the count and its channels. Channel
 contributions protect all NValue coordinates from counter-shifts and carry equality
 indicators and binary channels. Proposals changing presence literals decline. Complete

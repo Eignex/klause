@@ -178,7 +178,7 @@ internal class NValueInvariant(
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
-            eliminationMoves.propose(state, factorId, s.distinctCount, sink)
+            if (state.violated.size == 1) eliminationMoves.propose(state, factorId, s.distinctCount, sink)
         }
     }
 
