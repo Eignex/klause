@@ -2514,6 +2514,39 @@ class PortfolioTest {
     }
 
     @Test
+    fun `charged auxiliary continuations advance ordinary family allowances`() {
+        for (charged in listOf(false, true)) {
+            val clock = TestTimeSource()
+            val allowances = ArrayList<Long>()
+            val finder = ScriptedSearch({ it == 0 }) {}
+            val observedFinder = object : ResumableSearch by finder {
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                    allowances += sliceNodes
+                    return finder.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                }
+            }
+            val probe = ScriptedSearch({ false }) { clock += 1_000.milliseconds }
+            val observedProbe = object : ResumableSearch by probe {
+                override val work: Long get() = if (charged) probe.work else 0L
+            }
+            val workers = listOf(
+                trackingWorker("finder", 0, observedFinder),
+                trackingWorker("probe", 1, observedProbe),
+            )
+            val portfolio = Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = 21,
+                reseedStaleThreshold = 0).also {
+                it.incumbentProbeArms = setOf(1)
+                it.runTimeSource = clock
+            }
+
+            portfolio.use { it.minimize(Cancellation { allowances.size >= 2 }) }
+
+            assertEquals(listOf(7L, if (charged) 21L else 7L), allowances)
+        }
+    }
+
+    @Test
     fun `incumbent probes retain feasibility work before a witness`() {
         val slices = IntArray(2)
         val workers = listOf(
