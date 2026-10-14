@@ -46,6 +46,31 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `objective equality fixing bounds an integral coordinate seated inside the LP face`() {
+        for (sign in listOf(-1.0, 1.0)) {
+            val problem = Problem(
+                0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+                arrayOf(Linear(intArrayOf(0, 1), doubleArrayOf(-4.0 * sign, -sign), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
+                numRealVars = 1,
+                realLower = doubleArrayOf(if (sign > 0.0) 1.0 else -100.0),
+                realUpper = doubleArrayOf(if (sign > 0.0) 100.0 else -1.0),
+            )
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(sign))
+            val sink = SolveStatsSink(backend = "objective-equality-fixing")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, 2.0,
+                    sink, Cancellation.Never, -1, true)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, 0), session.intDomain(0))
+                assertEquals(IntDomain(0, 1), session.intDomain(1))
+            }
+        }
+    }
+
+    @Test
     fun `declared continuous objective ceilings fix integral domains before an incumbent`() {
         for (sign in listOf(-1.0, 1.0)) for (coefficient in listOf(3.0, 4.0)) {
             val lower = if (sign > 0.0) 0.0 else -3.0

@@ -579,12 +579,14 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     if (cancellation()) return LpNodeOutcome(false, null)
+    var objectiveCertificate: LpDeductionCertificate? = null
     val cert = if ((learn && canPropagate) || canFix) {
         solveContext.certificationPolicy.acceptNullable(
             LpCertifier.INTEGER,
             nodeDualCertificate(
                 boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
                 eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
+                onObjectiveCertificate = if (canFix) { { objectiveCertificate = it } } else null,
             ),
         ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
@@ -691,6 +693,13 @@ internal fun LpEngine.sparseSafePrune(
             cancellation,
             objectiveCeiling,
         )
+    ) {
+        return LpNodeOutcome(true, null)
+    }
+    val objectiveCert = objectiveCertificate
+    if (canFix && cert != null && objectiveCert != null && !cancellation() &&
+        applySparseReducedCostFixing(boundRel, objectiveCert, session, bound, sink, objectiveVar,
+            objectiveAscending, learn, cancellation, objectiveCeiling)
     ) {
         return LpNodeOutcome(true, null)
     }
