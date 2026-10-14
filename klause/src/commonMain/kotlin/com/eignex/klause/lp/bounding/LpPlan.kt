@@ -108,11 +108,12 @@ data class LpPlan(
     val branching: Boolean = true,
     /**
      * LP-rounding primal heuristic: before search, solve the root LP and try to round its
-     * fractional point into a feasible assignment by pinning each variable toward its LP value and
-     * propagating. A complete conflict-free pass is a feasible incumbent (propagation enforces every
-     * factor, so the result is sound by construction); it seeds the branch-and-bound bound so pruning
-     * and reduced-cost fixing bite from the first node. A conflict on the single pass abandons the
-     * probe (no backtracking). Requires a LinearObjective; off by default; never changes the optimum.
+     * fractional point into a feasible assignment by pinning each discrete variable toward its LP value
+     * and propagating. Publication requires the composed witness check, continuous completion where
+     * applicable, and improvement over the available incumbent cutoff. A declined proposal permits
+     * bounded feasibility pumping under the same root allowance. The relaxation point supplies only
+     * a target, so it cannot establish source feasibility on its own. Requires a LinearObjective;
+     * off by default; never changes the complete search's feasible region.
      */
     val probe: Boolean = false,
     /**
