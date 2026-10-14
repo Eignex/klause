@@ -221,6 +221,14 @@ loaded library/tool jar and reference binary identities. Source checking and set
 are outside the measured query spans. JFR instrumentation remains part of profile jobs;
 these measurements are preparation diagnostics, not ordinary end-to-end solve timings.
 
+`bench.profile.PublishedAbiSnapshot` captures compiler-generated JVM and Kotlin/Native
+published API declarations from the profile job's pinned checkout. It runs
+`:klause:updateKotlinAbi` remotely, retains both exact dumps, the generation log and
+source/hash provenance under `$OUT` (or `out=DIR`), and reports generation failure
+without fabricating declarations. Use this diagnostic when local builds are
+unavailable; inspect compatibility changes and commit the generated reference bytes
+before checking the final CI gate.
+
 `bench.profile.ProjectionProviderProfile` compares direct built-in projection opening,
 captured default opening and alternate clause propagation/scoring plus equivalent
 integer relaxation emission. It alternates control order after a warmup, records
