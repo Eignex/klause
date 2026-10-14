@@ -13,8 +13,16 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -29,6 +37,32 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CoreGuidedSearchTest {
+    @Test
+    fun `rebuilt core queries retain selected source propagation`() {
+        val hard = Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))
+        val source = Problem(2, 0, emptyArray(), arrayOf(hard))
+        var augmentedChecks = 0
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor != hard) BuiltInPropagationProjectionProvider.select(factor)
+            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
+                object : Propagator by delegate {
+                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                        if (state.problem.numBoolVars > source.numBoolVars) augmentedChecks++
+                        return delegate.propagate(state, factorId)
+                    }
+                }
+            }
+        })
+        val objective = LinearObjective(longArrayOf(-5, -3), constant = 8)
+
+        val result = CoreGuidedSolver(source.bake(providers)).minimize(objective, BacktrackParams())
+
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(3L, objective.evaluateLong(optimal.sample))
+        assertTrue(augmentedChecks > 0)
+    }
+
     @Test
     fun `propagated core premises preserve the cheaper original violation`() {
         val problem = Problem(
