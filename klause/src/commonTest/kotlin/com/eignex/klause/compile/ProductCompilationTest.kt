@@ -67,7 +67,8 @@ class ProductCompilationTest {
             assertEquals(sourceResidual, predicted, format)
             assertEquals(sourceResidual, committed, format)
             assertEquals(committed, state.cost, format)
-            assertTrue(state.factors[problem.factors.indexOf(product)].isViolated(state, problem.factors.indexOf(product)))
+            val factorId = problem.factors.indexOf(product)
+            assertTrue(state.factors[factorId].isViolated(state, factorId))
             assertFalse(state.assignment.intValue(product.a).let { it * it == 4L }, format)
         }
     }

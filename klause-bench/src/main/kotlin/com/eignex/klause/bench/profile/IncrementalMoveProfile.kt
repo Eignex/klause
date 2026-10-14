@@ -105,8 +105,12 @@ object IncrementalMoveProfile {
                         put("fresh", after.cost)
                         put("degreesAgree", degreesAgree)
                         put("assignmentsAgree", assignmentsAgree)
-                        put("bools", buildJsonArray { after.assignment.snapshot().bools.forEach { add(JsonPrimitive(it)) } })
-                        put("ints", buildJsonArray { after.assignment.snapshot().ints.forEach { add(JsonPrimitive(it)) } })
+                        put("bools", buildJsonArray {
+                            after.assignment.snapshot().bools.forEach { add(JsonPrimitive(it)) }
+                        })
+                        put("ints", buildJsonArray {
+                            after.assignment.snapshot().ints.forEach { add(JsonPrimitive(it)) }
+                        })
                         put("consistent", predicted == after.cost - before && committed == after.cost &&
                             degreesAgree && assignmentsAgree)
                     })
@@ -147,5 +151,6 @@ object IncrementalMoveProfile {
         }
     }
 
-    private fun hash(bytes: ByteArray): String = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
+    private fun hash(bytes: ByteArray): String =
+        HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
 }
