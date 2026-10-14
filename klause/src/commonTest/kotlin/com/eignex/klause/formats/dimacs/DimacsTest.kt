@@ -5,7 +5,9 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.toLinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -73,13 +75,13 @@ class DimacsTest {
         """.trimIndent()
         val w = Dimacs.parseWcnf(text)
         assertEquals(3, w.numOriginalBoolVars)
-        assertEquals(5, w.problem.numBoolVars)
         assertIs<PropagationResult.Unsat>(
             w.problem.propagate(Assumptions(bools = mapOf(0 to false, 1 to false))),
         )
-        assertEquals(0L, w.objective.boolWeights[0])
-        assertEquals(1L, w.objective.boolWeights[3])
-        assertEquals(2L, w.objective.boolWeights[4])
+        val assignment = Assignment(w.problem.numBoolVars, 0)
+        assignment.setBool(0, true)
+        assignment.setBool(1, true)
+        assertEquals(3L, w.objective.toLinearObjective().evaluateLong(assignment))
     }
 
     @Test
@@ -120,12 +122,13 @@ class DimacsTest {
         """.trimIndent()
         val w = Dimacs.parseWcnf(text)
         assertEquals(2, w.numOriginalBoolVars)
-        assertEquals(4, w.problem.numBoolVars)
         assertIs<PropagationResult.Unsat>(
             w.problem.propagate(Assumptions(bools = mapOf(0 to false, 1 to false))),
         )
-        assertEquals(5L, w.objective.boolWeights[2])
-        assertEquals(3L, w.objective.boolWeights[3])
+        val assignment = Assignment(w.problem.numBoolVars, 0)
+        assignment.setBool(0, true)
+        assignment.setBool(1, true)
+        assertEquals(8L, w.objective.toLinearObjective().evaluateLong(assignment))
     }
 
     @Test

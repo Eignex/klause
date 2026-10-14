@@ -58,7 +58,7 @@ sealed interface SatisfyResult {
  * On `Unsat`, the assumption subset returned in [SatisfyResult.UnsatUnderAssumptions.core]
  * is sound (jointly infeasible with the hard constraints) but not guaranteed minimal.
  * The [BacktrackSolver] override drives the seed phase manually so seed-time conflicts
- * yield a strict-subset core; deeper conflicts (after seed succeeded) fall back to the
+ * yield the applied prefix as a core; deeper conflicts (after seed succeeded) fall back to the
  * full input assumption set.
  */
 fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
@@ -92,8 +92,8 @@ fun <P : SolverParams> Solver<P>.satisfyUnderAssumptions(
 
 /**
  * Backtrack-specific path: run the bake check + seed phase by hand so a seed-time
- * conflict can be projected back to the exact subset of [assumptions] whose decision
- * levels appear in the propagation conflict set. If the seed succeeds we fall through
+ * conflict retains the applied prefix of [assumptions], including the transitive premises
+ * of propagated deductions. If the seed succeeds we fall through
  * to a normal `solve(withAssumptions)` for the DFS phase; an exhaustive-UNSAT verdict
  * there returns the full assumption set (conservative but sound).
  */
