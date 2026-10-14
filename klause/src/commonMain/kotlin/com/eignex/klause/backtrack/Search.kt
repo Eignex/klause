@@ -99,11 +99,9 @@ internal sealed interface SearchOutcome {
     /** DFS exhausted without finding a model. [core] is non-null when the exhaustion
      *  was forced by root-level propagation (bake or seed); after a full DFS-tree
      *  walk, no single-factor core explains the result and [core] stays null.
-     *  [touchedAssumptionLevels] is the union of seed-level decision levels that
-     *  appeared in any conflict's learned-clause decision-level set during the
-     *  search — feeds the assumption-core projection in
-     *  [com.eignex.klause.solver.result.satisfyUnderAssumptions]. Empty when no seed was
-     *  in play or no conflict referenced a seed level. */
+     *  [touchedAssumptionLevels] retains a jointly refuted seed prefix at propagation
+     *  or the full seed range after tree exhaustion. It feeds the assumption-core
+     *  projection in [com.eignex.klause.solver.result.satisfyUnderAssumptions]. */
     data class Exhausted(
         val core: UnsatCore? = null,
         val touchedAssumptionLevels: IntArray = EmptyIntArray,
@@ -330,7 +328,10 @@ internal class CpSatisfactionTraversal(
 
             SearchRunEvent.Exhausted -> {
                 close()
-                SearchOutcome.Exhausted(touchedAssumptionLevels = traversal.brancher.touchedAssumptionLevels())
+                // Learned decision levels describe traversal, not every premise of the exhausted tree.
+                SearchOutcome.Exhausted(touchedAssumptionLevels = IntArray(
+                    params.assumptions.numBools + params.assumptions.numInts,
+                ) { it + 1 })
             }
 
             SearchRunEvent.Indeterminate.Component -> {

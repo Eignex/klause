@@ -378,6 +378,8 @@ class PropagationSession private constructor(
      * Seed with an initial assumption set. Resets any prior trail to level 0 first, then
      * pushes each assumption in iteration order (bools first, then ints). Each gets its own
      * decision level. Returns the cumulative implied set beyond the seed pins (or Unsat).
+     * A seed refutation retains its complete applied prefix: propagated levels alone can
+     * omit earlier assumptions that contributed through a reason chain.
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
@@ -392,13 +394,15 @@ class PropagationSession private constructor(
         val bv = assumptions.boolValues
         for (i in bk.indices) {
             val r = pushBool(bk[i], bv[i])
-            if (r is PropagationResult.Unsat) return r
+            if (r is PropagationResult.Unsat) return r.copy(conflictLevels = IntArray(i + 1) { it + 1 })
         }
         val ik = assumptions.intKeys
         val iv = assumptions.intValues
         for (i in ik.indices) {
             val r = pushInt(ik[i], iv[i])
-            if (r is PropagationResult.Unsat) return r
+            if (r is PropagationResult.Unsat) {
+                return r.copy(conflictLevels = IntArray(bk.size + i + 1) { it + 1 })
+            }
         }
         return computeImplied()
     }

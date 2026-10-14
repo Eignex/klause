@@ -128,10 +128,7 @@ private fun satisfyUnderAssumptionsBacktrack(
         )
     }
     // Seed cleanly applied — defer to the engine's normal solve path for the DFS phase.
-    // The engine populates `r.assumptionCore` with the subset of seed assumptions whose
-    // decision levels appeared in any conflict's 1UIP-derived level set during search.
-    // That's typically a strict subset of the input and tighter than the destructive-MUS
-    // fallback below.
+    // Engine cores retain a refuted seed prefix or the full input after tree exhaustion.
     val merged = params.withAssumptions(assumptions)
     return when (val r = solver.solve(merged)) {
         is SolveResult.Sat -> SatisfyResult.Sat(r.assignment)
@@ -222,7 +219,7 @@ private fun Assumptions.dropInt(id: Int): Assumptions {
 }
 
 /**
- * Map a [PropagationResult.Unsat.conflictLevels] set produced during the seed phase back
+ * Map a refuted seed prefix in [PropagationResult.Unsat.conflictLevels] back
  * to the assumption literals that live at those levels. Seed iteration order is
  * bools-first (in [Assumptions.boolKeys] ascending order, each at its own level starting
  * at 1) then ints (same shape, continuing from `numBools + 1`).

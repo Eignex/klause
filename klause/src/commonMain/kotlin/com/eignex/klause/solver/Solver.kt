@@ -90,9 +90,9 @@ sealed interface SolveResult {
         override val stats: SolveStats = SolveStats.EMPTY,
         /**
          * When the engine was driven with `params.assumptions` non-empty and proved
-         * UNSAT, the subset of those assumptions whose decision levels were touched by
-         * any conflict's 1UIP analysis during the search. Sound (jointly infeasible
-         * with the hard constraints) but not guaranteed minimal — populated by
+         * UNSAT, a jointly refuted subset of those assumptions. Seed conflicts retain their
+         * complete applied prefix; tree exhaustion can retain the full input. The subset
+         * is not guaranteed minimal — populated by
          * [com.eignex.klause.backtrack.BacktrackSolver]; other backends leave
          * this `null`. Used by [com.eignex.klause.solver.result.satisfyUnderAssumptions] to surface a tight
          * [com.eignex.klause.solver.result.SatisfyResult.UnsatUnderAssumptions.core] without the
