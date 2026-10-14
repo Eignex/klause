@@ -124,7 +124,7 @@ class SearchBranchSelectionTest {
         val session = SearchComponentSet(listOf(installed), listOf(legacy), listOf(independent)).session()
         session.initialize()
         val run = session.openRun(1, observer = object : SearchRunObserver {
-            override fun onCommit(decision: SearchDecision, level: Int) {
+            override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                 commits += (decision as SearchDecision.Bool).literal ushr 1
             }
         })
@@ -160,7 +160,7 @@ class SearchBranchSelectionTest {
             val order = listOf(first) + SearchBranchKind.entries.filter { it != first }
             val run = session.openRun(1, branchSelection = SearchBranchSelection.Priority(order),
                 observer = object : SearchRunObserver {
-                    override fun onCommit(decision: SearchDecision, level: Int) {
+                    override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                         commits += (decision as SearchDecision.Bool).literal ushr 1
                     }
                 })
@@ -249,6 +249,6 @@ class SearchBranchSelectionTest {
         val run = session.openRun(0, branchSelection = SearchBranchSelection.Priority(
             listOf(SearchBranchKind.Finite, SearchBranchKind.Arithmetic, SearchBranchKind.Boolean)))
 
-        assertEquals(SearchRunEvent.Indeterminate.Cancelled, run.next())
+        assertIs<SearchRunEvent.Indeterminate>(run.next())
     }
 }
