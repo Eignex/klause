@@ -458,11 +458,12 @@ internal class MixedCertificateMeter(private val cancellation: Cancellation) {
     }
     fun <T : Any> attempt(observer: LpCertificationObserver?, stage: String, body: () -> T?): T? {
         val timer = LpPhaseTimer(observer, LpSolvePhase.NODE_DEDUCTION)
+        val initialWork = work
         reason = "UNSUPPORTED"
         return try {
-            body().also { timer.finish("${stage}_${if (it != null) "COMPLETE" else reason}") }
+            body().also { timer.finish("${stage}_${if (it != null) "COMPLETE" else reason}", work - initialWork) }
         } catch (stopped: LpProjectionStop) {
-            timer.finish("${stage}_$reason")
+            timer.finish("${stage}_$reason", work - initialWork)
             throw stopped
         }
     }
