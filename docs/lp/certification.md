@@ -35,6 +35,10 @@ has completed.
 
 Ceiling an objective bound requires a proved integral objective
 lattice. Combine packages only when authority, scope and objective units match.
+Mixed node certificates retain a directly integral source objective with an empty
+defining-row support set. Strict integer cutoffs and equality pruning do not require
+the separate CP objective range to fit in a Long; arithmetic overflow still declines
+the affected deduction. An equality-derived lattice retains its defining row instead.
 Exact rejection of one candidate is not a refutation of the model. Cross-arm
 publication also requires the [portfolio model and objective scope](../solver/portfolio.md#witnesses-and-proof-scope);
 its adapter certificate does not replace these numerical checks.
