@@ -178,6 +178,7 @@ internal class NValueInvariant(
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
+            eliminationMoves.propose(state, factorId, s.distinctCount, sink)
         }
     }
 
@@ -209,7 +210,7 @@ internal class NValueInvariant(
             sink.addChannelingIntSet(state, xs[i], pick ?: continue)
             emitted++
         }
-        eliminationMoves.propose(state, s.distinctCount, sink)
+        eliminationMoves.propose(state, factorId, s.distinctCount, sink)
     }
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {

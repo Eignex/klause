@@ -301,6 +301,8 @@ foreign-owned changed coordinates decline the whole class. Absent positions do n
 restrict a class unless they share a participating coordinate.
 Elimination declines factors reading maintained integers or presence literals, since
 changing a searched input can rewrite another class or its presence.
+Count-decreasing repairs use the same bounded operator when a lowered count leaves
+repeated classes to reconcile, including objective bounds pursued as constraints.
 
 Each call samples at most 24 class pairs and offers at most four elimination moves,
 each changing at most 32 class coordinates plus the count and its channels. Channel
@@ -309,9 +311,11 @@ indicators and binary channels. Proposals changing presence literals decline. Co
 model scoring and ordinary source publication checks remain required; NValue
 satisfaction alone establishes neither feasibility nor objective improvement.
 
-At a feasible assignment, the sampled elimination with the least positive whole-model
-cost delta after move-sink filtering may also use the existing directed repair-chain
-mechanism to reconcile regressed surrounding constraints. At most one completion follows at
+At a feasible assignment or when NValue is the sole violated factor, the sampled
+elimination with the least nonnegative whole-model cost delta after move-sink filtering
+may also use the existing directed repair-chain mechanism to reconcile regressed
+surrounding constraints. Zero-delta moves need completion only at an infeasible assignment.
+At most one completion follows at
 most eight repair steps, protects the changed class and count coordinates, and offers
 only a complete zero-violation proposal with at most 128 primitive parts. Class
 coordinates carry indicators together; arithmetic rows reconcile their combined drift

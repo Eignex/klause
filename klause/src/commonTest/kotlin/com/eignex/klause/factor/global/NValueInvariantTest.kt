@@ -526,6 +526,48 @@ class NValueInvariantTest {
     }
 
     @Test
+    fun `repairs reconcile repeated classes after an objective bound lowers the count`() {
+        val p = Problem(
+            0,
+            7,
+            arrayOf(
+                IntDomain(1, 2),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 2),
+                IntDomain(0, 4),
+            ),
+            arrayOf<Factor>(
+                NValue(0, intArrayOf(1, 2, 3, 4)),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 5), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, 1, 1, 1, -1), intArrayOf(1, 2, 3, 4, 6), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        for ((variable, value) in listOf(0 to 1L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L, 5 to 1L, 6 to 2L)) {
+            state.assignment.setInt(variable, value)
+        }
+        state.recompute()
+        val before = state.assignment.snapshot()
+        assertEquals(1L, state.cost)
+
+        state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+        val move = state.moveSink.list.first { state.netDelta(it) == -1L }
+        assertEquals(before, state.assignment.snapshot())
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(1L, state.assignment.intValue(5))
+        assertEquals(1, (1..4).map { state.assignment.intValue(it) }.distinct().size)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
     fun `class elimination reconciles the combined drift of a surrounding equality`() {
         val p = Problem(
             0,
