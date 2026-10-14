@@ -2,7 +2,6 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -20,8 +19,6 @@ import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.TheoryRealId
-import com.eignex.klause.theory.Encoder
-import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.TheoryEncoding
 import com.eignex.klause.util.BigInt
@@ -51,15 +48,13 @@ internal class SharedPolynomialModel private constructor(
         fun assemble(
             source: Problem,
             sourceFormula: PolynomialRealFormula? = null,
-            formulaForFactor: (Factor) -> PolynomialRealFormula? = { null },
         ): SharedPolynomialModel? {
-            return source.preparePolynomialExecutionPlan(sourceFormula, formulaForFactor).polynomialModel
+            return source.preparePolynomialExecutionPlan(sourceFormula).polynomialModel
         }
 
         internal fun lower(
             source: Problem,
             sourceFormula: PolynomialRealFormula?,
-            formulaForFactor: (Factor) -> PolynomialRealFormula?,
             projections: PreparedFactorProjections,
         ): SharedPolynomialModel? {
             if ((0 until source.numIntVars).any { !source.intBounds.hasLower(it) || !source.intBounds.hasUpper(it) }) {
@@ -76,19 +71,14 @@ internal class SharedPolynomialModel private constructor(
             val kept = ArrayList<Int>()
             val attributions = ArrayList<EncodingAttribution>()
             for ((index, factor) in source.factors.withIndex()) {
-                val explicit = formulaForFactor(factor)
-                val continuous = explicit != null || factor is ContinuousProduct || factor is RealProduct ||
+                val continuous = factor is ContinuousProduct || factor is RealProduct ||
                     factor.variables.reals.isNotEmpty() ||
                     factor.linearForm?.rows?.any { it.constants is RealConstants } == true
                 if (!continuous) {
                     kept += index
                     continue
                 }
-                val selected = if (explicit == null) projections.encoder(index, EncodingTarget.POLYNOMIAL)
-                else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
-                    encoding.polynomial(explicit)
-                    null
-                }
+                val selected = projections.encoder(index, EncodingTarget.POLYNOMIAL)
                 val emitted = ArrayList<PolynomialRealFormula>()
                 val integerMapping = LinkedHashMap<SourceIntId, TheoryRealId>()
                 val realMapping = LinkedHashMap<SourceRealId, TheoryRealId>()

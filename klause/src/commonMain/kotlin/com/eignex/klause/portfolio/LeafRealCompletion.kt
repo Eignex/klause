@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
@@ -25,9 +26,11 @@ import kotlin.math.ceil
  */
 internal class LeafRealCompletion(private val problem: Problem, private val objective: LinearObjective?) :
     CandidateCompletion {
+    private val encoders = problem.selectedFactorProjections()
+
     override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
         val sink = LpStatsSink(LpRoute.STANDALONE)
-        val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink)
+        val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink, encoders = encoders)
         val work = movesFor(sink.snapshot().standaloneWorkOps.sum)
         return when (real.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
