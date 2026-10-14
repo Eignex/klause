@@ -147,6 +147,13 @@ coordinate coverage and raw primitive callback absence. They describe stages;
 semantic scoring may select after forward coverage is absent. Cached reads and
 owner-masked non-null preferences do not create raw producer-absence observations.
 
+`PolynomialTheoryStats` retains its three-counter constructors, default construction,
+destructuring and copy descriptors. Additional private witness observations are
+immutable nullable values on the same snapshot; the three-counter copy preserves
+them. Legacy construction retains its three-counter hash and text rendering and
+leaves observations absent, while instrumented zero counts are
+actual observations. A completed proposal base supplies no source-result authority.
+
 Experimental composition includes `PreparedSourcePlan` and its inspectable component,
 operation and strategy admission contracts, `ComponentPlan`, CP projection planning, shared
 search session/runner construction, direct pipeline engines and concrete theory

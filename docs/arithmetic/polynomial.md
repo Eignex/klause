@@ -27,6 +27,14 @@ order. Coefficient extraction uses ascending exponents; zero has degree -1 and a
 empty coefficient list. Derivatives, substitution and exact division retain source
 coefficient authority without floating conversion.
 
+Each monomial captures descending coordinate IDs and their degrees in private
+primitive arrays. Comparison merges those arrays without allocating; equality
+retains the normalized powers, and the cached hash mixes canonical coordinate and
+degree pairs. Variable views are fresh ascending lists. Capture retains O(n)
+storage and performs atomic coordinate sorting without its own cancellation or
+work token. Caller checkpoints do not provide a full construction precharge, and
+this representation adds no arithmetic dimension limit.
+
 Bareiss elimination computes polynomial-ring Sylvester determinants with exact
 polynomial division and row swaps. Resultants include zero/shared-factor and
 constant cases. Principal subresultant coefficients use the truncated Sylvester

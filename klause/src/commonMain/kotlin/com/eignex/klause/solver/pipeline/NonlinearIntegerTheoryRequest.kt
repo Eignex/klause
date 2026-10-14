@@ -178,7 +178,9 @@ internal class NonlinearIntegerInvocation(
         }
         return PolynomialTheoryExecution(
             published,
-            PolynomialTheoryStats(native.projectedPolynomials, native.liftedCells, native.workSpent), resource,
+            PolynomialTheoryStats(native.projectedPolynomials, native.liftedCells, native.workSpent,
+                native.dyadicAttempts, native.dyadicBases, native.coupledWorkDeclines,
+                native.dyadicPreExtractionDeclines), resource,
         )
     }
 
@@ -312,6 +314,14 @@ internal class NonlinearIntegerInvocation(
         native = QfNraStats(
             sum(native.projectedPolynomials, observed.projectedPolynomials),
             sum(native.liftedCells, observed.liftedCells), sum(native.workSpent, observed.workSpent),
+            if (native.dyadicAttempts == null && observed.dyadicAttempts == null) null
+            else sum(native.dyadicAttempts ?: 0, observed.dyadicAttempts ?: 0),
+            if (native.dyadicBases == null && observed.dyadicBases == null) null
+            else sum(native.dyadicBases ?: 0, observed.dyadicBases ?: 0),
+            if (native.coupledWorkDeclines == null && observed.coupledWorkDeclines == null) null
+            else sum(native.coupledWorkDeclines ?: 0, observed.coupledWorkDeclines ?: 0),
+            if (native.dyadicPreExtractionDeclines == null && observed.dyadicPreExtractionDeclines == null) null
+            else sum(native.dyadicPreExtractionDeclines ?: 0, observed.dyadicPreExtractionDeclines ?: 0),
         )
         val declined = execution.result as? QfNraResult.Unknown
         resource = declined?.resource?.let {

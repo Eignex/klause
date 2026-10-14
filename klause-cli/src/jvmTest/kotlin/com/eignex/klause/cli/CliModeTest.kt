@@ -20,6 +20,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.ValSelectorKind
 import com.eignex.klause.solver.pipeline.VarSelectorKind
@@ -49,6 +50,42 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModeTest {
+
+    @Test
+    fun `native stats retain three counter JVM constructors and default copy`() {
+        val type = PolynomialTheoryStats::class.java
+        val observed = PolynomialTheoryStats(1, 2, 3, 4, 2, 1, 1)
+
+        val empty = type.getConstructor().newInstance()
+        val legacy = type.getConstructor(java.lang.Long.TYPE, java.lang.Long.TYPE, java.lang.Long.TYPE)
+            .newInstance(1L, 2L, 3L)
+        val copied = type.getDeclaredMethod("copy\$default", type, java.lang.Long.TYPE,
+            java.lang.Long.TYPE, java.lang.Long.TYPE, Integer.TYPE, Any::class.java)
+            .invoke(null, observed, 0L, 0L, 0L, 7, null) as PolynomialTheoryStats
+
+        assertNull(empty.dyadicAttempts)
+        assertEquals(PolynomialTheoryStats(1, 2, 3), legacy)
+        assertEquals(observed, copied)
+        assertEquals(4L, copied.dyadicAttempts)
+    }
+
+    @Test
+    fun `SMT private dyadic observations report completed bases independently of verdicts`() {
+        val source = File.createTempFile("nra-dyadic-observations", ".smt2").apply {
+            writeText("(declare-const x Real) (declare-const y Real) (assert (> (* x y) 1)) (check-sat)")
+        }
+        val output = try {
+            capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
+        } finally {
+            source.delete()
+        }
+
+        assertTrue(output.startsWith("sat\n"), output)
+        assertTrue("; nraDyadicAttempts=1" in output.lines(), output)
+        assertTrue("; nraDyadicBases=1" in output.lines(), output)
+        assertTrue("; nraCoupledWorkDeclines=0" in output.lines(), output)
+        assertTrue("; nraDyadicPreExtractionDeclines=0" in output.lines(), output)
+    }
 
     @Test
     fun `ordinary source publication failure leaves a later invocation independent`() {

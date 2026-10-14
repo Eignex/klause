@@ -16,6 +16,33 @@ import kotlin.test.assertTrue
 
 class PolynomialTheoryServiceTest {
     @Test
+    fun `dyadic query snapshots survive accumulation copying and repeated close`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (> (* x y) 1))
+        """.trimIndent())
+        val invocation = PolynomialTheoryService(source.formula, source.boolCount, source.realCount).invocation()
+
+        val first = assertIs<QfNraResult.Satisfiable>(invocation.check()).stats
+        val second = assertIs<QfNraResult.Satisfiable>(invocation.check()).stats
+        val accumulated = invocation.stats
+        val copied = accumulated.copy(workSpent = 0)
+        invocation.close()
+        invocation.close()
+
+        assertEquals(1L, first.dyadicAttempts)
+        assertEquals(1L, first.dyadicBases)
+        assertEquals(first, second)
+        assertEquals(2L, accumulated.dyadicAttempts)
+        assertEquals(2L, copied.dyadicBases)
+        assertEquals(0L, accumulated.coupledWorkDeclines)
+        assertEquals(0L, accumulated.dyadicPreExtractionDeclines)
+        assertEquals(accumulated, invocation.stats)
+        assertEquals(first.workSpent + second.workSpent, accumulated.workSpent)
+    }
+
+    @Test
     fun `completed query has no further elements`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)

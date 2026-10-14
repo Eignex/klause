@@ -256,6 +256,15 @@ does not disable admission or polynomial solving because this route has no finit
 bound proof. [Polynomial source semantics](formats/smtlib.md#polynomial-source-lowering)
 defines exact root rendering and supported syntax.
 
+When the native producer supplies private witness observations, `-s` also reports
+`nraDyadicAttempts`, `nraDyadicBases`, `nraCoupledWorkDeclines` and
+`nraDyadicPreExtractionDeclines`. These count eligible attempts, complete bases,
+private coupled-work stops and the pre-extraction subset. A base does not establish
+source truth, and a containing stop is not a private-work decline. Missing observations
+are omitted; reported zero is an observed zero. Counts can aggregate several
+instrumented conditioned queries and workers without identifying their elapsed cost
+or establishing coverage of unobserved queries.
+
 Polynomial affine optimization uses the quadratic source executor, native
 allowance and exact result publisher. Affine coefficients retain their source namespaces and declared
 binary64 authority; maximization passes the original objective and explicit direction.

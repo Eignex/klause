@@ -284,6 +284,12 @@ meter acknowledgement or completed operations. They exclude primitive validation
 wrapper allocation and optional profile preparation. Recording these observations
 reuses existing loop results and ledger state without scans, polls or producer calls.
 
+Polynomial witness term-sort pricing uses cached linear monomial comparisons within
+the same private native prefix. Changing that estimate changes usable headroom,
+without refunding admission work or renewing the containing ledger. Atomic initial
+getters remain outside a complete allocation or sort precharge; see
+[polynomial probing](../theories/polynomial-real.md#decision-procedure).
+
 Linear repair completion retains the same native check, decision and work ledgers
 across candidate queries. Cached source planning neither renews an allowance nor
 rearms the containing deadline. An interrupted native root installation releases

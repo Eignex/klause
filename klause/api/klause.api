@@ -11297,12 +11297,24 @@ public final class com/eignex/klause/solver/pipeline/PolynomialTheoryStats {
 	public fun <init> ()V
 	public fun <init> (JJJ)V
 	public synthetic fun <init> (JJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JJJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;)V
+	public synthetic fun <init> (JJJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component2 ()J
 	public final fun component3 ()J
+	public final fun component4 ()Ljava/lang/Long;
+	public final fun component5 ()Ljava/lang/Long;
+	public final fun component6 ()Ljava/lang/Long;
+	public final fun component7 ()Ljava/lang/Long;
 	public final fun copy (JJJ)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
+	public final fun copy (JJJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJJILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;JJJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryStats;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoupledWorkDeclines ()Ljava/lang/Long;
+	public final fun getDyadicAttempts ()Ljava/lang/Long;
+	public final fun getDyadicBases ()Ljava/lang/Long;
+	public final fun getDyadicPreExtractionDeclines ()Ljava/lang/Long;
 	public final fun getLiftedCells ()J
 	public final fun getProjectedPolynomials ()J
 	public final fun getWorkSpent ()J

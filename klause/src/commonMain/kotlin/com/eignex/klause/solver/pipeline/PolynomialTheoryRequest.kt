@@ -82,7 +82,54 @@ data class PolynomialTheoryStats(
     val liftedCells: Long = 0,
     /** Native coefficient, formula and traversal work charged by the theory. */
     val workSpent: Long = 0,
-)
+    /** Eligible dyadic base attempts; null when the producer did not supply this observation. */
+    val dyadicAttempts: Long?,
+    /** Complete admitted dyadic bases, before original-source witness checking. */
+    val dyadicBases: Long?,
+    /** Coupled phases stopped at their private native-work boundary, excluding containing stops. */
+    val coupledWorkDeclines: Long?,
+    /** Private work stops during an eligible dyadic attempt before all payloads were extracted. */
+    val dyadicPreExtractionDeclines: Long?,
+) {
+    /** Construct unobserved native counters. */
+    constructor() : this(0, 0, 0, null, null, null, null)
+
+    /** Construct native counters without private witness observations. */
+    constructor(
+        projectedPolynomials: Long = 0,
+        liftedCells: Long = 0,
+        workSpent: Long = 0,
+    ) : this(projectedPolynomials, liftedCells, workSpent, null, null, null, null)
+
+    /** Copy native counters while retaining private witness observations. */
+    fun copy(
+        projectedPolynomials: Long = this.projectedPolynomials,
+        liftedCells: Long = this.liftedCells,
+        workSpent: Long = this.workSpent,
+    ): PolynomialTheoryStats = PolynomialTheoryStats(projectedPolynomials, liftedCells, workSpent,
+        dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines)
+
+    override fun toString(): String {
+        val prefix = "PolynomialTheoryStats(projectedPolynomials=$projectedPolynomials, " +
+            "liftedCells=$liftedCells, workSpent=$workSpent"
+        return if (dyadicAttempts == null && dyadicBases == null && coupledWorkDeclines == null &&
+            dyadicPreExtractionDeclines == null
+        ) "$prefix)" else "$prefix, dyadicAttempts=$dyadicAttempts, dyadicBases=$dyadicBases, " +
+            "coupledWorkDeclines=$coupledWorkDeclines, dyadicPreExtractionDeclines=$dyadicPreExtractionDeclines)"
+    }
+
+    override fun hashCode(): Int {
+        val native = (31 * projectedPolynomials.hashCode() + liftedCells.hashCode()) * 31 + workSpent.hashCode()
+        if (dyadicAttempts == null && dyadicBases == null && coupledWorkDeclines == null &&
+            dyadicPreExtractionDeclines == null
+        ) return native
+        var hash = native
+        hash = 31 * hash + (dyadicAttempts?.hashCode() ?: 0)
+        hash = 31 * hash + (dyadicBases?.hashCode() ?: 0)
+        hash = 31 * hash + (coupledWorkDeclines?.hashCode() ?: 0)
+        return 31 * hash + (dyadicPreExtractionDeclines?.hashCode() ?: 0)
+    }
+}
 
 /** Checked representation resource that prevented completing a polynomial-real invocation. */
 enum class PolynomialTheoryResource {

@@ -144,6 +144,14 @@ internal class PolynomialTheoryInvocation(
     private fun combine(left: QfNraStats, right: QfNraStats): QfNraStats = QfNraStats(
         sum(left.projectedPolynomials, right.projectedPolynomials),
         sum(left.liftedCells, right.liftedCells), sum(left.workSpent, right.workSpent),
+        if (left.dyadicAttempts == null && right.dyadicAttempts == null) null
+        else sum(left.dyadicAttempts ?: 0, right.dyadicAttempts ?: 0),
+        if (left.dyadicBases == null && right.dyadicBases == null) null
+        else sum(left.dyadicBases ?: 0, right.dyadicBases ?: 0),
+        if (left.coupledWorkDeclines == null && right.coupledWorkDeclines == null) null
+        else sum(left.coupledWorkDeclines ?: 0, right.coupledWorkDeclines ?: 0),
+        if (left.dyadicPreExtractionDeclines == null && right.dyadicPreExtractionDeclines == null) null
+        else sum(left.dyadicPreExtractionDeclines ?: 0, right.dyadicPreExtractionDeclines ?: 0),
     )
 
     private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
