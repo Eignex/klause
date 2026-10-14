@@ -119,8 +119,11 @@ data class PortfolioScenario(
     val sliceWork: Long = DEFAULT_SLICE_WORK,
     /** Share of the arm bandit's evidence kept across the first incumbent; see [Portfolio.DEFAULT_PHASE_RETENTION]. */
     val phaseRetention: Double = Portfolio.DEFAULT_PHASE_RETENTION,
-    /** Non-improving segments before an observable or restart-configured arm reseeds; zero disables it.
-     *  Complete search without a restart schedule retains its traversal across tighter incumbent cutoffs. */
+    /**
+     * Non-improving segments before an observable arm reseeds; scheduled restarting backtrack arms count
+     * equivalent full-work segments. Whole lanes count each positive-work return. Zero disables reseeding.
+     * Complete search without a restart schedule retains its traversal across tighter incumbent cutoffs.
+     */
     val reseedStaleThreshold: Int = 3,
     /** Optional solve-spanning decision-node allowance, applied here rather than by the caller so that
      *  every arm that runs a backtrack engine spends the one counter — including the ones that build

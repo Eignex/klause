@@ -105,7 +105,8 @@ class Portfolio(
     /** Local-search instructions that cost as much as one search node; see `LS_INSTRUCTIONS_PER_WORK`. */
     private val lsInstructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
     /**
-     * Non-improving segments before an observable or restart-configured arm reseeds; `0` disables re-seeding.
+     * Non-improving segments before an observable arm reseeds; scheduled restarting backtrack arms count
+     * equivalent full-work segments. Whole lanes count each positive-work return. `0` disables re-seeding.
      */
     private val reseedStaleThreshold: Int = 3,
     /**
@@ -314,8 +315,7 @@ class Portfolio(
         val start = TimeSource.Monotonic.markNow()
         val readBound = { incumbents.bound() }
         val observedCutoffs = arrayOfNulls<Double>(workers.size)
-        // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
-        val staleSegments = IntArray(workers.size)
+        val staleCredits = DoubleArray(workers.size)
         var callbackFailure: Throwable? = null
         var unbounded: MinimizeResult.Unbounded? = null
         var exhausted = false
@@ -526,18 +526,22 @@ class Portfolio(
                     incumbent.current() != null
                 ) {
                     if (claim.improved) {
-                        staleSegments[arm] = 0
+                        staleCredits[arm] = 0.0
                     } else if (work > 0L && (handle as? ReseedGuard)?.canReseed != false &&
-                        reseedStaleThreshold > 0 &&
-                        ++staleSegments[arm] >= reseedStaleThreshold
+                        reseedStaleThreshold > 0
                     ) {
-                        val closed = runCatching { run.closeHandle(arm) }
-                        closed.onFailure {
-                            run.log.failure(arm, it, "close")
-                            run.retire(arm)
+                        staleCredits[arm] += if (!claim.whole && worker.family == ArmFamily.Backtrack) {
+                            minOf(work.toDouble() / claim.sliceWork, 1.0)
+                        } else 1.0
+                        if (staleCredits[arm] >= reseedStaleThreshold) {
+                            val closed = runCatching { run.closeHandle(arm) }
+                            closed.onFailure {
+                                run.log.failure(arm, it, "close")
+                                run.retire(arm)
+                            }
+                            if (closed.isSuccess) run.log.reseeded(arm)
+                            staleCredits[arm] = 0.0
                         }
-                        if (closed.isSuccess) run.log.reseeded(arm)
-                        staleSegments[arm] = 0
                     }
                 }
                 // A ray proves the model unbounded whatever bound the arm ran under.
