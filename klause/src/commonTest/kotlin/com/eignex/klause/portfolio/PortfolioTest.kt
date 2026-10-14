@@ -216,6 +216,49 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 class PortfolioTest {
 
     @Test
+    fun `supplemental proof waits for sibling work after the latest improvement`() {
+        var completeVisits = 0
+        var proofVisits = 0
+        val complete = ScriptedSearch({ it < 3 }) { completeVisits++ }
+        val proofBase = ScriptedSearch({ false }) {
+            assertEquals(4, completeVisits)
+            proofVisits++
+        }
+        val proof = object : ResumableSearch by proofBase {
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+            }
+        }
+        val workers = listOf(trackingWorker("complete", 0, complete),
+            trackingWorker("proof", 1, proof).also { it.auxiliaryProof = true; it.improvementOnly = true })
+
+        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+            it.minimize(Cancellation { proofVisits > 0 })
+        }
+
+        assertEquals(1, proofVisits)
+    }
+
+    @Test
+    fun `continued incumbent improvements keep supplemental proof deferred`() {
+        var completeVisits = 0
+        var proofVisits = 0
+        val complete = ScriptedSearch({ true }) { completeVisits++ }
+        val proof = ScriptedSearch({ false }) { proofVisits++ }
+        val workers = listOf(trackingWorker("complete", 0, complete),
+            trackingWorker("proof", 1, proof).also { it.auxiliaryProof = true; it.improvementOnly = true })
+
+        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+            it.minimize(Cancellation { completeVisits >= 8 })
+        }
+
+        assertEquals(8, completeVisits)
+        assertEquals(0, proofVisits)
+    }
+
+    @Test
     fun `unspent complete work offers do not admit a supplemental proof service`() {
         var completeVisits = 0
         var proofVisits = 0
