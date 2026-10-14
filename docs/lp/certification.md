@@ -120,6 +120,13 @@ against every exact endpoint and accepted only when its bound is at least as
 strong. It shares the node certificate allowance; a decline retains the completed
 certificate. This supplies integral reduced costs when a degenerate optimum
 leaves the objective seated at its continuous bound.
+When fixing is requested, one additional candidate uses only the verified
+objective-defining equality. Its integral affine costs can bound a coordinate
+whose reduced cost vanishes in the stronger LP certificate. The strongest bound
+continues to govern pruning; both complete certificates may supply local fixing.
+This candidate shares the same work/allocation allowance and endpoint checks,
+and retains the defining row and its scoped premises. Publication follows the
+final cancellation check and certification policy admission.
 For a nonintegral objective, node pruning compares the exact certified bound in
 minimized source units with an enclosing rational incumbent cutoff. It uses the
 unrounded objective without an integer objective atom, so the prune has no
