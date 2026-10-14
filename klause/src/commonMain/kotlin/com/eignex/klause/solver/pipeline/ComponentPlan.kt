@@ -186,7 +186,8 @@ class ComponentPlan internal constructor(
     }
 
     private fun selectedTheoryFactorIndices(): List<Int> = factorOwners.indices.filter {
-        encodingFactors[it] || (theoryPipeline != ProblemPipeline.FINITE_CP && factorOwners[it] == FactorOwner.SHARED)
+        encodingFactors[it] || (theoryPipeline != ProblemPipeline.FINITE_CP &&
+            theoryPipeline != ProblemPipeline.DIFFERENCE_THEORY && factorOwners[it] == FactorOwner.SHARED)
     }
 
     private val encodedFragment: Problem? by lazy {
@@ -384,7 +385,8 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
     }
     val kept = factors.indices.filter { encoded[it] || factorOwners[it] == FactorOwner.SHARED }
     val fragment = projections.linearTheoryModel(EncodingTarget.LINEAR, kept)
-    val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE, kept)
+    val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE,
+        kept.filter { factorOwners[it] != FactorOwner.SHARED })
     val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
     val route = when {
         unownedOpenColumn != null || unownedRealFactor -> ProblemPipeline.UNSUPPORTED_OPEN

@@ -38,6 +38,7 @@ import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchBoolValue
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
@@ -277,6 +278,37 @@ class EncoderTest {
         assertEquals(IntVariableOwner.CP, ownership.intOwner(0))
         assertEquals(listOf(BigFraction.ofLong(3), BigFraction.ONE),
             compiled.sourceWitness(listOf(BigFraction.ofLong(3), BigFraction.ONE)).values)
+    }
+
+    @Test
+    fun `a Boolean relation installed in the difference component is fully enforced`() {
+        val input = assertIs<SmtLibInput.Linear>(SmtLibAdmission.parse("(declare-const b Bool) (assert b)"))
+        val source = input.problem.model
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { null })
+        val plan = assertNotNull(source.prepareExecutionPlan(providers).componentPlan)
+
+        val result = plan.search(source, emptyMap()).use { it.session.solve(source.numBoolVars) }
+
+        val model = assertIs<SearchResult.Satisfied>(result).model
+        assertEquals(true, model.valueOf<Boolean>(SearchBoolValue(0)))
+    }
+
+    @Test
+    fun `a resource decline discards an emitted relation before source admission`() {
+        val input = assertIs<SmtLibInput.Linear>(SmtLibAdmission.parse(
+            "(declare-const x Real) (assert (= x 1))",
+        ))
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (!selected.enforcesSource) selected else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                selected.install(view, encoding)
+                EncoderDecline.RESOURCE
+            }
+        })
+
+        val plan = input.problem.model.prepareExecutionPlan(providers)
+
+        assertFalse(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
     }
 
 }
