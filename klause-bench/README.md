@@ -1470,7 +1470,9 @@ and generated repairs with fresh whole-model grading. Its `sources` argument is 
 array of `{name, format, text, ints, bools, moves}` objects. Formats are `flatzinc`,
 `smtlib` and `xcsp3`; assignments list every compiled coordinate, and each supplied move
 is `{id, value}`. `seed` pins initialization. Real coordinates and out-of-domain values
-are refused. The probe uses ordinary finite scoring without inferred definitions.
+are refused. The probe uses ordinary finite scoring without inferred definitions. The `product-aliases`
+suite supplies MiniZinc square, fixed-power-chain and result-alias source regressions;
+use `param=source-validation=true` to check their complete original-source witnesses.
 
 Run the committed main through the lab client at an immutable revision. It retains
 source texts, hashes, installed-build/runtime/dependency identities and every predicted,

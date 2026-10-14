@@ -28,7 +28,7 @@ internal object Suites {
     val all: List<Suite> by lazy {
         listOf(
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
-            smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit,
+            smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit, productAliases,
         ) + QfNraSuites.all + QfNraCanonicalSuite.suite + NonlinearIntegerSuite.suite
     }
 
@@ -766,6 +766,13 @@ internal object Suites {
             250,
         )) {
             inCode("rand3sat-$v", Category.SAT, Expected.Unknown) { SatGenerators.random3Sat(v) }
+        }
+    }
+
+    private val productAliases = suite("product-aliases", "Repeated product roles and fixed-power chains") {
+        license = "internal"
+        for (name in listOf("square", "power-chain", "result-aliases")) {
+            vendoredMzn(name, Category.CSP, Expected.Sat, model = "product-aliases/$name.mzn")
         }
     }
 

@@ -152,4 +152,35 @@ class ProductCompilationTest {
         }
     }
 
+    @Test
+    fun `integer image float squares retain repeated source operands`() {
+        for (exact in listOf(false, true)) {
+            val program = parseFlatZinc(
+                """var 1..3: n; var float: x; var float: z;
+                    constraint int2float(n, x); constraint float_times(x, x, z);
+                    constraint float_eq(z, 4.0); solve satisfy;""",
+                exactFloats = exact,
+            )
+            val problem = program.problem
+            val product = problem.factors.filterIsInstance<Product>().single()
+            assertEquals(product.a, product.b)
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
+            for (id in 0 until problem.numIntVars) state.assignment.setInt(id, state.rootDomains[id].min)
+            for (id in 0 until problem.numBoolVars) state.assignment.setBool(id, true)
+            state.assignment.setInt(product.a, 2)
+            state.assignment.setInt(product.result, 4)
+            state.recompute()
+            assertEquals(0L, state.cost)
+            val predicted = state.netDelta(Move.IntSet(product.a, 3))
+
+            state.apply(Move.IntSet(product.a, 3))
+            val committed = state.cost
+            state.recompute()
+
+            assertEquals(3L * 3L - 4L, predicted)
+            assertEquals(5L, committed)
+            assertEquals(committed, state.cost)
+        }
+    }
+
 }
