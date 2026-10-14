@@ -196,7 +196,7 @@ class SearchBranchSelectionTest {
             assertIs<SearchRunEvent.Satisfied>(run.next())
             assertEquals(SearchRunEvent.Exhausted, run.next())
 
-            assertEquals(listOf(true, false), checked)
+            assertEquals(listOf<Boolean?>(true, false), checked)
         }
     }
 
