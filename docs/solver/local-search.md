@@ -236,7 +236,9 @@ Unit Boolean folds share the bounded literal inverse route. Requests on a mainta
 unit output backsolve its signed source, including nested unit folds. Source and output
 pins remain enforced; wider folds retain their existing repair behavior.
 Boolean objective-bound and linear-objective moves use this route before ordinary
-complete scoring.
+complete scoring. Clause-only repair chains use complete grading for source flips
+that feed definitions; cached single-coordinate break/make counts cover only flips
+without maintained consequences.
 
 ## Maintained literal channels
 
