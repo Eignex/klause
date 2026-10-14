@@ -44,7 +44,8 @@ Arithmetic components retain the dependency boundary against finite CP domains.
 `EncodingTarget`. `EncoderSupport` distinguishes direct, equivalent, conditioned,
 relaxation-only and unsupported representations. `TheoryEncoding` supplies typed
 source coordinates, original factor attribution and the receiving allowance. It
-accepts complete linear relations or neutral polynomial formulas; other consumers
+conjoins all linear emissions and accepts compound conjunction/disjunction formulas
+or neutral polynomial formulas; other consumers
 can declare a target and implement the same installation scope. Selection contains
 no mutable solving state. Prepared relations are combined within one arithmetic
 owner before its checks, rather than checked as independent factor witnesses.
@@ -55,7 +56,12 @@ coordinate ownership stays independent of that participation. Propagation and en
 can reason over the same factor; authoritative finite choices retain their integrality,
 bounds and holes. Arithmetic completion waits for those choices before contributing
 its final point, under the same shared assertion/retraction lifecycle. Polynomial
-composition installs selected continuous relations alongside its finite projection.
+composition installs required encodings and connected optional finite encodings
+alongside its finite projection. Missing finite propagation can be supplied by a complete
+polynomial encoder without transferring finite choices to arithmetic. Private linear
+affine values and Boolean formula names are scope-owned, exactly defined and expanded
+before consumer installation. Missing, duplicate, cyclic or foreign definitions reject
+the installation; the retained attribution owns their reconstruction data.
 A conditioning pin must hold for the entire installed relation's scope; retraction
 invalidates its derived state and witness. Failed or interrupted installation
 publishes no partial enforcing relation. Relaxation support cannot substitute for

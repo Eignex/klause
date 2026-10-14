@@ -15,8 +15,6 @@ import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.SelectedProjectionChecks
-import com.eignex.klause.theory.EncodedTheoryFactor
-import com.eignex.klause.theory.installLinearFactor
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncodingTarget
 
@@ -41,16 +39,6 @@ class PreparedFactorProjections internal constructor(
 ) {
     /** Immutable whole-relation selection in this canonical source's factor namespace. */
     fun encoder(factorId: Int, target: EncodingTarget): Encoder = encoders.getValue(target)[factorId]
-
-    private val linearEncodings: Map<EncodingTarget, Array<EncodedTheoryFactor?>> by lazy {
-        listOf(EncodingTarget.LINEAR, EncodingTarget.DIFFERENCE).associateWith { target ->
-            Array(problem.numFactors) { installLinearFactor(it, target) }
-        }
-    }
-
-    internal fun preparedLinearEncoding(factorId: Int, target: EncodingTarget): EncodedTheoryFactor? =
-        linearEncodings[target]?.get(factorId) ?: if (target !in linearEncodings) installLinearFactor(factorId, target)
-        else null
 
     private val declarations = Array(problem.numFactors) { id ->
         FactorExecutionCapabilities(

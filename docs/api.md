@@ -335,7 +335,14 @@ exact checks and scoring delta consistency remain extension obligations.
 `encoder.select(factor, target)` returns a prepared `Encoder`. Direct/equivalent
 support authorizes the complete relation; conditioned support also declares required
 integer fixings or Boolean pins. The receiving `TheoryEncoding` captures those source
-conditions, stages the full relation and owns private coordinate allocation. The
+conditions, stages the full relation and owns private allocation. Repeated `linear`
+emissions are conjoined. `linearFormula` accepts compound `And`/`Or` structure.
+`auxiliary` and `guard` allocate private affine values and Boolean formula names;
+`define` supplies exactly one acyclic definition in that receiving scope. Affine
+definitions retain exact rational coefficients and tagged source terms, including aliases.
+Definitions are expanded before the linear consumer receives attributed conjunctions
+and disjunctions. These names occupy no source coordinate, and their reconstruction
+definitions outlive the component without retaining mutable solving state. The
 consumer commits that scope only after a successful installation; a decline discards
 all staged constraints and auxiliaries.
 Relaxation-only and unsupported support decline enforcing installation. Resource
@@ -356,6 +363,12 @@ receiving encoding's typed `integer`/`real` mappings and `conditional` allocator
 private polynomial reals are not original source declarations. `EncodingAttribution`
 retains original coordinates, integer embeddings, private auxiliaries and scope pins.
 The shared witness assembler still requires complete, unique original coordinates.
+`prepareExecutionPlan` and `componentPlan` accept the containing cancellation token.
+Normal routing passes its control into installation; callers with a work meter retain
+all construction charges. Interrupted execution preparation reports `RESOURCE`.
+Provider captures cache selections, while installed relations belong to the preparation
+that completed them; cancellation and conditioned installation outcomes are not cached
+on the reusable selection.
 An encoding provides no independent proof certificate solely by being installed.
 
 Finite facades accept `problem.bake(providers)` for invocation-specific selection.

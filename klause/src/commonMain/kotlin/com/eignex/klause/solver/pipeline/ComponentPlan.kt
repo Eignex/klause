@@ -13,10 +13,12 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
+import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
+import com.eignex.klause.util.Cancellation
 
 /** Ownership of an integer column selected once before a search begins. */
 enum class IntVariableOwner {
@@ -53,6 +55,7 @@ class ComponentPlan internal constructor(
     private val encodingFactors: BooleanArray = BooleanArray(factorOwners.size) {
         factorOwners[it] == FactorOwner.THEORY
     },
+    private val installedFragment: Problem? = null,
 ) {
     init {
         factorProjections.requireSource(source)
@@ -118,6 +121,13 @@ class ComponentPlan internal constructor(
             unplaceable,
             factorProjections.projected(spec, IntArray(spec.numFactors) { it }),
             encodingFactors.copyOfRange(0, spec.numFactors),
+            installedFragment?.let { fragment ->
+                val kept = fragment.factors.indices.filter { index ->
+                    (fragment.factors[index] as EncodedTheoryFactor).attribution.sourceFactorIndex < spec.numFactors
+                }
+                spec.withFactors(Array(kept.size) { fragment.factors[kept[it]] },
+                    fragment.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
+            },
         )
     }
 
@@ -188,15 +198,9 @@ class ComponentPlan internal constructor(
             theoryPipeline != ProblemPipeline.DIFFERENCE_THEORY && factorOwners[it] == FactorOwner.SHARED)
     }
 
-    private val encodedFragment: Problem? by lazy {
-        val target = if (theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) EncodingTarget.DIFFERENCE
-        else EncodingTarget.LINEAR
-        factorProjections.linearTheoryModel(target, selectedTheoryFactorIndices())
-    }
-
     internal fun encodedTheoryFragment(spec: Problem): Problem? {
         requireBelongsTo(spec)
-        return encodedFragment
+        return installedFragment
     }
 
     // Shared clauses stay out because the shared clause component enforces them in the same session.
@@ -207,7 +211,11 @@ class ComponentPlan internal constructor(
             spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
     }
 
-    internal fun forObjectiveRound(spec: Problem, appended: Boolean): ComponentPlan {
+    internal fun forObjectiveRound(
+        spec: Problem,
+        appended: Boolean,
+        cancellation: Cancellation = Cancellation.Never,
+    ): ComponentPlan {
         val prefix = factorOwners.size - if (appended) 1 else 0
         requireSamePrefix(spec, prefix)
         require(spec.factors.size == factorOwners.size) { "objective round changed the factor count" }
@@ -224,9 +232,14 @@ class ComponentPlan internal constructor(
                 }
             ) { "objective round must retain the planned row's columns and coefficients" }
         }
-        return ComponentPlan(spec, intOwners, factorOwners, theoryPipeline, unplaceable,
-            if (appended) factorProjections.replacedLast(spec)
-            else factorProjections.projected(spec, IntArray(spec.numFactors) { it }), encodingFactors)
+        val selection = if (appended) factorProjections.replacedLast(spec)
+        else factorProjections.projected(spec, IntArray(spec.numFactors) { it })
+        val fragment = if (appended) {
+            selection.linearTheoryModel(encodingTarget(), selectedTheoryFactorIndices(), cancellation = cancellation)
+        } else installedFragment?.let { spec.withFactors(it.factors, it.impliedFactorMask) }
+        return ComponentPlan(spec, intOwners, factorOwners,
+            if (appended && hasTheoryComponent && fragment == null) ProblemPipeline.UNSUPPORTED_OPEN else theoryPipeline,
+            unplaceable, selection, encodingFactors, fragment)
     }
 
     private fun requireSamePrefix(spec: Problem, count: Int) {
@@ -257,21 +270,28 @@ class ComponentPlan internal constructor(
         }
     }
 
-    internal fun forLinearConditions(spec: Problem, retainEmptyTheory: Boolean = false): ComponentPlan? {
+    private fun encodingTarget(): EncodingTarget =
+        if (theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) EncodingTarget.DIFFERENCE else EncodingTarget.LINEAR
+
+    internal fun forLinearConditions(
+        spec: Problem,
+        retainEmptyTheory: Boolean = false,
+        cancellation: Cancellation = Cancellation.Never,
+    ): ComponentPlan? {
         requireBelongsTo(spec)
         if (unplaceable != null) return null
         if (spec.numIntVars == 0 && spec.numRealVars == 0 && !retainEmptyTheory) return this
-        val selected = spec.componentPlan(factorProjections)
+        val selected = spec.componentPlan(factorProjections, cancellation = cancellation)
         if (selected.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN) return null
         val fragment = factorProjections.linearTheoryModel(EncodingTarget.LINEAR,
-            selected.selectedTheoryFactorIndices()) ?: return null
+            selected.selectedTheoryFactorIndices(), cancellation = cancellation) ?: return null
         val route = when {
             fragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
             fragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
             else -> return null
         }
         return ComponentPlan(spec, intOwners, selected.factorOwners, route, factorProjections = factorProjections,
-            encodingFactors = selected.encodingFactors)
+            encodingFactors = selected.encodingFactors, installedFragment = fragment)
     }
 
     internal fun requireSource(spec: Problem) = requireBelongsTo(spec)
@@ -305,12 +325,19 @@ class CpProblemProjection internal constructor(
 }
 
 /** Select component ownership from the source model. */
-fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan = componentPlan(
-    (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this), preferFinite,
+fun Problem.componentPlan(
+    preferFinite: Boolean = false,
+    cancellation: Cancellation = Cancellation.Never,
+): ComponentPlan = componentPlan(
+    (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this), preferFinite, cancellation,
 )
 
 /** Select component ownership using the descriptors captured for this canonical source. */
-fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: Boolean = false): ComponentPlan {
+fun Problem.componentPlan(
+    projections: PreparedFactorProjections,
+    preferFinite: Boolean = false,
+    cancellation: Cancellation = Cancellation.Never,
+): ComponentPlan {
     projections.requireSource(this)
     if (preferFinite) {
         return ComponentPlan(
@@ -328,8 +355,8 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
         if (intBounds.hasLower(variable) && intBounds.hasUpper(variable)) IntVariableOwner.CP
         else IntVariableOwner.THEORY
     }
-    val linear = projections.linearTheoryModel(EncodingTarget.LINEAR)
-    val difference = projections.linearTheoryModel(EncodingTarget.DIFFERENCE)
+    val linear = projections.linearTheoryModel(EncodingTarget.LINEAR, cancellation = cancellation)
+    val difference = projections.linearTheoryModel(EncodingTarget.DIFFERENCE, cancellation = cancellation)
     val completeTheory = when {
         linear?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
         difference != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
@@ -388,11 +415,12 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
         factorOwners[index] == FactorOwner.CP && factors[index].variables.reals.isNotEmpty()
     }
     val kept = factors.indices.filter { encoded[it] || factorOwners[it] == FactorOwner.SHARED }
-    val fragment = projections.linearTheoryModel(EncodingTarget.LINEAR, kept)
+    val fragment = projections.linearTheoryModel(EncodingTarget.LINEAR, kept, cancellation = cancellation)
     val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE,
-        kept.filter { factorOwners[it] != FactorOwner.SHARED })
+        kept.filter { factorOwners[it] != FactorOwner.SHARED }, cancellation = cancellation)
     val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
     val route = when {
+        cancellation() -> ProblemPipeline.UNSUPPORTED_OPEN
         unownedOpenColumn != null || unownedRealFactor -> ProblemPipeline.UNSUPPORTED_OPEN
         !needsArithmetic -> ProblemPipeline.FINITE_CP
         fragment?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
@@ -402,7 +430,8 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
         else -> ProblemPipeline.UNSUPPORTED_OPEN
     }
     return ComponentPlan(this, intOwners, factorOwners, route,
-        unownedOpenColumn?.let { unplaceable(it, projections, numRealVars != 0) }, projections, encoded)
+        unownedOpenColumn?.let { unplaceable(it, projections, numRealVars != 0) }, projections, encoded,
+        if (route == ProblemPipeline.DIFFERENCE_THEORY) differenceFragment else fragment)
 }
 
 /**

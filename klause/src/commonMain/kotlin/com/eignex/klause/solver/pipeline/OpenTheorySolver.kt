@@ -334,6 +334,7 @@ class OpenTheoryEngine internal constructor(
         // Preparation runs before the route exists, so its refutation is the model's verdict.
         val source = prepare(cancellation)
         val prepared = source.prepared
+        if (cancellation()) return OpenTheoryStart.Decided(unknown(params.timeout(), stats = stats, state = state))
         stats.presolve = prepared.stats.takeIf { prepared.changed || it.infeasible }
         val routed = when (source) {
             is OpenSourcePreparation.Refuted -> return OpenTheoryStart.Decided(
@@ -364,7 +365,8 @@ class OpenTheoryEngine internal constructor(
                 is OpenPresolveResult.Tightened -> closed.spec
             }
         }
-        val plan = selectedPlan.forObjectiveRound(model, appended = false)
+        val plan = selectedPlan.forObjectiveRound(model, appended = false, cancellation = cancellation)
+        if (cancellation()) return OpenTheoryStart.Decided(unknown(params.timeout(), stats = stats, state = state))
         val cpDomains = plan.cpSourceDomains(model)
         val planned = plan.search(
             model,
@@ -471,7 +473,9 @@ class OpenTheoryEngine internal constructor(
 
     /** Prepare the source under the caller's stop, once per engine. */
     private fun prepare(cancellation: Cancellation): OpenSourcePreparation = preparation
-        ?: prepareSource(alsoStoppedBy(cancellation)).also { preparation = it }
+        ?: prepareSource(alsoStoppedBy(cancellation)).also {
+            if (!alsoStoppedBy(cancellation)()) preparation = it
+        }
 
     /** The bound-closing phase's allowance: what is left of preparation's, capped by the solve's own. */
     private fun boundCancellation(prepared: PreparedSource, cancellation: Cancellation): Cancellation =

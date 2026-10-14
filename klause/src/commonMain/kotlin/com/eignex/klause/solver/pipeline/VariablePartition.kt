@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
-import com.eignex.klause.ir.IntegralConstants
 
 /** Factor representation eligibility; [ComponentPlan] independently owns finite choices. */
 class VariablePartition(private val searchRequired: BooleanArray) {
@@ -47,6 +47,7 @@ internal fun Problem.variablePartition(projections: PreparedFactorProjections): 
 internal fun PreparedFactorProjections.theoryOwnable(index: Int, hasRealColumns: Boolean): Boolean {
     if (!encoder(index, EncodingTarget.LINEAR).enforcesSource) return false
     if (hasRealColumns) return true
-    val factor = linearTheoryModel(EncodingTarget.LINEAR, listOf(index))?.factors?.single() ?: return false
-    return factor.intVars.isNotEmpty() && factor.linearForm!!.rows.all { it.constants is IntegralConstants }
+    val factors = linearTheoryModel(EncodingTarget.LINEAR, listOf(index))?.factors ?: return false
+    return factors.any { it.intVars.isNotEmpty() } &&
+        factors.all { factor -> factor.linearForm!!.rows.all { it.constants is IntegralConstants } }
 }
