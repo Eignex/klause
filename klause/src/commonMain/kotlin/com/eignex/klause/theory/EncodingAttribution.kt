@@ -27,6 +27,8 @@ class EncodingAttribution internal constructor(
     auxiliaries: List<TheoryRealId> = emptyList(),
     integerConditions: Map<SourceIntId, BigInt> = emptyMap(),
     booleanConditions: Map<SourceBoolId, Boolean> = emptyMap(),
+    affineAuxiliaries: List<EncodingAffineExpression> = emptyList(),
+    linearGuards: List<LinearEncodingFormula> = emptyList(),
 ) {
     private val boolIds = booleans.toList()
     private val intIds = integers.toList()
@@ -36,6 +38,13 @@ class EncodingAttribution internal constructor(
     private val auxiliaryIds = auxiliaries.toList()
     private val intPins = integerConditions.toMap()
     private val boolPins = booleanConditions.toMap()
+    private val affineDefinitions = affineAuxiliaries.toList()
+    private val guardDefinitions = linearGuards.toList()
+
+    /** Private affine reconstruction definitions, expanded into source coordinates before solving. */
+    val affineAuxiliaries: List<EncodingAffineExpression> get() = affineDefinitions.toList()
+    /** Private Boolean definitions, expanded into complete source comparisons before solving. */
+    val linearGuards: List<LinearEncodingFormula> get() = guardDefinitions.toList()
 
     /** Source Boolean coordinates; linear targets retain their identity. */
     val booleans: List<SourceBoolId> get() = boolIds.toList()

@@ -323,7 +323,7 @@ class OpenTheoryMinimizer internal constructor(
             // Ownership stays selected from the model as prepared, not from the closed one below. Closing a
             // column does not move a factor between components, but it does change what `componentPlan` reads:
             // a descent whose every side closed would select the finite route, which no round of it can run.
-            val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning(), projections).plan
+            val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning(), projections, stop).plan
             // Close the open sides once for the whole descent. Every round decides this model plus a strictly
             // tighter objective row, and a row only removes solutions, so a bound proved here holds for every
             // round below it. Leaving the close to the rounds has each one re-derive the same bounds from the
@@ -369,7 +369,8 @@ class OpenTheoryMinimizer internal constructor(
                 terms.isEmpty() -> opened.base to opened.boundedPlan.forObjectiveRound(opened.base, appended = false)
                 bound == null -> opened.base to opened.boundedPlan.withoutAppendedFactor(opened.base)
                 else -> opened.base.boundedBy(bound - BIG_ONE).let { spec ->
-                    spec to opened.boundedPlan.forObjectiveRound(spec, appended = true)
+                    spec to opened.boundedPlan.forObjectiveRound(spec, appended = true,
+                        cancellation = presolveCancellation or params.cancellation or params.timeout or global)
                 }
             }
             val engine = OpenTheoryEngine(

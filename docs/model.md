@@ -226,13 +226,20 @@ arithmetic-owned. `factorOwner` names the primary enforcing path; `factorEncoded
 records additional arithmetic participation, including factors with propagators.
 Only relations needed by the arithmetic component are installed. An exact coefficient
 or one continuous relation cannot promote unrelated finite factors or choices. The prepared linear relations
-retain original factor attribution and typed coordinates; component openings own their
+retain original factor attribution and typed coordinates. A compound installation can
+produce several conjunctions and disjunctions attributed to the same source factor.
+Private affine temporaries and Boolean formula names have exactly one acyclic definition
+in their receiving scope; exact expansion removes them before solving and retains their
+reconstruction definitions in the attribution. Source declaration counts remain unchanged; component openings own their
 combined graph, assertion scopes, LP state and resources. Conditioned finite completion
 captures the fixed discrete point without changing source declarations. Its pins do
 not authorize a refutation outside that scope.
 
-Polynomial preparation installs every applicable continuous factor through its selected
-encoder into one combined formula. Integer embeddings and private Boolean-choice
+Polynomial preparation installs required relations and connected, completely encodable
+finite relations through the selected encoders into one combined formula. A finite
+relation without a propagator requires a complete encoder; relaxation-only support
+cannot fill that gap. Optional arithmetic participation retains its finite propagator
+and finite coordinate owner. Unrelated finite coordinates receive no polynomial embedding. Integer embeddings and private Boolean-choice
 auxiliaries retain typed source correspondence and factor attribution. Their defining
 guards are conjoined with the relation; source publication excludes private auxiliaries.
 Generic linear-to-polynomial equivalence belongs to `lowering`. Exact source checks
@@ -266,7 +273,7 @@ select fresh descriptors; objective overlays retain prior selections and select 
 the appended factor. `bake(selection)` keeps the captured choice through finite
 root construction instead of invoking selectors again.
 
-`prepareExecutionPlan(providers, ...)` captures immutable projection descriptors on
+`prepareExecutionPlan(providers, cancellation = ..., ...)` captures immutable projection descriptors on
 its canonical model. Component ownership and admission read that capture, including
 shared clauses whose heuristic score belongs to the finite invocation. Complete
 traversal requires an exact propagation or installed source check; scoring availability

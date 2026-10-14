@@ -57,7 +57,7 @@ internal fun Problem.prepareOpenSource(
         budget,
     )
     if (prepared.infeasible) return OpenSourcePreparation.Refuted(prepared)
-    return prepared.planned(prepared.problem, projections)
+    return prepared.planned(prepared.problem, projections, cancellation)
 }
 
 /**
@@ -70,16 +70,18 @@ internal fun Problem.prepareOpenSource(
 internal fun PreparedSource.planned(
     model: Problem,
     projections: PreparedFactorProjections? = null,
+    cancellation: Cancellation = Cancellation.Never,
 ): OpenSourcePreparation.Planned {
-    val selected = projections?.forEngineView(model)?.let { model.componentPlan(it) } ?: model.componentPlan()
-    val plan = if (selected.theoryPipeline == ProblemPipeline.FINITE_CP) {
-        requireNotNull(selected.forLinearConditions(model, retainEmptyTheory = true)) {
+    val selected = projections?.forEngineView(model)?.let { model.componentPlan(it, cancellation = cancellation) }
+        ?: model.componentPlan(cancellation = cancellation)
+    val plan = if (!cancellation() && selected.theoryPipeline == ProblemPipeline.FINITE_CP) {
+        requireNotNull(selected.forLinearConditions(model, retainEmptyTheory = true, cancellation = cancellation)) {
             "source preparation lost the selected arithmetic completion"
         }
     } else selected
     require(
         plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
-            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN,
+            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN || cancellation(),
     ) {
         "source preparation left the model without an open-theory route"
     }

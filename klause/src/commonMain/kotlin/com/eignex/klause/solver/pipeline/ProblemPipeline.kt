@@ -154,7 +154,7 @@ private fun Problem.pipelineRouteObserved(
     routeLinearToTheory: Boolean,
     providers: FactorProjectionProviders = FactorProjectionProviders.Default,
 ): SourceProblemRoute {
-    val source = prepareExecutionPlan(providers)
+    val source = prepareExecutionPlan(providers, cancellation = boundCancellation)
     val initial = objective?.let { source.withObjective(it, maximize) } ?: source
     if (initial.kind == PreparedExecutionKind.POLYNOMIAL) {
         return SourceProblemRoute.PolynomialTheory(initial.polynomialRequest(), objective, maximize)
@@ -172,14 +172,14 @@ private fun Problem.pipelineRouteObserved(
     val finiteIntegerRanges = routed.hasFiniteIntegerRanges()
     val projections = requireNotNull(source.factorProjections).forEngineView(routed)
     val arithmetic = routed.prepareExecutionPlan(this, objective, maximize,
-        preferFinite = false, providers, projections)
+        preferFinite = false, providers, projections, boundCancellation)
     val arithmeticRoute = arithmetic.componentPlan?.theoryPipeline
     val preferExact = routeLinearToTheory &&
         (arithmeticRoute == ProblemPipeline.EXACT_LRA || arithmeticRoute == ProblemPipeline.EXACT_LIRA)
     val preferFinite = finiteIntegerRanges && !preferExact &&
         (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA)
     val prepared = if (preferFinite) routed.prepareExecutionPlan(this, objective, maximize,
-        preferFinite = true, providers, projections) else arithmetic
+        preferFinite = true, providers, projections, boundCancellation) else arithmetic
     val plan = requireNotNull(prepared.componentPlan)
     if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
         return SourceProblemRoute.Finite(routed, plan, prepared)

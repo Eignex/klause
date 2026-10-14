@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 
 /** Execution data selected from a source, before any mutable search state is allocated. */
 enum class PreparedExecutionKind {
@@ -85,6 +86,9 @@ class ExecutionComponentDescriptor internal constructor(
 
 /** Why preparation cannot construct the required source completion. */
 enum class PreparedPlanDecline {
+    /** The containing invocation interrupted required encoder construction. */
+    RESOURCE,
+
     /** The polynomial-to-finite assembler cannot materialize open integer declarations. */
     OPEN_POLYNOMIAL_INTEGER,
 
@@ -252,7 +256,8 @@ fun Problem.prepareExecutionPlan(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     preferFinite: Boolean = false,
-): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite)
+    cancellation: Cancellation = Cancellation.Never,
+): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite, cancellation = cancellation)
 
 /** Capture per-invocation factor mechanisms before selecting source ownership and admission. */
 fun Problem.prepareExecutionPlan(
@@ -260,7 +265,8 @@ fun Problem.prepareExecutionPlan(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     preferFinite: Boolean = false,
-): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite, providers)
+    cancellation: Cancellation = Cancellation.Never,
+): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite, providers, cancellation = cancellation)
 
 internal fun Problem.prepareExecutionPlan(
     original: Problem,
@@ -271,6 +277,7 @@ internal fun Problem.prepareExecutionPlan(
         ?: FactorProjectionProviders.Default,
     projections: PreparedFactorProjections = (this as? BakedProblem)?.factorProjections
         ?.takeIf { it.providers === providers } ?: providers.prepare(this),
+    cancellation: Cancellation = Cancellation.Never,
 ): PreparedSourcePlan {
     projections.requireSource(this)
     val continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true
@@ -278,9 +285,17 @@ internal fun Problem.prepareExecutionPlan(
         (!preferFinite && !continuousObjective && factors.any { it is RealProduct })
     ) {
         return preparePolynomialExecutionPlan(original = original, objective = objective, maximize = maximize,
-            providers = providers, projections = projections)
+            providers = providers, projections = projections, cancellation = cancellation)
     }
-    return preparedWithComponents(componentPlan(projections, preferFinite), original, objective, maximize)
+    val ownership = componentPlan(projections, preferFinite, cancellation)
+    if (cancellation()) return PreparedSourcePlan(original, this, PreparedExecutionKind.DECLINED,
+        null, null, listOf(ExecutionComponentDescriptor("interrupted-preparation", ComponentResponsibility.UNPLACED,
+            factors.indices.toList(), (0 until numIntVars).toList(), (0 until numRealVars).toList(),
+            (0 until numBoolVars).toList(), unavailableContract(ExecutionDeclineCause.PREPARATION,
+                "interrupted-preparation", PreparedPlanDecline.RESOURCE))),
+        original.numBoolVars, original.numIntVars, original.numRealVars, objective, maximize,
+        PreparedPlanDecline.RESOURCE, factorProjections = projections)
+    return preparedWithComponents(ownership, original, objective, maximize)
 }
 
 internal fun Problem.preparedWithComponents(
@@ -335,12 +350,14 @@ internal fun Problem.preparePolynomialExecutionPlan(
     maximize: Boolean = false,
     providers: FactorProjectionProviders = FactorProjectionProviders.Default,
     projections: PreparedFactorProjections = providers.prepare(this),
+    cancellation: Cancellation = Cancellation.Never,
 ): PreparedSourcePlan {
     projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
     val polynomial = if (openInteger) null else
-        SharedPolynomialModel.lower(this, sourceFormula, projections)
+        SharedPolynomialModel.lower(this, sourceFormula, projections, cancellation)
     val cause = when {
+        cancellation() -> PreparedPlanDecline.RESOURCE
         openInteger -> PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER
         polynomial == null -> PreparedPlanDecline.POLYNOMIAL_ENCODING
         objective?.realCoefficientValues?.any { it != 0.0 } == true -> PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE
@@ -356,7 +373,8 @@ internal fun Problem.preparePolynomialExecutionPlan(
         ExecutionComponentDescriptor("polynomial-real", ComponentResponsibility.COMPLETION,
             factors.indices.filter { it !in finiteFactors }, emptyList(), (0 until numRealVars).toList(),
             execution = if (polynomial != null) checkedCompletionContract(ProcedureCompleteness.DECISION)
-            else unavailableContract(ExecutionDeclineCause.PREPARATION, "polynomial-real", cause)),
+            else unavailableContract(ExecutionDeclineCause.PREPARATION, "polynomial-real", cause),
+            participatingFactorIndices = polynomial?.encodingAttributions?.map { it.sourceFactorIndex }.orEmpty()),
     ) + if (openInteger) listOf(ExecutionComponentDescriptor("unplaced-polynomial-integer",
         ComponentResponsibility.UNPLACED, emptyList(),
         (0 until numIntVars).filter { it !in boundedIntegers }, emptyList()))

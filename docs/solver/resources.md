@@ -195,6 +195,15 @@ rearms the containing deadline. An interrupted native root installation releases
 that partial mutable search; a retry keeps the immutable source plan, canonical
 CP projection, selected theory fragment, completed native row factory and charged work. Active query assertions retract even when an invocation expires.
 
+Encoder construction observes the containing invocation token during normal source
+routing, component preparation and polynomial assembly. Exact linear formula expansion
+charges row, term and distribution visits to that token's meter; polynomial assembly
+charges factor visits and installers can charge their native construction work.
+Interrupted construction discards every emitted relation and private definition and
+retains its charges. Immutable provider selections cache no installation outcome or
+control owner. Successfully installed relations can be reused without retaining the
+construction token; rewritten or conditioned relations receive their current controls.
+
 The exact-linear source factory charges factor, row and coefficient visits to its
 supplied cancellation meter. Exact rational row conversion and owned-buffer copies
 are charged before their atomic operation; the next poll can withhold the entire

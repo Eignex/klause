@@ -125,8 +125,20 @@ interface TheoryEncoding {
     fun fixedInteger(id: SourceIntId): BigInt?
     /** Captured source Boolean pin, absent when the scope does not require that truth value. */
     fun fixedBoolean(id: SourceBoolId): Boolean?
-    /** Install one complete linear conjunction or disjunction with unchanged source coordinates. */
+    /** Conjoin a complete linear relation with every other emission from this installation. */
     fun linear(form: LinearForm)
+    /** Install a complete compound linear formula; private names belong to this receiving scope. */
+    fun linearFormula(formula: LinearEncodingFormula): Unit = error("compound linear formulas unavailable")
+    /** Allocate a private affine value, requiring exactly one acyclic definition before installation completes. */
+    fun auxiliary(): EncodingAuxiliary = error("affine auxiliaries unavailable")
+    /** Define a private affine value with exact source or scoped auxiliary terms. */
+    fun define(auxiliary: EncodingAuxiliary, expression: EncodingAffineExpression): Unit =
+        error("affine auxiliaries unavailable")
+    /** Allocate a private Boolean formula name, requiring exactly one acyclic definition. */
+    fun guard(): EncodingGuard = error("private linear guards unavailable")
+    /** Define a private guard's complete relation, retained within this installation's lifetime. */
+    fun define(guard: EncodingGuard, formula: LinearEncodingFormula): Unit =
+        error("private linear guards unavailable")
     /** Install a neutral polynomial relation, preserving guards and original attribution. */
     fun polynomial(formula: PolynomialRealFormula)
     /** Map a finite source integer to its private polynomial coordinate. */

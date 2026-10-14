@@ -149,6 +149,13 @@ source formulas and create fresh execution state for each call. Original Boolean
 pins and exact integer windows are captured without changing that source. Refutations
 cover the actual supplied scope; a neighborhood failure cannot refute its parent.
 
+Private linear auxiliary and guard names belong to one encoder installation. Exact
+affine and Boolean definitions expand into source-coordinate comparisons before
+installation; attribution retains immutable reconstruction definitions. Another scope
+cannot define or reference those names. Compound formulas keep every conjunction and
+alternative under the source factor's attribution and the component's assertion/retraction
+lifetime. No private value is appended to a published source assignment.
+
 Prepared encoders and installed source relations retain no cancellation token or live
 component owner. Each arithmetic opening owns its combined assertions and native
 resources. Finite conditioned encoding captures one immutable discrete point; another

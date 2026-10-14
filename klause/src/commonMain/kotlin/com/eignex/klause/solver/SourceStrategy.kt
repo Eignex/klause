@@ -143,7 +143,7 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders)
+        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders, cancellation = scope.stop)
             .withObjective(objective, maximize = sense == ObjectiveSense.MAXIMIZE)
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
@@ -182,7 +182,7 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders)
+        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders, cancellation = scope.stop)
             .withObjective(objective, sense)
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
