@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 internal object NativeVmSignatureVerification {
@@ -30,7 +31,7 @@ internal object NativeVmSignatureVerification {
             val captured = File(out, "captured-vm-symbols.json").apply { writeBytes(raw) }
             require(raw.size <= MAX_REPORT_BYTES) { "Captured symbol report exceeds diagnostic bounds" }
             val actual = MessageDigest.getInstance("SHA-256").digest(raw)
-                .joinToString("") { "%02x".format(it) }
+                .joinToString("") { "%02x".format(Locale.ROOT, it) }
             require(actual == expected) { "Captured symbol report hash differs" }
             val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
             val names = listOf("read_native_vm_signatures.py", "native_vm_demangler.py",
