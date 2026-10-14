@@ -3,11 +3,13 @@ package com.eignex.klause.meta.coreguided
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.opb.toProblem
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -27,6 +29,34 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CoreGuidedSearchTest {
+    @Test
+    fun `successive thresholds account for three unavoidable violations`() {
+        val literals = IntArray(5) { Lit.make(it, true) }
+        val problem = Problem(5, 0, emptyArray(), arrayOf(Cardinality(literals, min = 3, max = 5))).bake()
+        val objective = LinearObjective(LongArray(5) { 1 })
+
+        val result = CoreGuidedSolver(problem).minimize(objective, BacktrackParams())
+
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(3L, objective.evaluateLong(optimal.sample))
+    }
+
+    @Test
+    fun `partially split threshold costs preserve later violations`() {
+        val literals = IntArray(5) { Lit.make(it, true) }
+        val factors: List<Factor> = listOf(Cardinality(literals, min = 3, max = 5)) + List(5) {
+            Clause(intArrayOf(Lit.make(it, false), Lit.make((it + 1) % 5, true), Lit.make(5, true)))
+        }
+        val problem = Problem(6, 0, emptyArray(), factors).bake()
+        val objective = LinearObjective(longArrayOf(3, 3, 3, 3, 3, 1))
+
+        val result = CoreGuidedSolver(problem).minimize(objective, BacktrackParams())
+
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(10L, objective.evaluateLong(optimal.sample))
+        assertTrue(optimal.sample.boolValue(5))
+    }
+
     @Test
     fun `decision quota is retained when the objective stratum changes`() {
         val problem = Problem(4, 0, emptyArray(), emptyArray()).bake()
