@@ -24,6 +24,7 @@ import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.propagation.NoPropagator
@@ -184,7 +185,7 @@ object ProjectionProviderProfile {
                 val plan = source.prepareExecutionPlan(providers, preferFinite = true)
                 val baked = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.BACKTRACK,
                     presolveConfig = PresolveConfig.NONE, preparedPlan = plan)).problem
-                check(baked is com.eignex.klause.propagation.BakedProblem)
+                check(baked is BakedProblem)
                 val params = BacktrackParams(randomSeed = seed, maxDecisions = 10000)
                 val witnesses = BacktrackSolver(baked).enumerate(params).toList()
                 val projection = LocalSearchProblem(source, providers.prepare(source), domains)
