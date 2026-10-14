@@ -325,4 +325,33 @@ class PreparedSourceAgreementTest {
             assertIs<ComponentResult.Conflict>(result)
         }
     }
+
+    @Test
+    fun `adjacent wide integer equalities conflict without narrowing`() {
+        for (negative in listOf(false, true)) {
+            val lower = parseBigInt(if (negative) "-9223372036854775810" else "9223372036854775808")
+            val open = Bits(1).also { it.set(0) }
+            val source = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+                factors = arrayOf(
+                    Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, lower),
+                    Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, lower + BIG_ONE),
+                ))
+            val registrations = source.factors.indices.map { index ->
+                val fragment = source.withFactors(arrayOf(source.factors[index]))
+                PreparedSearchRegistration(source, ExecutionComponentDescriptor("linear-$index",
+                    ComponentResponsibility.COMPLETION, listOf(index),
+                    if (index == 0) listOf(0) else emptyList(), emptyList())) { opening ->
+                    listOf(opening.own(ExactLiraSearchComponent(fragment) { assignment, model ->
+                        if (index == 0) model.contribute(SearchExactIntValue(SourceIntId(0)), assignment.ints[0])
+                    }))
+                }
+            }
+            PreparedSearchRegistrations(source, registrations)
+                .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+                    val result = search.session.solve(0)
+
+                    assertIs<SearchResult.Exhausted>(result)
+                }
+        }
+    }
 }
