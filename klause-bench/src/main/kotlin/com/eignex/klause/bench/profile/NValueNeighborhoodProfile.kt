@@ -6,19 +6,23 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Runners
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.sun.management.ThreadMXBean
+import kotlinx.serialization.Serializable
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlin.random.Random
-import kotlinx.serialization.Serializable
 
 /** Measures NValue proposals at a CP incumbent, separately from end-to-end solving. */
 object NValueNeighborhoodProfile {
@@ -30,6 +34,7 @@ object NValueNeighborhoodProfile {
         val objective: Double,
         val residuals: Map<String, Int>,
         val parts: Int,
+        val clauseDependencies: Map<Int, List<String>>,
     )
 
     @Serializable
@@ -85,11 +90,15 @@ object NValueNeighborhoodProfile {
             File(out, "no-incumbent.txt").writeText(result.toString())
             return
         }
-        Reports.writeJson(File(out, "incumbent-ints.json").path,
-            LongArray(problem.numIntVars) { sample.intValue(it) })
-        Reports.writeJson(File(out, "incumbent-bools.json").path,
-            BooleanArray(problem.numBoolVars) { sample.boolValue(it) })
-        val allocation = (ManagementFactory.getThreadMXBean() as? com.sun.management.ThreadMXBean)
+        Reports.writeJson(
+            File(out, "incumbent-ints.json").path,
+            LongArray(problem.numIntVars) { sample.intValue(it) },
+        )
+        Reports.writeJson(
+            File(out, "incumbent-bools.json").path,
+            BooleanArray(problem.numBoolVars) { sample.boolValue(it) },
+        )
+        val allocation = (ManagementFactory.getThreadMXBean() as? ThreadMXBean)
             ?.takeIf { it.isThreadAllocatedMemorySupported }
         val thread = Thread.currentThread().threadId()
         val runs = ArrayList<FactorRun>()
@@ -111,19 +120,23 @@ object NValueNeighborhoodProfile {
                 var bytes = 0L
                 var emitted = 0
                 val reductions = LinkedHashSet<Proposal>()
-                repeat(calls) {
+                repeat(calls) { _ ->
                     sink.clear()
                     sink.proposer = fid
                     val beforeBytes = allocation?.getThreadAllocatedBytes(thread)
                     val start = System.nanoTime()
                     state.factors[fid].proposeStructuredMoves(state, fid, sink)
                     ns += System.nanoTime() - start
-                    if (beforeBytes != null) bytes += checkNotNull(allocation).getThreadAllocatedBytes(thread) - beforeBytes
-                    check((0 until problem.numIntVars).all {
-                        state.assignment.intValue(it) == sample.intValue(it)
-                    } && (0 until problem.numBoolVars).all {
-                        state.assignment.boolValue(it) == sample.boolValue(it)
-                    }) { "Proposal changed the incumbent" }
+                    if (beforeBytes != null) {
+                        bytes += checkNotNull(allocation).getThreadAllocatedBytes(thread) - beforeBytes
+                    }
+                    check(
+                        (0 until problem.numIntVars).all {
+                            state.assignment.intValue(it) == sample.intValue(it)
+                        } && (0 until problem.numBoolVars).all {
+                            state.assignment.boolValue(it) == sample.boolValue(it)
+                        },
+                    ) { "Proposal changed the incumbent" }
                     val moves = sink.list
                     emitted += moves.size
                     for (move in moves) {
@@ -133,18 +146,23 @@ object NValueNeighborhoodProfile {
                             val residuals = (0 until problem.numFactors)
                                 .filter { state.factors[it].isViolated(state, it) }
                                 .groupingBy { problem.factors[it]::class.simpleName ?: "Factor" }.eachCount()
-                            reductions += Proposal(nextDistinct, state.assignment.intValue(factor.n), state.cost,
+                            reductions += Proposal(
+                                nextDistinct, state.assignment.intValue(factor.n), state.cost,
                                 objective.evaluate(state.assignment), residuals,
-                                if (move is com.eignex.klause.localsearch.Move.Compound) move.parts.size else 1)
+                                if (move is Move.Compound) move.parts.size else 1,
+                                clauseDependencies(state),
+                            )
                         }
                         restore(state, sample)
                     }
                 }
                 val network = state.invariants
-                runs += FactorRun(fid, maintained, network?.isDefinedInt(factor.n) == true,
+                runs += FactorRun(
+                    fid, maintained, network?.isDefinedInt(factor.n) == true,
                     factor.xs.distinct().count { network?.isDefinedInt(it) == true },
                     factor.presents.map(Lit::variable).distinct().count { network?.isDefinedBool(it) == true },
-                    originalDistinct, calls, ns, allocation?.let { bytes }, emitted, reductions.toList())
+                    originalDistinct, calls, ns, allocation?.let { bytes }, emitted, reductions.toList(),
+                )
             }
         }
         Reports.writeJson(File(out, "neighborhoods.json").path, runs)
@@ -157,8 +175,38 @@ object NValueNeighborhoodProfile {
         state.recompute()
     }
 
+    private fun clauseDependencies(state: LocalSearchState): Map<Int, List<String>> = buildMap {
+        for (fid in 0 until state.problem.numFactors) {
+            val clause = state.problem.factors[fid] as? Clause ?: continue
+            if (!state.factors[fid].isViolated(state, fid)) continue
+            val descriptions = arrayListOf("literals=${clause.literals.contentToString()}")
+            val network = state.invariants
+            if (network != null) {
+                for (i in 0 until network.size) {
+                    val node = network.node(i)
+                    if (!node.outIsBool || node.out !in clause.boolVars) continue
+                    descriptions += "b${node.out}=${state.assignment.boolValue(node.out)} " +
+                        "${node::class.simpleName} boolInputs=${node.boolInputs.contentToString()} " +
+                        "intInputs=${node.intInputs.contentToString()}"
+                    for (b in node.boolInputs) for (rowId in state.projection.boolOccurrences[b]) {
+                        val row = state.problem.factors[rowId] as? ReifiedLinear ?: continue
+                        if (row.auxBoolVar != b) continue
+                        val constants = row.integerConstants ?: continue
+                        descriptions += "b$b=${state.assignment.boolValue(b)} ${row.op} " +
+                            "vars=${row.vars.contentToString()} bound=${constants.bound} " +
+                            "coeffs=${row.vars.indices.map { constants.coeff(it) }} " +
+                            "values=${row.vars.map { state.assignment.intValue(it) }}"
+                    }
+                }
+            }
+            put(fid, descriptions)
+        }
+    }
+
     private fun distinct(state: LocalSearchState, factor: NValue): Int = factor.xs.indices.filter {
-        factor.presents.isEmpty() || Lit.evaluate(factor.presents[it],
-            state.assignment.boolValue(Lit.variable(factor.presents[it])))
+        factor.presents.isEmpty() || Lit.evaluate(
+            factor.presents[it],
+            state.assignment.boolValue(Lit.variable(factor.presents[it])),
+        )
     }.map { state.assignment.intValue(factor.xs[it]) }.distinct().size
 }
