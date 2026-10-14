@@ -1,8 +1,6 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.factor.arithmetic.Product
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -12,6 +10,8 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationProblem
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.NamedConstraint
@@ -177,18 +177,20 @@ class ProductCompilationTest {
             val scoring = assertNotNull(plan.finiteFactorProjections)
             val state = LocalSearchState(LocalSearchModel.open(problem, scoring), Random(1))
             for (id in 0 until problem.numIntVars) state.assignment.setInt(id, state.rootDomains[id].min)
-            for (clause in problem.factors.filterIsInstance<Clause>()) {
-                if (clause.literals.size != 1) continue
-                val literal = clause.literals.single()
-                state.assignment.setBool(Lit.variable(literal), Lit.isPositive(literal))
+            val session = PropagationSession(PropagationProblem(problem, scoring))
+            session.pinInt(product.a, 2)
+            session.pinInt(product.result, 4)
+            for (id in 0 until problem.numBoolVars) {
+                state.assignment.setBool(id, session.boolValue(id) ?: false)
             }
             state.assignment.setInt(product.a, 2)
             state.assignment.setInt(product.result, 4)
             state.recompute()
             assertEquals(0L, state.cost)
-            val predicted = state.netDelta(Move.IntSet(product.a, 3))
+            val move = state.synthesizeChannelingMove(product.a, 3)
+            val predicted = state.netDelta(move)
 
-            state.apply(Move.IntSet(product.a, 3))
+            state.apply(move)
             val committed = state.cost
             state.recompute()
 
