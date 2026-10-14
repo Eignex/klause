@@ -60,8 +60,10 @@ class ExecutionComponentDescriptor internal constructor(
     booleanCoordinates: List<Int> = emptyList(),
     internal val execution: ComponentExecutionContract = unavailableContract(
         ExecutionDeclineCause.SOURCE_COMPLETION, semantics),
+    participatingFactorIndices: List<Int> = factorIndices,
 ) {
     private val factors = factorIndices.toList()
+    private val participatingFactors = participatingFactorIndices.toList()
     private val integers = integerCoordinates.toList()
     private val reals = realCoordinates.toList()
     private val booleans = booleanCoordinates.toList()
@@ -71,6 +73,9 @@ class ExecutionComponentDescriptor internal constructor(
 
     /** Canonical source factor indices enforced by this component. */
     val factorIndices: List<Int> get() = factors.toList()
+
+    /** Factors consumed by this participant; a factor can participate in several components. */
+    val participatingFactorIndices: List<Int> get() = participatingFactors.toList()
 
     /** Canonical integer coordinates owned by this component. */
     val integerCoordinates: List<Int> get() = integers.toList()
@@ -311,9 +316,10 @@ internal fun Problem.preparedWithComponents(
             emptyList(), emptyList(), (0 until numBoolVars).toList(),
             checkedCompletionContract(ProcedureCompleteness.DECISION)),
         ExecutionComponentDescriptor("arithmetic", ComponentResponsibility.COMPLETION, theoryFactors,
-            ownership.theoryIntVars.toList(), (0 until numRealVars).toList(), execution = completion),
+            ownership.theoryIntVars.toList(), (0 until numRealVars).toList(), execution = completion,
+            participatingFactorIndices = ownership.encodedFactorIndices),
     ).filter { it.responsibility == ComponentResponsibility.FINITE ||
-        it.factorIndices.isNotEmpty() || it.booleanCoordinates.isNotEmpty() ||
+        it.participatingFactorIndices.isNotEmpty() || it.booleanCoordinates.isNotEmpty() ||
         it.integerCoordinates.isNotEmpty() || it.realCoordinates.isNotEmpty() }
     return PreparedSourcePlan(original, this, PreparedExecutionKind.FINITE_LINEAR, ownership, null, descriptors,
         original.numBoolVars, original.numIntVars, original.numRealVars, objective, maximize,

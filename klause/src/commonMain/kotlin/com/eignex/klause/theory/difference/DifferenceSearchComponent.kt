@@ -106,6 +106,9 @@ class DifferenceSearchComponent private constructor(
                 Potentials.Abandoned -> return ComponentCheck.Indeterminate
             }
         }
+        if (values.indices.any { variable -> model.intDomainOrNull(variable)?.let {
+                values[variable] !in it
+            } == true }) return ComponentCheck.Indeterminate
         assignment = Sample(bools, values)
         return ComponentCheck.Feasible
     }

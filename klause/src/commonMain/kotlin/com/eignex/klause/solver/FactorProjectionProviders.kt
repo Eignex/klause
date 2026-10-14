@@ -24,9 +24,16 @@ class FactorProjectionProviders(
     /** Selects sound model-facing linear relaxation emission. */
     val relaxation: RelaxationProjectionProvider = BuiltInRelaxationProjectionProvider,
     /** Selects complete source relation installation in shared arithmetic components. */
-    val encoder: EncoderProvider = BuiltInEncoderProvider,
+    val encoder: EncoderProvider,
     encodingTargets: Set<EncodingTarget> = emptySet(),
 ) {
+    /** Preserve the original provider constructor and its built-in theory selection. */
+    constructor(
+        propagation: PropagationProjectionProvider = BuiltInPropagationProjectionProvider,
+        scoring: ScoringProjectionProvider = BuiltInScoringProjectionProvider,
+        relaxation: RelaxationProjectionProvider = BuiltInRelaxationProjectionProvider,
+    ) : this(propagation, scoring, relaxation, BuiltInEncoderProvider)
+
     private val selectedEncodingTargets = EncodingTarget.entries.toSet() + encodingTargets
 
     /** Consumer languages captured at preparation, including every built-in target. */

@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
@@ -11,9 +10,6 @@ import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
-import com.eignex.klause.theory.qflra.exactTheoryOwnable
-import com.eignex.klause.theory.qflra.supportsExactLira
-import com.eignex.klause.theory.qflra.supportsExactLra
 import com.eignex.klause.util.Cancellation
 
 /** The solver pipeline selected once from a source [Problem]. */
@@ -174,10 +170,16 @@ private fun Problem.pipelineRouteObserved(
         is BoundedRouting.Proved -> bounded.problem
     }
     val finiteIntegerRanges = routed.hasFiniteIntegerRanges()
-    val preferExact = routeLinearToTheory && (routed.supportsExactLra() || routed.supportsExactLira())
-    val preferFinite = finiteIntegerRanges && !preferExact && (!routePureRealToTheory || !routed.supportsExactLra())
-    val prepared = routed.prepareExecutionPlan(this, objective, maximize, preferFinite, providers,
-        requireNotNull(source.factorProjections).forEngineView(routed))
+    val projections = requireNotNull(source.factorProjections).forEngineView(routed)
+    val arithmetic = routed.prepareExecutionPlan(this, objective, maximize,
+        preferFinite = false, providers, projections)
+    val arithmeticRoute = arithmetic.componentPlan?.theoryPipeline
+    val preferExact = routeLinearToTheory &&
+        (arithmeticRoute == ProblemPipeline.EXACT_LRA || arithmeticRoute == ProblemPipeline.EXACT_LIRA)
+    val preferFinite = finiteIntegerRanges && !preferExact &&
+        (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA)
+    val prepared = if (preferFinite) routed.prepareExecutionPlan(this, objective, maximize,
+        preferFinite = true, providers, projections) else arithmetic
     val plan = requireNotNull(prepared.componentPlan)
     if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
         return SourceProblemRoute.Finite(routed, plan, prepared)
@@ -242,12 +244,3 @@ private sealed interface BoundedRouting {
  * theory cover the whole model.
  */
 fun Problem.sourceRoute(): ProblemPipeline = componentPlan(preferFinite = hasFiniteIntegerRanges()).theoryPipeline
-
-/**
- * A factor some lane other than CP can hold, so CP need not own the columns it reads.
- *
- * The one rule the plan reads: [variablePartition] marks a column search-required from it, [componentPlan]
- * assigns factor ownership from it, and an open column it marks has no owner at all — the model's verdict.
- */
-internal fun Factor.isTheoryOwnable(hasRealColumns: Boolean): Boolean =
-    integerTheoryOwnable || (hasRealColumns && exactTheoryOwnable)

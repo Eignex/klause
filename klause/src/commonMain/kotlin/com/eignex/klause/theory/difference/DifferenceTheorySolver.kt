@@ -20,8 +20,11 @@ import com.eignex.klause.theory.TheoryContext
 /** Complete open integer difference-logic solver. */
 class DifferenceTheorySolver(
     override val model: Problem,
-    projections: PreparedFactorProjections = model.selectedFactorProjections(),
+    projections: PreparedFactorProjections,
 ) : Theory<Sample> {
+    /** Open the built-in or source-retained selection with the original service constructor. */
+    constructor(model: Problem) : this(model, model.selectedFactorProjections())
+
     private val encoded = requireNotNull(projections.linearTheoryModel(EncodingTarget.DIFFERENCE)) {
         "unsupported selected difference encoding"
     }.also { projections.requireSource(model) }
@@ -48,6 +51,9 @@ class DifferenceTheorySolver(
                 Potentials.Abandoned -> return TheoryCheck.Cancelled
             }
         }
+        if (values.indices.any { variable -> model.intDomainOrNull(variable)?.let {
+                values[variable] !in it
+            } == true }) return TheoryCheck.Cancelled
         return TheoryCheck.Sat(Sample(bools.copyOf(), values))
     }
 

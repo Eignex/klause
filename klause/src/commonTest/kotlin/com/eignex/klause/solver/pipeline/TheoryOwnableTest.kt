@@ -39,11 +39,11 @@ class TheoryOwnableTest {
     )
 
     @Test
-    fun `an unknown factor kind that declares an integer theory can hold it is theory-owned`() {
+    fun `a declared complete relation retains finite variable ownership`() {
         val plan = specOf(factorDeclaring(complete = true)).componentPlan()
 
         assertEquals(FactorOwner.THEORY, plan.factorOwner(0))
-        assertEquals(IntVariableOwner.THEORY, plan.intOwner(0))
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
     }
 
     @Test
@@ -109,6 +109,7 @@ class TheoryOwnableTest {
         )
 
         assertEquals(FactorOwner.CP, model.componentPlan(preferFinite = true).factorOwner(0))
-        assertEquals(FactorOwner.THEORY, model.componentPlan().factorOwner(0))
+        assertEquals(FactorOwner.CP, model.componentPlan().factorOwner(0))
+        assertEquals(true, model.componentPlan().factorEncoded(0))
     }
 }

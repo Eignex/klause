@@ -195,3 +195,10 @@ descriptors on the source-prepared view. Their source model and domains remain
 neutral; a required source check does not grant an omitted relaxation permission
 to emit the default rows. Numerical certificates and native LP accounting remain
 owned by the existing model-facing runtime and numerical engine.
+
+Source rewrites reselect encoders against the new canonical factors. A preparation
+capture keeps primary finite enforcement separate from additional arithmetic
+participation. Narrowing an open side to a proved finite declaration can create a
+finite choice owner; needing arithmetic or exact source coefficients cannot promote
+unrelated finite declarations. Original value sets, reconstruction and assertion
+premises remain authoritative after an encoding is selected.
