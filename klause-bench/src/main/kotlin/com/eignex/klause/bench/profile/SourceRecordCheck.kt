@@ -31,7 +31,6 @@ object SourceRecordCheck {
             "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest> and checker=source|boolean"
         }
         require(options["captureSources"] in listOf(null, "true", "false")) { "captureSources must be true or false" }
-
         require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
         val witnessOnly = options["witnessOnly"] == "true"
         require(options["catalog"] == null || options["catalog"] == "true")
@@ -50,8 +49,10 @@ object SourceRecordCheck {
         } ?: run {
             val url = URI(requireNotNull(options["bundle"]))
             require(url.scheme == "https" && url.userInfo == null)
-            val connection = url.toURL().openConnection().apply { connectTimeout = 30_000
-                readTimeout = 30_000 }
+            val connection = url.toURL().openConnection().apply {
+                connectTimeout = 30_000
+                readTimeout = 30_000
+            }
             connection.getInputStream().use { it.readNBytes(32 * 1024 * 1024 + 1) }
         }
         require(bytes.size <= 32 * 1024 * 1024 && sha(bytes) == options["sha256"]) { "Bundle identity differs" }
