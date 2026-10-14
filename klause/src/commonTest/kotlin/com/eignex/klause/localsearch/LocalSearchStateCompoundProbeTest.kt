@@ -290,6 +290,33 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
+    fun `defined wide objective deltas reflect final coordinate values and restore state`() {
+        val half = 1L shl 62
+        val problem = Problem(0, 2, Array(2) { IntDomain(-half, half) },
+            arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
+        val network = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(2, 0)
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.invariants = network
+        state.assignment.setInt(0, -half)
+        state.assignment.setInt(1, -half)
+        state.recompute()
+        val before = state.assignment.snapshot()
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 1))
+        val moves = listOf(
+            Move.IntSet(0, half),
+            Move.Compound(listOf(Move.IntSet(0, -half + 1), Move.IntSet(0, half))),
+        )
+
+        for (move in moves) {
+            val delta = state.objectiveDelta(objective, move)
+
+            assertEquals(half.toDouble() * 2.0, delta)
+            assertEquals(before, state.assignment.snapshot())
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
     fun `compound probes restore derived values when the inverse cannot write`() {
         val problem = Problem(
             numBoolVars = 0,

@@ -18,6 +18,37 @@ import kotlin.test.assertTrue
 
 class FunctionalObjectiveTest {
     @Test
+    fun `functional objective deltas preserve wide endpoint differences`() {
+        val half = 1L shl 62
+        for (minimize in listOf(true, false)) {
+            val objective = FunctionalObjective(0, minimize, emptyList(), intArrayOf(0))
+            val assignment = Assignment(0, 1)
+            assignment.setInt(0, -half)
+
+            val delta = objective.deltaIfApplied(assignment, Move.IntSet(0, half))
+
+            assertEquals(half.toDouble() * if (minimize) 2.0 else -2.0, delta)
+            assertEquals(-half, assignment.intValue(0))
+        }
+    }
+
+    @Test
+    fun `functional objective deltas preserve weighted values outside the long range`() {
+        for (minimize in listOf(true, false)) {
+            val objective = FunctionalObjective(intArrayOf(0), longArrayOf(Long.MAX_VALUE), 0,
+                minimize, emptyList(), intArrayOf(0))
+            val assignment = Assignment(0, 1)
+
+            val delta = objective.deltaIfApplied(assignment, Move.IntSet(0, 2))
+            assignment.setInt(0, 2)
+
+            val expected = Long.MAX_VALUE.toDouble() * if (minimize) 2.0 else -2.0
+            assertEquals(expected, delta)
+            assertEquals(expected, objective.evaluate(assignment))
+        }
+    }
+
+    @Test
     fun `cross space objectives honor final repeated targets and Boolean parity`() {
         val fold = FunctionalObjective.BoolFold(3, intArrayOf(Lit.make(1, true), Lit.make(2, false)), true)
         val objective = FunctionalObjective(

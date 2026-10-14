@@ -23,6 +23,7 @@ import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
+import com.eignex.klause.util.ExactIntegerSum
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
@@ -611,51 +612,50 @@ class LocalSearchState private constructor(
     }
 
     private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double {
-        return when (move) {
+        objectiveDeltaSum.reset()
+        var realDelta = 0.0
+        if (move !is Move.Compound) {
+            realDelta = addLinearObjectivePart(move, obj)
+            return objectiveDeltaSum.toDouble() + realDelta
+        }
+        probeSlotSet.clear()
+        for (part in move.parts) {
+            if (!probeSlotSet.add(slotOf(part))) return evaluateMove(move, obj).objectiveDelta
+            realDelta += addLinearObjectivePart(part, obj)
+        }
+        return objectiveDeltaSum.toDouble() + realDelta
+    }
+
+    private fun addLinearObjectivePart(part: Move, obj: LinearObjective): Double {
+        when (part) {
             is Move.BoolFlip -> {
-                val v = move.varId
+                val v = part.varId
                 if (v < obj.boolWeightValues.size) {
-                    val w = obj.boolWeightValues[v]
-                    (if (assignment.boolValue(v)) -w else w).toDouble()
-                } else {
-                    0.0
+                    val before = if (assignment.boolValue(v)) 1L else 0L
+                    objectiveDeltaSum.addDelta(obj.boolWeightValues[v], before, 1L - before)
                 }
             }
 
             is Move.IntSet -> {
-                val v = move.varId
+                val v = part.varId
                 if (v < obj.intCoefficientValues.size) {
-                    (obj.intCoefficientValues[v] * (move.newValue - assignment.intValue(v))).toDouble()
-                } else {
-                    0.0
+                    objectiveDeltaSum.addDelta(obj.intCoefficientValues[v], assignment.intValue(v), part.newValue)
                 }
             }
 
             is Move.RealSet -> {
-                val v = move.varId
+                val v = part.varId
                 if (v < obj.realCoefficientValues.size) {
-                    obj.realCoefficientValues[v] * (
-                        move.newValue - assignment.realValue(
-                            v,
-                        )
-                        )
-                } else {
-                    0.0
+                    return obj.realCoefficientValues[v] * (part.newValue - assignment.realValue(v))
                 }
             }
 
-            is Move.Compound -> {
-                // Distinct-coordinate deltas are additive; repeated writes need their final combined value.
-                probeSlotSet.clear()
-                var sum = 0.0
-                for (p in move.parts) {
-                    if (!probeSlotSet.add(slotOf(p))) return evaluateMove(move, obj).objectiveDelta
-                    sum += linearObjectiveDelta(p, obj)
-                }
-                sum
-            }
+            is Move.Compound -> error("nested compound move")
         }
+        return 0.0
     }
+
+    private val objectiveDeltaSum = ExactIntegerSum()
 
     /**
      * Synthesize a value-driven move that sets [intVar] to [newValue] and coordinately flips all
@@ -1236,23 +1236,24 @@ class LocalSearchState private constructor(
     }
 
     private fun probeLinearObjectiveDelta(objective: LinearObjective): Double {
-        var delta = 0.0
+        objectiveDeltaSum.reset()
+        var realDelta = 0.0
         for (i in 0 until probeSlots.size) {
             val slot = probeSlots[i]
             val old = savedValuesScratch[i]
             if (slot < problem.numBoolVars) {
                 val coefficient = objective.boolWeightValues.getOrElse(slot) { 0L }
-                delta += (coefficient * (probeValue(slot) - old)).toDouble()
+                objectiveDeltaSum.addDelta(coefficient, old, probeValue(slot))
             } else if (slot < problem.numBoolVars + problem.numIntVars) {
                 val coefficient = objective.intCoefficientValues.getOrElse(slot - problem.numBoolVars) { 0L }
-                delta += (coefficient * (probeValue(slot) - old)).toDouble()
+                objectiveDeltaSum.addDelta(coefficient, old, probeValue(slot))
             } else {
                 val real = slot - problem.numBoolVars - problem.numIntVars
                 val coefficient = objective.realCoefficientValues.getOrElse(real) { 0.0 }
-                delta += coefficient * (assignment.realValue(real) - Double.fromBits(old))
+                realDelta += coefficient * (assignment.realValue(real) - Double.fromBits(old))
             }
         }
-        return delta
+        return objectiveDeltaSum.toDouble() + realDelta
     }
 
     private fun weightedDegreeDelta(degBefore: IntArray): Double {

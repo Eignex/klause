@@ -41,7 +41,7 @@ internal class DiffnBoundCompletion(
                 if (!spend(row.vars.size)) return geometry
                 for (i in row.vars.indices) {
                     val v = row.vars[i]
-                    if (constants.coeffs[i] != -1L || !sink.allowsInt(v)) continue
+                    if (constants.coeff(i) != -1L || !sink.allowsInt(v)) continue
                     if (state.projection.intOccurrences[v].binarySearchInt(factorId) >= 0) continue
                     if ((0 until count).any { targets[it] == v }) continue
                     targets[count++] = v
@@ -69,7 +69,7 @@ internal class DiffnBoundCompletion(
             val constants = row.integerConstants ?: return null
             if (!spend(row.vars.size)) return null
             val index = row.vars.indexOf(v)
-            val coefficient = constants.coeffs[index]
+            val coefficient = constants.coeff(index)
             if (coefficient >= 0L) continue
             if (coefficient != -1L) return null
             val required = requiredLower(row, index, parts) ?: return null
@@ -86,7 +86,7 @@ internal class DiffnBoundCompletion(
             var sum = 0L
             for (i in row.vars.indices) {
                 if (i == outputIndex) continue
-                sum = addExact(sum, mulExact(constants.coeffs[i], value(row.vars[i], parts)))
+                sum = addExact(sum, mulExact(constants.coeff(i), value(row.vars[i], parts)))
             }
             return bigIntOf(subExact(sum, constants.bound))
         } catch (_: CheckedLongOverflowException) {
@@ -94,7 +94,7 @@ internal class DiffnBoundCompletion(
             var sum = BIG_ZERO
             for (i in row.vars.indices) {
                 if (i == outputIndex) continue
-                sum += bigIntOf(constants.coeffs[i]) * bigIntOf(value(row.vars[i], parts))
+                sum += bigIntOf(constants.coeff(i)) * bigIntOf(value(row.vars[i], parts))
             }
             return sum - bigIntOf(constants.bound)
         }

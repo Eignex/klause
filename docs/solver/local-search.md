@@ -159,6 +159,12 @@ retain their tabu restriction. This permits monotone envelope descent after a
 recent coordinate write; tabu cannot trap a feasible improving compound behind
 unrelated zero-objective candidates.
 
+Discrete linear objective deltas accumulate in a retained per-state integer sum,
+using checked 64-bit arithmetic and arbitrary precision on overflow. Compound and
+definition probes round that complete discrete sum once, preserving cancellation
+and the direction of wide coordinate changes. Functional objective views retain
+exact weighted cone totals and subtract them before conversion to floating point.
+
 ### Element results
 
 Hinted native Element results are maintained from their indexes and selected cells.
