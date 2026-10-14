@@ -160,9 +160,12 @@ internal class ComposedSampleVerifier(
     private val problem: Problem,
     private val objective: LinearObjective,
     private val cancellation: Cancellation,
+    private val assumptions: Assumptions = Assumptions.None,
+    private val onWork: (Long) -> Unit = {},
+    toleranceCheck: ((Sample) -> Boolean)? = null,
 ) : CandidateVerifier<Sample, Double> {
 
-    private val admission = sampleAdmission(problem)
+    private val admission = sampleAdmission(problem, toleranceCheck)
 
     override fun verify(candidate: Candidate<Sample, Double>): Verification<Sample, Double> {
         val admitted = admission.verify(candidate)
@@ -178,7 +181,7 @@ internal class ComposedSampleVerifier(
         if (evaluated != candidate.objective) {
             return Verification.Rejected("objective is $evaluated, not the claimed ${candidate.objective}")
         }
-        return composedFixpoint(problem, candidate, cancellation)
+        return composedFixpoint(problem, candidate, cancellation, assumptions, onWork)
     }
 }
 
@@ -191,32 +194,38 @@ internal fun <V> composedFixpoint(
     candidate: Candidate<Sample, V>,
     cancellation: Cancellation,
     assumptions: Assumptions = Assumptions.None,
+    onWork: (Long) -> Unit = {},
 ): Verification<Sample, V> {
     val sample = candidate.assignment
     val session = PropagationSession(problem, cancellation)
-    if (session.isUnsatAtRoot) return Verification.Rejected("root propagation refutes the assignment")
-    if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
-    if (!assumptions.isEmpty && session.seed(assumptions) is PropagationResult.Unsat) {
-        return Verification.Rejected("the assumptions refute the assignment")
-    }
-    for (b in 0 until problem.numBoolVars) {
+    try {
+        if (session.isUnsatAtRoot) return Verification.Rejected("root propagation refutes the assignment")
         if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
-        if (session.pinBool(b, sample.boolValue(b)) is PropagationResult.Unsat) {
-            return Verification.Rejected("bool $b = ${sample.boolValue(b)} conflicts")
+        if (!assumptions.isEmpty && session.seed(assumptions) is PropagationResult.Unsat) {
+            return Verification.Rejected("the assumptions refute the assignment")
         }
-    }
-    for (v in 0 until problem.numIntVars) {
+        for (b in 0 until problem.numBoolVars) {
+            if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
+            if (session.pinBool(b, sample.boolValue(b)) is PropagationResult.Unsat) {
+                return Verification.Rejected("bool $b = ${sample.boolValue(b)} conflicts")
+            }
+        }
+        for (v in 0 until problem.numIntVars) {
+            if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
+            if (session.pinInt(v, sample.intValue(v)) is PropagationResult.Unsat) {
+                return Verification.Rejected("int $v = ${sample.intValue(v)} conflicts")
+            }
+        }
+        // Sticky across every fixpoint above: a cut one leaves the state under-propagated, so a
+        // surviving assignment proves nothing.
         if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
-        if (session.pinInt(v, sample.intValue(v)) is PropagationResult.Unsat) {
-            return Verification.Rejected("int $v = ${sample.intValue(v)} conflicts")
+        return when (session.checkSelectedProjection()) {
+            ComponentCheck.Feasible -> Verification.Accepted(candidate)
+            is ComponentCheck.Infeasible -> Verification.Rejected("original source check refutes the assignment")
+            ComponentCheck.Indeterminate ->
+                Verification.Indeterminate("original source check is unavailable or cancelled")
         }
-    }
-    // Sticky across every fixpoint above: a cut one leaves the state under-propagated, so a
-    // surviving assignment proves nothing.
-    if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
-    return when (session.checkSelectedProjection()) {
-        ComponentCheck.Feasible -> Verification.Accepted(candidate)
-        is ComponentCheck.Infeasible -> Verification.Rejected("original source check refutes the assignment")
-        ComponentCheck.Indeterminate -> Verification.Indeterminate("original source check is unavailable or cancelled")
+    } finally {
+        onWork(session.work)
     }
 }

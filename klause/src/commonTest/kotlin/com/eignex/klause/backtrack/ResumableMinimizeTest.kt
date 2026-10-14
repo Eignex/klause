@@ -654,6 +654,42 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `mixed rounding publishes completed reals without tree decisions`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> true }
+        val offered = ArrayList<Sample>()
+        val params = fixture.params.copy(maxDecisions = 0L,
+            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
+
+        fixture.solver.resumable(fixture.objective, params).use { search ->
+            search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
+            val sample = offered.single()
+            assertEquals(1L, sample.ints.single())
+            assertEquals(0.5, sample.reals.single())
+            assertEquals(BigFraction.ofDouble(0.5), sample.exactReals?.single())
+            assertEquals(0.0, search.stats.search.nodes.sum)
+            assertTrue(search.stats.lp.standaloneWorkOps.sum > 0.0)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `mixed rounding cannot publish an uncertified completion`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+        val offered = ArrayList<Sample>()
+        val params = fixture.params.copy(maxDecisions = 0L,
+            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
+
+        fixture.solver.resumable(fixture.objective, params).use { search ->
+            search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
+        }
+
+        assertTrue(offered.isEmpty())
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
     fun `a real leaf LP is handed the run deadline`() {
         val deadlines = ArrayList<ComparableTimeMark?>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {

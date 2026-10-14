@@ -104,6 +104,10 @@ propagation work one per 4000 visits, inprocessing probes one per 12 and subsump
 visits one per 18000. Fractional LP and propagation marks survive slices and the
 preparation-to-search transition. Overspend debt is settled once and repaid by later
 slices. A nested private search leaves debt ownership with its containing budget.
+Private LP rounding, pump and proposal-verification propagation charge the same
+slice currency, including rejected proposals. Mixed proposal completion uses the
+containing root cancellation and real-leaf native ledger; composed verification
+adds its own short deadline without renewing the root allowance.
 Relative counters and saturating additions prevent a large allowance from wrapping.
 Retained finite optimization behind a finite external cutoff converts the slice's remaining work to an optional
 node-LP operation cap, subtracting fractional LP work already charged. The adapter
