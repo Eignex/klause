@@ -25,6 +25,8 @@ internal fun nodeDualCertificate(
             integerCertifyUnchecked(model, duals, DEFAULT_SCALE_BITS, allowMixed = true, scan = meter::step)
         } ?: meter.attempt(observer, "ROUNDED") {
             mixedCertificate(model, state, duals, meter)
+        } ?: meter.attempt(observer, "ENDPOINT_REPAIR") {
+            repairMixedEndpoints(model, state, duals, meter)
         } ?: meter.attempt(observer, "RECONSTRUCTED") {
             reconstructedMixedCertificate(model, state, duals, meter)
         }
@@ -294,6 +296,89 @@ private fun reconstructedMixedCertificate(
     return mixedCertificate(model, state, y, meter)
 }
 
+private fun repairMixedEndpoints(
+    model: LpModel,
+    state: LpExactState,
+    duals: DoubleArray,
+    meter: MixedCertificateMeter,
+): LpDeductionCertificate? {
+    meter.reserve(model.m * 16L)
+    val rounded = roundDuals(model, duals) ?: return null
+    val inverseScale = meter.read(BigFraction.ofLong(rounded.scale).reciprocal())
+    val y = MutableList(model.m) { meter.multiply(BigFraction.ofLong(rounded.mult[it]), inverseScale) }
+    clampMixedMultipliers(model, y, meter)
+    val continuousCounts = continuousRowCounts(model, state, meter)
+    var repaired = false
+    for (column in 0 until model.n) {
+        meter.step()
+        if (state.model.column(column).integral) continue
+        val corrected = repairMixedColumn(model, y, continuousCounts, column, meter)
+            ?: return meter.decline("MISSING_ENDPOINT")
+        repaired = repaired || corrected
+    }
+    return if (repaired) mixedCertificate(model, state, y, meter) else null
+}
+
+private fun continuousRowCounts(model: LpModel, state: LpExactState, meter: MixedCertificateMeter): IntArray {
+    meter.reserve(model.m * 4L)
+    val counts = IntArray(model.m)
+    for (column in 0 until model.n) {
+        meter.step()
+        if (state.model.column(column).integral) continue
+        for (entry in state.model.columnEntries(column)) {
+            meter.step()
+            if (!entry.number.value.isZero && state.rows.row(entry.row).active) {
+                counts[entry.row] = minOf(2, counts[entry.row] + 1)
+            }
+        }
+    }
+    return counts
+}
+
+private fun repairMixedColumn(
+    model: LpModel,
+    y: MutableList<BigFraction>,
+    continuousCounts: IntArray,
+    column: Int,
+    meter: MixedCertificateMeter,
+): Boolean? {
+    val state = checkNotNull(model.exactState)
+    var residual = meter.read(model.exactCost(column))
+    model.forEachRationalColumn(column) { row, coefficient ->
+        meter.step()
+        residual = meter.add(residual, meter.multiply(y[row], coefficient).negated())
+    }
+    val bounds = model.exactBounds(column)
+    if (!((residual.signum() > 0 && bounds.lower == null) ||
+            (residual.signum() < 0 && bounds.upper == null))) return false
+    for (entry in state.model.columnEntries(column)) {
+        meter.step()
+        if (!state.rows.row(entry.row).active || continuousCounts[entry.row] != 1 ||
+            entry.number.value.isZero) continue
+        val inverse = meter.read(meter.read(entry.number.value).reciprocal())
+        val candidate = meter.add(y[entry.row], meter.multiply(residual, inverse))
+        val slack = model.slackCol(entry.row)
+        val slackBounds = model.exactBounds(slack)
+        val slackCost = meter.read(model.exactCost(slack))
+        if ((slackBounds.lower == null && candidate < slackCost) ||
+            (slackBounds.upper == null && candidate > slackCost)) continue
+        // A singleton continuous row cancels this residual without changing another real reduced cost.
+        y[entry.row] = candidate
+        return true
+    }
+    return null
+}
+
+private fun clampMixedMultipliers(model: LpModel, y: MutableList<BigFraction>, meter: MixedCertificateMeter) {
+    for (row in y.indices) {
+        meter.step()
+        val slack = model.slackCol(row)
+        val cost = meter.read(model.exactCost(slack))
+        val bounds = model.exactBounds(slack)
+        if ((bounds.lower == null && y[row] < cost) || (bounds.upper == null && y[row] > cost)) y[row] = cost
+    }
+}
+
 private fun mixedCertificate(
     model: LpModel,
     state: LpExactState,
@@ -303,12 +388,7 @@ private fun mixedCertificate(
     val scale = meter.read(state.model.objective.scale.value)
     meter.reserve(model.m * 8L)
     val y = multipliers.toMutableList()
-    for (row in y.indices) {
-        val slack = model.slackCol(row)
-        val cost = meter.read(model.exactCost(slack))
-        val bounds = model.exactBounds(slack)
-        if ((bounds.lower == null && y[row] < cost) || (bounds.upper == null && y[row] > cost)) y[row] = cost
-    }
+    clampMixedMultipliers(model, y, meter)
     var value = meter.read(model.exactConstant())
     for (row in y.indices) value = meter.add(value, meter.multiply(y[row], model.exactRhs(row)))
     val reduced = List(model.numVars) { column ->
