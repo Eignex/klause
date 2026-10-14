@@ -62,6 +62,59 @@ class SolveTest(unittest.TestCase):
         self.assertEqual(5, result["objective"])
         self.assertTrue(result["maximize"])
 
+    def test_negative_tables_preserve_pairs_after_source_domain_exclusions(self):
+        xml = """<instance format="XCSP3" type="COP">
+          <variables><var id="x">0..5</var><var id="y">0..5</var></variables>
+          <constraints>
+            <extension><list>x</list><conflicts>1 3 4</conflicts></extension>
+            <extension><list>y</list><conflicts>0 2 3</conflicts></extension>
+            <extension><list>x y</list><conflicts>(0,0)(0,2)(1,1)(2,4)(3,3)(4,4)</conflicts></extension>
+          </constraints><objectives><maximize type="sum"><list>x y</list></maximize></objectives>
+        </instance>"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "domain-conflicts.xml"
+            path.write_text(xml)
+            result = solve(path, 1, 1)
+        self.assertEqual("OPTIMAL", result["exit"])
+        self.assertEqual({"x": 5, "y": 5}, result["witness"])
+        self.assertEqual("10", result["exactObjective"])
+
+    def test_negative_table_wildcards_exclude_only_matching_coordinates(self):
+        xml = """<instance format="XCSP3" type="CSP">
+          <variables><var id="x">0..1</var><var id="y">0..1</var></variables>
+          <constraints><extension><list>x y</list><conflicts>(0,*)(1,1)</conflicts></extension></constraints>
+        </instance>"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "wildcard-conflicts.xml"
+            path.write_text(xml)
+            result = solve(path, 1, 1)
+        self.assertEqual("FEASIBLE", result["exit"])
+        self.assertEqual({"x": 1, "y": 0}, result["witness"])
+
+    def test_all_wildcard_conflicts_remain_infeasible(self):
+        xml = """<instance format="XCSP3" type="CSP">
+          <variables><var id="x">0..1</var><var id="y">0..1</var></variables>
+          <constraints><extension><list>x y</list><conflicts>(*,*)</conflicts></extension></constraints>
+        </instance>"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "all-wildcards.xml"
+            path.write_text(xml)
+            result = solve(path, 1, 1)
+        self.assertEqual("UNSATISFIABLE", result["exit"])
+
+    def test_repeated_negative_table_coordinates_preserve_source_aliases(self):
+        for conflicts, expected in [("(0,1)(1,0)", "FEASIBLE"), ("(0,0)(1,1)", "UNSATISFIABLE")]:
+            with self.subTest(conflicts=conflicts):
+                xml = f"""<instance format="XCSP3" type="CSP">
+                  <variables><var id="x">0..1</var></variables>
+                  <constraints><extension><list>x x</list><conflicts>{conflicts}</conflicts></extension></constraints>
+                </instance>"""
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "repeated-coordinates.xml"
+                    path.write_text(xml)
+                    result = solve(path, 1, 1)
+                self.assertEqual(expected, result["exit"])
+
     def test_expression_sums_preserve_the_source_objective_and_witness(self):
         xml = """<instance format="XCSP3" type="COP">
           <variables><array id="x" size="[2]">0..2</array></variables>
