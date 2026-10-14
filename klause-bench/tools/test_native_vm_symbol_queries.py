@@ -20,6 +20,21 @@ class NativeVmSymbolQueriesTest(unittest.TestCase):
         self.assertEqual(('CompileQueue', 'CompileTaskWrapper'),
                          symbols.query_names(['CompileQueue', 'CompileTaskWrapper']))
 
+    def test_invalid_cli_query_retains_its_failure_without_reading_the_library(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'symbols.json'
+            arguments = ['reader', '/unread/library', 'pinned', str(output), 'invalid*']
+
+            with patch.object(symbols.sys, 'argv', arguments), patch.object(symbols, 'inspect_file') as inspect, \
+                    self.assertRaises(ValueError):
+                symbols.main()
+            report = json.loads(output.read_text())
+
+            inspect.assert_not_called()
+            self.assertFalse(report['completed'])
+            self.assertEqual(['invalid*'], report['queries'])
+            self.assertEqual('ValueError', report['error']['type'])
+
     def test_requested_source_identifiers_are_scanned_without_replacing_raw_records(self):
         strings = b'\0CompileQueue_add\0'
         entries = bytes(24) + symbols.SYMBOL.pack(1, 2, 0, 1, 0x100, 16)
