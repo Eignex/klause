@@ -56,6 +56,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PreparedExecutionKind
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.ProblemPipeline
@@ -66,6 +67,7 @@ import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.polynomialRequest
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.search
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBoolValue
 import com.eignex.klause.solver.search.SearchResult
@@ -106,6 +108,89 @@ class EncoderTest {
         assertNull(plan.polynomialIntegerCoordinate(1))
         assertEquals(1, plan.finiteIntegerCoordinate(1))
         assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `normal source routing admits a required finite polynomial encoder without native propagation`() {
+        val relation = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1) {
+            override val linearForm: LinearForm? = null
+        }
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(relation))
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { _, target ->
+            if (target != EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
+            else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                encoding.polynomial(PolynomialRealFormula.Atom(encoding.integer(SourceIntId(0)),
+                    PolynomialRelation.EQ, PolynomialExpression.Constant.of(bigIntOf(1))))
+                null
+            }
+        })
+
+        val result = BacktrackSolver.source(source).withProjectionProviders(providers).solve()
+
+        assertEquals("1", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(0))
+    }
+
+    @Test
+    fun `a required polynomial peer enforces an opaque finite filter in the same search`() {
+        val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)
+        val relation = object : Factor by row { override val linearForm: LinearForm? = null }
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(relation,
+            RealProduct(0, 0, 1, 1.0, 1.0)), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider { factor ->
+                if (factor !== relation) BuiltInPropagationProjectionProvider.select(factor)
+                else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "The required arithmetic peer supplies whole-relation enforcement.") { NoPropagator }
+            },
+            encoder = EncoderProvider { factor, target ->
+                if (factor !== relation || target != EncodingTarget.POLYNOMIAL) {
+                    BuiltInEncoderProvider.select(factor, target)
+                } else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                    encoding.polynomial(PolynomialRealFormula.Atom(encoding.integer(SourceIntId(0)),
+                        PolynomialRelation.EQ, PolynomialExpression.Constant.of(bigIntOf(1))))
+                    null
+                }
+            },
+        )
+        val plan = source.prepareExecutionPlan(providers)
+
+        val result = OpenTheoryPipeline.execute(plan.polynomialRequest(), engine = FiniteEngine.BACKTRACK).result
+
+        assertTrue(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        assertEquals(listOf(0), plan.polynomialModel!!.finiteFactorIndices)
+        assertEquals("1", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(0))
+        val standalone = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(relation))
+        assertIs<SolveResult.Unknown>(BacktrackSolver(standalone.bake(providers)).solve())
+    }
+
+    @Test
+    fun `source polynomial work limits include actual encoder installation`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(ContinuousProduct(0, 0, 1)), numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        for (allowance in listOf(0L, 3L)) {
+            var installations = 0
+            var charged = 0L
+            val caller = object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (target != EncodingTarget.POLYNOMIAL) selected
+                else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    installations++
+                    selected.install(view, encoding)
+                }
+            })
+
+            val result = BacktrackSolver.source(source).withProjectionProviders(providers)
+                .solve(PolynomialTheoryParams(maximumWork = allowance, cancellation = caller))
+
+            assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+            assertEquals(if (allowance == 0L) 0 else 1, installations)
+            assertEquals(allowance, charged)
+        }
     }
 
     @Test

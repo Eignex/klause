@@ -12,8 +12,10 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.Cancellation
 
 /** Execution data selected from a source, before any mutable search state is allocated. */
@@ -301,9 +303,7 @@ internal fun Problem.prepareExecutionPlan(
 ): PreparedSourcePlan {
     projections.requireSource(this)
     val continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true
-    if (factors.any { it is ContinuousProduct } ||
-        (!preferFinite && !continuousObjective && factors.any { it is RealProduct })
-    ) {
+    if (requiresPolynomialCompletion(projections, preferFinite, continuousObjective)) {
         return preparePolynomialExecutionPlan(original = original, objective = objective, maximize = maximize,
             providers = providers, projections = projections, cancellation = cancellation)
     }
@@ -318,6 +318,19 @@ internal fun Problem.prepareExecutionPlan(
         PreparedPlanDecline.RESOURCE, factorProjections = projections)
     return preparedWithComponents(ownership, original, objective, maximize)
 }
+
+internal fun Problem.requiresPolynomialCompletion(
+    projections: PreparedFactorProjections,
+    preferFinite: Boolean = false,
+    continuousObjective: Boolean = false,
+): Boolean = factors.any { it is ContinuousProduct } || (!preferFinite && !continuousObjective &&
+    factors.indices.any { index ->
+        factors[index] is RealProduct ||
+            (!projections.encoder(index, EncodingTarget.LINEAR).enforcesSource &&
+                projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
+                (factors[index].variables.reals.isNotEmpty() ||
+                    projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED))
+    })
 
 internal fun Problem.preparedWithComponents(
     ownership: ComponentPlan,
@@ -391,7 +404,8 @@ internal fun Problem.preparePolynomialExecutionPlan(
         ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteFactors,
             boundedIntegers, emptyList(), (0 until numBoolVars).toList(),
             finiteComponentContract(finiteFactors, boundedIntegers, null, polynomial != null,
-                exactNeighborhood = false, projections = projections)),
+                exactNeighborhood = false, projections = projections,
+                enforcingFactors = polynomial?.encodingAttributions?.map { it.sourceFactorIndex }?.toSet().orEmpty())),
         ExecutionComponentDescriptor("polynomial-real", ComponentResponsibility.COMPLETION,
             factors.indices.filter { it !in finiteFactors }, emptyList(), (0 until numRealVars).toList(),
             execution = if (polynomial != null) checkedCompletionContract(ProcedureCompleteness.DECISION)

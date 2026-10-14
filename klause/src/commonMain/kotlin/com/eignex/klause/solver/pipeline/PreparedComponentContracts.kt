@@ -71,6 +71,7 @@ internal fun Problem.finiteComponentContract(
     sourceCompletion: Boolean,
     exactNeighborhood: Boolean,
     projections: PreparedFactorProjections? = null,
+    enforcingFactors: Set<Int> = emptySet(),
 ): ComponentExecutionContract {
     projections?.requireSource(this)
     fun capabilities(index: Int) = projections?.capabilities(index) ?: this.factors[index].executionCapabilities()
@@ -78,7 +79,7 @@ internal fun Problem.finiteComponentContract(
         val factor = this.factors[index]
         val selected = capabilities(index)
         if (selected.propagationCheck == AssignmentCheckCapability.EXACT) return true
-        if (sourceCompletion && ownership?.factorEncoded(index) == true) return true
+        if (sourceCompletion && (ownership?.factorEncoded(index) == true || index in enforcingFactors)) return true
         if (factor.variables.reals.isNotEmpty()) {
             return selected.propagationCheck == AssignmentCheckCapability.SOURCE_CERTIFICATION && sourceCompletion
         }

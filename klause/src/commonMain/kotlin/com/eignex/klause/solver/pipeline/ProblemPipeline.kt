@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.hasFiniteIntegerRanges
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -145,6 +146,13 @@ fun Problem.pipelineRoute(
 ): SourceProblemRoute = pipelineRouteObserved(objective, maximize, routePureRealToTheory,
     boundCancellation, onLpStats, routeLinearToTheory, providers)
 
+internal fun Problem.pipelineRoute(
+    projections: PreparedFactorProjections,
+    routePureRealToTheory: Boolean,
+    boundCancellation: Cancellation,
+): SourceProblemRoute = pipelineRouteObserved(null, false, routePureRealToTheory, boundCancellation, null, false,
+    projections.providers, projections)
+
 private fun Problem.pipelineRouteObserved(
     objective: LinearObjective?,
     maximize: Boolean,
@@ -153,8 +161,10 @@ private fun Problem.pipelineRouteObserved(
     onLpStats: ((LpStats) -> Unit)?,
     routeLinearToTheory: Boolean,
     providers: FactorProjectionProviders = FactorProjectionProviders.Default,
+    projectionCapture: PreparedFactorProjections? = null,
 ): SourceProblemRoute {
-    val source = prepareExecutionPlan(providers, cancellation = boundCancellation)
+    val selection = projectionCapture ?: providers.prepare(this)
+    val source = prepareExecutionPlan(this, null, false, false, providers, selection, boundCancellation)
     val initial = objective?.let { source.withObjective(it, maximize) } ?: source
     if (initial.kind == PreparedExecutionKind.POLYNOMIAL) {
         return SourceProblemRoute.PolynomialTheory(initial.polynomialRequest(), objective, maximize)

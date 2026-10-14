@@ -1,9 +1,11 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -19,11 +21,30 @@ internal class PolynomialSearchComponent(
     private val invocation: PolynomialTheoryInvocation,
     integerColumns: Map<Int, Int> = emptyMap(),
     private val capture: ((QfNraAssignment, SearchContext) -> Sample)? = null,
-) : TheoryComponent, PreparingSearchComponent {
+) : TheoryComponent, PreparingSearchComponent, FiniteFactorEnforcer {
     private val integerColumns = integerColumns.toMap()
     val witnessKey = SearchModelKey(QfNraAssignment::class)
     private var signature: PolynomialSignature? = null
     private var outcome: QfNraResult? = null
+
+    private var attached = false
+    private var finiteSource: Problem? = null
+    private var finiteFactors: Set<Int> = emptySet()
+
+    fun useFiniteEnforcement(source: Problem, factors: Set<Int>) {
+        check(!attached && finiteSource == null)
+        require(factors.all { it in source.factors.indices })
+        finiteSource = source
+        finiteFactors = factors.toSet()
+    }
+
+    override fun enforcingFiniteFactors(problem: Problem): Set<Int> {
+        val source = finiteSource ?: return emptySet()
+        return if (problem.numBoolVars == source.numBoolVars && problem.numIntVars == source.numIntVars &&
+            problem.numFactors >= source.numFactors &&
+            source.factors.indices.all { problem.factors[it] === source.factors[it] }
+        ) finiteFactors else emptySet()
+    }
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
         invalidate()
@@ -32,9 +53,13 @@ internal class PolynomialSearchComponent(
 
     override fun retract(decisionLevel: Int) = invalidate()
 
-    override fun initialize(context: SearchContext): ComponentResult = propagate(context)
+    override fun initialize(context: SearchContext): ComponentResult {
+        attached = true
+        return propagate(context)
+    }
 
     override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+        attached = true
         if (context.cancelled() || !context.consumeCheck()) {
             yield(ComponentResult.Indeterminate)
             return@sequence

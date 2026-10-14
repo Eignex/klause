@@ -665,6 +665,13 @@ come only from the declared coordinate owner. An isolated arithmetic service wit
 point outside a source value set withholds that witness instead of treating its bound
 hull as the source. Retraction invalidates both peers' scoped outcomes.
 
+A required polynomial peer identifies the finite factors it completely enforces
+against the actual retained factor identities. Backtracking and its optimization
+openings omit duplicate original checks only while that peer is installed. Polynomial
+neighborhoods and quadratic witness checks retain the same selected finite projections
+and check the combined formula before publication. Standalone finite projections
+retain their original source checks.
+
 A composed finite registration omits duplicate original point checks for factors
 whose mandatory arithmetic peer installs a complete enforcing encoding. The
 finite adapter still rejects interrupted fixpoints, and every arithmetic check

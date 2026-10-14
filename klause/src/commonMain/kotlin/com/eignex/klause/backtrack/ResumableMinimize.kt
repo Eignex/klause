@@ -49,6 +49,7 @@ import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
@@ -370,6 +371,8 @@ internal class ResumableMinimize(
                 add(cp)
                 addAll(params.componentFactory?.invoke().orEmpty().also { components ->
                     components.forEach(resources::ownComponent)
+                    cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
+                        .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
                 })
                 if (lpEngine.lpRelaxer != null) {
                     lpEngine.cpAdapter.attach(session, feasibility = false)

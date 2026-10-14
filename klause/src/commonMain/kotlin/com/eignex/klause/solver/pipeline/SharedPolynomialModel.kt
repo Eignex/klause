@@ -35,6 +35,10 @@ internal class SharedPolynomialModel private constructor(
     val finiteFactorIndices: List<Int>,
     val encodingAttributions: List<EncodingAttribution>,
 ) {
+    val finiteEnforcingFactors: Set<Int> = finiteFactorIndices.indices.filter { local ->
+        encodingAttributions.any { it.sourceFactorIndex == finiteFactorIndices[local] }
+    }.toSet()
+
     fun capture(assignment: QfNraAssignment, bools: BooleanArray, ints: LongArray): Sample {
         val reals = List(source.numRealVars) { assignment.realValue(it) }
         return Sample(
@@ -65,12 +69,12 @@ internal class SharedPolynomialModel private constructor(
             if ((0 until source.numIntVars).any { !source.intBounds.hasLower(it) || !source.intBounds.hasUpper(it) }) {
                 return null
             }
+            val lowering = PolynomialRealLowering(source.numRealVars)
             val integerIds = LinkedHashMap<Int, Int>()
             fun integer(id: Int): PolynomialExpression = PolynomialExpression.Variable(
-                SourceRealId(integerIds.getOrPut(id) { source.numRealVars + integerIds.size }),
+                SourceRealId(integerIds.getOrPut(id) { lowering.opaqueReal().id.index }),
             )
             fun real(id: Int): PolynomialExpression = PolynomialExpression.Variable(SourceRealId(id))
-            val lowering = PolynomialRealLowering(source.numRealVars + source.numIntVars)
             val formulas = ArrayList<PolynomialRealFormula>()
             sourceFormula?.let(formulas::add)
             val kept = ArrayList<Int>()

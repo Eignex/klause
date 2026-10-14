@@ -206,7 +206,10 @@ conversion and retained finite neighborhood installation use the current opening
 token. A numerical point requiring private real coordinates receives an exact pinned
 completion under the same token; rejection or interruption withholds that point and
 never refutes its parent source. Immutable provider selections cache no installation outcome or
-control owner. Successfully installed relations can be reused without retaining the
+control owner. Source strategies charge polynomial installation against their native
+`maximumWork` and pass only the remaining allowance into execution. Zero prevents
+installer entry. Caller meters receive construction and execution charges once;
+runtime polynomial counters remain distinct from source construction work. Successfully installed relations can be reused without retaining the
 construction token; rewritten or conditioned relations receive their current controls.
 
 The exact-linear source factory charges factor, row and coefficient visits to its

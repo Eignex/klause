@@ -36,10 +36,12 @@ import com.eignex.klause.solver.pipeline.optimize
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.polynomialRequest
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
+import com.eignex.klause.solver.pipeline.requiresPolynomialCompletion
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 
 /**
  * Source-aware strategy selected by [BacktrackSolver.source] or [LocalSearchSolver.source].
@@ -81,9 +83,12 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()
         if (!scope.supportsSource()) return scope.unsupported()
+        val projections = projectionProviders.prepare(source)
+        val preparation = if (source.requiresPolynomialCompletion(projections)) scope.polynomialPreparation()
+            else scope.stop
         val route = source.pipelineRoute(
-            projectionProviders, routePureRealToTheory = true,
-            boundCancellation = scope.stop,
+            projections, routePureRealToTheory = true,
+            boundCancellation = preparation,
         )
         if (scope.stop()) return scope.unknown()
         val result = when (route) {
@@ -147,11 +152,14 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders, cancellation = scope.stop)
+        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders,
+            cancellation = scope.polynomialPreparation())
             .withObjective(objective, maximize = sense == ObjectiveSense.MAXIMIZE)
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
-        ) return unsupportedQuadratic(sense)
+        ) return unsupportedQuadratic(sense, if (plan.decline == PreparedPlanDecline.RESOURCE) {
+            if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted
+        } else TerminationReason.Unsupported)
         return OpenTheoryPipeline.optimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
     }
 
@@ -186,11 +194,14 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders, cancellation = scope.stop)
+        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders,
+            cancellation = scope.polynomialPreparation())
             .withObjective(objective, sense)
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
-        ) return unsupportedQuadratic(sense)
+        ) return unsupportedQuadratic(sense, if (plan.decline == PreparedPlanDecline.RESOURCE) {
+            if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted
+        } else TerminationReason.Unsupported)
         return OpenTheoryPipeline.minimize(plan.polynomialRequest(), objective, scope.polynomial, engine, sense)
     }
 
@@ -311,8 +322,23 @@ class SourceStrategy internal constructor(
         val backtrack: BacktrackParams,
         val localSearch: LocalSearchParams,
         val theory: TheoryParams,
-        val polynomial: PolynomialTheoryParams,
+        private val originalPolynomial: PolynomialTheoryParams,
     ) {
+        private var preparationWork = 0L
+        val polynomial: PolynomialTheoryParams get() = originalPolynomial.copy(
+            maximumWork = originalPolynomial.maximumWork?.let { (it - preparationWork).coerceAtLeast(0) },
+        )
+        fun polynomialPreparation(): Cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = stop() ||
+                originalPolynomial.maximumWork?.let { preparationWork >= it } == true
+            override fun deadline() = stop.deadline()
+            override fun workMeter(): WorkMeter = WorkMeter { units ->
+                require(units >= 0)
+                preparationWork = if (units > Long.MAX_VALUE - preparationWork) Long.MAX_VALUE
+                else preparationWork + units
+                stop.charge(units)
+            }
+        }
         fun unknown(stats: SolveStats = SolveStats.EMPTY): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(
             if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
             else TerminationReason.Cancelled,
