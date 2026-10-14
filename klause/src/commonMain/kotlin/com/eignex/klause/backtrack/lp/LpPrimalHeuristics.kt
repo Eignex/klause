@@ -117,28 +117,33 @@ private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo:
  * (cycle) triggers a Fischetti–Glover–Lodi perturbation ([perturbRounding]) — flip the most-fractional
  * coordinates and keep pumping — up to [PUMP_MAX_RESTARTS] times before giving up. Re-solves prefer the
  * primal pass ([LpSolver.solvePrimal], phase-1 included) and fall back to the dual
- * [LpSolver.solve].
+ * [LpSolver.solve]. [initial] supplies only the first discrete target; its real coordinates and
+ * claimed objective supply no admission authority.
  */
 internal fun LpEngine.lpFeasibilityPump(
     objective: LinearObjective,
     cancellation: Cancellation,
+    initial: Sample? = null,
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
+    val seed = initial?.takeIf { it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars }
     var solved = solveRelaxation(objective, cancellation) ?: return null
     val seen = HashSet<String>()
     val rng = Random(params.randomSeed ?: 0L)
     var restarts = 0
-    repeat(PUMP_ROUNDS) {
+    repeat(PUMP_ROUNDS) { step ->
         if (cancellation()) return null
         val (relaxation, primal) = solved
         val intTarget = LongArray(problem.numIntVars) { v ->
             val col = relaxation.intColOf[v]
             val d = problem.rootDomainOf(v)
-            if (col in 0 until primal.size) round(primal[col]).toLong().coerceIn(d.min, d.max) else d.min
+            if (step == 0 && seed != null) seed.intValue(v).coerceIn(d.min, d.max) else {
+                if (col in 0 until primal.size) round(primal[col]).toLong().coerceIn(d.min, d.max) else d.min
+            }
         }
         val boolTarget = BooleanArray(problem.numBoolVars) { b ->
             val col = relaxation.boolColOf[b]
-            col in 0 until primal.size && primal[col] >= 0.5
+            if (step == 0 && seed != null) seed.boolValue(b) else col in 0 until primal.size && primal[col] >= 0.5
         }
         if (!seen.add(pumpKey(intTarget, boolTarget))) {
             // Cycle: perturb the rounding (flip the most-fractional coordinates) and keep pumping, rather

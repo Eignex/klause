@@ -440,7 +440,10 @@ or external incumbent cutoff before admission; a completed candidate that misses
 that cutoff permits further pumping without renewing its budget. An integral distance
 optimum with no fractional support uses seeded perturbations of live discrete
 coordinates to escape a declined rounding. Fixed coordinates remain fixed, and
-source completion and admission check every proposed assignment.
+source completion and admission check every proposed assignment. Mixed root pumping
+can use the current peer's discrete assignment as its first target. Continuous
+coordinates are completed independently; the peer target remains a proposal and
+must improve the available cutoff before publication.
 
 [Theory contracts](../theories.md) define the fragment-specific checks and evidence.
 Difference graphs, exact linear systems and polynomial completion keep their own

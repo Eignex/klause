@@ -966,7 +966,9 @@ internal class ResumableMinimize(
                 return accepted.assignment.takeIf { improving && !rootToken() }
             }
             val seed = lpEngine.lpRoundingProbe(objective, rootToken)?.let(::accept)
-                ?: lpEngine.lpFeasibilityPump(objective, rootToken, ::accept)
+                ?: lpEngine.lpFeasibilityPump(objective, rootToken,
+                    initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
+                    accept = ::accept)
             if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
         }
         if (problem.numRealVars == 0) {
