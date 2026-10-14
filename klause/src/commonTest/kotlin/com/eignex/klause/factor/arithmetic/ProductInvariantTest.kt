@@ -4,6 +4,12 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.localsearch.BuiltInScoringProjectionProvider
 import com.eignex.klause.localsearch.LocalSearchProblem
@@ -183,6 +189,29 @@ class ProductInvariantTest {
             assertEquals(2, original.a)
             assertEquals(3, original.b)
             assertEquals(4, original.result)
+        }
+    }
+
+    @Test
+    fun `overflowed products cannot satisfy a saturated result endpoint`() {
+        for ((product, values) in listOf(
+            Product(0, 1, 0) to longArrayOf(Long.MAX_VALUE, 2, 0),
+            Product(0, 1, 0) to longArrayOf(Long.MIN_VALUE, 2, 0),
+            Product(0, 0, 0) to longArrayOf(Long.MAX_VALUE, 0, 0),
+            Product(0, 0, 1) to longArrayOf(3037000500, Long.MAX_VALUE, 0),
+            Product(0, 1, 2) to longArrayOf(Long.MIN_VALUE, -1, Long.MAX_VALUE),
+        )) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(values[it], values[it]) }, arrayOf<Factor>(product))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
+            for (id in values.indices) state.assignment.setInt(id, values[id])
+            val raw = (bigIntOf(values[product.a]) * bigIntOf(values[product.b]) -
+                bigIntOf(values[product.result])).abs()
+            val capped = if (raw > bigIntOf(Long.MAX_VALUE)) Long.MAX_VALUE else raw.toLongExact()
+
+            state.recompute()
+
+            assertTrue(state.factors[0].isViolated(state, 0))
+            assertEquals(compressViolation(capped, state.violationSoftCap).toLong(), state.cost)
         }
     }
 

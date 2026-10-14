@@ -6,6 +6,8 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import com.eignex.klause.propagation.Assumptions
 
 class FlatZincIntConstraintsTest {
 
@@ -169,4 +171,16 @@ class FlatZincIntConstraintsTest {
 
         assertEquals(setOf(listOf(false, false), listOf(false, true)), assignments)
     }
+    @Test
+    fun `square propagation retains source witnesses when corner products overflow`() {
+        val parsed = parseFlatZinc("var 2900000000..4000000000: x; " +
+            "constraint int_times(x, x, 9000000000000000000); solve satisfy;")
+        val baked = parsed.problem.bake()
+        val variable = parsed.intVarsByName.getValue("x")
+
+        val pins = baked.rootPins(Assumptions.None.withInt(variable, 3000000000))
+
+        assertNotNull(pins)
+    }
+
 }
