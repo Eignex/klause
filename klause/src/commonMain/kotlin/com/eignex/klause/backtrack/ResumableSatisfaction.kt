@@ -19,7 +19,11 @@ import com.eignex.klause.util.cancelledWhen
  * boundary is polled at decisions alone.
  */
 @Suppress("TooGenericExceptionCaught") // ownership boundaries preserve arbitrary primary and cleanup failures
-internal class ResumableSatisfaction(private val solver: BacktrackSolver, params0: BacktrackParams) : ResumableSolve {
+internal class ResumableSatisfaction(
+    private val solver: BacktrackSolver,
+    params0: BacktrackParams,
+    ownsWorkDebt: Boolean = true,
+) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: Cancellation = params0.cancellation
     private val sink = SolveStatsSink(backend = "backtrack").also { it.start() }
@@ -29,6 +33,7 @@ internal class ResumableSatisfaction(private val solver: BacktrackSolver, params
         { sink.search.searchWork },
         { traversal.lpWork() },
         { traversal.propagationWork() },
+        ownsWorkDebt = ownsWorkDebt,
     )
     private val params = params0.copy(cancellation = cancelledWhen({
         listOfNotNull(globalToken.deadline(), slice.deadline).minOrNull()

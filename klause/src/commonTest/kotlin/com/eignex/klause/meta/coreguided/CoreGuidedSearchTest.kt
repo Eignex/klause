@@ -38,6 +38,29 @@ import kotlin.test.assertTrue
 
 class CoreGuidedSearchTest {
     @Test
+    fun `exhausted preparation slice pauses before decisions and resumes the same objective`() {
+        val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(LongArray(1024) { 1L })
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams())
+
+        val paused = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { error("unfinished preparation") }
+        val charged = search.work
+        val exhausted = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 0) { error("exhausted slice") }
+
+        assertNull(paused)
+        assertNull(exhausted)
+        assertTrue(search.preparationPending)
+        assertTrue(charged > 0L)
+        assertEquals(charged, search.work)
+        assertEquals(0.0, search.stats.search.nodes.sum)
+        val optimal = assertIs<MinimizeResult.Optimal>(
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {},
+        )
+        assertEquals(0L, objective.evaluateLong(optimal.sample))
+        search.close()
+    }
+
+    @Test
     fun `rebuilt core queries retain captured propagation in engine views`() {
         val hard = Clause(intArrayOf(Lit.make(3, false), Lit.make(5, false)))
         val source = Problem(6, 0, emptyArray(), arrayOf(hard))

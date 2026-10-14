@@ -282,7 +282,10 @@ Other pooled solution phasing retains its restart-boundary import policy.
 
 Curated mixed finite optimization pools append a retained core-guided complete worker
 when every objective term is Boolean and the model has no continuous columns.
-Explicit backtrack pools keep their requested recipes; `core-guided` selects
+On one lane the automatically appended core worker joins after the first checked
+incumbent, or after the original initial pool retires. Sibling complete and heuristic
+workers retain their initial coverage, seed positions and family policy. Parallel
+pools admit the core worker immediately. Explicit backtrack pools keep their requested recipes; `core-guided` selects
 this objective-only mechanism directly. The worker retains the active
 assumption traversal across slices, closes it before changing the encoding, and keeps
 all source constraints and caller assumptions in every round. Rebuilt private models
@@ -322,7 +325,13 @@ proof certificates while retaining checked points and downward-rounded shared
 floors. Their direct retained handle still compares its exact objective and bound.
 Cancellation publishes neither a partial encoding
 nor an unfinished refutation. Core encoding checkpoints retain their cursor, and
-query propagation fractions and slice overspend carry across rounds. Containing
+objective and core encoding visits, augmented-root construction and propagation
+charge the core arm at the propagation work rate. Query construction receives the
+current segment deadline and remaining work allowance. Its immutable baked snapshot
+survives interrupted traversal construction; the next segment opens a fresh traversal
+over that snapshot without repeating the bake. Atomic allocations and factor calls
+can overrun cooperative boundaries. Query propagation fractions and slice overspend
+carry across rounds, with debt owned once by the containing core handle. Containing
 decision quotas survive every query rebuild. These engine completions retain the
 ordinary in-memory proof authority; independent serialized derivations are unavailable.
 Core telemetry records completed core counts, the largest core and the exact accumulated

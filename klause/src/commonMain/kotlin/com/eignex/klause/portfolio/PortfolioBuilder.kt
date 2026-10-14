@@ -91,7 +91,9 @@ object PortfolioBuilder {
                     problem, index, armId, seed, scenario.lsLambda, objective, lsObjective,
                     definitionalSweep, onEvent, pools,
                 ).bindEvidence(ModelIdentity.of(problem, objective)).also {
-                    it.improvementOnly = armId >= plan.firstSolutionCount
+                    it.improvementOnly = armId >= plan.firstSolutionCount ||
+                        (config is CoreGuidedWorkerConfig && scenario.cores == 1 &&
+                            scenario.engine == EngineMix.MIXED && scenario.btPool == null)
                 }
             }
         }

@@ -1,8 +1,9 @@
 package com.eignex.klause.meta.coreguided
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
+import com.eignex.klause.backtrack.ResumableSatisfaction
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.bool.Clause
@@ -12,6 +13,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -24,6 +26,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.lifetimeCancellation
+import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.CoreGuidedStats
 import com.eignex.klause.solver.result.MinimizeResult
@@ -41,6 +44,7 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.toDouble
 import kotlin.math.nextDown
+import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -67,6 +71,8 @@ internal class CoreGuidedSearch(
     }
     private var threshold: BigInt? = null
     private var query: ResumableSolve? = null
+    private var queryModel: BakedProblem? = null
+    private var preparationVisits = factors.size.toLong() + objective.boolWeightValues.size
     private var querySofts = IntArray(0)
     private var completedStats = SolveStats.EMPTY
     private var completedWork = 0L
@@ -97,12 +103,16 @@ internal class CoreGuidedSearch(
     )
     override val work: Long get() {
         val live = query?.stats?.search?.propagationWork?.sum?.toLong() ?: 0L
-        val carried = (completedPropagation % PROPAGATION_WORK_PER_NODE + live % PROPAGATION_WORK_PER_NODE) /
-            PROPAGATION_WORK_PER_NODE
-        return completedWork + (query?.work ?: 0L) + carried
+        val carried = (completedPropagation % PROPAGATION_WORK_PER_NODE + live % PROPAGATION_WORK_PER_NODE +
+            preparationVisits % PROPAGATION_WORK_PER_NODE) / PROPAGATION_WORK_PER_NODE
+        return addWork(addWork(completedWork, query?.work ?: 0L),
+            addWork(preparationVisits / PROPAGATION_WORK_PER_NODE, carried))
     }
+    override val initialWork: Long = work
     override val canReseed: Boolean get() = false
-    override val preparationPending: Boolean get() = initialIndex < objective.boolWeightValues.size || core != null
+    override val preparationPending: Boolean
+        get() = initialIndex < objective.boolWeightValues.size || core != null ||
+            (queryModel != null && query == null)
 
     override fun runSlice(
         global: Cancellation,
@@ -123,10 +133,36 @@ internal class CoreGuidedSearch(
         workDebt -= repaid
         val allowance = if (sliceNodes < 0L) -1L else sliceNodes - repaid
         if (allowance == 0L) return null
-        while (!token() && !deadline.hasPassedNow()) {
+        val preparation = object : Cancellation {
+            private val meter = object : RootWorkMeter {
+                override fun construction(entries: Long) = charge(entries)
+                override fun propagation(units: Long) = charge(units)
+                override fun charge(units: Long) = recordPreparation(units)
+            }
+            override fun isCancelled(): Boolean = token() || deadline.hasPassedNow() ||
+                (allowance >= 0L && work - start >= allowance)
+            override fun deadline() = listOfNotNull(token.deadline(), deadline).minOrNull()
+            override fun workMeter(): RootWorkMeter = meter
+        }
+        try {
+            return advance(token, preparation, deadline, start, allowance, onIncumbent)
+        } finally {
+            if (allowance >= 0L) workDebt = addWork(workDebt, (work - start - allowance).coerceAtLeast(0L))
+        }
+    }
+
+    private fun advance(
+        token: Cancellation,
+        preparation: Cancellation,
+        deadline: ComparableTimeMark,
+        start: Long,
+        allowance: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult? {
+        while (!preparation()) {
             if (initialIndex < objective.boolWeightValues.size) {
                 prepareObjective()
-                if (preparationPending) continue
+                if (initialIndex < objective.boolWeightValues.size) continue
                 threshold = if (stratify) maximumWeight() else BIG_ONE
             }
             if (core != null) {
@@ -140,17 +176,15 @@ internal class CoreGuidedSearch(
                 return finish(MinimizeResult.Optimal(incumbent, requireNotNull(bestValue).toDouble(), stats))
             }
             if (allowance >= 0L && work - start >= allowance) return null
-            val beforeQuery = work
             val handle = query ?: try {
-                openQuery(token).also { query = it }
+                openQuery(preparation.withLifetime(lifetime)).also { query = it }
             } catch (_: SearchInitializationCancelled) {
                 return null
             }
-            val remaining = if (allowance < 0L) -1L else (allowance - (beforeQuery - start)).coerceAtLeast(0L)
+            val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
             val result = handle.runSlice(token, millis, remaining)
             if (result == null) return null
-            if (allowance >= 0L) workDebt = (work - start - allowance).coerceAtLeast(0L)
             finishQuery()
             when (result) {
                 is SolveResult.Unknown -> return finish(stopped(result.reason))
@@ -205,6 +239,7 @@ internal class CoreGuidedSearch(
         val end = minOf(objective.boolWeightValues.size, initialIndex + 256)
         while (initialIndex < end) {
             val id = initialIndex++
+            recordPreparation(1L)
             val weight = objective.boolWeightValues[id]
             if (weight == 0L) continue
             val exact = bigIntOf(weight)
@@ -213,6 +248,7 @@ internal class CoreGuidedSearch(
             factors.add(Oll.relaxerClause(preferred, selector))
             factors.add(Clause(intArrayOf(Lit.negate(preferred), Lit.make(selector, false))))
             weights[selector] = exact.abs()
+            recordPreparation(6L)
         }
     }
 
@@ -226,6 +262,7 @@ internal class CoreGuidedSearch(
         val end = minOf(selected.size, coreCursor + 256)
         while (coreCursor < end) {
             val id = selected[coreCursor++]
+            recordPreparation(1L)
             val residual = requireNotNull(weights[id]) - coreWeight
             if (residual == BIG_ZERO) {
                 weights.remove(id)
@@ -248,6 +285,7 @@ internal class CoreGuidedSearch(
         val aux = nextBool++
         factors.add(ReifiedCardinality(aux, literals, min = minimum, max = literals.size))
         weights[aux] = weight
+        recordPreparation(1L + literals.size)
         // Every latent higher threshold implies this frontier. It stays false in a completed
         // all-residual query; spending the frontier exposes its successor at the original weight.
         if (minimum < literals.size) tails[aux] = ThresholdTail(literals, minimum + 1, weight)
@@ -256,6 +294,7 @@ internal class CoreGuidedSearch(
     private fun maximumWeight(below: BigInt? = null): BigInt? {
         var maximum: BigInt? = null
         for (weight in weights.values) {
+            recordPreparation(1L)
             if (below != null && weight >= below) continue
             if (maximum == null || weight > maximum) maximum = weight
         }
@@ -263,8 +302,32 @@ internal class CoreGuidedSearch(
     }
 
     private fun openQuery(token: Cancellation): ResumableSolve {
+        recordPreparation(weights.size.toLong())
         querySofts = weights.filterValues { it >= (threshold ?: BIG_ZERO) }.keys.toIntArray()
+        recordPreparation(querySofts.size.toLong())
         val softPins = Assumptions(bools = querySofts.associateWith { false })
+        val baked = queryModel ?: bakeQuery(token).also { queryModel = it }
+        return try {
+            ResumableSatisfaction(BacktrackSolver(baked),
+                params.copy(
+                    assumptions = params.assumptions.mergedWith(softPins),
+                    cancellation = token,
+                    maxDecisions = (
+                        minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE) -
+                            completedStats.search.nodes.sum.toLong()
+                    ).coerceAtLeast(0L),
+                    clauseExchange = null,
+                    cutExchange = null,
+                ),
+                ownsWorkDebt = false,
+            )
+        } catch (failure: SearchInitializationCancelled) {
+            settleQuery(failure.stats, failure.work)
+            throw failure
+        }
+    }
+
+    private fun bakeQuery(token: Cancellation): BakedProblem {
         val problem = Problem(
             settings = base.settings,
             numBoolVars = nextBool,
@@ -274,29 +337,15 @@ internal class CoreGuidedSearch(
             modelBounds = base.intBounds,
         )
         val providers = base.projectionProviders
-        val baked = if (providers == null || providers == FactorProjectionProviders.Default) {
+        return if (providers == null || providers == FactorProjectionProviders.Default) {
             problem.bake(token)
         } else {
             problem.bake(requireNotNull(base.factorProjections).withAppendedFactors(problem), token)
         }
-        return try {
-            BacktrackSolver(baked).resumableSolve(
-                params.copy(
-                assumptions = params.assumptions.mergedWith(softPins),
-                cancellation = token,
-                maxDecisions = (
-                    minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE) -
-                    completedStats.search.nodes.sum.toLong()
-                ).coerceAtLeast(0L),
-                clauseExchange = null,
-                cutExchange = null,
-            )
-            )
-        } catch (failure: SearchInitializationCancelled) {
-            completedStats = completedStats.mergedWith(failure.stats)
-            completedWork += failure.work
-            throw failure
-        }
+    }
+
+    private fun recordPreparation(units: Long) {
+        preparationVisits = addWork(preparationVisits, units)
     }
 
     private fun publishLowerBound() {
@@ -309,13 +358,18 @@ internal class CoreGuidedSearch(
     private fun finishQuery() {
         val handle = query ?: return
         handle.close()
-        completedStats = completedStats.mergedWith(handle.stats)
-        val visits = handle.stats.search.propagationWork.sum.toLong()
+        settleQuery(handle.stats, handle.work)
+        query = null
+        queryModel = null
+    }
+
+    private fun settleQuery(queryStats: SolveStats, queryWork: Long) {
+        completedStats = completedStats.mergedWith(queryStats)
+        val visits = queryStats.search.propagationWork.sum.toLong()
         val carried = (completedPropagation % PROPAGATION_WORK_PER_NODE + visits % PROPAGATION_WORK_PER_NODE) /
             PROPAGATION_WORK_PER_NODE
-        completedPropagation += visits
-        completedWork += handle.work + carried
-        query = null
+        completedPropagation = addWork(completedPropagation, visits)
+        completedWork = addWork(completedWork, addWork(queryWork, carried))
     }
 
     private fun stopped(reason: TerminationReason): MinimizeResult = best?.let {
@@ -331,6 +385,7 @@ internal class CoreGuidedSearch(
     override fun close() {
         if (closed) return
         finishQuery()
+        queryModel = null
         closed = true
     }
 
@@ -348,3 +403,6 @@ internal class CoreGuidedSearch(
                 objective.realCoefficientValues.all { it == 0.0 }
     }
 }
+
+private fun addWork(left: Long, right: Long): Long =
+    if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right
