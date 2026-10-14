@@ -18,7 +18,9 @@ Internal [mixed deduction operations](certification.md#mixed-deduction-operation
 provide exact certificate and row-projection mechanisms with source endpoints,
 state identity and supported explanations. Their callers own activation, cutoff
 policy, applying domain changes and retraction; the numerical engine owns none of
-that search state. Node bounding selects the integer certificate entry point.
+that search state. Node bounding invokes mixed certification under its existing
+query allowance, retains the strongest checked objective bound, and applies only
+integral-coordinate consequences with complete CP explanations.
 
 ## Boundaries
 
