@@ -242,10 +242,30 @@ private fun objectiveExpressionCertificate(
         if (r == row) coefficient = meter.read(value)
     }
     if (coefficient.isZero) return null
+    val multiplier = meter.multiply(model.exactCost(objective), coefficient.reciprocal())
+    integralObjectiveExpressionCertificate(model, row, multiplier, meter)?.let { return it }
     meter.reserve(model.m * 8L)
     val y = MutableList(model.m) { BigFraction.ZERO }
-    y[row] = meter.multiply(model.exactCost(objective), coefficient.reciprocal())
+    y[row] = multiplier
     return mixedCertificate(model, state, y, meter)
+}
+
+private fun integralObjectiveExpressionCertificate(
+    model: LpModel,
+    row: Int,
+    multiplier: BigFraction,
+    meter: MixedCertificateMeter,
+): LpDeductionCertificate? {
+    if (ExactLpNumber.of(multiplier).exactLong() == null) return null
+    meter.reserve(128L)
+    val proposed = multiplier.toDouble()
+    if (!proposed.isFinite() || BigFraction.ofDouble(proposed) != multiplier) return null
+    meter.reserve(model.numVars.toLong() * 16L + model.m * 24L + 512L)
+    val duals = DoubleArray(model.m)
+    duals[row] = proposed
+    val certificate = integerCertifyUnchecked(model, duals, DEFAULT_SCALE_BITS, allowMixed = true, scan = meter::step)
+        ?: return null
+    return certificate.takeIf { meter.read(it.exactMultiplier(row)) == multiplier }
 }
 
 private fun objectiveEliminationCertificate(

@@ -186,6 +186,11 @@ When fixing is requested, one additional candidate uses only the verified
 objective-defining equality. Its integral affine costs can bound a coordinate
 whose reduced cost vanishes in the stronger LP certificate. A metered exact comparison selects the stronger bound for pruning; both complete
 certificates may supply local fixing. A selection decline preserves the primary bound.
+An exactly representable integral defining multiplier first admits checked Int128
+evaluation over integral-valued source data. The complete certificate and defining
+multiplier are checked; fractional data, inexact projection and overflow retain
+the rational evaluation under the remaining shared allowance. Scratch allocation
+and failed attempts are charged before fallback.
 The objective candidate can also supply a bound when the proposed LP duals
 decline on an absent endpoint. It shares the same work/allocation allowance and endpoint checks,
 and retains the defining row and its scoped premises. Candidate publication follows the
