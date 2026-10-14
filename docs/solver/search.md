@@ -394,10 +394,12 @@ unconditional restrictions. Larger unary relations and multi-column tables retai
 deferred preparation. Search-time filtering retains STR2 explanations.
 
 LP explanations cite selected source bound witnesses and recursively expanded row,
-fixing and cutoff premises. Root mixed-row feasibility certificates also provide
+fixing and cutoff premises. Mixed-row feasibility certificates also provide
 integer domain bounds without an incumbent. Their reasons exclude the target's own
 endpoint and retain all supporting row and bound premises. Unexpressible numerical
-scope withholds a root consequence. This bounded post-LP pass does not own incremental
+scope withholds a consequence. Search-time row selection follows narrowed finite
+endpoints and Boolean pins; the resulting domain bounds retract on the CP trail.
+This bounded post-LP pass does not own incremental
 theory state. There is no explanation weakening pass.
 See [LP consumer contracts](../lp/architecture.md#consumers-explanations-and-cuts).
 

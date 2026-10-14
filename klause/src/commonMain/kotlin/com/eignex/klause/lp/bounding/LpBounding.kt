@@ -514,15 +514,17 @@ internal fun LpEngine.sparseSafePrune(
     hints?.record(relaxation, result.primal, result.duals)
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
     val optimalBasis = result.basis
-    val rootMeter = if (session.decisionLevel == 0 && problem.numRealVars > 0 &&
+    val rowMeter = if (problem.numRealVars > 0 &&
         (problem.numIntVars > 0 || problem.numBoolVars > 0)
     ) MixedCertificateMeter(cancellation) else null
-    if (rootMeter != null) {
+    if (rowMeter != null) {
+        val affectedColumns = if (session.decisionLevel == 0) null
+            else narrowedRowColumns(relaxation, session, cancellation)
         val projected = solveContext.certificationPolicy.acceptNullable(
             LpCertifier.INTEGER,
-            mixedRowBounds(model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), rootMeter),
+            mixedRowBounds(model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), rowMeter, affectedColumns),
         ).orEmpty()
-        noteNodeOverhead(rootMeter.work)
+        noteNodeOverhead(rowMeter.work)
         if (observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
             applyRowBounds(relaxation, projected, session, sink, learn, cancellation)
         }) return LpNodeOutcome(true, null)
@@ -606,7 +608,7 @@ internal fun LpEngine.sparseSafePrune(
                 boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
                 eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
                 onAdditionalCertificate = if (canFix) { { additionalCertificates.add(it) } } else null,
-                sharedMeter = rootMeter,
+                sharedMeter = rowMeter,
             ),
         ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
@@ -724,6 +726,30 @@ internal fun LpEngine.sparseSafePrune(
     return LpNodeOutcome(false, optimalBasis)
 }
 
+private fun LpEngine.narrowedRowColumns(
+    relaxation: LpRelaxation,
+    session: PropagationSession,
+    cancellation: Cancellation,
+): IntArray {
+    val columns = IntArrayList()
+    noteNodeOverhead(relaxation.colVarId.size.toLong())
+    for (column in relaxation.colVarId.indices) {
+        if (cancellation()) return intArrayOf()
+        val variable = relaxation.colVarId[column]
+        if (variable < 0 || relaxation.model.colContinuous[column]) continue
+        val narrowed = if (relaxation.colIsBool[column]) {
+            session.boolValue(variable) != null
+        } else {
+            val domain = session.intDomain(variable)
+            val declared = problem.intBounds
+            !declared.hasLower(variable) || !declared.hasUpper(variable) ||
+                domain.min != declared.lower(variable) || domain.max != declared.upper(variable)
+        }
+        if (narrowed) columns.add(column)
+    }
+    return columns.toIntArray()
+}
+
 @Suppress("CyclomaticComplexMethod")
 internal fun LpEngine.applyRowBounds(
     relaxation: LpRelaxation,
@@ -733,7 +759,6 @@ internal fun LpEngine.applyRowBounds(
     learn: Boolean,
     cancellation: Cancellation,
 ): Boolean {
-    if (session.decisionLevel != 0) return false
     for (certificate in bounds) {
         if (cancellation()) return false
         if (!certificate.belongsTo(relaxation.model)) continue

@@ -38,20 +38,23 @@ internal fun mixedRowBounds(
     cancellation: Cancellation = Cancellation.Never,
     observer: LpCertificationObserver? = null,
     meter: MixedCertificateMeter = MixedCertificateMeter(cancellation),
+    affectedColumns: IntArray? = null,
 ): List<LpRowBound> {
     val initialWork = meter.work
     val completed = ArrayList<LpRowBound>()
     try {
         meter.attempt(observer, "ROW_BOUNDS") {
             val state = model.exactState ?: return@attempt null
+            if (affectedColumns?.isEmpty() == true) return@attempt completed
             meter.reserve(model.m.toLong() * 64L + 128L)
             val rows = Array(model.m) { ArrayList<LpRowBoundTerm>() }
             val mixed = BooleanArray(model.m)
+            val selected = affectedColumns?.let { affectedRowMask(state, it, meter) }
             for (column in 0 until model.n) {
                 meter.step()
                 for (entry in state.model.columnEntries(column)) {
                     meter.step()
-                    if (entry.number.value.isZero) continue
+                    if (entry.number.value.isZero || selected?.get(entry.row) == false) continue
                     meter.reserve(32L)
                     rows[entry.row].add(LpRowBoundTerm(column, meter.read(entry.number.value)))
                     if (!state.model.column(column).integral) mixed[entry.row] = true
@@ -78,6 +81,20 @@ internal fun mixedRowBounds(
     }
     observer?.observe(LpCertifier.INTEGER, completed.isNotEmpty(), LpCertifierCost.Metered(meter.work - initialWork))
     return if (cancellation()) emptyList() else completed
+}
+
+private fun affectedRowMask(state: LpExactState, columns: IntArray, meter: MixedCertificateMeter): BooleanArray {
+    meter.reserve(state.model.m.toLong() + 32L)
+    val selected = BooleanArray(state.model.m)
+    for (column in columns) {
+        meter.step()
+        if (column !in 0 until state.model.n) continue
+        for (entry in state.model.columnEntries(column)) {
+            meter.step()
+            if (!entry.number.value.isZero) selected[entry.row] = true
+        }
+    }
+    return selected
 }
 
 private data class RowEndpointSum(val value: BigFraction, val missing: Int, val strict: Int)
