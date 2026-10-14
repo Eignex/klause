@@ -469,6 +469,41 @@ class Xcsp3SourceCheckerTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = [
+        "<list>a b</list><index>i</index><value>v</value>|0 7|valid",
+        "<list>a b</list><index>i</index><value>v</value>|1 9|valid",
+        "<list>a b</list><index>i</index><value>v</value>|1 7|invalid",
+        "<list>7 9</list><index>i</index><value>v</value>|1 9|valid",
+        "<list startIndex=\"1\">a b</list><index>i</index><value>v</value>|1 7|valid",
+        "<list>a b</list><index rank=\"first\">i</index><value>v</value>|0 7|unknown",
+        "<list>a b</list><index rank=\"last\">i</index><value>v</value>|1 9|unknown",
+        "<list>a b</list><index>i</index><value>v</value>|2 9|unknown",
+        "<list startIndex=\"-2000000000\">a b</list><index>i</index><value>v</value>|2000000000 9|unknown",
+    ])
+    fun `vector elements admit only bounded unranked indexing`(children: String, values: String, status: String) {
+        val model = File.createTempFile("xcsp-vector-element-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables><var id="a">7</var><var id="b">9</var>
+                    <var id="i">-2000000000..2000000000</var><var id="v">7..9</var></variables>
+                  <constraints><element>$children</element></constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>a b i v</list><values>7 9 $values</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals(status, checked.status, checked.reason)
+            if (status == "valid") assertNotNull(checked.checkedWitness) else assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
         "<cumulative><origins>x y</origins><lengths>1 1</lengths><heights>1500000000 1500000000</heights>" +
             "<condition>(le,1)</condition></cumulative>|0 0|cumulative load",
         "<cumulative><origins>x y</origins><lengths>1500000000 1500000000</lengths><heights>2 2</heights>" +

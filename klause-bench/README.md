@@ -811,14 +811,16 @@ unweighted terms and constant or variable coefficients. Every expression node,
 intermediate addition/product and weighted term must fit a signed long and agree
 with the pinned evaluator; the exact sum must fit a signed integer. This guards
 the checker's long multiplication before its exact accumulation, including
-cancellation between large terms.
+cancellation between large terms. Indexed vector elements admit only `rank="any"`,
+constant or variable entries, and an in-range index whose exact offset fits a signed
+integer. Ranked, matrix and unindexed elements remain unchecked.
 
 Supported expression trees are evaluated with `BigInteger` and compared with the
 pinned evaluator, including its normalized intension tree. Matching cancellation
 results remain checkable; any disagreement or unsupported operation leaves checking
 `unknown`. Supported expressions include integer arithmetic (except powers),
 comparisons and Boolean operators. Hybrid extension tuples, set expressions, powers,
-logical meta-constraints, flow, channel, element, circuit and indexed extrema
+logical meta-constraints, flow, channel, circuit and indexed extrema
 remain outside the audited surface. Direct variable objectives retain the pinned
 checker's exact sum/product/minimum/maximum/distinct-value aggregates; expression
 objectives require the same exact arithmetic agreement. Nonconstant objective
