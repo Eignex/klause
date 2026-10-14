@@ -66,15 +66,19 @@ internal class NValueEliminationMoves(
             if (canComplete) {
                 val delta = state.netDelta(move)
                 if (delta >= 0L && (state.cost > 0L || delta > 0L)) {
-                    val candidate = if (state.invariants == null) move else {
-                        val clauses = coordinator ?: NValueClauseCompletion(state, sink, xs + intArrayOf(n))
+                    val candidate = if (state.invariants == null) {
+                        move
+                    } else {
+                        val clauses = coordinator ?: NValueClauseCompletion(state, sink, xs, n)
                             .also { created -> coordinator = created }
                         clauses.complete(move)
                     }
                     val candidateParts = if (candidate is Move.Compound) candidate.parts else listOf(candidate)
                     if (candidateParts.size > MAX_COMPLETED_PARTS ||
                         !preservesCount(state, candidateParts, distinct - 1)
-                    ) return@repeat
+                    ) {
+                        return@repeat
+                    }
                     val reconciled = state.netDelta(candidate)
                     if (reconciled < completionDelta) {
                         completion = candidate
@@ -164,9 +168,13 @@ internal class NValueEliminationMoves(
                 val element = state.problem.factors[fid] as? Element ?: continue
                 if (element.idx == variable && element.arrIsVars &&
                     state.invariants?.elementResultDefinition(element.result)?.factor === element
-                ) elements += element
+                ) {
+                    elements += element
+                }
             }
-            val candidates = if (representatives.size <= MAX_SPLIT_TARGETS) representatives else {
+            val candidates = if (representatives.size <= MAX_SPLIT_TARGETS) {
+                representatives
+            } else {
                 List(MAX_SPLIT_TARGETS) { representatives[state.rng.nextInt(representatives.size)] }
             }
             var target: Long? = null
@@ -175,7 +183,9 @@ internal class NValueEliminationMoves(
                 val value = state.assignment.intValue(representative)
                 if (value == old || value !in state.rootDomains[variable] ||
                     elements.any { !admitsSelectedValue(state, it, value, sink) }
-                ) continue
+                ) {
+                    continue
+                }
                 eligible++
                 if (state.rng.nextInt(eligible) == 0) target = value
             }
@@ -184,9 +194,7 @@ internal class NValueEliminationMoves(
         return parts.takeIf { it.isNotEmpty() }
     }
 
-    private fun admitsSelectedValue(
-        state: LocalSearchState, element: Element, index: Long, sink: MoveSink,
-    ): Boolean {
+    private fun admitsSelectedValue(state: LocalSearchState, element: Element, index: Long, sink: MoveSink): Boolean {
         val position = index - element.indexOffset
         if (position < 0 || position >= element.arr.size) return false
         val value = state.assignment.intValue(element.arr[position.toInt()].toInt())
