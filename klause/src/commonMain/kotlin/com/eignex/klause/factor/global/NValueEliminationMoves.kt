@@ -31,6 +31,8 @@ internal class NValueEliminationMoves(
         }
         val targetN = countTarget(state, distinct - 1, sink) ?: return
         if (targetN != state.assignment.intValue(n) && !sink.allowsInt(n)) return
+        val representatives = classRepresentatives(state)
+        if (representatives.size < 2) return
         var emitted = 0
         var completion: Move? = null
         var completionDelta = Long.MAX_VALUE
@@ -38,12 +40,10 @@ internal class NValueEliminationMoves(
         val attempted = HashSet<Pair<Long, Long>>()
         repeat(MAX_ATTEMPTS) {
             if (emitted >= MAX_MOVES) return@repeat
-            val from = state.rng.nextInt(xs.size)
-            val to = state.rng.nextInt(xs.size)
-            if (!present(state, from) || !present(state, to)) return@repeat
-            val old = state.assignment.intValue(xs[from])
-            val target = state.assignment.intValue(xs[to])
-            if (old == target || !attempted.add(old to target)) return@repeat
+            val from = representatives[state.rng.nextInt(representatives.size)]
+            val old = state.assignment.intValue(from)
+            val target = sampleTarget(state, from, representatives) ?: return@repeat
+            if (!attempted.add(old to target)) return@repeat
             val parts = classTargets(state, old, target, sink) ?: return@repeat
             if (parts.any { it.varId == n && it.newValue != targetN }) return@repeat
             if (parts.none { it.varId == n } && targetN != state.assignment.intValue(n)) {
@@ -60,6 +60,30 @@ internal class NValueEliminationMoves(
             }
         }
         completion?.let { completeMove(state, it, sink, distinct - 1) }
+    }
+
+    private fun classRepresentatives(state: LocalSearchState): List<Int> {
+        val values = LongHashSet()
+        val representatives = ArrayList<Int>()
+        for (i in xs.indices) {
+            if (present(state, i) && values.add(state.assignment.intValue(xs[i]))) representatives += xs[i]
+        }
+        return representatives
+    }
+
+    private fun sampleTarget(state: LocalSearchState, from: Int, representatives: List<Int>): Long? {
+        val old = state.assignment.intValue(from)
+        val domain = state.rootDomains[from]
+        var target: Long? = null
+        var seen = 0
+        for (variable in representatives) {
+            val value = state.assignment.intValue(variable)
+            if (value != old && value in domain) {
+                seen++
+                if (state.rng.nextInt(seen) == 0) target = value
+            }
+        }
+        return target
     }
 
     private fun countTarget(state: LocalSearchState, distinct: Int, sink: MoveSink): Long? {
