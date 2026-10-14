@@ -27,6 +27,10 @@ class FactorProjectionProviders(
     val encoder: EncoderProvider,
     encodingTargets: Set<EncodingTarget> = emptySet(),
 ) {
+    /** Construct the built-in provider selection. */
+    constructor() : this(BuiltInPropagationProjectionProvider, BuiltInScoringProjectionProvider,
+        BuiltInRelaxationProjectionProvider, BuiltInEncoderProvider)
+
     /** Preserve the original provider constructor and its built-in theory selection. */
     constructor(
         propagation: PropagationProjectionProvider = BuiltInPropagationProjectionProvider,

@@ -9274,6 +9274,7 @@ public final class com/eignex/klause/solver/AssignmentCheckCapability : java/lan
 
 public final class com/eignex/klause/solver/FactorProjectionProviders {
 	public static final field Companion Lcom/eignex/klause/solver/FactorProjectionProviders$Companion;
+	public fun <init> ()V
 	public fun <init> (Lcom/eignex/klause/propagation/PropagationProjectionProvider;Lcom/eignex/klause/localsearch/ScoringProjectionProvider;Lcom/eignex/klause/lp/RelaxationProjectionProvider;)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/PropagationProjectionProvider;Lcom/eignex/klause/localsearch/ScoringProjectionProvider;Lcom/eignex/klause/lp/RelaxationProjectionProvider;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/propagation/PropagationProjectionProvider;Lcom/eignex/klause/localsearch/ScoringProjectionProvider;Lcom/eignex/klause/lp/RelaxationProjectionProvider;Lcom/eignex/klause/theory/EncoderProvider;Ljava/util/Set;)V
