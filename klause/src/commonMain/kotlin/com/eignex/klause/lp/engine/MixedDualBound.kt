@@ -66,6 +66,7 @@ private fun integralObjectiveRows(model: LpModel, meter: MixedCertificateMeter):
         val lower = bounds.lower
         val upper = bounds.upper
         if (!coefficient.isZero && lower != null && upper != null && !lower.strict && !upper.strict &&
+            lower.premises == null && upper.premises == null &&
             lower.number.value == upper.number.value && slack < state.baseModel.numVars &&
             bounds == state.baseModel.column(slack).bounds
         ) {
