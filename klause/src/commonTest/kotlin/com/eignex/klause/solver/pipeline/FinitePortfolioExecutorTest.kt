@@ -25,9 +25,9 @@ class FinitePortfolioExecutorTest {
     fun `bounded Boolean proof service preserves one feasibility share for complete siblings`() {
         val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(1, 2))
-        for (cores in listOf(1, 2)) {
+        for ((cores, arms) in listOf(1 to PortfolioScenario.DEFAULT_ARMS, 1 to 12, 2 to PortfolioScenario.DEFAULT_ARMS)) {
             val workers = PortfolioBuilder.build(problem,
-                PortfolioScenario.sequential(Kind.COP).copy(cores = cores), objective)
+                PortfolioScenario.sequential(Kind.COP).copy(cores = cores, arms = arms), objective)
 
             try {
                 val shares = booleanIncumbentShares(workers)
@@ -37,9 +37,13 @@ class FinitePortfolioExecutorTest {
                     assertEquals(1.0 / families, shares.sum())
                     for ((index, worker) in workers.withIndex()) {
                         assertEquals(
-                            worker.family == ArmFamily.Backtrack && !worker.auxiliaryProof, shares[index] > 0.0,
+                            worker.family == ArmFamily.Backtrack && !worker.auxiliaryProof && !worker.improvementOnly,
+                            shares[index] > 0.0,
                         )
                     }
+                    if (arms == 12) assertTrue(workers.any {
+                        it.family == ArmFamily.Backtrack && !it.auxiliaryProof && it.improvementOnly
+                    })
                 } else assertTrue(shares.isEmpty())
             } finally {
                 workers.forEach { it.close() }

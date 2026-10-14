@@ -90,9 +90,13 @@ once and retains fractional charges across rounds; its nested traversal does not
 repay the same debt. An automatically deferred single-lane core worker has one base
 work slice per turn and two seconds of cumulative active time, independent of
 later scheduler growth. Work pauses retain completed fixpoints and traversal state;
-propagation interruptions discard the partial traversal. Idle waits spend no active
-time; construction and every
-retained slice do. Expiry keeps completed checked floors and returns a budget stop. Explicit core
+propagation interruptions discard the partial traversal. A private segment stop
+reported as native budget exhaustion pauses the core
+handle while its decision, node and lifetime quotas remain available. Source
+verification observes the same segment and cumulative active-time controls;
+interrupted checking withholds the candidate and stops further assignment pins.
+Idle waits spend no active time; construction and every retained slice do.
+Expiry keeps completed checked floors and returns a budget stop. Explicit core
 selection and parallel slots retain their ordinary allowances. See [core search](portfolio.md#boolean-objective-core-search).
 
 Slice pricing belongs to solver policy: LP work costs one node per 600 units,

@@ -18,6 +18,36 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `cancelled seeding leaves the remaining assumptions unapplied`() {
+        for (boolean in listOf(false, true)) {
+            val problem = if (boolean) {
+                Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))))
+            } else {
+                Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                    arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+            }
+            var polls = 0
+            val session = PropagationSession(problem, Cancellation { ++polls >= 3 }, propagationCancelFloor = 0)
+            val assumptions = if (boolean) {
+                Assumptions.None.withBool(0, true).withBool(1, true)
+            } else {
+                Assumptions.None.withInt(0, 1L).withInt(1, 1L)
+            }
+
+            assertIs<PropagationResult.Implied>(session.seed(assumptions))
+
+            assertTrue(session.fixpointCancelled)
+            if (boolean) {
+                assertEquals(true, session.boolValue(0))
+                assertNull(session.boolValue(1))
+            } else {
+                assertEquals(IntDomain(1, 1), session.intDomain(0))
+                assertEquals(IntDomain(0, 1), session.intDomain(1))
+            }
+        }
+    }
+
+    @Test
     fun `a late mixed clause implication survives an asserting backjump`() {
         val session = PropagationSession(
             Problem(

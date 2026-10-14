@@ -293,7 +293,7 @@ wait for a sibling the improving-phase policy may not select. Further incumbent
 improvements do not erase that credit. Private state and lifetime limits survive the pause. Unspent
 work offers and debt repayments do not establish that coverage. Sibling complete and heuristic
 workers retain their initial coverage, seed positions and family policy. Before the
-first witness, ordinary complete siblings reserve one family share of elapsed time,
+first witness, initially eligible ordinary complete siblings reserve one family share of elapsed time,
 split equally; that reservation ends at the first checked incumbent. Existing source
 reservations keep priority. The deferred
 core worker receives a base work allowance per turn and at most two seconds

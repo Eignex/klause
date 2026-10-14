@@ -39,6 +39,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
@@ -370,6 +371,26 @@ class PreparedFactorProjectionsTest {
             .map { it.intValue(0) }.toSet()
 
         assertEquals(setOf(0L, 1L), witnesses)
+    }
+
+    @Test
+    fun `cancelled original source checking stops before coordinate pins`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0, 2))))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The original source relation is checked at a complete point.") { NoPropagator }
+        })
+        val selection = providers.prepare(source)
+        val session = PropagationSession(PropagationProblem(source, selection))
+        session.pinBool(0, true)
+        session.pinBool(1, true)
+        val work = session.work
+        var polls = 0
+
+        val result = requireNotNull(selection.originalChecks).check(session, Cancellation { ++polls >= 2 })
+
+        assertEquals(ComponentCheck.Indeterminate, result)
+        assertEquals(work, session.work)
     }
 
     @Test
