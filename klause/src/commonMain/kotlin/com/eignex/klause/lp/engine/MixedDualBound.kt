@@ -86,12 +86,12 @@ internal fun nodeDualCertificate(
     }
     val alternative = if (fixingCertificate != null && fixingCertificate !== primary) {
         fixingCertificate
-    } else if (primary != null && objectiveCertificate != null) {
+    } else if (primary != null && onAdditionalCertificate != null) {
         try {
             meter.attempt(observer, "FINITE_ENDPOINT_CANCEL") {
                 finiteEndpointCancellation(model, primary, meter)
-            } ?: meter.attempt(observer, "BLENDED") {
-                blendedCertificate(model, primary, objectiveCertificate, meter)
+            } ?: objectiveCertificate?.let {
+                meter.attempt(observer, "BLENDED") { blendedCertificate(model, primary, it, meter) }
             }
         } catch (_: LpProjectionStop) {
             null
@@ -335,11 +335,23 @@ private fun finiteEndpointCancellation(
     meter: MixedCertificateMeter,
 ): LpDeductionCertificate? {
     val state = model.exactState ?: return null
+    var first = -1
+    for (column in 0 until model.n) {
+        meter.step()
+        if (state.model.column(column).integral) continue
+        val sign = certificate.reducedCostSign(column)
+        val bounds = model.exactBounds(column)
+        if ((sign > 0 && bounds.lower != null) || (sign < 0 && bounds.upper != null)) {
+            first = column
+            break
+        }
+    }
+    if (first < 0) return null
     meter.reserve(model.m * 8L + 128L)
     val y = MutableList(model.m) { meter.multiplier(certificate, it) }
     val counts = continuousRowCounts(model, state, meter)
     var attempts = 0
-    for (column in 0 until model.n) {
+    for (column in first until model.n) {
         meter.step()
         if (state.model.column(column).integral) continue
         var residual = meter.read(model.exactCost(column))
