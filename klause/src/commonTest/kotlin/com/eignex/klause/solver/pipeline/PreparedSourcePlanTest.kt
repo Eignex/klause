@@ -24,17 +24,105 @@ import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
+    @Test
+    fun `unchanged routing retains completed encoder work and source objective`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(
+            Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(), realVars = intArrayOf(0),
+                realCoeffs = doubleArrayOf(1.0), op = LinearOp.EQ, bound = 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        for ((objective, maximize) in listOf(
+            null to false,
+            LinearObjective(realCoefficients = doubleArrayOf(1.0), constant = 7) to false,
+            LinearObjective(realCoefficients = doubleArrayOf(1.0), constant = 7) to true,
+        )) {
+            var installations = 0
+            var charged = 0L
+            var completedWork = 0L
+            var completedInstallations = 0
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (target != EncodingTarget.LINEAR || !selected.enforcesSource) selected
+                else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    installations++
+                    encoding.cancellation.charge(1)
+                    selected.install(view, encoding)
+                }
+            })
+
+            val route = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute(
+                providers, objective, maximize, routePureRealToTheory = true, boundCancellation = stop,
+                onLpStats = {
+                    completedWork = charged
+                    completedInstallations = installations
+                },
+            ))
+
+            assertTrue(completedInstallations > 0)
+            assertTrue(completedWork > 0)
+            assertEquals(completedInstallations, installations)
+            assertEquals(completedWork, charged)
+            assertSame(source, route.preparedPlan.originalSource)
+            assertSame(source, route.preparedPlan.model)
+            assertSame(providers, assertNotNull(route.preparedPlan.factorProjections).providers)
+            assertSame(objective, route.preparedPlan.objective)
+            assertEquals(maximize, route.preparedPlan.maximize)
+            assertEquals(ProblemPipeline.EXACT_LRA, route.request.route)
+        }
+    }
+
+    @Test
+    fun `routing preserves maximization metadata without an objective`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(
+            Linear(intVars = intArrayOf(), intCoeffs = doubleArrayOf(), realVars = intArrayOf(0),
+                realCoeffs = doubleArrayOf(1.0), op = LinearOp.EQ, bound = 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+
+        val route = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute(
+            maximize = true, routePureRealToTheory = true,
+        ))
+
+        assertNull(route.preparedPlan.objective)
+        assertTrue(route.preparedPlan.maximize)
+        assertSame(source, route.preparedPlan.originalSource)
+        assertSame(source, route.preparedPlan.model)
+    }
+
+    @Test
+    fun `unchanged finite routing retains finite ownership selection`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
+
+        val route = assertIs<SourceProblemRoute.Finite>(source.pipelineRoute())
+
+        assertSame(source, route.problem)
+        assertEquals(ProblemPipeline.FINITE_CP, route.componentPlan.theoryPipeline)
+        assertEquals(IntVariableOwner.CP, route.componentPlan.intOwner(0))
+        assertEquals(FactorOwner.CP, route.componentPlan.factorOwner(0))
+    }
+
     @Test
     fun `open source preparation retains selected deduction on its compact finite view`() {
         val open = Bits(3).also { it.set(1) }

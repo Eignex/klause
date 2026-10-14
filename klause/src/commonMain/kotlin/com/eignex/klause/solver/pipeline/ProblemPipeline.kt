@@ -181,8 +181,12 @@ private fun Problem.pipelineRouteObserved(
     }
     val finiteIntegerRanges = routed.hasFiniteIntegerRanges()
     val projections = requireNotNull(source.factorProjections).forEngineView(routed)
-    val arithmetic = routed.prepareExecutionPlan(this, objective, maximize,
-        preferFinite = false, providers, projections, boundCancellation)
+    val reuseInitial = routed === this && initial.factorProjections === projections &&
+        initial.objective === objective && initial.maximize == maximize
+    val stopped = reuseInitial && boundCancellation()
+    val preparationStop = if (stopped) Cancellation { true } or boundCancellation else boundCancellation
+    val arithmetic = if (reuseInitial && !stopped) initial else routed.prepareExecutionPlan(
+        this, objective, maximize, preferFinite = false, providers, projections, preparationStop)
     if (arithmetic.kind == PreparedExecutionKind.DECLINED) {
         return SourceProblemRoute.UnsupportedOpen(null, routed, arithmetic)
     }
