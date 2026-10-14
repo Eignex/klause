@@ -23,11 +23,13 @@ internal class SearchComponentOpening(
     val smtStats: SmtStatsSink?,
     val theorySolveStop: Cancellation?,
     private val resources: SearchInvocationResources,
+    val openHintFlips: Long? = null,
 ) {
     private var primitiveHints: Pair<IntArray, SearchCandidateHints>? = null
     private var releaseHints: (() -> Unit)? = null
     private var pointAvailable: (() -> Boolean)? = null
     private var knownBool: (Int) -> Boolean? = { null }
+    private var primitiveHintFlips: Long? = null
 
     fun registerCandidateHints(
         variables: IntArray,
@@ -35,12 +37,14 @@ internal class SearchComponentOpening(
         release: () -> Unit,
         available: (() -> Boolean)? = null,
         knownBool: (Int) -> Boolean? = { null },
+        openHintFlips: Long? = null,
     ) {
         check(primitiveHints == null) { "candidate hints already have an owner" }
         primitiveHints = variables to hints
         releaseHints = release
         pointAvailable = available
         this.knownBool = knownBool
+        primitiveHintFlips = openHintFlips
         own(AutoCloseable { release() })
     }
 
@@ -77,7 +81,10 @@ internal class SearchComponentOpening(
             accounted = true
             val compiled = SourceConjunctionHints.create(clauses, source.numBoolVars, variables, hints, cancellation,
                 usage = smtStats?.hintUsage, available = pointAvailable, knownBool = knownBool)
-            if (compiled != null) return own(compiled)
+            if (compiled != null) {
+                own(compiled)
+                return if (primitiveHintFlips == 0L) SearchCandidateHints.None else compiled
+            }
             releaseHints?.invoke()
             return SearchCandidateHints.None
         } finally {
@@ -130,9 +137,10 @@ internal class PreparedSearchRegistrations(
         learnedDb: SearchLearnedDbParams,
         smtStats: SmtStatsSink?,
         theorySolveStop: Cancellation?,
+        openHintFlips: Long? = null,
     ): PlannedSearch {
         val resources = SearchInvocationResources()
-        val opening = SearchComponentOpening(cancellation, smtStats, theorySolveStop, resources)
+        val opening = SearchComponentOpening(cancellation, smtStats, theorySolveStop, resources, openHintFlips)
         try {
             val groups = registrations.map { it.open(opening) }
             val components = groups.flatten()

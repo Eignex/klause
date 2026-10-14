@@ -27,6 +27,32 @@ those assertions through their decision scope, checks the residual system and
 contributes exact source coordinates at a complete check. Disequalities require
 an applicable direction and remain part of the source check.
 
+For a source containing real coordinates, the linear component can reuse the exact
+source-coordinate prefix of an existing
+completed LP witness, or the point from its existing feasible difference check,
+to prefer primitive comparison polarities while Booleans remain open. Positive
+source comparisons retain strictness, equality, disequality and signed Boolean
+coefficients. Every member sharing an activator must be evaluable and agree;
+missing Boolean terms, unsupported private members or conflicting preferences
+decline that activator. A shared
+source-clause adapter can extend preferences through complete signed conjunction
+definitions, including an earlier source gate. While the point remains live, the
+adapter can compare the selected Boolean's two values against semantic clauses
+using current search pins and primitive comparisons. A non-null live primitive
+comparison keeps its forward preference; semantic scoring applies to the remaining
+declared Boolean or compound choices. Unknown partners remain
+unknown; complete definition clauses supply structure and remain fully enforced.
+Construction observations distinguish known lowered source dimensions from completed
+raw incidence progress and private ledger debit. Unobserved fields remain absent.
+An interrupted prefix supplies no semantic preference and is not a full literal count.
+These guesses only order exhaustive Boolean splits; they supply no values, facts,
+conflicts or source verdict.
+Built-in guidance is opt-in through the existing `openHintFlips` allowance. Null
+skips point-row registration, capture enablement and source indexing. Explicit zero
+retains bounded construction observations without component steering; positive
+values permit the reviewed preferences. Arithmetic and index work keep their
+existing cumulative owners and limits, independently of the Boolean draw's flip ceiling.
+
 Linear completion also serves finite mixed models and local-search candidates.
 Boolean pins and source rows stay intact through completion. The shared search
 session owns traversal; [LP architecture](../lp/architecture.md) owns numerical
@@ -60,6 +86,32 @@ own rows. Scoped assertions, graph potentials, LP bases and witness candidates
 remain invocation-owned. Retraction restores their premises and invalidates
 incompatible evidence. Open work and numerical limits retain their own currencies;
 a stopped source check withholds the witness or proof.
+
+Sources with no real coordinates or no Booleans retain traversal without this
+optional hint work. Optional hint storage admits at most 65,536 source
+row/term/coordinate/index entries.
+The scalar policy admits 4,096-bit normalized rationals and bounds intermediate
+products before evaluation. Copying, term visits and bit/word arithmetic costs
+charge the current operation token's native meter and poll its unchanged deadline.
+No LP or graph invocation, complete-check charge or allowance is created for hints.
+Publication is transactional; a cancelled scan publishes nothing. Arithmetic
+decisions, retraction and restart invalidate preferences. A Boolean decision absent
+from all arithmetic dependencies can retain the same point preferences in its
+unchanged arithmetic residual. Closing releases the primitive and clause indices.
+Opt-in partial-point hints first complete a raw original-clause incidence core before
+optional compound recognition spends the remaining shared index allowance. Raw
+polarity scoring uses registered primitive comparisons and current pins; every
+unrecognized Boolean partner remains unknown. No gate meaning is derived without
+a completed global profile. Full recognition retains ambiguity and acyclic checks
+and excludes only qualified definition clauses from scoring. Failed optional profiles
+leave the completed raw core intact; a failed raw core can retain direct primitive
+preferences only after complete ID validation. Source invalidity and containing stops
+withhold all optional preferences. Retraction, dirty state, coordinate limits and
+close retain their point authority; no index limit renews numerical work.
+Hint applicability observations distinguish an initially unavailable point, an
+uncovered selected Boolean and a primitive callback returning no preference.
+They do not distinguish unavailable point state, scalar admission or an individual
+guard's row decline, and they perform no additional producer or owner calls.
 
 ## Implementation
 

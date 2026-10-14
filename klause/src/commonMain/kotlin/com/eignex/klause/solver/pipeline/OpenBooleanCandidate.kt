@@ -59,7 +59,10 @@ internal class SourceConjunctionHints private constructor(
 
     override fun preferredBool(variable: Int): Boolean? {
         val live = available
-        if (live != null && !live()) return null
+        if (live != null && !live()) {
+            usage?.pointUnavailable()
+            return null
+        }
         val consultation = Consultation()
         val fallback = forward(variable, consultation)
         if (live == null) return fallback
@@ -106,7 +109,9 @@ internal class SourceConjunctionHints private constructor(
             if (!visit()) return null
             if (variable !in primitiveValues) {
                 if (!reserve()) return null
-                primitiveValues[variable] = primitive.preferredBool(variable).takeUnless { stop() }
+                val preferred = primitive.preferredBool(variable)
+                if (preferred == null) usage?.primitiveUnavailable()
+                primitiveValues[variable] = preferred.takeUnless { stop() }
             }
             return primitiveValues[variable]
         }
@@ -135,7 +140,10 @@ internal class SourceConjunctionHints private constructor(
     private fun forward(variable: Int, consultation: Consultation): Boolean? {
         if (!consultation.visit(1)) return null
         if (variable in inputs) return consultation.primitive(variable).takeUnless { stop() }
-        if (variable !in gates) return null
+        if (variable !in gates) {
+            usage?.variableUncovered()
+            return null
+        }
         if (!consultation.reserve(4)) return null
         val values = HashMap<Int, Boolean>()
         val visiting = HashSet<Int>()
@@ -214,11 +222,32 @@ internal class SourceConjunctionHints private constructor(
             maxClauseEntries: Int = MAX_INDEX_ENTRIES,
         ): SourceConjunctionHints? {
             var outcome = HintIndexOutcome.ABORTED
+            var completeInputs: MutableSet<Int>? = null
+            var core: SourceClauseGuidance? = null
+            var shared: SourceClauseGuidance.Budget? = null
+            var transferred = false
             fun decline(reason: HintIndexOutcome): SourceConjunctionHints? {
                 outcome = reason
-                return null
+                if (reason != HintIndexOutcome.VISITS && reason != HintIndexOutcome.STORAGE) return null
+                val inputs = completeInputs ?: return null
+                val live = available ?: return null
+                if (shared?.stopped() ?: stopped(stop, 3)) {
+                    outcome = HintIndexOutcome.STOPPED
+                    return null
+                }
+                val result = SourceConjunctionHints(primitive, inputs, HashMap(), stop, usage)
+                result.available = live
+                result.knownBool = knownBool
+                result.clauses = core
+                if (shared?.stopped() ?: stop()) {
+                    outcome = HintIndexOutcome.STOPPED
+                    return null
+                }
+                transferred = true
+                return result
             }
             try {
+                usage?.sourceDimensions(boolCount, clauses.size, variables.size)
                 if (clauses.size > maxClauses || variables.size > maxClauses) {
                     return decline(HintIndexOutcome.SOURCE_LIMIT)
                 }
@@ -231,10 +260,33 @@ internal class SourceConjunctionHints private constructor(
                     if (variable !in 0 until boolCount) return decline(HintIndexOutcome.INVALID_PRIMITIVE)
                     inputs += variable
                 }
+                completeInputs = inputs
+                if (available != null && maxClauseEntries > 0) {
+                    val budget = SourceClauseGuidance.Budget(
+                        minOf(maxClauseEntries, MAX_INDEX_ENTRIES - inputs.size),
+                        MAX_INDEX_ENTRIES - preparationVisits, stop,
+                    )
+                    shared = budget
+                    if (!budget.reserve(3)) {
+                        outcome = requireNotNull(budget.outcome)
+                        return null
+                    }
+                    core = SourceClauseGuidance.createRaw(clauses, boolCount, budget, usage)
+                    usage?.clauseIndex(core != null)
+                    if (core == null) return decline(requireNotNull(budget.outcome))
+                }
+                if (shared?.reserve(3) == false) return decline(requireNotNull(shared?.outcome))
                 val pairs = HashSet<Long>()
                 for (clause in clauses) {
                     preparationVisits += 1 + minOf(3, clause.literals.size)
-                    if (stopped(stop, 1 + minOf(3, clause.literals.size))) return decline(HintIndexOutcome.STOPPED)
+                    val budget = shared
+                    if (budget != null) {
+                        if (!budget.visit(1 + minOf(3, clause.literals.size))) {
+                            return decline(requireNotNull(budget.outcome))
+                        }
+                    } else if (stopped(stop, 1 + minOf(3, clause.literals.size))) {
+                        return decline(HintIndexOutcome.STOPPED)
+                    }
                     val literals = clause.literals
                     if (literals.size != 2 || clause.tautological) continue
                     if (literals.any { Lit.variable(it) !in 0 until boolCount }) continue
@@ -242,80 +294,92 @@ internal class SourceConjunctionHints private constructor(
                     if (key !in pairs && inputs.size + pairs.size >= MAX_INDEX_ENTRIES) {
                         return decline(HintIndexOutcome.STORAGE)
                     }
+                    if (key !in pairs && shared?.reserve(1) == false) {
+                        return decline(requireNotNull(shared?.outcome))
+                    }
                     pairs += key
                 }
                 val gates = HashMap<Int, Gate>()
                 val ambiguous = HashSet<Int>()
                 var entries = inputs.size + pairs.size
                 var visits = 0L
+                fun visit(count: Int = 1): Boolean {
+                    val budget = shared
+                    if (budget != null) return budget.visit(count)
+                    visits += count
+                    return visits <= MAX_INDEX_ENTRIES && !stopped(stop, count)
+                }
+                fun visitDecline(): SourceConjunctionHints? = decline(
+                    shared?.outcome ?: if (visits > MAX_INDEX_ENTRIES) HintIndexOutcome.VISITS
+                    else HintIndexOutcome.STOPPED,
+                )
                 for (clause in clauses) {
-                    if (++visits > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.VISITS)
-                    if (stopped(stop, 1)) return decline(HintIndexOutcome.STOPPED)
+                    if (!visit()) return visitDecline()
                     val literals = clause.literals
                     if (literals.size < 3 || clause.tautological) continue
                     if (literals.size > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.STORAGE)
                     var valid = true
                     for (literal in literals) {
-                        if (++visits > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.VISITS)
-                        if (stopped(stop, 1)) return decline(HintIndexOutcome.STOPPED)
+                        if (!visit()) return visitDecline()
                         if (Lit.variable(literal) !in 0 until boolCount) valid = false
                     }
                     if (!valid) continue
                     for (index in literals.indices) {
-                        if (++visits > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.VISITS)
-                        if (stopped(stop, 1)) return decline(HintIndexOutcome.STOPPED)
+                        if (!visit()) return visitDecline()
                         val target = literals[index]
                         val variable = Lit.variable(target)
                         if (variable in inputs || variable in ambiguous) continue
                         val count = literals.size - 1
-                        if (++visits > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.VISITS)
-                        if (stopped(stop, 1)) return decline(HintIndexOutcome.STOPPED)
+                        if (!visit()) return visitDecline()
                         val first = if (index == 0) 1 else 0
                         if (pair(Lit.negate(target), Lit.negate(literals[first])) !in pairs) continue
                         if (entries.toLong() + count + 1L > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.STORAGE)
-                        visits += count
-                        if (visits > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.VISITS)
-                        if (stopped(stop, count)) return decline(HintIndexOutcome.STOPPED)
+                        if (!visit(count)) return visitDecline()
+                        if (shared?.reserve(count + 1) == false) {
+                            return decline(requireNotNull(shared?.outcome))
+                        }
                         val operands = IntArray(count)
                         var complete = true
+                        var canonical = true
+                        var previousInput = -1
                         var next = 0
                         for (other in literals.indices) {
                             if (other == index) continue
-                            if (++visits > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.VISITS)
-                            if (stopped(stop, 1)) return decline(HintIndexOutcome.STOPPED)
+                            if (!visit(2)) return visitDecline()
                             val operand = Lit.negate(literals[other])
                             if (pair(Lit.negate(target), operand) !in pairs) {
                                 complete = false
                                 break
                             }
                             operands[next++] = operand
+                            val input = Lit.variable(operand)
+                            if (input <= previousInput || input == variable) canonical = false
+                            previousInput = input
                         }
                         if (!complete) continue
-                        var width = count
-                        var levels = 0
-                        while (width > 0) { width = width ushr 1; levels++ }
-                        val sortingWork = count.toLong() * levels
-                        visits += sortingWork
-                        if (visits > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.VISITS)
-                        if (stopped(stop, sortingWork.toInt())) return decline(HintIndexOutcome.STOPPED)
-                        operands.sort()
-                        var previous = -1
-                        for (operand in operands) {
-                            if (++visits > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.VISITS)
-                            if (stopped(stop, 1)) return decline(HintIndexOutcome.STOPPED)
-                            val input = Lit.variable(operand)
-                            if (input == variable || input == previous) complete = false
-                            previous = input
+                        if (!canonical) {
+                            var width = count
+                            var levels = 0
+                            while (width > 0) { width = width ushr 1; levels++ }
+                            val sortingWork = count.toLong() * levels
+                            if (!visit(sortingWork.toInt())) return visitDecline()
+                            operands.sort()
+                            var previous = -1
+                            for (operand in operands) {
+                                if (!visit()) return visitDecline()
+                                val input = Lit.variable(operand)
+                                if (input == variable || input == previous) complete = false
+                                previous = input
+                            }
                         }
                         if (!complete) continue
                         val prior = gates[variable]
                         if (prior != null) {
-                            visits += count
-                            if (visits > MAX_INDEX_ENTRIES) return decline(HintIndexOutcome.VISITS)
-                            if (stopped(stop, count)) return decline(HintIndexOutcome.STOPPED)
+                            if (!visit(count)) return visitDecline()
                         }
                         if (prior != null && (prior.target != target || !prior.inputs.contentEquals(operands))) {
                             gates.remove(variable)
+                            if (shared?.reserve(1) == false) return decline(requireNotNull(shared?.outcome))
                             ambiguous += variable
                             entries -= prior.inputs.size
                         } else if (prior == null) {
@@ -324,20 +388,25 @@ internal class SourceConjunctionHints private constructor(
                         }
                     }
                 }
+                val budget = shared
+                if (budget != null) {
+                    val enriched = requireNotNull(core).enriched(gates, ambiguous, budget)
+                        ?: return decline(requireNotNull(budget.outcome))
+                    core = enriched
+                }
                 val result = SourceConjunctionHints(primitive, inputs, gates, stop, usage)
                 if (available != null) {
                     result.available = available
                     result.knownBool = knownBool
-                    result.clauses = SourceClauseGuidance.create(
-                        clauses, boolCount, gates, ambiguous, stop,
-                        minOf(maxClauseEntries, MAX_INDEX_ENTRIES - entries),
-                        MAX_INDEX_ENTRIES - visits - preparationVisits,
-                    )
-                    usage?.clauseIndex(result.clauses != null)
+                    result.clauses = core
+                    if (budget == null) usage?.clauseIndex(false)
                 }
+                if (budget?.stopped() == true) return decline(HintIndexOutcome.STOPPED)
                 outcome = HintIndexOutcome.ADMITTED
+                transferred = true
                 return result
             } finally {
+                if (!transferred) core?.close()
                 usage?.index(outcome)
             }
         }

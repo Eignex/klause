@@ -43,10 +43,42 @@ import kotlin.time.Duration
 class CliStatsTest {
 
     @Test
+    fun `construction fields are omitted independently until their stages are observed`() {
+        val admitted = SolveStats(openHints = OpenHintStats(usage = OpenHintUsageStats(indexesAdmitted = 1)))
+        val rawUsage = OpenHintUsageStats(
+            sourceBooleansMax = null, sourceClausesMax = null, sourcePrimitiveEntriesMax = null,
+            rawClausesMax = 0, rawLiteralsMax = 0, rawIncidencesMax = 0, rawVariablesMax = 0, rawLedgerDebits = 0,
+        )
+        val raw = SolveStats(openHints = OpenHintStats(usage = rawUsage))
+        val complete = SolveStats(openHints = OpenHintStats(usage = rawUsage.copy(
+            sourceBooleansMax = 0, sourceClausesMax = 0, sourcePrimitiveEntriesMax = 0,
+        )))
+
+        val legacyPairs = openHintUsageStatPairs(admitted).toMap()
+        assertEquals("1", legacyPairs["openHintIndexAdmitted"])
+        assertEquals(null, legacyPairs["openHintRawClausesMax"])
+        assertEquals(null, legacyPairs["openHintRawLedgerDebits"])
+        assertEquals(null, legacyPairs["openHintSourceBooleansMax"])
+        val rawPairs = openHintUsageStatPairs(raw).toMap()
+        assertEquals("0", rawPairs["openHintRawClausesMax"])
+        assertEquals("0", rawPairs["openHintRawLedgerDebits"])
+        assertEquals(null, rawPairs["openHintSourceBooleansMax"])
+        assertEquals(null, rawPairs["openHintSourcePrimitiveEntriesMax"])
+        val observedPairs = openHintUsageStatPairs(complete).toMap()
+        assertEquals("0", observedPairs["openHintSourceBooleansMax"])
+        assertEquals("0", observedPairs["openHintSourceClausesMax"])
+        assertEquals("0", observedPairs["openHintSourcePrimitiveEntriesMax"])
+        assertEquals("0", observedPairs["openHintRawClausesMax"])
+    }
+
+    @Test
     fun `component hint usage is emitted when no Boolean proposal was drawn`() {
         val stats = SolveStats(openHints = OpenHintStats(usage = OpenHintUsageStats(
             indexesAdmitted = 1, componentConsultations = 3, componentSelections = 2, gateSelections = 2,
             clauseIndexesAdmitted = 1, clauseConsultations = 3, clauseSelections = 1, clauseDeclines = 2,
+            earlyPointUnavailable = 1, forwardUncovered = 2, primitiveProviderNone = 3,
+            sourceBooleansMax = 9, sourceClausesMax = 7, sourcePrimitiveEntriesMax = 5,
+            rawClausesMax = 3, rawLiteralsMax = 11, rawIncidencesMax = 7, rawVariablesMax = 4, rawLedgerDebits = 19,
         )))
 
         val pairs = openTheoryStatPairs(stats, 1L).toMap()
@@ -59,6 +91,17 @@ class CliStatsTest {
         assertEquals("3", pairs["openHintClauseConsulted"])
         assertEquals("1", pairs["openHintClauseSelected"])
         assertEquals("2", pairs["openHintClauseDeclined"])
+        assertEquals("1", pairs["openHintEarlyPointUnavailable"])
+        assertEquals("2", pairs["openHintForwardUncovered"])
+        assertEquals("3", pairs["openHintPrimitiveProviderNone"])
+        assertEquals("9", pairs["openHintSourceBooleansMax"])
+        assertEquals("7", pairs["openHintSourceClausesMax"])
+        assertEquals("5", pairs["openHintSourcePrimitiveEntriesMax"])
+        assertEquals("3", pairs["openHintRawClausesMax"])
+        assertEquals("11", pairs["openHintRawLiteralsMax"])
+        assertEquals("7", pairs["openHintRawIncidencesMax"])
+        assertEquals("4", pairs["openHintRawVariablesMax"])
+        assertEquals("19", pairs["openHintRawLedgerDebits"])
         assertEquals(null, pairs["openHintDraws"])
         assertTrue(openHintUsageStatPairs(SolveStats.EMPTY).isEmpty())
     }

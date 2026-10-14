@@ -101,8 +101,286 @@ data class OpenHintUsageStats(
     val clauseSelections: Long = 0,
     /** Semantic consultations that produced no preference, including ties and resource declines. */
     val clauseDeclines: Long = 0,
+    /** Consultations whose first live-point hook returned unavailable. */
+    val earlyPointUnavailable: Long = 0,
+    /** Selected variables absent from the forward primitive and gate domains. */
+    val forwardUncovered: Long = 0,
+    /** Actual primitive callbacks that returned no preference, before owner masking. */
+    val primitiveProviderNone: Long = 0,
+    /** Largest supplied source Boolean coordinate count; null when unobserved. */
+    val sourceBooleansMax: Long?,
+    /** Largest supplied original clause count; null when unobserved. */
+    val sourceClausesMax: Long?,
+    /** Largest supplied primitive input count, including duplicates; null when unobserved. */
+    val sourcePrimitiveEntriesMax: Long?,
+    /** Largest completed raw clause prefix; null when no raw stage was observed. */
+    val rawClausesMax: Long?,
+    /** Largest validated raw literal prefix, including tautological clauses; null when unobserved. */
+    val rawLiteralsMax: Long?,
+    /** Largest number of completed raw incidence appends; null when unobserved. */
+    val rawIncidencesMax: Long?,
+    /** Largest completed raw distinct-variable bucket count; null when unobserved. */
+    val rawVariablesMax: Long?,
+    /** Private raw-stage visit debits; null when unobserved, not external meter acknowledgement or completion. */
+    val rawLedgerDebits: Long?,
 ) {
-    /** Merge independent nonnegative usage deltas with saturating arithmetic. */
+    /** Construct empty usage without construction observations. */
+    constructor() : this(
+        noProvider = 0,
+        indexesAdmitted = 0,
+        sourceLimitDeclines = 0,
+        storageDeclines = 0,
+        visitDeclines = 0,
+        invalidPrimitiveDeclines = 0,
+        stoppedIndexes = 0,
+        abortedIndexes = 0,
+        callerConsultations = 0,
+        callerSelections = 0,
+        componentConsultations = 0,
+        componentSelections = 0,
+        primitiveSelections = 0,
+        gateSelections = 0,
+        clauseIndexesAdmitted = 0,
+        clauseIndexesDeclined = 0,
+        clauseConsultations = 0,
+        clauseSelections = 0,
+        clauseDeclines = 0,
+        earlyPointUnavailable = 0,
+        forwardUncovered = 0,
+        primitiveProviderNone = 0,
+        sourceBooleansMax = null,
+        sourceClausesMax = null,
+        sourcePrimitiveEntriesMax = null,
+        rawClausesMax = null,
+        rawLiteralsMax = null,
+        rawIncidencesMax = null,
+        rawVariablesMax = null,
+        rawLedgerDebits = null,
+    )
+
+    /** Construct 19 usage counters without construction observations. */
+    constructor(
+        noProvider: Long = 0,
+        indexesAdmitted: Long = 0,
+        sourceLimitDeclines: Long = 0,
+        storageDeclines: Long = 0,
+        visitDeclines: Long = 0,
+        invalidPrimitiveDeclines: Long = 0,
+        stoppedIndexes: Long = 0,
+        abortedIndexes: Long = 0,
+        callerConsultations: Long = 0,
+        callerSelections: Long = 0,
+        componentConsultations: Long = 0,
+        componentSelections: Long = 0,
+        primitiveSelections: Long = 0,
+        gateSelections: Long = 0,
+        clauseIndexesAdmitted: Long = 0,
+        clauseIndexesDeclined: Long = 0,
+        clauseConsultations: Long = 0,
+        clauseSelections: Long = 0,
+        clauseDeclines: Long = 0,
+    ) : this(
+        noProvider = noProvider,
+        indexesAdmitted = indexesAdmitted,
+        sourceLimitDeclines = sourceLimitDeclines,
+        storageDeclines = storageDeclines,
+        visitDeclines = visitDeclines,
+        invalidPrimitiveDeclines = invalidPrimitiveDeclines,
+        stoppedIndexes = stoppedIndexes,
+        abortedIndexes = abortedIndexes,
+        callerConsultations = callerConsultations,
+        callerSelections = callerSelections,
+        componentConsultations = componentConsultations,
+        componentSelections = componentSelections,
+        primitiveSelections = primitiveSelections,
+        gateSelections = gateSelections,
+        clauseIndexesAdmitted = clauseIndexesAdmitted,
+        clauseIndexesDeclined = clauseIndexesDeclined,
+        clauseConsultations = clauseConsultations,
+        clauseSelections = clauseSelections,
+        clauseDeclines = clauseDeclines,
+        earlyPointUnavailable = 0,
+        forwardUncovered = 0,
+        primitiveProviderNone = 0,
+        sourceBooleansMax = null,
+        sourceClausesMax = null,
+        sourcePrimitiveEntriesMax = null,
+        rawClausesMax = null,
+        rawLiteralsMax = null,
+        rawIncidencesMax = null,
+        rawVariablesMax = null,
+        rawLedgerDebits = null,
+    )
+
+    /** Copy 19 usage counters while retaining omitted observations. */
+    fun copy(
+        noProvider: Long = this.noProvider,
+        indexesAdmitted: Long = this.indexesAdmitted,
+        sourceLimitDeclines: Long = this.sourceLimitDeclines,
+        storageDeclines: Long = this.storageDeclines,
+        visitDeclines: Long = this.visitDeclines,
+        invalidPrimitiveDeclines: Long = this.invalidPrimitiveDeclines,
+        stoppedIndexes: Long = this.stoppedIndexes,
+        abortedIndexes: Long = this.abortedIndexes,
+        callerConsultations: Long = this.callerConsultations,
+        callerSelections: Long = this.callerSelections,
+        componentConsultations: Long = this.componentConsultations,
+        componentSelections: Long = this.componentSelections,
+        primitiveSelections: Long = this.primitiveSelections,
+        gateSelections: Long = this.gateSelections,
+        clauseIndexesAdmitted: Long = this.clauseIndexesAdmitted,
+        clauseIndexesDeclined: Long = this.clauseIndexesDeclined,
+        clauseConsultations: Long = this.clauseConsultations,
+        clauseSelections: Long = this.clauseSelections,
+        clauseDeclines: Long = this.clauseDeclines,
+    ): OpenHintUsageStats = OpenHintUsageStats(
+        noProvider = noProvider,
+        indexesAdmitted = indexesAdmitted,
+        sourceLimitDeclines = sourceLimitDeclines,
+        storageDeclines = storageDeclines,
+        visitDeclines = visitDeclines,
+        invalidPrimitiveDeclines = invalidPrimitiveDeclines,
+        stoppedIndexes = stoppedIndexes,
+        abortedIndexes = abortedIndexes,
+        callerConsultations = callerConsultations,
+        callerSelections = callerSelections,
+        componentConsultations = componentConsultations,
+        componentSelections = componentSelections,
+        primitiveSelections = primitiveSelections,
+        gateSelections = gateSelections,
+        clauseIndexesAdmitted = clauseIndexesAdmitted,
+        clauseIndexesDeclined = clauseIndexesDeclined,
+        clauseConsultations = clauseConsultations,
+        clauseSelections = clauseSelections,
+        clauseDeclines = clauseDeclines,
+        earlyPointUnavailable = earlyPointUnavailable,
+        forwardUncovered = forwardUncovered,
+        primitiveProviderNone = primitiveProviderNone,
+        sourceBooleansMax = sourceBooleansMax,
+        sourceClausesMax = sourceClausesMax,
+        sourcePrimitiveEntriesMax = sourcePrimitiveEntriesMax,
+        rawClausesMax = rawClausesMax,
+        rawLiteralsMax = rawLiteralsMax,
+        rawIncidencesMax = rawIncidencesMax,
+        rawVariablesMax = rawVariablesMax,
+        rawLedgerDebits = rawLedgerDebits,
+    )
+
+    /** Construct 22 usage counters without construction observations. */
+    constructor(
+        noProvider: Long = 0,
+        indexesAdmitted: Long = 0,
+        sourceLimitDeclines: Long = 0,
+        storageDeclines: Long = 0,
+        visitDeclines: Long = 0,
+        invalidPrimitiveDeclines: Long = 0,
+        stoppedIndexes: Long = 0,
+        abortedIndexes: Long = 0,
+        callerConsultations: Long = 0,
+        callerSelections: Long = 0,
+        componentConsultations: Long = 0,
+        componentSelections: Long = 0,
+        primitiveSelections: Long = 0,
+        gateSelections: Long = 0,
+        clauseIndexesAdmitted: Long = 0,
+        clauseIndexesDeclined: Long = 0,
+        clauseConsultations: Long = 0,
+        clauseSelections: Long = 0,
+        clauseDeclines: Long = 0,
+        earlyPointUnavailable: Long = 0,
+        forwardUncovered: Long = 0,
+        primitiveProviderNone: Long = 0,
+    ) : this(
+        noProvider = noProvider,
+        indexesAdmitted = indexesAdmitted,
+        sourceLimitDeclines = sourceLimitDeclines,
+        storageDeclines = storageDeclines,
+        visitDeclines = visitDeclines,
+        invalidPrimitiveDeclines = invalidPrimitiveDeclines,
+        stoppedIndexes = stoppedIndexes,
+        abortedIndexes = abortedIndexes,
+        callerConsultations = callerConsultations,
+        callerSelections = callerSelections,
+        componentConsultations = componentConsultations,
+        componentSelections = componentSelections,
+        primitiveSelections = primitiveSelections,
+        gateSelections = gateSelections,
+        clauseIndexesAdmitted = clauseIndexesAdmitted,
+        clauseIndexesDeclined = clauseIndexesDeclined,
+        clauseConsultations = clauseConsultations,
+        clauseSelections = clauseSelections,
+        clauseDeclines = clauseDeclines,
+        earlyPointUnavailable = earlyPointUnavailable,
+        forwardUncovered = forwardUncovered,
+        primitiveProviderNone = primitiveProviderNone,
+        sourceBooleansMax = null,
+        sourceClausesMax = null,
+        sourcePrimitiveEntriesMax = null,
+        rawClausesMax = null,
+        rawLiteralsMax = null,
+        rawIncidencesMax = null,
+        rawVariablesMax = null,
+        rawLedgerDebits = null,
+    )
+
+    /** Copy 22 usage counters while retaining omitted observations. */
+    fun copy(
+        noProvider: Long = this.noProvider,
+        indexesAdmitted: Long = this.indexesAdmitted,
+        sourceLimitDeclines: Long = this.sourceLimitDeclines,
+        storageDeclines: Long = this.storageDeclines,
+        visitDeclines: Long = this.visitDeclines,
+        invalidPrimitiveDeclines: Long = this.invalidPrimitiveDeclines,
+        stoppedIndexes: Long = this.stoppedIndexes,
+        abortedIndexes: Long = this.abortedIndexes,
+        callerConsultations: Long = this.callerConsultations,
+        callerSelections: Long = this.callerSelections,
+        componentConsultations: Long = this.componentConsultations,
+        componentSelections: Long = this.componentSelections,
+        primitiveSelections: Long = this.primitiveSelections,
+        gateSelections: Long = this.gateSelections,
+        clauseIndexesAdmitted: Long = this.clauseIndexesAdmitted,
+        clauseIndexesDeclined: Long = this.clauseIndexesDeclined,
+        clauseConsultations: Long = this.clauseConsultations,
+        clauseSelections: Long = this.clauseSelections,
+        clauseDeclines: Long = this.clauseDeclines,
+        earlyPointUnavailable: Long = this.earlyPointUnavailable,
+        forwardUncovered: Long = this.forwardUncovered,
+        primitiveProviderNone: Long = this.primitiveProviderNone,
+    ): OpenHintUsageStats = OpenHintUsageStats(
+        noProvider = noProvider,
+        indexesAdmitted = indexesAdmitted,
+        sourceLimitDeclines = sourceLimitDeclines,
+        storageDeclines = storageDeclines,
+        visitDeclines = visitDeclines,
+        invalidPrimitiveDeclines = invalidPrimitiveDeclines,
+        stoppedIndexes = stoppedIndexes,
+        abortedIndexes = abortedIndexes,
+        callerConsultations = callerConsultations,
+        callerSelections = callerSelections,
+        componentConsultations = componentConsultations,
+        componentSelections = componentSelections,
+        primitiveSelections = primitiveSelections,
+        gateSelections = gateSelections,
+        clauseIndexesAdmitted = clauseIndexesAdmitted,
+        clauseIndexesDeclined = clauseIndexesDeclined,
+        clauseConsultations = clauseConsultations,
+        clauseSelections = clauseSelections,
+        clauseDeclines = clauseDeclines,
+        earlyPointUnavailable = earlyPointUnavailable,
+        forwardUncovered = forwardUncovered,
+        primitiveProviderNone = primitiveProviderNone,
+        sourceBooleansMax = sourceBooleansMax,
+        sourceClausesMax = sourceClausesMax,
+        sourcePrimitiveEntriesMax = sourcePrimitiveEntriesMax,
+        rawClausesMax = rawClausesMax,
+        rawLiteralsMax = rawLiteralsMax,
+        rawIncidencesMax = rawIncidencesMax,
+        rawVariablesMax = rawVariablesMax,
+        rawLedgerDebits = rawLedgerDebits,
+    )
+
+    /** Merge events and observed ledger debits by saturating sum, and observed construction maxima by maximum. */
     fun mergedWith(other: OpenHintUsageStats): OpenHintUsageStats = OpenHintUsageStats(
         noProvider = sumHintUsage(noProvider, other.noProvider),
         indexesAdmitted = sumHintUsage(indexesAdmitted, other.indexesAdmitted),
@@ -123,6 +401,17 @@ data class OpenHintUsageStats(
         clauseConsultations = sumHintUsage(clauseConsultations, other.clauseConsultations),
         clauseSelections = sumHintUsage(clauseSelections, other.clauseSelections),
         clauseDeclines = sumHintUsage(clauseDeclines, other.clauseDeclines),
+        earlyPointUnavailable = sumHintUsage(earlyPointUnavailable, other.earlyPointUnavailable),
+        forwardUncovered = sumHintUsage(forwardUncovered, other.forwardUncovered),
+        primitiveProviderNone = sumHintUsage(primitiveProviderNone, other.primitiveProviderNone),
+        sourceBooleansMax = maxHintObservation(sourceBooleansMax, other.sourceBooleansMax),
+        sourceClausesMax = maxHintObservation(sourceClausesMax, other.sourceClausesMax),
+        sourcePrimitiveEntriesMax = maxHintObservation(sourcePrimitiveEntriesMax, other.sourcePrimitiveEntriesMax),
+        rawClausesMax = maxHintObservation(rawClausesMax, other.rawClausesMax),
+        rawLiteralsMax = maxHintObservation(rawLiteralsMax, other.rawLiteralsMax),
+        rawIncidencesMax = maxHintObservation(rawIncidencesMax, other.rawIncidencesMax),
+        rawVariablesMax = maxHintObservation(rawVariablesMax, other.rawVariablesMax),
+        rawLedgerDebits = sumHintObservation(rawLedgerDebits, other.rawLedgerDebits),
     )
 }
 
@@ -143,6 +432,17 @@ internal class OpenHintUsageSink {
     private var clauseConsultations = 0L
     private var clauseSelections = 0L
     private var clauseDeclines = 0L
+    private var earlyPointUnavailable = 0L
+    private var forwardUncovered = 0L
+    private var primitiveProviderNone = 0L
+    private var sourceBooleansMax: Long? = null
+    private var sourceClausesMax: Long? = null
+    private var sourcePrimitiveEntriesMax: Long? = null
+    private var rawClausesMax: Long? = null
+    private var rawLiteralsMax: Long? = null
+    private var rawIncidencesMax: Long? = null
+    private var rawVariablesMax: Long? = null
+    private var rawLedgerDebits: Long? = null
 
     fun index(outcome: HintIndexOutcome) {
         val before = indexes[outcome.ordinal]
@@ -165,6 +465,23 @@ internal class OpenHintUsageSink {
     fun clauseConsulted() { clauseConsultations += minOf(1L, Long.MAX_VALUE - clauseConsultations) }
     fun clauseSelected() { clauseSelections += minOf(1L, Long.MAX_VALUE - clauseSelections) }
     fun clauseDeclined() { clauseDeclines += minOf(1L, Long.MAX_VALUE - clauseDeclines) }
+    fun pointUnavailable() { earlyPointUnavailable += minOf(1L, Long.MAX_VALUE - earlyPointUnavailable) }
+    fun variableUncovered() { forwardUncovered += minOf(1L, Long.MAX_VALUE - forwardUncovered) }
+    fun primitiveUnavailable() { primitiveProviderNone += minOf(1L, Long.MAX_VALUE - primitiveProviderNone) }
+
+    fun sourceDimensions(booleans: Int, clauses: Int, primitives: Int) {
+        sourceBooleansMax = maxHintObservation(sourceBooleansMax, booleans.toLong())
+        sourceClausesMax = maxHintObservation(sourceClausesMax, clauses.toLong())
+        sourcePrimitiveEntriesMax = maxHintObservation(sourcePrimitiveEntriesMax, primitives.toLong())
+    }
+
+    fun rawConstruction(clauses: Long, literals: Long, incidences: Long, variables: Long, debits: Long) {
+        rawClausesMax = maxHintObservation(rawClausesMax, clauses)
+        rawLiteralsMax = maxHintObservation(rawLiteralsMax, literals)
+        rawIncidencesMax = maxHintObservation(rawIncidencesMax, incidences)
+        rawVariablesMax = maxHintObservation(rawVariablesMax, variables)
+        rawLedgerDebits = sumHintObservation(rawLedgerDebits, debits)
+    }
 
     fun snapshot(): OpenHintUsageStats = OpenHintUsageStats(
         noProvider = indexes[HintIndexOutcome.NO_PROVIDER.ordinal],
@@ -186,7 +503,30 @@ internal class OpenHintUsageSink {
         clauseConsultations = clauseConsultations,
         clauseSelections = clauseSelections,
         clauseDeclines = clauseDeclines,
+        earlyPointUnavailable = earlyPointUnavailable,
+        forwardUncovered = forwardUncovered,
+        primitiveProviderNone = primitiveProviderNone,
+        sourceBooleansMax = sourceBooleansMax,
+        sourceClausesMax = sourceClausesMax,
+        sourcePrimitiveEntriesMax = sourcePrimitiveEntriesMax,
+        rawClausesMax = rawClausesMax,
+        rawLiteralsMax = rawLiteralsMax,
+        rawIncidencesMax = rawIncidencesMax,
+        rawVariablesMax = rawVariablesMax,
+        rawLedgerDebits = rawLedgerDebits,
     )
 }
 
 private fun sumHintUsage(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
+
+private fun maxHintObservation(left: Long?, right: Long?): Long? = when {
+    left == null -> right
+    right == null -> left
+    else -> maxOf(left, right)
+}
+
+private fun sumHintObservation(left: Long?, right: Long?): Long? = when {
+    left == null -> right
+    right == null -> left
+    else -> sumHintUsage(left, right)
+}

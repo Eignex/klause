@@ -33,6 +33,11 @@ retracts assertions with their decision scope. Exact reductions can preserve
 integer structure while shrinking the system. Reconstruction recovers original
 integer and real coordinates before acceptance.
 
+Existing completed partial LP points can supply the same primitive Boolean
+preferences as the [linear-real component](linear-real.md#solving-and-composition).
+They remain guesses about branch order; a fractional source integer is not a
+model value and integrality remains a complete-check requirement.
+
 Complete workers and open local search can share checked incumbents under the
 same source and objective. Candidate integer windows guide heuristic search; they
 do not bound the source model for a refutation. [Portfolios](../solver/portfolio.md)

@@ -428,6 +428,17 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
             "openHintClauseConsulted",
             "openHintClauseSelected",
             "openHintClauseDeclined",
+            "openHintEarlyPointUnavailable",
+            "openHintForwardUncovered",
+            "openHintPrimitiveProviderNone",
+            "openHintSourceBooleansMax",
+            "openHintSourceClausesMax",
+            "openHintSourcePrimitiveEntriesMax",
+            "openHintRawClausesMax",
+            "openHintRawLiteralsMax",
+            "openHintRawIncidencesMax",
+            "openHintRawVariablesMax",
+            "openHintRawLedgerDebits",
 
         )
     }

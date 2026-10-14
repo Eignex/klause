@@ -613,5 +613,17 @@ internal fun openHintUsageStatPairs(stats: SolveStats): List<Pair<String, String
         "openHintClauseConsulted" to "$clauseConsultations",
         "openHintClauseSelected" to "$clauseSelections",
         "openHintClauseDeclined" to "$clauseDeclines",
+        "openHintEarlyPointUnavailable" to "$earlyPointUnavailable",
+        "openHintForwardUncovered" to "$forwardUncovered",
+        "openHintPrimitiveProviderNone" to "$primitiveProviderNone",
+    ) + listOfNotNull(
+        sourceBooleansMax?.let { "openHintSourceBooleansMax" to "$it" },
+        sourceClausesMax?.let { "openHintSourceClausesMax" to "$it" },
+        sourcePrimitiveEntriesMax?.let { "openHintSourcePrimitiveEntriesMax" to "$it" },
+        rawClausesMax?.let { "openHintRawClausesMax" to "$it" },
+        rawLiteralsMax?.let { "openHintRawLiteralsMax" to "$it" },
+        rawIncidencesMax?.let { "openHintRawIncidencesMax" to "$it" },
+        rawVariablesMax?.let { "openHintRawVariablesMax" to "$it" },
+        rawLedgerDebits?.let { "openHintRawLedgerDebits" to "$it" },
     )
 }

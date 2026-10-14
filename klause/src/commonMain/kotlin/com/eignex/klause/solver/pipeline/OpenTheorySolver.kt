@@ -381,6 +381,7 @@ class OpenTheoryEngine internal constructor(
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
             smtStats = state.smt,
             theorySolveStop = cancellation,
+            openHintFlips = params.openHintFlips,
         )
         var handedOff = false
         var failure: Throwable? = null

@@ -56,6 +56,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactAlgebraicRealValue
@@ -208,6 +209,10 @@ class ExactLiraSearchComponent private constructor(
     private var assignment: ExactLiraAssignment? = null
     private var outcome: ComponentCheck? = null
     private var candidate: List<BigFraction>? = null
+    private var pointHintRows: List<PreparedSourceRow>? = null
+    private var pointHintValues: IntArray? = null
+    private var pointHintLevel = -1
+    private var pointHintStop = Cancellation.Never
     private var dirty = true
     private var sourceInstalled = false
     private var graphFirst = false
@@ -275,6 +280,121 @@ class ExactLiraSearchComponent private constructor(
 
     internal fun observeWith(stats: SmtStatsSink) {
         smtStats = stats
+    }
+
+    internal fun partialPointHints(stop: Cancellation): Pair<IntArray, SearchCandidateHints>? {
+        check(context == null)
+        if (model.numRealVars == 0 || model.numBoolVars == 0 || model.numBoolVars > MAX_POINT_HINT_ENTRIES ||
+            preparedRows.size > MAX_POINT_HINT_ENTRIES || stop()
+        ) {
+            return null
+        }
+        var entries = model.numRealVars.toLong() + model.numIntVars + model.numBoolVars
+        val rows = ArrayList<PreparedSourceRow>()
+        val variables = LinkedHashSet<Int>()
+        for (prepared in preparedRows) {
+            stop.charge(1)
+            if (stop()) return null
+            if (prepared.row.activator == LinearRow.ALWAYS) continue
+            if (prepared.row.activator !in bools.indices) return null
+            entries += prepared.row.size.toLong() + 1L
+            if (entries > MAX_POINT_HINT_ENTRIES) return null
+            rows += prepared
+            variables += prepared.row.activator
+        }
+        stop.charge(rows.size.toLong() + variables.size + 1L)
+        if (stop() || rows.isEmpty()) return null
+        pointHintRows = rows.toList()
+        pointHintStop = stop
+        return variables.toIntArray() to SearchCandidateHints { variable ->
+            if (!partialPointHintAvailable()) null
+            else pointHintValues?.getOrNull(variable)?.let { value ->
+                when (value) { TRUE -> true; FALSE -> false; else -> null }
+            }
+        }
+    }
+
+    internal fun partialPointHintAvailable(): Boolean {
+        val current = context ?: return false
+        return pointHintValues != null && !dirty && current.decisionLevel == pointHintLevel &&
+            !current.cancelled() && !pointHintStop() && !parentStop()
+    }
+
+    internal fun partialPointHintBool(variable: Int): Boolean? =
+        if (partialPointHintAvailable()) context?.boolValue(variable) else null
+
+    internal fun releasePartialPointHints() {
+        pointHintRows = null
+        pointHintValues = null
+        pointHintLevel = -1
+        pointHintStop = Cancellation.Never
+    }
+
+    private fun capturePointHints(point: List<BigFraction>, context: SearchContext) {
+        pointHintValues = null
+        val rows = pointHintRows ?: return
+        if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
+        operationStop.charge(model.numBoolVars.toLong() + point.size + 1L)
+        if (operationStop() || point.any { !hintScalar(it) }) return
+        val values = IntArray(model.numBoolVars) { UNASSIGNED }
+        for (prepared in rows) {
+            operationStop.charge(1)
+            if (operationStop() || pointHintStop()) return
+            val variable = prepared.row.activator
+            if (values[variable] == DECLINED_HINT) continue
+            val comparison = if (prepared.disjunction) null else prepared.form.hintComparison(
+                { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
+                ::hintScalar, ::hintPreflight,
+            )
+            val preference = comparison?.let { hintTruth(it, point) }
+            if (preference == null) {
+                values[variable] = DECLINED_HINT
+                continue
+            }
+            val value = if (preference) TRUE else FALSE
+            if (values[variable] != UNASSIGNED && values[variable] != value) {
+                values[variable] = DECLINED_HINT
+            } else {
+                values[variable] = value
+            }
+        }
+        if (operationStop() || pointHintStop()) return
+        pointHintLevel = context.decisionLevel
+        pointHintValues = values
+    }
+
+    private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? {
+        var activity = BigFraction.ZERO
+        for ((column, coefficient) in comparison.terms) {
+            val coordinate = point.getOrNull(column) ?: return null
+            if (!hintPreflight(coefficient, coordinate)) return null
+            val product = coefficient * coordinate
+            if (!hintScalar(product) || !hintPreflight(activity, product)) return null
+            activity += product
+            if (!hintScalar(activity)) return null
+        }
+        if (!hintPreflight(activity, comparison.bound)) return null
+        return when (comparison.op) {
+            LinearOp.LE -> if (comparison.strict) activity < comparison.bound else activity <= comparison.bound
+            LinearOp.GE -> if (comparison.strict) activity > comparison.bound else activity >= comparison.bound
+            LinearOp.EQ -> activity == comparison.bound
+            LinearOp.NE -> activity != comparison.bound
+        }
+    }
+
+    private fun hintScalar(value: BigFraction): Boolean {
+        val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
+        operationStop.charge(1L + bits / Long.SIZE_BITS)
+        return bits <= MAX_POINT_HINT_BITS && !operationStop() && !pointHintStop()
+    }
+
+    private fun hintPreflight(left: BigFraction, right: BigFraction): Boolean {
+        val bits = maxOf(left.num.magnitudeBitLength(), left.den.magnitudeBitLength()).toLong() +
+            maxOf(right.num.magnitudeBitLength(), right.den.magnitudeBitLength()) + 2L
+        if (bits > MAX_POINT_HINT_BITS * 2L + 2L) return false
+        val words = bits / Long.SIZE_BITS + 1L
+        operationStop.charge(bits + words * words)
+        return !operationStop() && !pointHintStop()
     }
 
     init {
@@ -428,8 +548,12 @@ class ExactLiraSearchComponent private constructor(
         }
     }
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
-    override fun onRestart(context: SearchContext) = lp.onRestart(context)
+    override fun onRestart(context: SearchContext) {
+        pointHintValues = null
+        lp.onRestart(context)
+    }
     override fun close() {
+        releasePartialPointHints()
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
     }
 
@@ -570,6 +694,8 @@ class ExactLiraSearchComponent private constructor(
         assignment = null
         outcome = null
         candidate = null
+        val priorHints = pointHintValues
+        pointHintValues = null
         val wasDirty = dirty
         dirty = true
         when (decision) {
@@ -585,6 +711,10 @@ class ExactLiraSearchComponent private constructor(
                 if (variable !in arithmeticVariables && bools.any { it == UNASSIGNED }) {
                     nodesByLevel.put(context.decisionLevel, node)
                     dirty = wasDirty
+                    if (!dirty) {
+                        pointHintValues = priorHints
+                        pointHintLevel = context.decisionLevel
+                    }
                     return ComponentResult.Consistent
                 }
             }
@@ -771,6 +901,7 @@ class ExactLiraSearchComponent private constructor(
         dirty = false
         candidate = null
         assignment = null
+        pointHintValues = null
         smtStats?.observeConflict(explanation)
         outcome = ComponentCheck.Infeasible(explanation)
         return ComponentResult.Conflict(explanation)
@@ -779,6 +910,7 @@ class ExactLiraSearchComponent private constructor(
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
+        pointHintValues = null
         // Root publications precede their delivery to components during shared initialization.
         if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
             bools.indices.all { context.boolValue(it) != null }
@@ -805,6 +937,11 @@ class ExactLiraSearchComponent private constructor(
                 }
                 is RealDifferenceSystem.Result.Feasible -> {
                     if (bools.any { it == UNASSIGNED }) {
+                        if (pointHintRows != null) {
+                            operationStop.charge(model.numRealVars.toLong() + 1L)
+                            if (!operationStop()) capturePointHints(result.point, context)
+                        }
+                        if (operationStop()) return ComponentResult.Indeterminate
                         candidate = null
                         assignment = null
                         outcome = null
@@ -839,6 +976,8 @@ class ExactLiraSearchComponent private constructor(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
+        if (bools.any { it == UNASSIGNED }) candidate?.let { capturePointHints(it, context) }
+        if (operationStop()) return ComponentResult.Indeterminate
         val complete = bools.none { it == UNASSIGNED } && node.selectsEveryDisjunction(model, disjunctionAtoms) &&
             node.nextDisequality(model, disjunctionAtoms, bools) == null
         if (complete) {
@@ -1032,6 +1171,7 @@ class ExactLiraSearchComponent private constructor(
         assignment = null
         outcome = null
         candidate = null
+        pointHintValues = null
         dirty = true
     }
 
@@ -1174,6 +1314,9 @@ private fun sharedExactLiraSource(model: Problem, stop: Cancellation): PreparedE
 }
 
 private const val UNASSIGNED = -1
+private const val DECLINED_HINT = -2
+private const val MAX_POINT_HINT_ENTRIES = 65_536
+private const val MAX_POINT_HINT_BITS = 4096
 private const val FALSE = 0
 private const val TRUE = 1
 

@@ -2,10 +2,12 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.solver.result.HintIndexOutcome
+import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.binarySearchInt
 
-// Source definitions supply structure; only the remaining original clauses supply the preference.
+// Only a completed profile gives source clause identities structural authority.
 internal class SourceClauseGuidance private constructor(
     private var clauses: List<Clause>,
     private var definitions: BooleanArray,
@@ -53,7 +55,7 @@ internal class SourceClauseGuidance private constructor(
         var supported = false
         for (id in affected) {
             if (!consultation.visit()) return null
-            if (definitions[id]) continue
+            if (definitions.isNotEmpty() && definitions[id]) continue
             val a = left.clause(clauses[id]) ?: return null
             val b = right.clause(clauses[id]) ?: return null
             supported = supported || (a.point && b.point)
@@ -165,87 +167,45 @@ internal class SourceClauseGuidance private constructor(
     companion object {
         private const val LIMIT = SourceConjunctionHints.MAX_INDEX_ENTRIES
 
-        fun create(
+        fun createRaw(
             clauses: List<Clause>,
             boolCount: Int,
-            gates: Map<Int, SourceConjunctionHints.Gate>,
-            ambiguous: Set<Int>,
-            stop: Cancellation,
-            remainingEntries: Int,
-            remainingVisits: Long,
+            budget: Budget,
+            usage: OpenHintUsageSink? = null,
         ): SourceClauseGuidance? {
-            val budget = Budget(remainingEntries, remainingVisits, stop)
-            if (!budget.reserve(clauses.size + 6)) return null
-            val definitions = BooleanArray(clauses.size)
-            val parents = HashMap<Int, MutableList<Int>>()
-            val degrees = HashMap<Int, Int>()
-            val ready = ArrayList<Int>()
-            for ((variable, gate) in gates) {
-                if (!budget.reserve(3)) return null
-                var degree = 0
-                for (literal in gate.inputs) {
-                    if (!budget.visit() || !budget.reserve(1)) return null
-                    val input = Lit.variable(literal)
-                    if (input !in parents && !budget.reserve(2)) return null
-                    parents.getOrPut(input) { ArrayList() }.add(variable)
-                    if (input in gates) degree++
-                    if (input in ambiguous) degree = LIMIT
-                }
-                degrees[variable] = degree
-                if (degree == 0) ready += variable
-            }
-            val qualified = HashSet<Int>()
-            while (ready.isNotEmpty()) {
-                if (!budget.visit()) return null
-                val variable = ready.removeAt(ready.lastIndex)
-                qualified += variable
-                for (parent in parents[variable].orEmpty()) {
+            val initialVisits = budget.remainingVisits
+            var completedClauses = 0L
+            var validatedLiterals = 0L
+            var incidences = 0L
+            var variables = 0L
+            try {
+                if (!budget.reserve(5)) return null
+                val occurrences = HashMap<Int, MutableList<Int>>()
+                for ((id, clause) in clauses.withIndex()) {
                     if (!budget.visit()) return null
-                    val degree = degrees.getValue(parent) - 1
-                    degrees[parent] = degree
-                    if (degree == 0) ready += parent
-                }
-            }
-            for ((id, clause) in clauses.withIndex()) {
-                if (!budget.visit()) return null
-                if (clause.tautological) continue
-                val literals = clause.literals
-                for (index in literals.indices) {
-                    if (!budget.visit()) return null
-                    val literal = literals[index]
-                    val variable = Lit.variable(literal)
-                    val gate = gates[variable].takeIf { variable in qualified } ?: continue
-                    if (literals.size == 2 && literal == Lit.negate(gate.target)) {
-                        val input = literals[1 - index]
-                        if (!budget.visit(searchWork(gate.inputs.size))) return null
-                        if (gate.inputs.binarySearchInt(input) >= 0) definitions[id] = true
-                    } else if (literal == gate.target && literals.size == gate.inputs.size + 1) {
-                        var complete = true
-                        for (other in literals.indices) {
-                            if (other == index) continue
-                            if (!budget.visit(searchWork(gate.inputs.size))) return null
-                            if (gate.inputs.binarySearchInt(Lit.negate(literals[other])) < 0) complete = false
+                    for (literal in clause.literals) {
+                        if (!budget.visit()) return null
+                        val variable = Lit.variable(literal)
+                        if (variable !in 0 until boolCount) {
+                            budget.invalidSource()
+                            return null
                         }
-                        if (complete) definitions[id] = true
+                        validatedLiterals++
+                        if (clause.tautological) continue
+                        if (variable !in occurrences && !budget.reserve(2)) return null
+                        if (!budget.reserve(1)) return null
+                        occurrences.getOrPut(variable) { ArrayList() }.add(id)
+                        incidences++
+                        variables = occurrences.size.toLong()
                     }
+                    completedClauses++
                 }
+                return SourceClauseGuidance(clauses, booleanArrayOf(), emptyMap(), emptySet(),
+                    HashSet(), HashMap(), occurrences).takeUnless { budget.stopped() }
+            } finally {
+                usage?.rawConstruction(completedClauses, validatedLiterals, incidences, variables,
+                    initialVisits - budget.remainingVisits)
             }
-            val occurrences = HashMap<Int, MutableList<Int>>()
-            for ((id, clause) in clauses.withIndex()) {
-                if (!budget.visit()) return null
-                if (definitions[id] || clause.tautological) continue
-                for (literal in clause.literals) {
-                    if (!budget.visit()) return null
-                    if (Lit.variable(literal) !in 0 until boolCount) return null
-                }
-                for (literal in clause.literals) {
-                    if (!budget.reserve(1)) return null
-                    val variable = Lit.variable(literal)
-                    if (variable !in occurrences && !budget.reserve(2)) return null
-                    occurrences.getOrPut(variable) { ArrayList() }.add(id)
-                }
-            }
-            return SourceClauseGuidance(clauses, definitions, gates, ambiguous, qualified, parents, occurrences)
         }
 
         private fun searchWork(size: Int): Int {
@@ -256,16 +216,97 @@ internal class SourceClauseGuidance private constructor(
         }
     }
 
-    private class Budget(private var entries: Int, private var visits: Long, private val stop: Cancellation) {
+    fun enriched(
+        gates: Map<Int, SourceConjunctionHints.Gate>,
+        ambiguous: Set<Int>,
+        budget: Budget,
+    ): SourceClauseGuidance? {
+        if (!budget.reserve(clauses.size + 6)) return null
+        val definitions = BooleanArray(clauses.size)
+        val parents = HashMap<Int, MutableList<Int>>()
+        val degrees = HashMap<Int, Int>()
+        val ready = ArrayList<Int>()
+        for ((variable, gate) in gates) {
+            if (!budget.reserve(3)) return null
+            var degree = 0
+            for (literal in gate.inputs) {
+                if (!budget.visit() || !budget.reserve(1)) return null
+                val input = Lit.variable(literal)
+                if (input !in parents && !budget.reserve(2)) return null
+                parents.getOrPut(input) { ArrayList() }.add(variable)
+                if (input in gates) degree++
+                if (input in ambiguous) degree = LIMIT
+            }
+            degrees[variable] = degree
+            if (degree == 0) ready += variable
+        }
+        val qualified = HashSet<Int>()
+        while (ready.isNotEmpty()) {
+            if (!budget.visit()) return null
+            val variable = ready.removeAt(ready.lastIndex)
+            qualified += variable
+            for (parent in parents[variable].orEmpty()) {
+                if (!budget.visit()) return null
+                val degree = degrees.getValue(parent) - 1
+                degrees[parent] = degree
+                if (degree == 0) ready += parent
+            }
+        }
+        for ((id, clause) in clauses.withIndex()) {
+            if (!budget.visit()) return null
+            if (clause.tautological) continue
+            val literals = clause.literals
+            for (index in literals.indices) {
+                if (!budget.visit()) return null
+                val literal = literals[index]
+                val variable = Lit.variable(literal)
+                val gate = gates[variable].takeIf { variable in qualified } ?: continue
+                if (literals.size == 2 && literal == Lit.negate(gate.target)) {
+                    val input = literals[1 - index]
+                    if (!budget.visit(searchWork(gate.inputs.size))) return null
+                    if (gate.inputs.binarySearchInt(input) >= 0) definitions[id] = true
+                } else if (literal == gate.target && literals.size == gate.inputs.size + 1) {
+                    var complete = true
+                    for (other in literals.indices) {
+                        if (other == index) continue
+                        if (!budget.visit(searchWork(gate.inputs.size))) return null
+                        if (gate.inputs.binarySearchInt(Lit.negate(literals[other])) < 0) complete = false
+                    }
+                    if (complete) definitions[id] = true
+                }
+            }
+        }
+        return SourceClauseGuidance(clauses, definitions, gates, ambiguous, qualified, parents, occurrences)
+            .takeUnless { budget.stopped() }
+    }
+
+    internal class Budget(private var entries: Int, private var visits: Long, private val stop: Cancellation) {
+        val remainingVisits: Long get() = visits
+
+        var outcome: HintIndexOutcome? = null
+            private set
+
+        fun stopped(): Boolean = outcome == HintIndexOutcome.STOPPED ||
+            stop().also { if (it) outcome = HintIndexOutcome.STOPPED }
+
+        fun invalidSource() { outcome = HintIndexOutcome.INVALID_PRIMITIVE }
+
         fun visit(count: Int = 1): Boolean {
-            if (count > visits) return false
+            if (count > visits) {
+                outcome = HintIndexOutcome.VISITS
+                return false
+            }
             visits -= count
             stop.charge(count.toLong())
-            return !stop()
+            return !stopped()
         }
 
         fun reserve(count: Int): Boolean {
-            if (count > entries || !visit(count)) return false
+            if (count > entries) {
+                outcome = HintIndexOutcome.STORAGE
+                return false
+            }
+            if (!visit(count)) return false
             entries -= count
             return true
         }

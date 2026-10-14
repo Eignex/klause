@@ -10,8 +10,8 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 
 class SearchCandidateHintsTest {
 

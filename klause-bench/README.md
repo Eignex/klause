@@ -551,6 +551,11 @@ with ordinary order; it is not a source witness or a committed-decision count.
 Primitive and gate selections classify outer consultations, not recursive leaf
 reads. Missing fields in older records are unavailable rather than observed zero.
 Use the same record's route, index outcome and usage to establish feature coverage.
+Built-in exact-linear partial-point guidance requires the existing
+`open-hint-flips` parameter. Its absent default skips producer registration and
+source-index construction; zero permits bounded construction observations but no
+component steering. Positive values allow component preferences after caller or
+deferred hints decline. This opt-in does not renew numerical or indexing allowances.
 
 `openHintClauseIndexAdmitted` and `openHintClauseIndexDeclined` describe the optional
 semantic index separately from the forward index. `openHintClauseConsulted`,

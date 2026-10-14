@@ -10,9 +10,76 @@ import kotlin.test.assertTrue
 class SolveStatsMergeTest {
 
     @Test
+    fun `unobserved fields remain absent and observed raw zero survives copies and merges`() {
+        val sink = OpenHintUsageSink()
+        val absent = sink.snapshot()
+        sink.rawConstruction(0, 0, 0, 0, 0)
+        val zero = sink.snapshot()
+
+        assertEquals(null, absent.rawClausesMax)
+        assertEquals(null, absent.rawLedgerDebits)
+        assertEquals(null, zero.sourceBooleansMax)
+        assertEquals(null, zero.sourceClausesMax)
+        assertEquals(null, zero.sourcePrimitiveEntriesMax)
+        assertEquals(0L, zero.rawClausesMax)
+        assertEquals(0L, zero.rawLiteralsMax)
+        assertEquals(0L, zero.rawIncidencesMax)
+        assertEquals(0L, zero.rawVariablesMax)
+        assertEquals(0L, zero.rawLedgerDebits)
+        assertEquals(zero, zero.copy())
+        assertEquals(zero, absent.mergedWith(zero))
+        assertEquals(zero, zero.mergedWith(absent))
+        assertEquals(absent, absent.mergedWith(absent))
+        sink.sourceDimensions(0, 0, 0)
+        val observed = sink.snapshot()
+        assertEquals(0L, observed.sourceBooleansMax)
+        assertEquals(0L, observed.sourceClausesMax)
+        assertEquals(0L, observed.sourcePrimitiveEntriesMax)
+        assertEquals(observed, observed.copy())
+        assertTrue(observed != absent)
+    }
+
+    @Test
+    fun `construction maxima survive snapshots copies and independent slice merges`() {
+        val sink = OpenHintUsageSink()
+        sink.sourceDimensions(9, 7, 5)
+        sink.rawConstruction(3, 11, 7, 4, 19)
+        val first = sink.snapshot()
+        sink.sourceDimensions(4, 2, 1)
+        sink.rawConstruction(2, 8, 6, 3, 13)
+        val second = sink.snapshot()
+
+        assertEquals(19L, first.rawLedgerDebits)
+        assertEquals(32L, second.rawLedgerDebits)
+        assertEquals(9L, second.sourceBooleansMax)
+        assertEquals(7L, second.sourceClausesMax)
+        assertEquals(5L, second.sourcePrimitiveEntriesMax)
+        assertEquals(3L, second.rawClausesMax)
+        assertEquals(11L, second.rawLiteralsMax)
+        assertEquals(7L, second.rawIncidencesMax)
+        assertEquals(4L, second.rawVariablesMax)
+        assertEquals(second, sink.snapshot())
+        assertEquals(second, second.copy())
+        assertEquals(second.copy(componentConsultations = 1), second.copy().copy(componentConsultations = 1))
+        assertEquals(second, OpenHintStats(usage = second).copy(draws = 2).usage)
+        val merged = SolveStats(openHints = OpenHintStats(usage = first))
+            .mergedWith(SolveStats(openHints = OpenHintStats(usage = second))).openHints.usage
+        assertEquals(second.copy(rawLedgerDebits = 51), merged)
+        val saturated = second.copy(rawLedgerDebits = Long.MAX_VALUE).mergedWith(second)
+        assertEquals(Long.MAX_VALUE, saturated.rawLedgerDebits)
+        assertEquals(second.rawLiteralsMax, saturated.rawLiteralsMax)
+        assertEquals(second, OpenHintUsageStats().mergedWith(second))
+        assertEquals(second, second.mergedWith(OpenHintUsageStats()))
+        sink.rawConstruction(0, 0, 0, 0, Long.MAX_VALUE)
+        assertEquals(Long.MAX_VALUE, sink.snapshot().rawLedgerDebits)
+        assertEquals(second.rawLiteralsMax, sink.snapshot().rawLiteralsMax)
+    }
+
+    @Test
     fun `legacy hint copies preserve immutable usage and merge it across workers`() {
         val usage = OpenHintUsageStats(indexesAdmitted = 1, componentSelections = 3, gateSelections = 3,
-            clauseIndexesAdmitted = 1, clauseConsultations = 3, clauseSelections = 2, clauseDeclines = 1)
+            clauseIndexesAdmitted = 1, clauseConsultations = 3, clauseSelections = 2, clauseDeclines = 1,
+            earlyPointUnavailable = 2, forwardUncovered = 3, primitiveProviderNone = 1)
         val original = OpenHintStats(draws = 1, steeredSplits = 2, usage = usage)
 
         val copied = original.copy(steeredSplits = 7)
@@ -24,7 +91,8 @@ class SolveStatsMergeTest {
         assertEquals(2L, merged.draws)
         assertEquals(9L, merged.steeredSplits)
         assertEquals(OpenHintUsageStats(indexesAdmitted = 2, componentSelections = 6, gateSelections = 6,
-            clauseIndexesAdmitted = 2, clauseConsultations = 6, clauseSelections = 4, clauseDeclines = 2), merged.usage)
+            clauseIndexesAdmitted = 2, clauseConsultations = 6, clauseSelections = 4, clauseDeclines = 2,
+            earlyPointUnavailable = 4, forwardUncovered = 6, primitiveProviderNone = 2), merged.usage)
         assertEquals(OpenHintStats(), OpenHintStats(0, 0, 0, 0, 0))
         assertTrue(original != replaced)
     }
@@ -35,19 +103,34 @@ class SolveStatsMergeTest {
         sink.index(HintIndexOutcome.ADMITTED)
         sink.componentConsulted()
         sink.componentSelected(primitive = false, gate = true)
+        sink.pointUnavailable()
+        sink.variableUncovered()
+        sink.primitiveUnavailable()
         val first = sink.snapshot()
 
         assertEquals(first, sink.snapshot())
         sink.index(HintIndexOutcome.STOPPED)
+        sink.pointUnavailable()
         val second = sink.snapshot()
 
         assertEquals(0L, first.stoppedIndexes)
         assertEquals(1L, second.stoppedIndexes)
         assertEquals(1L, second.indexesAdmitted)
         assertEquals(1L, second.componentSelections)
+        assertEquals(1L, first.earlyPointUnavailable)
+        assertEquals(2L, second.earlyPointUnavailable)
+        assertEquals(1L, second.forwardUncovered)
+        assertEquals(1L, second.primitiveProviderNone)
         assertEquals(Long.MAX_VALUE,
             OpenHintUsageStats(componentSelections = Long.MAX_VALUE)
                 .mergedWith(OpenHintUsageStats(componentSelections = 1)).componentSelections)
+        val saturated = OpenHintUsageStats(
+            earlyPointUnavailable = Long.MAX_VALUE, forwardUncovered = Long.MAX_VALUE,
+            primitiveProviderNone = Long.MAX_VALUE,
+        ).mergedWith(OpenHintUsageStats(earlyPointUnavailable = 1, forwardUncovered = 1, primitiveProviderNone = 1))
+        assertEquals(Long.MAX_VALUE, saturated.earlyPointUnavailable)
+        assertEquals(Long.MAX_VALUE, saturated.forwardUncovered)
+        assertEquals(Long.MAX_VALUE, saturated.primitiveProviderNone)
     }
 
     @Test

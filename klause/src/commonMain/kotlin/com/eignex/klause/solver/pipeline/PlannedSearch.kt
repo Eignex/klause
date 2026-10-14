@@ -53,8 +53,9 @@ internal fun ComponentPlan.search(
     learnedDb: SearchLearnedDbParams,
     smtStats: SmtStatsSink?,
     theorySolveStop: Cancellation? = null,
+    openHintFlips: Long? = null,
 ): PlannedSearch = PreparedSearchComponents(this, spec, cpDomains).open(
-    maxChecks, cancellation, learnedDb, smtStats, theorySolveStop,
+    maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips,
 )
 
 internal class PreparedSearchComponents(
@@ -141,5 +142,6 @@ internal class PreparedSearchComponents(
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         smtStats: SmtStatsSink? = null,
         theorySolveStop: Cancellation? = null,
-    ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop)
+        openHintFlips: Long? = null,
+    ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips)
 }

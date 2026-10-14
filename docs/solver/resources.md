@@ -178,34 +178,6 @@ Every spent charge and the original deadline remain in force. A stopped repair
 publishes no point, model or conflict, and optional seed storage is released even
 when hint indexing declines.
 
-Source-gate indexing and each sparse dependency consultation charge the opening
-token, with at most 65,536 index or consultation entries. Definition recognition
-has the same bounded visit allowance and charges input copies, canonical sorting
-and candidate comparisons. Nested and n-ary definitions retain every implication
-pair and the full reverse clause. No gate values survive a consultation, and no
-Boolean or arithmetic invocation or allowance is created by this adapter.
-
-Optional semantic-clause indexing uses the remaining storage and recognition visits
-of that same index. It retains complete definition clause identities and sparse gate
-parent and semantic-clause incidences; an incomplete index is discarded without
-releasing admitted forward hints or the graph proof owner. A consultation shares its
-65,536 entry and visit boundary across forward evaluation and both hypotheses. Live
-pin and primitive reads are memoized for that consultation only. Primitive comparisons
-may perform already-owned scalar work; memoization avoids repeating those calls, not
-their charges. All structural visits, comparisons and allocation entries debit the
-opening token. No additional graph solve, LP query or allowance is created.
-Forward recognition charges the first implication-pair lookup before reserving or
-allocating the complete operand buffer. Failed first pairs spend only their actual
-scanned work; completed definitions retain all pair, copy, sort and distinctness charges.
-An available direct primitive preference bypasses semantic scoring after the existing
-owner and point-lifetime checks, without reconsulting its producer.
-
-Hint usage accounting has a fixed set of invocation-owned counters. Recording an
-index outcome or branch consultation performs constant work and does not poll,
-charge or reconsult a numerical producer. Immutable snapshots retain outcomes after
-private provider cleanup; cumulative snapshots are read without re-adding them.
-Independent solve-slice merges add usage counters with saturating arithmetic.
-
 Custom contexts retain the cancellation-only default for compatibility. Alternate
 coordinators inject persistent controls to retain deadline metadata, accounting
 and typed diagnostics across component callbacks.
@@ -240,6 +212,77 @@ Arithmetic services retain their own work currencies inside the containing solve
 A conditioned check receives only its invocation's remaining allowance; new branches,
 retractions and candidate retries do not renew it. Native work is forwarded once to
 the caller meter, and resource exhaustion withholds an incomplete verdict.
+
+Exact-linear partial-point polarity hints reuse a completed arithmetic check. Source
+comparison visits and bounded rational operations charge that check's current operation
+token, including its native meter; they create no numerical invocation or allowance.
+Built-in preparation requires an explicit existing `openHintFlips` value. Null
+skips row registration and source-index work before allocation or charging. Zero
+can retain construction observations but withholds component preferences; positive
+values permit them. The local-search flip ceiling is not a new point or index budget.
+Required encoder and exact-source preparation still uses the containing token,
+independently of the optional hint setting.
+Private representation or scalar declines supply no hint and retain ordinary traversal.
+Cancellation withholds the entire proposed hint table. Structural source-gate
+indexing and each sparse dependency consultation charge the opening token, with
+at most 65,536 index or consultation entries. Definition recognition has the same
+bounded visit allowance and charges input copies, canonical sorting and candidate
+comparisons. No gate values survive a consultation. See the
+[linear-real hint lifetime](../theories/linear-real.md#state-and-resources).
+Opt-in live-point construction validates every primitive ID before a complete raw
+source-clause incidence scan. That core, optional gate profile and all construction
+allocations share one cumulative 65,536 visit and storage boundary. Input-validation
+visits are included, so the combined boundary can decline earlier than forward-only
+legacy recognition. All raw source IDs and the entire suffix must complete before
+semantic metadata can survive. Raw mode gives no structural meaning to an unknown
+gate and excludes no possible definition clause.
+
+Optional full gate recognition, global ambiguity checks, acyclic qualification and
+definition flags consume only the remaining same budget. All partial profile state
+is discarded on a private limit; an independently completed raw core can remain.
+No second raw incidence index is allocated. Constant wrapper allocation is prepaid
+before construction, and a containing stop withholds all metadata and remains
+latched. If the raw core itself declines on a private limit, fully validated primitive
+preferences can remain without a semantic index. Invalid IDs and source-size declines
+retain no fallback. Index outcomes and semantic-core admission remain separate.
+Legacy providers without a point hook retain forward-only accounting; explicitly
+zero semantic storage disables the core without changing forward recognition.
+
+A consultation shares its 65,536 entry and visit boundary across forward evaluation
+and both hypotheses. Live pin and primitive reads are memoized for that consultation
+only. Primitive comparisons still charge their retained arithmetic owner's operations;
+memoization avoids repeated callbacks, not their charges. No extra numerical solve,
+query, complete check or allowance is created. Structural visits, copies, sorting,
+candidate comparison, incidence writes and staged allocations are prepaid to the
+opening token. Private construction limits retain all spent work; rejected staged
+allocations receive no refunded visit allowance. An available direct primitive
+preference bypasses semantic scoring after the existing owner and point-lifetime
+checks, without reconsulting its producer.
+Hint applicability counters observe existing hook, membership and producer results.
+They add no owner polls, producer calls, scalar operations or native charges.
+The producer's raw absence is recorded before the existing stop mask; a non-null
+preference withheld by cancellation is not a producer absence. Snapshots and
+independent merges retain these stage observations without treating them as work
+units or an exhaustive classification of stopped consultations.
+
+Hint usage accounting has a fixed set of invocation-owned counters. Recording an
+index outcome or branch consultation performs constant work and does not poll,
+charge or reconsult a numerical producer. Immutable snapshots retain outcomes after
+private provider cleanup; cumulative snapshots are read without re-adding them.
+Independent solve-slice merges add event counters and raw-stage ledger debits with
+saturating arithmetic; known source dimensions and completed construction progress
+merge by maximum. Each construction field is absent until its stage is observed;
+legacy constructors and unrelated index outcomes do not imply measured zeros.
+The CLI omits absent fields independently. Observed zero remains distinct from
+absence through snapshots, copies and merges. Supplied primitive counts include
+duplicates. Raw clause counts record only completed clauses; validated literals,
+completed incidence appends and distinct-variable buckets retain their actual
+prefixes on a decline or interruption.
+A prefix maximum is not a complete source total. Private raw-stage ledger debits
+include a debit whose external charge callback throws; they do not attest external
+meter acknowledgement or completed operations. They exclude primitive validation,
+wrapper allocation and optional profile preparation. Recording these observations
+reuses existing loop results and ledger state without scans, polls or producer calls.
 
 Linear repair completion retains the same native check, decision and work ledgers
 across candidate queries. Cached source planning neither renews an allowance nor
