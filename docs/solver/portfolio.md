@@ -284,8 +284,9 @@ Curated mixed finite optimization pools append a retained core-guided complete w
 when every objective term is Boolean and the model has no continuous columns.
 On one lane with another complete worker, the automatically appended core worker
 joins after the first checked incumbent and after each ordinary complete worker has
-spent one base of charged work after the first checked incumbent, or after the
-original initial pool retires. Each charged core turn then renews continuation coverage:
+spent one base of charged work since the latest checked improvement, or after the
+original initial pool retires. Improvements renew that initial window until the
+proof service starts. Each charged core turn then renews continuation coverage:
 the ordinary backtrack family spends one base per active initial complete sibling,
 distributed according to its ordinary arm policy. Requiring each arm again would
 wait for a sibling the improving-phase policy may not select. Further incumbent
