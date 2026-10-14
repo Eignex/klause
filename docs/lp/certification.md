@@ -122,8 +122,8 @@ certificate. This supplies integral reduced costs when a degenerate optimum
 leaves the objective seated at its continuous bound.
 When fixing is requested, one additional candidate uses only the verified
 objective-defining equality. Its integral affine costs can bound a coordinate
-whose reduced cost vanishes in the stronger LP certificate. The strongest bound
-continues to govern pruning; both complete certificates may supply local fixing.
+whose reduced cost vanishes in the stronger LP certificate. A metered exact comparison selects the stronger bound for pruning; both complete
+certificates may supply local fixing. A selection decline preserves the primary bound.
 This candidate shares the same work/allocation allowance and endpoint checks,
 and retains the defining row and its scoped premises. Candidate publication follows the
 final cancellation check; each consumer also applies certification policy admission.
