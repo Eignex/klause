@@ -32,16 +32,18 @@ class ProductInvariantTest {
             val problem = Problem(0, 2, Array(2) { IntDomain(-10, 10) },
                 arrayOf<Factor>(Product(a, b, result)))
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
-            for ((old, target) in listOf(2L to 3L, -2L to -3L, 0L to 1L, 1L to 0L)) {
-                state.assignment.setInt(0, old)
-                state.assignment.setInt(1, 4)
-                state.recompute()
-                val before = state.cost
-                val predicted = state.netDelta(Move.IntSet(0, target))
-                state.assignment.setInt(0, target)
-                state.recompute()
+            for (other in listOf(0L, 1L, -1L, 4L)) {
+                for ((old, target) in listOf(2L to 3L, -2L to -3L, 0L to 1L, 1L to 0L)) {
+                    state.assignment.setInt(0, old)
+                    state.assignment.setInt(1, other)
+                    state.recompute()
+                    val before = state.cost
+                    val predicted = state.netDelta(Move.IntSet(0, target))
+                    state.assignment.setInt(0, target)
+                    state.recompute()
 
-                assertEquals(state.cost - before, predicted, "$roles $old -> $target")
+                    assertEquals(state.cost - before, predicted, "$roles $other $old -> $target")
+                }
             }
         }
     }
@@ -53,23 +55,25 @@ class ProductInvariantTest {
             val problem = Problem(0, 2, Array(2) { IntDomain(-10, 10) },
                 arrayOf<Factor>(Product(a, b, result)))
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
-            for ((old, target) in listOf(2L to 3L, -2L to -3L, 0L to 1L, 1L to 0L)) {
-                state.assignment.setInt(0, old)
-                state.assignment.setInt(1, 4)
-                state.recompute()
+            for (other in listOf(0L, 1L, -1L, 4L)) {
+                for ((old, target) in listOf(2L to 3L, -2L to -3L, 0L to 1L, 1L to 0L)) {
+                    state.assignment.setInt(0, old)
+                    state.assignment.setInt(1, other)
+                    state.recompute()
 
-                val before = state.cost
-                state.assignment.setInt(0, target)
-                val delta = state.factors[0].applyIntSet(state, 0, 0, old)
-                state.recompute()
-                assertEquals(state.cost - before, delta.toLong(), "$roles $old -> $target")
-                state.assignment.setInt(0, old)
-                state.recompute()
-                state.apply(Move.IntSet(0, target))
-                val committed = state.cost
-                state.recompute()
+                    val before = state.cost
+                    state.assignment.setInt(0, target)
+                    val delta = state.factors[0].applyIntSet(state, 0, 0, old)
+                    state.recompute()
+                    assertEquals(state.cost - before, delta.toLong(), "$roles $other $old -> $target")
+                    state.assignment.setInt(0, old)
+                    state.recompute()
+                    state.apply(Move.IntSet(0, target))
+                    val committed = state.cost
+                    state.recompute()
 
-                assertEquals(state.cost, committed, "$roles $old -> $target")
+                    assertEquals(state.cost, committed, "$roles $other $old -> $target")
+                }
             }
         }
     }
