@@ -511,8 +511,18 @@ unconditional restrictions. Larger unary relations and multi-column tables retai
 deferred preparation. Search-time filtering retains STR2 explanations.
 
 LP explanations cite selected source bound witnesses and recursively expanded row,
-fixing and cutoff premises. Current CP propagation and source LP conflicts do not
-include an optional exact-theory row-propagation scanner or explanation weakening pass.
+fixing and cutoff premises. Objective-relative fixing can use a weaker completed
+certificate while pruning retains the strongest bound. Cancelling a continuous
+reduced cost through an active singleton row retains that row's scope even when
+the original certificate had a finite supporting endpoint. Mixed-row feasibility certificates also provide
+integer domain bounds without an incumbent. Interval reasons exclude the target's own
+endpoint and retain all supporting row and bound premises. Optional integer-residue
+checks retain both real interval sides and the prior target endpoint that delimits
+their excluded prefix or suffix. Unexpressible numerical
+scope withholds a consequence. Search-time row selection follows narrowed finite
+endpoints and Boolean pins; the resulting domain bounds retract on the CP trail.
+This bounded post-LP pass does not own incremental
+theory state. There is no explanation weakening pass.
 See [LP consumer contracts](../lp/architecture.md#consumers-explanations-and-cuts).
 
 ## Learned-clause retention

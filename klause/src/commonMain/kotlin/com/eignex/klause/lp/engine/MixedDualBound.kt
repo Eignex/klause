@@ -88,7 +88,11 @@ internal fun nodeDualCertificate(
         fixingCertificate
     } else if (primary != null && objectiveCertificate != null) {
         try {
-            meter.attempt(observer, "BLENDED") { blendedCertificate(model, primary, objectiveCertificate, meter) }
+            meter.attempt(observer, "FINITE_ENDPOINT_CANCEL") {
+                finiteEndpointCancellation(model, primary, meter)
+            } ?: meter.attempt(observer, "BLENDED") {
+                blendedCertificate(model, primary, objectiveCertificate, meter)
+            }
         } catch (_: LpProjectionStop) {
             null
         }
@@ -323,6 +327,47 @@ private fun reconstructedMixedCertificate(
         meter.multiply(BigFraction.ofLong(rational.numerator), BigFraction.ofLong(rational.denominator).reciprocal())
     }
     return mixedCertificate(model, state, y, meter)
+}
+
+private fun finiteEndpointCancellation(
+    model: LpModel,
+    certificate: LpDeductionCertificate,
+    meter: MixedCertificateMeter,
+): LpDeductionCertificate? {
+    val state = model.exactState ?: return null
+    meter.reserve(model.m * 8L + 128L)
+    val y = MutableList(model.m) { meter.multiplier(certificate, it) }
+    val counts = continuousRowCounts(model, state, meter)
+    var attempts = 0
+    for (column in 0 until model.n) {
+        meter.step()
+        if (state.model.column(column).integral) continue
+        var residual = meter.read(model.exactCost(column))
+        model.forEachRationalColumn(column) { row, coefficient ->
+            meter.step()
+            residual = meter.add(residual, meter.multiply(y[row], coefficient).negated())
+        }
+        if (residual.isZero) continue
+        val bounds = model.exactBounds(column)
+        val endpoint = if (residual.signum() > 0) bounds.lower else bounds.upper
+        if (endpoint == null) continue
+        for (entry in state.model.columnEntries(column)) {
+            meter.step()
+            if (!state.rows.row(entry.row).active || counts[entry.row] != 1 || entry.number.value.isZero) continue
+            val inverse = meter.read(meter.read(entry.number.value).reciprocal())
+            val proposed = meter.add(y[entry.row], meter.multiply(residual, inverse))
+            val slack = model.slackCol(entry.row)
+            val cost = meter.read(model.exactCost(slack))
+            val sides = model.exactBounds(slack)
+            if ((sides.lower == null && proposed < cost) || (sides.upper == null && proposed > cost)) continue
+            if (attempts++ == 8) return null
+            val previous = y[entry.row]
+            y[entry.row] = proposed
+            mixedCertificate(model, state, y, meter)?.let { return it }
+            y[entry.row] = previous
+        }
+    }
+    return null
 }
 
 private fun repairMixedEndpoints(
