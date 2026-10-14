@@ -21,7 +21,7 @@ class MixedDualBoundTest {
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         val additional = ArrayList<LpDeductionCertificate>()
 
-        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(2.5),
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(-2.5),
             onAdditionalCertificate = { additional.add(it) }))
 
         assertNull(certificate.fixSteps(0, 106L, 0L))
