@@ -115,6 +115,26 @@ class LpAutoConfigTest {
     }
 
     @Test
+    fun `ordinary root cut rows stay within the original relaxation row count`() {
+        val p = problem(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val relaxer = CpToLpRelaxation(p, objective)
+        val session = PropagationSession(p)
+        val originalRows = relaxer.build(session).model.m
+
+        val cuts = LpEngine(p, objective, LpParams(lpConfig = LpConfig.parse("default,+cuts")),
+            SolveStatsSink("cuts")).use {
+            it.harvestRootCuts(relaxer, session, emptyList(), true, true)
+        }
+
+        assertTrue(cuts.size <= originalRows)
+    }
+
+    @Test
     fun `explicit cut plans preserve mixed root separation`() {
         val p = problem(
             Linear(longArrayOf(2), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.LE, 3),

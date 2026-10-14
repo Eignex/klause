@@ -208,6 +208,8 @@ internal class LpEngine(
     private val auxiliarySources = LpAuxiliarySources()
     private var structuralCutSupport = params0.lpPlan.cuts || params0.lpPlan.circuit
 
+    internal val ordinaryCutSeparation: Boolean get() = !structuralCutSupport
+
     internal fun cutSeparationSupported(
         relaxation: LpRelaxation,
         cancellation: Cancellation,

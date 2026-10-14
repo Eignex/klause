@@ -32,7 +32,9 @@ class PortfolioCompositionTest {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, integerLinear = true) { true }
         val baseline = PortfolioComposition.compose(scenario, facts)
 
-        val composed = PortfolioComposition.compose(scenario.copy(lpCeiling = LpConfig.parse("aggressive,-cuts")), facts)
+        val composed = PortfolioComposition.compose(
+            scenario.copy(lpCeiling = LpConfig.parse("aggressive,-cuts")), facts,
+        )
 
         assertEquals(baseline.map { it.label }, composed.map { it.label })
     }

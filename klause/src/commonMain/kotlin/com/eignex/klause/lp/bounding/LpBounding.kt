@@ -1068,11 +1068,14 @@ internal fun LpEngine.harvestRootCuts(
 ): List<Cut> {
     if (session.isUnsatAtRoot) return emptyList()
     if (separators.isEmpty() && !gomory && !mir) return emptyList()
-    val pool = CutPool()
+    var pool = CutPool()
     try {
         var relaxation = relaxer.build(session, cancellation = cancellation)
         if (relaxation.model.n == 0) return emptyList()
         if (!cutSeparationSupported(relaxation, cancellation, root = true)) return emptyList()
+        if (ordinaryCutSeparation) {
+            pool = CutPool(maxCuts = minOf(CutPool.DEFAULT_MAX_CUTS, relaxation.model.m))
+        }
         var simplex = dualSimplex(relaxation.model, cancellation)
         var ownedSimplex: TableauCutSolver? = simplex
         var primaryFailure: Throwable? = null
@@ -1117,6 +1120,10 @@ internal fun LpEngine.harvestRootCuts(
                 val added = candidates.count { pool.add(it, relaxation) }
                 observeRootCutAccounting(candidates.size, 0, 0)
                 if (added == 0) break
+                if (ordinaryCutSeparation) {
+                    pool.observe(result.primal)
+                    pool.retainMostActive()
+                }
                 val selected = pool.cuts()
                 relaxation = observeRootCutBuild(selected.size) { relaxer.build(session, selected, cancellation) }
                 val replacement = dualSimplex(relaxation.model, cancellation)
