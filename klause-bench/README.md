@@ -227,7 +227,10 @@ structured proposals for each original NValue factor with per-move definitions d
 and enabled. Use `suite=<id> problem=<name> seed=17 timeout=10000 calls=32`; the timeout
 applies to incumbent acquisition and calls is capped at 256. It retains the incumbent,
 installed-build provenance, proposal time/allocation totals, maintained input counts and
-the residual factor kinds of proposed cardinality reductions under `$OUT`. Proposal
+the residual factor kinds and clause dependencies of proposed cardinality reductions under `$OUT`.
+For a reduction with remaining violations, a separate diagnostic state traces up to two
+ordinary clause repairs while protecting every NValue coordinate and the count. The
+trace does not change the measured state's assignment or random stream. Proposal
 generation must leave the incumbent unchanged. Scoring and incumbent acquisition are
 outside proposal timing. This probes the neighborhood at a captured feasible point;
 it does not measure portfolio reachability, independent source validity or end-to-end gains.
