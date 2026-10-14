@@ -13342,19 +13342,25 @@ final class com.eignex.klause.solver.result/ConflictAnalysisStats { // com.eigne
 }
 
 final class com.eignex.klause.solver.result/CoreGuidedStats { // com.eignex.klause.solver.result/CoreGuidedStats|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Int = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ...) // com.eignex.klause.solver.result/CoreGuidedStats.<init>|<init>(kotlin.Long;kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger?){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Int = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ..., kotlin/Long? = ..., kotlin/Long? = ...) // com.eignex.klause.solver.result/CoreGuidedStats.<init>|<init>(kotlin.Long;kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger?;kotlin.Long?;kotlin.Long?){}[0]
 
+    final val activeMillisLimit // com.eignex.klause.solver.result/CoreGuidedStats.activeMillisLimit|{}activeMillisLimit[0]
+        final fun <get-activeMillisLimit>(): kotlin/Long? // com.eignex.klause.solver.result/CoreGuidedStats.activeMillisLimit.<get-activeMillisLimit>|<get-activeMillisLimit>(){}[0]
     final val cores // com.eignex.klause.solver.result/CoreGuidedStats.cores|{}cores[0]
         final fun <get-cores>(): kotlin/Long // com.eignex.klause.solver.result/CoreGuidedStats.cores.<get-cores>|<get-cores>(){}[0]
     final val largestCore // com.eignex.klause.solver.result/CoreGuidedStats.largestCore|{}largestCore[0]
         final fun <get-largestCore>(): kotlin/Int // com.eignex.klause.solver.result/CoreGuidedStats.largestCore.<get-largestCore>|<get-largestCore>(){}[0]
     final val lowerBound // com.eignex.klause.solver.result/CoreGuidedStats.lowerBound|{}lowerBound[0]
         final fun <get-lowerBound>(): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.solver.result/CoreGuidedStats.lowerBound.<get-lowerBound>|<get-lowerBound>(){}[0]
+    final val workLimit // com.eignex.klause.solver.result/CoreGuidedStats.workLimit|{}workLimit[0]
+        final fun <get-workLimit>(): kotlin/Long? // com.eignex.klause.solver.result/CoreGuidedStats.workLimit.<get-workLimit>|<get-workLimit>(){}[0]
 
     final fun component1(): kotlin/Long // com.eignex.klause.solver.result/CoreGuidedStats.component1|component1(){}[0]
     final fun component2(): kotlin/Int // com.eignex.klause.solver.result/CoreGuidedStats.component2|component2(){}[0]
     final fun component3(): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.solver.result/CoreGuidedStats.component3|component3(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Int = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ...): com.eignex.klause.solver.result/CoreGuidedStats // com.eignex.klause.solver.result/CoreGuidedStats.copy|copy(kotlin.Long;kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger?){}[0]
+    final fun component4(): kotlin/Long? // com.eignex.klause.solver.result/CoreGuidedStats.component4|component4(){}[0]
+    final fun component5(): kotlin/Long? // com.eignex.klause.solver.result/CoreGuidedStats.component5|component5(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Int = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ..., kotlin/Long? = ..., kotlin/Long? = ...): com.eignex.klause.solver.result/CoreGuidedStats // com.eignex.klause.solver.result/CoreGuidedStats.copy|copy(kotlin.Long;kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger?;kotlin.Long?;kotlin.Long?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/CoreGuidedStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/CoreGuidedStats.hashCode|hashCode(){}[0]
     final fun mergedWith(com.eignex.klause.solver.result/CoreGuidedStats): com.eignex.klause.solver.result/CoreGuidedStats // com.eignex.klause.solver.result/CoreGuidedStats.mergedWith|mergedWith(com.eignex.klause.solver.result.CoreGuidedStats){}[0]
