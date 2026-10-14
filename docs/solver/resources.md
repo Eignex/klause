@@ -91,7 +91,7 @@ repay the same debt. An automatically deferred single-lane core worker has one b
 work slice per turn and two seconds of cumulative active time, independent of
 later scheduler growth. Work pauses retain completed fixpoints and traversal state;
 propagation interruptions discard the partial traversal. A private segment stop
-reported as native budget exhaustion pauses the core
+reported as native budget exhaustion, including cancellation after traversal starts, pauses the core
 handle while its decision, node and lifetime quotas remain available. Source
 verification observes the same segment and cumulative active-time controls;
 interrupted checking withholds the candidate and stops further assignment pins.
