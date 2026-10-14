@@ -638,6 +638,7 @@ final enum class com.eignex.klause.solver.pipeline/PreparedPlanDecline : kotlin/
     enum entry CONTINUOUS_LINEAR_OBJECTIVE // com.eignex.klause.solver.pipeline/PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE|null[0]
     enum entry OPEN_POLYNOMIAL_INTEGER // com.eignex.klause.solver.pipeline/PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER|null[0]
     enum entry POLYNOMIAL_ENCODING // com.eignex.klause.solver.pipeline/PreparedPlanDecline.POLYNOMIAL_ENCODING|null[0]
+    enum entry RESOURCE // com.eignex.klause.solver.pipeline/PreparedPlanDecline.RESOURCE|null[0]
     enum entry UNOWNED_SOURCE_COMPONENT // com.eignex.klause.solver.pipeline/PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT|null[0]
 
     final val entries // com.eignex.klause.solver.pipeline/PreparedPlanDecline.entries|#static{}entries[0]
@@ -1728,6 +1729,12 @@ abstract interface com.eignex.klause.theory/TheoryEncoding { // com.eignex.klaus
     abstract fun linear(com.eignex.klause.ir/LinearForm) // com.eignex.klause.theory/TheoryEncoding.linear|linear(com.eignex.klause.ir.LinearForm){}[0]
     abstract fun polynomial(com.eignex.klause.ir/PolynomialRealFormula) // com.eignex.klause.theory/TheoryEncoding.polynomial|polynomial(com.eignex.klause.ir.PolynomialRealFormula){}[0]
     abstract fun real(com.eignex.klause.ir/SourceRealId): com.eignex.klause.ir/PolynomialExpression // com.eignex.klause.theory/TheoryEncoding.real|real(com.eignex.klause.ir.SourceRealId){}[0]
+    open fun auxiliary(): com.eignex.klause.theory/EncodingAuxiliary // com.eignex.klause.theory/TheoryEncoding.auxiliary|auxiliary(){}[0]
+    open fun define(com.eignex.klause.theory/EncodingAuxiliary, com.eignex.klause.theory/EncodingAffineExpression) // com.eignex.klause.theory/TheoryEncoding.define|define(com.eignex.klause.theory.EncodingAuxiliary;com.eignex.klause.theory.EncodingAffineExpression){}[0]
+    open fun define(com.eignex.klause.theory/EncodingGuard, com.eignex.klause.theory/LinearEncodingFormula) // com.eignex.klause.theory/TheoryEncoding.define|define(com.eignex.klause.theory.EncodingGuard;com.eignex.klause.theory.LinearEncodingFormula){}[0]
+    open fun guard(): com.eignex.klause.theory/EncodingGuard // com.eignex.klause.theory/TheoryEncoding.guard|guard(){}[0]
+    open fun linearFormula(com.eignex.klause.theory/LinearEncodingFormula) // com.eignex.klause.theory/TheoryEncoding.linearFormula|linearFormula(com.eignex.klause.theory.LinearEncodingFormula){}[0]
+    open fun realAuxiliary(): com.eignex.klause.theory/EncodingRealAuxiliary // com.eignex.klause.theory/TheoryEncoding.realAuxiliary|realAuxiliary(){}[0]
 }
 
 abstract interface com.eignex.klause.util/CharSource { // com.eignex.klause.util/CharSource|null[0]
@@ -12936,6 +12943,7 @@ final class com.eignex.klause.solver.pipeline/PreparedSourcePlan { // com.eignex
     final fun integerCoordinate(kotlin/Int): kotlin/Int // com.eignex.klause.solver.pipeline/PreparedSourcePlan.integerCoordinate|integerCoordinate(kotlin.Int){}[0]
     final fun polynomialIntegerCoordinate(kotlin/Int): kotlin/Int? // com.eignex.klause.solver.pipeline/PreparedSourcePlan.polynomialIntegerCoordinate|polynomialIntegerCoordinate(kotlin.Int){}[0]
     final fun prepareConditionedLinearQuery(): com.eignex.klause.solver.pipeline/PreparedSourcePlan? // com.eignex.klause.solver.pipeline/PreparedSourcePlan.prepareConditionedLinearQuery|prepareConditionedLinearQuery(){}[0]
+    final fun prepareConditionedLinearQuery(com.eignex.klause.util/Cancellation): com.eignex.klause.solver.pipeline/PreparedSourcePlan? // com.eignex.klause.solver.pipeline/PreparedSourcePlan.prepareConditionedLinearQuery|prepareConditionedLinearQuery(com.eignex.klause.util.Cancellation){}[0]
     final fun realCoordinate(kotlin/Int): kotlin/Int // com.eignex.klause.solver.pipeline/PreparedSourcePlan.realCoordinate|realCoordinate(kotlin.Int){}[0]
     final fun withObjective(com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/PreparedSourcePlan.withObjective|withObjective(com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.ir.ObjectiveSense){}[0]
     final fun withObjective(com.eignex.klause.solver.objective/LinearObjective, kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/PreparedSourcePlan.withObjective|withObjective(com.eignex.klause.solver.objective.LinearObjective;kotlin.Boolean){}[0]
@@ -15292,7 +15300,18 @@ final class com.eignex.klause.theory/Encoder { // com.eignex.klause.theory/Encod
     final fun install(com.eignex.klause.ir/Factor, com.eignex.klause.theory/TheoryEncoding): com.eignex.klause.theory/EncoderDecline? // com.eignex.klause.theory/Encoder.install|install(com.eignex.klause.ir.Factor;com.eignex.klause.theory.TheoryEncoding){}[0]
 }
 
+final class com.eignex.klause.theory/EncodingAffineExpression { // com.eignex.klause.theory/EncodingAffineExpression|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.theory/EncodingLinearTerm>, com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.theory/EncodingAffineExpression.<init>|<init>(kotlin.collections.List<com.eignex.klause.theory.EncodingLinearTerm>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+
+    final val constant // com.eignex.klause.theory/EncodingAffineExpression.constant|{}constant[0]
+        final fun <get-constant>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.theory/EncodingAffineExpression.constant.<get-constant>|<get-constant>(){}[0]
+    final val terms // com.eignex.klause.theory/EncodingAffineExpression.terms|{}terms[0]
+        final fun <get-terms>(): kotlin.collections/List<com.eignex.klause.theory/EncodingLinearTerm> // com.eignex.klause.theory/EncodingAffineExpression.terms.<get-terms>|<get-terms>(){}[0]
+}
+
 final class com.eignex.klause.theory/EncodingAttribution { // com.eignex.klause.theory/EncodingAttribution|null[0]
+    final val affineAuxiliaries // com.eignex.klause.theory/EncodingAttribution.affineAuxiliaries|{}affineAuxiliaries[0]
+        final fun <get-affineAuxiliaries>(): kotlin.collections/List<com.eignex.klause.theory/EncodingAffineExpression> // com.eignex.klause.theory/EncodingAttribution.affineAuxiliaries.<get-affineAuxiliaries>|<get-affineAuxiliaries>(){}[0]
     final val auxiliaries // com.eignex.klause.theory/EncodingAttribution.auxiliaries|{}auxiliaries[0]
         final fun <get-auxiliaries>(): kotlin.collections/List<com.eignex.klause.theory/TheoryRealId> // com.eignex.klause.theory/EncodingAttribution.auxiliaries.<get-auxiliaries>|<get-auxiliaries>(){}[0]
     final val booleanConditions // com.eignex.klause.theory/EncodingAttribution.booleanConditions|{}booleanConditions[0]
@@ -15305,12 +15324,57 @@ final class com.eignex.klause.theory/EncodingAttribution { // com.eignex.klause.
         final fun <get-integerEmbeddings>(): kotlin.collections/Map<com.eignex.klause.ir/SourceIntId, com.eignex.klause.theory/TheoryRealId> // com.eignex.klause.theory/EncodingAttribution.integerEmbeddings.<get-integerEmbeddings>|<get-integerEmbeddings>(){}[0]
     final val integers // com.eignex.klause.theory/EncodingAttribution.integers|{}integers[0]
         final fun <get-integers>(): kotlin.collections/List<com.eignex.klause.ir/SourceIntId> // com.eignex.klause.theory/EncodingAttribution.integers.<get-integers>|<get-integers>(){}[0]
+    final val linearGuards // com.eignex.klause.theory/EncodingAttribution.linearGuards|{}linearGuards[0]
+        final fun <get-linearGuards>(): kotlin.collections/List<com.eignex.klause.theory/LinearEncodingFormula> // com.eignex.klause.theory/EncodingAttribution.linearGuards.<get-linearGuards>|<get-linearGuards>(){}[0]
     final val realEmbeddings // com.eignex.klause.theory/EncodingAttribution.realEmbeddings|{}realEmbeddings[0]
         final fun <get-realEmbeddings>(): kotlin.collections/Map<com.eignex.klause.ir/SourceRealId, com.eignex.klause.theory/TheoryRealId> // com.eignex.klause.theory/EncodingAttribution.realEmbeddings.<get-realEmbeddings>|<get-realEmbeddings>(){}[0]
     final val reals // com.eignex.klause.theory/EncodingAttribution.reals|{}reals[0]
         final fun <get-reals>(): kotlin.collections/List<com.eignex.klause.ir/SourceRealId> // com.eignex.klause.theory/EncodingAttribution.reals.<get-reals>|<get-reals>(){}[0]
     final val sourceFactorIndex // com.eignex.klause.theory/EncodingAttribution.sourceFactorIndex|{}sourceFactorIndex[0]
         final fun <get-sourceFactorIndex>(): kotlin/Int // com.eignex.klause.theory/EncodingAttribution.sourceFactorIndex.<get-sourceFactorIndex>|<get-sourceFactorIndex>(){}[0]
+}
+
+final class com.eignex.klause.theory/EncodingAuxiliary { // com.eignex.klause.theory/EncodingAuxiliary|null[0]
+    final val index // com.eignex.klause.theory/EncodingAuxiliary.index|{}index[0]
+        final fun <get-index>(): kotlin/Int // com.eignex.klause.theory/EncodingAuxiliary.index.<get-index>|<get-index>(){}[0]
+}
+
+final class com.eignex.klause.theory/EncodingGuard { // com.eignex.klause.theory/EncodingGuard|null[0]
+    final val index // com.eignex.klause.theory/EncodingGuard.index|{}index[0]
+        final fun <get-index>(): kotlin/Int // com.eignex.klause.theory/EncodingGuard.index.<get-index>|<get-index>(){}[0]
+}
+
+final class com.eignex.klause.theory/EncodingLinearTerm { // com.eignex.klause.theory/EncodingLinearTerm|null[0]
+    final val auxiliary // com.eignex.klause.theory/EncodingLinearTerm.auxiliary|{}auxiliary[0]
+        final fun <get-auxiliary>(): com.eignex.klause.theory/EncodingAuxiliary? // com.eignex.klause.theory/EncodingLinearTerm.auxiliary.<get-auxiliary>|<get-auxiliary>(){}[0]
+    final val coefficient // com.eignex.klause.theory/EncodingLinearTerm.coefficient|{}coefficient[0]
+        final fun <get-coefficient>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.theory/EncodingLinearTerm.coefficient.<get-coefficient>|<get-coefficient>(){}[0]
+    final val realAuxiliary // com.eignex.klause.theory/EncodingLinearTerm.realAuxiliary|{}realAuxiliary[0]
+        final fun <get-realAuxiliary>(): com.eignex.klause.theory/EncodingRealAuxiliary? // com.eignex.klause.theory/EncodingLinearTerm.realAuxiliary.<get-realAuxiliary>|<get-realAuxiliary>(){}[0]
+    final val reference // com.eignex.klause.theory/EncodingLinearTerm.reference|{}reference[0]
+        final fun <get-reference>(): kotlin/Int? // com.eignex.klause.theory/EncodingLinearTerm.reference.<get-reference>|<get-reference>(){}[0]
+
+    final object Companion { // com.eignex.klause.theory/EncodingLinearTerm.Companion|null[0]
+        final fun auxiliary(com.eignex.klause.theory/EncodingAuxiliary, com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.theory/EncodingLinearTerm // com.eignex.klause.theory/EncodingLinearTerm.Companion.auxiliary|auxiliary(com.eignex.klause.theory.EncodingAuxiliary;com.eignex.klause.simplex.exact.BigFraction){}[0]
+        final fun auxiliary(com.eignex.klause.theory/EncodingRealAuxiliary, com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.theory/EncodingLinearTerm // com.eignex.klause.theory/EncodingLinearTerm.Companion.auxiliary|auxiliary(com.eignex.klause.theory.EncodingRealAuxiliary;com.eignex.klause.simplex.exact.BigFraction){}[0]
+        final fun source(kotlin/Int, com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.theory/EncodingLinearTerm // com.eignex.klause.theory/EncodingLinearTerm.Companion.source|source(kotlin.Int;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    }
+}
+
+final class com.eignex.klause.theory/EncodingNamespace { // com.eignex.klause.theory/EncodingNamespace|null[0]
+    constructor <init>() // com.eignex.klause.theory/EncodingNamespace.<init>|<init>(){}[0]
+
+    final fun auxiliary(kotlin/Int): com.eignex.klause.theory/EncodingAuxiliary // com.eignex.klause.theory/EncodingNamespace.auxiliary|auxiliary(kotlin.Int){}[0]
+    final fun guard(kotlin/Int): com.eignex.klause.theory/EncodingGuard // com.eignex.klause.theory/EncodingNamespace.guard|guard(kotlin.Int){}[0]
+    final fun owns(com.eignex.klause.theory/EncodingAuxiliary): kotlin/Boolean // com.eignex.klause.theory/EncodingNamespace.owns|owns(com.eignex.klause.theory.EncodingAuxiliary){}[0]
+    final fun owns(com.eignex.klause.theory/EncodingGuard): kotlin/Boolean // com.eignex.klause.theory/EncodingNamespace.owns|owns(com.eignex.klause.theory.EncodingGuard){}[0]
+    final fun owns(com.eignex.klause.theory/EncodingRealAuxiliary): kotlin/Boolean // com.eignex.klause.theory/EncodingNamespace.owns|owns(com.eignex.klause.theory.EncodingRealAuxiliary){}[0]
+    final fun realAuxiliary(com.eignex.klause.theory/TheoryRealId): com.eignex.klause.theory/EncodingRealAuxiliary // com.eignex.klause.theory/EncodingNamespace.realAuxiliary|realAuxiliary(com.eignex.klause.theory.TheoryRealId){}[0]
+}
+
+final class com.eignex.klause.theory/EncodingRealAuxiliary { // com.eignex.klause.theory/EncodingRealAuxiliary|null[0]
+    final val coordinate // com.eignex.klause.theory/EncodingRealAuxiliary.coordinate|{}coordinate[0]
+        final fun <get-coordinate>(): com.eignex.klause.theory/TheoryRealId // com.eignex.klause.theory/EncodingRealAuxiliary.coordinate.<get-coordinate>|<get-coordinate>(){}[0]
 }
 
 final class com.eignex.klause.util/Bits { // com.eignex.klause.util/Bits|null[0]
@@ -15686,6 +15750,49 @@ sealed class com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.kla
 
         final val pool // com.eignex.klause.solver.pipeline/PortfolioPlan.LocalSearchDryRun.pool|{}pool[0]
             final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? // com.eignex.klause.solver.pipeline/PortfolioPlan.LocalSearchDryRun.pool.<get-pool>|<get-pool>(){}[0]
+    }
+}
+
+sealed class com.eignex.klause.theory/LinearEncodingFormula { // com.eignex.klause.theory/LinearEncodingFormula|null[0]
+    final class And : com.eignex.klause.theory/LinearEncodingFormula { // com.eignex.klause.theory/LinearEncodingFormula.And|null[0]
+        constructor <init>(kotlin.collections/List<com.eignex.klause.theory/LinearEncodingFormula>) // com.eignex.klause.theory/LinearEncodingFormula.And.<init>|<init>(kotlin.collections.List<com.eignex.klause.theory.LinearEncodingFormula>){}[0]
+
+        final val operands // com.eignex.klause.theory/LinearEncodingFormula.And.operands|{}operands[0]
+            final fun <get-operands>(): kotlin.collections/List<com.eignex.klause.theory/LinearEncodingFormula> // com.eignex.klause.theory/LinearEncodingFormula.And.operands.<get-operands>|<get-operands>(){}[0]
+    }
+
+    final class Comparison : com.eignex.klause.theory/LinearEncodingFormula { // com.eignex.klause.theory/LinearEncodingFormula.Comparison|null[0]
+        constructor <init>(com.eignex.klause.theory/EncodingAffineExpression, com.eignex.klause.ir/LinearOp, com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ...) // com.eignex.klause.theory/LinearEncodingFormula.Comparison.<init>|<init>(com.eignex.klause.theory.EncodingAffineExpression;com.eignex.klause.ir.LinearOp;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean){}[0]
+
+        final val bound // com.eignex.klause.theory/LinearEncodingFormula.Comparison.bound|{}bound[0]
+            final fun <get-bound>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.theory/LinearEncodingFormula.Comparison.bound.<get-bound>|<get-bound>(){}[0]
+        final val expression // com.eignex.klause.theory/LinearEncodingFormula.Comparison.expression|{}expression[0]
+            final fun <get-expression>(): com.eignex.klause.theory/EncodingAffineExpression // com.eignex.klause.theory/LinearEncodingFormula.Comparison.expression.<get-expression>|<get-expression>(){}[0]
+        final val relation // com.eignex.klause.theory/LinearEncodingFormula.Comparison.relation|{}relation[0]
+            final fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.theory/LinearEncodingFormula.Comparison.relation.<get-relation>|<get-relation>(){}[0]
+        final val strict // com.eignex.klause.theory/LinearEncodingFormula.Comparison.strict|{}strict[0]
+            final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.theory/LinearEncodingFormula.Comparison.strict.<get-strict>|<get-strict>(){}[0]
+    }
+
+    final class Guard : com.eignex.klause.theory/LinearEncodingFormula { // com.eignex.klause.theory/LinearEncodingFormula.Guard|null[0]
+        constructor <init>(com.eignex.klause.theory/EncodingGuard) // com.eignex.klause.theory/LinearEncodingFormula.Guard.<init>|<init>(com.eignex.klause.theory.EncodingGuard){}[0]
+
+        final val guard // com.eignex.klause.theory/LinearEncodingFormula.Guard.guard|{}guard[0]
+            final fun <get-guard>(): com.eignex.klause.theory/EncodingGuard // com.eignex.klause.theory/LinearEncodingFormula.Guard.guard.<get-guard>|<get-guard>(){}[0]
+    }
+
+    final class Or : com.eignex.klause.theory/LinearEncodingFormula { // com.eignex.klause.theory/LinearEncodingFormula.Or|null[0]
+        constructor <init>(kotlin.collections/List<com.eignex.klause.theory/LinearEncodingFormula>) // com.eignex.klause.theory/LinearEncodingFormula.Or.<init>|<init>(kotlin.collections.List<com.eignex.klause.theory.LinearEncodingFormula>){}[0]
+
+        final val operands // com.eignex.klause.theory/LinearEncodingFormula.Or.operands|{}operands[0]
+            final fun <get-operands>(): kotlin.collections/List<com.eignex.klause.theory/LinearEncodingFormula> // com.eignex.klause.theory/LinearEncodingFormula.Or.operands.<get-operands>|<get-operands>(){}[0]
+    }
+
+    final class Relation : com.eignex.klause.theory/LinearEncodingFormula { // com.eignex.klause.theory/LinearEncodingFormula.Relation|null[0]
+        constructor <init>(com.eignex.klause.ir/LinearForm) // com.eignex.klause.theory/LinearEncodingFormula.Relation.<init>|<init>(com.eignex.klause.ir.LinearForm){}[0]
+
+        final val form // com.eignex.klause.theory/LinearEncodingFormula.Relation.form|{}form[0]
+            final fun <get-form>(): com.eignex.klause.ir/LinearForm // com.eignex.klause.theory/LinearEncodingFormula.Relation.form.<get-form>|<get-form>(){}[0]
     }
 }
 
@@ -16102,13 +16209,17 @@ final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.evidence/sourc
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/componentPlan(com.eignex.klause.solver/PreparedFactorProjections, kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/componentPlan|componentPlan@com.eignex.klause.ir.Problem(com.eignex.klause.solver.PreparedFactorProjections;kotlin.Boolean){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/componentPlan(com.eignex.klause.solver/PreparedFactorProjections, kotlin/Boolean = ..., com.eignex.klause.util/Cancellation): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/componentPlan|componentPlan@com.eignex.klause.ir.Problem(com.eignex.klause.solver.PreparedFactorProjections;kotlin.Boolean;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/componentPlan(kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/componentPlan|componentPlan@com.eignex.klause.ir.Problem(kotlin.Boolean){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/componentPlan(kotlin/Boolean = ..., com.eignex.klause.util/Cancellation): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/componentPlan|componentPlan@com.eignex.klause.ir.Problem(kotlin.Boolean;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/pipelineRoute(com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute // com.eignex.klause.solver.pipeline/pipelineRoute|pipelineRoute@com.eignex.klause.ir.Problem(com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/pipelineRoute(com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ..., kotlin/Function1<com.eignex.klause.solver.result/LpStats, kotlin/Unit>): com.eignex.klause.solver.pipeline/SourceProblemRoute // com.eignex.klause.solver.pipeline/pipelineRoute|pipelineRoute@com.eignex.klause.ir.Problem(com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;kotlin.Boolean;kotlin.Function1<com.eignex.klause.solver.result.LpStats,kotlin.Unit>){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/pipelineRoute(com.eignex.klause.solver/FactorProjectionProviders, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ..., kotlin/Function1<com.eignex.klause.solver.result/LpStats, kotlin/Unit>? = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute // com.eignex.klause.solver.pipeline/pipelineRoute|pipelineRoute@com.eignex.klause.ir.Problem(com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;kotlin.Boolean;kotlin.Function1<com.eignex.klause.solver.result.LpStats,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/prepareExecutionPlan(com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/prepareExecutionPlan|prepareExecutionPlan@com.eignex.klause.ir.Problem(com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/prepareExecutionPlan(com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/prepareExecutionPlan|prepareExecutionPlan@com.eignex.klause.ir.Problem(com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/prepareExecutionPlan(com.eignex.klause.solver/FactorProjectionProviders, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/prepareExecutionPlan|prepareExecutionPlan@com.eignex.klause.ir.Problem(com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/prepareExecutionPlan(com.eignex.klause.solver/FactorProjectionProviders, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/prepareExecutionPlan|prepareExecutionPlan@com.eignex.klause.ir.Problem(com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/sourceRoute(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/sourceRoute|sourceRoute@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/variablePartition(): com.eignex.klause.solver.pipeline/VariablePartition // com.eignex.klause.solver.pipeline/variablePartition|variablePartition@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver/hasFiniteIntegerRanges(): kotlin/Boolean // com.eignex.klause.solver/hasFiniteIntegerRanges|hasFiniteIntegerRanges@com.eignex.klause.ir.Problem(){}[0]
