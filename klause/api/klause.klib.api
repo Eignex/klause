@@ -6571,8 +6571,10 @@ final class com.eignex.klause.formats.dimacs/WcnfDocument { // com.eignex.klause
 }
 
 final class com.eignex.klause.formats.dimacs/WcnfProblem { // com.eignex.klause.formats.dimacs/WcnfProblem|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec, kotlin/Int) // com.eignex.klause.formats.dimacs/WcnfProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec;kotlin.Int){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec, kotlin/Int, kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ...) // com.eignex.klause.formats.dimacs/WcnfProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec;kotlin.Int;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>){}[0]
 
+    final val boolFolds // com.eignex.klause.formats.dimacs/WcnfProblem.boolFolds|{}boolFolds[0]
+        final fun <get-boolFolds>(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.formats.dimacs/WcnfProblem.boolFolds.<get-boolFolds>|<get-boolFolds>(){}[0]
     final val numOriginalBoolVars // com.eignex.klause.formats.dimacs/WcnfProblem.numOriginalBoolVars|{}numOriginalBoolVars[0]
         final fun <get-numOriginalBoolVars>(): kotlin/Int // com.eignex.klause.formats.dimacs/WcnfProblem.numOriginalBoolVars.<get-numOriginalBoolVars>|<get-numOriginalBoolVars>(){}[0]
     final val objective // com.eignex.klause.formats.dimacs/WcnfProblem.objective|{}objective[0]
@@ -6583,7 +6585,8 @@ final class com.eignex.klause.formats.dimacs/WcnfProblem { // com.eignex.klause.
     final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.formats.dimacs/WcnfProblem.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec // com.eignex.klause.formats.dimacs/WcnfProblem.component2|component2(){}[0]
     final fun component3(): kotlin/Int // com.eignex.klause.formats.dimacs/WcnfProblem.component3|component3(){}[0]
-    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec = ..., kotlin/Int = ...): com.eignex.klause.formats.dimacs/WcnfProblem // com.eignex.klause.formats.dimacs/WcnfProblem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec;kotlin.Int){}[0]
+    final fun component4(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.formats.dimacs/WcnfProblem.component4|component4(){}[0]
+    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec = ..., kotlin/Int = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ...): com.eignex.klause.formats.dimacs/WcnfProblem // com.eignex.klause.formats.dimacs/WcnfProblem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec;kotlin.Int;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.dimacs/WcnfProblem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.dimacs/WcnfProblem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.dimacs/WcnfProblem.toString|toString(){}[0]

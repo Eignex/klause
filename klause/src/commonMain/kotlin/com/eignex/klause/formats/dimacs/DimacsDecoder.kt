@@ -4,6 +4,7 @@ package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
@@ -18,6 +19,8 @@ data class WcnfProblem(
     val objective: LinearObjectiveSpec,
     /** Number of original, non-relaxation variables. */
     val numOriginalBoolVars: Int,
+    /** Exact soft-clause violation definitions over original literals. */
+    val boolFolds: List<BoolFoldDefinition> = emptyList(),
 )
 
 /** Lower this parsed CNF document to a solver problem. */
@@ -60,6 +63,7 @@ fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.prob
     val factors = ArrayList<Factor>(hardClauses.size + relaxedClauses + if (triviallyUnsat) 2 else 0)
     factors.addAll(hardClauses.map(::Clause))
     val weights = unitCosts.copyOf(totalVars)
+    val boolFolds = ArrayList<BoolFoldDefinition>(relaxedClauses)
     var relax = numOriginalBoolVars
     for ((index, soft) in softClauses.withIndex()) {
         if (direct[index]) continue
@@ -67,6 +71,9 @@ fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.prob
         for (literal in soft.literals) {
             factors.add(Clause(intArrayOf(Lit.make(relax, positive = false), Lit.negate(literal))))
         }
+        boolFolds.add(BoolFoldDefinition(
+            relax, IntArray(soft.literals.size) { Lit.negate(soft.literals[it]) }, isAnd = true,
+        ))
         weights[relax++] = soft.weight
     }
     if (triviallyUnsat) {
@@ -78,5 +85,6 @@ fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.prob
         Problem(totalVars, 0, emptyArray(), factors.toTypedArray(), settings = settings),
         LinearObjectiveSpec(boolWeights = weights, constant = constant),
         numOriginalBoolVars,
+        boolFolds,
     )
 }
