@@ -217,8 +217,8 @@ internal class ObjectiveBoundInvariant(
         if (state.longPayload[factorId] <= bound.value) return
         for (i in boolVars.indices) {
             val cur = state.assignment.boolValue(boolVars[i])
-            if (boolWeights[i] > 0L && cur) sink.addBoolFlip(boolVars[i])
-            if (boolWeights[i] < 0L && !cur) sink.addBoolFlip(boolVars[i])
+            if (boolWeights[i] > 0L && cur) sink.addChannelingBoolFlip(state, boolVars[i])
+            if (boolWeights[i] < 0L && !cur) sink.addChannelingBoolFlip(state, boolVars[i])
         }
         for (i in intVars.indices) {
             val v = intVars[i]
@@ -321,8 +321,8 @@ internal class FloatObjectiveBoundInvariant(
         if (overshoot <= 0.0) return
         for (i in boolVars.indices) {
             val cur = state.assignment.boolValue(boolVars[i])
-            if (boolWeights[i] > 0L && cur) sink.addBoolFlip(boolVars[i])
-            if (boolWeights[i] < 0L && !cur) sink.addBoolFlip(boolVars[i])
+            if (boolWeights[i] > 0L && cur) sink.addChannelingBoolFlip(state, boolVars[i])
+            if (boolWeights[i] < 0L && !cur) sink.addChannelingBoolFlip(state, boolVars[i])
         }
         for (i in intVars.indices) {
             val v = intVars[i]

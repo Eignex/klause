@@ -79,3 +79,7 @@ Lowering retains each explicit penalty's exact Boolean definition in
 the conjunction of the complemented source literals. Consumers can use this metadata
 with the shared Boolean definition mechanisms; the equivalence clauses remain the
 authority for feasible source costs.
+
+The WCNF CLI forwards these definitions to the objective view. Unit penalties join
+the maintained Boolean sweep, so Boolean objective-leaf moves update the source
+literal and its penalty together. Wider folds retain the priced-input admission policy.

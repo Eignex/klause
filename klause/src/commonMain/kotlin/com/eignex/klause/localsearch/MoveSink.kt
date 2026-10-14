@@ -90,6 +90,8 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     internal fun allowsBool(varId: Int): Boolean =
         !assumptions.isFrozenBool(varId) && invariants?.isDefinedBool(varId) != true
 
+    internal fun allowsDefinedBool(varId: Int): Boolean = !assumptions.isFrozenBool(varId)
+
     internal fun allowsInt(varId: Int): Boolean =
         !assumptions.isFrozenInt(varId) && invariants?.isDefinedInt(varId) != true && !ownedByOther(varId)
 

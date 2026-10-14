@@ -709,11 +709,8 @@ internal fun linearSolvable(
     routingElapsedMs: Long = 0L,
     searchHints: com.eignex.klause.ir.SearchHints? = null,
 ): Solvable {
-    // Feasibility sweep derives functionally-defined vars and excludes them from search. A bool AND
-    // fold is derived only when all its literals are objective variables: deriving an OPB product
-    // indicator lets local search drop it and re-derive it from its literals, which pays off when
-    // those literals are the ones the objective drives, but stalls repair when they are pure
-    // feasibility-structure variables entangled in the hard constraints.
+    // Unit folds preserve literal moves. Wider folds derive from priced inputs;
+    // excluding unpriced feasibility structure can stall constraint repair.
     val derivedFolds = if (objective == null) emptyList() else foldsOverObjectiveVars(boolFolds, objective)
     val sweep = DefinitionalSweep.infer(problem, definedVars, derivedFolds)
     if (objective == null) {
@@ -766,10 +763,7 @@ private fun LinearObjective.continuousObjectiveValue(maximize: Boolean): ((Sampl
     return { s -> evaluate(s).let { if (maximize) -it else it } }
 }
 
-/** Keep only the AND folds whose every literal is an objective variable (nonzero bool weight). These
- *  are the OPB product indicators worth deriving in the feasibility sweep — the ones whose literals
- *  the objective drives, rather than pure feasibility-structure variables whose exclusion stalls
- *  constraint repair. */
+/** Unit folds retain literal coordinates; wider folds derive only from priced inputs. */
 private fun foldsOverObjectiveVars(
     folds: List<BoolFoldDefinition>,
     objective: LinearObjective,
@@ -777,7 +771,7 @@ private fun foldsOverObjectiveVars(
     if (folds.isEmpty()) return folds
     val bw = objective.boolWeights
     fun isObjectiveVar(v: Int) = v in bw.indices && bw[v] != 0L
-    return folds.filter { spec -> spec.lits.all { isObjectiveVar(Lit.variable(it)) } }
+    return folds.filter { spec -> spec.lits.size == 1 || spec.lits.all { isObjectiveVar(Lit.variable(it)) } }
 }
 
 /** Build a functional-objective gradient view of [objective] over [sweep]'s int and bool cones, or

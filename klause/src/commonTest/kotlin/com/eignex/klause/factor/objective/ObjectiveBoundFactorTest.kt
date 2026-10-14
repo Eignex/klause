@@ -2,10 +2,12 @@ package com.eignex.klause.factor.objective
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
@@ -16,9 +18,41 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ObjectiveBoundFactorTest {
+
+    @Test
+    fun `Boolean objective bound repairs backsolve maintained unit penalties`() {
+        val problem = Problem(2, 0, emptyArray(), listOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+        ))
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+        )))
+        for (weight in listOf(3L, (1L shl 62) + 1)) {
+            val objective = LinearObjective(boolWeights = longArrayOf(0, weight))
+            val (overlay, bound) = assertIs<Pair<BakedProblem, MutableObjectiveBound>>(
+                objectiveBoundOverlay(problem.bake(), objective),
+            )
+            val state = LocalSearchState(overlay, Random(3))
+            state.invariants = sweep.network(0, 2)
+            sweep.sweep(state.assignment, state.rootDomains, overlay.factors)
+            bound.tightenBelow(3.0)
+            state.recompute()
+            val proposals = MoveSink().also { it.setInvariants(state.invariants) }
+
+            state.factors[overlay.numFactors - 1].proposeRepairMoves(state, overlay.numFactors - 1, proposals)
+            state.apply(proposals.list.single())
+
+            assertEquals(true, state.assignment.boolValue(0))
+            assertEquals(false, state.assignment.boolValue(1))
+            assertEquals(0L, state.cost)
+            assertEquals(0L, objective.evaluateLong(state.assignment))
+        }
+    }
 
     @Test
     fun `a bool flip reads the flipped variable's own weight`() {

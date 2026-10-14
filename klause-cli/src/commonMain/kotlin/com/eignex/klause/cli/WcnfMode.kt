@@ -28,7 +28,9 @@ internal object WcnfMode : CliMode {
             }
             val render: (Sample) -> String = { s -> renderWcnfModel(parsed.numOriginalBoolVars, s) }
             // MaxSAT minimises the weight of falsified soft clauses.
-            return linearSolvable(parsed.problem, parsed.objective, maximize = false, render)
+            return linearSolvable(
+                parsed.problem, parsed.objective, maximize = false, render, boolFolds = parsed.boolFolds,
+            )
         }
 
         override fun output(common: CommonOptions): OutputProtocol = WcnfOutput()

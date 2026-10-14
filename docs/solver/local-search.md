@@ -229,6 +229,15 @@ counter-shifts cannot overwrite those coordinates. Unsupported definitions, over
 nonintegral inverses decline the candidate; an unreachable matching cell does not stop
 the remaining element scan.
 
+Functional objectives seed both integer and Boolean leaves. Boolean leaf flips use
+the same scope and definition filters as other candidate moves.
+
+Unit Boolean folds share the bounded literal inverse route. Requests on a maintained
+unit output backsolve its signed source, including nested unit folds. Source and output
+pins remain enforced; wider folds retain their existing repair behavior.
+Boolean objective-bound and linear-objective moves use this route before ordinary
+complete scoring.
+
 ## Maintained literal channels
 
 Domain-aware definition inference derives hinted unit equality channels only when their

@@ -19,6 +19,7 @@ import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.toSortedIntArray
 
@@ -538,6 +539,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
     private val intDefinitions: MutableIntObjectMap<FunctionalObjective.Node> = data.intDefinitions
     private val literalChannels: MutableIntObjectMap<LiteralIntDefinition> = data.literalChannels
     private val unaryPredicates: MutableIntObjectMap<UnaryPredicateDefinition> = data.unaryPredicates
+    private val booleanLiterals: MutableIntIntMap = data.booleanLiterals
     private val elementResults: MutableIntObjectMap<ElementResultDefinition> = data.elementResults
     private val extremumRepairs: BooleanArray = data.extremumRepairs
     private val intReaders: Array<IntArray> = data.intReaders
@@ -568,6 +570,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             val intDefinitions = MutableIntObjectMap<FunctionalObjective.Node>()
             val literalChannels = MutableIntObjectMap<LiteralIntDefinition>()
             val unaryPredicates = MutableIntObjectMap<UnaryPredicateDefinition>()
+            val booleanLiterals = MutableIntIntMap()
             val elementResults = MutableIntObjectMap<ElementResultDefinition>()
             for (i in nodeArr.indices) {
                 if (i % INITIALIZATION_BATCH == 0) yield(null)
@@ -580,6 +583,9 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
                 }
                 if (n is LiteralIntDefinition) literalChannels.put(n.out, n)
                 if (n is UnaryPredicateDefinition) unaryPredicates.put(n.out, n)
+                if (n is DefinitionalSweep.SweepNode.BoolFold && n.ins.size == 1) {
+                    booleanLiterals.put(n.out, n.ins[0])
+                }
                 if (n is ElementResultDefinition) elementResults.put(n.out, n)
             }
             var intReaders: Array<IntArray>? = null
@@ -593,7 +599,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             }
             yield(DefinitionIndex(
                 nodeArr, definedInt, definedBool, intDefinitions, literalChannels,
-                unaryPredicates, elementResults, extremumRepairs,
+                unaryPredicates, booleanLiterals, elementResults, extremumRepairs,
                 checkNotNull(intReaders), checkNotNull(boolReaders),
             ))
         }
@@ -649,6 +655,8 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
         unaryPredicates[v] as? EqualityPredicateDefinition
 
     internal fun unaryPredicate(v: Int): UnaryPredicateDefinition? = unaryPredicates[v]
+
+    internal fun booleanLiteral(v: Int): Int? = booleanLiterals.getOrDefault(v, -1).takeIf { it >= 0 }
 
     internal fun elementResultDefinition(v: Int): ElementResultDefinition? = elementResults[v]
 
@@ -749,6 +757,7 @@ private class DefinitionIndex(
     val intDefinitions: MutableIntObjectMap<FunctionalObjective.Node>,
     val literalChannels: MutableIntObjectMap<LiteralIntDefinition>,
     val unaryPredicates: MutableIntObjectMap<UnaryPredicateDefinition>,
+    val booleanLiterals: MutableIntIntMap,
     val elementResults: MutableIntObjectMap<ElementResultDefinition>,
     val extremumRepairs: BooleanArray,
     val intReaders: Array<IntArray>,
