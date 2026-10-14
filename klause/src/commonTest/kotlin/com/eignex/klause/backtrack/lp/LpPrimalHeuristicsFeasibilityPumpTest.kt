@@ -8,11 +8,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -83,6 +85,25 @@ class LpPrimalHeuristicsFeasibilityPumpTest {
 
             assertNotEquals(declined, sample.ints.single())
         }
+    }
+
+    @Test
+    fun `the pump explores from an initial discrete target`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val initial = Sample(BooleanArray(0), longArrayOf(1, 1))
+        val proposed = ArrayList<List<Long>>()
+        val sink = SolveStatsSink(backend = "pump-test")
+
+        val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            assertNotNull(engine.lpFeasibilityPump(objective, Cancellation.Never, initial = initial) { sample ->
+                proposed += sample.ints.toList()
+                sample.takeIf { it.ints.toList() != initial.ints.toList() }
+            })
+        }
+
+        assertEquals(initial.ints.toList(), proposed.first())
+        assertNotEquals(initial.ints.toList(), sample.ints.toList())
     }
 
     @Test

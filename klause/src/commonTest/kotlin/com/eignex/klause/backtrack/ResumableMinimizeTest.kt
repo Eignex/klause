@@ -36,6 +36,7 @@ import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -711,23 +712,25 @@ class ResumableMinimizeTest {
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(10.0))
-        val offered = ArrayList<Sample>()
-        val nodesAtPublication = ArrayList<Double>()
-        val params = BacktrackParams(randomSeed = 0L, maxDecisions = 0L, objectiveBoundSupplier = { 5.0 },
-            lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false))
+        for (initial in listOf(null, Sample(BooleanArray(0), longArrayOf(0, 1, 1), doubleArrayOf(0.3)))) {
+            val offered = ArrayList<Sample>()
+            val nodesAtPublication = ArrayList<Double>()
+            val pool = initial?.let { sample -> IncumbentExchange.minimizing<Sample>().apply { offer(sample, 5.0) } }
+            val params = BacktrackParams(randomSeed = 0L, maxDecisions = 0L, objectiveBoundSupplier = { 5.0 },
+                pooledIncumbents = pool, lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false))
 
-        BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation.Never, 1000L, 100_000L) {
-                offered += it.sample
-                nodesAtPublication += search.stats.search.nodes.sum
+            BacktrackSolver(problem).resumable(objective, params).use { search ->
+                search.runSlice(Cancellation.Never, 1000L, 100_000L) {
+                    offered += it.sample
+                    nodesAtPublication += search.stats.search.nodes.sum
+                }
             }
-        }
 
-        val sample = offered.single()
-        assertEquals(3.0, objective.evaluate(sample))
-        assertEquals(listOf(0.0), nodesAtPublication)
-        assertEquals(BigFraction.ZERO, sample.exactReals?.single())
-        assertTrue((0 until 3).all { sample.ints[it] == 1L })
+            val sample = offered.single()
+            assertEquals(if (initial == null) 3.0 else 2.0, objective.evaluate(sample))
+            assertEquals(listOf(0.0), nodesAtPublication)
+            assertEquals(BigFraction.ZERO, sample.exactReals?.single())
+        }
     }
 
     @Test
