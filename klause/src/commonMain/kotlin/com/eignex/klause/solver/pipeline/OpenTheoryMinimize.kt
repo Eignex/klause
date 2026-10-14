@@ -14,6 +14,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.objective.LinearObjective
