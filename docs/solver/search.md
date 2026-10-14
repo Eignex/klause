@@ -490,3 +490,8 @@ mutable deduction mechanisms separately for each session. A clause assigned to a
 custom CP projection is omitted from the shared default clause propagator. The
 Boolean peer retains canonical Boolean coordinates and branching; complete point
 checks retain the clause's original source authority when selected filtering is inert.
+
+Polynomial and quadratic workers retain the prepared finite-factor descriptors when
+opening their private finite projection. Exact arithmetic still checks its original
+source fragment; finite-provider selection does not replace that authority or its
+resumable lifecycle. See [the polynomial route](../theories/polynomial-real.md).

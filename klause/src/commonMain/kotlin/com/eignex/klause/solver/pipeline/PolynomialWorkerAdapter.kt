@@ -44,7 +44,9 @@ internal class PolynomialWorkerAdapter(
     private val cancellation = cancellation or Cancellation {
         invocation.workExhausted || invocation.lastUnknown?.reason == QfNraReason.ResourceLimit
     }
-    private val finite: BakedProblem = model.finite.bake(this.cancellation)
+    private val finite: BakedProblem = binding.preparedPlan.finiteFactorProjections?.let { selected ->
+        model.finite.bake(selected.forEngineView(model.finite), this.cancellation)
+    } ?: model.finite.bake(this.cancellation)
     private val fixed = if (params.assumptions.isEmpty) finite.fixedDiscreteSample() else {
         finite.conditionedRoot(params.assumptions, this.cancellation).fixedDiscreteSample()
     }
