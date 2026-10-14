@@ -305,8 +305,9 @@ internal class NValueClauseCompletion(
                     assignment.setBool(node.out, value != 0L)
                     enqueue(node.out)
                 }
-            } else {
+            } else if (assignment.intValue(node.out) != value) {
                 assignment.setInt(node.out, value)
+                for (fid in state.projection.intOccurrences[node.out]) enqueueFactor(fid)
             }
         }
     }

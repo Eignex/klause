@@ -56,6 +56,41 @@ class NValueClauseCompletionTest {
     }
 
     @Test
+    fun `class completion reconciles indicators reading a maintained integer output`() {
+        val p = Problem(
+            2, 4,
+            arrayOf(IntDomain(1, 2), IntDomain(0, 1), IntDomain(0, 1), IntDomain(1, 1)),
+            arrayOf<Factor>(
+                NValue(0, intArrayOf(1, 1, 3, 3)),
+                Element(1, 2, longArrayOf(0, 1), false, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        state.invariants = InvariantNetwork(listOf(ElementResultDefinition(p.factors[1] as Element)), 4, 2)
+        state.assignment.setInt(0, 2)
+        state.assignment.setInt(3, 1)
+        state.assignment.setBool(0, true)
+        state.recompute()
+        val before = state.assignment.snapshot()
+        assertEquals(0L, state.cost)
+        val coordinator = NValueClauseCompletion(state, state.moveSink, intArrayOf(1, 3), 0)
+
+        val move = coordinator.complete(Move.Compound(listOf(Move.IntSet(1, 1), Move.IntSet(0, 1))))
+        assertEquals(before, state.assignment.snapshot())
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(1L, state.assignment.intValue(2))
+        assertEquals(false, state.assignment.boolValue(0))
+        assertEquals(true, state.assignment.boolValue(1))
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
     fun `class absorption reassigns a recipient through its maintained result domain`() {
         for (protection in listOf("none", "pin", "owner", "domain")) {
             val p = Problem(
