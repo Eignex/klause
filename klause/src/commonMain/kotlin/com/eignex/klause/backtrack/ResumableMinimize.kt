@@ -227,7 +227,7 @@ internal class ResumableMinimize(
         return bound
     }
 
-    private fun beatsExternalCutoff(exact: BigFraction, cutoff: Double): Boolean {
+    private fun beatsCutoff(exact: BigFraction, cutoff: Double): Boolean {
         if (cutoff == Double.NEGATIVE_INFINITY) return false
         if (cutoff == Double.POSITIVE_INFINITY) return true
         return exact < checkNotNull(BigFraction.ofDouble(cutoff))
@@ -804,7 +804,7 @@ internal class ResumableMinimize(
     private fun recordIfImproving(sample: Sample, o: Double): MinimizeResult.WithSample? {
         val exact = exactSourceObjective(objective, sample, params.toleranceCheck)
         if (rebindable && exact == null) return null
-        if (rebindable && exact != null && !beatsExternalCutoff(exact, externalCutoff())) return null
+        if (rebindable && exact != null && !beatsCutoff(exact, externalCutoff())) return null
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
         brancher.onSolution(sample)
@@ -957,7 +957,14 @@ internal class ResumableMinimize(
         boundExchange.importGlobalVarBounds()
         boundExchange.publishGlobalVarBounds()
         if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
-            fun accept(proposal: Sample): Sample? = verifiedLpProposal(proposal, rootToken)?.assignment
+            fun accept(proposal: Sample): Sample? {
+                val accepted = verifiedLpProposal(proposal, rootToken) ?: return null
+                val cutoff = minOf(bestObj, externalCutoff())
+                if (cutoff.isNaN()) return null
+                val exact = exactSourceObjective(objective, accepted.assignment, params.toleranceCheck)
+                val improving = exact?.let { beatsCutoff(it, cutoff) } ?: (accepted.objective < cutoff)
+                return accepted.assignment.takeIf { improving && !rootToken() }
+            }
             val seed = lpEngine.lpRoundingProbe(objective, rootToken)?.let(::accept)
                 ?: lpEngine.lpFeasibilityPump(objective, rootToken, ::accept)
             if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }

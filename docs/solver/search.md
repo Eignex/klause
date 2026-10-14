@@ -435,7 +435,9 @@ proposals first satisfy the discrete fixpoint under caller assumptions, then obt
 continuous coordinates from the retained real-leaf owner. Only a complete checked
 witness reaches incumbent admission; an incomplete or unbounded completion does not
 publish a heuristic result. The pump can continue after a declined completion under
-its existing root allowance.
+its existing root allowance. Root primal proposals must improve the available local
+or external incumbent cutoff before admission; a completed candidate that misses
+that cutoff permits further pumping without renewing its budget.
 
 [Theory contracts](../theories.md) define the fragment-specific checks and evidence.
 Difference graphs, exact linear systems and polynomial completion keep their own

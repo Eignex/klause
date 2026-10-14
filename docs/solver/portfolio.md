@@ -199,11 +199,9 @@ trial uses the current ordinary allowance, clipped to its remaining work
 and time budget, and preserves the other arms'
 policy evidence. An auxiliary arm admitted before the incumbent enters its trial
 when the ordinary policy next selects it, using the base probe allowance. Trial
-continuations alternate with available ordinary work after every initial sibling
-has been admitted. Pending unproductive trials stay outside ordinary family and arm
-selection; their private continuations preserve the retained policy's random stream.
-A trial can continue consecutively when no ordinary worker is free. Explicit minimum
-shares retain precedence. Ordinary retained-worker segments advance
+continuations run before ordinary policy selection, preserving
+the retained policy's random stream after every initial sibling has been admitted.
+Explicit minimum shares retain precedence. Ordinary retained-worker segments advance
 the shared allowance ladder; an unproductive trial preserves it even when charging
 fresh work. Search work after
 preparation is capped at twelve maximum work allowances and four base time allowances;
