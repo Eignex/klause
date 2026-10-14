@@ -3,6 +3,7 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
+import com.eignex.klause.factor.saturatedMul
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
@@ -30,6 +31,7 @@ internal class ProductPropagator(
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        if (a == b) return propagateSquare(state)
         val da = state.intDomains[a]
         val db = state.intDomains[b]
         val (pLo, pHi) = cornerProductRange(da, db)
@@ -55,6 +57,37 @@ internal class ProductPropagator(
             if (dbFinal.max == 0L && !state.tightenIntMax(b, -1L, antB)) return false
         }
         return true
+    }
+
+    private fun propagateSquare(state: PropagationState): Boolean {
+        val domain = state.intDomains[a]
+        val first = saturatedMul(domain.min, domain.min)
+        val last = saturatedMul(domain.max, domain.max)
+        val lower = when {
+            domain.min >= 0L -> first
+            domain.max <= 0L -> last
+            else -> 0L
+        }
+        if (!tightenLong(state, result, lower, maxOf(first, last),
+                state.composeIntVarAtomAntecedents(intArrayOf(a)))) return false
+        val output = state.intDomains[result]
+        val upperRoot = floorSquareRoot(output.max)
+        val floorLower = floorSquareRoot(output.min)
+        val lowerRoot = if (floorLower * floorLower == output.min) floorLower else floorLower + 1L
+        val current = state.intDomains[a]
+        val lo = if (current.min >= 0L) lowerRoot else -upperRoot
+        val hi = if (current.max <= 0L) -lowerRoot else upperRoot
+        return tightenLong(state, a, lo, hi, state.composeIntVarAtomAntecedents(intArrayOf(a, result)))
+    }
+
+    private fun floorSquareRoot(value: Long): Long {
+        var lo = 0L
+        var hi = minOf(value, 1L shl 32)
+        while (lo < hi) {
+            val middle = lo + (hi - lo + 1L) / 2L
+            if (middle <= value / middle) lo = middle else hi = middle - 1L
+        }
+        return lo
     }
 
     private fun reverseNarrow(state: PropagationState, target: Int, divisorDomain: IntDomain, r: IntDomain): Boolean {
@@ -117,10 +150,10 @@ internal class ProductPropagator(
     }
 
     private fun cornerProductRange(da: IntDomain, db: IntDomain): Pair<Long, Long> {
-        val p1 = da.min * db.min
-        val p2 = da.min * db.max
-        val p3 = da.max * db.min
-        val p4 = da.max * db.max
+        val p1 = saturatedMul(da.min, db.min)
+        val p2 = saturatedMul(da.min, db.max)
+        val p3 = saturatedMul(da.max, db.min)
+        val p4 = saturatedMul(da.max, db.max)
         return minOf(p1, p2, p3, p4) to maxOf(p1, p2, p3, p4)
     }
 

@@ -33,7 +33,10 @@ coordinate, including positions with different presence literals. Product scorin
 new values into every matching operand and result position. Committed residual differences
 restore the old value in every matching position, and repair probes grade the same complete
 relation. Repeated operands in fixed-power chains and result aliases use this rule with
-saturated arithmetic and the state's shared violation compression. Assignments, RNGs,
+the state's shared violation compression. Product residuals subtract the result exactly
+before capping the distance; an overflowing product cannot satisfy a signed-word endpoint.
+Representable products keep the primitive path, while overflow uses a private 128-bit
+temporary with no retained invariant payload. Assignments, RNGs,
 weights and invariant payloads belong to each live state. Immutable per-factor integer
 lookups store their arrays on one owner, shared with the projection. Compact key ranges
 use offset arrays; sparse ranges use primitive probing with storage bounded by entry

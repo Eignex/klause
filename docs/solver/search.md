@@ -232,6 +232,12 @@ deliberately omit CP propagation. Every inert built-in role carries a reason. A 
 family can decline emission under feature, resource or domain gates, and omitted rows
 weaken the relaxation.
 
+Product bounds clamp corner products to signed-word endpoints instead of wrapping them.
+Repeated operands use nonnegative square bounds and exact integer square-root inverse
+bounds. The inverse uses signed-word division comparisons, so it cannot overflow or
+publish an approximate endpoint. Mixed-sign input domains retain their interior values;
+complete assignment checks still enforce the complete relation.
+
 ### Custom factor publication checks
 
 Custom factors retain the `Propagator` and `Invariant` extension paths. A custom
