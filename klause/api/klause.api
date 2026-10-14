@@ -3261,11 +3261,127 @@ public final class com/eignex/klause/ir/ObjectiveSense : java/lang/Enum {
 	public static fun values ()[Lcom/eignex/klause/ir/ObjectiveSense;
 }
 
+public abstract interface class com/eignex/klause/ir/PolynomialExpression {
+}
+
+public final class com/eignex/klause/ir/PolynomialExpression$Constant : com/eignex/klause/ir/PolynomialExpression {
+	public static final field Companion Lcom/eignex/klause/ir/PolynomialExpression$Constant$Companion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDenominator ()Ljava/math/BigInteger;
+	public final fun getNumerator ()Ljava/math/BigInteger;
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/ir/PolynomialExpression$Constant$Companion {
+	public final fun of (Ljava/math/BigInteger;Ljava/math/BigInteger;)Lcom/eignex/klause/ir/PolynomialExpression$Constant;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/PolynomialExpression$Constant$Companion;Ljava/math/BigInteger;Ljava/math/BigInteger;ILjava/lang/Object;)Lcom/eignex/klause/ir/PolynomialExpression$Constant;
+}
+
+public final class com/eignex/klause/ir/PolynomialExpression$Power : com/eignex/klause/ir/PolynomialExpression {
+	public fun <init> (Lcom/eignex/klause/ir/PolynomialExpression;I)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBase ()Lcom/eignex/klause/ir/PolynomialExpression;
+	public final fun getExponent ()I
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/ir/PolynomialExpression$Product : com/eignex/klause/ir/PolynomialExpression {
+	public fun <init> (Ljava/util/List;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOperands ()Ljava/util/List;
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/ir/PolynomialExpression$Sum : com/eignex/klause/ir/PolynomialExpression {
+	public fun <init> (Ljava/util/List;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOperands ()Ljava/util/List;
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/ir/PolynomialExpression$Variable : com/eignex/klause/ir/PolynomialExpression {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-P0Uu7zc ()I
+	public final fun copy-NWoOmUI (I)Lcom/eignex/klause/ir/PolynomialExpression$Variable;
+	public static synthetic fun copy-NWoOmUI$default (Lcom/eignex/klause/ir/PolynomialExpression$Variable;IILjava/lang/Object;)Lcom/eignex/klause/ir/PolynomialExpression$Variable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-P0Uu7zc ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/ir/PolynomialRealFormula {
+}
+
+public final class com/eignex/klause/ir/PolynomialRealFormula$And : com/eignex/klause/ir/PolynomialRealFormula {
+	public fun <init> (Ljava/util/List;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOperands ()Ljava/util/List;
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/ir/PolynomialRealFormula$Atom : com/eignex/klause/ir/PolynomialRealFormula {
+	public fun <init> (Lcom/eignex/klause/ir/PolynomialExpression;Lcom/eignex/klause/ir/PolynomialRelation;Lcom/eignex/klause/ir/PolynomialExpression;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeft ()Lcom/eignex/klause/ir/PolynomialExpression;
+	public final fun getRelation ()Lcom/eignex/klause/ir/PolynomialRelation;
+	public final fun getRight ()Lcom/eignex/klause/ir/PolynomialExpression;
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/ir/PolynomialRealFormula$BooleanVariable : com/eignex/klause/ir/PolynomialRealFormula {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-fb54piM ()I
+	public final fun copy-Tr0PeTE (I)Lcom/eignex/klause/ir/PolynomialRealFormula$BooleanVariable;
+	public static synthetic fun copy-Tr0PeTE$default (Lcom/eignex/klause/ir/PolynomialRealFormula$BooleanVariable;IILjava/lang/Object;)Lcom/eignex/klause/ir/PolynomialRealFormula$BooleanVariable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-fb54piM ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/ir/PolynomialRealFormula$Constant : com/eignex/klause/ir/PolynomialRealFormula {
+	public fun <init> (Z)V
+	public final fun component1 ()Z
+	public final fun copy (Z)Lcom/eignex/klause/ir/PolynomialRealFormula$Constant;
+	public static synthetic fun copy$default (Lcom/eignex/klause/ir/PolynomialRealFormula$Constant;ZILjava/lang/Object;)Lcom/eignex/klause/ir/PolynomialRealFormula$Constant;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/ir/PolynomialRealFormula$Not : com/eignex/klause/ir/PolynomialRealFormula {
+	public fun <init> (Lcom/eignex/klause/ir/PolynomialRealFormula;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOperand ()Lcom/eignex/klause/ir/PolynomialRealFormula;
+	public fun hashCode ()I
+}
+
+public final class com/eignex/klause/ir/PolynomialRealFormula$Or : com/eignex/klause/ir/PolynomialRealFormula {
+	public fun <init> (Ljava/util/List;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOperands ()Ljava/util/List;
+	public fun hashCode ()I
+}
+
 public final class com/eignex/klause/ir/PolynomialRealProblem {
 	public final fun getBoolVarNames ()Ljava/util/Map;
 	public final fun getRealVarNames ()Ljava/util/Map;
 	public final fun getSourceBoolCount ()I
 	public final fun getSourceRealCount ()I
+}
+
+public final class com/eignex/klause/ir/PolynomialRelation : java/lang/Enum {
+	public static final field EQ Lcom/eignex/klause/ir/PolynomialRelation;
+	public static final field GE Lcom/eignex/klause/ir/PolynomialRelation;
+	public static final field GT Lcom/eignex/klause/ir/PolynomialRelation;
+	public static final field LE Lcom/eignex/klause/ir/PolynomialRelation;
+	public static final field LT Lcom/eignex/klause/ir/PolynomialRelation;
+	public static final field NE Lcom/eignex/klause/ir/PolynomialRelation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/ir/PolynomialRelation;
+	public static fun values ()[Lcom/eignex/klause/ir/PolynomialRelation;
 }
 
 public class com/eignex/klause/ir/Problem {
@@ -9158,9 +9274,12 @@ public final class com/eignex/klause/solver/AssignmentCheckCapability : java/lan
 
 public final class com/eignex/klause/solver/FactorProjectionProviders {
 	public static final field Companion Lcom/eignex/klause/solver/FactorProjectionProviders$Companion;
-	public fun <init> ()V
 	public fun <init> (Lcom/eignex/klause/propagation/PropagationProjectionProvider;Lcom/eignex/klause/localsearch/ScoringProjectionProvider;Lcom/eignex/klause/lp/RelaxationProjectionProvider;)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/PropagationProjectionProvider;Lcom/eignex/klause/localsearch/ScoringProjectionProvider;Lcom/eignex/klause/lp/RelaxationProjectionProvider;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/propagation/PropagationProjectionProvider;Lcom/eignex/klause/localsearch/ScoringProjectionProvider;Lcom/eignex/klause/lp/RelaxationProjectionProvider;Lcom/eignex/klause/theory/EncoderProvider;Ljava/util/Set;)V
+	public synthetic fun <init> (Lcom/eignex/klause/propagation/PropagationProjectionProvider;Lcom/eignex/klause/localsearch/ScoringProjectionProvider;Lcom/eignex/klause/lp/RelaxationProjectionProvider;Lcom/eignex/klause/theory/EncoderProvider;Ljava/util/Set;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getEncoder ()Lcom/eignex/klause/theory/EncoderProvider;
+	public final fun getEncodingTargets ()Ljava/util/Set;
 	public final fun getPropagation ()Lcom/eignex/klause/propagation/PropagationProjectionProvider;
 	public final fun getRelaxation ()Lcom/eignex/klause/lp/RelaxationProjectionProvider;
 	public final fun getScoring ()Lcom/eignex/klause/localsearch/ScoringProjectionProvider;
@@ -9194,6 +9313,7 @@ public final class com/eignex/klause/solver/Optimizer$DefaultImpls {
 }
 
 public final class com/eignex/klause/solver/PreparedFactorProjections {
+	public final fun encoder-yJKIlq4 (ILjava/lang/String;)Lcom/eignex/klause/theory/Encoder;
 	public final fun forProblem (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/PreparedFactorProjections;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getProviders ()Lcom/eignex/klause/solver/FactorProjectionProviders;
@@ -10356,6 +10476,7 @@ public final class com/eignex/klause/solver/pipeline/BtResolution {
 public final class com/eignex/klause/solver/pipeline/ComponentPlan {
 	public final fun cpProjection (Lcom/eignex/klause/ir/Problem;Ljava/util/Map;)Lcom/eignex/klause/solver/pipeline/CpProblemProjection;
 	public final fun cpSourceDomains (Lcom/eignex/klause/ir/Problem;)Ljava/util/Map;
+	public final fun factorEncoded (I)Z
 	public final fun factorOwner (I)Lcom/eignex/klause/solver/pipeline/FactorOwner;
 	public final fun getCpIntVars ()[I
 	public final fun getHasCpComponent ()Z
@@ -10448,6 +10569,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionComponentDescripto
 	public final fun getBooleanCoordinates ()Ljava/util/List;
 	public final fun getFactorIndices ()Ljava/util/List;
 	public final fun getIntegerCoordinates ()Ljava/util/List;
+	public final fun getParticipatingFactorIndices ()Ljava/util/List;
 	public final fun getRealCoordinates ()Ljava/util/List;
 	public final fun getResponsibility ()Lcom/eignex/klause/solver/pipeline/ComponentResponsibility;
 	public final fun getSemantics ()Ljava/lang/String;
@@ -14481,6 +14603,78 @@ public final class com/eignex/klause/solver/search/Vsids : com/eignex/klause/sol
 	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 }
 
+public final class com/eignex/klause/theory/BuiltInEncoderProvider : com/eignex/klause/theory/EncoderProvider {
+	public static final field INSTANCE Lcom/eignex/klause/theory/BuiltInEncoderProvider;
+	public fun select-yJKIlq4 (Lcom/eignex/klause/ir/Factor;Ljava/lang/String;)Lcom/eignex/klause/theory/Encoder;
+}
+
+public final class com/eignex/klause/theory/Encoder {
+	public fun <init> (Lcom/eignex/klause/theory/EncoderSupport;Ljava/util/List;Ljava/util/Map;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/eignex/klause/theory/EncoderSupport;Ljava/util/List;Ljava/util/Map;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getEnforcesSource ()Z
+	public final fun getRequiredBooleans ()Ljava/util/Map;
+	public final fun getRequiredIntegers ()Ljava/util/List;
+	public final fun getSupport ()Lcom/eignex/klause/theory/EncoderSupport;
+	public final fun install (Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/theory/TheoryEncoding;)Lcom/eignex/klause/theory/EncoderDecline;
+}
+
+public final class com/eignex/klause/theory/EncoderDecline : java/lang/Enum {
+	public static final field CONDITIONS Lcom/eignex/klause/theory/EncoderDecline;
+	public static final field RESOURCE Lcom/eignex/klause/theory/EncoderDecline;
+	public static final field UNSUPPORTED Lcom/eignex/klause/theory/EncoderDecline;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/theory/EncoderDecline;
+	public static fun values ()[Lcom/eignex/klause/theory/EncoderDecline;
+}
+
+public abstract interface class com/eignex/klause/theory/EncoderProvider {
+	public abstract fun select-yJKIlq4 (Lcom/eignex/klause/ir/Factor;Ljava/lang/String;)Lcom/eignex/klause/theory/Encoder;
+}
+
+public final class com/eignex/klause/theory/EncoderSupport : java/lang/Enum {
+	public static final field CONDITIONED Lcom/eignex/klause/theory/EncoderSupport;
+	public static final field DIRECT Lcom/eignex/klause/theory/EncoderSupport;
+	public static final field EQUIVALENT Lcom/eignex/klause/theory/EncoderSupport;
+	public static final field RELAXATION_ONLY Lcom/eignex/klause/theory/EncoderSupport;
+	public static final field UNSUPPORTED Lcom/eignex/klause/theory/EncoderSupport;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/theory/EncoderSupport;
+	public static fun values ()[Lcom/eignex/klause/theory/EncoderSupport;
+}
+
+public final class com/eignex/klause/theory/EncodingAttribution {
+	public final fun getAuxiliaries ()Ljava/util/List;
+	public final fun getBooleanConditions ()Ljava/util/Map;
+	public final fun getBooleans ()Ljava/util/List;
+	public final fun getIntegerConditions ()Ljava/util/Map;
+	public final fun getIntegerEmbeddings ()Ljava/util/Map;
+	public final fun getIntegers ()Ljava/util/List;
+	public final fun getRealEmbeddings ()Ljava/util/Map;
+	public final fun getReals ()Ljava/util/List;
+	public final fun getSourceFactorIndex ()I
+}
+
+public final class com/eignex/klause/theory/EncodingTarget {
+	public static final field Companion Lcom/eignex/klause/theory/EncodingTarget$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/eignex/klause/theory/EncodingTarget;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/theory/EncodingTarget$Companion {
+	public final fun getDIFFERENCE-UtreXms ()Ljava/lang/String;
+	public final fun getLINEAR-UtreXms ()Ljava/lang/String;
+	public final fun getPOLYNOMIAL-UtreXms ()Ljava/lang/String;
+}
+
 public abstract interface class com/eignex/klause/theory/Theory {
 	public abstract fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
 	public abstract fun getModel ()Lcom/eignex/klause/ir/Problem;
@@ -14532,6 +14726,33 @@ public final class com/eignex/klause/theory/TheoryContext$DefaultImpls {
 	public static fun intUpperBound (Lcom/eignex/klause/theory/TheoryContext;I)Ljava/lang/Long;
 }
 
+public abstract interface class com/eignex/klause/theory/TheoryEncoding {
+	public abstract fun conditional (Lcom/eignex/klause/ir/PolynomialRealFormula;Lcom/eignex/klause/ir/PolynomialExpression;Lcom/eignex/klause/ir/PolynomialExpression;)Lcom/eignex/klause/ir/PolynomialExpression;
+	public abstract fun fixedBoolean-Tr0PeTE (I)Ljava/lang/Boolean;
+	public abstract fun fixedInteger-BbWYBdc (I)Ljava/math/BigInteger;
+	public abstract fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public abstract fun getSourceFactorIndex ()I
+	public abstract fun getTarget-UtreXms ()Ljava/lang/String;
+	public abstract fun integer-BbWYBdc (I)Lcom/eignex/klause/ir/PolynomialExpression;
+	public abstract fun linear (Lcom/eignex/klause/ir/LinearForm;)V
+	public abstract fun polynomial (Lcom/eignex/klause/ir/PolynomialRealFormula;)V
+	public abstract fun real-NWoOmUI (I)Lcom/eignex/klause/ir/PolynomialExpression;
+}
+
+public final class com/eignex/klause/theory/TheoryRealId {
+	public static final synthetic fun box-impl (I)Lcom/eignex/klause/theory/TheoryRealId;
+	public static fun constructor-impl (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public final fun getIndex ()I
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
+}
+
 public final class com/eignex/klause/theory/TheorySearchComponent : com/eignex/klause/solver/search/TheoryComponent {
 	public fun <init> (Lcom/eignex/klause/theory/Theory;Lkotlin/jvm/functions/Function2;)V
 	public synthetic fun <init> (Lcom/eignex/klause/theory/Theory;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -14547,6 +14768,8 @@ public final class com/eignex/klause/theory/TheorySearchComponent : com/eignex/k
 }
 
 public final class com/eignex/klause/theory/difference/DifferenceSearchComponent : com/eignex/klause/solver/search/TheoryComponent {
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[I)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/ir/Problem;[I)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -14562,6 +14785,7 @@ public final class com/eignex/klause/theory/difference/DifferenceSearchComponent
 
 public final class com/eignex/klause/theory/difference/DifferenceTheorySolver : com/eignex/klause/theory/Theory {
 	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
 	public fun getModel ()Lcom/eignex/klause/ir/Problem;
 }
@@ -14588,6 +14812,8 @@ public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com/eignex/klause/solver/search/SearchBranchProposal, com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/SourceCoordinateAgreement, com/eignex/klause/solver/search/TheoryComponent, java/lang/AutoCloseable {
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;Lkotlin/jvm/functions/Function2;[I)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;Lkotlin/jvm/functions/Function2;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function2;)V
 	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
