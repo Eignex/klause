@@ -51,7 +51,10 @@ class SmtWitnessValidationTest {
     @Test
     fun `gzip payloads reject truncated corrupt and uncompressed transports in either role`() {
         val source = "source".toByteArray()
-        val compressed = gzip(source)
+        val compressed = ByteArrayOutputStream().use { output ->
+            GZIPOutputStream(output).use { it.write(source) }
+            output.toByteArray()
+        }
         val corrupt = compressed.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() }
         for (model in listOf(false, true)) {
             for (transport in listOf(compressed.copyOf(compressed.size - 1), corrupt, source)) {
@@ -107,7 +110,11 @@ class SmtWitnessValidationTest {
         val canonical = request(source, model, sourceEncoding = "gzip", modelEncoding = "gzip")
         for (payload in listOf(source, model)) {
             val text = Base64.getDecoder().decode(canonical).decodeToString()
-            val transport = Base64.getEncoder().encodeToString(gzip(payload))
+            val compressed = ByteArrayOutputStream().use { output ->
+                GZIPOutputStream(output).use { it.write(payload) }
+                output.toByteArray()
+            }
+            val transport = Base64.getEncoder().encodeToString(compressed)
             val encoded = Base64.getEncoder().encodeToString(
                 text.replace(transport, transport.trimEnd('=')).toByteArray())
 
@@ -174,7 +181,10 @@ class SmtWitnessValidationTest {
             put("bytes", size + if (mismatch && invalid == "bytes") 1 else 0)
             put("sha256", if (mismatch && invalid == "hash") "0".repeat(64) else SmtWitnessValidation.hash(bytes))
             val supplied = if (sourcePayload) sourceTransport else modelTransport
-            val transport = supplied ?: if (encoding == "gzip") gzip(bytes) else bytes
+            val transport = supplied ?: if (encoding == "gzip") ByteArrayOutputStream().use { output ->
+                GZIPOutputStream(output).use { it.write(bytes) }
+                output.toByteArray()
+            } else bytes
             put("base64", Base64.getEncoder().encodeToString(transport))
             encoding?.let { put("encoding", it) }
         }
@@ -189,10 +199,5 @@ class SmtWitnessValidationTest {
             })
         }
         return Base64.getEncoder().encodeToString(json.toString().toByteArray())
-    }
-
-    private fun gzip(bytes: ByteArray): ByteArray = ByteArrayOutputStream().use { output ->
-        GZIPOutputStream(output).use { it.write(bytes) }
-        output.toByteArray()
     }
 }
