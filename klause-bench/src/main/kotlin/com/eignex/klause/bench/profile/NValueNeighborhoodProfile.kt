@@ -210,7 +210,8 @@ object NValueNeighborhoodProfile {
                     descriptions += "b${node.out}=${state.assignment.boolValue(node.out)} " +
                         "${node::class.simpleName} boolInputs=${node.boolInputs.contentToString()} " +
                         "intInputs=${node.intInputs.contentToString()}"
-                    for (b in node.boolInputs + intArrayOf(node.out)) for (rowId in state.projection.boolOccurrences[b]) {
+                    val observedBools = node.boolInputs + intArrayOf(node.out)
+                    for (b in observedBools) for (rowId in state.projection.boolOccurrences[b]) {
                         val row = state.problem.factors[rowId] as? ReifiedLinear ?: continue
                         if (row.auxBoolVar != b) continue
                         val constants = row.integerConstants ?: continue
