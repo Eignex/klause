@@ -30,6 +30,24 @@ import kotlin.test.assertTrue
 
 class CoreGuidedSearchTest {
     @Test
+    fun `propagated core premises preserve the cheaper original violation`() {
+        val problem = Problem(
+            4, 0, emptyArray(),
+            arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
+            ),
+        ).bake()
+        val objective = LinearObjective(longArrayOf(-1, -10, 0, -10), constant = 21)
+
+        val result = CoreGuidedSolver(problem).minimize(objective, BacktrackParams())
+
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(1L, objective.evaluateLong(optimal.sample))
+        assertFalse(optimal.sample.boolValue(0))
+    }
+
+    @Test
     fun `successive thresholds account for three unavoidable violations`() {
         val literals = IntArray(5) { Lit.make(it, true) }
         val problem = Problem(5, 0, emptyArray(), arrayOf(Cardinality(literals, min = 3, max = 5))).bake()

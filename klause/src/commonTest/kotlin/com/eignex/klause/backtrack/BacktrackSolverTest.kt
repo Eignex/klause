@@ -295,6 +295,24 @@ class BacktrackSolverTest {
     }
 
     @Test
+    fun `returned assumption core retains transitive propagated premises`() {
+        val problem = Problem(
+            4, 0, emptyArray(),
+            arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
+            ),
+        ).bake()
+        val params = BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to true, 1 to true, 3 to true)))
+        val solver = BacktrackSolver(problem)
+
+        val result = assertIs<SolveResult.Unsat>(solver.solve(params))
+        val core = requireNotNull(result.assumptionCore)
+
+        assertIs<SolveResult.Unsat>(solver.solve(params.copy(assumptions = core)))
+    }
+
+    @Test
     fun `enumerate yields every distinct SAT model on exactly-one`() {
         val p = Problem(
             numBoolVars = 4,

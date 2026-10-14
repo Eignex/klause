@@ -280,6 +280,11 @@ traversal clears visited ids between extractions and reads learned native clause
 variables directly, retaining the same factor-core membership across restarts and
 learned-clause compaction.
 
+Assumption cores retain the complete applied seed prefix when propagation refutes it,
+or the full assumption set when a search tree is exhausted. Decision-level conflict
+summaries guide traversal; they do not enumerate every transitive assumption premise.
+Returned cores are jointly refuted with the hard model and need not be minimal.
+
 Clause minimization reuses its redundancy memo storage within an analyzer. It clears
 the memo before each conflict because levels and antecedents belong to the frozen
 reason graph of that analysis, rather than the variable across search paths.
