@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.EngineMix
@@ -35,6 +36,27 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
+
+    @Test
+    fun `prebake LP reasoning uses the selected relaxation rows`() {
+        val span = 1L shl 40
+        val source = Problem(0, 2, Array(2) { IntDomain(0, span) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)))
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider {
+                PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "The original source is checked at complete points.") { NoPropagator }
+            },
+            relaxation = RelaxationProjectionProvider { null },
+        )
+        val plan = source.prepareExecutionPlan(providers, preferFinite = true)
+
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.BACKTRACK,
+            presolveConfig = PresolveConfig.NONE, preparedPlan = plan)).executableProblem()
+
+        assertEquals(IntDomain(0, span), prepared.rootIntDomain(0))
+        assertEquals(IntDomain(0, span), prepared.rootIntDomain(1))
+    }
 
     @Test
     fun `finite preparation retains selected deduction through the deferred bake`() {

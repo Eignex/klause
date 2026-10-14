@@ -15,6 +15,7 @@ import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.LpRoute
@@ -96,6 +97,7 @@ internal fun lpRootInfeasibleReporting(
     cancellation: Cancellation = Cancellation.Never,
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
+    projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ): LpRootInfeasibleResult {
     val sink = SolveStatsSink(backend = "lp-root-feasibility", lpProbeRoute = LpRoute.ROOT)
     val infeasible = LpEngine(
@@ -108,6 +110,7 @@ internal fun lpRootInfeasibleReporting(
             randomSeed = randomSeed,
         ),
         sink,
+        projections = projections,
     ).rootLpInfeasibleNoBake(cancellation)
     return LpRootInfeasibleResult(infeasible, sink.snapshot().lp)
 }
@@ -143,6 +146,7 @@ internal fun lpRootBoundsReporting(
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
     minimumSpan: Long = 0L,
+    projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ): LpRootBoundsResult {
     val sink = SolveStatsSink(backend = "lp-obbt", lpProbeRoute = LpRoute.ROOT)
     val engine = LpEngine(
@@ -155,6 +159,7 @@ internal fun lpRootBoundsReporting(
             randomSeed = randomSeed,
         ),
         sink,
+        projections = projections,
     )
     val shaved = engine.rootLpBoundsNoBake(cancellation, minimumSpan)
     if (shaved.isEmpty()) return LpRootBoundsResult(problem, sink.snapshot().lp)

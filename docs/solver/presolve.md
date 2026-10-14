@@ -189,3 +189,9 @@ invocation provider bundle. Mid-life factors use that bundle for their private
 propagators. A materialized contradiction carries its known infeasibility even when
 selected deduction is inert. These mechanisms do not change pass ordering, source
 mappings or the guarantee required for a reduction.
+
+Pre-bake LP infeasibility and bound tightening consume the selected relaxation
+descriptors on the source-prepared view. Their source model and domains remain
+neutral; a required source check does not grant an omitted relaxation permission
+to emit the default rows. Numerical certificates and native LP accounting remain
+owned by the existing model-facing runtime and numerical engine.
