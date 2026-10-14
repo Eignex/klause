@@ -6,9 +6,10 @@ import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.ExactLpNumber
-import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpCertificationObserver
+import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpRowBound
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.forEachRationalColumn
@@ -29,7 +30,7 @@ import com.eignex.klause.util.unaryMinus
 
 /**
  * Turns LP certificates into learned-clause material over absolute variable-bound atoms, read off the
- * integer-multiplier [IntegerCertificate], which carries the reduced-cost signs
+ * integer-multiplier [LpDeductionCertificate], which carries the reduced-cost signs
  * and dual-weight rows the reasons lean on. The artifacts share one
  * shape: a set of *premises* — column bounds the certificate leans on — whose negations form clause
  * literals, with the constraint rows kept implicit. Keeping the rows implicit is what makes the
@@ -74,8 +75,13 @@ internal object LpExplanation {
      * which is what the no-entering-column argument was evaluated against.
      */
     fun premiseLit(relaxation: LpRelaxation, session: PropagationSession, col: Int, lowerSide: Boolean): Int {
-        // A continuous column's bounds are declared globals (or probe stand-ins), valid at every node.
-        if (col < relaxation.colRealId.size && relaxation.colRealId[col] >= 0) return PREMISE_NONE
+        if (col < relaxation.colRealId.size && relaxation.colRealId[col] >= 0) {
+            val bounds = relaxation.model.exactBounds(col)
+            val side = (if (lowerSide) bounds.lower else bounds.upper) ?: return PREMISE_AUX
+            val declared = relaxation.model.exactState?.baseModel?.column(col)?.bounds
+            if (declared != null && side != (if (lowerSide) declared.lower else declared.upper)) return PREMISE_AUX
+            return PREMISE_NONE
+        }
         val varId = relaxation.colVarId[col]
         if (varId < 0) return presencePremise(relaxation, session, col, lowerSide)
         val model = relaxation.model
@@ -142,7 +148,7 @@ internal object LpExplanation {
      */
     fun objectiveBoundReason(
         relaxation: LpRelaxation,
-        cert: IntegerCertificate,
+        cert: LpDeductionCertificate,
         session: PropagationSession,
         observer: LpCertificationObserver? = null,
     ): IntArray? {
@@ -156,6 +162,40 @@ internal object LpExplanation {
             for (lit in premises) if (seen.add(lit)) lits.add(lit)
         }
         return lits.toIntArray()
+    }
+
+    fun rowBoundReason(relaxation: LpRelaxation, cert: LpRowBound, session: PropagationSession): IntArray? {
+        if (!cert.belongsTo(relaxation.model)) return null
+        var integralSupport = true
+        cert.forEachIntegralSupport { column ->
+            val variable = relaxation.colVarId.getOrNull(column) ?: -1
+            val count = if (relaxation.colIsBool.getOrNull(column) == true) session.problem.numBoolVars
+                else session.problem.numIntVars
+            if (variable !in 0 until count || relaxation.colRealId.getOrNull(column)?.let { it >= 0 } == true) {
+                integralSupport = false
+            }
+        }
+        if (!integralSupport) return null
+        val lits = IntArrayList()
+        val seen = IntHashSet()
+        if (!addRowPremiseLits(lits, seen, relaxation, intArrayOf(cert.row), session)) return null
+        var supported = true
+        cert.forEachSupport { column, lower ->
+            if (column >= relaxation.model.n) {
+                val state = relaxation.model.exactState
+                val bounds = state?.model?.column(column)?.bounds
+                val base = state?.baseModel?.column(column)?.bounds
+                val side = if (lower) bounds?.lower else bounds?.upper
+                if (side == null || side.premises != null || side != if (lower) base?.lower else base?.upper) {
+                    supported = false
+                }
+            } else {
+                val premises = boundPremiseLits(relaxation, session, column, lower)
+                if (premises == null) supported = false
+                else for (literal in premises) if (seen.add(literal)) lits.add(literal)
+            }
+        }
+        return if (supported) lits.toIntArray() else null
     }
 
     /**
@@ -283,17 +323,20 @@ internal object LpExplanation {
         return true
     }
 
-    /** [addRowPremiseLits] over the rows carrying nonzero dual weight in an optimal [cert]. */
+    /** [addRowPremiseLits] over dual support and the equality proving an integral objective. */
     fun addDualRowPremiseLits(
         lits: IntArrayList,
         seen: IntHashSet,
         relaxation: LpRelaxation,
-        cert: IntegerCertificate,
+        cert: LpDeductionCertificate,
         session: PropagationSession,
         observer: LpCertificationObserver? = null,
     ): Boolean {
         if (!cert.belongsTo(relaxation.model, observer)) return false
-        val rows = (0 until relaxation.model.m).filter { cert.dualNonzeroRow(it) }.toIntArray()
+        val integralRows = cert.integralObjectiveRows()
+        val rows = (0 until relaxation.model.m).filter {
+            cert.dualNonzeroRow(it) || integralRows?.contains(it) == true
+        }.toIntArray()
         return addRowPremiseLits(lits, seen, relaxation, rows, session)
     }
 

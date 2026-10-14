@@ -14,6 +14,12 @@ This page covers engine boundaries, exact authority and consumer integration bef
 private basis mechanics. [Certification](certification.md) defines accepted proof
 packages; [dependency integration](dependencies.md) defines kernel interfaces.
 
+Internal [mixed deduction operations](certification.md#mixed-deduction-operations)
+provide exact certificate and row-projection mechanisms with source endpoints,
+state identity and supported explanations. Their callers own activation, cutoff
+policy, applying domain changes and retraction; the numerical engine owns none of
+that search state. Node bounding selects the integer certificate entry point.
+
 ## Boundaries
 
 ```text

@@ -3,9 +3,12 @@ package com.eignex.klause.solver.evidence
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.engine.CertifiedLpBound
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.integerCertify
+import com.eignex.klause.lp.engine.nodeDualCertificate
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
@@ -27,6 +30,34 @@ class LpSourceEvidenceCaptureTest {
             "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(upper))),
         )
         return SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
+    }
+
+    @Test
+    fun `mixed multipliers capture a fractional bound in original objective units`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val quarter = assertNotNull(BigFraction.ofDouble(0.25))
+        val source = LpBuilder().apply {
+            addVar(0L, 10L, cost = 1L)
+            addRealVar(0.25, 1.25, cost = 0.5)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf()))
+        val bound = CertifiedLpBound(
+            certificate.exactObjectiveBound(), dualMultipliers = certificate.exactMultipliers(),
+        )
+        val original = context(0L, 10L)
+        val premises = original.premises + mapOf(
+            "real lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), quarter.negated())),
+            "real upper" to SourcePremise(SourceInequality(
+                mapOf(real to BigFraction.ONE), quarter + BigFraction.ONE,
+            )),
+        )
+        val context = SourceProofContext(scope, setOf(x, real), premises,
+            mapOf(x to BigFraction.ONE, real to assertNotNull(BigFraction.ofDouble(0.5))))
+
+        val evidence = LpSourceEvidenceCapture(context, listOf(x, real)).bound(model, bound)
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
