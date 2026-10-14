@@ -10,6 +10,9 @@ internal enum class LpSolvePhase {
     CLEANUP,
     EXACT_LADDER,
     NODE_DEDUCTION,
+    NODE_PRIMARY_FIXING,
+    NODE_SECONDARY_FIXING,
+    NODE_TERTIARY_FIXING,
 }
 
 internal data class LpPhaseMetrics(
