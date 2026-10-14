@@ -751,7 +751,8 @@ internal fun LpEngine.applyRowBounds(
         val support = LpExplanation.rowBoundReason(relaxation, certificate, session) ?: continue
         val reason = support.takeIf { learn && !bool }
         val result = when {
-            bool && (threshold < minimum && certificate.upper || threshold > maximum && !certificate.upper) -> {
+            bool && ((threshold < minimum && certificate.upper) ||
+                (threshold > maximum && !certificate.upper)) -> {
                 sink.lp.observePrune()
                 return true
             }
