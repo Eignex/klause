@@ -1205,6 +1205,21 @@ Retain raw profiles/resource reports externally; compare uninstrumented paired
 runs separately. Inlining/frame removal does not establish saved CPU time.
 [LP capture/replay](../docs/lp/replay.md) covers numerical and owner lifecycles.
 
+### Compressed profile captures
+
+Internal profile entry points can wrap their body in `ProfileCaptureArchive.run`.
+After success or failure, it packages `$OUT` into `capture.tar.gz` and records the
+archive hash plus every original file's size and hash in `capture-manifest.json`.
+It extracts and verifies the archive before removing the original staging files.
+An action failure stays primary; an archive failure is retained as a suppressed
+exception when both fail. Symbolic links are rejected before traversal, and an
+existing archive refuses overwrite.
+
+The live parent `profile.jfr` stays outside the archive so the lab wrapper can
+finalize it. Packing runs after the profile body, outside solver timing. Consumers
+must unpack and verify the manifest before source filtering or publication;
+compression establishes byte preservation, not source feasibility or performance.
+
 ### Table profiling
 
 ```sh
