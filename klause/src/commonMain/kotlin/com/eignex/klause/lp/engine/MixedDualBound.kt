@@ -39,6 +39,16 @@ internal fun nodeDualCertificate(
     } else {
         null
     }
+    val objectiveRows = rows ?: if (integralObjective) {
+        try {
+            meter.reserve(160L)
+            IntArray(0)
+        } catch (_: LpProjectionStop) {
+            null
+        }
+    } else {
+        null
+    }
     val fixingCertificate = if (eliminateContinuousObjective && certificate != null && rows != null) {
         try {
             meter.attempt(observer, "OBJECTIVE_ELIMINATION") {
@@ -89,10 +99,12 @@ internal fun nodeDualCertificate(
     observer?.observe(LpCertifier.INTEGER, accepted != null, LpCertifierCost.Metered(meter.work))
     if (cancellation()) return null
     for (candidate in candidates) if (candidate !== accepted) {
-        onAdditionalCertificate?.invoke(if (rows != null) IntegralObjectiveCertificate(candidate, rows) else candidate)
+        onAdditionalCertificate?.invoke(
+            if (objectiveRows != null) IntegralObjectiveCertificate(candidate, objectiveRows) else candidate,
+        )
     }
     val selected = accepted ?: return null
-    return if (rows != null) IntegralObjectiveCertificate(selected, rows) else selected
+    return if (objectiveRows != null) IntegralObjectiveCertificate(selected, objectiveRows) else selected
 }
 
 private class IntegralObjectiveCertificate(

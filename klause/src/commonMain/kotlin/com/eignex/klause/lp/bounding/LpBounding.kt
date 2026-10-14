@@ -604,7 +604,9 @@ internal fun LpEngine.sparseSafePrune(
         null
     }
     if (cancellation()) return LpNodeOutcome(false, null)
-    val rationalCutoff = if (canPrune && !boundRel.model.hasIntegralObjective()) {
+    val rationalCutoff = if (canPrune &&
+        (cert?.integralObjectiveRows() != null || !boundRel.model.hasIntegralObjective())
+    ) {
         BigFraction.ofDouble(bound.nextUp())
     } else {
         null

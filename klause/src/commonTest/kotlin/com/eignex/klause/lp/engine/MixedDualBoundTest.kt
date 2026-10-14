@@ -11,6 +11,20 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `directly integral mixed objectives retain lattice support without defining rows`() {
+        val source = LpBuilder().apply {
+            addVar(0L, 10L, cost = 2L)
+            addRealVar(0.25, 1.25)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf()))
+
+        assertEquals(emptyList(), certificate.integralObjectiveRows()?.toList())
+        assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
+    }
+
+    @Test
     fun `combined dual costs fix an integral coordinate when either component leaves it free`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L, cost = 10L)
