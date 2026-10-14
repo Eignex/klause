@@ -902,6 +902,9 @@ while the original source remains feasible.
 
 Claimed SAT/UNSAT require matching exact source verdicts. A proven finite optimum
 needs a feasible source objective and exclusion of every strictly better objective;
+an exactly checked complete MPS point with that exact objective establishes attainment
+without rediscovering it through a satisfiability search. Strict improvement exclusion
+still requires its independent source query.
 tolerance acceptance cannot justify either optimum or infeasibility. Unknown
 records make no proof claim. Unbounded claims and unsupported constructs decline.
 An explicit default-MPS `tolerance-optimum` retains its source point, objective
