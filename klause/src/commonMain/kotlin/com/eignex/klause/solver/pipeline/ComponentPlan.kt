@@ -13,6 +13,8 @@ import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
@@ -170,6 +172,14 @@ class ComponentPlan internal constructor(
     /** Source view consumed by the selected theory component. */
     fun theoryFragment(spec: Problem): Problem = fragment(spec) { it != FactorOwner.CP }
 
+    internal fun encodedTheoryFragment(spec: Problem): Problem? {
+        requireBelongsTo(spec)
+        val target = if (theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) EncodingTarget.DIFFERENCE
+        else EncodingTarget.LINEAR
+        return factorProjections.linearTheoryModel(target,
+            factorOwners.indices.filter { factorOwners[it] != FactorOwner.CP })
+    }
+
     // Shared clauses stay out because the shared clause component enforces them in the same session.
     internal fun theoryOwnedFragment(spec: Problem): Problem = fragment(spec) { it == FactorOwner.THEORY }
 
@@ -304,17 +314,19 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
             factorProjections = projections,
         )
     }
-    val partition = variablePartition()
+    val partition = variablePartition(projections)
+    val linearModel = projections.linearTheoryModel(EncodingTarget.LINEAR)
+    val differenceModel = projections.linearTheoryModel(EncodingTarget.DIFFERENCE)
     val completeTheory = when {
-        supportsExactLra() -> ProblemPipeline.EXACT_LRA
+        linearModel?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
 
-        numRealVars == 0 && supportsCompleteDifferenceTheory(
-            factors,
+        differenceModel != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
+            differenceModel.factors,
             numIntVars,
             intBounds,
         ) -> ProblemPipeline.DIFFERENCE_THEORY
 
-        supportsExactLira() -> ProblemPipeline.EXACT_LIRA
+        linearModel?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
 
         else -> null
     }
@@ -339,29 +351,28 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
         when {
             factor is Clause && projections.usesBuiltInPropagation(i) -> FactorOwner.SHARED
             factor is Clause -> FactorOwner.CP
-            completeTheory == ProblemPipeline.EXACT_LIRA && factor.exactTheoryOwnable -> FactorOwner.THEORY
-            factor.isTheoryOwnable(numRealVars != 0) -> FactorOwner.THEORY
+            completeTheory == ProblemPipeline.EXACT_LIRA &&
+                projections.encoder(i, EncodingTarget.LINEAR).enforcesSource -> FactorOwner.THEORY
+            projections.theoryOwnable(i, numRealVars != 0) -> FactorOwner.THEORY
             else -> FactorOwner.CP
         }
     }
     val theoryKept = factorOwners.indices.filter { factorOwners[it] != FactorOwner.CP }
-    val theoryFragment = withFactors(
-        Array(theoryKept.size) { factors[theoryKept[it]] },
-        impliedFactorMask?.let { mask -> BooleanArray(theoryKept.size) { mask[theoryKept[it]] } },
-    )
+    val theoryFragment = projections.linearTheoryModel(EncodingTarget.LINEAR, theoryKept)
+    val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE, theoryKept)
     val route = when {
         unownedOpenColumn >= 0 -> ProblemPipeline.UNSUPPORTED_OPEN
 
-        theoryFragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
+        theoryFragment?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
 
         intOwners.any { it == IntVariableOwner.THEORY } || factorOwners.any { it == FactorOwner.THEORY } -> when {
-            theoryFragment.numRealVars == 0 && supportsCompleteDifferenceTheory(
-                theoryFragment.factors,
-                theoryFragment.numIntVars,
-                theoryFragment.intBounds,
+            differenceFragment != null && differenceFragment.numRealVars == 0 && supportsCompleteDifferenceTheory(
+                differenceFragment.factors,
+                differenceFragment.numIntVars,
+                differenceFragment.intBounds,
             ) -> ProblemPipeline.DIFFERENCE_THEORY
 
-            theoryFragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
+            theoryFragment?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
 
             else -> ProblemPipeline.UNSUPPORTED_OPEN
         }

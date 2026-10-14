@@ -3,24 +3,27 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
-import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraAssignment
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.TheoryEncoding
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.Cancellation
 
 internal class SharedPolynomialModel private constructor(
     val source: Problem,
@@ -54,6 +57,7 @@ internal class SharedPolynomialModel private constructor(
             source: Problem,
             sourceFormula: PolynomialRealFormula?,
             formulaForFactor: (Factor) -> PolynomialRealFormula?,
+            projections: PreparedFactorProjections,
         ): SharedPolynomialModel? {
             if ((0 until source.numIntVars).any { !source.intBounds.hasLower(it) || !source.intBounds.hasUpper(it) }) {
                 return null
@@ -69,29 +73,37 @@ internal class SharedPolynomialModel private constructor(
             val kept = ArrayList<Int>()
             for ((index, factor) in source.factors.withIndex()) {
                 val explicit = formulaForFactor(factor)
-                if (explicit != null) {
-                    formulas += explicit
-                } else if (factor is ContinuousProduct) {
-                    formulas += PolynomialRealFormula.Atom(
-                        PolynomialExpression.Product(listOf(real(factor.a), real(factor.b))),
-                        PolynomialRelation.EQ, real(factor.result),
-                    )
-                } else if (factor is RealProduct) {
-                    formulas += PolynomialRealFormula.Atom(
-                        PolynomialExpression.Product(listOf(integer(factor.intOperand), real(factor.realOperand))),
-                        PolynomialRelation.EQ, real(factor.result),
-                    )
-                } else if (factor.variables.reals.isNotEmpty() ||
+                val continuous = explicit != null || factor is ContinuousProduct || factor is RealProduct ||
+                    factor.variables.reals.isNotEmpty() ||
                     factor.linearForm?.rows?.any { it.constants is RealConstants } == true
-                ) {
-                    val form = factor.linearForm ?: return null
-                    if (form is LinearForm.Relaxation) return null
-                    val rows = form.rows.map { row -> polynomialRow(row, ::integer, ::real, lowering) }
-                    formulas += if (form is LinearForm.Disjunction) PolynomialRealFormula.Or(rows)
-                    else PolynomialRealFormula.And(rows)
-                } else {
+                if (!continuous) {
                     kept += index
+                    continue
                 }
+                val selected = if (explicit == null) projections.encoder(index, EncodingTarget.POLYNOMIAL)
+                else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                    encoding.polynomial(explicit)
+                    null
+                }
+                val emitted = ArrayList<PolynomialRealFormula>()
+                val encoding = object : TheoryEncoding {
+                    override val target = EncodingTarget.POLYNOMIAL
+                    override val sourceFactorIndex = index
+                    override val cancellation = Cancellation.Never
+                    override fun fixedInteger(id: SourceIntId): BigInt? = null
+                    override fun fixedBoolean(id: SourceBoolId): Boolean? = null
+                    override fun linear(form: LinearForm): Unit = error("polynomial target requires a formula")
+                    override fun polynomial(formula: PolynomialRealFormula) { emitted += formula }
+                    override fun integer(id: SourceIntId): PolynomialExpression = integer(id.index)
+                    override fun real(id: SourceRealId): PolynomialExpression = real(id.index)
+                    override fun conditional(
+                        condition: PolynomialRealFormula,
+                        whenTrue: PolynomialExpression,
+                        whenFalse: PolynomialExpression,
+                    ): PolynomialExpression = lowering.conditional(condition, whenTrue, whenFalse)
+                }
+                if (selected.install(factor, encoding) != null || emitted.isEmpty()) return null
+                formulas += emitted
             }
             for (id in 0 until source.numRealVars) {
                 val lower = source.realLower[id]
@@ -119,49 +131,6 @@ internal class SharedPolynomialModel private constructor(
                 PolynomialTheoryService(formula, source.numBoolVars, lowering.realCount, fixedReals),
                 integerIds.toMap(),
                 kept.toList(),
-            )
-        }
-
-        private fun polynomialRow(
-            row: LinearRow,
-            integer: (Int) -> PolynomialExpression,
-            real: (Int) -> PolynomialExpression,
-            lowering: PolynomialRealLowering,
-        ): PolynomialRealFormula {
-            val terms = List(row.size) { index ->
-                val ref = row.ref(index)
-                val value = when {
-                    Term.isInt(ref) -> integer(Term.intVar(ref))
-                    Term.isReal(ref) -> real(Term.realVar(ref))
-                    else -> {
-                        val literal = Term.lit(ref)
-                        val boolean = PolynomialRealFormula.BooleanVariable(SourceBoolId(literal ushr 1))
-                        val condition = if (literal and 1 == 0) boolean else PolynomialRealFormula.Not(boolean)
-                        lowering.conditional(condition, constant(BigFraction.ONE), constant(BigFraction.ZERO))
-                    }
-                }
-                val coefficient = when (val constants = row.constants) {
-                    is IntegralConstants -> BigFraction.of(constants.exactCoeff(index), BIG_ONE)
-                    is RealConstants -> requireNotNull(BigFraction.ofDouble(
-                        if (index < constants.intCoefficients.size) constants.intCoefficients.at(index)
-                        else constants.realCoefficients.at(index - constants.intCoefficients.size),
-                    ))
-                }
-                PolynomialExpression.Product(listOf(constant(coefficient), value))
-            }
-            val rhs = when (val constants = row.constants) {
-                is IntegralConstants -> BigFraction.of(constants.exactBound, BIG_ONE)
-                is RealConstants -> requireNotNull(BigFraction.ofDouble(constants.bound))
-            }
-            val relation = when (row.relation) {
-                LinearOp.EQ -> PolynomialRelation.EQ
-                LinearOp.LE -> if (row.strict) PolynomialRelation.LT else PolynomialRelation.LE
-                LinearOp.GE -> if (row.strict) PolynomialRelation.GT else PolynomialRelation.GE
-                LinearOp.NE -> PolynomialRelation.NE
-            }
-            val atom = PolynomialRealFormula.Atom(PolynomialExpression.Sum(terms), relation, constant(rhs))
-            return if (row.activator == LinearRow.ALWAYS) atom else PolynomialRealLowering.equivalent(
-                PolynomialRealFormula.BooleanVariable(SourceBoolId(row.activator)), atom,
             )
         }
 

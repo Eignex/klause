@@ -60,7 +60,7 @@ internal class PreparedSearchComponents(
     spec: Problem,
     cpDomains: Map<Int, IntDomain>,
 ) {
-    private val fragment = plan.theoryFragment(spec)
+    private val fragment = plan.encodedTheoryFragment(spec) ?: plan.theoryFragment(spec)
     private val projection = if (plan.hasCpComponent) plan.cpProjection(spec, cpDomains) else null
     private val propagation = projection?.takeIf { it.problem.factorProjections?.nativePropagation != false }
         ?.let { PropagationProblem(it.problem) }
