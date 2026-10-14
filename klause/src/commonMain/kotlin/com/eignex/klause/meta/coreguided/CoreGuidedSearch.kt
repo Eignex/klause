@@ -250,8 +250,8 @@ internal class CoreGuidedSearch(
                         querySofts
                     } else {
                         querySofts.filter {
-                        assumptions.boolValueOrNull(it) == false
-                    }.toIntArray()
+                            assumptions.boolValueOrNull(Lit.variable(it)) == !Lit.isPositive(it)
+                        }.toIntArray()
                     }
                     if (selected.isEmpty()) return finish(MinimizeResult.Infeasible(stats = stats))
                     recordPreparation(3L * selected.size)
@@ -259,7 +259,7 @@ internal class CoreGuidedSearch(
                     core = selected
                     coreCursor = 0
                     coreEncoded = false
-                    coreLiterals = IntArray(selected.size) { Lit.make(selected[it], true) }
+                    coreLiterals = selected.copyOf()
                     factors.add(Clause(coreLiterals))
                     lower += coreWeight
                     completedCores++
@@ -285,11 +285,15 @@ internal class CoreGuidedSearch(
             if (weight == 0L) continue
             val exact = bigIntOf(weight)
             val preferred = Lit.make(id, weight < 0L)
-            val selector = nextBool++
-            factors.add(Oll.relaxerClause(preferred, selector))
-            factors.add(Clause(intArrayOf(Lit.negate(preferred), Lit.make(selector, false))))
-            weights[selector] = exact.abs()
-            recordPreparation(6L)
+            val violation = if (params.assumptions.isFrozenBool(id)) {
+                // Private assumptions must not overwrite a caller's source pin.
+                val selector = nextBool++
+                factors.add(Oll.relaxerClause(preferred, selector))
+                factors.add(Clause(intArrayOf(Lit.negate(preferred), Lit.make(selector, false))))
+                recordPreparation(6L)
+                Lit.make(selector, true)
+            } else Lit.negate(preferred)
+            weights[violation] = exact.abs()
         }
     }
 
@@ -321,11 +325,12 @@ internal class CoreGuidedSearch(
 
     private fun appendThreshold(literals: IntArray, minimum: Int, weight: BigInt) {
         val aux = nextBool++
+        val literal = Lit.make(aux, true)
         factors.add(ReifiedCardinality(aux, literals, min = minimum, max = literals.size))
-        weights[aux] = weight
+        weights[literal] = weight
         recordPreparation(1L + literals.size)
         // A latent higher threshold implies its frontier; spending the frontier exposes its successor.
-        if (minimum < literals.size) tails[aux] = ThresholdTail(literals, minimum + 1, weight)
+        if (minimum < literals.size) tails[literal] = ThresholdTail(literals, minimum + 1, weight)
     }
 
     private fun maximumWeight(below: BigInt? = null): BigInt? {
@@ -342,7 +347,7 @@ internal class CoreGuidedSearch(
         recordPreparation(weights.size.toLong())
         querySofts = weights.filterValues { it >= (threshold ?: BIG_ZERO) }.keys.toIntArray()
         recordPreparation(querySofts.size.toLong())
-        val softPins = Assumptions(bools = querySofts.associateWith { false })
+        val softPins = Assumptions(bools = querySofts.associate { Lit.variable(it) to !Lit.isPositive(it) })
         val baked = queryModel ?: bakeQuery(token).also { queryModel = it }
         return try {
             ResumableSatisfaction(BacktrackSolver(baked),
