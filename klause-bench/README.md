@@ -1411,6 +1411,23 @@ records without a source-signature claim. A demangled signature supplies no proo
 actual argument registers, live task pointer, root association, clock/loss,
 code-size result or compiler saving. Validate those boundaries before probing.
 
+### Native executable entry bytes
+
+`com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
+three default symbol queries, `CompileQueue` and `CompileTaskWrapper` from the
+pinned Linux x86-64 JVM library. Each function's complete declared span must fit
+an allocated executable section and one matching file-backed executable segment.
+The capture retains at most 16 KiB per function and 256 candidate records, with
+explicit truncated, non-function, undefined, zero-size and per-record error states.
+
+An unprivileged child downloads the hash-pinned Capstone 5.0.6 wheel into the
+capture directory. Bounded extraction rejects unsafe members; the imported
+binding and native provider must come from that directory. Package member hashes,
+provider identity, raw input bytes, decoded instruction boundaries, undecoded
+suffixes and failures are retained. There is no global installation or target
+library loading. Linear decoding establishes no control-flow or argument proof;
+do not derive private field offsets, task lifetime or compiler savings from it.
+
 ### Table profiling
 
 ```sh

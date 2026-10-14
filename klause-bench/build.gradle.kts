@@ -88,9 +88,18 @@ val checkNativeVmSymbolQueries = tasks.register<Exec>("checkNativeVmSymbolQuerie
         "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
 }
 
+val checkNativeVmEntries = tasks.register<Exec>("checkNativeVmEntries") {
+    group = "verification"
+    description = "Test executable entry byte ownership and partial decoder captures."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_read_native_vm_entries.py")
+    inputs.files("tools/read_native_vm_entries.py", "tools/native_vm_entry_decoder.py",
+        "tools/test_read_native_vm_entries.py", "tools/read_native_vm_symbols.py")
+}
+
 tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
-        checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries)
+        checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
