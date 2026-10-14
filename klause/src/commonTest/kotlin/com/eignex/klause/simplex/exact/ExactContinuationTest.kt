@@ -37,7 +37,9 @@ class ExactContinuationTest {
             listOf(BigFraction.ZERO, BigFraction.ZERO, two, BigFraction.ZERO),
             listOf(BigFraction.ONE, BigFraction.ONE, two, BigFraction.ZERO),
             listOf(1),
-            listOf(ContinuationStatus.LOWER, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED),
+            listOf(
+                ContinuationStatus.LOWER, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED,
+            ),
             lowerStrict = listOf(true, true, false, false),
         )
 
@@ -120,7 +122,9 @@ class ExactContinuationTest {
             listOf(listOf(0 to huge, 1 to BigFraction.ONE), listOf(0 to BigFraction.ONE, 1 to huge)),
             List(2) { BigFraction.ONE }, List(4) { BigFraction.ZERO },
             listOf(null, null, BigFraction.ZERO, BigFraction.ZERO), listOf(0, 1),
-            listOf(ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED),
+            listOf(
+                ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED,
+            ),
             lowerStrict = listOf(true, true, false, false),
         )
 

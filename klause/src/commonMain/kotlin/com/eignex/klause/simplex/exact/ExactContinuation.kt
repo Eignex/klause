@@ -451,7 +451,8 @@ private class RationalContinuationLane<F>(
         while (true) {
             val values = values(budget)
             val epsilon = epsilonValues(budget)
-            val row = headings.indices.filter { violation(it, values, epsilon, budget) != 0 }.minByOrNull { headings[it] }
+            val row = headings.indices.filter { violation(it, values, epsilon, budget) != 0 }
+                .minByOrNull { headings[it] }
             if (row == null) {
                 return LaneResult(
                     materialize(values, epsilon, budget),
