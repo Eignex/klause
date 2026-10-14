@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.util.Cancellation
 
 /** Execution data selected from a source, before any mutable search state is allocated. */
@@ -307,7 +308,8 @@ internal fun Problem.prepareExecutionPlan(
             providers = providers, projections = projections, cancellation = cancellation)
     }
     val ownership = componentPlan(projections, preferFinite, cancellation)
-    if (cancellation()) return PreparedSourcePlan(original, this, PreparedExecutionKind.DECLINED,
+    if (cancellation() || ownership.encodingDecline == EncoderDecline.RESOURCE) return PreparedSourcePlan(
+        original, this, PreparedExecutionKind.DECLINED,
         null, null, listOf(ExecutionComponentDescriptor("interrupted-preparation", ComponentResponsibility.UNPLACED,
             factors.indices.toList(), (0 until numIntVars).toList(), (0 until numRealVars).toList(),
             (0 until numBoolVars).toList(), unavailableContract(ExecutionDeclineCause.PREPARATION,
@@ -373,10 +375,11 @@ internal fun Problem.preparePolynomialExecutionPlan(
 ): PreparedSourcePlan {
     projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
+    var encodingDecline: EncoderDecline? = null
     val polynomial = if (openInteger) null else
-        SharedPolynomialModel.lower(this, sourceFormula, projections, cancellation)
+        SharedPolynomialModel.lower(this, sourceFormula, projections, cancellation) { encodingDecline = it }
     val cause = when {
-        cancellation() -> PreparedPlanDecline.RESOURCE
+        cancellation() || encodingDecline == EncoderDecline.RESOURCE -> PreparedPlanDecline.RESOURCE
         openInteger -> PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER
         polynomial == null -> PreparedPlanDecline.POLYNOMIAL_ENCODING
         objective?.realCoefficientValues?.any { it != 0.0 } == true -> PreparedPlanDecline.CONTINUOUS_LINEAR_OBJECTIVE

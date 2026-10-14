@@ -12,10 +12,12 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialRealLowering
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.TheoryEncoding
@@ -58,6 +60,7 @@ internal class SharedPolynomialModel private constructor(
             sourceFormula: PolynomialRealFormula?,
             projections: PreparedFactorProjections,
             cancellation: Cancellation,
+            onDecline: (EncoderDecline) -> Unit,
         ): SharedPolynomialModel? {
             if ((0 until source.numIntVars).any { !source.intBounds.hasLower(it) || !source.intBounds.hasUpper(it) }) {
                 return null
@@ -130,7 +133,13 @@ internal class SharedPolynomialModel private constructor(
                     override fun fixedInteger(id: SourceIntId): BigInt? = null
                     override fun fixedBoolean(id: SourceBoolId): Boolean? = null
                     override fun linear(form: LinearForm): Unit = error("polynomial target requires a formula")
-                    override fun polynomial(formula: PolynomialRealFormula) { emitted += formula }
+                    private fun coordinates(): Set<Int> =
+                        (integerMapping.values + realMapping.values + auxiliaries).map { it.index }.toSet()
+                    override fun polynomial(formula: PolynomialRealFormula) {
+                        validatePolynomialEncodingCoordinates(formula, null, coordinates(), factor.boolVars.toSet(),
+                            cancellation)
+                        emitted += formula
+                    }
                     override fun integer(id: SourceIntId): PolynomialExpression {
                         require(id.index in factor.intVars)
                         return integer(id.index).also {
@@ -147,13 +156,26 @@ internal class SharedPolynomialModel private constructor(
                         whenTrue: PolynomialExpression,
                         whenFalse: PolynomialExpression,
                     ): PolynomialExpression {
+                        val coordinates = coordinates()
+                        val booleans = factor.boolVars.toSet()
+                        validatePolynomialEncodingCoordinates(condition, null, coordinates, booleans, cancellation)
+                        validatePolynomialEncodingCoordinates(null, whenTrue, coordinates, booleans, cancellation)
+                        validatePolynomialEncodingCoordinates(null, whenFalse, coordinates, booleans, cancellation)
                         val before = lowering.realCount
                         return lowering.conditional(condition, whenTrue, whenFalse).also {
                             for (id in before until lowering.realCount) auxiliaries += TheoryRealId(id)
                         }
                     }
                 }
-                if (selected.install(factor, encoding) != null || emitted.isEmpty()) return null
+                val decline = try {
+                    selected.install(factor, encoding)
+                } catch (_: PolynomialSourceInterrupted) {
+                    EncoderDecline.RESOURCE
+                }
+                if (decline != null || emitted.isEmpty()) {
+                    onDecline(decline ?: EncoderDecline.UNSUPPORTED)
+                    return null
+                }
                 formulas += emitted
                 attributions += EncodingAttribution(index, factor.boolVars.map(::SourceBoolId),
                     factor.intVars.map(::SourceIntId), factor.variables.reals.map(::SourceRealId),

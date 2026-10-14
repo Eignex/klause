@@ -33,6 +33,7 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.Vsids
+import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
@@ -276,7 +277,8 @@ class OpenTheoryEngine internal constructor(
         planned: OpenSourcePreparation.Planned,
         preparationCancellation: Cancellation,
         reuseOpeningBoundAttempt: Boolean,
-    ) : this(planned.route, { planned }, preparationCancellation, reuseOpeningBoundAttempt)
+        declaredRoute: ProblemPipeline = planned.route,
+    ) : this(declaredRoute, { planned }, preparationCancellation, reuseOpeningBoundAttempt)
 
     init {
         require(declaredRoute != ProblemPipeline.FINITE_CP && declaredRoute != ProblemPipeline.UNSUPPORTED_OPEN) {
@@ -344,6 +346,9 @@ class OpenTheoryEngine internal constructor(
             is OpenSourcePreparation.Planned -> source
         }
         val selectedPlan = routed.plan
+        if (selectedPlan.encodingDecline == EncoderDecline.RESOURCE) {
+            return OpenTheoryStart.Decided(unknown(false, budgetExhausted = true, stats = stats, state = state))
+        }
         val route = routed.route
         stats.backend = route.backendName()
         // Close the open sides before the theory sees them. A proved bound narrows the box the theory
@@ -474,7 +479,9 @@ class OpenTheoryEngine internal constructor(
     /** Prepare the source under the caller's stop, once per engine. */
     private fun prepare(cancellation: Cancellation): OpenSourcePreparation = preparation
         ?: prepareSource(alsoStoppedBy(cancellation)).also {
-            if (!alsoStoppedBy(cancellation)()) preparation = it
+            if (!alsoStoppedBy(cancellation)() &&
+                (it as? OpenSourcePreparation.Planned)?.plan?.encodingDecline != EncoderDecline.RESOURCE
+            ) preparation = it
         }
 
     /** The bound-closing phase's allowance: what is left of preparation's, capped by the solve's own. */

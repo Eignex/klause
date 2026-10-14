@@ -9,11 +9,11 @@ import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 
@@ -57,7 +57,8 @@ internal class LeafRealSolver(
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
         )
-        return relaxation.leafResult(certified, problem, objective, sample, sink).checkedEncoding(encoded, sample)
+        return relaxation.leafResult(certified, problem, objective, sample, sink)
+            .checkedEncoding(encoded, sample, cancellation)
     }
 
     private fun relaxation(sample: Sample, cancellation: Cancellation): LpRelaxation? {

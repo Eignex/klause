@@ -277,6 +277,11 @@ these diagnostic timings; they are not ordinary CLI throughput measurements.
 `bench.profile.EncoderProviderProfile` runs caller-supplied factor-admitted SMT files
 through normal source routing with default and private equivalent linear encoders.
 Pass `inputs=<comma-separated repository-relative or absolute paths> repeats=N warmups=N seed=N`.
+`parser=admission` requires linear factor admission; `parser=factor` exercises the
+existing library SMT factor facade, including representable bounded mixed products.
+The original source bytes remain the checking authority. Each input also interrupts
+a real selected installation through its caller token and records the resource decline;
+inputs with no applicable installer record that control as inapplicable.
 The private mode constrains scoped real auxiliaries with exact affine definitions and
 retains conjunction/disjunction structure; guarded rows keep their selected built-in
 encoding. Modes alternate in a measured JVM with one active processor, Serial GC and

@@ -6,13 +6,15 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.theory.finiteLinearModel
+import com.eignex.klause.theory.rebindEncoding
 import com.eignex.klause.util.Cancellation
 
 internal fun BakedProblem.fixedDiscreteSample(): Sample? {
@@ -26,26 +28,47 @@ internal fun BakedProblem.fixedDiscreteSample(): Sample? {
 
 internal class FiniteExactNeighborhood(
     private val source: BakedProblem,
-    fixed: Sample,
+    private val fixed: Sample,
     private val params: TheoryParams,
-    objective: LinearObjective?,
+    private val objective: LinearObjective?,
     private val certify: (Sample) -> Unit,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
-    private val linear = requireNotNull(
-        (source.factorProjections ?: FactorProjectionProviders.Default.prepare(source))
-            .finiteLinearModel(fixed, Cancellation.Never),
-    ) { "finite neighborhood requires complete conditioned encoders" }.withIntDomains(source.rootIntDomainsInPlace)
-        .let { encoded -> encoded.withFactors(encoded.factors + Array(source.numBoolVars) { id ->
-            Clause(intArrayOf(Lit.make(id, fixed.boolValue(id))))
-        }) }
-    private val adapter = OpenExactNeighborhood(linear, params, objective)
-    val exhausted: Boolean get() = adapter.exhausted
+    private val geometry = OpenExactNeighborhood(source.withIntDomains(source.rootIntDomainsInPlace), params, objective)
+    private var adapter: OpenExactNeighborhood? = null
+    val exhausted: Boolean get() = adapter?.exhausted == true
+
+    private fun prepare(cancellation: Cancellation): OpenExactNeighborhood? {
+        adapter?.let { return it }
+        val stop = params.cancellation or params.timeout or cancellation
+        if (stop()) return null
+        val selected = source.factorProjections ?: FactorProjectionProviders.Default.prepare(source)
+        val encoded = selected.finiteLinearModel(fixed, stop) ?: return null
+        val narrowed = source.withIntDomains(source.rootIntDomainsInPlace)
+        val pins = Array(source.numBoolVars) { id -> Clause(intArrayOf(Lit.make(id, fixed.boolValue(id)))) }
+        val canonical = narrowed.withFactors(narrowed.factors + pins)
+        val projections = selected.forEngineView(narrowed).withAppendedFactors(canonical)
+        val owners = Array(canonical.numFactors) { index ->
+            when {
+                canonical.factors[index].variables.reals.isNotEmpty() -> FactorOwner.THEORY
+                canonical.factors[index] is Clause && projections.usesBuiltInPropagation(index) -> FactorOwner.SHARED
+                else -> FactorOwner.CP
+            }
+        }
+        val fragment = encoded.rebindEncoding(canonical, encoded.factors + pins, null)
+        val plan = ComponentPlan(canonical, Array(canonical.numIntVars) { IntVariableOwner.CP }, owners,
+            if (canonical.numIntVars == 0) ProblemPipeline.EXACT_LRA else ProblemPipeline.EXACT_LIRA,
+            factorProjections = projections, installedFragment = fragment)
+        if (stop()) return null
+        return OpenExactNeighborhood(canonical, params, objective,
+            preparedSource = canonical.preparedWithComponents(plan, objective = objective)).also { adapter = it }
+    }
 
     override fun check(
         condition: ExactNeighborhoodCondition,
         cancellation: Cancellation,
     ): ExactNeighborhoodResult {
-        val result = adapter.check(condition, cancellation)
+        val result = prepare(cancellation)?.check(condition, cancellation)
+            ?: return ExactNeighborhoodResult.Undecided
         if (result !is ExactNeighborhoodResult.Witness) return result
         return when (verifyOpenWitness(source, result.sample, cancellation)) {
             is Verification.Accepted -> {
@@ -57,10 +80,15 @@ internal class FiniteExactNeighborhood(
         }
     }
 
-    fun search(adaptive: Boolean, seed: Long): ExactNeighborhood = adapter.search(adaptive, seed, completion = this,
-        maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null)
+    fun search(adaptive: Boolean, seed: Long): ExactNeighborhood = geometry.search(adaptive, seed, completion = this,
+        maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
+        nativeWork = { adapter?.work ?: 0 }, completionStats = { adapter?.stats ?: SolveStats.EMPTY },
+        onClose = ::close)
 
-    override fun close() = adapter.close()
+    override fun close() {
+        adapter?.close()
+        geometry.close()
+    }
 }
 
 internal fun finiteExactNeighborhoodWorker(
