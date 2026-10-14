@@ -165,16 +165,16 @@ class ProductCompilationTest {
                 exactFloats = exact,
             )
             val plan = program.problem.prepareExecutionPlan()
-            val canonical = assertNotNull(plan.model)
-            val projection = assertNotNull(plan.componentPlan).cpProjection(canonical, emptyMap())
-            val problem = projection.problem
+            val polynomial = assertNotNull(plan.polynomialModel)
+            val problem = polynomial.finite
             val product = problem.factors.filterIsInstance<Product>().single()
             val original = program.problem.factors.filterIsInstance<Product>().single()
-            assertEquals(plan.integerCoordinate(original.a), projection.sourceId(product.a))
-            assertEquals(plan.integerCoordinate(original.b), projection.sourceId(product.b))
-            assertEquals(plan.integerCoordinate(original.result), projection.sourceId(product.result))
+            assertTrue(program.problem.factors.indexOf(original) in polynomial.finiteFactorIndices)
+            assertEquals(plan.integerCoordinate(original.a), product.a)
+            assertEquals(plan.integerCoordinate(original.b), product.b)
+            assertEquals(plan.integerCoordinate(original.result), product.result)
             assertEquals(product.a, product.b)
-            val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
+            val state = LocalSearchState(LocalSearchModel.open(problem, assertNotNull(plan.finiteFactorProjections)), Random(1))
             for (id in 0 until problem.numIntVars) state.assignment.setInt(id, state.rootDomains[id].min)
             for (clause in problem.factors.filterIsInstance<Clause>()) {
                 if (clause.literals.size != 1) continue
