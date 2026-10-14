@@ -100,6 +100,15 @@ set share these identities. SAT/UNSAT expectations describe source mathematics;
 incomplete search can return UNKNOWN, including the integer equation `n*n = 2`.
 Every manifest entry pins the exact original bytes, attribution and license.
 
+## XCSP3 source checking
+
+The self-authored Apache-2.0 [region-counts-tiny.xml](../../klause-bench/src/test/resources/xcsp3/region-counts-tiny.xml)
+combines grouped Boolean membership sums with variable conditions, region-size
+vector lookup and starred extension tuples. Complete-search tests check returned
+named witnesses against the original XML. The contradictory count variant requires
+four region memberships across three cells, while every cell belongs to exactly one
+region. It exercises source lowering and complete search without a wall-clock budget.
+
 ## XCSP3 reference importer
 
 [`test_solve.py`](../../klause-bench/xcsp3-cpsat/test_solve.py) contains self-authored

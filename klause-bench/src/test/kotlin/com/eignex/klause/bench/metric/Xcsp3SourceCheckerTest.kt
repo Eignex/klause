@@ -1,6 +1,11 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.backtrack.BacktrackPresets
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
 import java.io.File
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.params.ParameterizedTest
@@ -9,6 +14,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import org.xcsp.parser.callbacks.SolutionChecker
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -17,9 +23,48 @@ import kotlin.test.assertTrue
 class Xcsp3SourceCheckerTest {
     private val source = File(CorpusFetcher.workspaceRoot(), "klause-bench/smoke-corpus/xcsp3/sum-opt-tiny.xml")
 
+    private val regions = File(
+        CorpusFetcher.workspaceRoot(),
+        "klause-bench/src/test/resources/xcsp3/region-counts-tiny.xml",
+    )
+
     init {
         val witness = "<instantiation><list>a b c</list><values>2 2 0</values></instantiation>"
         Xcsp3SourceChecker.inspect(source, witness, "10")
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["satOptimized", "conflictDriven"])
+    fun `source region count witnesses survive complete search`(preset: String) {
+        val parsed = Xcsp3.parse(regions.readText())
+        val params = when (preset) {
+            "satOptimized" -> BacktrackPresets.satOptimized(randomSeed = 3L)
+            else -> BacktrackPresets.conflictDriven(randomSeed = 3L)
+        }
+
+        val result = BacktrackSolver(parsed.problem.bake()).solve(params)
+
+        val sample = assertIs<SolveResult.Sat>(result).assignment
+        val names = parsed.intVarNames.keys.joinToString(" ")
+        val values = parsed.intVarNames.values.joinToString(" ") { sample.ints[it].toString() }
+        val witness = "<instantiation><list>$names</list><values>$values</values></instantiation>"
+        val checked = Xcsp3SourceChecker.inspect(regions, witness, null)
+        assertEquals("valid", checked.status, checked.reason)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["satOptimized", "conflictDriven"])
+    fun `inconsistent source region counts are refuted by complete search`(preset: String) {
+        val text = regions.readText().replace("<values>0 1 2 1</values>", "<values>0 1 2 2</values>")
+        val parsed = Xcsp3.parse(text)
+        val params = when (preset) {
+            "satOptimized" -> BacktrackPresets.satOptimized(randomSeed = 3L)
+            else -> BacktrackPresets.conflictDriven(randomSeed = 3L)
+        }
+
+        val result = BacktrackSolver(parsed.problem.bake()).solve(params)
+
+        assertIs<SolveResult.Unsat>(result)
     }
 
     @Test
