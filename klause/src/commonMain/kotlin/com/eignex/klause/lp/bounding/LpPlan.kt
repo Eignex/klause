@@ -112,8 +112,8 @@ data class LpPlan(
      * and propagating. Publication requires the composed witness check, continuous completion where
      * applicable, and improvement over the available incumbent cutoff. A declined mixed proposal permits
      * peer-target and directed rounding of the same LP point before bounded feasibility pumping under
-     * the same root allowance. The relaxation point supplies only
-     * a target, so it cannot establish source feasibility on its own. Requires a LinearObjective;
+     * the same root allowance. The relaxation point supplies only a target, so it cannot establish
+     * source feasibility on its own. Requires a LinearObjective;
      * off by default; never changes the complete search's feasible region.
      */
     val probe: Boolean = false,
