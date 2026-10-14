@@ -196,7 +196,7 @@ private fun integralObjectiveAfterRow(
 
 private fun objectiveBoxCertificate(model: LpModel, meter: MixedCertificateMeter): LpDeductionCertificate? {
     val state = model.exactState ?: return null
-    meter.reserve(model.m * 16L)
+    meter.reserve(model.numVars.toLong() * 16L + model.m * 24L + 512L)
     val zero = DoubleArray(model.m)
     return integerCertifyUnchecked(model, zero, DEFAULT_SCALE_BITS, allowMixed = true, scan = meter::step)
         ?: mixedCertificate(model, state, List(model.m) { BigFraction.ZERO }, meter)
