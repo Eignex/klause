@@ -81,6 +81,26 @@ cumulative allowances, with unchanged dimension and pivot caps. Nonzero objectiv
 retain closure continuation and their existing strict-refinement policy.
 
 Node deductions admit mixed structural columns under the retained exact authority.
+At the root, mixed-row feasibility certificates project `A*x + s = b` onto each
+integral structural coordinate by bounding every other contribution at its exact
+minimizing or maximizing endpoint. The target's own endpoint is excluded from the
+premises. Absent supporting sides decline that projection; a missing target side
+does not. Origins reconstruct source coordinates before integer rounding. A strict
+supporting endpoint excludes equality when the projected bound is integral.
+The pass builds a bounded sparse row view once per root query and retains only
+completed coordinate certificates. It shares the 128-bit scalar admission,
+250,000 work and 16 MiB allocation allowance with subsequent objective candidates.
+Cancellation discards unpublished projections; resource decline can retain completed
+ones. The consumer charges row work and rounding to the containing LP ledger.
+Each certificate retains its exact-state identity, row and endpoint support. Bound
+rollback, foreign state or objective change prevents reuse. Reusable integer reasons
+cite the row and every supporting side. A root consequence with unsupported
+continuous or logical scope is withheld from CP, whose root lifetime must cover
+every numerical premise. Continuous coordinates are
+never fixing targets. The `NODE_ROW_FIXING` phase records actual domain reductions
+separately from objective-relative fixing. This pass supplies no objective bound
+or source-completion claim and requires no additional numerical solve.
+
 The integer-multiplier path evaluates integral-valued data in Int128 without
 requiring continuous coordinates to be integral. Fractional data falls back to an
 exact rational Lagrangian with 128-bit scalar admission, 250,000 work units and

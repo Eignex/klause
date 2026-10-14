@@ -12,9 +12,11 @@ internal fun nodeDualCertificate(
     observer: LpCertificationObserver? = null,
     eliminateContinuousObjective: Boolean = false,
     onAdditionalCertificate: ((LpDeductionCertificate) -> Unit)? = null,
+    sharedMeter: MixedCertificateMeter? = null,
 ): LpDeductionCertificate? {
     if (!model.hasContinuous) return integerCertify(model, duals, observer = observer)
-    val meter = MixedCertificateMeter(cancellation)
+    val meter = sharedMeter ?: MixedCertificateMeter(cancellation)
+    val initialWork = meter.work
     val certificate = try {
         meter.poll()
         val state = model.exactState ?: throw LpProjectionStop()
@@ -96,7 +98,7 @@ internal fun nodeDualCertificate(
             continue
         }
     }
-    observer?.observe(LpCertifier.INTEGER, accepted != null, LpCertifierCost.Metered(meter.work))
+    observer?.observe(LpCertifier.INTEGER, accepted != null, LpCertifierCost.Metered(meter.work - initialWork))
     if (cancellation()) return null
     for (candidate in candidates) if (candidate !== accepted) {
         onAdditionalCertificate?.invoke(
@@ -362,7 +364,7 @@ internal class MixedDualBound(
         BigFraction.ofLong(improvingMax) - BigFraction.ofLong(sourceConstant) - bound
 }
 
-private class MixedCertificateMeter(private val cancellation: Cancellation) {
+internal class MixedCertificateMeter(private val cancellation: Cancellation) {
     private val meter = LpProjectionMeter(250_000L, 16L * 1024L * 1024L)
     private val stride = PollStride()
     private val meteredCancellation = cancellation.workMeter() != null

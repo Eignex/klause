@@ -9,6 +9,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpRowBound
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.forEachRationalColumn
@@ -161,6 +162,30 @@ internal object LpExplanation {
             for (lit in premises) if (seen.add(lit)) lits.add(lit)
         }
         return lits.toIntArray()
+    }
+
+    fun rowBoundReason(relaxation: LpRelaxation, cert: LpRowBound, session: PropagationSession): IntArray? {
+        if (!cert.belongsTo(relaxation.model)) return null
+        val lits = IntArrayList()
+        val seen = IntHashSet()
+        if (!addRowPremiseLits(lits, seen, relaxation, intArrayOf(cert.row), session)) return null
+        var supported = true
+        cert.forEachSupport { column, lower ->
+            if (column >= relaxation.model.n) {
+                val state = relaxation.model.exactState
+                val bounds = state?.model?.column(column)?.bounds
+                val base = state?.baseModel?.column(column)?.bounds
+                val side = if (lower) bounds?.lower else bounds?.upper
+                if (side == null || side.premises != null || side != if (lower) base?.lower else base?.upper) {
+                    supported = false
+                }
+            } else {
+                val premises = boundPremiseLits(relaxation, session, column, lower)
+                if (premises == null) supported = false
+                else for (literal in premises) if (seen.add(literal)) lits.add(literal)
+            }
+        }
+        return if (supported) lits.toIntArray() else null
     }
 
     /**
