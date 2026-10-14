@@ -192,7 +192,7 @@ private fun LpEngine.perturbRounding(
     val live = IntArrayList()
     val fracs = ArrayList<Double>()
     for (col in relaxation.colVarId.indices) {
-        if (col >= primal.size || relaxation.colVarId[col] < 0 || relaxation.model.upperIsZero(col)) continue
+        if (col >= primal.size || relaxation.colVarId[col] < 0 || relaxation.model.fixed(col)) continue
         val variable = relaxation.colVarId[col]
         if (!relaxation.colIsBool[col] && problem.rootDomainOf(variable).valueCount <= 1L) continue
         live.add(col)
