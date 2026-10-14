@@ -2505,7 +2505,7 @@ class PortfolioTest {
 
     @Test
     fun `auxiliary trial preserves subsequent retained policy choices`() {
-        fun choices(continueTrial: Boolean, admittedBeforeIncumbent: Boolean): List<Int> {
+        fun choices(continueTrial: Boolean, admittedBeforeIncumbent: Boolean, withProof: Boolean): List<Int> {
             val reached = ArrayList<Int>()
             var finderVisited = false
             val probe = ScriptedSearch({ false }) {}
@@ -2524,8 +2524,23 @@ class PortfolioTest {
             }).also { it.family = ArmFamily.LocalSearch }
             val retained = trackingWorker("retained", 1, ScriptedSearch({ false }) { reached += 1 })
             val auxiliary = trackingWorker("probe", 2, trial)
-            val workers = if (admittedBeforeIncumbent) listOf(auxiliary, finder, retained) else {
-                listOf(finder, retained, auxiliary)
+            val workers = if (admittedBeforeIncumbent) mutableListOf(auxiliary, finder, retained) else {
+                mutableListOf(finder, retained, auxiliary)
+            }
+            if (withProof) {
+                var proofVisits = 0
+                val proofBase = ScriptedSearch({ false }) { proofVisits++ }
+                val proof = object : ResumableSearch by proofBase {
+                    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                        proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                        return if (proofVisits == 3) MinimizeResult.Unknown(TerminationReason.BudgetExhausted) else null
+                    }
+                }
+                workers.add(trackingWorker("proof", 3, proof).also {
+                    it.auxiliaryProof = true
+                    it.improvementOnly = true
+                })
             }
 
             Portfolio.thompson(workers, seed = 0, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
@@ -2536,7 +2551,10 @@ class PortfolioTest {
         }
 
         for (admittedBeforeIncumbent in listOf(false, true)) {
-            assertEquals(choices(false, admittedBeforeIncumbent), choices(true, admittedBeforeIncumbent))
+            for (withProof in listOf(false, true)) {
+                assertEquals(choices(false, admittedBeforeIncumbent, withProof),
+                    choices(true, admittedBeforeIncumbent, withProof))
+            }
         }
     }
 

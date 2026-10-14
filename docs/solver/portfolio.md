@@ -201,7 +201,8 @@ policy evidence. An auxiliary arm admitted before the incumbent enters its trial
 when the ordinary policy next selects it, using the base probe allowance. Trial
 continuations run before ordinary policy selection, preserving
 the retained policy's random stream after every initial sibling has been admitted.
-Explicit minimum shares retain precedence. Ordinary retained-worker segments advance
+Explicit minimum shares and eligible bounded core proof continuations retain precedence.
+Ordinary retained-worker segments advance
 the shared allowance ladder; an unproductive trial preserves it even when charging
 fresh work. Search work after
 preparation is capped at twelve maximum work allowances and four base time allowances;
