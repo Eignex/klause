@@ -201,7 +201,8 @@ charges row, term and distribution visits to that token's meter; polynomial asse
 charges factor visits and installers can charge their native construction work.
 Interrupted construction discards every emitted relation and private definition and
 retains its charges. Explicit installer resource declines retain the resource cause
-even when the containing token has not fired. Exact linear component source
+even when the containing token has not fired. Decline diagnostics use selected
+ownership without re-entering an installer. Exact linear component source
 conversion and retained finite neighborhood installation use the current opening/query
 token. A numerical point requiring private real coordinates receives an exact pinned
 completion under the same token; rejection or interruption withholds that point and

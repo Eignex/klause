@@ -981,4 +981,30 @@ class EncoderTest {
         assertNull(optimum.incumbent)
     }
 
+    @Test
+    fun `cancelled preparation diagnostics do not restart encoder installation`() {
+        val open = Bits(2).also { it.set(0) }
+        val source = Problem(0, IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, open),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                AllDifferent(intArrayOf(0, 1), 0, 3)))
+        var cancelled = false
+        var installations = 0
+        val stop = Cancellation { cancelled }
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (target != EncodingTarget.LINEAR || !selected.enforcesSource) selected
+            else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                installations++
+                val decline = selected.install(view, encoding)
+                cancelled = true
+                decline
+            }
+        })
+
+        val plan = source.prepareExecutionPlan(providers, cancellation = stop)
+
+        assertEquals(PreparedPlanDecline.RESOURCE, plan.decline)
+        assertEquals(1, installations)
+    }
+
 }
