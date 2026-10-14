@@ -152,13 +152,14 @@ class NValueInvariantTest {
             arrayOf(IntDomain(0, 2), IntDomain(0, 0), IntDomain(0, 1), IntDomain(0, 1)),
             arrayOf<Factor>(
                 NValue(
-                    0, intArrayOf(1, 2, 3),
+                    0,
+                    intArrayOf(1, 2, 3),
                     presents = intArrayOf(
-                Lit.make(0, true),
-                Lit.make(0, false),
-                Lit.make(0, false),
-            )
-                )
+                        Lit.make(0, true),
+                        Lit.make(0, false),
+                        Lit.make(0, false),
+                    ),
+                ),
             ),
         )
         val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
@@ -225,8 +226,10 @@ class NValueInvariantTest {
 
             state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
             val move = state.moveSink.list.first { candidate ->
-                candidate is Move.Compound || (candidate is Move.IntSet && candidate.newValue in 0L..1L &&
-                    state.netDelta(candidate) == 0L)
+                candidate is Move.Compound || (
+                    candidate is Move.IntSet && candidate.newValue in 0L..1L &&
+                    state.netDelta(candidate) == 0L
+                )
             }
             state.apply(move)
 
@@ -411,7 +414,7 @@ class NValueInvariantTest {
             ),
             arrayOf<Factor>(
                 NValue(0, intArrayOf(1, 2, 3, 4)),
-                AllDifferent(intArrayOf(5, 7)),
+                AllDifferent(intArrayOf(5, 7), domainMin = 0, domainSize = 3),
                 Linear(intArrayOf(1, -1, 1), intArrayOf(0, 5, 6), LinearOp.EQ, 0),
             ),
         )
