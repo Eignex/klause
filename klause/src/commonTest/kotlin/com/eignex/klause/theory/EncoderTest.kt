@@ -49,6 +49,7 @@ import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.ScoringCapability
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
@@ -58,6 +59,7 @@ import com.eignex.klause.solver.pipeline.FiniteExactNeighborhood
 import com.eignex.klause.solver.pipeline.IntVariableOwner
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
+import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -957,6 +959,26 @@ class EncoderTest {
         val plan = input.problem.model.prepareExecutionPlan(providers)
 
         assertFalse(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+    }
+
+    @Test
+    fun `source optimization retains an explicit encoder resource decline`() {
+        val input = assertIs<SmtLibInput.Linear>(SmtLibAdmission.parse(
+            "(declare-const x Real) (assert (= x 1)) (minimize x)",
+        )).problem
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (!selected.enforcesSource) selected else Encoder(EncoderSupport.EQUIVALENT) { _, _ ->
+                EncoderDecline.RESOURCE
+            }
+        })
+
+        val result = BacktrackSolver.source(input.model).withProjectionProviders(providers)
+            .optimizeOpen(assertNotNull(input.objective).toLinearObjective())
+
+        val optimum = assertIs<OpenTheoryOptimum.Bounded>(assertIs<OpenTheoryExecution.Optimize>(result).result)
+        assertEquals(TerminationReason.BudgetExhausted, optimum.reason)
+        assertNull(optimum.incumbent)
     }
 
 }
