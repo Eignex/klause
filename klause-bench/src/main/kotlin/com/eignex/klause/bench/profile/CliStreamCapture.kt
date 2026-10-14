@@ -5,6 +5,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.source.CorpusFiles
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -103,7 +104,7 @@ internal object CliStreamCapture {
         val extension = settings["extension"] ?: "smt2"
         require(extension in setOf("smt2", "fzn", "mps", "opb", "xml"))
         require((settings["input"] != null) != (settings["text64"] != null)) { "Supply input or text64" }
-        val bytes = settings["input"]?.let { File(it).readBytes() }
+        val bytes = settings["input"]?.let { CorpusFiles.open(File(it)).use { source -> source.readBytes() } }
             ?: Base64.getDecoder().decode(settings.getValue("text64"))
         val source = File(output, "input.$extension").apply { writeBytes(bytes) }
         val stopAfter = settings["stopAfter"]?.toLong() ?: 0L

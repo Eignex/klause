@@ -602,7 +602,8 @@ not only the worker's completion flag.
 and retains original input bytes, build/runtime provenance, command, stdout, stderr,
 and a JSONL arrival record with byte offsets and subprocess liveness. Run it through
 a lab profile job on AWS. Capture settings precede `--`; the remaining arguments go
-directly to the CLI, followed by the preserved input path. Supply `input=<path>` or
+directly to the CLI, followed by the preserved input path. Compressed corpus inputs
+are decoded before their bytes and source hash are preserved. Supply `input=<path>` or
 `text64=<base64 input bytes>`, `extension=smt2|fzn|mps|opb|xml`, and optional
 `timeoutMs=60000`. `marker=<whole-line regex>` counts completed output records;
 `stopAfter=2` forcibly terminates the subprocess after the second matching line while
