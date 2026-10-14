@@ -11,6 +11,26 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `objective expression fixing preserves exact integer and fractional defining multipliers`() {
+        for (coefficient in listOf(1.0, 3.0)) {
+            val source = LpBuilder().apply {
+                val x = addVar(0L, 10L)
+                val r = addRealVar(0.0, 10.0, cost = 1.0)
+                addRealRow(intArrayOf(x, r), doubleArrayOf(-coefficient, coefficient), Relation.EQ, 0.0)
+            }.build(Sense.MINIMIZE)
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+            val additional = ArrayList<LpDeductionCertificate>()
+
+            val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
+                onAdditionalCertificate = { additional.add(it) }))
+
+            assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
+            assertTrue(additional.any { it.fixStepsAtCutoff(0, BigFraction.ofLong(3L), 0L) == 3L })
+            assertTrue(additional.all { it.exactReducedCost(1).isZero })
+        }
+    }
+
+    @Test
     fun `a weaker objective elimination certificate fixes the opposite integer endpoint`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 10L)
