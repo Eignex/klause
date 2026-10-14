@@ -679,6 +679,29 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `completed mixed leaves publish only an improvement over the peer cutoff`() {
+        for ((cutoff, expected) in listOf(0.5 to 0, 1.0 to 1)) {
+            val fixture = UnresolvedRealLeafFixture(true)
+            fixture.acceptProof = { _, _ -> true }
+            val offered = ArrayList<Sample>()
+            val params = fixture.params.copy(maxDecisions = 0L, objectiveBoundSupplier = { cutoff },
+                assumptions = Assumptions.None.withInt(0, 1L))
+
+            fixture.solver.resumable(fixture.objective, params).use { search ->
+                search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
+            }
+
+            assertEquals(expected, offered.size)
+            assertTrue(offered.all { fixture.objective.evaluate(it) < cutoff })
+            for (sample in offered) {
+                assertEquals(1L, sample.ints.single())
+                assertEquals(0.5, sample.reals.single())
+            }
+            assertEquals(fixture.opened, fixture.closed)
+        }
+    }
+
+    @Test
     fun `mixed root probes admit only an improvement over the peer cutoff`() {
         for ((cutoff, expected) in listOf(0.5 to 0, 1.0 to 1)) {
             val fixture = UnresolvedRealLeafFixture(true)
