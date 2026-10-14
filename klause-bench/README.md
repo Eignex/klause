@@ -1453,6 +1453,13 @@ only feasible rows carry original witnesses. A repaired target may worsen other
 objective terms, so strict improvements are measured against the original point.
 This conditional diagnostic does not measure whole-engine or default behavior.
 
+`conditionalScope=true` restricts each conditional walk to the target's reachable
+clause-support region at the supplied point. A clause with one satisfying literal
+links that literal's variable to its other unfrozen variables; unary definition
+aliases link both ways. Coordinates outside the region stay pinned at their initial
+values, alongside every effective root pin. Rows report the remaining free coordinates
+and the lowest observed hard cost. This heuristic restriction proves no infeasibility.
+
 ### Objective representation probe
 
 `com.eignex.klause.bench.profile.ObjectiveRepresentationProbe` measures the public

@@ -9,6 +9,7 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -52,7 +53,7 @@ internal object BooleanObjectiveDescentProbe {
             require(parts.size == 2)
             parts[0] to parts[1]
         }
-        require(options.keys - setOf("prepareMs", "timeout", "conditional") ==
+        require(options.keys - setOf("prepareMs", "timeout", "conditional", "conditionalScope") ==
             setOf("suite", "problem", "sha256", "witness64", "work"))
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -60,7 +61,10 @@ internal object BooleanObjectiveDescentProbe {
         val timeout = options["timeout"]?.toLong() ?: 5000L
         val prepareMs = options["prepareMs"]?.toLong() ?: 500L
         val conditional = options["conditional"]?.toInt() ?: 0
+        require(options["conditionalScope"] in listOf(null, "true", "false"))
+        val scoped = options["conditionalScope"] == "true"
         require(conditional in 0..32)
+        require(!scoped || conditional > 0)
         require(timeout in 1..60_000 && prepareMs in 1..5000)
         val ref = Catalog.uncapped(suite).problems.single { it.name == name }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
@@ -109,10 +113,10 @@ internal object BooleanObjectiveDescentProbe {
         out.resolve("sources/$digest.txt").writeBytes(bytes)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         if (conditional > 0) {
-            val roots = parsed.boolFolds.map { Lit.variable(it.lits.single()) }.distinct()
             val rows = conditionalRepairs(
-                problem, objective, sweep, initial, roots, conditional, work, timeout,
+                problem, objective, sweep, initial, parsed.boolFolds, conditional, work, timeout,
                 suite, name, digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct,
+                scoped,
             )
             out.resolve("cases.json").writeText(rows.toString() + "\n")
             return
@@ -207,7 +211,7 @@ internal object BooleanObjectiveDescentProbe {
         objective: LinearObjective,
         sweep: DefinitionalSweep,
         initial: Sample,
-        roots: List<Int>,
+        folds: List<BoolFoldDefinition>,
         count: Int,
         work: Long,
         timeout: Long,
@@ -217,6 +221,7 @@ internal object BooleanObjectiveDescentProbe {
         originalBools: Int,
         sourceObjective: LinearObjective,
         reconstruct: (Sample) -> Sample,
+        scoped: Boolean,
     ) = buildJsonArray {
         val setupStarted = System.nanoTime()
         val pins = requireNotNull(LocalSearchModel.of(problem.bake()).pinsUnder(Assumptions.None))
@@ -227,6 +232,9 @@ internal object BooleanObjectiveDescentProbe {
         base.invariants = sweep.network(0, problem.numBoolVars)
         base.recompute()
         require(base.cost == 0L)
+        val graph = if (scoped) supportGraph(problem, initial, pins, folds,
+            Cancellation.after(timeout.milliseconds)) else null
+        val roots = folds.map { Lit.variable(it.lits.single()) }.distinct()
         val targets = roots.filter { !pins.isFrozenBool(it) }.mapNotNull { v ->
             val delta = requireNotNull(base.objectiveDelta(objective, Move.BoolFlip(v)))
             if (delta < 0.0) v to delta else null
@@ -236,7 +244,11 @@ internal object BooleanObjectiveDescentProbe {
         for ((index, target) in targets.withIndex()) {
             val materializeStarted = System.nanoTime()
             val (root, delta) = target
-            val assumptions = pins.withBool(root, !initial.boolValue(root))
+            val region = graph?.let { supportRegion(it, root, pins, Cancellation.after(timeout.milliseconds)) }
+            val scopePins = if (region == null) Assumptions.None else Assumptions(bools =
+                (0 until problem.numBoolVars).filter { !region[it] && !pins.isFrozenBool(it) }
+                    .associateWith(initial::boolValue))
+            val assumptions = pins.mergedWith(scopePins).withBool(root, !initial.boolValue(root))
             val state = LocalSearchState(model, Random(3), assumptions, base.projection)
             for (v in 0 until problem.numBoolVars) state.assignment.setBool(v, initial.boolValue(v))
             assumptions.forEachBool { id, value -> state.assignment.setBool(id, value) }
@@ -250,6 +262,7 @@ internal object BooleanObjectiveDescentProbe {
             val started = System.nanoTime()
             var moves = 0L
             var stalled = false
+            var bestHardCost = state.cost
             while (state.cost != 0L && moves < work && !cancellation.isCancelled()) {
                 val move = strategy.pickMove(state)
                 if (move == null) {
@@ -258,6 +271,7 @@ internal object BooleanObjectiveDescentProbe {
                 }
                 state.apply(move)
                 moves++
+                bestHardCost = minOf(bestHardCost, state.cost)
             }
             val elapsedNanos = System.nanoTime() - started
             assumptions.forEachBool { id, value -> check(state.assignment.boolValue(id) == value) }
@@ -265,7 +279,8 @@ internal object BooleanObjectiveDescentProbe {
             val sourceSample = if (feasible) reconstruct(state.assignment.snapshot()) else null
             val value = sourceSample?.let(sourceObjective::evaluateExact)
             add(buildJsonObject {
-                put("index", index); put("status", "DONE"); put("arm", "conditional-cbls-$root")
+                put("index", index); put("status", "DONE")
+                put("arm", "conditional-${if (scoped) "support" else "full"}-cbls-$root")
                 put("seed", 3)
                 put("problem", buildJsonObject {
                     put("suite", suite); put("problem", name); put("format", "WCNF")
@@ -285,7 +300,9 @@ internal object BooleanObjectiveDescentProbe {
                         if (value != null && value < sourceObjective.evaluateExact(initial)) 1 else 0)
                     put("targetRoot", root); put("targetDelta", delta)
                     put("rootPins", pins.numBools); put("pinsSatisfied", true)
+                    put("scoped", scoped); put("freeBools", problem.numBoolVars - assumptions.numBools)
                     put("initialHardCost", initialCost); put("finalHardCost", state.cost)
+                    put("bestHardCost", bestHardCost)
                     put("nativeWitnesses", if (feasible) 1 else 0)
                     put("sharedSetupNanos", sharedSetupNanos); put("materializeNanos", materializeNanos)
                     put("elapsedNanos", elapsedNanos); put("workLimit", work); put("timeoutMillis", timeout)
@@ -293,9 +310,76 @@ internal object BooleanObjectiveDescentProbe {
                     put("stats", buildJsonObject { put("lsMoves", moves); put("lsRestarts", 0) })
                 })
             })
-            println("conditional root=$root delta=$delta initialHard=$initialCost finalHard=${state.cost} " +
+            println("conditional root=$root scoped=$scoped free=${problem.numBoolVars - assumptions.numBools} " +
+                "delta=$delta initialHard=$initialCost bestHard=$bestHardCost finalHard=${state.cost} " +
                 "sourceObjective=$value moves=$moves elapsedNanos=$elapsedNanos")
         }
         println("conditional targets=${targets.size} requested=$count sharedSetupNanos=$sharedSetupNanos")
+    }
+
+    private fun supportGraph(
+        problem: Problem,
+        initial: Sample,
+        pins: Assumptions,
+        folds: List<BoolFoldDefinition>,
+        cancellation: Cancellation,
+    ): Array<IntArray> {
+        val graph = Array(problem.numBoolVars) { ArrayList<Int>() }
+        var visits = 0
+        fun poll() {
+            if (visits++ % 256 == 0) check(!cancellation.isCancelled())
+        }
+        for ((index, factor) in problem.factors.withIndex()) {
+            if (index % 256 == 0) check(!cancellation.isCancelled())
+            val clause = factor as Clause
+            var support = -1
+            for (literal in clause.literals) {
+                poll()
+                if (!Lit.evaluate(literal, initial.boolValue(Lit.variable(literal)))) continue
+                if (support != -1) {
+                    support = -2
+                    break
+                }
+                support = Lit.variable(literal)
+            }
+            if (support < 0 || pins.isFrozenBool(support)) continue
+            for (literal in clause.literals) {
+                poll()
+                val variable = Lit.variable(literal)
+                if (variable != support && !pins.isFrozenBool(variable)) graph[support].add(variable)
+            }
+        }
+        for (fold in folds) {
+            poll()
+            val source = Lit.variable(fold.lits.single())
+            graph[source].add(fold.out)
+            graph[fold.out].add(source)
+        }
+        return Array(graph.size) { poll(); graph[it].toIntArray() }
+    }
+
+    private fun supportRegion(
+        graph: Array<IntArray>,
+        root: Int,
+        pins: Assumptions,
+        cancellation: Cancellation,
+    ): BooleanArray {
+        val region = BooleanArray(graph.size)
+        val queue = IntArray(graph.size)
+        var end = 1
+        var cursor = 0
+        var visits = 0
+        queue[0] = root
+        region[root] = true
+        while (cursor < end) {
+            for (variable in graph[queue[cursor++]]) {
+                if (visits++ % 256 == 0) check(!cancellation.isCancelled())
+                if (region[variable] || pins.isFrozenBool(variable)) continue
+                region[variable] = true
+                queue[end++] = variable
+            }
+        }
+        check(!cancellation.isCancelled())
+        return region
     }
 }
