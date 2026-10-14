@@ -5,14 +5,18 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class UnplaceableColumnTest {
 
@@ -54,6 +58,35 @@ class UnplaceableColumnTest {
     }
 
     @Test
+    fun `interrupted preparation after bounding retains the source and objective`() {
+        val model = withAllDifferentOverOpenColumn()
+        for ((objective, maximize) in listOf(
+            null to false,
+            LinearObjective(intCoefficients = longArrayOf(1, 0), constant = 7) to true,
+        )) {
+            var stopped = false
+
+            val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
+                objective = objective,
+                maximize = maximize,
+                boundCancellation = Cancellation { stopped },
+                onLpStats = { stopped = true },
+            ))
+
+            assertTrue(stopped)
+            assertNull(route.unplaceable)
+            assertEquals(PreparedExecutionKind.DECLINED, route.preparedPlan.kind)
+            assertEquals(PreparedPlanDecline.RESOURCE, route.preparedPlan.decline)
+            assertNull(route.preparedPlan.componentPlan)
+            assertSame(model, route.preparedPlan.originalSource)
+            assertSame(route.problem, route.preparedPlan.model)
+            assertSame(objective, route.preparedPlan.objective)
+            assertEquals(maximize, route.preparedPlan.maximize)
+            assertNotNull(route.preparedPlan.factorProjections).requireSource(route.problem)
+        }
+    }
+
+    @Test
     fun `a refuted model is decided rather than declined for the column it could not place`() {
         // AllDifferent leaves column 1 unplaceable while it is open, and the two rows cross over its
         // range. Deciding the model is the stronger answer, so the refusal must not win the race.
@@ -68,7 +101,17 @@ class UnplaceableColumnTest {
             ),
         )
 
-        assertIs<SourceProblemRoute.Refuted>(model.pipelineRoute())
+        for (stopAfterBounds in listOf(false, true)) {
+            var stopped = false
+
+            val route = model.pipelineRoute(
+                boundCancellation = Cancellation { stopped },
+                onLpStats = { stopped = stopAfterBounds },
+            )
+
+            assertIs<SourceProblemRoute.Refuted>(route)
+            assertEquals(stopAfterBounds, stopped)
+        }
     }
 
     @Test
@@ -99,5 +142,37 @@ class UnplaceableColumnTest {
         kotlin.test.assertSame(model, planned.preparedPlan.originalSource)
         assertEquals(5L, assertNotNull(planned.preparedPlan.model).intBounds.upper(1))
         assertEquals(false, model.intBounds.hasUpper(1))
+    }
+
+    @Test
+    fun `interrupted preparation retains a completed partial bound closure`() {
+        val openHi = Bits(3).also {
+            it.set(1)
+            it.set(2)
+        }
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(5, 0, 0), null, openHi),
+            factors = arrayOf(
+                AllDifferent(vars = intArrayOf(0, 1), domainMin = 0, domainSize = 6),
+                Linear(longArrayOf(1), intArrayOf(1), LinearOp.LE, 5),
+            ),
+        )
+        var stopped = false
+
+        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
+            boundCancellation = Cancellation { stopped },
+            onLpStats = { stopped = true },
+        ))
+
+        assertTrue(stopped)
+        assertEquals(PreparedExecutionKind.DECLINED, route.preparedPlan.kind)
+        assertEquals(PreparedPlanDecline.RESOURCE, route.preparedPlan.decline)
+        assertNull(route.preparedPlan.componentPlan)
+        assertSame(model, route.preparedPlan.originalSource)
+        assertSame(route.problem, route.preparedPlan.model)
+        assertEquals(5L, route.problem.intBounds.upper(1))
+        assertEquals(false, model.intBounds.hasUpper(1))
+        assertEquals(false, route.problem.intBounds.hasUpper(2))
     }
 }

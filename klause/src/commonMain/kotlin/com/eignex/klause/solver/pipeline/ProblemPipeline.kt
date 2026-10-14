@@ -183,6 +183,9 @@ private fun Problem.pipelineRouteObserved(
     val projections = requireNotNull(source.factorProjections).forEngineView(routed)
     val arithmetic = routed.prepareExecutionPlan(this, objective, maximize,
         preferFinite = false, providers, projections, boundCancellation)
+    if (arithmetic.kind == PreparedExecutionKind.DECLINED) {
+        return SourceProblemRoute.UnsupportedOpen(null, routed, arithmetic)
+    }
     val arithmeticRoute = arithmetic.componentPlan?.theoryPipeline
     val preferExact = routeLinearToTheory &&
         (arithmeticRoute == ProblemPipeline.EXACT_LRA || arithmeticRoute == ProblemPipeline.EXACT_LIRA)
@@ -190,6 +193,9 @@ private fun Problem.pipelineRouteObserved(
         (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA)
     val prepared = if (preferFinite) routed.prepareExecutionPlan(this, objective, maximize,
         preferFinite = true, providers, projections, boundCancellation) else arithmetic
+    if (prepared.kind == PreparedExecutionKind.DECLINED) {
+        return SourceProblemRoute.UnsupportedOpen(null, routed, prepared)
+    }
     val plan = requireNotNull(prepared.componentPlan)
     if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
         return SourceProblemRoute.Finite(routed, plan, prepared)

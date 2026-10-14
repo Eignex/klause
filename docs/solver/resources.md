@@ -297,8 +297,11 @@ charges factor visits and installers can charge their native construction work.
 Interrupted construction discards every emitted relation and private definition and
 retains its charges. Explicit installer resource declines retain the resource cause
 even when the containing token has not fired. Decline diagnostics use selected
-ownership without re-entering an installer. Open heuristic fallback and neighborhood
-preparation observes the invocation token and caller meter. Exact linear component source
+ownership without re-entering an installer. Source routing retains secondary arithmetic
+and finite preparation declines with their actual cause, source identity, objective and
+completed bound narrowing. A completed bound refutation takes precedence over a later
+stop; a preparation decline is not a refutation. Open heuristic fallback and neighborhood
+preparation observe the invocation token and caller meter. Exact linear component source
 conversion and retained finite neighborhood installation use the current opening/query
 token. A numerical point requiring private real coordinates receives an exact pinned
 completion under the same token; rejection or interruption withholds that point and
