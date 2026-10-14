@@ -51,13 +51,17 @@ class LpExplanationTest {
                 LinearOp.EQ, 5.0)),
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val session = PropagationSession(problem)
-        session.implyIntAtMost(0, 1L)
-        val relaxation = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 0L))).build(session)
-        val bound = mixedRowBounds(relaxation.model).first {
-            it.column == relaxation.intColOf[0] && it.upper && it.integerBound() == 0L
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L))
+        val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))
+        val trail = LpBoundTrail(assertNotNull(relaxation.model.authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(relaxation.intColOf[0], true, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+        val child = relaxation.withModel(assertNotNull(trail.state.toWorkingModel()))
+        val bound = mixedRowBounds(child.model).first {
+            it.column == child.intColOf[0] && it.upper && it.integerBound() == 0L
         }
 
-        val reason = assertNotNull(LpExplanation.rowBoundReason(relaxation, bound, session))
+        val reason = assertNotNull(LpExplanation.rowBoundReason(child, bound, session))
 
         assertTrue(session.boundLeLit(0, 1L, positive = false) in reason)
     }
