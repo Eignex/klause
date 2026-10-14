@@ -515,7 +515,9 @@ internal fun LpEngine.sparseSafePrune(
     val optimalBasis = result.basis
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
-    if (!canPrune && !canPropagate) {
+    val objectiveCeiling = singleObjectiveCeiling(relaxation, cancellation)
+    val canFix = canPrune || objectiveCeiling != null
+    if (!canFix && !canPropagate) {
         val constant = cutPool.constantContradiction() ?: return LpNodeOutcome(false, optimalBasis)
         return when (val outcome = solveSelectedCuts(
             session, LpCutOutcome.Solved(relaxation, result), listOf(constant), cancellation, sink, learn,
@@ -581,7 +583,7 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     if (cancellation()) return LpNodeOutcome(false, null)
-    val cert = if ((learn && canPropagate) || canPrune) {
+    val cert = if ((learn && canPropagate) || canFix) {
         solveContext.certificationPolicy.acceptNullable(
             LpCertifier.INTEGER,
             nodeDualCertificate(
@@ -679,7 +681,7 @@ internal fun LpEngine.sparseSafePrune(
     // Reduced-cost fixing on the exact certified Lagrangian and reduced costs needs a finite incumbent
     // for the improving gap, but not an attained LP optimum: the certificate inequality holds for any
     // rounded dual vector.
-    if (canPrune && cert != null &&
+    if (canFix && cert != null &&
         !cancellation() &&
         applySparseReducedCostFixing(
             boundRel,
@@ -691,6 +693,7 @@ internal fun LpEngine.sparseSafePrune(
             objectiveAscending,
             learn,
             cancellation,
+            objectiveCeiling,
         )
     ) {
         return LpNodeOutcome(true, null)
@@ -702,7 +705,8 @@ internal fun LpEngine.sparseSafePrune(
  * Reduced-cost fixing from one [LpDeductionCertificate] in minimized source objective units. Moving
  * an integral column Δ steps from its minimizing endpoint raises the Lagrangian by `|reducedCost|·Δ`.
  * A verified integral objective uses `ceil(bound) - 1`; other objectives retain an enclosing rational
- * cutoff. The allowed movement uses the unrounded gap divided by `|reducedCost|`.
+ * cutoff. A finite single-coordinate objective ceiling supplies a closed feasibility cutoff,
+ * including before an incumbent exists. The allowed movement uses the unrounded gap divided by `|reducedCost|`.
  * With [learn] each integer fixing carries the LP dual-decomposition reason (the other
  * support columns' seated bounds + the incumbent bound + any dual-weighted non-global row's premises);
  * when the reason is inexpressible the fixing falls back to a reason-less level-local tightening (a
@@ -719,17 +723,20 @@ internal fun LpEngine.applySparseReducedCostFixing(
     objectiveAscending: Boolean = true,
     learn: Boolean = false,
     cancellation: Cancellation = Cancellation.Never,
+    objectiveCeiling: BigFraction? = null,
 ): Boolean {
     if (cancellation() || !cert.belongsTo(relaxation.model, sink.lp.certificationObserver(LpRoute.NODE))) return false
     val sourceRange = sourceObjectiveRange(relaxation)
-    val improvingMax = if (sourceRange != null || cert.integralObjectiveRows() != null) {
+    val incumbentMax = if (!bound.isFinite()) {
+        objectiveCeiling ?: return false
+    } else if (sourceRange != null || cert.integralObjectiveRows() != null) {
         val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
         if (ceiling == Long.MIN_VALUE) return false
         BigFraction.ofLong(ceiling - 1L)
     } else {
-        if (!bound.isFinite()) return false
         BigFraction.ofDouble(bound.nextUp()) ?: return false
     }
+    val improvingMax = objectiveCeiling?.let { minOf(it, incumbentMax) } ?: incumbentMax
     val sourceConstant = relaxation.objectiveConstant
     val integralCutoff = ExactLpNumber.of(improvingMax).exactLong()
     if (integralCutoff != null) {
@@ -818,6 +825,39 @@ internal fun LpEngine.applySparseReducedCostFixing(
         if (session.decisionLevel == 0) sink.lp.observeRootReducedCostFixes(1)
     }
     return false
+}
+
+private fun LpEngine.singleObjectiveCeiling(
+    relaxation: LpRelaxation,
+    cancellation: Cancellation,
+): BigFraction? {
+    val model = relaxation.model
+    if (!model.finiteExactInput()) return null
+    noteNodeOverhead(model.numVars.toLong() * LpNodeOverhead.FIXING)
+    var column = -1
+    var coefficient = BigFraction.ZERO
+    for (j in 0 until model.numVars) {
+        if (cancellation()) return null
+        val cost = model.exactCost(j)
+        if (cost.isZero) continue
+        if (column >= 0 || j >= model.n) return null
+        column = j
+        coefficient = cost
+    }
+    if (column < 0) return null
+    val bounds = model.exactBounds(column)
+    val side = (if (coefficient.signum() > 0) bounds.upper else bounds.lower) ?: return null
+    val objective = model.exactState?.model?.objective
+    val scale = objective?.scale?.value ?: BigFraction.ONE
+    val external = objective?.externalConstant?.value ?: BigFraction.ZERO
+    val constant = model.exactConstant()
+    val bits = exactBits(listOf(coefficient, side.number.value, constant, scale, external))
+    if (bits > 128) return null
+    val words = (maxOf(Long.SIZE_BITS, bits) + 63L) / 64L
+    noteNodeOverhead(12L * words * words)
+    val ceiling = (constant + coefficient * side.number.value) * scale.reciprocal() + external +
+        BigFraction.ofLong(relaxation.objectiveConstant)
+    return ceiling.takeIf { exactBits(listOf(it)) <= 128 }
 }
 
 /** One certificate's reusable support for local reduced-cost deductions under a named cutoff. */

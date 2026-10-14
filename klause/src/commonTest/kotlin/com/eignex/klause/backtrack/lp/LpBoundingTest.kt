@@ -46,6 +46,51 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `declared continuous objective ceilings fix integral domains before an incumbent`() {
+        for (sign in listOf(-1.0, 1.0)) for (coefficient in listOf(3.0, 4.0)) {
+            val lower = if (sign > 0.0) 0.0 else -3.0
+            val upper = if (sign > 0.0) 3.0 else 0.0
+            val problem = Problem(
+                0, 1, arrayOf(IntDomain(0, 10)),
+                arrayOf(Linear(intArrayOf(0), doubleArrayOf(-sign * coefficient), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
+                numRealVars = 1, realLower = doubleArrayOf(lower), realUpper = doubleArrayOf(upper),
+            )
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(sign))
+            val sink = SolveStatsSink(backend = "objective-ceiling")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(
+                    assertNotNull(engine.lpRelaxer), session, Double.POSITIVE_INFINITY, sink,
+                    Cancellation.Never, -1, true,
+                )
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, if (coefficient == 3.0) 1 else 0), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `an absent continuous objective ceiling cannot use a probe box for fixing`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(0), doubleArrayOf(-4.0), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.EQ, 0.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val sink = SolveStatsSink(backend = "absent-ceiling")
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, Double.POSITIVE_INFINITY,
+                sink, Cancellation.Never, -1, true)
+
+            assertEquals(IntDomain(0, 10), session.intDomain(0))
+        }
+    }
+
+    @Test
     fun `integral continuous objective definitions prune equal incumbent nodes`() {
         for ((coefficient, minimum) in listOf(1.0 to 1.0, -1.0 to -2.0)) {
             for (cutoff in listOf(minimum - 0.5, minimum, minimum + 0.5)) {
