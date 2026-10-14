@@ -21,10 +21,20 @@ internal interface LpDeductionCertificate {
         return 12L * words * words
     }
 
-    fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? {
+    fun permitsMovement(col: Int, steps: Long, cutoff: Long, sourceConstant: Long): Boolean {
+        val reduced = exactReducedCost(col)
+        val cost = if (reduced.signum() < 0) reduced.negated() else reduced
+        val gap = BigFraction.ofLong(cutoff) - BigFraction.ofLong(sourceConstant) - exactObjectiveBound()
+        return cost * BigFraction.ofLong(steps) <= gap
+    }
+
+    fun fixStepsForGap(col: Int, gap: BigFraction): Long? {
         val reduced = exactReducedCost(col)
         if (reduced.isZero) return null
         val cost = if (reduced.signum() < 0) reduced.negated() else reduced
-        return ((cutoff - BigFraction.ofLong(sourceConstant) - exactObjectiveBound()) * cost.reciprocal()).floorLong()
+        return (gap * cost.reciprocal()).floorLong()
     }
+
+    fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? =
+        fixStepsForGap(col, cutoff - BigFraction.ofLong(sourceConstant) - exactObjectiveBound())
 }

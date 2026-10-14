@@ -207,6 +207,21 @@ internal class IntegerCertificate(
     override fun rationalFixingWork(col: Int, cutoff: BigFraction): Long =
         if (ExactLpNumber.of(cutoff).exactLong() != null) 0L else super.rationalFixingWork(col, cutoff)
 
+    override fun permitsMovement(col: Int, steps: Long, cutoff: Long, sourceConstant: Long): Boolean {
+        val reducedCost = reduced[col]
+        if (steps < 0L || reducedCost == Long.MIN_VALUE) return false
+        val gap = gapNumerator(cutoff, sourceConstant)
+        if (!gap.isNonNegative()) return false
+        val movement = Int128().also {
+            it.addProduct(if (reducedCost < 0L) -reducedCost else reducedCost, steps)
+        }
+        gap.subtract(movement)
+        return gap.isNonNegative()
+    }
+
+    override fun fixStepsForGap(col: Int, gap: BigFraction): Long? =
+        if (authority?.model?.column(col)?.integral == false) null else super.fixStepsForGap(col, gap)
+
     override fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? {
         if (authority?.model?.column(col)?.integral == false) return null
         val integer = ExactLpNumber.of(cutoff).exactLong()

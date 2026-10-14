@@ -771,6 +771,14 @@ internal fun LpEngine.applySparseReducedCostFixing(
         noteNodeOverhead(4L * words * words)
         if (improvingMax < lower + BigFraction.ofLong(sourceConstant)) return false
     }
+    val rationalGap = if (cert.usesRationalArithmetic() || integralCutoff == null) {
+        val lower = cert.exactObjectiveBound()
+        val words = (maxOf(Long.SIZE_BITS, exactBits(listOf(improvingMax, lower))) + 63L) / 64L
+        noteNodeOverhead(4L * words * words)
+        improvingMax - BigFraction.ofLong(sourceConstant) - lower
+    } else {
+        null
+    }
     val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending && sourceRange != null) {
         reducedCostFixingReasons(relaxation, cert, session, objectiveVar, checkNotNull(improvingMax.floorLong()),
             sink.lp.certificationObserver(LpRoute.NODE))
@@ -800,14 +808,35 @@ internal fun LpEngine.applySparseReducedCostFixing(
         if (liveMin == liveMax) continue
         val sign = cert.reducedCostSign(col)
         if (sign == 0) continue
+        val bounds = relaxation.model.exactBounds(col)
+        val side = (if (sign > 0) bounds.lower else bounds.upper) ?: continue
+        val endpoint = ExactLpNumber.of(relaxation.model.exactShift(col) + side.number.value).exactLong() ?: continue
         noteNodeOverhead(cert.rationalFixingWork(col, improvingMax))
-        val dMax = cert.fixStepsAtCutoff(col, improvingMax, sourceConstant) ?: continue
+        val distance = try {
+            if (sign > 0) subExact(liveMax, endpoint) else subExact(endpoint, liveMin)
+        } catch (_: CheckedLongOverflowException) {
+            null
+        }
+        if (distance != null && distance >= 0L) {
+            val permitted = if (rationalGap != null) {
+                val reduced = cert.exactReducedCost(col)
+                val cost = if (sign < 0) reduced.negated() else reduced
+                cost * BigFraction.ofLong(distance) <= rationalGap
+            } else {
+                cert.permitsMovement(col, distance, checkNotNull(integralCutoff), sourceConstant)
+            }
+            if (permitted) continue
+        }
+        val dMax = if (rationalGap != null) {
+            noteNodeOverhead(cert.rationalFixingWork(col, improvingMax))
+            cert.fixStepsForGap(col, rationalGap)
+        } else {
+            cert.fixStepsAtCutoff(col, improvingMax, sourceConstant)
+        }
+        if (dMax == null) continue
         val res = when {
             // A positive reduced cost is minimized at the certificate model's lower endpoint.
             sign > 0 -> {
-                val side = relaxation.model.exactBounds(col).lower ?: continue
-                val endpoint = ExactLpNumber.of(relaxation.model.exactShift(col) + side.number.value).exactLong()
-                    ?: continue
                 val hi = try {
                     addExact(endpoint, dMax)
                 } catch (_: CheckedLongOverflowException) {
@@ -823,9 +852,6 @@ internal fun LpEngine.applySparseReducedCostFixing(
 
             // A negative reduced cost is minimized at the certificate model's upper endpoint.
             sign < 0 -> {
-                val side = relaxation.model.exactBounds(col).upper ?: continue
-                val endpoint = ExactLpNumber.of(relaxation.model.exactShift(col) + side.number.value).exactLong()
-                    ?: continue
                 val lo = try {
                     subExact(endpoint, dMax)
                 } catch (_: CheckedLongOverflowException) {
