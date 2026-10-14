@@ -110,8 +110,9 @@ data class LpPlan(
      * LP-rounding primal heuristic: before search, solve the root LP and try to round its
      * fractional point into a feasible assignment by pinning each discrete variable toward its LP value
      * and propagating. Publication requires the composed witness check, continuous completion where
-     * applicable, and improvement over the available incumbent cutoff. A declined proposal permits
-     * bounded feasibility pumping under the same root allowance. The relaxation point supplies only
+     * applicable, and improvement over the available incumbent cutoff. A declined mixed proposal permits
+     * peer-target and directed rounding of the same LP point before bounded feasibility pumping under
+     * the same root allowance. The relaxation point supplies only
      * a target, so it cannot establish source feasibility on its own. Requires a LinearObjective;
      * off by default; never changes the complete search's feasible region.
      */

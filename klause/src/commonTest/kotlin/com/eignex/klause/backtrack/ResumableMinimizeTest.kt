@@ -732,7 +732,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `mixed pumping improves an integral rounding before tree branching`() {
+    fun `mixed root proposals improve a declined completion before tree branching`() {
         val problem = Problem(
             0, 3, Array(3) { IntDomain(0, 1) },
             arrayOf<Factor>(
@@ -764,6 +764,42 @@ class ResumableMinimizeTest {
             assertEquals(if (initial == null) 3.0 else 2.0, objective.evaluate(sample))
             assertEquals(listOf(0.0), nodesAtPublication)
             assertEquals(BigFraction.ZERO, sample.exactReals?.single())
+        }
+    }
+
+    @Test
+    fun `mixed directed rounding completes fractional capacity proposals before branching`() {
+        for (sign in listOf(1L, -1L)) {
+            val domain = if (sign > 0L) IntDomain(0L, 5L) else IntDomain(-5L, 0L)
+            val problem = Problem(
+                0, 1, arrayOf(domain),
+                arrayOf<Factor>(
+                    Linear(intArrayOf(0), doubleArrayOf(sign.toDouble()),
+                        intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+                    Linear(IntArray(0), DoubleArray(0),
+                        intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.4),
+                ),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            ).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(sign))
+            val params = BacktrackParams(maxDecisions = 0L, objectiveBoundSupplier = { 5.0 },
+                lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false))
+            val offered = ArrayList<Sample>()
+            val nodesAtPublication = ArrayList<Double>()
+
+            BacktrackSolver(problem).resumable(objective, params).use { search ->
+                search.runSlice(Cancellation.Never, 1000L, 100_000L) {
+                    offered += it.sample
+                    nodesAtPublication += search.stats.search.nodes.sum
+                }
+            }
+
+            val sample = offered.single()
+            assertEquals(sign, sample.ints.single())
+            assertEquals(1.0, objective.evaluate(sample))
+            assertTrue(sample.reals.single() >= 0.4)
+            assertEquals(1, sample.exactReals?.size)
+            assertEquals(listOf(0.0), nodesAtPublication)
         }
     }
 

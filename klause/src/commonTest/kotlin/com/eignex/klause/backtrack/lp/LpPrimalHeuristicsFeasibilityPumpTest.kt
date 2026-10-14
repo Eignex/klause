@@ -107,6 +107,33 @@ class LpPrimalHeuristicsFeasibilityPumpTest {
     }
 
     @Test
+    fun `directed rounding reuses its LP solve after a declined mixed proposal`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 5)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(0), doubleArrayOf(1.0),
+                    intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+                Linear(IntArray(0), DoubleArray(0),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.4),
+            ),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val sink = SolveStatsSink(backend = "rounding-test")
+        val proposed = ArrayList<Long>()
+
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never) { sample ->
+                proposed += sample.ints.single()
+                sample.takeIf { it.ints.single() == 1L }
+            })
+        }
+
+        assertEquals(listOf(0L, 1L), proposed)
+        assertEquals(1.0, sink.snapshot().lp.rootPasses.sum)
+    }
+
+    @Test
     fun `the rounding probe attributes its solve to root work`() {
         val problem = Problem(
             0,

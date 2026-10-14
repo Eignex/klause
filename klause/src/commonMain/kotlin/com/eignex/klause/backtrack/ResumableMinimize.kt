@@ -991,7 +991,9 @@ internal class ResumableMinimize(
                     sink.lp.observePrimalPhase("PRIMAL_PROPOSAL", outcome, started.elapsedNow().inWholeNanoseconds)
                 }
             }
-            val seed = lpEngine.lpRoundingProbe(objective, rootToken)?.let(::accept)
+            val seed = lpEngine.lpRoundingProbe(objective, rootToken,
+                initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
+                accept = ::accept)
                 ?: lpEngine.lpFeasibilityPump(objective, rootToken,
                     initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
                     accept = ::accept)

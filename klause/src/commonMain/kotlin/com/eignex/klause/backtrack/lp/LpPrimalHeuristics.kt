@@ -15,26 +15,18 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.round
 import kotlin.random.Random
 import kotlin.time.TimeSource
 
-/**
- * LP-rounding primal heuristic on the sparse revised-simplex path: solve the root relaxation,
- * round each variable's fractional LP value to the nearest in-domain integer, and propagate. Returns a
- * complete assignment when rounding-then-propagation reaches a fixpoint without a wipeout, else null.
- * Sound by construction — the result is a candidate that the caller re-evaluates against the objective
- * and only keeps if feasible-and-improving; a bad rounding just yields null or a worse incumbent.
- *
- * Two refinements over rounding each variable once in declaration order. Variables are pinned in order
- * of the LP's confidence — least-fractional integers and most-decisive Booleans first — so the values
- * the relaxation is surest about propagate first and steer the rest. And when a rounding conflicts the
- * other side of the LP value is tried before giving up, recovering assignments a one-shot round drops.
- * Every discrete variable ends pinned to a single value. The caller re-derives discrete feasibility
- * and completes any continuous coordinates before publication; a variable that conflicts both ways
- * yields null.
- */
-internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
+internal fun LpEngine.lpRoundingProbe(
+    objective: LinearObjective,
+    cancellation: Cancellation,
+    initial: Sample? = null,
+    accept: (Sample) -> Sample? = { it },
+): Sample? {
     val started = TimeSource.Monotonic.markNow()
     var outcome = "RELAXATION_DECLINED"
     val session = PropagationSession(problem, cancellation)
@@ -63,14 +55,48 @@ internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: 
             return null
         } ?: return null
         val primal = result.primal
-        val sample = pinToward(session, relaxation) { col -> if (col in 0 until primal.size) primal[col] else null }
-        val cancelled = session.fixpointCancelled || cancellation()
-        outcome = when {
-            cancelled -> "CANCELLED"
-            sample == null -> "PINNING_DECLINED"
-            else -> "PROPOSED"
+        val seen = HashSet<String>()
+        fun propose(rounding: LpRounding, seed: Sample? = null): Sample? {
+            if (cancellation()) return null
+            val attempt = if (rounding == LpRounding.NEAREST && seed == null) session else {
+                PropagationSession(problem, cancellation)
+            }
+            try {
+                if (attempt.isUnsatAtRoot) return null
+                val sample = pinToward(attempt, relaxation, rounding) { col ->
+                    if (col !in relaxation.colVarId.indices) {
+                        null
+                    } else if (seed == null) {
+                        primal.getOrNull(col)
+                    } else {
+                        val variable = relaxation.colVarId[col]
+                        if (relaxation.colIsBool[col]) {
+                            if (seed.boolValue(variable)) 1.0 else 0.0
+                        } else seed.intValue(variable).toDouble()
+                    }
+                }
+                if (attempt.fixpointCancelled || cancellation()) {
+                    outcome = "CANCELLED"
+                    return null
+                }
+                if (sample == null) return null
+                outcome = "PROPOSED"
+                if (!seen.add(pumpKey(sample.ints, sample.bools))) return null
+                return accept(sample)
+            } finally {
+                if (attempt !== session) primalPropagationWork += attempt.work
+            }
         }
-        return sample.takeUnless { cancelled }
+        outcome = "PINNING_DECLINED"
+        propose(LpRounding.NEAREST)?.let { return it }
+        if (problem.numRealVars > 0) {
+            initial?.takeIf { it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars }?.let { seed ->
+                propose(LpRounding.NEAREST, seed)?.let { return it }
+            }
+            propose(LpRounding.UP)?.let { return it }
+            propose(LpRounding.DOWN)?.let { return it }
+        }
+        return null
     } finally {
         primalPropagationWork += session.work
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)
@@ -87,6 +113,7 @@ internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: 
 internal fun LpEngine.pinToward(
     session: PropagationSession,
     relaxation: LpRelaxation,
+    rounding: LpRounding = LpRounding.NEAREST,
     targetOf: (col: Int) -> Double?,
 ): Sample? {
     val intOrder = (0 until problem.numIntVars).sortedBy { v ->
@@ -95,34 +122,57 @@ internal fun LpEngine.pinToward(
     for (v in intOrder) {
         val d = session.intDomain(v)
         if (d.min == d.max) continue // already fixed by propagation
-        if (!pinIntTowardLp(session, v, targetOf(relaxation.intColOf[v]), d.min, d.max)) return null
+        if (!pinIntTowardLp(session, v, targetOf(relaxation.intColOf[v]), d.min, d.max, rounding)) return null
     }
     val boolOrder = (0 until problem.numBoolVars).sortedByDescending { b ->
         targetOf(relaxation.boolColOf[b])?.let { abs(it - 0.5) } ?: -1.0
     }
     for (b in boolOrder) {
         if (session.boolValue(b) != null) continue
-        val first = (targetOf(relaxation.boolColOf[b]) ?: 0.0) >= 0.5
+        val target = targetOf(relaxation.boolColOf[b]) ?: 0.0
+        val first = when (rounding) {
+            LpRounding.NEAREST -> target >= 0.5
+            LpRounding.UP -> target > 0.0
+            LpRounding.DOWN -> target >= 1.0
+        }
         if (session.pinBool(b, first) !is PropagationResult.Unsat) continue
         if (session.pinBool(b, !first) is PropagationResult.Unsat) return null
     }
     return snapshotAssignment(session)
 }
 
+internal enum class LpRounding { NEAREST, UP, DOWN }
+
 /** Pin [v] to the rounded LP value (or [lo] when it has no LP column), falling back to the other side
  *  of the LP value on a conflict. False only when both candidates wipe out — a conflicting pin reverts
  *  the session to its pre-pin state, so the fallback resumes cleanly. */
-private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo: Long, hi: Long): Boolean {
+private fun pinIntTowardLp(
+    session: PropagationSession,
+    v: Int,
+    lp: Double?,
+    lo: Long,
+    hi: Long,
+    rounding: LpRounding,
+): Boolean {
     if (lp == null) return session.pinInt(v, lo) !is PropagationResult.Unsat
-    val first = round(lp).toLong().coerceIn(lo, hi)
+    val target = when (rounding) {
+        LpRounding.NEAREST -> round(lp)
+        LpRounding.UP -> ceil(lp)
+        LpRounding.DOWN -> floor(lp)
+    }
+    val first = target.toLong().coerceIn(lo, hi)
     if (session.pinInt(v, first) !is PropagationResult.Unsat) return true
-    val second = (if (lp >= first) first + 1 else first - 1).coerceIn(lo, hi)
+    val second = when {
+        lp >= first && first < hi -> first + 1L
+        lp < first && first > lo -> first - 1L
+        else -> first
+    }
     if (second == first) return false
     return session.pinInt(v, second) !is PropagationResult.Unsat
 }
 
 /**
- * Feasibility pump on the primal pass: when single-shot rounding ([lpRoundingProbe]) fails to
+ * Feasibility pump on the primal pass: when root rounding ([lpRoundingProbe]) fails to
  * land a feasible point, alternate between an LP solution and its integer rounding, each round
  * re-solving the relaxation under an L1-distance objective that pulls the LP toward the current
  * rounding, then retrying the rounding. The distance objective is exact (linear) over variables whose
