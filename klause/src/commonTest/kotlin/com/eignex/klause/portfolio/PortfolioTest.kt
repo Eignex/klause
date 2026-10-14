@@ -238,7 +238,7 @@ class PortfolioTest {
                 trackingWorker("proof", 1, proof).also { it.auxiliaryProof = true; it.improvementOnly = true })
 
             Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-                it.minimize(Cancellation { proofVisits >= 3 })
+                it.minimize(Cancellation { proofVisits >= 3 || completeVisits >= 8 })
             }
 
             assertEquals(3, proofVisits)
