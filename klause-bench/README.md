@@ -1382,6 +1382,10 @@ local, duplicate, undefined and non-function entries. Missing names are reported
 only as absent from the available tables, with full versus dynamic table coverage
 recorded separately. Source-name matches establish no exact C++ signature or ABI.
 
+Pass up to sixteen distinct ASCII source identifiers to select additional query
+groups. Omitted arguments retain the three defaults. Wildcards, C++ punctuation,
+empty or oversized identifiers are refused; no mangled symbol name is invented.
+
 The capture includes original record bytes, section/table hashes, scan completion,
 partial records, errors and exits. The reader neither loads nor invokes the library,
 attaches no probes and supplies no task/root, code-size, timing or savings proof.
@@ -1402,7 +1406,8 @@ provider metadata and partial/error captures are retained.
 
 Every original symbol record remains. Exact matches to the three source
 signatures are listed separately, preserving duplicates and excluding undefined
-or non-function definitions. A demangled signature supplies no proof of the
+or non-function definitions. Other bounded query groups retain their demangled
+records without a source-signature claim. A demangled signature supplies no proof of the
 actual argument registers, live task pointer, root association, clock/loss,
 code-size result or compiler saving. Validate those boundaries before probing.
 
