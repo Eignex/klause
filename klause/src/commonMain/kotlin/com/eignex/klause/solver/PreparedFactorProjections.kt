@@ -76,6 +76,23 @@ class PreparedFactorProjections internal constructor(
             Array(factorIndices.size) { relaxation[factorIndices[it]] })
     }
 
+    internal fun withAppendedFactors(view: Problem): PreparedFactorProjections {
+        require(view.numFactors >= problem.numFactors &&
+            problem.factors.indices.all { view.factors[it] === problem.factors[it] }) {
+            "augmented factors must retain their prepared source prefix"
+        }
+        return PreparedFactorProjections(view, providers,
+            Array(view.numFactors) {
+                if (it < problem.numFactors) propagation[it] else providers.propagation.select(view.factors[it])
+            },
+            Array(view.numFactors) {
+                if (it < problem.numFactors) scoring[it] else providers.scoring.select(view.factors[it])
+            },
+            Array(view.numFactors) {
+                if (it < problem.numFactors) relaxation[it] else providers.relaxation.select(view.factors[it])
+            })
+    }
+
     internal fun appended(view: Problem): PreparedFactorProjections {
         require(view.numFactors == problem.numFactors + 1)
         val extra = view.factors.last()

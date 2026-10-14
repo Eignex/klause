@@ -277,7 +277,7 @@ internal class CoreGuidedSearch(
         val baked = if (providers == null || providers == FactorProjectionProviders.Default) {
             problem.bake(token)
         } else {
-            problem.bake(providers, token)
+            problem.bake(requireNotNull(base.factorProjections).withAppendedFactors(problem), token)
         }
         return try {
             BacktrackSolver(baked).resumableSolve(
