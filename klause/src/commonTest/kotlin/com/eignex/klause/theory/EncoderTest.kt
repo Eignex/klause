@@ -72,7 +72,8 @@ class EncoderTest {
             Encoder(EncoderSupport.RELAXATION_ONLY)
         })
 
-        val admission = input.problem.model.prepareExecutionPlan(providers).capabilities.admission(ExecutionStrategy.COMPLETE)
+        val admission = input.problem.model.prepareExecutionPlan(providers).capabilities
+            .admission(ExecutionStrategy.COMPLETE)
 
         assertFalse(admission.runnable)
     }

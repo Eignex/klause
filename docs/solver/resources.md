@@ -212,3 +212,10 @@ coefficient/row visits to the existing caller meter and poll its current invocat
 stop. No peer completion opens a fresh native allowance or replaces a slice token
 with a new lifetime token. Interruption and representation decline retain their
 separate incomplete diagnostics; a failed chosen point supplies no global proof.
+
+Whole-relation encoder installation uses the receiving scope's cancellation and resource
+controls. An interrupted installation exports no partial source relation. Immutable
+unconditioned linear relations can be reused across component openings; live assertions,
+query results and native resources cannot. Conditioned completion supplies only its
+captured pins and current containing token, without renewing any arithmetic allowance.
+Numerical execution and source-enforcement admission keep their separate resource gates.

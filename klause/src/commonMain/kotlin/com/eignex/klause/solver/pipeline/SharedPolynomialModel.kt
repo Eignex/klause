@@ -18,6 +18,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.theory.EncodingAttribution
+import com.eignex.klause.theory.TheoryRealId
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
@@ -31,6 +33,7 @@ internal class SharedPolynomialModel private constructor(
     val service: PolynomialTheoryService,
     val integerColumns: Map<Int, Int>,
     val finiteFactorIndices: List<Int>,
+    val encodingAttributions: List<EncodingAttribution>,
 ) {
     fun capture(assignment: QfNraAssignment, bools: BooleanArray, ints: LongArray): Sample {
         val reals = List(source.numRealVars) { assignment.realValue(it) }
@@ -71,6 +74,7 @@ internal class SharedPolynomialModel private constructor(
             val formulas = ArrayList<PolynomialRealFormula>()
             sourceFormula?.let(formulas::add)
             val kept = ArrayList<Int>()
+            val attributions = ArrayList<EncodingAttribution>()
             for ((index, factor) in source.factors.withIndex()) {
                 val explicit = formulaForFactor(factor)
                 val continuous = explicit != null || factor is ContinuousProduct || factor is RealProduct ||
@@ -86,6 +90,9 @@ internal class SharedPolynomialModel private constructor(
                     null
                 }
                 val emitted = ArrayList<PolynomialRealFormula>()
+                val integerMapping = LinkedHashMap<SourceIntId, TheoryRealId>()
+                val realMapping = LinkedHashMap<SourceRealId, TheoryRealId>()
+                val auxiliaries = ArrayList<TheoryRealId>()
                 val encoding = object : TheoryEncoding {
                     override val target = EncodingTarget.POLYNOMIAL
                     override val sourceFactorIndex = index
@@ -94,16 +101,33 @@ internal class SharedPolynomialModel private constructor(
                     override fun fixedBoolean(id: SourceBoolId): Boolean? = null
                     override fun linear(form: LinearForm): Unit = error("polynomial target requires a formula")
                     override fun polynomial(formula: PolynomialRealFormula) { emitted += formula }
-                    override fun integer(id: SourceIntId): PolynomialExpression = integer(id.index)
-                    override fun real(id: SourceRealId): PolynomialExpression = real(id.index)
+                    override fun integer(id: SourceIntId): PolynomialExpression {
+                        require(id.index in factor.intVars)
+                        return integer(id.index).also {
+                            integerMapping[id] = TheoryRealId(integerIds.getValue(id.index))
+                        }
+                    }
+                    override fun real(id: SourceRealId): PolynomialExpression {
+                        require(id.index in factor.variables.reals)
+                        realMapping[id] = TheoryRealId(id.index)
+                        return real(id.index)
+                    }
                     override fun conditional(
                         condition: PolynomialRealFormula,
                         whenTrue: PolynomialExpression,
                         whenFalse: PolynomialExpression,
-                    ): PolynomialExpression = lowering.conditional(condition, whenTrue, whenFalse)
+                    ): PolynomialExpression {
+                        val before = lowering.realCount
+                        return lowering.conditional(condition, whenTrue, whenFalse).also {
+                            for (id in before until lowering.realCount) auxiliaries += TheoryRealId(id)
+                        }
+                    }
                 }
                 if (selected.install(factor, encoding) != null || emitted.isEmpty()) return null
                 formulas += emitted
+                attributions += EncodingAttribution(index, factor.boolVars.map(::SourceBoolId),
+                    factor.intVars.map(::SourceIntId), factor.variables.reals.map(::SourceRealId),
+                    integerMapping, realMapping, auxiliaries)
             }
             for (id in 0 until source.numRealVars) {
                 val lower = source.realLower[id]
@@ -131,6 +155,7 @@ internal class SharedPolynomialModel private constructor(
                 PolynomialTheoryService(formula, source.numBoolVars, lowering.realCount, fixedReals),
                 integerIds.toMap(),
                 kept.toList(),
+                attributions.toList(),
             )
         }
 

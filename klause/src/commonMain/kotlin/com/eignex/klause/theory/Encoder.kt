@@ -7,6 +7,7 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import kotlin.jvm.JvmInline
@@ -84,6 +85,10 @@ class Encoder(
     init {
         require(support == EncoderSupport.CONDITIONED || (integerConditions.isEmpty() && booleanConditions.isEmpty()))
     }
+
+    internal fun remapped(mapping: VarRemap): Encoder = Encoder(support,
+        integerConditions.map { requireNotNull(mapping.int(it)) { "removed encoding condition" } },
+        booleanConditions.mapKeys { requireNotNull(mapping.bool(it.key)) { "removed encoding condition" } }, installer)
 
     /** Whether this descriptor enforces the unconditioned source relation. */
     val enforcesSource: Boolean get() = support == EncoderSupport.DIRECT || support == EncoderSupport.EQUIVALENT

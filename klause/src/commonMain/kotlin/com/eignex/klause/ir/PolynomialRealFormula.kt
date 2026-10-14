@@ -1,13 +1,40 @@
 package com.eignex.klause.ir
 
-internal enum class PolynomialRelation { EQ, NE, LT, LE, GT, GE }
+/** Exact comparison of polynomial expressions. */
+enum class PolynomialRelation {
+    /** Equality. */
+    EQ,
+    /** Disequality. */
+    NE,
+    /** Strictly less. */
+    LT,
+    /** Less or equal. */
+    LE,
+    /** Strictly greater. */
+    GT,
+    /** Greater or equal. */
+    GE,
+}
 
-internal sealed interface PolynomialRealFormula {
-    data class Constant(val value: Boolean) : PolynomialRealFormula
-    data class BooleanVariable(val id: SourceBoolId) : PolynomialRealFormula
+/** Immutable Boolean structure over exact polynomial relations in one coordinate scope. */
+sealed interface PolynomialRealFormula {
+    /** A Boolean constant. */
+    data class Constant(
+        /** Constant truth value. */
+        val value: Boolean,
+    ) : PolynomialRealFormula
+    /** A Boolean coordinate in the owning scope. */
+    data class BooleanVariable(
+        /** Typed Boolean coordinate. */
+        val id: SourceBoolId,
+    ) : PolynomialRealFormula
+    /** Exact polynomial comparison. */
     class Atom(
+        /** Left expression. */
         val left: PolynomialExpression,
+        /** Exact comparison, including strictness. */
         val relation: PolynomialRelation,
+        /** Right expression. */
         val right: PolynomialExpression,
     ) : PolynomialRealFormula {
         private val hash = (31 * left.hashCode() + relation.hashCode()) * 31 + right.hashCode()
@@ -15,22 +42,30 @@ internal sealed interface PolynomialRealFormula {
         override fun equals(other: Any?): Boolean = other is Atom && polynomialFormulasEqual(this, other)
     }
 
-    class Not(val operand: PolynomialRealFormula) : PolynomialRealFormula {
+    /** Logical complement of the complete operand. */
+    class Not(
+        /** Captured operand. */
+        val operand: PolynomialRealFormula,
+    ) : PolynomialRealFormula {
         private val hash = 31 * operand.hashCode() + 3
         override fun hashCode(): Int = hash
         override fun equals(other: Any?): Boolean = other is Not && polynomialFormulasEqual(this, other)
     }
 
+    /** Conjunction; an empty conjunction is true. */
     class And(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
+        /** Captured operands in syntax order. */
         val operands: List<PolynomialRealFormula> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is And && polynomialFormulasEqual(this, other)
         private val hash = 31 * values.contentHashCode() + 1
         override fun hashCode(): Int = hash
     }
 
+    /** Disjunction; an empty disjunction is false. */
     class Or(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
+        /** Captured operands in syntax order. */
         val operands: List<PolynomialRealFormula> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Or && polynomialFormulasEqual(this, other)
         private val hash = 31 * values.contentHashCode() + 2

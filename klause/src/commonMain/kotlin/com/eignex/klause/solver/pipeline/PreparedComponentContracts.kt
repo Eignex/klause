@@ -10,6 +10,9 @@ import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.ScoringCapability
 import com.eignex.klause.solver.defaultExecutionCapabilities
 import com.eignex.klause.solver.executionCapabilities
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingTarget
 
 internal val witnessAuthority = setOf(ExecutionClaimAuthority.WITNESS)
 internal val completeAuthority = ExecutionClaimAuthority.entries.toSet()
@@ -48,12 +51,18 @@ internal fun checkedCompletionContract(
     ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority),
 )
 
-internal fun Problem.finiteRealCompletionSupported(): Boolean = realLower.none { it.isNaN() } &&
-    realUpper.none { it.isNaN() } && factors.all { factor ->
-        factor.variables.reals.isEmpty() || factor is RealProduct ||
-            ((factor.linearForm is LinearForm.Conjunction || factor.linearForm is LinearForm.Disjunction) &&
-                factor.linearForm!!.rows.none { it.strict })
-    }
+internal fun Problem.finiteRealCompletionSupported(
+    projections: PreparedFactorProjections = selectedFactorProjections(),
+): Boolean = realLower.none { it.isNaN() } && realUpper.none { it.isNaN() } && factors.indices.all { index ->
+    val factor = factors[index]
+    val encoder = projections.encoder(index, EncodingTarget.LINEAR)
+    if (factor.variables.reals.isNotEmpty() && !encoder.enforcesSource &&
+        encoder.support != EncoderSupport.CONDITIONED
+    ) return@all false
+    factor.variables.reals.isEmpty() || factor is RealProduct ||
+        ((factor.linearForm is LinearForm.Conjunction || factor.linearForm is LinearForm.Disjunction) &&
+            factor.linearForm!!.rows.none { it.strict })
+}
 
 internal fun Problem.finiteComponentContract(
     factors: List<Int>,

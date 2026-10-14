@@ -209,11 +209,29 @@ the decoding and ownership boundary; assembly adds no independent proof authorit
 ## Factor projection selection
 
 `FactorProjectionProviders.prepare(problem)` captures immutable selected propagation,
-scoring and relaxation descriptors against one canonical `Problem`. The descriptors
+scoring, relaxation and theory encoder descriptors against one canonical `Problem`. The descriptors
 couple declared capabilities to their factories or emitters; null selects an unsupported
 role, while an explicit inert descriptor records deliberate absence. Source factors
 remain engine-neutral and borrowed read-only. `forProblem` retains the capture only
 for the identical model; a rewritten or remapped model selects against its own factors.
+
+Encoder selection names the consumer language separately from numerical execution.
+Direct and equivalent encoders enforce the whole factor; conditioned encoders require
+captured source pins. Relaxation-only and unsupported descriptors confer no source
+ownership. Finite/linear planning reads those selected relations for variable ownership,
+fragment admission and shared component installation. The prepared linear relations
+retain original factor attribution and typed coordinates; component openings own their
+combined graph, assertion scopes, LP state and resources. Conditioned finite completion
+captures the fixed discrete point without changing source declarations. Its pins do
+not authorize a refutation outside that scope.
+
+Polynomial preparation installs every applicable continuous factor through its selected
+encoder into one combined formula. Integer embeddings and private Boolean-choice
+auxiliaries retain typed source correspondence and factor attribution. Their defining
+guards are conjoined with the relation; source publication excludes private auxiliaries.
+Generic linear-to-polynomial equivalence belongs to `lowering`. Exact source checks
+remain separate from a numerical execution view and from relaxation-provider emission.
+
 
 `PropagationProblem(problem, selection)` and `LocalSearchProblem(problem, selection,
 domains)` open mechanisms from that capture. Factories allocate private mutable

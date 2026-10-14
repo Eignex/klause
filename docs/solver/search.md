@@ -571,3 +571,21 @@ Polynomial and quadratic workers retain the prepared finite-factor descriptors w
 opening their private finite projection. Exact arithmetic still checks its original
 source fragment; finite-provider selection does not replace that authority or its
 resumable lifecycle. See [the polynomial route](../theories/polynomial-real.md).
+
+
+## Selected theory encoders
+
+Prepared factor encoders supply the full relations used by shared arithmetic
+components. Ownership, admission and component construction consume the same selected
+capture. Linear relations retain conjunction/disjunction structure, row activators,
+Boolean terms, strictness and original factor attribution. Integer difference admission
+checks complete selected relations and the safety of their combined graph. Polynomial
+installation conjoins factor relations and all private auxiliary definitions before
+completion checks the combined system.
+
+Source integer/real coordinates retain their typed publication keys. Finite integer
+embeddings in polynomial queries are private reals whose fixings come from finite state;
+an unfixed interval remains a relaxation and supplies no witness authority. Conditioned
+linear products capture the same source integer pins as their completion scope. The
+original source checker remains required when numerical execution proposes a point.
+Relaxation selection cannot omit an encoder's enforcing relation or grant completeness.

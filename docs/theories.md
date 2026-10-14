@@ -40,6 +40,24 @@ Optional branching, blocking and conflict capabilities extend that lifecycle.
 `TheoryComponent` remains a deprecated compatibility marker with no extra behavior.
 Arithmetic components retain the dependency boundary against finite CP domains.
 
+`EncoderProvider` selects immutable whole-factor installers for a consumer's
+`EncodingTarget`. `EncoderSupport` distinguishes direct, equivalent, conditioned,
+relaxation-only and unsupported representations. `TheoryEncoding` supplies typed
+source coordinates, original factor attribution and the receiving allowance. It
+accepts complete linear relations or neutral polynomial formulas; other consumers
+can declare a target and implement the same installation scope. Selection contains
+no mutable solving state. Prepared relations are combined within one arithmetic
+owner before its checks, rather than checked as independent factor witnesses.
+
+Linear and difference ownership use the selected complete relations and retain
+existing exact coefficient, strictness and combined graph safety gates. Polynomial
+composition installs selected continuous relations alongside its finite projection.
+A conditioning pin must hold for the entire installed relation's scope; retraction
+invalidates its derived state and witness. Failed or interrupted installation
+publishes no partial enforcing relation. Relaxation support cannot substitute for
+source enforcement. [Provider extensions](api.md#projection-provider-extensions)
+define the public selection and mapping obligations.
+
 Participation and completeness are separate. A batch service can be sound and incomplete;
 its legacy `TheoryCheck.Cancelled` answer leaves the fragment undecided under cancellation,
 limits or incomplete checking. The bridge maps it to an indeterminate component answer.

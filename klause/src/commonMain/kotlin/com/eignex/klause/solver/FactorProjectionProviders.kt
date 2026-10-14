@@ -10,6 +10,7 @@ import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncodingTarget
 
 /**
  * Engine-owned mechanism selection for one preparation. Providers borrow immutable factor data;
@@ -24,7 +25,13 @@ class FactorProjectionProviders(
     val relaxation: RelaxationProjectionProvider = BuiltInRelaxationProjectionProvider,
     /** Selects complete source relation installation in shared arithmetic components. */
     val encoder: EncoderProvider = BuiltInEncoderProvider,
+    encodingTargets: Set<EncodingTarget> = emptySet(),
 ) {
+    private val selectedEncodingTargets = EncodingTarget.entries.toSet() + encodingTargets
+
+    /** Consumer languages captured at preparation, including every built-in target. */
+    val encodingTargets: Set<EncodingTarget> get() = selectedEncodingTargets.toSet()
+
     /** Built-in mechanisms with their existing source behavior and numerical gates. */
     companion object {
         /** Shared stateless selectors; selected mutable work belongs to each engine. */
