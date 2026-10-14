@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.solver.ProblemClass
 import kotlin.test.Test
@@ -11,6 +12,48 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioCompositionTest {
+
+    @Test
+    fun `integer linear companion preserves existing worker positions`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val baseline = PortfolioComposition.compose(scenario, ProblemFacts(profile, binaryIntegers = true) { true })
+
+        val composed = PortfolioComposition.compose(
+            scenario, ProblemFacts(profile, binaryIntegers = true, integerLinear = true) { true },
+        )
+
+        assertEquals(baseline.map { it.label } + "lp-aggressive", composed.map { it.label })
+    }
+
+    @Test
+    fun `integer linear companion remains available with cuts disabled`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, integerLinear = true) { true }
+        val baseline = PortfolioComposition.compose(scenario, facts)
+
+        val composed = PortfolioComposition.compose(scenario.copy(lpCeiling = LpConfig.parse("aggressive,-cuts")), facts)
+
+        assertEquals(baseline.map { it.label }, composed.map { it.label })
+    }
+
+    @Test
+    fun `explicit and parallel integer linear pools retain their composition`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val baseline = ProblemFacts(profile) { true }
+        val integer = ProblemFacts(profile, integerLinear = true) { true }
+        for (control in listOf(
+            scenario.copy(cores = 2), scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(kind = Kind.CSP), scenario.copy(arms = 5), scenario.copy(btEdit = { it }),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
+            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
+            scenario.copy(annotationArm = BacktrackParams()),
+        )) {
+            assertEquals(PortfolioComposition.compose(control, baseline).map { it.label },
+                PortfolioComposition.compose(control, integer).map { it.label })
+        }
+    }
 
     @Test
     fun `finite mixed optimization admits selector diversity without a relaxation`() {

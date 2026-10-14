@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -34,6 +35,7 @@ internal class ProblemFacts(
     val profile: ProblemProfile,
     val binaryIntegers: Boolean = false,
     val continuousObjective: Boolean = false,
+    val integerLinear: Boolean = false,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -60,6 +62,9 @@ internal class ProblemFacts(
             profile,
             binaryIntegers = problem.binaryIntegers,
             continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
+            integerLinear = problem.factors.isNotEmpty() && problem.factors.all {
+                it is Linear && it.integerConstants != null
+            },
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
             },
