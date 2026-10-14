@@ -49,7 +49,8 @@ def read_strings(stream, section, file_size):
     return raw
 
 
-def inspect(stream, file_size, report):
+def inspect(stream, file_size, report, queries=QUERIES):
+    queries = query_names(queries)
     raw_header = read_at(stream, 0, ELF_HEADER.size, file_size)
     fields = ELF_HEADER.unpack(raw_header)
     ident, kind, machine, version = fields[:4]
@@ -77,7 +78,7 @@ def inspect(stream, file_size, report):
         name = string_at(names, section['nameOffset'])
         section.update(index=index, nameHex=name.hex(), name=name.decode('ascii', errors='backslashreplace'))
     report.update(sectionTableFileOffset=offset, sectionTableSha256=hashlib.sha256(raw_sections).hexdigest(),
-                  sections=sections, symbolTables=[], candidates={query: [] for query in QUERIES})
+                  sections=sections, symbolTables=[], candidates={query: [] for query in queries})
     total_symbols = 0
     for section in sections:
         if section['type'] not in (2, 11):
@@ -108,7 +109,7 @@ def inspect(stream, file_size, report):
                 raise ValueError('Extended ELF symbol section indexes are unsupported')
             if 0 < owner < 0xff00 and owner >= len(sections):
                 raise ValueError('ELF symbol owner exceeds section table')
-            for query in QUERIES:
+            for query in queries:
                 if query.encode('ascii') not in name:
                     continue
                 records = report['candidates'][query]
@@ -134,14 +135,14 @@ def identity(stat):
     return stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
 
 
-def inspect_file(library, expected, report):
+def inspect_file(library, expected, report, queries=QUERIES):
     with library.open('rb') as stream:
         before = os.fstat(stream.fileno())
         actual = hashlib.file_digest(stream, 'sha256').hexdigest()
         report.update(librarySha256=actual, fileBytes=before.st_size, device=before.st_dev, inode=before.st_ino)
         if actual != expected or identity(before) != identity(library.stat()):
             raise ValueError('Pinned library identity mismatch before inspection')
-        inspect(stream, before.st_size, report)
+        inspect(stream, before.st_size, report, queries)
         stream.seek(0)
         after_hash = hashlib.file_digest(stream, 'sha256').hexdigest()
         report['librarySha256After'] = after_hash
@@ -151,14 +152,31 @@ def inspect_file(library, expected, report):
     report['completed'] = True
 
 
+def query_names(values):
+    if not 0 < len(values) <= 16:
+        raise ValueError('Symbol query names are empty or oversized')
+    for value in values:
+        if not isinstance(value, str) or not 1 <= len(value) <= 128 or not value.isascii() or \
+                not all(character.isalnum() or character == '_' for character in value):
+            raise ValueError('Symbol query names must be bounded source identifiers')
+    if len(set(values)) != len(values):
+        raise ValueError('Symbol query names are duplicate')
+    return tuple(values)
+
+
 def main():
     library, expected, output = Path(sys.argv[1]).resolve(), sys.argv[2], Path(sys.argv[3])
+    queries = tuple(sys.argv[4:]) if len(sys.argv) > 4 else QUERIES
     report = {'library': str(library), 'expectedLibrarySha256': expected, 'completed': False,
               'sourceSha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-              'queries': list(QUERIES), 'matchPolicy': 'Raw source method-name substring; no mangled-name or ABI inference',
+              'queries': list(queries), 'matchPolicy': 'Raw source method-name substring; no mangled-name or ABI inference',
               'diagnosticOnly': True, 'acceptedSavingsCredit': False}
     try:
-        inspect_file(library, expected, report)
+        queries = query_names(queries)
+        if queries == QUERIES:
+            inspect_file(library, expected, report)
+        else:
+            inspect_file(library, expected, report, queries)
     except Exception as error:
         report['error'] = {'type': type(error).__name__, 'message': str(error)}
         raise
