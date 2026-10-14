@@ -79,6 +79,8 @@ internal class ExactContinuationInput(
     upper: List<BigFraction?>,
     headings: List<Int>,
     statuses: List<ContinuationStatus>,
+    lowerStrict: List<Boolean> = emptyList(),
+    upperStrict: List<Boolean> = emptyList(),
 ) {
     val columns = columns.map { it.toList() }
     val rhs = rhs.toList()
@@ -86,9 +88,15 @@ internal class ExactContinuationInput(
     val upper = upper.toList()
     val headings = headings.toList()
     val statuses = statuses.toList()
+    val lowerStrict = lowerStrict.toList()
+    val upperStrict = upperStrict.toList()
     val n = columns.size
     val m = rhs.size
     val total = n + m
+    val hasStrictSides = this.lowerStrict.any { it } || this.upperStrict.any { it }
+
+    fun lowerIsStrict(column: Int): Boolean = lowerStrict.getOrElse(column) { false }
+    fun upperIsStrict(column: Int): Boolean = upperStrict.getOrElse(column) { false }
 }
 
 internal class ExactContinuationResult(
@@ -267,7 +275,9 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
             throw ContinuationStop(ContinuationDecline.DIMENSION)
         }
         if (input.lower.size != input.total || input.upper.size != input.total ||
-            input.headings.size != input.m || input.statuses.size != input.total
+            input.headings.size != input.m || input.statuses.size != input.total ||
+            (input.lowerStrict.isNotEmpty() && input.lowerStrict.size != input.total) ||
+            (input.upperStrict.isNotEmpty() && input.upperStrict.size != input.total)
         ) {
             throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
         }
@@ -281,10 +291,16 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
             budget.step()
             val lower = input.lower[j]?.let(::visit)
             val upper = input.upper[j]?.let(::visit)
+            if ((input.lowerIsStrict(j) && lower == null) || (input.upperIsStrict(j) && upper == null)) {
+                throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
+            }
             if (lower != null && upper != null && lower > upper) {
                 throw ContinuationStop(
                     ContinuationDecline.INVALID_INPUT,
                 )
+            }
+            if (lower != null && lower == upper && (input.lowerIsStrict(j) || input.upperIsStrict(j))) {
+                throw ContinuationStop(ContinuationDecline.CANDIDATE)
             }
             val valid = when (input.statuses[j]) {
                 ContinuationStatus.BASIC -> seen[j]
@@ -344,6 +360,7 @@ private class RationalContinuationLane<F>(
     private var table: List<MutableList<F>>
     private var headings = MutableList(input.m) { input.n + it }
     private var seats: MutableList<F>
+    private val seatEpsilon: MutableList<F>?
     private var statuses = MutableList(input.total) { j -> canonical(j) }
     private val lower: List<F?>
     private val upper: List<F?>
@@ -379,6 +396,12 @@ private class RationalContinuationLane<F>(
             val status = input.statuses[j].takeUnless { it == ContinuationStatus.BASIC } ?: canonical(j)
             statuses[j] = if (j >= input.n) ContinuationStatus.BASIC else status
             endpoint(j, status)
+        }
+        seatEpsilon = if (input.hasStrictSides) {
+            budget.step(input.total.toLong(), input.total * 8L)
+            MutableList(input.total) { j -> endpointEpsilon(j, statuses[j]) }
+        } else {
+            null
         }
     }
 
@@ -427,15 +450,17 @@ private class RationalContinuationLane<F>(
         budget.phase = ContinuationPhase.FEASIBILITY
         while (true) {
             val values = values(budget)
-            val row = headings.indices.filter { violation(it, values, budget) != 0 }.minByOrNull { headings[it] }
+            val epsilon = epsilonValues(budget)
+            val row = headings.indices.filter { violation(it, values, epsilon, budget) != 0 }.minByOrNull { headings[it] }
             if (row == null) {
                 return LaneResult(
-                    values.map { toBig(it, budget) },
-                    headings = headings.toList(),
-                    statuses = statuses.toList(),
+                    materialize(values, epsilon, budget),
+                    // Finite strict points need not sit at the original nonbasic endpoints.
+                    headings = if (epsilon == null) headings.toList() else null,
+                    statuses = if (epsilon == null) statuses.toList() else null,
                 )
             }
-            val direction = violation(row, values, budget)
+            val direction = violation(row, values, epsilon, budget)
             val enter = entering(row, direction, budget)
             if (enter == null) return conflict(row, direction, budget)
             beforePivot()
@@ -447,19 +472,26 @@ private class RationalContinuationLane<F>(
 
     private fun findConflict(budget: ContinuationBudget): LaneResult? {
         val values = values(budget)
+        val epsilon = epsilonValues(budget)
         for (row in headings.indices) {
             budget.step()
-            val direction = violation(row, values, budget)
+            val direction = violation(row, values, epsilon, budget)
             if (direction != 0 && entering(row, direction, budget) == null) return conflict(row, direction, budget)
         }
         return null
     }
 
-    private fun violation(row: Int, values: List<F>, budget: ContinuationBudget): Int {
+    private fun violation(row: Int, values: List<F>, epsilon: List<F>?, budget: ContinuationBudget): Int {
         val column = headings[row]
         val value = values[column]
-        if (lower[column]?.let { compare(value, it, budget) < 0 } == true) return 1
-        if (upper[column]?.let { compare(value, it, budget) > 0 } == true) return -1
+        if (lower[column]?.let {
+                compareValue(value, epsilon?.get(column), it, lowerEpsilon(column), budget) < 0
+            } == true
+        ) return 1
+        if (upper[column]?.let {
+                compareValue(value, epsilon?.get(column), it, upperEpsilon(column), budget) > 0
+            } == true
+        ) return -1
         return 0
     }
 
@@ -470,6 +502,11 @@ private class RationalContinuationLane<F>(
         return result
     }
 
+    private fun compareValue(value: F, epsilon: F?, bound: F, boundEpsilon: F, budget: ContinuationBudget): Int {
+        val comparison = compare(value, bound, budget)
+        return if (comparison == 0 && epsilon != null) compare(epsilon, boundEpsilon, budget) else comparison
+    }
+
     private fun entering(row: Int, direction: Int, budget: ContinuationBudget): Int? {
         for (j in 0 until input.total) {
             budget.step()
@@ -478,9 +515,9 @@ private class RationalContinuationLane<F>(
             if (sign == 0) continue
             val increasing = -sign == direction
             val movable = if (increasing) {
-                upper[j]?.let { compare(seats[j], it, budget) < 0 } ?: true
+                upper[j]?.let { compareValue(seats[j], seatEpsilon?.get(j), it, upperEpsilon(j), budget) < 0 } ?: true
             } else {
-                lower[j]?.let { compare(seats[j], it, budget) > 0 } ?: true
+                lower[j]?.let { compareValue(seats[j], seatEpsilon?.get(j), it, lowerEpsilon(j), budget) > 0 } ?: true
             }
             if (movable) return j
         }
@@ -501,6 +538,70 @@ private class RationalContinuationLane<F>(
             result[headings[row]] = value
         }
         return result
+    }
+
+    private fun epsilonValues(budget: ContinuationBudget): List<F>? {
+        val epsilon = seatEpsilon ?: return null
+        budget.step(bytes = input.total * 8L)
+        val result = epsilon.toMutableList()
+        for (row in headings.indices) {
+            var value = ops.zero
+            for (j in 0 until input.total) {
+                budget.step()
+                if (statuses[j] != ContinuationStatus.BASIC && !ops.isZero(epsilon[j])) {
+                    value = subtract(value, multiply(table[row][j], epsilon[j], budget), budget)
+                }
+            }
+            result[headings[row]] = value
+        }
+        return result
+    }
+
+    private fun materialize(values: List<F>, epsilon: List<F>?, budget: ContinuationBudget): List<BigFraction> {
+        if (epsilon == null) return values.map { toBig(it, budget) }
+        var step = ops.one
+        for (j in values.indices) {
+            budget.step()
+            lower[j]?.let {
+                step = finiteStep(step, subtract(values[j], it, budget), epsilon[j], input.lowerIsStrict(j), budget)
+            }
+            upper[j]?.let {
+                step = finiteStep(
+                    step, subtract(it, values[j], budget), multiply(ops.minusOne, epsilon[j], budget),
+                    input.upperIsStrict(j), budget,
+                )
+            }
+        }
+        budget.step(input.total.toLong(), input.total * 8L)
+        return values.mapIndexed { j, value ->
+            val point = add(value, multiply(step, epsilon[j], budget), budget)
+            lower[j]?.let {
+                val comparison = compare(point, it, budget)
+                if (comparison < 0 || (comparison == 0 && input.lowerIsStrict(j))) {
+                    throw ContinuationStop(ContinuationDecline.CANDIDATE)
+                }
+            }
+            upper[j]?.let {
+                val comparison = compare(point, it, budget)
+                if (comparison > 0 || (comparison == 0 && input.upperIsStrict(j))) {
+                    throw ContinuationStop(ContinuationDecline.CANDIDATE)
+                }
+            }
+            toBig(point, budget)
+        }
+    }
+
+    private fun finiteStep(step: F, slack: F, slope: F, strict: Boolean, budget: ContinuationBudget): F {
+        val sign = compare(slack, ops.zero, budget)
+        val direction = compare(slope, ops.zero, budget)
+        if (sign < 0 || (sign == 0 && (direction < 0 || (strict && direction == 0)))) {
+            throw ContinuationStop(ContinuationDecline.CANDIDATE)
+        }
+        if (sign == 0 || direction >= 0) return step
+        // Stay below every slack crossing, preserving both strict and closed source sides.
+        val crossing = multiply(slack, reciprocal(multiply(ops.minusOne, slope, budget), budget), budget)
+        val limit = multiply(ops.half, crossing, budget)
+        return if (compare(limit, step, budget) < 0) limit else step
     }
 
     private fun conflict(row: Int, direction: Int, budget: ContinuationBudget): LaneResult = LaneResult(
@@ -525,6 +626,7 @@ private class RationalContinuationLane<F>(
         budget.step()
         val leaving = headings[row]
         seats[leaving] = endpoint(leaving, seat)
+        seatEpsilon?.set(leaving, endpointEpsilon(leaving, seat))
         statuses[leaving] = seat
         statuses[enter] = ContinuationStatus.BASIC
         headings[row] = enter
@@ -541,6 +643,15 @@ private class RationalContinuationLane<F>(
     private fun endpoint(j: Int, status: ContinuationStatus): F = when (status) {
         ContinuationStatus.LOWER, ContinuationStatus.FIXED -> requireNotNull(lower[j])
         ContinuationStatus.UPPER -> requireNotNull(upper[j])
+        else -> ops.zero
+    }
+
+    private fun lowerEpsilon(j: Int): F = if (input.lowerIsStrict(j)) ops.one else ops.zero
+    private fun upperEpsilon(j: Int): F = if (input.upperIsStrict(j)) ops.minusOne else ops.zero
+
+    private fun endpointEpsilon(j: Int, status: ContinuationStatus): F = when (status) {
+        ContinuationStatus.LOWER -> lowerEpsilon(j)
+        ContinuationStatus.UPPER -> upperEpsilon(j)
         else -> ops.zero
     }
 
@@ -581,6 +692,11 @@ private class RationalContinuationLane<F>(
     private fun subtract(a: F, b: F, budget: ContinuationBudget): F {
         preflight(a, b, budget)
         return checked(ops.minus(a, b), budget)
+    }
+
+    private fun add(a: F, b: F, budget: ContinuationBudget): F {
+        preflight(a, b, budget)
+        return checked(ops.plus(a, b), budget)
     }
 
     private fun reciprocal(a: F, budget: ContinuationBudget): F {
