@@ -13,6 +13,7 @@ import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -40,6 +41,7 @@ import com.eignex.klause.theory.LinearEncodingFormula
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.parseBigInt
 import java.io.File
 import java.lang.management.ManagementFactory
 import kotlin.time.Duration.Companion.seconds
@@ -154,8 +156,10 @@ object EncoderProviderProfile {
                         put("timeoutMs", 10000)
                         put("independentProofCheck", false)
                     }.toString())
-                    if (result is OpenTheoryResult.Sat) checker.check(directory, source,
-                        interrupted = false, minimumWitnesses = 1, provision = true)
+                    if (result is OpenTheoryResult.Sat) check(checker.check(directory, source,
+                        interrupted = false, minimumWitnesses = 1, provision = true)) {
+                        "source witness check failed: $directory"
+                    }
                     println("source=$index alternate=$alternate round=$round verdict=$verdict " +
                         "elapsedNs=$elapsed nativeWork=$work installations=$installations")
                 }
@@ -244,7 +248,23 @@ object EncoderProviderProfile {
     }
 
     private fun render(source: SmtLibProblem, assignment: OpenTheoryAssignment): String = buildString {
-        append("sat\n(model\n")
+        append("sat\n")
+        source.objective?.let { objective ->
+            var value = BigFraction.ofLong(objective.constant)
+            for ((id, weight) in objective.boolWeights.withIndex()) {
+                if (weight != 0L && assignment.boolValue(id)) value += BigFraction.ofLong(weight)
+            }
+            for ((id, coefficient) in objective.intCoefficients.withIndex()) {
+                if (coefficient != 0L) value += BigFraction.ofLong(coefficient) * rational(assignment.intValue(id))
+            }
+            for ((id, coefficient) in objective.realCoefficients.withIndex()) {
+                if (coefficient != 0.0) value += requireNotNull(BigFraction.ofDouble(coefficient)) *
+                    rational(assignment.realValue(id))
+            }
+            if (source.sense == ObjectiveSense.MAXIMIZE) value = value.negated()
+            append("; objective=$value\n")
+        }
+        append("(model\n")
         for ((name, id) in source.boolVarNames) append("(define-fun $name () Bool ${assignment.boolValue(id)})\n")
         for ((name, id) in source.intVarNames) append("(define-fun $name () Int ${signed(assignment.intValue(id))})\n")
         for ((name, id) in source.realVarNames) {
@@ -252,6 +272,11 @@ object EncoderProviderProfile {
             append("(define-fun $name () Real (/ ${signed(parts[0])} ${parts.getOrElse(1) { "1" }}))\n")
         }
         append(")\n")
+    }
+
+    private fun rational(value: String): BigFraction {
+        val parts = value.split('/')
+        return BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
     }
 
     private fun signed(value: String): String = if (value.startsWith('-')) "(- ${value.drop(1)})" else value

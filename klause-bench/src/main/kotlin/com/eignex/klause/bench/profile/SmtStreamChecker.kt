@@ -13,7 +13,7 @@ internal class SmtStreamChecker(private val output: File) {
     private var prepared = false
     private var attempted = false
 
-    fun check(directory: File, source: File, interrupted: Boolean, minimumWitnesses: Int, provision: Boolean) {
+    fun check(directory: File, source: File, interrupted: Boolean, minimumWitnesses: Int, provision: Boolean): Boolean {
         prepare(provision)
         val command = listOf(File(environment, "bin/python").path,
             File(tools, "verify_stream_source_results.py").path, source.path, File(directory, "stdout").path,
@@ -21,6 +21,7 @@ internal class SmtStreamChecker(private val output: File) {
             if (interrupted) listOf("--interrupted") else emptyList()
         val execution = execute(command, File(directory, "source-check.stdout"), File(directory, "source-check.stderr"))
         Reports.writeJson(File(directory, "source-check-execution.json").path, execution)
+        return execution.exitCode == 0 && !execution.timedOut
     }
 
     private fun prepare(provision: Boolean) {

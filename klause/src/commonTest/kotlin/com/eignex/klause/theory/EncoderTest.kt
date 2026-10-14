@@ -67,6 +67,7 @@ import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.pipeline.admission
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.polynomialRequest

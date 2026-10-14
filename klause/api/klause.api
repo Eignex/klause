@@ -10494,9 +10494,13 @@ public final class com/eignex/klause/solver/pipeline/ComponentPlan {
 
 public final class com/eignex/klause/solver/pipeline/ComponentPlanKt {
 	public static final fun componentPlan (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;Z)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
+	public static final fun componentPlan (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;ZLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public static final fun componentPlan (Lcom/eignex/klause/ir/Problem;Z)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
+	public static final fun componentPlan (Lcom/eignex/klause/ir/Problem;ZLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public static synthetic fun componentPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;ZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
+	public static synthetic fun componentPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/PreparedFactorProjections;ZLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public static synthetic fun componentPlan$default (Lcom/eignex/klause/ir/Problem;ZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
+	public static synthetic fun componentPlan$default (Lcom/eignex/klause/ir/Problem;ZLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 }
 
 public final class com/eignex/klause/solver/pipeline/ComponentResponsibility : java/lang/Enum {
@@ -11359,6 +11363,7 @@ public final class com/eignex/klause/solver/pipeline/PreparedPlanDecline : java/
 	public static final field CONTINUOUS_LINEAR_OBJECTIVE Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field OPEN_POLYNOMIAL_INTEGER Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field POLYNOMIAL_ENCODING Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
+	public static final field RESOURCE Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field UNOWNED_SOURCE_COMPONENT Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
@@ -11387,6 +11392,7 @@ public final class com/eignex/klause/solver/pipeline/PreparedSourcePlan {
 	public final fun integerCoordinate (I)I
 	public final fun polynomialIntegerCoordinate (I)Ljava/lang/Integer;
 	public final fun prepareConditionedLinearQuery ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public final fun prepareConditionedLinearQuery (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public final fun realCoordinate (I)I
 	public final fun withObjective (Lcom/eignex/klause/ir/QuadraticObjectiveSpec;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public final fun withObjective (Lcom/eignex/klause/solver/objective/LinearObjective;Z)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
@@ -11398,9 +11404,13 @@ public final class com/eignex/klause/solver/pipeline/PreparedSourcePlanKt {
 	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/NonlinearIntegerProblem;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/PolynomialRealProblem;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/solver/objective/LinearObjective;ZZ)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZ)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static synthetic fun prepareExecutionPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/solver/objective/LinearObjective;ZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public static synthetic fun prepareExecutionPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static synthetic fun prepareExecutionPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public static synthetic fun prepareExecutionPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 }
 
 public final class com/eignex/klause/solver/pipeline/ProblemPipeline : java/lang/Enum {
@@ -14654,16 +14664,61 @@ public final class com/eignex/klause/theory/EncoderSupport : java/lang/Enum {
 	public static fun values ()[Lcom/eignex/klause/theory/EncoderSupport;
 }
 
+public final class com/eignex/klause/theory/EncodingAffineExpression {
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getTerms ()Ljava/util/List;
+}
+
 public final class com/eignex/klause/theory/EncodingAttribution {
+	public final fun getAffineAuxiliaries ()Ljava/util/List;
 	public final fun getAuxiliaries ()Ljava/util/List;
 	public final fun getBooleanConditions ()Ljava/util/Map;
 	public final fun getBooleans ()Ljava/util/List;
 	public final fun getIntegerConditions ()Ljava/util/Map;
 	public final fun getIntegerEmbeddings ()Ljava/util/Map;
 	public final fun getIntegers ()Ljava/util/List;
+	public final fun getLinearGuards ()Ljava/util/List;
 	public final fun getRealEmbeddings ()Ljava/util/Map;
 	public final fun getReals ()Ljava/util/List;
 	public final fun getSourceFactorIndex ()I
+}
+
+public final class com/eignex/klause/theory/EncodingAuxiliary {
+	public final fun getIndex ()I
+}
+
+public final class com/eignex/klause/theory/EncodingGuard {
+	public final fun getIndex ()I
+}
+
+public final class com/eignex/klause/theory/EncodingLinearTerm {
+	public static final field Companion Lcom/eignex/klause/theory/EncodingLinearTerm$Companion;
+	public final fun getAuxiliary ()Lcom/eignex/klause/theory/EncodingAuxiliary;
+	public final fun getCoefficient ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getRealAuxiliary ()Lcom/eignex/klause/theory/EncodingRealAuxiliary;
+	public final fun getReference ()Ljava/lang/Integer;
+}
+
+public final class com/eignex/klause/theory/EncodingLinearTerm$Companion {
+	public final fun auxiliary (Lcom/eignex/klause/theory/EncodingAuxiliary;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/theory/EncodingLinearTerm;
+	public final fun auxiliary (Lcom/eignex/klause/theory/EncodingRealAuxiliary;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/theory/EncodingLinearTerm;
+	public final fun source (ILcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/theory/EncodingLinearTerm;
+}
+
+public final class com/eignex/klause/theory/EncodingNamespace {
+	public fun <init> ()V
+	public final fun auxiliary (I)Lcom/eignex/klause/theory/EncodingAuxiliary;
+	public final fun guard (I)Lcom/eignex/klause/theory/EncodingGuard;
+	public final fun owns (Lcom/eignex/klause/theory/EncodingAuxiliary;)Z
+	public final fun owns (Lcom/eignex/klause/theory/EncodingGuard;)Z
+	public final fun owns (Lcom/eignex/klause/theory/EncodingRealAuxiliary;)Z
+	public final fun realAuxiliary-O-N0hN4 (I)Lcom/eignex/klause/theory/EncodingRealAuxiliary;
+}
+
+public final class com/eignex/klause/theory/EncodingRealAuxiliary {
+	public final fun getCoordinate-PjD8VLc ()I
 }
 
 public final class com/eignex/klause/theory/EncodingTarget {
@@ -14685,6 +14740,38 @@ public final class com/eignex/klause/theory/EncodingTarget$Companion {
 	public final fun getDIFFERENCE-UtreXms ()Ljava/lang/String;
 	public final fun getLINEAR-UtreXms ()Ljava/lang/String;
 	public final fun getPOLYNOMIAL-UtreXms ()Ljava/lang/String;
+}
+
+public abstract class com/eignex/klause/theory/LinearEncodingFormula {
+}
+
+public final class com/eignex/klause/theory/LinearEncodingFormula$And : com/eignex/klause/theory/LinearEncodingFormula {
+	public fun <init> (Ljava/util/List;)V
+	public final fun getOperands ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/theory/LinearEncodingFormula$Comparison : com/eignex/klause/theory/LinearEncodingFormula {
+	public fun <init> (Lcom/eignex/klause/theory/EncodingAffineExpression;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;Z)V
+	public synthetic fun <init> (Lcom/eignex/klause/theory/EncodingAffineExpression;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBound ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getExpression ()Lcom/eignex/klause/theory/EncodingAffineExpression;
+	public final fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
+	public final fun getStrict ()Z
+}
+
+public final class com/eignex/klause/theory/LinearEncodingFormula$Guard : com/eignex/klause/theory/LinearEncodingFormula {
+	public fun <init> (Lcom/eignex/klause/theory/EncodingGuard;)V
+	public final fun getGuard ()Lcom/eignex/klause/theory/EncodingGuard;
+}
+
+public final class com/eignex/klause/theory/LinearEncodingFormula$Or : com/eignex/klause/theory/LinearEncodingFormula {
+	public fun <init> (Ljava/util/List;)V
+	public final fun getOperands ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/theory/LinearEncodingFormula$Relation : com/eignex/klause/theory/LinearEncodingFormula {
+	public fun <init> (Lcom/eignex/klause/ir/LinearForm;)V
+	public final fun getForm ()Lcom/eignex/klause/ir/LinearForm;
 }
 
 public abstract interface class com/eignex/klause/theory/Theory {
@@ -14739,16 +14826,31 @@ public final class com/eignex/klause/theory/TheoryContext$DefaultImpls {
 }
 
 public abstract interface class com/eignex/klause/theory/TheoryEncoding {
+	public fun auxiliary ()Lcom/eignex/klause/theory/EncodingAuxiliary;
 	public abstract fun conditional (Lcom/eignex/klause/ir/PolynomialRealFormula;Lcom/eignex/klause/ir/PolynomialExpression;Lcom/eignex/klause/ir/PolynomialExpression;)Lcom/eignex/klause/ir/PolynomialExpression;
+	public fun define (Lcom/eignex/klause/theory/EncodingAuxiliary;Lcom/eignex/klause/theory/EncodingAffineExpression;)V
+	public fun define (Lcom/eignex/klause/theory/EncodingGuard;Lcom/eignex/klause/theory/LinearEncodingFormula;)V
 	public abstract fun fixedBoolean-Tr0PeTE (I)Ljava/lang/Boolean;
 	public abstract fun fixedInteger-BbWYBdc (I)Ljava/math/BigInteger;
 	public abstract fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public abstract fun getSourceFactorIndex ()I
 	public abstract fun getTarget-UtreXms ()Ljava/lang/String;
+	public fun guard ()Lcom/eignex/klause/theory/EncodingGuard;
 	public abstract fun integer-BbWYBdc (I)Lcom/eignex/klause/ir/PolynomialExpression;
 	public abstract fun linear (Lcom/eignex/klause/ir/LinearForm;)V
+	public fun linearFormula (Lcom/eignex/klause/theory/LinearEncodingFormula;)V
 	public abstract fun polynomial (Lcom/eignex/klause/ir/PolynomialRealFormula;)V
 	public abstract fun real-NWoOmUI (I)Lcom/eignex/klause/ir/PolynomialExpression;
+	public fun realAuxiliary ()Lcom/eignex/klause/theory/EncodingRealAuxiliary;
+}
+
+public final class com/eignex/klause/theory/TheoryEncoding$DefaultImpls {
+	public static fun auxiliary (Lcom/eignex/klause/theory/TheoryEncoding;)Lcom/eignex/klause/theory/EncodingAuxiliary;
+	public static fun define (Lcom/eignex/klause/theory/TheoryEncoding;Lcom/eignex/klause/theory/EncodingAuxiliary;Lcom/eignex/klause/theory/EncodingAffineExpression;)V
+	public static fun define (Lcom/eignex/klause/theory/TheoryEncoding;Lcom/eignex/klause/theory/EncodingGuard;Lcom/eignex/klause/theory/LinearEncodingFormula;)V
+	public static fun guard (Lcom/eignex/klause/theory/TheoryEncoding;)Lcom/eignex/klause/theory/EncodingGuard;
+	public static fun linearFormula (Lcom/eignex/klause/theory/TheoryEncoding;Lcom/eignex/klause/theory/LinearEncodingFormula;)V
+	public static fun realAuxiliary (Lcom/eignex/klause/theory/TheoryEncoding;)Lcom/eignex/klause/theory/EncodingRealAuxiliary;
 }
 
 public final class com/eignex/klause/theory/TheoryRealId {
