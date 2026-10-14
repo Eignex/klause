@@ -16,8 +16,8 @@ internal object XcspWitnessReplay {
     @Suppress("TooGenericExceptionCaught")
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1) { "Supply a base64 gzip JSON array of captured XCSP witnesses" }
-        val bytes = GZIPInputStream(Base64.getDecoder().decode(args.single()).inputStream()).use { it.readBytes() }
+        require(args.isNotEmpty()) { "Supply a base64 gzip JSON array of captured XCSP witnesses" }
+        val bytes = GZIPInputStream(Base64.getDecoder().decode(args.joinToString("")).inputStream()).use { it.readBytes() }
         val records = Reports.json.decodeFromString<List<XcspWitnessRecord>>(bytes.toString(Charsets.UTF_8))
         require(records.isNotEmpty())
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
