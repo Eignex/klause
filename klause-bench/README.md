@@ -246,6 +246,11 @@ An independent Python process checks complete source enumeration, scoring accept
 and minimum/maximum original-direction integer objectives for both providers. Corner
 controls cover inert deduction, unsupported/uncheckable sources and omitted real
 relaxation rows, with exact rational source coordinates and objective directions.
+Prepared finite invocation controls retain the selected bundle through presolve and
+root baking. A source-associated unary-table fixture maps source integer 2 to CP
+integer 0, checking inert deduction, weighted scoring and scaled relaxation selected
+by original factor identity. Its bounded CP projection is enumerated completely;
+unused open source columns are checked in witnesses and are not enumerated.
 These checks establish these fixtures' source behavior; they export no proof file and
 do not certify arbitrary custom providers. Opening and allocation measurements are
 preparation diagnostics. Source checking and optimization controls occur outside the

@@ -30,6 +30,31 @@ class ProjectionSourceResultsTest(unittest.TestCase):
                             {"maximize": False, "exactReal": "3/2", "value": 1.5},
                             {"maximize": True, "exactReal": "5/2", "value": 2.5}]} for mode in ("default", "omitted")]}
 
+        self.mapped = {
+            "source": {"bounds": [{"lower": None, "upper": None}, {"lower": None, "upper": None},
+                                   {"lower": "0", "upper": "2"}],
+                       "tableColumns": [2], "tableTuples": ["1", "2"]},
+            "cpSourceIds": [2], "rootValues": ["0", "1", "2"],
+            "witnesses": [["0", "0", "1"], ["0", "0", "2"]],
+            "scores": [{"value": "0", "score": 9}, {"value": "1", "score": 0}, {"value": "2", "score": 0}],
+            "optimization": [{"maximize": False, "value": "1", "objective": 1},
+                             {"maximize": True, "value": "2", "objective": 2}],
+            "relaxationEmissions": 2,
+        }
+
+    def test_original_coordinate_projection_is_checked(self):
+        self.assertEqual([2], MODULE.verify_mapped(self.mapped)["cpSourceIds"])
+
+    def test_wrong_original_coordinate_is_refused(self):
+        self.mapped["cpSourceIds"] = [0]
+        with self.assertRaisesRegex(ValueError, "original source coordinates"):
+            MODULE.verify_mapped(self.mapped)
+
+    def test_missing_required_mapped_control_is_refused(self):
+        self.source["sourceMappedRequired"] = True
+        with self.assertRaisesRegex(ValueError, "missing required mapped"):
+            MODULE.verify_corners(self.source, self.corners)
+
     def test_complete_original_source_records_are_checked(self):
         result = MODULE.verify(self.source, self.controls)
         self.assertEqual(4, result["checkedAssignments"])
