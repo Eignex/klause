@@ -93,6 +93,55 @@ def verify(source, controls):
             "scope": "exhaustive finite source assignments and exact integer objectives", "proofFileVerification": False}
 
 
+def verify_mapped(control):
+    source = control["source"]
+    bounds = source["bounds"]
+    columns = source["tableColumns"]
+    if len(columns) != 1 or not 0 <= columns[0] < len(bounds):
+        raise ValueError("unsupported mapped source table")
+    column = columns[0]
+    if control["cpSourceIds"] != columns:
+        raise ValueError("CP coordinates differ from original source coordinates")
+    if any(bound != {"lower": None, "upper": None} for i, bound in enumerate(bounds) if i != column):
+        raise ValueError("mapped control invents restrictions on its open source columns")
+    lower, upper = int(bounds[column]["lower"]), int(bounds[column]["upper"])
+    if not 0 <= upper - lower <= 1000:
+        raise ValueError("mapped domain exceeds checker allowance")
+    domain = set(range(lower, upper + 1))
+    allowed = {int(value) for value in source["tableTuples"]} & domain
+    if not allowed or set(map(int, control["rootValues"])) != domain:
+        raise ValueError("selected inert deduction lost the original CP domain")
+    projected = []
+    for record in control["witnesses"]:
+        witness = list(map(int, record))
+        if len(witness) != len(bounds) or witness[column] not in allowed:
+            raise ValueError("mapped witness violates the original source table")
+        projected.append(witness[column])
+    if len(projected) != len(set(projected)) or set(projected) != allowed:
+        raise ValueError("mapped enumeration differs from the bounded CP source projection")
+    scores = {}
+    for record in control["scores"]:
+        value = int(record["value"])
+        if value in scores:
+            raise ValueError("duplicate mapped score")
+        scores[value] = record["score"]
+    if set(scores) != domain or any(score != (0 if value in allowed else 9) for value, score in scores.items()):
+        raise ValueError("mapped scorer does not implement the selected source relation")
+    senses = set()
+    for record in control["optimization"]:
+        maximize = record["maximize"]
+        if type(maximize) is not bool or maximize in senses:
+            raise ValueError("duplicate mapped objective direction")
+        senses.add(maximize)
+        expected = max(allowed) if maximize else min(allowed)
+        if int(record["value"]) != expected or record["objective"] != expected:
+            raise ValueError("mapped objective differs from the original source projection")
+    if senses != {False, True} or type(control["relaxationEmissions"]) is not int or control["relaxationEmissions"] <= 0:
+        raise ValueError("mapped relaxation control did not exercise both objective directions")
+    return {"cpSourceIds": columns, "projectedWitnesses": len(projected),
+            "scope": "exact source witnesses and complete bounded CP projection; open unused columns are not enumerated"}
+
+
 def verify_corners(source, controls):
     all_points = set(itertools.product(itertools.product((False, True), repeat=source["boolCount"]),
                                        itertools.product(*source["domains"])))
@@ -132,8 +181,13 @@ def verify_corners(source, controls):
             raise ValueError("missing real objective direction")
     if modes != {"default", "omitted"}:
         raise ValueError("missing real provider control")
-    return {"inertWitnesses": len(witnesses), "unsupported": "refused", "uncheckable": "Unsupported",
-            "realModes": sorted(modes), "realMinimum": str(minimum), "realMaximum": str(upper)}
+    result = {"inertWitnesses": len(witnesses), "unsupported": "refused", "uncheckable": "Unsupported",
+              "realModes": sorted(modes), "realMinimum": str(minimum), "realMaximum": str(upper)}
+    if "mapped" in controls:
+        result["mapped"] = verify_mapped(controls["mapped"])
+    elif source.get("sourceMappedRequired"):
+        raise ValueError("missing required mapped source control")
+    return result
 
 
 def main():

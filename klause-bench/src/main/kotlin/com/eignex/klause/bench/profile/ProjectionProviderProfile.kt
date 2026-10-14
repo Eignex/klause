@@ -5,7 +5,9 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -21,8 +23,10 @@ import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
 import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
+import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationProjection
@@ -38,7 +42,12 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.ScoringCapability
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
@@ -50,6 +59,7 @@ import kotlin.jvm.Volatile
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -173,7 +183,10 @@ object ProjectionProviderProfile {
         val controls = buildJsonArray {
             for ((mode, providers) in listOf("default" to FactorProjectionProviders.Default,
                 "alternate" to alternatives)) {
-                val baked = source.bake(providers)
+                val plan = source.prepareExecutionPlan(providers, preferFinite = true)
+                val baked = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.BACKTRACK,
+                    presolveConfig = PresolveConfig.NONE, preparedPlan = plan)).problem
+                check(baked is com.eignex.klause.propagation.BakedProblem)
                 val params = BacktrackParams(randomSeed = seed, maxDecisions = 10000)
                 val witnesses = BacktrackSolver(baked).enumerate(params).toList()
                 val projection = LocalSearchProblem(source, providers.prepare(source), domains)
@@ -297,6 +310,94 @@ object ProjectionProviderProfile {
         },
     )
 
+    private fun mappedControl(seed: Long): JsonObject {
+        val table = Table(intArrayOf(2), longArrayOf(1, 2))
+        val open = Bits(3).also { it.set(0); it.set(1) }
+        val bounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(0, 0, 2), open, open)
+        val source = Problem(0, intBounds = bounds, factors = arrayOf<Factor>(table))
+        var emissions = 0
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider { factor ->
+                if (factor !== table) BuiltInPropagationProjectionProvider.select(factor)
+                else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "The original table is checked at the complete point.") { NoPropagator }
+            },
+            scoring = ScoringProjectionProvider { factor ->
+                if (factor !== table) BuiltInScoringProjectionProvider.select(factor)
+                else ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { view, _ ->
+                    val column = view.intVars.single()
+                    object : Invariant {
+                        override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
+                            state.assignment.intValue(column) !in 1L..2L
+                        override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+                            if (isViolated(state, factorId)) 9 else 0
+                    }
+                }
+            },
+            relaxation = RelaxationProjectionProvider { factor ->
+                if (factor !== table) BuiltInRelaxationProjectionProvider.select(factor)
+                else RelaxationProjection(RelaxationCapability.SOUND) { view, builder ->
+                    emissions++
+                    val columns = intArrayOf(view.intVars.single())
+                    builder.linearRow(LinearOp.GE, columns, longArrayOf(3), 3)
+                    builder.linearRow(LinearOp.LE, columns, longArrayOf(3), 6)
+                }
+            },
+        )
+        val plan = source.prepareExecutionPlan(providers)
+        val ownership = checkNotNull(plan.componentPlan)
+        val view = ownership.cpProjection(source, ownership.cpSourceDomains(source))
+        val params = BacktrackParams(randomSeed = seed, maxDecisions = 10000,
+            lpPlan = LpPlan(bounding = true), cancellation = Cancellation.after(30.seconds))
+        val witnesses = BacktrackSolver(view.problem).enumerate(params).map {
+            JsonArray(listOf("0", "0", it.intValue(0).toString()).map(::JsonPrimitive))
+        }.toList()
+        val state = LocalSearchState(LocalSearchModel.of(view.problem), Random(seed))
+        val scores = buildJsonArray {
+            for (value in 0L..2L) {
+                state.assignment.setInt(0, value)
+                state.recompute()
+                add(buildJsonObject { put("value", value.toString()); put("score", state.cost) })
+            }
+        }
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val optimization = buildJsonArray {
+            for (maximize in listOf(false, true)) {
+                val result = BacktrackSolver(view.problem).minimize(
+                    if (maximize) objective.negated() else objective, params)
+                check(result is MinimizeResult.Optimal)
+                add(buildJsonObject {
+                    put("maximize", maximize)
+                    put("value", result.sample.intValue(0).toString())
+                    put("objective", if (maximize) -result.objectiveValue else result.objectiveValue)
+                })
+            }
+        }
+        return buildJsonObject {
+            put("source", buildJsonObject {
+                put("bounds", buildJsonArray {
+                    for (column in 0 until source.numIntVars) add(buildJsonObject {
+                        put("lower", if (bounds.hasLower(column)) JsonPrimitive(bounds.lower(column).toString())
+                            else JsonNull)
+                        put("upper", if (bounds.hasUpper(column)) JsonPrimitive(bounds.upper(column).toString())
+                            else JsonNull)
+                    })
+                })
+                put("tableColumns", JsonArray(table.xs.map(::JsonPrimitive)))
+                put("tableTuples", JsonArray(table.tuples.map { JsonPrimitive(it.toString()) }))
+            })
+            put("cpSourceIds", JsonArray((0 until view.problem.numIntVars).map {
+                JsonPrimitive(view.sourceId(CpIntId(it)).index)
+            }))
+            put("rootValues", JsonArray((0L..2L).filter { it in view.problem.rootIntDomain(0) }
+                .map { JsonPrimitive(it.toString()) }))
+            put("witnesses", JsonArray(witnesses))
+            put("scores", scores)
+            put("optimization", optimization)
+            put("relaxationEmissions", emissions)
+        }
+    }
+
     private fun corners(source: Problem, seed: Long): JsonObject {
         val params = BacktrackParams(randomSeed = seed, maxDecisions = 10000,
             cancellation = Cancellation.after(30.seconds))
@@ -359,6 +460,7 @@ object ProjectionProviderProfile {
                 put("bound", "3/2")
             })
             put("realControls", realControls)
+            put("mapped", mappedControl(seed))
         }
     }
 
@@ -366,6 +468,7 @@ object ProjectionProviderProfile {
         put("schema", "finite-projection-controls-v1")
         put("boolCount", 2)
         put("sourceCornersRequired", true)
+        put("sourceMappedRequired", true)
         put("domains", buildJsonArray { repeat(2) { add(JsonArray(listOf(-1, 0, 1).map(::JsonPrimitive))) } })
         put("clauses", buildJsonArray { repeat((factors + 1) / 2) {
             add(JsonArray(listOf(0, 3).map(::JsonPrimitive)))
