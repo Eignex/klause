@@ -10,9 +10,6 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.CardinalitySearchComponent
 import com.eignex.klause.solver.search.ClauseSearchComponent
-import com.eignex.klause.solver.search.SearchAtomRegistry
-import com.eignex.klause.solver.search.SearchComponent
-import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TheoryComponent
@@ -70,12 +67,44 @@ internal class PreparedSearchComponents(
     var sourcePrepared: Boolean = false
         private set
 
-    private val boolCount = spec.numBoolVars
     private val clauses = spec.factors.filterIsInstance<Clause>()
     // CP owns its projected cardinalities; a second component would enforce them twice.
     private val cardinalities = spec.factors.indices
         .filter { plan.factorOwner(it) != FactorOwner.CP }
         .mapNotNull { spec.factors[it] as? Cardinality }
+
+    private val selectedRegistrations = run {
+        val descriptors = spec.preparedWithComponents(plan).components
+        val selected = ArrayList<PreparedSearchRegistration>(3)
+        if (projection != null) {
+            val descriptor = descriptors.first { it.responsibility == ComponentResponsibility.FINITE }
+            selected += PreparedSearchRegistration(spec, descriptor) { opening ->
+                val cp = CpSearchComponent(
+                    PropagationSession(requireNotNull(propagation), opening.cancellation),
+                    IntArray(projection.problem.numIntVars) { local -> projection.sourceId(local) },
+                )
+                cp.rebase()
+                listOf(cp)
+            }
+        }
+        val boolean = descriptors.firstOrNull { it.responsibility == ComponentResponsibility.BOOLEAN }
+            ?: ExecutionComponentDescriptor("boolean", ComponentResponsibility.BOOLEAN, emptyList(),
+                emptyList(), emptyList())
+        selected += PreparedSearchRegistration(spec, boolean) {
+            listOf(ClauseSearchComponent(clauses)) + if (cardinalities.isEmpty()) emptyList()
+            else listOf(CardinalitySearchComponent(cardinalities))
+        }
+        plan.theoryComponentFactory(fragment) { exactSource }?.let { factory ->
+            val descriptor = descriptors.firstOrNull { it.responsibility == ComponentResponsibility.COMPLETION }
+                ?: ExecutionComponentDescriptor("arithmetic", ComponentResponsibility.COMPLETION,
+                    emptyList(), emptyList(), emptyList())
+            selected += PreparedSearchRegistration(spec, descriptor, factory)
+        }
+        selected.toList()
+    }
+    private val opening = PreparedSearchRegistrations(spec, selectedRegistrations)
+
+    val registrations: List<PreparedSearchRegistration> get() = selectedRegistrations.toList()
 
     fun prepareSource(stop: Cancellation): Boolean {
         if (sourcePrepared) return true
@@ -101,21 +130,5 @@ internal class PreparedSearchComponents(
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         smtStats: SmtStatsSink? = null,
         theorySolveStop: Cancellation? = null,
-    ): PlannedSearch {
-        val components = ArrayList<SearchComponent>(3)
-        val cp = projection?.let {
-            CpSearchComponent(PropagationSession(requireNotNull(propagation), cancellation),
-                IntArray(it.problem.numIntVars) { local -> it.sourceId(local) }).also(components::add)
-        }
-        components += ClauseSearchComponent(clauses)
-        if (cardinalities.isNotEmpty()) components += CardinalitySearchComponent(cardinalities)
-        val theory = plan.openTheoryComponent(fragment, smtStats, theorySolveStop, exactSource)
-        if (theory != null) components += theory
-        cp?.rebase()
-        return PlannedSearch(
-            SearchComponentSet(components).session(maxChecks, cancellation, learnedDb, SearchAtomRegistry(boolCount)),
-            cp,
-            theory,
-        )
-    }
+    ): PlannedSearch = opening.open(maxChecks, cancellation, learnedDb, smtStats, theorySolveStop)
 }

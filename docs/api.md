@@ -183,7 +183,11 @@ contract. Only one component may contribute a given key.
 
 Use `model.contribute(key, value)` and `assembled.valueOf(key)` to infer the same value
 type at publication and consumption. `SearchExactIntValue` always carries `BigInt`,
-including finite CP coordinates; `SearchExactRealValue` carries `BigFraction`.
+including finite CP coordinates; `SearchExactRealValue` carries `BigFraction`; `SearchExactAlgebraicRealValue` carries
+an owned `AlgebraicReal`. `SearchExactRealExpressionValue`
+carries an immutable `ExactRealValue` for algebraic or symbolic coordinates. A source
+real has one authoritative representation key; contributing multiple representation keys is unavailable
+at source witness assembly.
 `SearchBoolValue` carries `Boolean`. Arrays, functions and other theory symbols use
 extension-defined keys without adding cases to the shared engine.
 
@@ -197,6 +201,21 @@ Built-in scalar contributions publish both representations during migration.
 The assembled model captures its map so a retained assembly sink cannot add values to
 an already published model. Captured typed values can be read repeatedly without copies.
 A model key's identity belongs to its source scope, rather than a global symbol registry.
+
+The open executor decodes source scalar keys through a source-bound witness assembler,
+without inspecting a component identity or native assignment type. Every declared
+coordinate must be present. Foreign reconstruction mappings, unmapped numeric ids,
+and multiple real representations withhold publication. Existing reconstruction steps
+recover original Boolean and integer coordinates at exact width. Native assignment
+wrappers remain compatible, but the executor emits an owned neutral coordinate witness.
+
+Assembly uses the retained reconstruction operations without treating optional universal
+transformation guarantees as an independent proof of the published point.
+Assembly follows all required component checks; it establishes no independent source
+feasibility, agreement between fragments or proof authority. Exact affine certificate
+consumers require rational real coordinates. Algebraic and symbolic coordinates retain
+their representation and decline unsupported certificate conversion. Source checks,
+invocation restrictions and [evidence admission](solver/evidence.md) retain their scope.
 
 ## Identities at mapping boundaries
 

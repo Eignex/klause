@@ -11102,6 +11102,7 @@ public final class com/eignex/klause/solver/pipeline/PreparedExecutionKind : jav
 	public static final field FINITE_LINEAR Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
 	public static final field NONLINEAR_INTEGER Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
 	public static final field POLYNOMIAL Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
+	public static final field TRANSCENDENTAL Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
 	public static fun values ()[Lcom/eignex/klause/solver/pipeline/PreparedExecutionKind;
@@ -11439,6 +11440,8 @@ public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryRequest
 
 public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryRequestKt {
 	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
+	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;IILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryExecution;
 	public static final fun pipelineRequest (Lcom/eignex/klause/ir/TranscendentalProblem;)Lcom/eignex/klause/solver/pipeline/TranscendentalTheoryRequest;
 }
@@ -13294,7 +13297,9 @@ public final class com/eignex/klause/solver/search/SearchComponentSet {
 	public fun <init> (Ljava/util/List;Ljava/util/List;)V
 	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun session (JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Lcom/eignex/klause/solver/search/SearchAtomRegistry;)Lcom/eignex/klause/solver/search/SearchSession;
+	public final fun session (JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Lcom/eignex/klause/solver/search/SearchAtomRegistry;Lcom/eignex/klause/solver/search/SearchExecutionControls;)Lcom/eignex/klause/solver/search/SearchSession;
 	public static synthetic fun session$default (Lcom/eignex/klause/solver/search/SearchComponentSet;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Lcom/eignex/klause/solver/search/SearchAtomRegistry;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchSession;
+	public static synthetic fun session$default (Lcom/eignex/klause/solver/search/SearchComponentSet;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Lcom/eignex/klause/solver/search/SearchAtomRegistry;Lcom/eignex/klause/solver/search/SearchExecutionControls;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchSession;
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchConflictResolution {
@@ -13351,6 +13356,7 @@ public abstract interface class com/eignex/klause/solver/search/SearchContext {
 	public abstract fun cancelled ()Z
 	public abstract fun consumeCheck ()Z
 	public abstract fun getDecisionLevel ()I
+	public fun getExecutionControls ()Lcom/eignex/klause/solver/search/SearchExecutionControls;
 	public abstract fun imply (ILcom/eignex/klause/solver/search/SearchExplanation;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public abstract fun intLowerBound (I)Ljava/lang/Long;
 	public fun intLowerBoundPremise (I)Lcom/eignex/klause/solver/search/SearchAtomPremise;
@@ -13365,6 +13371,7 @@ public abstract interface class com/eignex/klause/solver/search/SearchContext {
 
 public final class com/eignex/klause/solver/search/SearchContext$DefaultImpls {
 	public static fun atomLiteral (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchDecision;)Ljava/lang/Integer;
+	public static fun getExecutionControls (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/SearchExecutionControls;
 	public static fun intLowerBoundPremise (Lcom/eignex/klause/solver/search/SearchContext;I)Lcom/eignex/klause/solver/search/SearchAtomPremise;
 	public static fun intUpperBoundPremise (Lcom/eignex/klause/solver/search/SearchContext;I)Lcom/eignex/klause/solver/search/SearchAtomPremise;
 	public static fun publish (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchAtomPremise;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -13447,6 +13454,20 @@ public final class com/eignex/klause/solver/search/SearchDecisionBudget$Unlimite
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/search/SearchExactAlgebraicRealValue : com/eignex/klause/solver/search/TypedSearchValueKey {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-P0Uu7zc ()I
+	public final fun copy-NWoOmUI (I)Lcom/eignex/klause/solver/search/SearchExactAlgebraicRealValue;
+	public static synthetic fun copy-NWoOmUI$default (Lcom/eignex/klause/solver/search/SearchExactAlgebraicRealValue;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchExactAlgebraicRealValue;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getValueType ()Lkotlin/reflect/KClass;
+	public final fun getVariable-P0Uu7zc ()I
+	public fun hashCode ()I
+	public fun snapshot (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
+	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/search/SearchExactIntValue : com/eignex/klause/solver/search/TypedSearchValueKey {
 	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1-2srAOhM ()I
@@ -13458,6 +13479,20 @@ public final class com/eignex/klause/solver/search/SearchExactIntValue : com/eig
 	public fun hashCode ()I
 	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
 	public fun snapshot (Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchExactRealExpressionValue : com/eignex/klause/solver/search/TypedSearchValueKey {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-P0Uu7zc ()I
+	public final fun copy-NWoOmUI (I)Lcom/eignex/klause/solver/search/SearchExactRealExpressionValue;
+	public static synthetic fun copy-NWoOmUI$default (Lcom/eignex/klause/solver/search/SearchExactRealExpressionValue;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchExactRealExpressionValue;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getValueType ()Lkotlin/reflect/KClass;
+	public final fun getVariable-P0Uu7zc ()I
+	public fun hashCode ()I
+	public fun snapshot (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -13473,6 +13508,68 @@ public final class com/eignex/klause/solver/search/SearchExactRealValue : com/ei
 	public fun snapshot (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
 	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
 	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/search/SearchExecutionAccounting {
+	public fun canCommitDecision ()Z
+	public fun consumeCheck ()Z
+	public fun getExhausted ()Z
+	public fun getStopCause ()Lcom/eignex/klause/solver/search/SearchStopCause;
+	public fun recordDecision (Lcom/eignex/klause/solver/search/SearchDecision;)Z
+}
+
+public final class com/eignex/klause/solver/search/SearchExecutionAccounting$DefaultImpls {
+	public static fun canCommitDecision (Lcom/eignex/klause/solver/search/SearchExecutionAccounting;)Z
+	public static fun consumeCheck (Lcom/eignex/klause/solver/search/SearchExecutionAccounting;)Z
+	public static fun getExhausted (Lcom/eignex/klause/solver/search/SearchExecutionAccounting;)Z
+	public static fun getStopCause (Lcom/eignex/klause/solver/search/SearchExecutionAccounting;)Lcom/eignex/klause/solver/search/SearchStopCause;
+	public static fun recordDecision (Lcom/eignex/klause/solver/search/SearchExecutionAccounting;Lcom/eignex/klause/solver/search/SearchDecision;)Z
+}
+
+public final class com/eignex/klause/solver/search/SearchExecutionAccounting$Unlimited : com/eignex/klause/solver/search/SearchExecutionAccounting {
+	public static final field INSTANCE Lcom/eignex/klause/solver/search/SearchExecutionAccounting$Unlimited;
+	public fun canCommitDecision ()Z
+	public fun consumeCheck ()Z
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getExhausted ()Z
+	public fun getStopCause ()Lcom/eignex/klause/solver/search/SearchStopCause;
+	public fun hashCode ()I
+	public fun recordDecision (Lcom/eignex/klause/solver/search/SearchDecision;)Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchExecutionControlAdapter : com/eignex/klause/solver/search/SearchExecutionControls {
+	public fun <init> ()V
+	public fun <init> (Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchExecutionAccounting;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchExecutionAccounting;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun beginOperation ()V
+	public fun beginTraversal ()V
+	public fun canCommitDecision ()Z
+	public fun consumeCheck ()Z
+	public fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public fun getExhausted ()Z
+	public fun getStopCause ()Lcom/eignex/klause/solver/search/SearchStopCause;
+	public fun operationAllowance (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public fun recordDecision (Lcom/eignex/klause/solver/search/SearchDecision;)Z
+	public fun reportStop (Lcom/eignex/klause/solver/search/SearchStopCause;)V
+}
+
+public abstract interface class com/eignex/klause/solver/search/SearchExecutionControls : com/eignex/klause/solver/search/SearchExecutionAccounting {
+	public abstract fun beginOperation ()V
+	public fun beginTraversal ()V
+	public abstract fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public abstract fun getStopCause ()Lcom/eignex/klause/solver/search/SearchStopCause;
+	public fun operationAllowance (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public abstract fun reportStop (Lcom/eignex/klause/solver/search/SearchStopCause;)V
+}
+
+public final class com/eignex/klause/solver/search/SearchExecutionControls$DefaultImpls {
+	public static fun beginTraversal (Lcom/eignex/klause/solver/search/SearchExecutionControls;)V
+	public static fun canCommitDecision (Lcom/eignex/klause/solver/search/SearchExecutionControls;)Z
+	public static fun consumeCheck (Lcom/eignex/klause/solver/search/SearchExecutionControls;)Z
+	public static fun getExhausted (Lcom/eignex/klause/solver/search/SearchExecutionControls;)Z
+	public static fun operationAllowance (Lcom/eignex/klause/solver/search/SearchExecutionControls;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public static fun recordDecision (Lcom/eignex/klause/solver/search/SearchExecutionControls;Lcom/eignex/klause/solver/search/SearchDecision;)Z
 }
 
 public final class com/eignex/klause/solver/search/SearchExplanation {
@@ -13951,6 +14048,8 @@ public final class com/eignex/klause/solver/search/SearchRunObserver$None : com/
 public final class com/eignex/klause/solver/search/SearchSession : com/eignex/klause/solver/search/ClauseWatchHost, com/eignex/klause/solver/search/SearchContext {
 	public fun <init> (Ljava/util/List;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;Lcom/eignex/klause/solver/search/SearchAtomRegistry;)V
 	public synthetic fun <init> (Ljava/util/List;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;Lcom/eignex/klause/solver/search/SearchAtomRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;Lcom/eignex/klause/solver/search/SearchAtomRegistry;Lcom/eignex/klause/solver/search/SearchExecutionControls;)V
+	public synthetic fun <init> (Ljava/util/List;JLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;Lcom/eignex/klause/solver/search/SearchAtomRegistry;Lcom/eignex/klause/solver/search/SearchExecutionControls;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun atomLiteral (Lcom/eignex/klause/solver/search/SearchDecision;)Ljava/lang/Integer;
 	public fun boolValue (I)Ljava/lang/Boolean;
 	public fun cancelled ()Z
@@ -13958,6 +14057,7 @@ public final class com/eignex/klause/solver/search/SearchSession : com/eignex/kl
 	public fun conflicted (I)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun consumeCheck ()Z
 	public fun getDecisionLevel ()I
+	public fun getExecutionControls ()Lcom/eignex/klause/solver/search/SearchExecutionControls;
 	public final fun getLearnedClauseCount ()I
 	public fun implied (II)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun imply (ILcom/eignex/klause/solver/search/SearchExplanation;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -14002,6 +14102,19 @@ public final class com/eignex/klause/solver/search/SearchSolveParams {
 	public final fun getRestart ()Lcom/eignex/klause/solver/search/SearchRestartPolicy;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchStopCause : java/lang/Enum {
+	public static final field Cancelled Lcom/eignex/klause/solver/search/SearchStopCause;
+	public static final field CheckAllowance Lcom/eignex/klause/solver/search/SearchStopCause;
+	public static final field DecisionAllowance Lcom/eignex/klause/solver/search/SearchStopCause;
+	public static final field OperationAllowance Lcom/eignex/klause/solver/search/SearchStopCause;
+	public static final field RepresentationDecline Lcom/eignex/klause/solver/search/SearchStopCause;
+	public static final field Timeout Lcom/eignex/klause/solver/search/SearchStopCause;
+	public static final field WorkAllowance Lcom/eignex/klause/solver/search/SearchStopCause;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/search/SearchStopCause;
+	public static fun values ()[Lcom/eignex/klause/solver/search/SearchStopCause;
 }
 
 public final class com/eignex/klause/solver/search/SearchTheoryAtom {

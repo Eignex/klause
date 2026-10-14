@@ -8,6 +8,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Bits
@@ -33,7 +34,7 @@ class OpenTheoryEngineTest {
         val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve()
 
         val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
-        assertEquals(0L, assertIs<OpenTheoryAssignment.Difference>(assignment).sample.ints[0])
+        assertEquals("0", assignment.intValue(0))
     }
 
     @Test
@@ -123,7 +124,12 @@ class OpenTheoryEngineTest {
 
         val result = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve()
 
-        assertIs<OpenTheoryAssignment.ExactLira>(assertIs<OpenTheoryResult.Sat>(result).assignment)
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        val x = TheoryCompletion.parseRational(assignment.intValue(0))
+        val y = TheoryCompletion.parseRational(assignment.intValue(1))
+        assertTrue(x >= BigFraction.ZERO && y >= BigFraction.ZERO)
+        assertTrue(x * BigFraction.ofLong(2) + y <= BigFraction.ofLong(3))
+        assertTrue(x + y >= BigFraction.ONE)
     }
 
     @Test
@@ -150,7 +156,9 @@ class OpenTheoryEngineTest {
         val result = OpenTheoryEngine(model, ProblemPipeline.EXACT_LRA).solve()
 
         val sat = assertIs<OpenTheoryResult.Sat>(result)
-        assertIs<OpenTheoryAssignment.ExactLra>(sat.assignment)
+        val y = TheoryCompletion.parseRational(sat.assignment.realValue(0))
+        assertTrue(y >= BigFraction.ZERO && y <= BigFraction.ofLong(3))
+        assertEquals(y <= BigFraction.ofLong(2), sat.assignment.boolValue(0))
         assertEquals(sat.stats.smt.witnessCandidates, sat.stats.smt.witnessAccepted)
         assertTrue(sat.stats.smt.witnessCandidates > 0L)
     }
@@ -169,7 +177,10 @@ class OpenTheoryEngineTest {
         val result = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve()
 
         assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(parsed.model))
-        assertIs<OpenTheoryAssignment.ExactLira>(assertIs<OpenTheoryResult.Sat>(result).assignment)
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        val x = TheoryCompletion.parseRational(assignment.intValue(0))
+        val y = TheoryCompletion.parseRational(assignment.realValue(0))
+        assertEquals(x + BigFraction.ofLong(3).reciprocal(), y)
     }
 
     @Test
@@ -269,4 +280,23 @@ class OpenTheoryEngineTest {
 
         assertIs<OpenTheoryResult.Unsat>(result)
     }
+
+    @Test
+    fun `exact source witnesses remain readable after native producer closure`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LRA)
+                (declare-const x Real)
+                (assert (= x (/ 1.0 3.0)))
+                (check-sat)
+            """.trimIndent(),
+        )
+        val engine = OpenTheoryEngine(parsed.model, parsed.model.componentPlan().theoryPipeline)
+        val witness = assertIs<OpenTheoryResult.Sat>(engine.solve()).assignment
+
+        assertIs<OpenTheoryResult.Unknown>(engine.solve(TheoryParams(cancellation = Cancellation { true })))
+
+        assertEquals("1/3", witness.realValue(0))
+    }
+
 }

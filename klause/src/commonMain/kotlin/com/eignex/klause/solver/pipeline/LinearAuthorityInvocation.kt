@@ -66,7 +66,7 @@ internal class LinearAuthorityInvocation(
     private val component = LinearAuthorityTraversal(context,
         SourceLpBudget(onWork = state.smt::observeSourceLp), stop, ::paused, ::offer)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop).also {
-        it.attachOpenTheoryWork(state.work)
+        it.bindOpenTheoryWork(state.work)
     }
     private var initialized = false
     private val branching = if (params.openBranching == OpenBranching.SourceOrder)

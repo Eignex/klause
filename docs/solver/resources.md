@@ -96,12 +96,42 @@ one available meter, rather than charging all possible ancestors. Presolve's ada
 explicitly owns native root-work conversion. Numerical kernels consume native controls;
 solver policy owns conversions and result/proof semantics.
 
+## Component execution controls
+
+`SearchContext.executionControls` supplies the invocation token with its deadline
+and caller meter, native check/decision accounting, and policy-owned operation
+allowances. `SearchExecutionControlAdapter` binds those services without exposing
+a concrete coordinator to components. The open-theory pipeline supplies its
+`OpenTheoryWorkSink` through an accounting adapter; shared search does not price
+or convert native work. Binding happens before component initialization. The
+containing sink survives branches, retractions, restarts and retained queries.
+
+`SearchStopCause` separates timeout, cancellation, native work, checks, decisions,
+operation allowance and representation decline. A component reports a local
+operation stop through its context; beginning another operation clears that local
+cause without renewing containing allowances. The traversal retains the cause of
+unresolved branches if subsequent operations clear their local diagnostics.
+Timeout and cancellation remain classified from the active token, so a resumed
+slice does not retain a previous invocation stop as lifetime cancellation.
+Containing native allowances and cancellation take precedence over a local
+decline. Timeout takes precedence over allowances, which take precedence over
+external cancellation. A fresh traversal clears its per-run decision diagnostic;
+its native accounting retains the containing allowances. An incomplete residual remains
+unknown and cannot prove exhaustion. Open routing maps representation decline to
+`Unsupported`, operation/check/decision/work stops to `BudgetExhausted`, and keeps
+timeout and cancellation distinct. Slice pauses remain traversal lifecycle events;
+they do not renew lifetime controls or become refutations.
+
+Custom contexts retain the cancellation-only default for compatibility. Alternate
+coordinators inject persistent controls to retain deadline metadata, accounting
+and typed diagnostics across component callbacks.
+
 ## Parallel cap
 
 Built-in finite portfolios with more than one lane partition the remaining solve
 allowance over every materialized worker, including replicas. Integer division gives
 equal shares, with remainder units assigned in worker order. Sequential portfolios
-retain one shared allowance. Shared finite, open, polynomial, nonlinear-integer and quadratic invocations
+retain one shared allowance. Shared finite, open, polynomial, nonlinear-integer, quadratic and transcendental invocations
 partition the decision/move allowance over their materialized parallel slots. Complete theory work
 retains its separate native currency and reservation.
 
@@ -167,3 +197,11 @@ Proposal and instruction caps divide among heuristic workers; completion work al
 charges their instruction ledger. Zero proposal, instruction or native work
 allowance prevents a heuristic completion. Timeout and external cancellation retain
 their separate reasons.
+
+[Transcendental execution](../theories/transcendental.md#state-and-resources) retains
+private source services in shared invocation slots. Slot native reservations and the
+containing synchronized meter cover enclosure, algebraic, relaxation and original-source
+checking cumulatively. Complete segment work includes native charges and decisions;
+heuristic completion retains the exact-neighborhood instruction conversion. Complete
+native queries can overrun slices while retaining whole-invocation cancellation. A
+neighborhood slice interruption has no source-refutation authority.

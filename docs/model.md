@@ -129,6 +129,15 @@ and the appended row's unchanged columns and coefficients. Variables owned by
 an open theory never become finite CP domains. Continuous coordinates remain
 arithmetic-owned and are not integer branch candidates.
 
+Finite/linear search preparation binds each component descriptor to its canonical
+source and opening factory. The registration collection checks source identity and
+unique factor and coordinate ownership before opening any factory. Factories retain
+read-only source fragments and reusable projections; every opening creates separate
+mutable components and an atom registry. A registration can supply several peers,
+such as shared clauses and cardinalities. Installation preserves CP, Boolean and
+arithmetic order; arithmetic route selection belongs to preparation. Specialized
+CP and theory accessors remain available on the resulting planned search.
+
 `PreparedSourcePlan.capabilities` reduces the execution contracts captured on its
 components. `admission(strategy, operation)` reports participating arms, procedure
 completeness, worker claim authority and explicit unsupported causes. Complete
@@ -177,5 +186,11 @@ Shared search exchanges Boolean literals, semantic integer bounds and typed opaq
 theory decisions. Components can maintain private residual state through
 `SearchBrancher`, but traversal and decision levels belong to the shared session.
 `PropagationSession` remains finite-domain state. Source-keyed `SearchBoolValue`,
-`SearchIntValue` and `SearchRealValue` assignments let each component contribute
-only the values it owns.
+`SearchExactIntValue`, `SearchExactRealValue`, `SearchExactAlgebraicRealValue` and
+`SearchExactRealExpressionValue`
+assignments let each component contribute only the values it owns. Legacy untyped
+keys remain compatible. The open pipeline assembles an owned exact coordinate snapshot
+against its retained source mapping, preserving arbitrary-width integers, rational,
+algebraic and symbolic reals. Missing or multiply represented coordinates withhold
+publication. [Typed contributions](api.md#typed-contributions-and-migration) define
+the decoding and ownership boundary; assembly adds no independent proof authority.

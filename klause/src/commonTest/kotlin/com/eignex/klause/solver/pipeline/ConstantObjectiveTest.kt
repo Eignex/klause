@@ -1,10 +1,12 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ConstantObjectiveTest {
 
@@ -49,7 +51,7 @@ class ConstantObjectiveTest {
         )
 
         assertEquals("4", result.value.toString())
-        assertIs<OpenTheoryAssignment.ExactLra>(result.assignment)
+        assertTrue(TheoryCompletion.parseRational(result.assignment.realValue(0)) >= BigFraction.ONE)
     }
 
     @Test

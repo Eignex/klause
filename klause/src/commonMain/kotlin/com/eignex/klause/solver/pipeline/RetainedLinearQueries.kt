@@ -129,7 +129,7 @@ internal class RetainedLinearQueries(
         val created = open(scope.stop, state) ?: return null
         var retained = false
         try {
-            created.session.attachOpenTheoryWork(state.work)
+            created.session.bindOpenTheoryWork(state.work)
             when (created.session.initialize()) {
                 ComponentResult.Consistent -> if (!scope.stop()) {
                     planned = created

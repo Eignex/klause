@@ -42,6 +42,11 @@ retaining learned clauses and reawakening units. Native CP clause state remains 
 contains the single traversal loop and owns frames, decisions, restarts, cancellation
 cadence and resumable/terminal state.
 
+Components obtain the invocation token, native allowance accounting and typed stop
+diagnostics from `SearchContext.executionControls`. Alternate coordinators supply
+those services through the same contract. [Resource allowances](resources.md#component-execution-controls)
+owns their units, cancellation scopes and diagnostic precedence.
+
 A conditioned run retains the decision level at which it opens. Restarts return
 to that level, and learned backjumps below it fall back to chronological traversal.
 Exhaustion is then conditional. The query owner retracts the condition after the
@@ -76,7 +81,12 @@ a global optimum or limit; a checked source ray can finish existentially. A slic
 pause preserves the current node and pending alternatives. See
 [linear certification](../lp/certification.md#refinement-and-strict-inequalities).
 
-Complete assignments use source-keyed values from each owner. CP-learned Boolean clauses
+Complete assignments use typed source-keyed values from each owner. The open executor
+reads those coordinates through its source-bound assembler and retained reconstruction
+mapping, rather than decoding concrete components. All required checks finish before
+assembly. Missing, unmapped or multiply represented coordinates leave publication
+unavailable; decoding supplies neither agreement between peer fragments nor proof
+coverage. Published snapshots retain exact values after their producing components close. CP-learned Boolean clauses
 remain natively owned by CP while their shared consequences reach theory peers. The
 shared store does not duplicate the CP pin.
 
@@ -92,6 +102,15 @@ comparison remains asserted through its LP scope; deeper checks reuse it until
 retraction removes that scope. Root
 checks can substitute newly fixed columns. Disequalities re-evaluate their justified
 direction against active bounds, and complete witnesses still check source rows.
+
+Source-bound registrations pair prepared execution descriptors with component
+factories. The collection validates canonical source identity and rejects duplicate
+factor and coordinate ownership before invoking a factory. Standard CP,
+Boolean and arithmetic opening uses that collection; the traversal does not select
+concrete arithmetic routes. Factories create fresh component instances and retain
+their optional branching, model-blocking and conflict-resolution capabilities.
+Repeated opening shares read-only source data and completed projections, preserving
+the default component and branch order.
 
 ## Finite propagation
 

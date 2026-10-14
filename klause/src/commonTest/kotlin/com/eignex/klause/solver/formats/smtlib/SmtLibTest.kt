@@ -16,6 +16,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.TheoryCompletion
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.sourceRoute
@@ -45,8 +46,12 @@ class SmtLibTest {
         model: com.eignex.klause.ir.Problem,
         params: TheoryParams = TheoryParams(),
     ): ExactLiraAssignment {
-        val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model, params))
-        return assertIs<OpenTheoryAssignment.ExactLira>(sat.assignment).assignment
+        val witness = assertIs<OpenTheoryResult.Sat>(openSolve(model, params)).assignment
+        return ExactLiraAssignment(
+            BooleanArray(model.numBoolVars) { witness.boolValue(it) },
+            Array(model.numIntVars) { parseBigInt(witness.intValue(it)) },
+            List(model.numRealVars) { TheoryCompletion.parseRational(witness.realValue(it)) },
+        )
     }
 
     private fun liraUnsat(model: com.eignex.klause.ir.Problem, params: TheoryParams = TheoryParams()) {
@@ -54,8 +59,11 @@ class SmtLibTest {
     }
 
     private fun lraSat(model: com.eignex.klause.ir.Problem): ExactLraAssignment {
-        val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
-        return assertIs<OpenTheoryAssignment.ExactLra>(sat.assignment).assignment
+        val witness = assertIs<OpenTheoryResult.Sat>(openSolve(model)).assignment
+        return ExactLraAssignment(
+            BooleanArray(model.numBoolVars) { witness.boolValue(it) },
+            List(model.numRealVars) { TheoryCompletion.parseRational(witness.realValue(it)) },
+        )
     }
 
     // Source reconstruction may eliminate columns or select a different theory route, so witness
@@ -70,8 +78,11 @@ class SmtLibTest {
     }
 
     private fun differenceSat(model: com.eignex.klause.ir.Problem): Sample {
-        val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
-        return assertIs<OpenTheoryAssignment.Difference>(sat.assignment).sample
+        val witness = assertIs<OpenTheoryResult.Sat>(openSolve(model)).assignment
+        return Sample(
+            BooleanArray(model.numBoolVars) { witness.boolValue(it) },
+            LongArray(model.numIntVars) { parseBigInt(witness.intValue(it)).toLongExact() },
+        )
     }
 
     private fun solve(text: String): LongArray {

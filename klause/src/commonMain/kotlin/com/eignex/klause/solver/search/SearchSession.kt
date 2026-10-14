@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
-import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -15,12 +14,31 @@ import com.eignex.klause.util.Cancellation
 class SearchSession(
     private val components: List<SearchComponent>,
     private val maxChecks: Long = Long.MAX_VALUE,
-    private val cancellation: Cancellation = Cancellation.Never,
+    cancellation: Cancellation = Cancellation.Never,
     learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
     private val branchers: List<SearchBrancher> = emptyList(),
     private val atoms: SearchAtomRegistry? = null,
+    executionControls: SearchExecutionControls,
 ) : SearchContext,
     ClauseWatchHost {
+    /** Open a session with cancellation-only controls and the existing native traversal defaults. */
+    constructor(
+        components: List<SearchComponent>,
+        maxChecks: Long = Long.MAX_VALUE,
+        cancellation: Cancellation = Cancellation.Never,
+        learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+        branchers: List<SearchBrancher> = emptyList(),
+        atoms: SearchAtomRegistry? = null,
+    ) : this(
+        components,
+        maxChecks,
+        cancellation,
+        learnedDb,
+        branchers,
+        atoms,
+        SearchExecutionControlAdapter(cancellation),
+    )
+
     init {
         atoms?.attach()
     }
@@ -37,7 +55,8 @@ class SearchSession(
     private var checks = 0L
     private var checksExhausted = false
     private var decisionsExhausted = false
-    private var openTheoryWork: OpenTheoryWorkSink? = null
+    override var executionControls: SearchExecutionControls = executionControls
+        private set
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.decisionLevel
@@ -62,11 +81,9 @@ class SearchSession(
 
     override fun intUpperBound(variable: Int): Long? = trail.upper(variable)
 
-    override fun intLowerBoundPremise(variable: Int): SearchAtomPremise =
-        trail.lowerPremise(variable)
+    override fun intLowerBoundPremise(variable: Int): SearchAtomPremise = trail.lowerPremise(variable)
 
-    override fun intUpperBoundPremise(variable: Int): SearchAtomPremise =
-        trail.upperPremise(variable)
+    override fun intUpperBoundPremise(variable: Int): SearchAtomPremise = trail.upperPremise(variable)
 
     /** Clause-form reason for the current assignment of [variable], or null when it is a decision. */
     fun reasonFor(variable: Int): SearchExplanation? = trail.reasonFor(variable)
@@ -177,36 +194,34 @@ class SearchSession(
     override fun consumeCheck(): Boolean {
         if (checks++ >= maxChecks) {
             checksExhausted = true
+            executionControls.reportStop(SearchStopCause.CheckAllowance)
             return false
         }
-        return openTheoryWork?.theoryCheck() != false
+        return executionControls.consumeCheck()
     }
 
-    internal fun workExhausted(): Boolean = openTheoryWork?.exhausted == true
+    internal fun workExhausted(): Boolean = executionControls.exhausted
     internal fun checkBudgetExhausted(): Boolean = checksExhausted
     internal fun decisionBudgetExhausted(): Boolean = decisionsExhausted
 
     internal fun markDecisionBudgetExhausted() {
         decisionsExhausted = true
+        executionControls.reportStop(SearchStopCause.DecisionAllowance)
     }
 
-    internal fun attachOpenTheoryWork(work: OpenTheoryWorkSink) {
-        check(openTheoryWork == null) { "open-theory work is attached once per search session" }
-        openTheoryWork = work
+    private var controlsAttached = false
+    private var initializationStarted = false
+
+    internal fun attachExecutionControls(controls: SearchExecutionControls) {
+        check(!controlsAttached) { "execution controls are attached once per search session" }
+        check(!initializationStarted && checks == 0L && decisionLevel == 0) {
+            "execution controls must be bound before search"
+        }
+        executionControls = controls
+        controlsAttached = true
     }
 
-    internal fun canCommitOpenTheoryDecision(): Boolean = openTheoryWork?.hasAllowance() != false
-
-    internal fun recordOpenTheoryDecision(decision: SearchDecision): Boolean = when (decision) {
-        is SearchDecision.Bool -> openTheoryWork?.boolDecision() != false
-
-        is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual ->
-            openTheoryWork?.intDecision() != false
-
-        is SearchDecision.Theory -> openTheoryWork?.theoryDecision() != false
-    }
-
-    override fun cancelled(): Boolean = cancellation()
+    override fun cancelled(): Boolean = executionControls.cancellation()
 
     private var cancellationPollRequested = false
 
@@ -218,10 +233,9 @@ class SearchSession(
         cancellationPollRequested = false
     }
 
-    internal fun stopToken(): Cancellation = cancellation
-
     /** Initialize all components at the shared root. */
     fun initialize(): ComponentResult {
+        initializationStarted = true
         val result = runComponents { it.initialize(this) }
         return if (result is ComponentResult.Consistent) propagate() else result
     }
@@ -229,6 +243,7 @@ class SearchSession(
     internal fun prepareInitialization(
         initialize: (SearchComponent, SearchContext) -> Iterator<ComponentResult?>,
     ): Iterator<ComponentResult?> = sequence {
+        initializationStarted = true
         for (component in components) {
             val pending = initialize(component, this@SearchSession)
             var result: ComponentResult? = null
@@ -407,8 +422,13 @@ class SearchSession(
         for (component in components) {
             when (val result = component.check(this)) {
                 ComponentCheck.Feasible -> Unit
+
                 is ComponentCheck.Infeasible -> return result
-                ComponentCheck.Indeterminate -> return result
+
+                ComponentCheck.Indeterminate -> {
+                    reportRepresentationDecline()
+                    return result
+                }
             }
         }
         return ComponentCheck.Feasible
@@ -629,8 +649,10 @@ class SearchSession(
         nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
         lifecycle: SearchRunLifecycle = SearchRunLifecycle.None,
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
-    ): SearchRun = openRunAt(numBoolVars, params, booleanBranching, decisionBudget, observer,
-        modelContinuation, modelPolicy, nodePolicy, lifecycle, candidateHints, 0)
+    ): SearchRun = openRunAt(
+        numBoolVars, params, booleanBranching, decisionBudget, observer,
+        modelContinuation, modelPolicy, nodePolicy, lifecycle, candidateHints, 0,
+    )
 
     internal fun openConditionedRun(
         numBoolVars: Int,
@@ -639,9 +661,11 @@ class SearchSession(
         booleanBranching: BooleanBranching = BooleanBranching.SourceOrder(numBoolVars),
         candidateHints: SearchCandidateHints = SearchCandidateHints.None,
         observer: SearchRunObserver = SearchRunObserver.None,
-    ): SearchRun = openRunAt(numBoolVars, params, booleanBranching, SearchDecisionBudget.Unlimited,
+    ): SearchRun = openRunAt(
+        numBoolVars, params, booleanBranching, SearchDecisionBudget.Unlimited,
         observer, SearchModelContinuation.Chronological, SearchModelPolicy.SurfaceAll,
-        nodePolicy, SearchRunLifecycle.None, candidateHints, decisionLevel)
+        nodePolicy, SearchRunLifecycle.None, candidateHints, decisionLevel,
+    )
 
     private fun openRunAt(
         numBoolVars: Int,
@@ -664,6 +688,7 @@ class SearchSession(
             "scoped runs require chronological model continuation"
         }
         decisionsExhausted = false
+        executionControls.beginTraversal()
         val listener = booleanBranching as? SearchUnassignListener
         observeUnassignments(
             if (atoms != null && listener != null) {
@@ -764,7 +789,12 @@ class SearchSession(
         return ComponentResult.Consistent
     }
 
+    private fun reportRepresentationDecline() {
+        if (executionControls.stopCause == null) executionControls.reportStop(SearchStopCause.RepresentationDecline)
+    }
+
     private fun recordConflict(component: SearchComponent, result: ComponentResult): ComponentResult {
+        if (result == ComponentResult.Indeterminate) reportRepresentationDecline()
         if (result is ComponentResult.Conflict) {
             conflictResolver = component as? SearchConflictResolver
             conflictOwner = component

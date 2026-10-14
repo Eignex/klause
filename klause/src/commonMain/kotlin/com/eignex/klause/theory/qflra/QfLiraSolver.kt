@@ -57,7 +57,7 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchIntegerBound
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchRealValue
-import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
@@ -179,7 +179,7 @@ class ExactLiraSearchComponent private constructor(
     private var graphFirst = false
     private var solveContext = LpSolveContext.Production
     private var solveStop: Cancellation? = null
-    private var operationAllowance: (Cancellation) -> Cancellation = { it.shorten(0.5) }
+    private var operationAllowance: ((Cancellation) -> Cancellation)? = null
     private var operationStop = Cancellation.Never
     private var parentStop = Cancellation.Never
     private var pollContextStop = true
@@ -253,8 +253,8 @@ class ExactLiraSearchComponent private constructor(
     override fun initialize(context: SearchContext): ComponentResult {
         check(this.context == null) { "a theory component belongs to one immutable source session" }
         this.context = context
-        val contextStop = (context as? SearchSession)?.stopToken()
-        parentStop = solveStop ?: contextStop ?: Cancellation(context::cancelled)
+        val contextStop = context.executionControls.cancellation
+        parentStop = solveStop ?: contextStop
         pollContextStop = solveStop != null && solveStop !== contextStop
         registerDisjunctions(context)
         beginOperation()
@@ -606,11 +606,16 @@ class ExactLiraSearchComponent private constructor(
 
     private fun beginOperation() {
         operationBudgetExhausted = false
-        operationStop = operationAllowance(parentStop)
+        context?.executionControls?.beginOperation()
+        operationStop = operationAllowance?.invoke(parentStop)
+            ?: checkNotNull(context).executionControls.operationAllowance(parentStop)
     }
 
     private fun endOperation(context: SearchContext) {
-        if (operationStop() && !context.cancelled()) operationBudgetExhausted = true
+        if (operationStop() && !context.cancelled()) {
+            operationBudgetExhausted = true
+            context.executionControls.reportStop(SearchStopCause.OperationAllowance)
+        }
         operationStop = parentStop
     }
 
@@ -759,7 +764,7 @@ class ExactLiraSearchComponent private constructor(
             return null
         }
         if (reduced !is ExactLiraReduction.Bounded) {
-            if (!operationStop() && (context as? SearchSession)?.canCommitOpenTheoryDecision() != false) {
+            if (!operationStop() && context.executionControls.canCommitDecision()) {
                 sourceIntegerSplit(requireNotNull(candidate), context)?.let { return it }
             }
             outcome = ComponentCheck.Indeterminate

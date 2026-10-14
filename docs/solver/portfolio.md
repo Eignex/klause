@@ -9,7 +9,7 @@ Execution has three parts: prepare retained workers, give them bounded slices, a
 verify their publications before sharing or returning them. Slices preserve state;
 reseeding or retiring a worker has its own lifetime and accounting rules.
 
-Finite, linear open, polynomial, nonlinear-integer and quadratic source execution supply retained recipe
+Finite, linear open, polynomial, nonlinear-integer, quadratic and transcendental source execution supply retained recipe
 factories to `PortfolioInvocation` with the routing plan and current executable projection. The invocation owns worker
 slots, seed offsets, parallel node quotas, scheduler controls, result verification
 and cleanup. Composed arm attribution remains distinct from materialized replica

@@ -25,6 +25,9 @@ enum class PreparedExecutionKind {
 
     /** A required source component has no implemented execution adapter. */
     DECLINED,
+
+    /** Original exact real functions retain their sound incomplete source service. */
+    TRANSCENDENTAL,
 }
 
 /** Semantic responsibility of a component, independent of an engine name. */
@@ -153,7 +156,9 @@ class PreparedSourcePlan internal constructor(
             linear.realCoefficientValues.size > sourceRealCount || linear.intCoefficientValues.size > sourceIntCount ||
             linear.boolWeightValues.size > sourceBoolCount
         ) return false
-        if (kind == PreparedExecutionKind.NONLINEAR_INTEGER) return false
+        if (kind == PreparedExecutionKind.NONLINEAR_INTEGER ||
+            kind == PreparedExecutionKind.TRANSCENDENTAL
+        ) return false
         return true
     }
 

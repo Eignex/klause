@@ -239,6 +239,6 @@ class OpenTheoryPipelineTest {
 
         val satisfiability = assertIs<OpenTheoryExecution.Satisfy>(result).result
         val assignment = assertIs<OpenTheoryResult.Sat>(satisfiability).assignment
-        assertEquals(0L, assertIs<OpenTheoryAssignment.Difference>(assignment).sample.ints[0])
+        assertEquals("0", assignment.intValue(0))
     }
 }

@@ -465,6 +465,10 @@ interface TheoryComponent : SearchComponent
 
 /** Shared state exposed to components without exposing finite CP domains. */
 interface SearchContext {
+    /** Execution controls; custom contexts can inject deadline, accounting and stop diagnostics. */
+    val executionControls: SearchExecutionControls
+        get() = SearchExecutionControlAdapter(com.eignex.klause.util.Cancellation(::cancelled))
+
     /** Current shared decision level. */
     val decisionLevel: Int
 
@@ -574,6 +578,17 @@ data class SearchRealValue(
 /** Immutable complete model assembled from all active components. */
 class AssembledSearchModel internal constructor(values: Map<Any, Any>) {
     private val values = values.toMap()
+
+    // Registered arithmetic atoms can add Boolean keys beyond the declared source variables.
+    internal fun numericCoordinatesFit(intCount: Int, realCount: Int): Boolean = values.keys.all { key ->
+        when (key) {
+            is SearchExactIntValue -> key.variable.index in 0 until intCount
+            is SearchExactRealValue -> key.variable.index in 0 until realCount
+            is SearchExactAlgebraicRealValue -> key.variable.index in 0 until realCount
+            is SearchExactRealExpressionValue -> key.variable.index in 0 until realCount
+            else -> true
+        }
+    }
 
     /** Read the immutable value of the type associated with [key], or null when absent. */
     @Suppress("UNCHECKED_CAST")

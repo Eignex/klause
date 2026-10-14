@@ -22,6 +22,7 @@ class SearchRun internal constructor(
     private var decisions = 0L
     private var decisionsSinceRestart = 0L
     private var sawIndeterminate = false
+    private var indeterminateCause: SearchStopCause? = null
 
     // Whether the last [applyLearnedConflict] call reached its backjump, so the conflict that produced it is spent.
     private var learnedApplied = false
@@ -211,7 +212,7 @@ class SearchRun internal constructor(
                     }
 
                     ComponentCheck.Indeterminate -> {
-                        sawIndeterminate = true
+                        rememberIndeterminate()
                         if (session.cancelled()) {
                             return lifecycle.onCancellation(session).toEvent()
                                 ?: finish(SearchRunEvent.Indeterminate.Cancelled)
@@ -266,21 +267,24 @@ class SearchRun internal constructor(
             val level = session.decisionLevel
             val decision = frame.decisions[frame.next++]
             if (!decision.tightens(session)) continue
-            if (!session.canCommitOpenTheoryDecision()) return Advance.Budget
+            if (!session.executionControls.canCommitDecision()) return Advance.Budget
             when (val result = session.push(decision)) {
                 ComponentResult.Consistent -> {
                     if (!session.lastPushCreatedLevel()) continue
-                    if (!session.recordOpenTheoryDecision(decision)) return Advance.Budget
+                    if (!session.executionControls.recordDecision(decision)) return Advance.Budget
                     decisions++
                     decisionsSinceRestart++
                     observer.onCommit(decision, session.decisionLevel)
-                    if (!decisionBudget.consume()) return Advance.Budget
+                    if (!decisionBudget.consume()) {
+                        session.markDecisionBudgetExhausted()
+                        return Advance.Budget
+                    }
                     return Advance.Expanded
                 }
 
                 ComponentResult.Indeterminate -> {
                     session.popTo(level)
-                    sawIndeterminate = true
+                    rememberIndeterminate()
                 }
 
                 is ComponentResult.Conflict -> {
@@ -394,7 +398,7 @@ class SearchRun internal constructor(
         -> false
 
         SearchLearnedConflictResult.Indeterminate -> {
-            sawIndeterminate = true
+            rememberIndeterminate()
             false
         }
 
@@ -432,7 +436,17 @@ class SearchRun internal constructor(
         SearchRunEvent.Exhausted
     }
 
+    private fun rememberIndeterminate() {
+        sawIndeterminate = true
+        val cause = session.executionControls.stopCause
+        indeterminateCause = cause.takeUnless { it == SearchStopCause.Timeout || it == SearchStopCause.Cancelled }
+            ?: SearchStopCause.RepresentationDecline
+    }
+
     private fun finish(event: SearchRunEvent): SearchRunEvent {
+        if (event == SearchRunEvent.Indeterminate.Component && session.executionControls.stopCause == null) {
+            session.executionControls.reportStop(indeterminateCause ?: SearchStopCause.RepresentationDecline)
+        }
         terminal = event
         return event
     }
