@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.Xcsp3CpSatReference
+import com.eignex.klause.bench.metric.Xcsp3SourceValidation
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -12,6 +13,7 @@ import java.util.Base64
 import java.util.concurrent.TimeUnit
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -42,6 +44,11 @@ internal object Xcsp3ReferenceReplay {
             require(original.size <= 32 * 1024 * 1024 &&
                 sha256(original) == row.getValue("sourceSha256").jsonPrimitive.content)
             out.resolve("$index.xml").writeBytes(original)
+            val objective = row.getValue("objective").jsonPrimitive.contentOrNull
+            val witness = row.getValue("witness").jsonPrimitive.content.removePrefix("v ")
+            val rawOutput = objective?.let { "o $it\n" }.orEmpty() + "v $witness\n"
+            Reports.writeJson(out.resolve("$index-source-check.json").path,
+                Xcsp3SourceValidation.validate(ref, rawOutput, objective))
         }
         val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
         root.resolve("klause-bench/xcsp3-cpsat/diagnose.py").copyTo(out.resolve("diagnose.py"))

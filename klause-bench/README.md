@@ -372,7 +372,9 @@ original XCSP sources through the catalog and requires their hashes to match.
 The default diagnoses the legacy image; `image=current` diagnoses the maintained
 image. It retains original bytes, parsed-witness violations, exact objective,
 native model text, runtime identities and solver outcomes under ordinary, pinned
-and isolated presolve settings. `mode=reduce` weakens the legacy native diagnostic
+and isolated presolve settings. Each supplied witness also uses the maintained
+independent source checker, retaining its accepted, invalid or declined result.
+`mode=reduce` weakens the legacy native diagnostic
 model while retaining a supplied witness, with at most 120 bounded solver calls;
 its reduced models are diagnostic derivatives, never original-source reference
 rows or independently checked proofs. Independently validate supplied and newly
