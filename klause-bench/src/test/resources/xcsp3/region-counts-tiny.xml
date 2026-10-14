@@ -1,0 +1,21 @@
+<instance format="XCSP3" type="CSP">
+  <variables>
+    <array id="x" size="[3]">0..1</array>
+    <array id="y" size="[3]">1..2</array>
+    <array id="s" size="[2]">1..2</array>
+    <var id="d">0..1</var>
+  </variables>
+  <constraints>
+    <instantiation><list>x[0] x[2] s[0] s[1]</list><values>0 1 2 1</values></instantiation>
+    <group>
+      <element><list>s[]</list><index>%0</index><value>%1</value></element>
+      <args>x[0] y[0]</args><args>x[1] y[1]</args><args>x[2] y[2]</args>
+    </group>
+    <group>
+      <sum><list>%...</list><condition>(eq,%0)</condition></sum>
+      <args>s[0] eq(x[0],0) eq(x[1],0) eq(x[2],0)</args>
+      <args>s[1] eq(x[0],1) eq(x[1],1) eq(x[2],1)</args>
+    </group>
+    <extension><list>x[1] y[1] d</list><supports>(0,2,1)(1,1,*)</supports></extension>
+  </constraints>
+</instance>
