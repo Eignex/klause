@@ -366,8 +366,8 @@ bench provenance. Importer behavior regressions run in the ordinary build gate;
 they cover matrix axes, weighted expression sums, contradictions, unconstrained
 source variables and objectives beyond binary64 precision.
 
-`bench.profile.Xcsp3ReferenceReplay` accepts `request64=<base64 JSON array>` of at
-most sixteen `{suite,problem,sourceSha256,witness,objective}` entries. It resolves
+`bench.profile.Xcsp3ReferenceReplay` accepts `request64=<base64 JSON array>` with
+one `{suite,problem,sourceSha256,witness,objective}` entry per bounded job. It resolves
 original XCSP sources through the catalog and requires their hashes to match.
 The default diagnoses the legacy image; `image=current` diagnoses the maintained
 image. It retains original bytes, parsed-witness violations, exact objective,

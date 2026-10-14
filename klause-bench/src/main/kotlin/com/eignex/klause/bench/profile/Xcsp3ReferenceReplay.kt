@@ -28,7 +28,7 @@ internal object Xcsp3ReferenceReplay {
         require(encoded.length <= 64 * 1024)
         val request = Base64.getDecoder().decode(encoded)
         val rows = Json.parseToJsonElement(request.decodeToString()).jsonArray
-        require(rows.size in 1..16)
+        require(rows.size == 1) { "Replay one source witness per bounded job" }
         val out = File(requireNotNull(System.getenv("OUT"))).resolve("xcsp3-reference-replay").apply { mkdirs() }
         out.resolve("request.json").writeBytes(request)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
