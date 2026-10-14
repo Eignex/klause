@@ -772,7 +772,12 @@ class Portfolio(
             val first = workers.indices.filter { !workers[it].improvementOnly }
             val eligible = if (improving || first.all { retired[it] }) workers.indices.toList() else first
             val complete = first.filter { workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof }
-            val covered = complete.all { retired[it] || siblingWork[it] >= baseSliceWork }
+            val covered = if (proofStarted) {
+                val active = complete.filter { !retired[it] }
+                var needed = active.fold(0L) { work, _ -> work + minOf(baseSliceWork, Long.MAX_VALUE - work) }
+                for (arm in active) needed -= minOf(needed, siblingWork[arm])
+                needed == 0L
+            } else complete.all { retired[it] || siblingWork[it] >= baseSliceWork }
             return if (covered) eligible else eligible.filter { !workers[it].auxiliaryProof }
         }
 
@@ -868,7 +873,7 @@ class Portfolio(
             val account = ledgerFor(arm)
             siblingWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - siblingWork[arm])
             val proofWork = workers[arm].auxiliaryProof && work > 0L
-            if ((!proofStarted && claim.improved) || proofWork) siblingWork.fill(0L)
+            if (claim.foundFirst || proofWork) siblingWork.fill(0L)
             if (proofWork) proofStarted = true
             armWork[arm] += if (work > 0L) work else claim.sliceWork
             if (stats != null) {

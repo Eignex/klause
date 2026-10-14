@@ -216,6 +216,34 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 class PortfolioTest {
 
     @Test
+    fun `proof continuation follows charged family work without waiting for every sibling`() {
+        var ordinaryVisits = 0
+        var proofVisits = 0
+        val progressing = ScriptedSearch({ true }) { ordinaryVisits++ }
+        val quietBase = ScriptedSearch({ false }) { ordinaryVisits++ }
+        val quiet = object : ResumableSearch by quietBase {
+            override val work: Long get() = minOf(5_000L, quietBase.work)
+        }
+        val proofBase = ScriptedSearch({ false }) { proofVisits++ }
+        val proof = object : ResumableSearch by proofBase {
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                return if (proofVisits == 3) MinimizeResult.Unknown(TerminationReason.BudgetExhausted) else null
+            }
+        }
+        val workers = listOf(trackingWorker("progressing", 0, progressing), trackingWorker("quiet", 1, quiet),
+            trackingWorker("proof", 2, proof).also { it.auxiliaryProof = true; it.improvementOnly = true })
+
+        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+            it.minimize(Cancellation { proofVisits >= 3 || ordinaryVisits >= 32 })
+        }
+
+        assertEquals(3, proofVisits)
+        assertEquals(5_000L, quiet.work)
+    }
+
+    @Test
     fun `proof continuations keep base work and receive a family deadline`() {
         var ordinaryVisits = 0
         val complete = trackingWorker("complete", 0, ScriptedSearch({ false }) { ordinaryVisits++ })
@@ -282,12 +310,12 @@ class PortfolioTest {
     }
 
     @Test
-    fun `supplemental proof waits for sibling work after the latest improvement`() {
+    fun `proof admission preserves charged sibling work across incumbent updates`() {
         var completeVisits = 0
         var proofVisits = 0
         val complete = ScriptedSearch({ it < 3 }) { completeVisits++ }
         val proofBase = ScriptedSearch({ false }) {
-            assertEquals(4, completeVisits)
+            assertEquals(2, completeVisits)
             proofVisits++
         }
         val proof = object : ResumableSearch by proofBase {
@@ -308,7 +336,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `continued incumbent improvements keep supplemental proof deferred`() {
+    fun `continued incumbent improvements allow supplemental proof turns`() {
         var completeVisits = 0
         var proofVisits = 0
         val complete = ScriptedSearch({ true }) { completeVisits++ }
@@ -321,7 +349,7 @@ class PortfolioTest {
         }
 
         assertEquals(8, completeVisits)
-        assertEquals(0, proofVisits)
+        assertTrue(proofVisits > 0)
     }
 
     @Test
