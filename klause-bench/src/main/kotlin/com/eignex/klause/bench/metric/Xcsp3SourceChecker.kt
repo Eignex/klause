@@ -155,6 +155,7 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
         c.childs.forEach { checkTrees(it.value) }
         when (c.type.name) {
             "sum" -> super<XCallbacks2>.loadCtr(c)
+            "element" -> checkElement(c)
             "intension" -> {
                 val tree = c.childs[0].value as XNode<*>
                 check(tree.canonization(), exact(tree))
@@ -266,6 +267,20 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
         val lengths = integers(c.childs[1].value)
         require(lengths.size == values.size - 1)
         lengths.indices.forEach { integer(values[it] + lengths[it], "ordered offset") }
+    }
+
+    private fun checkElement(c: XCtr) {
+        if (c.childs.size != 3 || c.childs[1].value !is XVarInteger) decline("unindexed or matrix element")
+        val list = c.childs[0].value as? Array<*> ?: decline("element list")
+        if (list.any { it !is XVarInteger && it !is Number }) decline("element list")
+        val rank = c.childs[1].attributes.entries.singleOrNull { it.key.name == "rank" }?.value
+        if (rank != null && rank.toString().lowercase() != "any") decline("ranked element")
+        val start = c.childs[0].attributes.entries.singleOrNull { it.key.name == "startIndex" }?.value
+            ?.let { it.toString().toIntOrNull() ?: decline("element start index") } ?: 0
+        val index = integers(c.childs[1].value).single() - BigInteger.valueOf(start.toLong())
+        integer(index, "element index offset")
+        if (index < BigInteger.ZERO || index >= BigInteger.valueOf(list.size.toLong())) decline("element index range")
+        integers(list).forEach { integer(it, "element entry") }
     }
 
     private fun checkEndpoints(origins: Any, lengths: Any) {
