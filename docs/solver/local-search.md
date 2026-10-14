@@ -356,8 +356,9 @@ This can reconcile searched usage flags and the coordinated attributes
 of a removed class without mutating the live assignment or extending generic repairs.
 At most one completion follows at
 most eight repair steps, protects the changed class and count coordinates, and offers
-only a complete zero-violation proposal with at most 128 primitive parts. Class
-coordinates carry indicators together; arithmetic rows reconcile their combined drift
+only a complete zero-violation proposal with at most 128 primitive parts. Its repair sink
+freezes every initial primitive write before proposing steps, matching the walk's slot protection.
+Class coordinates carry indicators together; arithmetic rows reconcile their combined drift
 through repairs instead of independent per-coordinate counter-shifts. The count retains
 its ordinary channel contributions. Chain generation restores the original assignment
 and tracking state before complete objective scoring.

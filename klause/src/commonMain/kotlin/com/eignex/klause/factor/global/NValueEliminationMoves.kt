@@ -269,7 +269,15 @@ internal class NValueEliminationMoves(
         }
         // Repair proposals can be requested while the caller owns a live repair walk.
         if (!allowRepairChain) return
-        val repairs = MoveSink(state.assumptions.withInt(n, state.assignment.intValue(n)))
+        var pins = state.assumptions.withInt(n, state.assignment.intValue(n))
+        for (part in firstParts) {
+            pins = when (part) {
+                is Move.IntSet -> pins.withInt(part.varId, part.newValue)
+                is Move.BoolFlip -> pins.withBool(part.varId, !state.assignment.boolValue(part.varId))
+                else -> pins
+            }
+        }
+        val repairs = MoveSink(pins)
         repairs.setInvariants(state.invariants)
         repairs.setOwners(state.seeding.ownerInt)
         val parts = state.buildRepairChain(move, MAX_REPAIR_DEPTH, repairs) ?: return
