@@ -806,13 +806,18 @@ It checks signed integer task endpoints, cumulative loads at task boundaries,
 bin-packing loads, ordered offsets and knapsack products/totals with exact integers.
 Direct sums require every assigned product and running total to fit a signed
 integer, including constant and variable coefficients. The source parser expands
-array lists, groups, slides and blocks for these checks.
+array lists, groups, slides and blocks for these checks. Expression sums admit
+unweighted terms and constant or variable coefficients. Every expression node,
+intermediate addition/product and weighted term must fit a signed long and agree
+with the pinned evaluator; the exact sum must fit a signed integer. This guards
+the checker's long multiplication before its exact accumulation, including
+cancellation between large terms.
 
 Supported expression trees are evaluated with `BigInteger` and compared with the
 pinned evaluator, including its normalized intension tree. Matching cancellation
 results remain checkable; any disagreement or unsupported operation leaves checking
 `unknown`. Supported expressions include integer arithmetic (except powers),
-comparisons and Boolean operators. Hybrid extension tuples, set expressions, powers, expression sums,
+comparisons and Boolean operators. Hybrid extension tuples, set expressions, powers,
 logical meta-constraints, flow, channel, element, circuit and indexed extrema
 remain outside the audited surface. Direct variable objectives retain the pinned
 checker's exact sum/product/minimum/maximum/distinct-value aggregates; expression
@@ -838,6 +843,18 @@ remains the solver's proof claim, recorded separately as `reportedProven`.
 
 `validate-solution` prints a structured validation result, source hashes, checker
 identity and the checked XCSP assignment when accepted, without solving again.
+
+`com.eignex.klause.bench.profile.XcspWitnessReplay` checks saved witnesses on a
+remote profile without invoking the solver. Its single argument is a base64 gzip
+JSON array containing `sourceRevision`, original `source`, `sourceSha256`, original
+`witness`, `witnessSha256` and optional exact integer `objective`. Hashes are
+verified before checking. It retains the original records, installed harness/runtime
+hashes, checker command, process exit, timeout, stdout/stderr and each check outcome.
+Each checker subprocess has one active processor, a 512 MiB heap and ten seconds.
+The lab's executed revision and setup identity belong with these results;
+`sourceRevision` describes the historical capture and is not the replay build.
+Acceptance certifies source feasibility and objective values, not optimality or
+infeasibility proofs.
 
 ### Offline source verifier
 
