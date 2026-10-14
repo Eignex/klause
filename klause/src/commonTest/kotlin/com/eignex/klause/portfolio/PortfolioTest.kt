@@ -2472,7 +2472,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `only initial auxiliary admission updates retained arm bandit evidence`() {
+    fun `unproductive auxiliary work does not update retained arm bandit evidence`() {
         for (seed in 0L..3L) {
             val reached = ArrayList<Int>()
             val updates = ArrayList<Int>()
@@ -2496,38 +2496,45 @@ class PortfolioTest {
                 it.minimize(Cancellation { reached.count { arm -> arm < 2 } >= 30 })
             }
 
-            assertEquals(reached.filterIndexed { index, arm -> arm < 2 || index == reached.indexOf(2) }, updates)
+            assertEquals(reached.filter { it < 2 }, updates)
         }
     }
 
     @Test
     fun `auxiliary trial preserves subsequent retained policy choices`() {
-        fun choices(continueTrial: Boolean): List<Int> {
+        fun choices(continueTrial: Boolean, admittedBeforeIncumbent: Boolean): List<Int> {
             val reached = ArrayList<Int>()
+            var finderVisited = false
             val probe = ScriptedSearch({ false }) {}
             val trial = object : ResumableSearch by probe {
                 override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                     probe.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
-                    return if (continueTrial) null else MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                    return if (continueTrial || !finderVisited) null else {
+                        MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                    }
                 }
             }
-            val workers = listOf(
-                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }).also {
-                    it.family = ArmFamily.LocalSearch
-                },
-                trackingWorker("retained", 1, ScriptedSearch({ false }) { reached += 1 }),
-                trackingWorker("probe", 2, trial),
-            )
+            val finder = trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) {
+                reached += 0
+                finderVisited = true
+            }).also { it.family = ArmFamily.LocalSearch }
+            val retained = trackingWorker("retained", 1, ScriptedSearch({ false }) { reached += 1 })
+            val auxiliary = trackingWorker("probe", 2, trial)
+            val workers = if (admittedBeforeIncumbent) listOf(auxiliary, finder, retained) else {
+                listOf(finder, retained, auxiliary)
+            }
 
             Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-                it.incumbentProbeArms = setOf(2)
+                it.incumbentProbeArms = setOf(if (admittedBeforeIncumbent) 0 else 2)
                 it.minimize(Cancellation { reached.size >= 16 })
             }
             return reached
         }
 
-        assertEquals(choices(false), choices(true))
+        for (admittedBeforeIncumbent in listOf(false, true)) {
+            assertEquals(choices(false, admittedBeforeIncumbent), choices(true, admittedBeforeIncumbent))
+        }
     }
 
     @Test

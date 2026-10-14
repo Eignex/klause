@@ -662,6 +662,7 @@ class Portfolio(
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
         private val productive = BooleanArray(workers.size)
+        private val trialStarted = BooleanArray(workers.size)
         private val trialPreparationTime = Array(workers.size) { Duration.ZERO }
         private val preparationTimeLimit = baseSliceMillis.milliseconds * AUXILIARY_PREPARATION_ALLOWANCES
         private val trialSearchWork = LongArray(workers.size)
@@ -772,8 +773,8 @@ class Portfolio(
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
-            val probing = probe != null
             val auxiliary = improving && arm in incumbentProbeArms && !productive[arm]
+            val probing = probe != null || (auxiliary && !trialStarted[arm])
             val baseAllowance = probing || revisit != null || workers[arm].auxiliaryProof
             val allowance = if (baseAllowance) baseSliceWork else sliceWork
             val time = if (baseAllowance) baseSliceMillis else slice
@@ -815,7 +816,7 @@ class Portfolio(
             }?.let { return it }
             if (improving) {
                 eligibleArms.firstOrNull {
-                    it in incumbentProbeArms && !productive[it] && !busy[it] && !retired[it]
+                    it in incumbentProbeArms && trialStarted[it] && !productive[it] && !busy[it] && !retired[it]
                 }?.let { return it }
             }
             val preparing = continuingPreparation
@@ -923,13 +924,14 @@ class Portfolio(
             val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
             if (unproductiveTrial) {
+                trialStarted[arm] = true
                 if (claim.preparing) trialPreparationTime[arm] += claim.trialTime
                 if (!claim.preparing) {
                     trialSearchTime[arm] += claim.trialTime
                     if (work > 0L) trialSearchWork[arm] += minOf(work, trialWorkLimit - trialSearchWork[arm])
                 }
             }
-            if ((!unproductiveTrial || claim.probing) && !workers[arm].auxiliaryProof) {
+            if (!unproductiveTrial && !workers[arm].auxiliaryProof) {
                 val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
                 bandit.update(arm, reward, weight)
                 families.record(policyFamily(arm), progressed = reward > 0.0, plateau = improving)

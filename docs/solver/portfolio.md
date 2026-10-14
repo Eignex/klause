@@ -196,8 +196,10 @@ See [search](search.md#finite-propagation) and [resource allowances](resources.m
 An auxiliary incumbent probe retains preparation and a search trial after an incumbent
 arrives. Every initial sibling admission precedes its continuation. The unproductive
 trial uses the current ordinary allowance, clipped to its remaining work
-and time budget. Initial admission supplies ordinary policy feedback; additional
-unproductive slices preserve the other arms' policy evidence. Trial continuations run before ordinary policy selection, preserving
+and time budget, and preserves the other arms'
+policy evidence. An auxiliary arm admitted before the incumbent enters its trial
+when the ordinary policy next selects it, using the base probe allowance. Trial
+continuations run before ordinary policy selection, preserving
 the retained policy's random stream after every initial sibling has been admitted.
 Explicit minimum shares retain precedence. Ordinary retained-worker segments advance
 the shared allowance ladder; an unproductive trial preserves it even when charging
@@ -469,9 +471,8 @@ retain their requested scheduling. An unproductive trial retires the arm and clo
 its handle, preserving the incumbent without claiming exhaustion. A witness, objective
 or bound improvement, root deductions, or used shared contributions retain the arm
 under normal bandit scheduling. Configured LP slots do not retire under the auxiliary
-policy. Initial auxiliary admission records ordinary bandit and family feedback.
-Unproductive continuation slices do not decay the retained workers' bandit or family
-evidence.
+policy. An unproductive auxiliary trial does not decay the retained workers' bandit
+or family evidence.
 
 See
 [SliceBudget](../../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)
