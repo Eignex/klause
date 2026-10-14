@@ -19,6 +19,7 @@ internal fun nodeDualCertificate(
         meter.reserve(model.numVars.toLong() * 16L + model.m * 8L)
         integerCertifyUnchecked(model, duals, DEFAULT_SCALE_BITS, allowMixed = true, scan = meter::step)
             ?: mixedCertificate(model, state, duals, meter)
+            ?: reconstructedMixedCertificate(model, state, duals, meter)
     } catch (_: LpProjectionStop) {
         null
     }
@@ -117,10 +118,36 @@ private fun mixedCertificate(
     meter: MixedCertificateMeter,
 ): LpDeductionCertificate? {
     val rounded = roundDuals(model, duals) ?: return null
-    val scale = meter.read(state.model.objective.scale.value)
     val y = List(model.m) { row ->
         meter.read(BigFraction.ofLong(rounded.mult[row]) * BigFraction.ofLong(rounded.scale).reciprocal())
-    }.toMutableList()
+    }
+    return mixedCertificate(model, state, y, meter)
+}
+
+private fun reconstructedMixedCertificate(
+    model: LpModel,
+    state: LpExactState,
+    duals: DoubleArray,
+    meter: MixedCertificateMeter,
+): LpDeductionCertificate? {
+    if (duals.size != model.m) return null
+    meter.reserve(model.m * 8L)
+    val y = List(model.m) { row ->
+        val rational = reconstructRational(duals[row], onStep = meter::reconstructionStep) ?: return null
+        meter.multiply(BigFraction.ofLong(rational.numerator), BigFraction.ofLong(rational.denominator).reciprocal())
+    }
+    return mixedCertificate(model, state, y, meter)
+}
+
+private fun mixedCertificate(
+    model: LpModel,
+    state: LpExactState,
+    multipliers: List<BigFraction>,
+    meter: MixedCertificateMeter,
+): LpDeductionCertificate? {
+    val scale = meter.read(state.model.objective.scale.value)
+    meter.reserve(model.m * 8L)
+    val y = multipliers.toMutableList()
     for (row in y.indices) {
         val slack = model.slackCol(row)
         val cost = meter.read(model.exactCost(slack))
@@ -154,6 +181,7 @@ internal class MixedDualBound(
     private val reduced: List<BigFraction>,
     private val bound: BigFraction,
 ) : LpDeductionCertificate {
+    override fun usesRationalArithmetic(): Boolean = true
     override fun belongsTo(model: LpModel, observer: LpCertificationObserver?): Boolean = model.exactState === authority
     override fun exactMultipliers(): List<BigFraction> = multipliers.toList()
     override fun exactReducedCost(col: Int): BigFraction = reduced[col]
@@ -184,6 +212,7 @@ private class MixedCertificateMeter(private val cancellation: Cancellation) {
     val work: Long get() = meter.work
     fun poll() { if (cancellation()) throw LpProjectionStop() }
     fun step() = charge(1L, 0L, matrix = true)
+    fun reconstructionStep() = charge(8L, 32L, matrix = false)
     fun reserve(bytes: Long) = charge(bytes / 8L + 1L, bytes, matrix = false)
 
     private fun charge(work: Long, bytes: Long, matrix: Boolean) {

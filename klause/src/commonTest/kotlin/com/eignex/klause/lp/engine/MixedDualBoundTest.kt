@@ -11,6 +11,29 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `reconstructed mixed duals require exact cancellation on free continuous columns`() {
+        for (coefficient in listOf(-3.0, -3.0000000001)) {
+            val source = LpBuilder().apply {
+                val x = addVar(0L, 10L, cost = 1L)
+                val r = addRealVar(null, null)
+                addRealRow(intArrayOf(x, r), doubleArrayOf(3.0, coefficient), Relation.EQ, 3.0)
+                addRealRow(intArrayOf(r), doubleArrayOf(1.0), Relation.EQ, 0.0)
+            }.build(Sense.MINIMIZE)
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+            val certificate = nodeDualCertificate(model, doubleArrayOf(1.0 / 3.0, 1.0))
+
+            if (coefficient == -3.0) {
+                assertEquals(BigFraction.ONE, assertNotNull(certificate).exactObjectiveBound())
+                assertEquals(BigFraction.ofLong(3L).reciprocal(), certificate.exactMultipliers()[0])
+                assertEquals(BigFraction.ZERO, certificate.exactReducedCost(1))
+            } else {
+                assertNull(certificate)
+            }
+        }
+    }
+
+    @Test
     fun `scoped logical sides cannot silently supply an objective lattice`() {
         val source = assertNotNull(LpBuilder().apply {
             val x = addVar(0L, 10L)
