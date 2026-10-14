@@ -335,7 +335,7 @@ internal class CpSatisfactionTraversal(
 
             SearchRunEvent.Indeterminate.Component -> {
                 close()
-                SearchOutcome.Exhausted(indeterminate = true)
+                if (params.cancellation()) SearchOutcome.BudgetCapped else SearchOutcome.Exhausted(indeterminate = true)
             }
 
             SearchRunEvent.Paused -> if (slice != null) {

@@ -28,9 +28,12 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.PreparingSearchComponent
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,6 +46,66 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
+    @Test
+    fun `native segment interruption after a decision pauses the core query`() {
+        val clock = TestTimeSource()
+        var interrupted = false
+        val params = BacktrackParams(
+            nativeSat = false,
+            variableSelector = InputOrder,
+            valueSelector = IndomainMin,
+            componentFactory = {
+                listOf(object : SearchComponent {
+                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                        if (!interrupted && context.decisionLevel > 0 && decision is SearchDecision.Bool &&
+                            Lit.variable(decision.literal) != 0
+                        ) {
+                            interrupted = true
+                            clock += 2.seconds
+                        }
+                        return ComponentResult.Consistent
+                    }
+                })
+            },
+        )
+        val problem = Problem(40, 0, emptyArray(), Array(19) {
+            Clause(intArrayOf(Lit.make(2 * it + 1, true), Lit.make(2 * it + 2, true)))
+        }).bake()
+        val objective = LinearObjective(longArrayOf(1))
+        val search = CoreGuidedSearch(problem, objective, params, timeSource = clock)
+
+        val paused = search.runSlice(Cancellation.Never, 1_000L, -1L) { error("interrupted query") }
+
+        assertTrue(interrupted)
+        assertNull(paused)
+        assertFalse(search.isDone)
+        assertTrue(search.stats.search.nodes.sum > 0.0)
+        val resumed = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, 1_000L, -1L) {})
+        assertEquals(0L, objective.evaluateLong(resumed.sample))
+        search.close()
+    }
+
+    @Test
+    fun `an unsupported native component without cancellation retires the core query`() {
+        val params = BacktrackParams(nativeSat = false, componentFactory = {
+            listOf(object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
+            })
+        })
+        val search = CoreGuidedSearch(Problem(2, 0, emptyArray(), emptyArray()).bake(),
+            LinearObjective(longArrayOf(1)), params)
+
+        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("unchecked candidate") }
+        val charged = search.work
+        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed unsupported query") }
+
+        assertEquals(TerminationReason.Unsupported, assertIs<MinimizeResult.Unknown>(stopped).reason)
+        assertTrue(search.isDone)
+        assertEquals(stopped, resumed)
+        assertEquals(charged, search.work)
+        search.close()
+    }
+
     @Test
     fun `native segment interruption pauses before its containing allowance is exhausted`() {
         val clock = TestTimeSource()
@@ -82,15 +145,32 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(longArrayOf(1))
         for (params in listOf(
             BacktrackParams(nativeSat = false, maxDecisions = 1L),
+            BacktrackParams(nativeSat = false, maxInstructions = 1L),
             BacktrackParams(nativeSat = false, nodeBudget = NodeBudget(1L)),
         )) {
-            val search = CoreGuidedSearch(problem, objective, params)
+            val clock = TestTimeSource()
+            var interrupted = false
+            val bounded = params.copy(componentFactory = {
+                listOf(object : SearchComponent {
+                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                        if (!interrupted && context.decisionLevel > 0 && decision is SearchDecision.Bool &&
+                            Lit.variable(decision.literal) != 0
+                        ) {
+                            interrupted = true
+                            clock += 2.seconds
+                        }
+                        return ComponentResult.Consistent
+                    }
+                })
+            })
+            val search = CoreGuidedSearch(problem, objective, bounded, timeSource = clock)
 
-            val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+            val stopped = search.runSlice(Cancellation.Never, 1_000L, -1L) {}
             val charged = search.work
             val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed decisions") }
 
             assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
+            assertTrue(interrupted)
             assertTrue(search.isDone)
             assertEquals(stopped, resumed)
             assertEquals(charged, search.work)
