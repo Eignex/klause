@@ -9,7 +9,8 @@ internal object NativeVmSymbolVerification {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty())
+        require(args.size <= 16 && args.distinct().size == args.size)
+        require(args.all { it.length in 1..128 && it.matches(Regex("[A-Za-z0-9_]+")) })
         ProfileCaptureArchive.run {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
             val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
@@ -19,7 +20,7 @@ internal object NativeVmSymbolVerification {
             val command = listOf(
                 "python3", tool.path, File(runtime, "lib/server/libjvm.so").path,
                 LIBRARY_SHA256, File(out, "vm-symbols.json").path,
-            )
+            ) + args
             val process = ProcessBuilder(command).directory(root)
                 .redirectOutput(File(out, "symbols.stdout"))
                 .redirectError(File(out, "symbols.stderr")).start()

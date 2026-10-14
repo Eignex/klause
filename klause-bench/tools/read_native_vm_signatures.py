@@ -28,14 +28,22 @@ def inspect(library, expected_library, captured, expected_capture, out, report):
     if source.get('completed') is not True or source.get('librarySha256') != expected_library or \
             source.get('librarySha256After') != expected_library:
         raise ValueError('Captured symbol inspection is incomplete or targets another library')
-    if source.get('queries') != list(SIGNATURES) or set(source.get('candidates', {})) != set(SIGNATURES):
+    queries = source.get('queries')
+    if not isinstance(queries, list) or not 0 < len(queries) <= 16:
+        raise ValueError('Captured symbol query groups differ')
+    if not all(isinstance(query, str) and 1 <= len(query) <= 128 and query.isascii() and
+               all(character.isalnum() or character == '_' for character in query) for query in queries):
+        raise ValueError('Captured queries are not bounded source identifiers')
+    if len(set(queries)) != len(queries) or not isinstance(source.get('candidates'), dict) or \
+            set(source['candidates']) != set(queries):
         raise ValueError('Captured symbol query groups differ')
     (out / 'captured-vm-symbols.json').write_bytes(raw)
     report.update(capturedSymbolsSha256=expected_capture, librarySha256=expected_library,
-                  candidates={name: [] for name in SIGNATURES}, matchedSourceSignatures={name: [] for name in SIGNATURES})
+                  candidates={name: [] for name in queries}, matchedSourceSignatures={name: [] for name in queries if name in SIGNATURES})
     provider = NativeDemangler(out)
     report['demanglerProvider'] = provider.provenance
-    for query, expected in SIGNATURES.items():
+    for query in queries:
+        expected = SIGNATURES.get(query)
         rows = source['candidates'][query]
         if not isinstance(rows, list) or len(rows) > MAX_RECORDS:
             raise ValueError('Captured candidate records exceed diagnostic bounds')
@@ -51,7 +59,7 @@ def inspect(library, expected_library, captured, expected_capture, out, report):
             except DemanglingError as error:
                 item['demanglerResult'] = error.context
                 raise
-            item.update(demanglerResult=result, exactSourceSignatureMatched=result['demangled'] == expected)
+            item.update(demanglerResult=result, exactSourceSignatureMatched=expected is not None and result['demangled'] == expected)
             if item['exactSourceSignatureMatched'] and row['function'] is True and \
                     row['undefined'] is False and row['ordinarySectionDefinition'] is True:
                 report['matchedSourceSignatures'][query].append(item)
