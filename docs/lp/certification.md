@@ -124,7 +124,8 @@ When fixing is requested, one additional candidate uses only the verified
 objective-defining equality. Its integral affine costs can bound a coordinate
 whose reduced cost vanishes in the stronger LP certificate. A metered exact comparison selects the stronger bound for pruning; both complete
 certificates may supply local fixing. A selection decline preserves the primary bound.
-This candidate shares the same work/allocation allowance and endpoint checks,
+The objective candidate can also supply a bound when the proposed LP duals
+decline on an absent endpoint. It shares the same work/allocation allowance and endpoint checks,
 and retains the defining row and its scoped premises. Candidate publication follows the
 final cancellation check; each consumer also applies certification policy admission.
 For a nonintegral objective, node pruning compares the exact certified bound in

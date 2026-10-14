@@ -11,6 +11,24 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `objective equalities retain fixing certificates when dual endpoints are absent`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val r = addRealVar(0.0, null, cost = 1.0)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(-4.0, 1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        var additional: LpDeductionCertificate? = null
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(2.0),
+            onAdditionalCertificate = { additional = it }))
+
+        assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
+        assertEquals(0L, certificate.fixSteps(0, 1L, 0L))
+        assertNull(additional)
+    }
+
+    @Test
     fun `node bounds retain a stronger complete objective equality candidate`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)
