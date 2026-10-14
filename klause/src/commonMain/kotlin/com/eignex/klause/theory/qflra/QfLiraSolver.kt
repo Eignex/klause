@@ -46,9 +46,6 @@ import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.search.AssembledSearchModel
@@ -78,13 +75,15 @@ import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.SourceCoordinateAgreement
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.snapshotValues
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.encodingSourceRealCount
+import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
@@ -92,12 +91,14 @@ import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.div
+import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.maxOf
 import com.eignex.klause.util.minOf
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.negate
 import com.eignex.klause.util.rem
+import com.eignex.klause.util.toLongExact
 
 /** An exact integer/rational witness for an open QF_LIRA or QF_LIA model. */
 class ExactLiraAssignment(
@@ -185,6 +186,8 @@ class ExactLiraSearchComponent private constructor(
     }.also { projections.requireSource(model) }), modelContribution, finiteIntegerVariables.copyOf())
 
     private val model = preparedSource.model
+    private val sourceRealCount = model.encodingSourceRealCount
+    private val hasPrivateReals = sourceRealCount != model.numRealVars
     private var smtStats: SmtStatsSink? = null
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
@@ -290,7 +293,7 @@ class ExactLiraSearchComponent private constructor(
         registerDisjunctions(context)
         beginOperation()
         return try {
-            graphFirst = model.numIntVars == 0 &&
+            graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
             if (disjunctionRegistrationDeclined || (!graphFirst && !installSource()) || operationStop()) {
                 ComponentResult.Indeterminate
@@ -328,6 +331,7 @@ class ExactLiraSearchComponent private constructor(
             val rows = agreementSourceRows()
                 ?: return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
             for (row in rows) {
+                if (row.columns.any { it in sourceRealCount until model.numRealVars }) continue
                 lpStop.charge(row.columns.size.toLong() + 1L)
                 if (operationStop()) return ComponentResult.Indeterminate
                 val terms = row.columns.indices.map { index ->
@@ -357,6 +361,10 @@ class ExactLiraSearchComponent private constructor(
             }
             val point = ArrayList<BigFraction>(model.numRealVars + model.numIntVars)
             for (variable in 0 until model.numRealVars) {
+                if (variable >= sourceRealCount) {
+                    point += candidate?.get(variable) ?: return coordinateDeclined(context)
+                    continue
+                }
                 lpStop.charge(1L)
                 if (operationStop()) return ComponentCheck.Indeterminate
                 val id = SourceRealId(variable)
@@ -443,7 +451,10 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun nameableDisjunct(row: LinearRow): Boolean {
-        if (row.booleanVariables().isNotEmpty()) return false
+        if (row.booleanVariables().isNotEmpty() || (0 until row.size).any { term ->
+                val ref = row.ref(term)
+                Term.isReal(ref) && Term.realVar(ref) >= sourceRealCount
+            }) return false
         val comparison = row.exactComparison(model.numRealVars, truth = true) { false }
         return comparison.terms.isNotEmpty() && (comparison.op == LinearOp.LE || comparison.op == LinearOp.GE)
     }
@@ -585,6 +596,17 @@ class ExactLiraSearchComponent private constructor(
                         if (context.atomLiteral(decision) == null) return ComponentResult.Indeterminate
                         node = node.copy(
                             rowAssertions = node.rowAssertions + (disjunct.address to payload),
+                            retainedReduction = null,
+                        )
+                        nodesByLevel.put(context.decisionLevel, node)
+                        return ComponentResult.Consistent
+                    }
+                    val privateDirection = payload.payload as? NamedPrivateDisequality
+                    if (privateDirection != null && privateDirection.owner === disjunctOwner) {
+                        if (context.atomLiteral(decision) == null) return ComponentResult.Indeterminate
+                        node = node.withDirection(privateDirection.address, privateDirection.direction).copy(
+                            directionPremises = node.directionPremises +
+                                (privateDirection.address to SearchAtomPremise.Asserted(decision)),
                             retainedReduction = null,
                         )
                         nodesByLevel.put(context.decisionLevel, node)
@@ -849,6 +871,14 @@ class ExactLiraSearchComponent private constructor(
             val comparison = exactForms[address.factor][address.row].comparison(truth) {
                 bools[it] == TRUE
             }
+            if (comparison.terms.keys.any { it in sourceRealCount until model.numRealVars }) {
+                val split = context.registerAtom(
+                    NamedPrivateDisequality(disjunctOwner, address, LinearOp.LE),
+                    NamedPrivateDisequality(disjunctOwner, address, LinearOp.GE),
+                )
+                if (split == null) outcome = ComponentCheck.Indeterminate
+                return split?.let { listOf(SearchDecision.Theory(it.positive), SearchDecision.Theory(it.negative)) }
+            }
             val terms = comparison.terms.map { (column, coefficient) ->
                 val source = if (column < model.numRealVars) {
                     SearchRealValue(column)
@@ -920,6 +950,7 @@ class ExactLiraSearchComponent private constructor(
             ExactReducedSearchResult.Interrupted -> outcome = ComponentCheck.Indeterminate
 
             is ExactReducedSearchResult.Found -> {
+                candidate = bounded.sourceValues
                 assignment = acceptWitness(bounded.sourceValues)
                 outcome = if (assignment != null && !operationStop()) {
                     ComponentCheck.Feasible
@@ -980,7 +1011,7 @@ class ExactLiraSearchComponent private constructor(
         return ExactLiraAssignment(
             bools.toCompleteValues(),
             Array(model.numIntVars) { point[model.numRealVars + it].num },
-            point.take(model.numRealVars),
+            point.take(sourceRealCount),
         ).also {
             smtStats?.observeWitnessAccepted(strict, wide)
         }
@@ -1829,6 +1860,9 @@ private fun SearchContext.truth(decision: RegisteredTheoryDecision): Boolean? =
     boolValue(decision.literal ushr 1)?.let { it == (decision.literal and 1 == 0) }
 
 // The owner fixes the entire source predicate, including its Boolean terms and activator, for this session.
+private data class NamedPrivateDisequality(val owner: Any, val address: RowAddress, val direction: LinearOp) :
+    SearchTheoryDecision
+
 private data class NamedDisjunctDecision(val owner: Any, val address: RowAddress, val holds: Boolean) :
     SearchTheoryDecision
 

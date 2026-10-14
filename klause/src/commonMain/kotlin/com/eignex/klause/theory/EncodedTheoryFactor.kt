@@ -3,6 +3,7 @@ package com.eignex.klause.theory
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.Problem
@@ -22,7 +23,13 @@ internal class EncodedTheoryFactor(
     val source: Factor,
     override val linearForm: LinearForm,
     val attribution: EncodingAttribution,
-) : Factor by source
+) : Factor by source {
+    override val variables = MixedVars(
+        boundInts = source.intVars,
+        boolVars = source.boolVars,
+        reals = (source.variables.reals.toList() + attribution.auxiliaries.map { it.index }).distinct().toIntArray(),
+    )
+}
 
 internal fun PreparedFactorProjections.linearTheoryModel(
     target: EncodingTarget,
@@ -36,15 +43,17 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     val booleanPins = fixedBooleans.toMap()
     val factors = ArrayList<Factor>(indices.size)
     val origins = ArrayList<Int>()
+    val allocator = EncodingRealAllocator(problem.numRealVars)
     for (index in indices) {
-        val relations = installLinearFactor(index, target, integerPins, booleanPins, cancellation) ?: return null
+        val relations = installLinearFactor(index, target, integerPins, booleanPins, cancellation, allocator)
+            ?: return null
         factors += relations
         repeat(relations.size) { origins += index }
     }
-    return problem.withFactors(factors.toTypedArray(),
+    return EncodedTheoryModel(problem, factors.toTypedArray(),
         problem.impliedFactorMask?.let { mask -> BooleanArray(factors.size) { local ->
             mask[origins[local]]
-        } })
+        } }, allocator.count)
 }
 
 internal fun PreparedFactorProjections.installLinearFactor(
@@ -53,6 +62,7 @@ internal fun PreparedFactorProjections.installLinearFactor(
     integerPins: Map<SourceIntId, BigInt> = emptyMap(),
     booleanPins: Map<SourceBoolId, Boolean> = emptyMap(),
     cancellation: Cancellation = Cancellation.Never,
+    allocator: EncodingRealAllocator = EncodingRealAllocator(problem.numRealVars),
 ): List<EncodedTheoryFactor>? {
     val source = problem.factors[index]
     val sourceIndex = (source as? EncodedTheoryFactor)?.attribution?.sourceFactorIndex ?: index
@@ -71,7 +81,7 @@ internal fun PreparedFactorProjections.installLinearFactor(
         }
     }
     val encoding = LinearTheoryEncoding(target, sourceIndex, integerPins, booleanPins, cancellation,
-        booleans, integers, reals)
+        booleans, integers, reals, allocator)
     val forms = try {
         if (encoder(index, target).install(source, encoding) != null) return null
         encoding.finish() ?: return null
@@ -80,11 +90,13 @@ internal fun PreparedFactorProjections.installLinearFactor(
     }
     if (cancellation()) return null
     val attribution = if (source is EncodedTheoryFactor && integerPins.isEmpty() && booleanPins.isEmpty() &&
-        encoding.auxiliaryDefinitions().isEmpty() && encoding.guardDefinitions().isEmpty()
+        encoding.auxiliaryDefinitions().isEmpty() && encoding.guardDefinitions().isEmpty() &&
+        encoding.realAuxiliaries.isEmpty()
     ) source.attribution else EncodingAttribution(sourceIndex,
         booleans.sorted().map(::SourceBoolId), integers.sorted().map(::SourceIntId),
         reals.sorted().map(::SourceRealId), integerConditions = integerPins,
-        booleanConditions = booleanPins, affineAuxiliaries = encoding.auxiliaryDefinitions(),
+        booleanConditions = booleanPins, auxiliaries = encoding.realAuxiliaries,
+        affineAuxiliaries = encoding.auxiliaryDefinitions(),
         linearGuards = encoding.guardDefinitions())
     return forms.map { EncodedTheoryFactor(source, it, attribution) }
 }
@@ -98,12 +110,15 @@ private class LinearTheoryEncoding(
     private val booleans: Set<Int>,
     private val integers: Set<Int>,
     private val reals: Set<Int>,
+    private val allocator: EncodingRealAllocator,
 ) : TheoryEncoding {
     private val owner = Any()
     private val formulas = ArrayList<LinearEncodingFormula>()
     private val auxiliaries = ArrayList<EncodingAffineExpression?>()
     private val guards = ArrayList<LinearEncodingFormula?>()
     private val lowering = LinearFormulaLowering(cancellation)
+    val realAuxiliaries = ArrayList<TheoryRealId>()
+    private val usedReals = HashSet<TheoryRealId>()
 
     override fun fixedInteger(id: SourceIntId): BigInt? = fixedIntegers[id]
     override fun fixedBoolean(id: SourceBoolId): Boolean? = fixedBooleans[id]
@@ -113,6 +128,12 @@ private class LinearTheoryEncoding(
     override fun linearFormula(formula: LinearEncodingFormula) {
         lowering.checkpoint()
         formulas += formula
+    }
+
+    override fun realAuxiliary(): EncodingRealAuxiliary {
+        require(target == EncodingTarget.LINEAR) { "private real coordinates require a linear consumer" }
+        lowering.checkpoint()
+        return EncodingRealAuxiliary(owner, allocator.allocate()).also { realAuxiliaries += it.coordinate }
     }
 
     override fun auxiliary(): EncodingAuxiliary {
@@ -148,7 +169,9 @@ private class LinearTheoryEncoding(
         require(guards.none { it == null }) { "missing encoding guard definition" }
         for (index in auxiliaries.indices) expand(checkNotNull(auxiliaries[index]), setOf(index))
         for (index in guards.indices) clauses(checkNotNull(guards[index]), setOf(index))
-        return lowering.forms(lowering.and(formulas.map { clauses(it) }))
+        val forms = lowering.forms(lowering.and(formulas.map { clauses(it) }))
+        require(usedReals.containsAll(realAuxiliaries)) { "unattributed private real coordinate" }
+        return forms
     }
 
     private fun validate(reference: Int) {
@@ -169,7 +192,13 @@ private class LinearTheoryEncoding(
         for (term in expression.terms) {
             lowering.checkpoint()
             val auxiliary = term.auxiliary
-            if (auxiliary == null) {
+            val privateReal = term.realAuxiliary
+            if (privateReal != null) {
+                require(privateReal.owner === owner) { "foreign encoding real auxiliary" }
+                usedReals += privateReal.coordinate
+                val reference = Term.ofRealVar(privateReal.coordinate.index)
+                coefficients[reference] = (coefficients[reference] ?: BigFraction.ZERO) + term.coefficient
+            } else if (auxiliary == null) {
                 val reference = checkNotNull(term.reference)
                 validate(reference)
                 coefficients[reference] = (coefficients[reference] ?: BigFraction.ZERO) + term.coefficient

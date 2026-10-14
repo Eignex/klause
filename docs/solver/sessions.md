@@ -154,7 +154,10 @@ affine and Boolean definitions expand into source-coordinate comparisons before
 installation; attribution retains immutable reconstruction definitions. Another scope
 cannot define or reference those names. Compound formulas keep every conjunction and
 alternative under the source factor's attribution and the component's assertion/retraction
-lifetime. No private value is appended to a published source assignment.
+lifetime. Existential real coordinates remain in the combined private model; decisions and
+retraction use component-owned atoms. No private value is appended to a published
+source assignment. Source-coordinate agreement checks the retained private completion
+and can withhold agreement when a different source point has no such completion.
 
 Prepared encoders and installed source relations retain no cancellation token or live
 component owner. Each arithmetic opening owns its combined assertions and native

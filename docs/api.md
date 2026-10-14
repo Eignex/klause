@@ -341,7 +341,10 @@ emissions are conjoined. `linearFormula` accepts compound `And`/`Or` structure.
 `define` supplies exactly one acyclic definition in that receiving scope. Affine
 definitions retain exact rational coefficients and tagged source terms, including aliases.
 Definitions are expanded before the linear consumer receives attributed conjunctions
-and disjunctions. These names occupy no source coordinate, and their reconstruction
+and disjunctions. `realAuxiliary` allocates an existential real used by the complete formula. Its
+`TheoryRealId` belongs to the private model, and registered decisions involving it
+remain private to the component. Publication retains only the original declaration
+counts. Affine and guard names occupy no source coordinate, and their reconstruction
 definitions outlive the component without retaining mutable solving state. The
 consumer commits that scope only after a successful installation; a decline discards
 all staged constraints and auxiliaries.

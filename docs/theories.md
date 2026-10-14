@@ -58,7 +58,8 @@ bounds and holes. Arithmetic completion waits for those choices before contribut
 its final point, under the same shared assertion/retraction lifecycle. Polynomial
 composition installs required encodings and connected optional finite encodings
 alongside its finite projection. Missing finite propagation can be supplied by a complete
-polynomial encoder without transferring finite choices to arithmetic. Private linear
+polynomial encoder without transferring finite choices to arithmetic. Private existential real coordinates remain in the exact component and are omitted
+from source publication and source-predicate exchange. Private linear
 affine values and Boolean formula names are scope-owned, exactly defined and expanded
 before consumer installation. Missing, duplicate, cyclic or foreign definitions reject
 the installation; the retained attribution owns their reconstruction data.

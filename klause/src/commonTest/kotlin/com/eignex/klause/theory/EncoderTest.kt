@@ -90,7 +90,8 @@ class EncoderTest {
         val result = OpenTheoryPipeline.execute(plan.polynomialRequest(), engine = FiniteEngine.BACKTRACK).result
 
         assertTrue(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
-        assertEquals(listOf(0, 1), assertNotNull(plan.polynomialModel).encodingAttributions.map { it.sourceFactorIndex })
+        assertEquals(listOf(0, 1), assertNotNull(plan.polynomialModel).encodingAttributions
+            .map { it.sourceFactorIndex })
         assertEquals(listOf(2), plan.polynomialModel!!.finiteFactorIndices)
         assertNull(plan.polynomialIntegerCoordinate(1))
         assertEquals(1, plan.finiteIntegerCoordinate(1))
@@ -98,7 +99,7 @@ class EncoderTest {
     }
 
     @Test
-    fun `polynomial participation combines a finite propagator with its correlated arithmetic relations`() {
+    fun `polynomial participation correlates finite propagation with arithmetic relations`() {
         val source = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
             RealProduct(0, 0, 1, 1.0, 1.0),
@@ -155,12 +156,17 @@ class EncoderTest {
                 encoding.define(auxiliary, EncodingAffineExpression(listOf(
                     EncodingLinearTerm.source(Term.ofRealVar(0), BigFraction.ONE),
                 )))
+                val result = encoding.realAuxiliary()
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(result, BigFraction.ONE),
+                    EncodingLinearTerm.source(Term.ofRealVar(1), BigFraction.MINUS_ONE),
+                )), LinearOp.EQ, BigFraction.ZERO))
                 val positive = EncodingAffineExpression(listOf(
-                    EncodingLinearTerm.source(Term.ofRealVar(1), BigFraction.ONE),
+                    EncodingLinearTerm.auxiliary(result, BigFraction.ONE),
                     EncodingLinearTerm.auxiliary(auxiliary, BigFraction.MINUS_ONE),
                 ))
                 val negative = EncodingAffineExpression(listOf(
-                    EncodingLinearTerm.source(Term.ofRealVar(1), BigFraction.ONE),
+                    EncodingLinearTerm.auxiliary(result, BigFraction.ONE),
                     EncodingLinearTerm.auxiliary(auxiliary, BigFraction.ONE),
                 ))
                 val alternatives = encoding.guard()
@@ -187,11 +193,47 @@ class EncoderTest {
         assertTrue(prepared.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
         assertIs<SearchResult.Exhausted>(result)
         val installed = assertNotNull(plan.encodedTheoryFragment(source))
-        assertEquals(2, installed.numRealVars)
+        assertEquals(3, installed.numRealVars)
         assertEquals(listOf(0, 0), installed.factors.map { (it as EncodedTheoryFactor).attribution.sourceFactorIndex })
         val attribution = (installed.factors.first() as EncodedTheoryFactor).attribution
+        assertEquals(listOf(TheoryRealId(2)), attribution.auxiliaries)
         assertEquals(1, attribution.affineAuxiliaries.size)
         assertEquals(1, attribution.linearGuards.size)
+    }
+
+    @Test
+    fun `private real completion retracts queries and publishes only source coordinates`() {
+        val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0)
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(row), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (target != EncodingTarget.LINEAR) BuiltInEncoderProvider.select(factor, target)
+            else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                val private = encoding.realAuxiliary()
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                    EncodingLinearTerm.source(Term.ofRealVar(0), BigFraction.MINUS_ONE),
+                )), LinearOp.EQ, BigFraction.ZERO))
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                )), LinearOp.EQ, BigFraction.ONE))
+                null
+            }
+        })
+        val plan = source.prepareExecutionPlan(providers)
+        val queries = OpenExactNeighborhood(source, TheoryParams(), preparedSource = plan)
+        val witness = queries.use {
+            assertIs<ExactNeighborhoodResult.Refuted>(it.check(ExactNeighborhoodCondition(emptyMap(),
+                mapOf(0 to BigFraction.ZERO), mapOf(0 to BigFraction.ZERO)), Cancellation.Never))
+            assertIs<ExactNeighborhoodResult.Undecided>(it.check(ExactNeighborhoodCondition(emptyMap(),
+                emptyMap(), emptyMap()), Cancellation { true }))
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(ExactNeighborhoodCondition(emptyMap(),
+                mapOf(0 to BigFraction.ONE), mapOf(0 to BigFraction.ONE)), Cancellation.Never)).sample
+        }
+
+        assertEquals(listOf(BigFraction.ONE), witness.exactReals)
+        assertEquals(1, witness.reals.size)
+        assertEquals(1, source.numRealVars)
     }
 
     @Test
@@ -261,7 +303,8 @@ class EncoderTest {
         }
         val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
             val selected = BuiltInEncoderProvider.select(factor, target)
-            if (target != EncodingTarget.POLYNOMIAL) selected else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+            if (target != EncodingTarget.POLYNOMIAL) selected
+            else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
                 val result = selected.install(view, encoding)
                 encoding.cancellation.charge(4)
                 result

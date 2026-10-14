@@ -18,6 +18,7 @@ import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
+import com.eignex.klause.theory.rebindEncoding
 import com.eignex.klause.util.Cancellation
 
 /** Ownership of an integer column selected once before a search begins. */
@@ -125,7 +126,7 @@ class ComponentPlan internal constructor(
                 val kept = fragment.factors.indices.filter { index ->
                     (fragment.factors[index] as EncodedTheoryFactor).attribution.sourceFactorIndex < spec.numFactors
                 }
-                spec.withFactors(Array(kept.size) { fragment.factors[kept[it]] },
+                fragment.rebindEncoding(spec, Array(kept.size) { fragment.factors[kept[it]] },
                     fragment.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
             },
         )
@@ -236,9 +237,10 @@ class ComponentPlan internal constructor(
         else factorProjections.projected(spec, IntArray(spec.numFactors) { it })
         val fragment = if (appended) {
             selection.linearTheoryModel(encodingTarget(), selectedTheoryFactorIndices(), cancellation = cancellation)
-        } else installedFragment?.let { spec.withFactors(it.factors, it.impliedFactorMask) }
+        } else installedFragment?.let { it.rebindEncoding(spec, it.factors, it.impliedFactorMask) }
         return ComponentPlan(spec, intOwners, factorOwners,
-            if (appended && hasTheoryComponent && fragment == null) ProblemPipeline.UNSUPPORTED_OPEN else theoryPipeline,
+            if (appended && hasTheoryComponent && fragment == null) ProblemPipeline.UNSUPPORTED_OPEN
+            else theoryPipeline,
             unplaceable, selection, encodingFactors, fragment)
     }
 
@@ -279,7 +281,10 @@ class ComponentPlan internal constructor(
         cancellation: Cancellation = Cancellation.Never,
     ): ComponentPlan? {
         requireBelongsTo(spec)
-        if (unplaceable != null) return null
+        if (unplaceable != null || cancellation()) return null
+        if ((theoryPipeline == ProblemPipeline.EXACT_LRA || theoryPipeline == ProblemPipeline.EXACT_LIRA) &&
+            installedFragment != null
+        ) return this
         if (spec.numIntVars == 0 && spec.numRealVars == 0 && !retainEmptyTheory) return this
         val selected = spec.componentPlan(factorProjections, cancellation = cancellation)
         if (selected.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN) return null
@@ -325,18 +330,27 @@ class CpProblemProjection internal constructor(
 }
 
 /** Select component ownership from the source model. */
+fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan =
+    componentPlan(preferFinite, Cancellation.Never)
+
+/** Select component ownership using the descriptors captured for this canonical source. */
+fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: Boolean = false): ComponentPlan =
+    componentPlan(projections, preferFinite, Cancellation.Never)
+
+/** Select component ownership from the source model. */
 fun Problem.componentPlan(
     preferFinite: Boolean = false,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: Cancellation,
 ): ComponentPlan = componentPlan(
-    (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this), preferFinite, cancellation,
+    (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this),
+    preferFinite, cancellation,
 )
 
 /** Select component ownership using the descriptors captured for this canonical source. */
 fun Problem.componentPlan(
     projections: PreparedFactorProjections,
     preferFinite: Boolean = false,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: Cancellation,
 ): ComponentPlan {
     projections.requireSource(this)
     if (preferFinite) {

@@ -214,9 +214,12 @@ class PreparedSourcePlan internal constructor(
      * Returns null when a required source factor has no such completion. The returned plan admits
      * registered source rows; each query's conditions and mutable session belong to its worker.
      */
-    fun prepareConditionedLinearQuery(): PreparedSourcePlan? {
+    fun prepareConditionedLinearQuery(): PreparedSourcePlan? = prepareConditionedLinearQuery(Cancellation.Never)
+
+    /** Prepare the conditioned linear adapter under the current containing construction controls. */
+    fun prepareConditionedLinearQuery(cancellation: Cancellation): PreparedSourcePlan? {
         val canonical = model ?: return null
-        val ownership = componentPlan?.forLinearConditions(canonical) ?: return null
+        val ownership = componentPlan?.forLinearConditions(canonical, cancellation = cancellation) ?: return null
         val original = originalSource as? Problem ?: return null
         return canonical.preparedWithComponents(ownership, original, objective, maximize)
     }
@@ -256,7 +259,22 @@ fun Problem.prepareExecutionPlan(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     preferFinite: Boolean = false,
-    cancellation: Cancellation = Cancellation.Never,
+): PreparedSourcePlan = prepareExecutionPlan(objective, maximize, preferFinite, Cancellation.Never)
+
+/** Capture per-invocation factor mechanisms before selecting source ownership and admission. */
+fun Problem.prepareExecutionPlan(
+    providers: FactorProjectionProviders,
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
+    preferFinite: Boolean = false,
+): PreparedSourcePlan = prepareExecutionPlan(providers, objective, maximize, preferFinite, Cancellation.Never)
+
+/** Prepare source ownership and completion without running a solver or inventing finite bounds. */
+fun Problem.prepareExecutionPlan(
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
+    preferFinite: Boolean = false,
+    cancellation: Cancellation,
 ): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite, cancellation = cancellation)
 
 /** Capture per-invocation factor mechanisms before selecting source ownership and admission. */
@@ -265,8 +283,9 @@ fun Problem.prepareExecutionPlan(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     preferFinite: Boolean = false,
-    cancellation: Cancellation = Cancellation.Never,
-): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite, providers, cancellation = cancellation)
+    cancellation: Cancellation,
+): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite, providers,
+    cancellation = cancellation)
 
 internal fun Problem.prepareExecutionPlan(
     original: Problem,

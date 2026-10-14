@@ -288,7 +288,7 @@ class OpenTheoryMinimizer internal constructor(
                 val spent = (endWork >= 0L && state.work.spent >= endWork) || end?.hasPassedNow() == true
                 if (!first && spent) return null
                 first = false
-                val current = round ?: startRound(opened).also { round = it }
+                val current = round ?: startRound(opened, global).also { round = it }
                 val remainingWork = if (endWork < 0L) -1L else (endWork - state.work.spent).coerceAtLeast(0L)
                 val remainingMillis = end?.let { (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
                     ?.coerceAtLeast(0L) ?: Long.MAX_VALUE
@@ -358,7 +358,7 @@ class OpenTheoryMinimizer internal constructor(
 
         // The next round: the model under a row refuting the better of the incumbent and the external bound, or
         // the model itself while there is neither.
-        private fun startRound(opened: Opening): ResumableOpenTheory {
+        private fun startRound(opened: Opening, global: Cancellation): ResumableOpenTheory {
             val own = incumbents.current()?.objective
             val external = externalBound()?.takeIf { terms.isNotEmpty() && (own == null || it < own) }
             roundBoundExternal = external != null

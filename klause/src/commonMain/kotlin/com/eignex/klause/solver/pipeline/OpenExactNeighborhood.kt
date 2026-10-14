@@ -9,18 +9,20 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
 import kotlin.coroutines.cancellation.CancellationException
@@ -32,16 +34,37 @@ internal class OpenExactNeighborhood(
     preparedSource: PreparedSourcePlan? = null,
     private val invocation: () -> EngineInvocation? = { null },
 ) : ExactNeighborhoodCompletion, AutoCloseable {
-    private val prepared by lazy {
-        (preparedSource ?: model.prepareExecutionPlan(objective)).prepareConditionedLinearQuery()
-    }
-    private val componentPreparation = lazy {
-        val source = prepared ?: return@lazy null
+    private val basePreparation = preparedSource
+    private var prepared: PreparedSourcePlan? = null
+    private var components: PreparedSearchComponents? = null
+    private var encodingPreparationWork = 0L
+
+    private fun prepare(stop: Cancellation): PreparedSearchComponents? {
+        components?.let { return it }
+        if (stop()) return null
+        val construction = object : Cancellation {
+            override fun isCancelled(): Boolean = stop()
+            override fun deadline() = stop.deadline()
+            override fun workMeter(): WorkMeter = WorkMeter { units ->
+                encodingPreparationWork += units
+                stop.charge(units)
+            }
+        }
+        val retained = prepared ?: basePreparation?.takeUnless { it.decline == PreparedPlanDecline.RESOURCE }
+        val source = (retained ?: model.prepareExecutionPlan(
+            basePreparation?.factorProjections?.providers ?: model.selectedFactorProjections().providers,
+            objective, cancellation = construction,
+        )).prepareConditionedLinearQuery(construction) ?: return null
+        if (stop()) return null
         val working = requireNotNull(source.model)
         val plan = requireNotNull(source.componentPlan)
-        PreparedSearchComponents(plan, working, plan.cpSourceDomains(working))
+        val selected = PreparedSearchComponents(plan, working, plan.cpSourceDomains(working))
+        if (stop()) return null
+        prepared = source
+        components = selected
+        return selected
     }
-    private val components by componentPreparation
+
     private val queries = RetainedLinearQueries(model, params, objective, hints = { stop, state ->
         val source = prepared
         val plan = source?.componentPlan
@@ -51,8 +74,8 @@ internal class OpenExactNeighborhood(
     val exhausted: Boolean get() = queries.exhausted
     val work: Long get() = queries.work
     val stats: SolveStats get() = queries.stats
-    val preparationWork: Long get() = if (componentPreparation.isInitialized()) components?.preparationWork ?: 0 else 0
-    val sourcePrepared: Boolean get() = componentPreparation.isInitialized() && components?.sourcePrepared == true
+    val preparationWork: Long get() = encodingPreparationWork + (components?.preparationWork ?: 0)
+    val sourcePrepared: Boolean get() = components?.sourcePrepared == true
 
     init {
         require(preparedSource == null || preparedSource.belongsTo(model)) {
@@ -61,7 +84,7 @@ internal class OpenExactNeighborhood(
     }
 
     private fun open(stop: Cancellation, state: OpenTheorySolveState): PlannedSearch? {
-        val source = components ?: return null
+        val source = prepare(stop) ?: return null
         if (!source.prepareSource(stop)) return null
         return source.open(maxChecks = params.maxLeaves, cancellation = stop,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
