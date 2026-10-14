@@ -122,7 +122,9 @@ A finite minimizing endpoint also permits a candidate that cancels its nonzero
 continuous reduced cost through an active singleton-continuous row. Logical
 endpoint signs must remain supported, and the complete adjusted vector is checked
 again. At most eight row adjustments are tried, returning one completed candidate.
-This candidate can expose an integral fixing direction even when the original
+The operation requires a primary certificate, independently of an objective lattice
+or objective-expression candidate. A charged eligibility scan precedes workspace
+allocation. This candidate can expose an integral fixing direction even when the original
 certificate already has valid finite endpoint support. An equality-derived
 candidate takes precedence; otherwise finite-endpoint cancellation precedes a
 blended candidate. The operation returns at most three complete certificates.
