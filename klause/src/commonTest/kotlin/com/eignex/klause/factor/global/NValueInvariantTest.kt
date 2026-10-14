@@ -394,7 +394,7 @@ class NValueInvariantTest {
     }
 
     @Test
-    fun `class completion reconciles a feasible merge among competing classes`() {
+    fun `class completion reconciles a feasible merge among competing owned classes`() {
         for (seed in listOf(3, 17, 41)) {
             val p = Problem(
                 0,
@@ -416,10 +416,12 @@ class NValueInvariantTest {
                 ),
             )
             val state = LocalSearchState(LocalSearchModel.open(p), Random(seed))
+            state.seedImplicitFeasible()
             for ((variable, value) in listOf(0 to 3L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L, 5 to 2L, 6 to 2L)) {
                 state.assignment.setInt(variable, value)
             }
             state.recompute()
+            state.moveSink.proposer = 0
             val before = state.assignment.snapshot()
 
             state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
