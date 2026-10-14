@@ -39,6 +39,34 @@ class PortfolioBuilderTest {
     }
 
     @Test
+    fun `sole complete core worker joins initial admission`() {
+        val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(longArrayOf(1, 2))
+        val workers = PortfolioBuilder.build(problem, PortfolioScenario.sequential(Kind.COP, arms = 1), objective)
+
+        try {
+            assertFalse(workers.single { it.label == "bt/core-guided" }.improvementOnly)
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `explicit core selection joins initial admission`() {
+        val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(longArrayOf(1, 2))
+        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.BACKTRACK,
+            btPool = listOf({ BacktrackCatalog.byLabel("core-guided") }))
+        val workers = PortfolioBuilder.build(problem, scenario, objective)
+
+        try {
+            assertFalse(workers.single().improvementOnly)
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
     fun `a restricted public worker cannot refute its feasible containing source`() {
         val problem = Problem(1, 0, emptyArray(),
             arrayOf(Clause(intArrayOf(Lit.make(0, false))))).bake()
