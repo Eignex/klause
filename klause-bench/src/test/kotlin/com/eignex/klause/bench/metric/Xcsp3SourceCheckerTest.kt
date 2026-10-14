@@ -31,6 +31,8 @@ class Xcsp3SourceCheckerTest {
     init {
         val witness = "<instantiation><list>a b c</list><values>2 2 0</values></instantiation>"
         Xcsp3SourceChecker.inspect(source, witness, "10")
+        val parsed = Xcsp3.parse(regions.readText())
+        BacktrackSolver(parsed.problem.bake()).solve(BacktrackPresets.satOptimized(randomSeed = 3L))
     }
 
     @ParameterizedTest
