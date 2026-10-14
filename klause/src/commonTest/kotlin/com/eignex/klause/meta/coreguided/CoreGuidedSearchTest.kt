@@ -61,6 +61,49 @@ class CoreGuidedSearchTest {
     }
 
     @Test
+    fun `interrupted query opening retains its baked model and charges preparation`() {
+        val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val source = Problem(2, 0, emptyArray(), arrayOf(hard))
+        val augmentedModels = mutableListOf<Problem>()
+        var cancelled = false
+        var interrupted = false
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor != hard) BuiltInPropagationProjectionProvider.select(factor)
+            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
+                object : Propagator by delegate {
+                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                        if (state.problem.numBoolVars > source.numBoolVars) {
+                            augmentedModels += state.problem
+                            if (!interrupted) {
+                                interrupted = true
+                                cancelled = true
+                            }
+                        }
+                        return delegate.propagate(state, factorId)
+                    }
+                }
+            }
+        })
+        val objective = LinearObjective(longArrayOf(1, 1))
+        val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective, BacktrackParams())
+
+        val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) { error("interrupted opening") }
+        val charged = search.work
+        cancelled = false
+        val result = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {}
+
+        assertNull(paused)
+        assertTrue(interrupted)
+        assertTrue(augmentedModels.size > 1)
+        assertTrue(augmentedModels[0] === augmentedModels[1])
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(1L, objective.evaluateLong(optimal.sample))
+        assertTrue(search.work >= charged)
+        search.close()
+    }
+
+    @Test
     fun `rebuilt core queries retain captured propagation in engine views`() {
         val hard = Clause(intArrayOf(Lit.make(3, false), Lit.make(5, false)))
         val source = Problem(6, 0, emptyArray(), arrayOf(hard))
