@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
@@ -13,6 +14,7 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -150,6 +152,96 @@ class QfNraSolverTest {
 
             assertNull(assignment)
         }
+    }
+
+    @Test
+    fun `coupled phase exhaustion leaves charged scalar fallback work available`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (>= (* x y) 1) (> x 0) (> y 0)))
+            (check-sat)
+        """.trimIndent())
+        var spent = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+        val work = QfNraWork(QfNraParams(cancellation))
+        val arithmetic = PolynomialArithmetic(work)
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, algebraic)
+        val before = spent
+
+        val assignment = work.probe {
+            assertNull(work.coupled {
+                repeat(65_536) { arithmetic.step() }
+                null
+            })
+            assertEquals(before + 32_768, spent)
+            probe.candidate(mapOf(0 to algebraic.rational(BigFraction.ONE), 1 to algebraic.rational(BigFraction.ONE)))
+        }
+
+        assertIs<QfNraAssignment>(assignment)
+        assertTrue(spent > before + 32_768)
+        assertTrue(spent < before + 65_536)
+        assertEquals(spent, work.snapshot().workSpent)
+    }
+
+    @Test
+    fun `an observed containing stop inside a coupled phase cannot publish a fallback witness`() {
+        var spent = 0L
+        var stopped = false
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean {
+                if (spent < 4 || stopped) return false
+                stopped = true
+                return true
+            }
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+        val work = QfNraWork(QfNraParams(cancellation))
+        val arithmetic = PolynomialArithmetic(work)
+        var fallbackReached = false
+
+        assertFailsWith<PolynomialInterrupted> {
+            work.probe {
+                work.coupled {
+                    repeat(8) { arithmetic.step() }
+                    null
+                }
+                fallbackReached = true
+                null
+            }
+        }
+
+        assertEquals(false, fallbackReached)
+        assertEquals(4L, spent)
+        assertEquals(spent, work.snapshot().workSpent)
+    }
+
+    @Test
+    fun `oversized affine intermediates decline without disabling complete point checks`() {
+        val coefficient = "1" + "0".repeat(1000)
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (= (+ (* $coefficient x) y) 1) (= (+ x (* $coefficient y)) 1) (> (* x y) 0)))
+            (check-sat)
+        """.trimIndent())
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, algebraic)
+
+        val coupled = probe.coupled(requireNotNull(formula.conjunctiveAtoms(arithmetic, 128)),
+            listOf(BigFraction.ZERO, BigFraction.ZERO), emptyMap())
+        val value = (BigFraction.of(parseBigInt(coefficient), bigIntOf(1)) + BigFraction.ONE).reciprocal()
+        val fallback = probe.candidate(mapOf(0 to algebraic.rational(value), 1 to algebraic.rational(value)))
+
+        assertNull(coupled)
+        assertIs<QfNraAssignment>(fallback)
     }
 
     @Test

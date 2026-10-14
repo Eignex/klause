@@ -331,7 +331,9 @@ sample authority. Fixed coordinates stay fixed. Rejected directions and inconsis
 affine completions supply no source refutation. Fractional elimination, substitution,
 root queries, reconstruction and checks debit the existing native owner; affine row
 storage respects the kernel matrix cap. Optional representation declines retain the
-spent work and leave ordinary coordinate probing available.
+spent work and leave ordinary coordinate probing available. Affine row, completion,
+direction and substituted coefficients decline above the same 4,096-bit admission
+ceiling as input coefficients.
 Equalities under negation or disjunction are proposal guides, never asserted facts.
 For a nonlinear conjunction of numeric inequalities and disequalities, an optional guide view
 complements directly negated atoms without changing the source formula. It excludes
@@ -352,7 +354,10 @@ This optional phase considers up to 32 real coordinates, 64 Boolean coordinates,
 Uniform rational centers and coupled lines seed at most
 64 complete proposals and 32 coordinate root queries across four repair passes per
 center. Coupled lines use at most half of these shared proposal and query caps, leaving
-the remaining slots for coordinate repairs. Every specialized polynomial consumes
+the remaining slots for coordinate repairs. Their native phase ends at the midpoint
+of the same 65,536-unit probe slice. A private phase stop retains every charge and
+continues scalar probing; a containing stop remains terminal even if its predicate
+later clears. Every specialized polynomial consumes
 one root-query slot. Root queries admit coordinate or line degree at most eight. One private slice of
 65,536 native units is debited to the containing query's cumulative work and caller
 meter. Rejected proposals, private exhaustion and optional representation declines
