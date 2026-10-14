@@ -191,7 +191,19 @@ allowances are unchanged. Closing drops the private cursor and closes any instal
 owner. Ordinary installation exceptions close the handle before propagating the failure.
 See [search](search.md#finite-propagation) and [resource allowances](resources.md).
 
-### Polynomial root preparation
+### Auxiliary incumbent evaluation
+
+An auxiliary incumbent probe retains preparation and a search trial after an incumbent
+arrives. Every initial sibling admission precedes its continuation. The unproductive
+trial uses base slices and preserves the other arms' policy evidence. Search work after
+preparation is capped at four base work allowances; atomic overspend consumes the trial
+instead of buying additional fresh segments. Charged debt repayment grants no fresh
+work and does not consume that allowance. Preparation has at most twelve advancing
+segments. Productive arms return to the ordinary policy; unproductive arms retire
+without plateau reseeding. This budget belongs to the invocation and never renews
+native arithmetic quotas.
+
+## Polynomial root preparation
 
 Polynomial complete workers defer component initialization into their retained handle.
 Clausal optimization with additional components uses retained preparation instead of
