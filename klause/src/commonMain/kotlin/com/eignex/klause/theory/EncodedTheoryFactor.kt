@@ -169,6 +169,7 @@ private class LinearTheoryEncoding(
         require(guards.none { it == null }) { "missing encoding guard definition" }
         for (index in auxiliaries.indices) expand(checkNotNull(auxiliaries[index]), setOf(index))
         for (index in guards.indices) clauses(checkNotNull(guards[index]), setOf(index))
+        usedReals.clear()
         val forms = lowering.forms(lowering.and(formulas.map { clauses(it) }))
         require(usedReals.containsAll(realAuxiliaries)) { "unattributed private real coordinate" }
         return forms
