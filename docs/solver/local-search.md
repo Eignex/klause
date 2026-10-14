@@ -318,12 +318,16 @@ elimination with the least nonnegative whole-model cost delta after move-sink fi
 may reconcile affected Boolean clauses on a scratch assignment before using the
 existing directed repair-chain mechanism to reconcile regressed
 surrounding constraints. Zero-delta moves need completion only at an infeasible assignment.
-Clause reconciliation inspects at most 512 queued clause occurrences and appends at
+Clause and unary-channel reconciliation inspects at most 512 queued factor occurrences and appends at
 most 32 primitive writes. A violated clause with one eligible repair can flip a searched
 flag or set a searched integer to satisfy a maintained unary equality (or falsify a
 unary disequality). Reconciliation can also force a maintained conjunction true or a maintained disjunction false,
 following at most four definition levels and 32 fold nodes per completion. Competing
 integer targets decline that folded repair. The 32-write cap includes all fold leaves.
+Changes to searched usage flags carry their incident unary reified equalities and
+disequalities. A channel with one eligible repair can update its searched indicator
+or set its searched integer to the exact equality value. Other channel choices remain
+with ordinary directed repair.
 All counted coordinates and the count remain protected. Auxiliary writes respect pins,
 domains and ownership. Each scratch write reevaluates its affected
 definitions. This can reconcile searched usage flags and the coordinated attributes

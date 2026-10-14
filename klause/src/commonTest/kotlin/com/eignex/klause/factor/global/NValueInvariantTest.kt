@@ -718,4 +718,55 @@ class NValueInvariantTest {
             }, protection)
         }
     }
+
+    @Test
+    fun `class elimination carries a searched usage flag through its unary channels`() {
+        val p = Problem(
+            3,
+            7,
+            arrayOf(
+                IntDomain(1, 2), IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 1),
+                IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),
+            ),
+            arrayOf<Factor>(
+                NValue(0, intArrayOf(1, 2, 3, 4)),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(4), LinearOp.EQ, 1),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(5), LinearOp.NE, 0),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(6), LinearOp.NE, 0),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        state.invariants = InvariantNetwork(
+            listOf(
+                DefinitionalSweep.SweepNode.CmpReif(0, longArrayOf(1), intArrayOf(3), 1, LinearOp.EQ),
+                DefinitionalSweep.SweepNode.CmpReif(1, longArrayOf(1), intArrayOf(4), 1, LinearOp.EQ),
+            ),
+            7,
+            3,
+        )
+        state.assignment.setInt(0, 2)
+        for (variable in 3..6) state.assignment.setInt(variable, 1)
+        for (b in 0..2) state.assignment.setBool(b, true)
+        state.recompute()
+        val before = state.assignment.snapshot()
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+        val completion = state.moveSink.list.first { move ->
+            move is Move.Compound && Move.IntSet(0, 1) in move.parts && state.netDelta(move) == 0L
+        }
+        assertEquals(before, state.assignment.snapshot())
+        state.apply(completion)
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(0L, state.assignment.intValue(5))
+        assertEquals(0L, state.assignment.intValue(6))
+        assertEquals(false, state.assignment.boolValue(2))
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
 }
