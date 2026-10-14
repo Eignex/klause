@@ -11,6 +11,25 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `combined dual costs fix an integral coordinate when either component leaves it free`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L, cost = 10L)
+            val z = addVar(0L, 1L, cost = 100L)
+            addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(x, z), doubleArrayOf(4.0, 1000.0), Relation.GE, 1001.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val additional = ArrayList<LpDeductionCertificate>()
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(2.5),
+            onAdditionalCertificate = { additional.add(it) }))
+
+        assertNull(certificate.fixSteps(0, 106L, 0L))
+        assertTrue(additional.any { it.fixSteps(0, 106L, 0L) == 0L })
+        assertTrue(additional.any { it.fixSteps(0, 106L, 0L)?.let { steps -> steps >= 1L } == true })
+    }
+
+    @Test
     fun `objective equalities retain fixing certificates when dual endpoints are absent`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)
@@ -21,7 +40,7 @@ class MixedDualBoundTest {
         var additional: LpDeductionCertificate? = null
 
         val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(2.0),
-            onAdditionalCertificate = { additional = it }))
+            onAdditionalCertificate = { if (additional == null) additional = it }))
 
         assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
         assertEquals(0L, certificate.fixSteps(0, 1L, 0L))
@@ -39,7 +58,7 @@ class MixedDualBoundTest {
         var additional: LpDeductionCertificate? = null
 
         val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(-1.0),
-            onAdditionalCertificate = { additional = it }))
+            onAdditionalCertificate = { if (additional == null) additional = it }))
 
         assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
         assertEquals(BigFraction.ofLong(-1L), assertNotNull(additional).exactObjectiveBound())
@@ -82,7 +101,7 @@ class MixedDualBoundTest {
         var objectiveCertificate: LpDeductionCertificate? = null
 
         val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
-            onAdditionalCertificate = { objectiveCertificate = it }))
+            onAdditionalCertificate = { if (objectiveCertificate == null) objectiveCertificate = it }))
 
         assertEquals(BigFraction.ONE, certificate.exactObjectiveBound())
         assertEquals(BigFraction.ZERO, certificate.exactReducedCost(0))

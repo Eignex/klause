@@ -18,7 +18,7 @@ internal fun nodeDualCertificate(
     val certificate = try {
         meter.poll()
         val state = model.exactState ?: throw LpProjectionStop()
-        meter.reserve(model.numVars.toLong() * 16L + model.m * 8L)
+        meter.reserve(model.numVars.toLong() * 16L + model.m * 8L + 128L)
         meter.attempt(observer, "INTEGER") {
             integerCertifyUnchecked(model, duals, DEFAULT_SCALE_BITS, allowMixed = true, scan = meter::step)
         } ?: meter.attempt(observer, "ROUNDED") {
@@ -29,7 +29,8 @@ internal fun nodeDualCertificate(
     } catch (_: LpProjectionStop) {
         null
     }
-    val rows = if (!model.hasIntegralObjective() && (certificate != null || onAdditionalCertificate != null)) {
+    val integralObjective = model.hasIntegralObjective()
+    val rows = if (!integralObjective && (certificate != null || onAdditionalCertificate != null)) {
         try {
             meter.attempt(observer, "OBJECTIVE_INTEGRAL") { integralObjectiveRows(model, meter) }
         } catch (_: LpProjectionStop) {
@@ -49,10 +50,11 @@ internal fun nodeDualCertificate(
     } else {
         null
     }
-    val objectiveCertificate = if (onAdditionalCertificate != null && rows != null) {
+    val objectiveCertificate = if (onAdditionalCertificate != null && (rows != null || integralObjective)) {
         try {
             meter.attempt(observer, "OBJECTIVE_EXPRESSION") {
-                objectiveExpressionCertificate(model, rows.single(), meter)
+                if (rows != null) objectiveExpressionCertificate(model, rows.single(), meter)
+                else objectiveBoxCertificate(model, meter)
             }
         } catch (_: LpProjectionStop) {
             null
@@ -61,28 +63,36 @@ internal fun nodeDualCertificate(
         null
     }
     val primary = fixingCertificate ?: certificate
-    val accepted = if (primary != null && objectiveCertificate != null) {
+    val blended = if (primary != null && objectiveCertificate != null) {
         try {
-            meter.attempt(observer, "OBJECTIVE_SELECT") {
-                if (meter.less(primary.exactObjectiveBound(), objectiveCertificate.exactObjectiveBound())) {
-                    objectiveCertificate
-                } else {
-                    primary
-                }
-            }
+            meter.attempt(observer, "BLENDED") { blendedCertificate(model, primary, objectiveCertificate, meter) }
         } catch (_: LpProjectionStop) {
-            primary
+            null
         }
     } else {
-        primary ?: objectiveCertificate
+        null
     }
-    val additional = if (accepted === objectiveCertificate) primary else objectiveCertificate
+    val candidates = listOfNotNull(primary, objectiveCertificate, blended)
+    var accepted = candidates.firstOrNull()
+    for (candidate in candidates) {
+        val selected = accepted ?: continue
+        if (candidate === selected) continue
+        try {
+            meter.attempt(observer, "OBJECTIVE_SELECT") {
+                if (meter.less(selected.exactObjectiveBound(), candidate.exactObjectiveBound())) accepted = candidate
+                accepted
+            }
+        } catch (_: LpProjectionStop) {
+            continue
+        }
+    }
     observer?.observe(LpCertifier.INTEGER, accepted != null, LpCertifierCost.Metered(meter.work))
     if (cancellation()) return null
-    if (additional != null && rows != null) {
-        onAdditionalCertificate?.invoke(IntegralObjectiveCertificate(additional, rows))
+    for (candidate in candidates) if (candidate !== accepted) {
+        onAdditionalCertificate?.invoke(if (rows != null) IntegralObjectiveCertificate(candidate, rows) else candidate)
     }
-    return if (accepted != null && rows != null) IntegralObjectiveCertificate(accepted, rows) else accepted
+    val selected = accepted ?: return null
+    return if (rows != null) IntegralObjectiveCertificate(selected, rows) else selected
 }
 
 private class IntegralObjectiveCertificate(
@@ -157,6 +167,30 @@ private fun integralObjectiveAfterRow(
     }
     constant = meter.add(meter.multiply(constant, scale.reciprocal()), source.objective.externalConstant.value)
     return ExactLpNumber.of(constant).exactLong() != null
+}
+
+private fun objectiveBoxCertificate(model: LpModel, meter: MixedCertificateMeter): LpDeductionCertificate? {
+    val state = model.exactState ?: return null
+    meter.reserve(model.m * 16L)
+    val zero = DoubleArray(model.m)
+    return integerCertifyUnchecked(model, zero, DEFAULT_SCALE_BITS, allowMixed = true, scan = meter::step)
+        ?: mixedCertificate(model, state, List(model.m) { BigFraction.ZERO }, meter)
+}
+
+private fun blendedCertificate(
+    model: LpModel,
+    primary: LpDeductionCertificate,
+    objective: LpDeductionCertificate,
+    meter: MixedCertificateMeter,
+): LpDeductionCertificate? {
+    val state = model.exactState ?: return null
+    meter.reserve(model.m * 24L)
+    val a = primary.exactMultipliers()
+    val b = objective.exactMultipliers()
+    if (a == b) return null
+    val half = BigFraction.ofLong(2L).reciprocal()
+    val y = List(model.m) { meter.multiply(meter.add(a[it], b[it]), half) }
+    return mixedCertificate(model, state, y, meter)
 }
 
 private fun objectiveExpressionCertificate(

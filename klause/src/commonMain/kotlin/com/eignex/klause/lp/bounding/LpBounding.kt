@@ -579,14 +579,14 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     if (cancellation()) return LpNodeOutcome(false, null)
-    var objectiveCertificate: LpDeductionCertificate? = null
+    val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
     val cert = if ((learn && canPropagate) || canFix) {
         solveContext.certificationPolicy.acceptNullable(
             LpCertifier.INTEGER,
             nodeDualCertificate(
                 boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
                 eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
-                onAdditionalCertificate = if (canFix) { { objectiveCertificate = it } } else null,
+                onAdditionalCertificate = if (canFix) { { additionalCertificates.add(it) } } else null,
             ),
         ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
@@ -696,14 +696,14 @@ internal fun LpEngine.sparseSafePrune(
     ) {
         return LpNodeOutcome(true, null)
     }
-    val objectiveCert = objectiveCertificate?.let {
-        solveContext.certificationPolicy.acceptNullable(LpCertifier.INTEGER, it)
-    }
-    if (canFix && cert != null && objectiveCert != null && !cancellation() &&
-        applySparseReducedCostFixing(boundRel, objectiveCert, session, bound, sink, objectiveVar,
+    if (canFix && cert != null) for (candidate in additionalCertificates) {
+        if (cancellation()) return LpNodeOutcome(false, optimalBasis)
+        val additional = solveContext.certificationPolicy.acceptNullable(LpCertifier.INTEGER, candidate) ?: continue
+        if (applySparseReducedCostFixing(boundRel, additional, session, bound, sink, objectiveVar,
             objectiveAscending, learn, cancellation, objectiveCeiling)
-    ) {
-        return LpNodeOutcome(true, null)
+        ) {
+            return LpNodeOutcome(true, null)
+        }
     }
     return LpNodeOutcome(false, optimalBasis)
 }
