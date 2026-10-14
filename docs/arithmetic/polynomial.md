@@ -34,6 +34,15 @@ matrices for indices 0 through one less than the smaller degree. Index zero is
 the resultant; leading coefficients are separately accessible. Policy chooses
 which polynomials, reducta and coefficient families to project.
 
+Prepared subresultant cursors retain private matrices, pivot signs, previous divisors
+and pending polynomial products across caller checkpoints. Multiplication snapshots
+its immutable term lists once and merges completed products in batches of 256; exact
+division retains its remainder and quotient between reductions. The prepared and eager
+paths charge the same native operations. Cursors expose only a completed polynomial
+or subresultant family, with null checkpoints carrying no mathematical result. Native
+interruption and representation failures remain terminal. Callers own cursor disposal
+and the meaning of suspension; the kernel does not read search or propagation state.
+
 ## Rational roots and scalar identity
 
 `RationalPolynomial` captures ascending rational coefficients and trims trailing

@@ -266,6 +266,14 @@ coefficient-folding units when a caller meter exists. Parsing is excluded from n
 engine counters. `nra-work-limit`, `nra-dense-coefficients` and `nra-matrix-cells` own
 the polynomial limits; `node-limit` and legacy open-work settings do not price them.
 
+A complete worker's root query retains normalization, probing and projection preparation
+between slices. Projection retains subresultant matrices, completed Bareiss cells,
+exact-division reductions and monomial-product batches. Individual rational operations,
+polynomial snapshots and the final cell check remain atomic with respect to slice
+suspension and poll solve-wide cancellation. Pending queries expose cumulative
+native charges without publishing partial results. Closing abandons private cursors while
+retaining their charges. See [portfolio preparation](../solver/portfolio.md#polynomial-root-preparation).
+
 A `PolynomialTheoryInvocation` shares one cumulative native allowance across its
 conditioned checks. Every check receives only the remaining allowance and forwards
 its observed arithmetic work once to the containing caller meter. Query condition

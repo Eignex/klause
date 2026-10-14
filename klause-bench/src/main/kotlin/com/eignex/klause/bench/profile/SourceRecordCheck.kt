@@ -7,6 +7,7 @@ import java.util.Base64
 import java.util.Locale
 import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -19,13 +20,23 @@ object SourceRecordCheck {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("bundle", "sha256")) { "Use bundle=<https URL> sha256=<digest>" }
-        val url = URI(requireNotNull(options["bundle"]))
-        require(url.scheme == "https" && url.userInfo == null)
+        val bundleOptions = options.keys - "witnessOnly"
+        require(bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256")) {
+            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest>"
+        }
+        require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
+        val witnessOnly = options["witnessOnly"] == "true"
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val root = File(System.getProperty("klause.workspace.root", "."))
-        val connection = url.toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
-        val bytes = connection.getInputStream().use { it.readNBytes(32 * 1024 * 1024 + 1) }
+        val bytes = options["input64"]?.let { encoded ->
+            require(encoded.length <= 96 * 1024) { "Inline bundle is oversized; use a URL" }
+            Base64.getDecoder().decode(encoded)
+        } ?: run {
+            val url = URI(requireNotNull(options["bundle"]))
+            require(url.scheme == "https" && url.userInfo == null)
+            val connection = url.toURL().openConnection().apply { connectTimeout = 30_000; readTimeout = 30_000 }
+            connection.getInputStream().use { it.readNBytes(32 * 1024 * 1024 + 1) }
+        }
         require(bytes.size <= 32 * 1024 * 1024 && sha(bytes) == options["sha256"]) { "Bundle identity differs" }
         out.resolve("input.json.gz").writeBytes(bytes)
         val text = GZIPInputStream(bytes.inputStream()).use { it.readNBytes(64 * 1024 * 1024 + 1) }
@@ -34,15 +45,23 @@ object SourceRecordCheck {
         require(bundle.keys == setOf("cases", "sources"))
         val cases = out.resolve("cases.json").apply { writeText(bundle.getValue("cases").jsonArray.toString()) }
         val sources = out.resolve("sources").apply { mkdirs() }
+        var sourceBytes = 0L
         for ((digest, encoded) in bundle.getValue("sources").jsonObject) {
             require(digest.matches(Regex("[0-9a-f]{64}")))
-            val source = Base64.getDecoder().decode(encoded.jsonPrimitive.content)
-            require(sha(source) == digest) { "Original source identity differs" }
+            val source = if (encoded is JsonObject) {
+                require(encoded.keys == setOf("gzip64")) { "Unsupported source encoding" }
+                val compressed = Base64.getDecoder().decode(encoded.getValue("gzip64").jsonPrimitive.content)
+                GZIPInputStream(compressed.inputStream()).use { it.readNBytes(64 * 1024 * 1024 + 1) }
+            } else Base64.getDecoder().decode(encoded.jsonPrimitive.content)
+            sourceBytes += source.size
+            require(sourceBytes <= 64 * 1024 * 1024 && sha(source) == digest) {
+                "Original source size or identity differs"
+            }
             sources.resolve("$digest.txt").writeBytes(source)
         }
         val log = out.resolve("checker-install.log")
-        fun execute(file: File, vararg command: String) {
-            val process = ProcessBuilder(command.toList()).redirectErrorStream(true)
+        fun execute(file: File, vararg command: String, extraArguments: List<String> = emptyList()) {
+            val process = ProcessBuilder(command.toList() + extraArguments).redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(file)).start()
             check(process.waitFor() == 0) { "${command.first()} failed; see ${file.path}" }
         }
@@ -63,7 +82,8 @@ object SourceRecordCheck {
         execute(out.resolve("checker.log"), python, tools.resolve("verify_source_results.py").absolutePath,
             cases.absolutePath, "--source-root", sources.absolutePath,
             "--progress", out.resolve("checked-prefix.jsonl").absolutePath,
-            "--output", out.resolve("source-checks.json").absolutePath)
+            "--output", out.resolve("source-checks.json").absolutePath,
+            extraArguments = if (witnessOnly) listOf("--witness-only") else emptyList())
         check(environment.deleteRecursively())
         println(out.resolve("source-checks.json").readText())
     }

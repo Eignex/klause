@@ -8,10 +8,108 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PolynomialTheoryServiceTest {
+    @Test
+    fun `completed query has no further elements`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        service.invocation().use { invocation ->
+            val pending = invocation.prepareCheck()
+            var result: QfNraResult? = null
+            while (result == null) result = pending.next()
+
+            assertFalse(pending.hasNext())
+            assertFailsWith<NoSuchElementException> { pending.next() }
+        }
+    }
+
+    @Test
+    fun `projection continuation retains native charges and refutation`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (= y (* x x)))
+            (assert (< y 0))
+        """.trimIndent())
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val complete = service.invocation().use { assertIs<QfNraResult.Unsatisfiable>(it.check()) }
+
+        service.invocation(QfNraParams(maximumWork = complete.stats.workSpent + 1)).use { invocation ->
+            val pending = invocation.prepareCheck()
+            var result: QfNraResult? = null
+            var pauses = 0
+            while (result == null) {
+                result = pending.next()
+                if (result == null) pauses++
+            }
+
+            assertIs<QfNraResult.Unsatisfiable>(result)
+            assertTrue(pauses > 2)
+            assertEquals(complete.stats, result.stats)
+            assertEquals(complete.stats, invocation.stats)
+            assertEquals(1L, invocation.queries)
+        }
+    }
+
+    @Test
+    fun `paused query retains native work without repeating preparation`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        val required = service.invocation().use { it.check().stats.workSpent }
+
+        service.invocation(QfNraParams(maximumWork = required + 1)).use { invocation ->
+            val pending = invocation.prepareCheck()
+            assertNull(pending.next())
+            val preparedWork = invocation.stats.workSpent
+            assertTrue(preparedWork > 0)
+            var result: QfNraResult? = null
+            while (result == null) result = pending.next()
+
+            assertIs<QfNraResult.Satisfiable>(result)
+            assertEquals(required, invocation.stats.workSpent)
+            assertEquals(1L, invocation.queries)
+            assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(invocation.check()).reason)
+        }
+    }
+
+    @Test
+    fun `closing paused query retains charges and rejects continuation`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
+        val invocation = PolynomialTheoryService(source.formula, source.boolCount, source.realCount).invocation()
+        val pending = invocation.prepareCheck()
+        assertNull(pending.next())
+        val charged = invocation.stats.workSpent
+
+        invocation.close()
+        invocation.close()
+
+        assertEquals(charged, invocation.stats.workSpent)
+        assertFailsWith<IllegalStateException> { pending.next() }
+    }
+
+    @Test
+    fun `solve cancellation terminates paused query without a partial witness`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= x 1))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        var cancelled = false
+        service.invocation(QfNraParams(cancellation = Cancellation { cancelled })).use { invocation ->
+            val pending = invocation.prepareCheck()
+            assertNull(pending.next())
+            cancelled = true
+
+            val result = pending.next()
+
+            assertEquals(QfNraReason.Interrupted, assertIs<QfNraResult.Unknown>(result).reason)
+        }
+    }
+
+
     @Test
     fun `query bounds cannot replace fixed source coordinates`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert true)")

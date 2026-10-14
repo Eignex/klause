@@ -191,6 +191,21 @@ allowances are unchanged. Closing drops the private cursor and closes any instal
 owner. Ordinary installation exceptions close the handle before propagating the failure.
 See [search](search.md#finite-propagation) and [resource allowances](resources.md).
 
+### Polynomial root preparation
+
+Polynomial complete workers defer component initialization into their retained handle.
+Clausal optimization with additional components uses retained preparation instead of
+opening its component root eagerly; native SAT settings and work currencies are preserved.
+Root normalization, bounded witness probing and projection retain completed phases and
+projection matrices across slices. Subresultant preparation checkpoints matrix rows,
+Bareiss cells, exact-division reductions and batches of 256 monomial products. A slice
+stops at those checkpoints; one rational operation, polynomial snapshot or the final
+cell check can overrun it. Arithmetic
+polls the solve-wide token, and every continuation retains the same native allowance.
+Unfinished initialization publishes neither a point nor a refutation. Native resource
+limits, solve-wide cancellation and component failures terminate the arm. Ordinary
+finite satisfaction construction retains its eager lifecycle.
+
 ## Preparation revisits
 
 Before the first incumbent, an optimization arm with pending private preparation or a
