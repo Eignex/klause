@@ -2747,8 +2747,8 @@ class PortfolioTest {
                 openingDeadline = params.cancellation.deadline()
                 val until = TimeSource.Monotonic.markNow() + 5.milliseconds
                 while (!until.hasPassedNow()) Unit
-                remainingMillis =
-                    (checkNotNull(openingDeadline) - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
+                remainingMillis = (checkNotNull(openingDeadline) - TimeSource.Monotonic.markNow())
+                    .inWholeMilliseconds.coerceAtLeast(0L)
                 return handle
             }
         }
