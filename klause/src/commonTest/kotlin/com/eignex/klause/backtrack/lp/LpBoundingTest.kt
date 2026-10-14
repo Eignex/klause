@@ -46,6 +46,47 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `fixing retains a permitted far endpoint`() {
+        for (sign in listOf(-1L, 1L)) for (realCost in listOf(0.0, 0.5)) {
+            val maximum = if (sign > 0L) 6.0 else 0.0
+            val cutoff = maximum + realCost * 0.25 + if (realCost == 0.0) 1.0 else 0.0
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+            val objective = LinearObjective(intCoefficients = longArrayOf(2L * sign),
+                realCoefficients = doubleArrayOf(realCost))
+            val sink = SolveStatsSink(backend = "endpoint-admission")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, cutoff,
+                    sink, Cancellation.Never, -1, true)
+
+                assertFalse(result.prune)
+                assertEquals(IntDomain(0, 3), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
+    fun `fixing removes a far endpoint beyond the cutoff`() {
+        for (sign in listOf(-1L, 1L)) for (realCost in listOf(0.0, 0.5)) {
+            val cutoff = if (sign > 0L) 6.0 else 0.0
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+            val objective = LinearObjective(intCoefficients = longArrayOf(2L * sign),
+                realCoefficients = doubleArrayOf(realCost))
+            val sink = SolveStatsSink(backend = "endpoint-admission")
+            val session = PropagationSession(problem)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session, cutoff,
+                    sink, Cancellation.Never, -1, true)
+
+                assertFalse(result.prune)
+                assertEquals(if (sign > 0L) IntDomain(0, 2) else IntDomain(1, 3), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
     fun `objective equality fixing bounds an integral coordinate seated inside the LP face`() {
         for (sign in listOf(-1.0, 1.0)) {
             val problem = Problem(

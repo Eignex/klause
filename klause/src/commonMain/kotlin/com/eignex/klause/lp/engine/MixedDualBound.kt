@@ -334,6 +334,9 @@ internal class MixedDualBound(
     override fun improvingGapNonNegative(improvingMax: Long, sourceConstant: Long): Boolean =
         gap(improvingMax, sourceConstant) >= BigFraction.ZERO
 
+    override fun fixStepsForGap(col: Int, gap: BigFraction): Long? =
+        if (authority.model.column(col).integral) super.fixStepsForGap(col, gap) else null
+
     override fun fixStepsAtCutoff(col: Int, cutoff: BigFraction, sourceConstant: Long): Long? =
         if (authority.model.column(col).integral) super.fixStepsAtCutoff(col, cutoff, sourceConstant) else null
 

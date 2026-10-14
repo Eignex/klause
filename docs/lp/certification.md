@@ -101,7 +101,11 @@ bound. Withholding the certificate still withholds that projection.
 Objective scale and external constants map the rational bound and reduced costs
 to minimized source units. Rational cutoff and fixing arithmetic charges operand word-length
 squared to the containing node work ledger; fixed-width integer fixing keeps its
-integer division lane. Retained multiplier snapshots remain compatible with
+integer division lane. Fixing first checks the far live endpoint against the exact
+allowed gap; an entirely admissible live domain requires no division. Rational
+gaps are computed once per certificate application. Productive reductions retain
+the same exact step quotient, source endpoints and cutoff semantics.
+Retained multiplier snapshots remain compatible with
 original-source capture, whose independent premise checks still govern authority.
 
 Reduced-cost fixing changes only source integral coordinates. An integral source
