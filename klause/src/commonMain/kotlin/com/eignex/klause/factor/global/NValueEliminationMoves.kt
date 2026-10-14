@@ -173,10 +173,19 @@ internal class NValueEliminationMoves(
     }
 
     private fun completeMove(state: LocalSearchState, move: Move, sink: MoveSink, expectedDistinct: Int) {
+        val first = if (state.invariants == null) move else {
+            NValueClauseCompletion(state, sink, xs + intArrayOf(n)).complete(move)
+        }
+        val firstParts = if (first is Move.Compound) first.parts else listOf(first)
+        if (firstParts.size > MAX_COMPLETED_PARTS || !preservesCount(state, firstParts, expectedDistinct)) return
+        if (state.netDelta(first) == -state.cost) {
+            sink.addCompound(firstParts)
+            return
+        }
         val repairs = MoveSink(state.assumptions.withInt(n, state.assignment.intValue(n)))
         repairs.setInvariants(state.invariants)
         repairs.setOwners(state.seeding.ownerInt)
-        val parts = state.buildRepairChain(move, MAX_REPAIR_DEPTH, repairs) ?: return
+        val parts = state.buildRepairChain(first, MAX_REPAIR_DEPTH, repairs) ?: return
         if (parts.size > MAX_COMPLETED_PARTS || !preservesCount(state, parts, expectedDistinct)) return
         val candidate = if (parts.size == 1) parts[0] else Move.Compound(parts)
         if (state.netDelta(candidate) == -state.cost) sink.addCompound(parts)
