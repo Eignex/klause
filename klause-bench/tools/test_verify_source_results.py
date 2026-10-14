@@ -372,6 +372,30 @@ class ProofCheckTest(unittest.TestCase):
 
         self.assertEqual(result['sourceQueryEncoding'], 'finite binary')
 
+    def test_binary_source_queries_preserve_rational_objectives_and_strict_thresholds(self):
+        for coefficient, row_kind, value in (('0.1', 'E', '-1/10'), ('-0.1', 'L', '-3/10')):
+            with self.subTest(coefficient=coefficient):
+                source = self.mps_source.replace('obj 0.1', 'obj ' + coefficient).replace(' E row', ' ' + row_kind + ' row')
+                source = source.replace('COLUMNS\n', "COLUMNS\n M1 'MARKER' 'INTORG'\n")
+                source = source.replace('RHS\n', " M2 'MARKER' 'INTEND'\nRHS\n").replace(' FR b x', ' BV b x')
+                case = self.case(suite='mps-core', arm='default', objective=value, finalWitness='v x=1')
+
+                result = self.check(case, source)
+
+                self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
+
+    def test_binary_source_query_weights_cannot_truncate_large_coefficients(self):
+        coefficient = 2 ** 64
+        source = self.mps_source.replace('obj 0.1', 'obj ' + str(coefficient))
+        source = source.replace('COLUMNS\n', "COLUMNS\n M1 'MARKER' 'INTORG'\n")
+        source = source.replace('RHS\n', " M2 'MARKER' 'INTEND'\nRHS\n").replace(' FR b x', ' BV b x')
+        case = self.case(suite='mps-core', arm='default', exactObjective=f'{5 * coefficient - 1}/5', finalWitness='v x=1')
+
+        result = self.check(case, source)
+
+        self.assertEqual(result['sourceQueryEncoding'], 'general')
+        self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
+
     def test_mps_query_preserves_a_nonbinary_integer_domain(self):
         source = "NAME fixture\nROWS\n N obj\n G row\nCOLUMNS\n M1 'MARKER' 'INTORG'\n x obj 1 row 1\n M2 'MARKER' 'INTEND'\nRHS\n rhs row 2\nBOUNDS\n UI b x 3\nENDATA\n"
         case = self.case(suite='mps-core', arm='default', objective=2, finalWitness='v x=2')

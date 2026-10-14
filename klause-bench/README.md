@@ -882,9 +882,12 @@ records passed; the final JSON output is written only after the whole batch succ
 Each solver query has a 120-second allowance; source parsing and witness construction
 are outside that query allowance and require an enclosing job budget.
 Exact MPS queries use Z3's finite-domain solver when every original integer
-column has explicit normalized zero/one bounds. All original constraints and the
-objective remain in the query; mixed, continuous and wider integer sources keep
-the general solver. Reports retain this query choice; UNKNOWN still fails checking.
+column has normalized zero/one bounds. An exact pseudo-Boolean representation
+preserves each source predicate and objective comparison, clearing rational
+coefficient denominators and handling strict thresholds on the integer lattice.
+Unsupported expressions or weights beyond the pseudo-Boolean API width keep the
+general solver, as do mixed, continuous and wider integer sources. Reports retain
+this query choice; UNKNOWN still fails checking.
 The recorded command's `--exact` flag requires exact source feasibility; its absence
 selects default MPS checking even when the arm name ends in `-exact`. Legacy records
 without a command use that arm suffix. Default MPS `toleranceAccepted`

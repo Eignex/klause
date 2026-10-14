@@ -342,7 +342,95 @@ def require_verdict(solver, expected, problem, purpose):
         raise AssertionError(f'{problem}: {purpose} expected {expected}, got {actual}{reason}')
 
 
-def source_query_solver(constraints, variables, is_smt):
+def binary_source_terms(expression, variables):
+    expression = z3.simplify(expression)
+    if expression.get_id() in variables:
+        return {expression.get_id(): fractions.Fraction(1)}, fractions.Fraction(0)
+    if z3.is_int_value(expression) or z3.is_rational_value(expression):
+        return {}, fractions.Fraction(str(expression))
+    kind = expression.decl().kind()
+    if kind == z3.Z3_OP_TO_REAL:
+        return binary_source_terms(expression.arg(0), variables)
+    if kind == z3.Z3_OP_UMINUS:
+        terms, constant = binary_source_terms(expression.arg(0), variables)
+        return {key: -value for key, value in terms.items()}, -constant
+    if kind in (z3.Z3_OP_ADD, z3.Z3_OP_SUB):
+        terms, constant = {}, fractions.Fraction(0)
+        for index, child in enumerate(expression.children()):
+            child_terms, child_constant = binary_source_terms(child, variables)
+            sign = -1 if kind == z3.Z3_OP_SUB and index > 0 else 1
+            constant += sign * child_constant
+            for key, value in child_terms.items():
+                terms[key] = terms.get(key, 0) + sign * value
+        return {key: value for key, value in terms.items() if value}, constant
+    if kind == z3.Z3_OP_MUL:
+        terms, constant = {}, fractions.Fraction(1)
+        for child in expression.children():
+            child_terms, child_constant = binary_source_terms(child, variables)
+            if terms and child_terms:
+                raise ValueError('nonlinear binary source query')
+            if child_terms:
+                terms = {key: constant * value for key, value in child_terms.items()}
+            else:
+                terms = {key: child_constant * value for key, value in terms.items()}
+            constant *= child_constant
+        return terms, constant
+    raise ValueError('unsupported binary source term')
+
+
+def binary_source_weights(terms):
+    scale = math.lcm(*(value.denominator for value in terms.values()))
+    weights = {key: int(value * scale) for key, value in terms.items()}
+    if sum(abs(value) for value in weights.values()) > 2147483647:
+        raise ValueError('binary source query exceeds pseudo-Boolean integer width')
+    return weights, scale
+
+
+def binary_source_predicate(expression, variables):
+    expression = z3.simplify(expression)
+    if z3.is_true(expression) or z3.is_false(expression):
+        return expression
+    kind = expression.decl().kind()
+    if kind in (z3.Z3_OP_AND, z3.Z3_OP_OR, z3.Z3_OP_NOT, z3.Z3_OP_IMPLIES):
+        constructor = {z3.Z3_OP_AND: z3.And, z3.Z3_OP_OR: z3.Or,
+                       z3.Z3_OP_NOT: z3.Not, z3.Z3_OP_IMPLIES: z3.Implies}[kind]
+        return constructor(*(binary_source_predicate(child, variables) for child in expression.children()))
+    if kind not in (z3.Z3_OP_LE, z3.Z3_OP_GE, z3.Z3_OP_LT, z3.Z3_OP_GT, z3.Z3_OP_EQ):
+        raise ValueError('unsupported binary source predicate')
+    left, right = expression.children()
+    terms, constant = binary_source_terms(left - right, variables)
+    weights, scale = binary_source_weights(terms)
+    bound = -constant * scale
+    literals = []
+    for key, weight in weights.items():
+        if weight < 0:
+            literals.append((z3.Not(variables[key]), -weight))
+            bound -= weight
+        else:
+            literals.append((variables[key], weight))
+    if kind == z3.Z3_OP_EQ:
+        if bound.denominator != 1:
+            return z3.BoolVal(False)
+        threshold, constructor = int(bound), z3.PbEq
+    elif kind in (z3.Z3_OP_LE, z3.Z3_OP_LT):
+        threshold = math.floor(bound) if kind == z3.Z3_OP_LE else math.ceil(bound) - 1
+        constructor = z3.PbLe
+    else:
+        threshold = math.ceil(bound) if kind == z3.Z3_OP_GE else math.floor(bound) + 1
+        constructor = z3.PbGe
+    maximum = sum(weight for _, weight in literals)
+    if constructor == z3.PbEq and not 0 <= threshold <= maximum:
+        return z3.BoolVal(False)
+    if constructor == z3.PbLe and (threshold < 0 or threshold >= maximum):
+        return z3.BoolVal(threshold >= maximum)
+    if constructor == z3.PbGe and (threshold <= 0 or threshold > maximum):
+        return z3.BoolVal(threshold <= 0)
+    if not literals:
+        return z3.BoolVal(threshold == 0)
+    return constructor(literals, threshold)
+
+
+def source_query_solver(constraints, variables, is_smt, objective):
     bounds = {variable.get_id(): set() for variable in variables.values()}
     if not is_smt:
         for constraint in constraints:
@@ -366,10 +454,22 @@ def source_query_solver(constraints, variables, is_smt):
     binary = not is_smt and bool(variables) and all(
         z3.is_int(variable) and bounds[variable.get_id()] == {'lower', 'upper'}
         for variable in variables.values())
+    query = lambda expression: expression
+    if binary:
+        booleans = {variable.get_id(): z3.FreshBool('source_binary') for variable in variables.values()}
+        try:
+            if objective is not None:
+                binary_source_weights(binary_source_terms(objective, booleans)[0])
+            translated = [binary_source_predicate(constraint, booleans) for constraint in constraints]
+        except ValueError:
+            binary = False
+        else:
+            constraints = translated
+            query = lambda expression: binary_source_predicate(expression, booleans)
     solver = z3.SolverFor('QF_FD') if binary else z3.Solver()
     solver.set(timeout=120000)
     solver.add(*constraints)
-    return solver, 'finite binary' if binary else 'general'
+    return solver, 'finite binary' if binary else 'general', query
 
 
 def check(cases, source_root=None, progress=None, witness_only=False):
@@ -426,7 +526,7 @@ def check(cases, source_root=None, progress=None, witness_only=False):
                 constraints, objective, variables, maximize = mps(text)
                 assert maximize == record["maximize"]
             assert reported_objective is None or objective is not None, "reported objective is absent from source"
-            solver, result['sourceQueryEncoding'] = source_query_solver(constraints, variables, is_smt)
+            solver, result['sourceQueryEncoding'], query = source_query_solver(constraints, variables, is_smt, objective)
             if record["feasible"] is False:
                 assert record["proven"]
                 require_verdict(solver, z3.unsat, record["problem"], 'source infeasibility')
@@ -477,11 +577,11 @@ def check(cases, source_root=None, progress=None, witness_only=False):
                     if maximize:
                         value = -value
                     solver.push()
-                    solver.add(objective == value)
+                    solver.add(query(objective == value))
                     require_verdict(solver, z3.sat, record["problem"], 'claimed source objective feasibility')
                     solver.pop()
                     solver.push()
-                    solver.add(objective < value)
+                    solver.add(query(objective < value))
                     require_verdict(solver, z3.unsat, record["problem"], 'strictly better source objective exclusion')
                     solver.pop()
                     result["optimalityCheck"] = "strictly better source objective unsat"
