@@ -1453,6 +1453,15 @@ only feasible rows carry original witnesses. A repaired target may worsen other
 objective terms, so strict improvements are measured against the original point.
 This conditional diagnostic does not measure whole-engine or default behavior.
 
+`conditionalClosure=true` instead decorates every native move source and the
+perturbation hook with complete binary implication closure. The graph is conditioned
+once on the existing root pins; all prepared clauses remain scored. The held target
+is seeded through the same graph. Conflicting proposals are rejected, derived unary
+outputs follow their source moves, and cancellation discards incomplete proposals.
+Rows distinguish accepted transitions, primitive flips and closure work, verify pins
+and terminal binary feasibility, and reconcile the incremental cost from scratch.
+This allocation-heavy diagnostic is not a production recipe or a performance claim.
+
 ### Objective representation probe
 
 `com.eignex.klause.bench.profile.ObjectiveRepresentationProbe` measures the public
