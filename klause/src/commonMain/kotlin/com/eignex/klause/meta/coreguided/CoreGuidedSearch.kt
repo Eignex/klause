@@ -1,9 +1,9 @@
 package com.eignex.klause.meta.coreguided
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
 import com.eignex.klause.backtrack.ResumableSatisfaction
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.bool.Clause
@@ -26,13 +26,13 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.lifetimeCancellation
-import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.CoreGuidedStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
