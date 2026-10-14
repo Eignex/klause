@@ -24,6 +24,21 @@ import kotlin.test.assertTrue
 class PortfolioBuilderTest {
 
     @Test
+    fun `automatic core worker waits for sibling incumbent discovery`() {
+        val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(longArrayOf(1, 2))
+        val workers = PortfolioBuilder.build(problem, PortfolioScenario.sequential(Kind.COP), objective)
+
+        try {
+            assertTrue(workers.single { it.label == "bt/core-guided" }.improvementOnly)
+            assertTrue(workers.any { it.family == ArmFamily.Backtrack && !it.improvementOnly })
+            assertTrue(workers.any { it.family == ArmFamily.LocalSearch && !it.improvementOnly })
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
     fun `a restricted public worker cannot refute its feasible containing source`() {
         val problem = Problem(1, 0, emptyArray(),
             arrayOf(Clause(intArrayOf(Lit.make(0, false))))).bake()

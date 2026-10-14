@@ -83,6 +83,12 @@ work. CLI statistics expose `nodeBudgetLimit`, `nodeBudgetSpent` and
 it is distinct from actual inner work. Native bootstrap/repair counters and
 `alnsOuterAllowance` retain those distinctions in statistics.
 
+Core-guided private encoding and augmented-model baking use the propagation visit
+currency, including work stopped during construction. Preparation does not spend
+solve-wide decisions or moves. The containing core handle settles query overspend
+once and retains fractional charges across rounds; its nested traversal does not
+repay the same debt. See [core search](portfolio.md#boolean-objective-core-search).
+
 Slice pricing belongs to solver policy: LP work costs one node per 600 units,
 propagation work one per 4000 visits, inprocessing probes one per 12 and subsumption
 visits one per 18000. Fractional LP and propagation marks survive slices and the
