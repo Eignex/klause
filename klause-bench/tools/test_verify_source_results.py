@@ -596,7 +596,7 @@ class ProofCheckTest(unittest.TestCase):
         case = self.case(suite='mps-core', objective='-1/10', finalWitness='v x=1')
 
         with mock.patch.object(proof_check.z3, 'Solver', return_value=solver), \
-                mock.patch.object(solver, 'check', side_effect=[z3.sat, z3.unknown]), \
+                mock.patch.object(solver, 'check', return_value=z3.unknown), \
                 mock.patch.object(solver, 'reason_unknown', return_value='timeout'):
             with self.assertRaisesRegex(AssertionError, 'strictly better source objective exclusion.*unknown'):
                 self.check(case, self.mps_source)
