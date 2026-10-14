@@ -72,11 +72,7 @@ class SatisfyTest {
     }
 
     @Test
-    fun `engine populates Unsat assumptionCore from 1UIP decision levels`() {
-        // Hard: ¬b0 ∨ ¬b1. Assume b0=true, b1=true, b2=true (b2 irrelevant). The seed
-        // phase catches this so the conflictLevels include b0 and b1 but not b2 —
-        // SolveResult.Unsat.assumptionCore should expose the same subset without any
-        // deletion-MUS work (minimizeCore = false).
+    fun `engine populates Unsat assumptionCore from the failing seed prefix`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,

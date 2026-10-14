@@ -182,7 +182,6 @@ internal class CpSatisfactionTraversal(
         cp,
         params,
         sink,
-        seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
         slice,
     )
     private lateinit var completion: BacktrackCompletion
@@ -398,7 +397,6 @@ private class CpSatisfactionTraversalPolicy(
     private val cp: CpSearchComponent,
     private val params: BacktrackParams,
     sink: SolveStatsSink?,
-    seedDecisionLevels: Int,
     private val slice: TraversalSlice?,
 ) : SearchTraversalPolicy,
     SearchRunLifecycle {
@@ -406,7 +404,7 @@ private class CpSatisfactionTraversalPolicy(
 
     private val session: PropagationSession get() = cp.session
     val brancher = BacktrackBrancher(
-        session, params, sink, restart, seedDecisionLevels = seedDecisionLevels,
+        session, params, sink, restart,
         nativeConflict = { cp.lastConflict },
     ).also {
         cp.propagationObserver = it::onPropagation
@@ -463,7 +461,6 @@ internal class BacktrackBrancher(
     private val sink: SolveStatsSink?,
     private val restart: RestartSchedule,
     private val branching: BacktrackBranching = BacktrackBranching.Selectors,
-    private val seedDecisionLevels: Int = 0,
     private val nativeConflict: () -> PropagationResult.Unsat? = { null },
 ) : SearchBrancher,
     SearchRunObserver {
@@ -476,7 +473,6 @@ internal class BacktrackBrancher(
     private val rng = Random(params.randomSeed ?: Random.Default.nextLong())
     private val onEvent = params.onEvent
     private var restartCount = 0L
-    private val touchedSeedLevels = IntHashSet()
 
     init {
         if (params.phaseSaving || params.targetPhasing) {
@@ -556,9 +552,6 @@ internal class BacktrackBrancher(
 
     override fun onLearnedConflict(conflict: com.eignex.klause.solver.search.SearchLearnedConflict) {
         sink?.search?.observeLearned(conflict.guardLiterals, conflict.lbd)
-        for (level in conflict.decisionLevels) {
-            if (level in 1..seedDecisionLevels) touchedSeedLevels.add(level)
-        }
     }
 
     override fun onRestart(decisions: Long) {
@@ -585,10 +578,7 @@ internal class BacktrackBrancher(
         phase.onSolution(sample)
     }
 
-    fun touchedAssumptionLevels(): IntArray {
-        if (touchedSeedLevels.isEmpty()) return EmptyIntArray
-        return touchedSeedLevels.toIntArray().also(IntArray::sort)
-    }
+
 }
 
 internal fun splitIntAlternatives(

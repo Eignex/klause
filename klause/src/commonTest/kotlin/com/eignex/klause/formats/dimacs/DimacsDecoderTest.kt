@@ -42,7 +42,7 @@ class DimacsDecoderTest {
     @Test
     fun `a satisfied soft clause cannot carry a violation penalty`() {
         val decoded = Dimacs.parseWcnf("p wcnf 2 3 20\n20 1 0\n5 1 2 0\n3 -1 0\n").toProblem()
-        val inflated = Assumptions(bools = mapOf(0 to true, 1 to false, 2 to true, 3 to true))
+        val inflated = Assumptions(bools = mapOf(0 to true, 1 to false, 2 to true))
 
         val result = decoded.problem.propagate(inflated)
 
@@ -59,12 +59,18 @@ class DimacsDecoderTest {
     }
 
     @Test
-    fun `nonuniform soft costs retain separate violation indicators`() {
+    fun `weighted units preserve source costs across both polarities`() {
         val decoded = Dimacs.parseWcnf("3 1 0\n7 -2 0\n").toProblem()
         val assignment = Assignment(decoded.problem.numBoolVars, 0)
-        assignment.setBool(2, true)
-
-        assertEquals(4, decoded.problem.numBoolVars)
-        assertEquals(3L, decoded.objective.toLinearObjective().evaluateLong(assignment))
+        for ((first, second, cost) in listOf(
+            Triple(false, false, 3L),
+            Triple(true, false, 0L),
+            Triple(false, true, 10L),
+            Triple(true, true, 7L),
+        )) {
+            assignment.setBool(0, first)
+            assignment.setBool(1, second)
+            assertEquals(cost, decoded.objective.toLinearObjective().evaluateLong(assignment))
+        }
     }
 }

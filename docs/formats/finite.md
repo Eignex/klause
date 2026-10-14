@@ -64,12 +64,10 @@ record fields and the saved-output validation command are defined in the
 
 ## WCNF lowering
 
-WCNF objectives with equal soft weights fold unit costs into the original Boolean
-objective.
+WCNF objectives fold weighted unit costs into the original Boolean objective.
 A negative unit adds its weight when the variable is true; a positive unit adds a
 constant and a negative coefficient. Non-unit soft clauses use fresh relaxation
 variables equivalent to the negation of their source disjunctions. Hard clauses
 force each penalty false when any source literal is true, so every feasible
-lowered point carries the exact original soft-clause cost. Nonuniform weighted objectives retain relaxation
-variables for their soft clauses. A unit also retains that encoding if folding its
+lowered point carries the exact original soft-clause cost. A unit retains that encoding if folding its
 cost would overflow a coefficient or constant. Empty soft clauses contribute fixed cost.
