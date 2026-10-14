@@ -17,15 +17,19 @@ internal fun nodeDualCertificate(
         meter.poll()
         val state = model.exactState ?: throw LpProjectionStop()
         meter.reserve(model.numVars.toLong() * 16L + model.m * 8L)
-        integerCertifyUnchecked(model, duals, DEFAULT_SCALE_BITS, allowMixed = true, scan = meter::step)
-            ?: mixedCertificate(model, state, duals, meter)
-            ?: reconstructedMixedCertificate(model, state, duals, meter)
+        meter.attempt(observer, "INTEGER") {
+            integerCertifyUnchecked(model, duals, DEFAULT_SCALE_BITS, allowMixed = true, scan = meter::step)
+        } ?: meter.attempt(observer, "ROUNDED") {
+            mixedCertificate(model, state, duals, meter)
+        } ?: meter.attempt(observer, "RECONSTRUCTED") {
+            reconstructedMixedCertificate(model, state, duals, meter)
+        }
     } catch (_: LpProjectionStop) {
         null
     }
     val rows = if (certificate != null && !model.hasIntegralObjective()) {
         try {
-            integralObjectiveRows(model, meter)
+            meter.attempt(observer, "OBJECTIVE_INTEGRAL") { integralObjectiveRows(model, meter) }
         } catch (_: LpProjectionStop) {
             null
         }
@@ -163,8 +167,8 @@ private fun mixedCertificate(
         }
         val bounds = model.exactBounds(column)
         val endpoint = when {
-            cost.signum() > 0 -> bounds.lower ?: return null
-            cost.signum() < 0 -> bounds.upper ?: return null
+            cost.signum() > 0 -> bounds.lower ?: return meter.decline("MISSING_LOWER")
+            cost.signum() < 0 -> bounds.upper ?: return meter.decline("MISSING_UPPER")
             else -> null
         }
         if (endpoint != null) value = meter.add(value, meter.multiply(cost, endpoint.number.value))
@@ -209,20 +213,48 @@ private class MixedCertificateMeter(private val cancellation: Cancellation) {
     private val meter = LpProjectionMeter(250_000L, 16L * 1024L * 1024L)
     private val stride = PollStride()
     private val meteredCancellation = cancellation.workMeter() != null
+    private var reason = "UNSUPPORTED"
     val work: Long get() = meter.work
-    fun poll() { if (cancellation()) throw LpProjectionStop() }
+    fun poll() {
+        if (cancellation()) {
+            reason = "CANCELLED"
+            throw LpProjectionStop()
+        }
+    }
+    fun <T : Any> attempt(observer: LpCertificationObserver?, stage: String, body: () -> T?): T? {
+        val timer = LpPhaseTimer(observer, LpSolvePhase.NODE_DEDUCTION)
+        reason = "UNSUPPORTED"
+        return try {
+            body().also { timer.finish("${stage}_${if (it != null) "COMPLETE" else reason}") }
+        } catch (stopped: LpProjectionStop) {
+            timer.finish("${stage}_$reason")
+            throw stopped
+        }
+    }
+    fun decline(reason: String): Nothing? {
+        this.reason = reason
+        return null
+    }
     fun step() = charge(1L, 0L, matrix = true)
     fun reconstructionStep() = charge(8L, 96L, matrix = false)
     fun reserve(bytes: Long) = charge(bytes / 8L + 1L, bytes, matrix = false)
 
     private fun charge(work: Long, bytes: Long, matrix: Boolean) {
         if (meteredCancellation || stride.due(work)) poll()
-        meter.reserve(work, bytes, matrix)
+        try {
+            meter.reserve(work, bytes, matrix)
+        } catch (stopped: LpProjectionStop) {
+            reason = "RESOURCE_LIMIT"
+            throw stopped
+        }
     }
 
     fun read(value: BigFraction): BigFraction {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
-        if (bits > 128) throw LpProjectionStop()
+        if (bits > 128) {
+            reason = "SCALAR_WIDTH"
+            throw LpProjectionStop()
+        }
         val words = (bits.toLong() + 63L) / 64L
         charge(1L + words * words, 64L + (bits.toLong() + 7L) / 4L, matrix = false)
         return value
