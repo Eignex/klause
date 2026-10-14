@@ -444,7 +444,11 @@ real-leaf owner. Exact invocations require that owner's certified coordinates.
 Only a complete checked
 witness reaches incumbent admission; an incomplete or unbounded completion does not
 publish a heuristic result. The pump can continue after a declined completion under
-its existing root allowance. Root primal proposals must improve the available local
+its existing root allowance. Every incumbent producer, including a completed leaf
+whose discrete coordinates require no decision, must strictly improve the current
+external cutoff at the shared admission point. Exact source objectives govern that
+comparison when available; rejecting equality does not change conservative numerical
+pruning cutoffs. Root primal proposals must improve the available local
 or external incumbent cutoff before admission; a completed candidate that misses
 that cutoff permits further pumping without renewing its budget. An integral distance
 optimum with no fractional support uses seeded perturbations of live discrete
