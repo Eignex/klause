@@ -21,7 +21,18 @@ data class WcnfProblem(
     val numOriginalBoolVars: Int,
     /** Exact soft-clause violation definitions over original literals. */
     val boolFolds: List<BoolFoldDefinition> = emptyList(),
-)
+) {
+    /** Construct a problem without soft-clause fold metadata. */
+    constructor(problem: Problem, objective: LinearObjectiveSpec, numOriginalBoolVars: Int) :
+        this(problem, objective, numOriginalBoolVars, emptyList())
+
+    /** Copy legacy fields while retaining [boolFolds]. */
+    fun copy(
+        problem: Problem = this.problem,
+        objective: LinearObjectiveSpec = this.objective,
+        numOriginalBoolVars: Int = this.numOriginalBoolVars,
+    ): WcnfProblem = WcnfProblem(problem, objective, numOriginalBoolVars, boolFolds)
+}
 
 /** Lower this parsed CNF document to a solver problem. */
 fun CnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): Problem {
