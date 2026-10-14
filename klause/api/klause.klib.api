@@ -13342,6 +13342,7 @@ final class com.eignex.klause.solver.result/ConflictAnalysisStats { // com.eigne
 }
 
 final class com.eignex.klause.solver.result/CoreGuidedStats { // com.eignex.klause.solver.result/CoreGuidedStats|null[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Int = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ...) // com.eignex.klause.solver.result/CoreGuidedStats.<init>|<init>(kotlin.Long;kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger?){}[0]
     constructor <init>(kotlin/Long = ..., kotlin/Int = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ..., kotlin/Long? = ..., kotlin/Long? = ...) // com.eignex.klause.solver.result/CoreGuidedStats.<init>|<init>(kotlin.Long;kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger?;kotlin.Long?;kotlin.Long?){}[0]
 
     final val activeMillisLimit // com.eignex.klause.solver.result/CoreGuidedStats.activeMillisLimit|{}activeMillisLimit[0]
@@ -13360,6 +13361,7 @@ final class com.eignex.klause.solver.result/CoreGuidedStats { // com.eignex.klau
     final fun component3(): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.solver.result/CoreGuidedStats.component3|component3(){}[0]
     final fun component4(): kotlin/Long? // com.eignex.klause.solver.result/CoreGuidedStats.component4|component4(){}[0]
     final fun component5(): kotlin/Long? // com.eignex.klause.solver.result/CoreGuidedStats.component5|component5(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Int = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ...): com.eignex.klause.solver.result/CoreGuidedStats // com.eignex.klause.solver.result/CoreGuidedStats.copy|copy(kotlin.Long;kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger?){}[0]
     final fun copy(kotlin/Long = ..., kotlin/Int = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ..., kotlin/Long? = ..., kotlin/Long? = ...): com.eignex.klause.solver.result/CoreGuidedStats // com.eignex.klause.solver.result/CoreGuidedStats.copy|copy(kotlin.Long;kotlin.Int;com.ionspin.kotlin.bignum.integer.BigInteger?;kotlin.Long?;kotlin.Long?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/CoreGuidedStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/CoreGuidedStats.hashCode|hashCode(){}[0]

@@ -16,6 +16,17 @@ data class CoreGuidedStats(
     /** Largest finite core active-time allowance, in milliseconds, among reported workers. */
     val activeMillisLimit: Long? = null,
 ) {
+    /** Create core observations without resource-limit telemetry. */
+    constructor(cores: Long = 0L, largestCore: Int = 0, lowerBound: BigInt? = null) :
+        this(cores, largestCore, lowerBound, null, null)
+
+    /** Copy core observations while retaining the reported resource limits. */
+    fun copy(
+        cores: Long = this.cores,
+        largestCore: Int = this.largestCore,
+        lowerBound: BigInt? = this.lowerBound,
+    ): CoreGuidedStats = CoreGuidedStats(cores, largestCore, lowerBound, workLimit, activeMillisLimit)
+
     /** Combine workers of the same objective invocation; floors take their maximum. */
     fun mergedWith(other: CoreGuidedStats): CoreGuidedStats = CoreGuidedStats(
         cores + minOf(other.cores, Long.MAX_VALUE - cores),
