@@ -53,16 +53,60 @@ internal class PolynomialArithmetic(
         step()
         return Polynomial.of(buildList {
             for (a in left.terms) for (b in right.terms) {
-                step()
-                for (variable in a.monomial.variables) {
-                    if (b.monomial.exponent(variable) > Int.MAX_VALUE - a.monomial.exponent(variable)) {
-                        throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
-                    }
-                }
-                add(PolynomialTerm(a.monomial.times(b.monomial), a.coefficient * b.coefficient))
+                add(product(a, b))
             }
         })
     }
+
+    private fun product(left: PolynomialTerm, right: PolynomialTerm): PolynomialTerm {
+        step()
+        for (variable in left.monomial.variables) {
+            if (right.monomial.exponent(variable) > Int.MAX_VALUE - left.monomial.exponent(variable)) {
+                throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+            }
+        }
+        return PolynomialTerm(left.monomial.times(right.monomial), left.coefficient * right.coefficient)
+    }
+
+    fun prepareMultiply(left: Polynomial, right: Polynomial): Iterator<Polynomial?> = sequence {
+        step()
+        val leftTerms = left.terms
+        val rightTerms = right.terms
+        val merged = mutableMapOf<Monomial, BigFraction>()
+        var batch = 0
+        for (a in leftTerms) for (b in rightTerms) {
+            val term = product(a, b)
+            merged[term.monomial] = (merged[term.monomial] ?: BigFraction.ZERO) + term.coefficient
+            if (++batch == PREPARATION_BATCH) {
+                batch = 0
+                yield(null)
+            }
+        }
+        yield(Polynomial.of(merged.map { (monomial, coefficient) -> PolynomialTerm(monomial, coefficient) }))
+    }.iterator()
+
+    private fun prepareDivision(dividend: Polynomial, divisor: Polynomial): Iterator<Polynomial?> = sequence {
+        require(!divisor.isZero)
+        val lead = divisor.terms.last()
+        var remainder = dividend
+        var quotient = Polynomial.ZERO
+        while (!remainder.isZero) {
+            step()
+            val term = remainder.terms.last()
+            val monomial = requireNotNull(term.monomial.quotient(lead.monomial)) { "nonexact polynomial division" }
+            val next = Polynomial.of(listOf(PolynomialTerm(monomial, term.coefficient * lead.coefficient.reciprocal())))
+            quotient = add(quotient, next)
+            val pending = prepareMultiply(next, divisor)
+            var product: Polynomial? = null
+            while (product == null) {
+                product = pending.next()
+                if (product == null) yield(null)
+            }
+            remainder = subtract(remainder, product)
+            yield(null)
+        }
+        yield(quotient)
+    }.iterator()
 
     fun power(value: Polynomial, exponent: Int): Polynomial {
         require(exponent >= 0)
@@ -182,6 +226,93 @@ internal class PolynomialArithmetic(
         }
     }
 
+    fun preparePrincipalSubresultants(
+        left: Polynomial,
+        right: Polynomial,
+        variable: Int,
+    ): Iterator<List<Polynomial>?> = sequence {
+        step()
+        val a = coefficients(left, variable)
+        val b = coefficients(right, variable)
+        val m = a.lastIndex
+        val n = b.lastIndex
+        val result = ArrayList<Polynomial>()
+        for (index in 0 until minOf(m, n)) {
+            val matrix = matrix(m.toLong() + n - 2L * index)
+            val size = matrix.size
+            for (row in 0 until n - index) {
+                for (column in a.indices) {
+                    step()
+                    if (row + column < size) matrix[row][row + column] = a[m - column]
+                }
+                yield(null)
+            }
+            for (row in 0 until m - index) {
+                for (column in b.indices) {
+                    step()
+                    if (row + column < size) matrix[n - index + row][row + column] = b[n - column]
+                }
+                yield(null)
+            }
+            val pending = prepareDeterminant(matrix)
+            var determinant: Polynomial? = null
+            while (determinant == null) {
+                determinant = pending.next()
+                if (determinant == null) yield(null)
+            }
+            result += determinant
+        }
+        yield(result.toList())
+    }.iterator()
+
+    private fun prepareDeterminant(matrix: Array<Array<Polynomial>>): Iterator<Polynomial?> = sequence {
+        var previous = Polynomial.ONE
+        var negative = false
+        for (column in 0 until matrix.lastIndex) {
+            step()
+            val pivotRow = (column..matrix.lastIndex).firstOrNull { !matrix[it][column].isZero }
+            if (pivotRow == null) {
+                yield(Polynomial.ZERO)
+                return@sequence
+            }
+            if (pivotRow != column) {
+                val row = matrix[column]
+                matrix[column] = matrix[pivotRow]
+                matrix[pivotRow] = row
+                negative = !negative
+            }
+            val pivot = matrix[column][column]
+            for (row in column + 1..matrix.lastIndex) {
+                for (entry in column + 1..matrix.lastIndex) {
+                    val left = prepareMultiply(pivot, matrix[row][entry])
+                    var a: Polynomial? = null
+                    while (a == null) {
+                        a = left.next()
+                        if (a == null) yield(null)
+                    }
+                    val right = prepareMultiply(matrix[row][column], matrix[column][entry])
+                    var b: Polynomial? = null
+                    while (b == null) {
+                        b = right.next()
+                        if (b == null) yield(null)
+                    }
+                    val division = prepareDivision(subtract(a, b), previous)
+                    var value: Polynomial? = null
+                    while (value == null) {
+                        value = division.next()
+                        if (value == null) yield(null)
+                    }
+                    matrix[row][entry] = value
+                    yield(null)
+                }
+                matrix[row][column] = Polynomial.ZERO
+            }
+            previous = pivot
+        }
+        val result = matrix.last().last()
+        yield(if (negative) negate(result) else result)
+    }.iterator()
+
     fun denseSize(degree: Int): Int {
         step()
         val maximum = limits.maxDenseCoefficients ?: Int.MAX_VALUE
@@ -230,3 +361,5 @@ internal class PolynomialArithmetic(
         return if (negative) negate(result) else result
     }
 }
+
+private const val PREPARATION_BATCH = 256

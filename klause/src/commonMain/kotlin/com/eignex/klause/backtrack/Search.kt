@@ -33,6 +33,7 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
@@ -157,6 +158,7 @@ internal class CpSatisfactionTraversal(
     propagationCancellation: Cancellation = params.cancellation,
     private val slice: TraversalSlice? = null,
     projection: PropagationProblem = PropagationProblem(problem),
+    private val deferredInitialization: Boolean = false,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
@@ -190,6 +192,8 @@ internal class CpSatisfactionTraversal(
     private var sharedSession: SearchSession? = null
     private var rootLp: LpFeasibilityComponent? = null
     private var rootPrepared = false
+    private var initialization: Iterator<ComponentResult?>? = null
+    private var deferredRoot = false
 
     // The verdict the root reached before any search, handed out by the first [next].
     private var rootOutcome: SearchOutcome? = null
@@ -218,8 +222,9 @@ internal class CpSatisfactionTraversal(
             lp?.let { components += it.component }
             components += params.componentFactory?.invoke().orEmpty()
             components.forEach(resources::ownComponent)
+            deferredRoot = deferredInitialization && components.any { it is PreparingSearchComponent }
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
-                cancellation = params.cancellation,
+                cancellation = if (deferredRoot) propagationCancellation else params.cancellation,
                 learnedDb = params.sharedLearnedDb(),
             )
             val seeded = cp.session.seed(params.assumptions)
@@ -234,7 +239,7 @@ internal class CpSatisfactionTraversal(
                 null
             }
             if (rootOutcome == null) {
-                if (lp?.preparesRoot == true) {
+                if (deferredRoot || lp?.preparesRoot == true) {
                     sharedSession = session
                 } else {
                     rootOutcome = when (session.initialize()) {
@@ -283,13 +288,23 @@ internal class CpSatisfactionTraversal(
             }
             if (rootOutcome == null) {
                 if (params.cancellation() && slice?.pauses() == true) return null
-                rootOutcome = when (session.initialize()) {
+                val result = if (deferredRoot) {
+                    val pending = initialization ?: session.prepareInitialization { component, context ->
+                        if (component is PreparingSearchComponent) component.prepareInitialization(context)
+                        else sequenceOf(component.initialize(context)).iterator()
+                    }.also { initialization = it }
+                    var initialized: ComponentResult? = null
+                    while (initialized == null) {
+                        if (params.cancellation() && slice?.pauses() == true) return null
+                        initialized = pending.next()
+                    }
+                    initialization = null
+                    initialized
+                } else session.initialize()
+                rootOutcome = when (result) {
                     ComponentResult.Consistent -> null
                     is ComponentResult.Conflict -> SearchOutcome.Exhausted()
-                    ComponentResult.Indeterminate -> {
-                        if (params.cancellation() && slice?.pauses() == true) return null
-                        SearchOutcome.BudgetCapped
-                    }
+                    ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
                 }
                 if (rootOutcome == null) {
                     run = session.openRun(problem.numBoolVars, traversal).also {
@@ -298,6 +313,7 @@ internal class CpSatisfactionTraversal(
                 }
             }
             sharedSession = null
+            if (rootOutcome == null && params.cancellation() && slice?.pauses() == true) return null
         }
         rootOutcome?.let { outcome ->
             rootOutcome = null
@@ -342,6 +358,8 @@ internal class CpSatisfactionTraversal(
     override fun close() {
         if (closed) return
         closed = true
+        initialization = null
+        sharedSession = null
         resources.close()
     }
 
@@ -349,6 +367,8 @@ internal class CpSatisfactionTraversal(
     fun closeAfter(failure: Throwable) {
         if (closed) return
         closed = true
+        initialization = null
+        sharedSession = null
         resources.closeAfter(failure)
     }
 }

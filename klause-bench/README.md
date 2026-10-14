@@ -827,7 +827,9 @@ the containing allowance. Neither control may publish a terminal proof after dec
 Vendored inputs are retrieved at the recorded revision; original MIPLIB3 inputs
 are retrieved separately. All source hashes must match. `--source-root` instead
 reads original uncompressed inputs named `<sourceHashes.model>.txt` from a supplied
-directory, allowing the same checks without network retrieval.
+directory, allowing the same checks without network retrieval. MIPLIB 2003, 2010,
+2017 and OR-Library MPS records require this hash-matched source directory and use the same exact
+row, integrality, objective and source-tolerance checks.
 The five SMT corpus suites require this directory and their hash-matched original
 bytes; they do not fetch a source by corpus path. Other suites are declined.
 
@@ -842,10 +844,20 @@ python3 klause-bench/tools/verify_source_results.py /path/to/cases.json \
 AWS lab profile without rerunning the solver. Pass `bundle=<https URL>` and
 `sha256=<compressed SHA-256>` for a gzip JSON object containing `cases` (the case
 array) and `sources` (original source SHA-256 keys with base64 original bytes).
+For small saved-record bundles, `input64=<base64 gzip bytes>` replaces `bundle`;
+the encoded input is capped at 96 KiB and the compressed `sha256` remains required.
+Each `sources` value is base64 original bytes or an object with `gzip64` holding
+base64 gzip bytes. Decompression preserves the original source hash and caps the
+combined uncompressed sources at 64 MiB.
 It checks bundle/source identities, provisions the pinned checker dependencies,
 and retains checker logs, versions and a checked prefix on failure under `$OUT`.
 Original unknown records retain their no-claim outcome; reference agreement does
 not independently verify an exported proof.
+For a separate point check, `witnessOnly=true` forwards `--witness-only` to the
+verifier. Every record must contain a reported feasible witness. The report preserves
+`reportedProven`, marks `verificationScope=witness-only` and
+`proofCertificateChecked=false`, and omits optimality checks. The default still
+requires independent optimality and infeasibility queries.
 
 Inputs can be JSON, gzip or xz; `--records-root` selects `cases/<index>/record.json`
 instead of embedded records. SMT models must cover source sorts and satisfy all

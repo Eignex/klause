@@ -2,15 +2,78 @@ package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialArithmeticTest {
     private val arithmetic = PolynomialArithmetic()
     private val x = Polynomial.variable(0)
     private val y = Polynomial.variable(1)
+
+    @Test
+    fun `prepared multiplication publishes only the completed product`() {
+        val value = arithmetic.power(arithmetic.add(x, y), 17)
+        val pending = arithmetic.prepareMultiply(value, value)
+
+        assertNull(pending.next())
+        var result: Polynomial? = null
+        while (result == null) result = pending.next()
+
+        assertEquals(arithmetic.multiply(value, value), result)
+    }
+
+    @Test
+    fun `prepared subresultants retain exact shared factor coefficients`() {
+        val left = arithmetic.multiply(
+            arithmetic.multiply(arithmetic.subtract(x, constant(1)), arithmetic.subtract(x, constant(2))),
+            arithmetic.subtract(x, constant(3)),
+        )
+        val right = arithmetic.multiply(arithmetic.subtract(x, constant(2)),
+            arithmetic.subtract(arithmetic.scale(x, fraction(2)), constant(1)))
+        val pending = arithmetic.preparePrincipalSubresultants(left, right, 0)
+        var result: List<Polynomial>? = null
+        while (result == null) result = pending.next()
+
+        assertEquals(listOf(Polynomial.ZERO, constant(5)), result)
+    }
+
+    @Test
+    fun `prepared subresultants charge each native operation once`() {
+        val left = arithmetic.subtract(arithmetic.power(y, 3), x)
+        val right = arithmetic.subtract(arithmetic.power(y, 2), arithmetic.add(x, Polynomial.ONE))
+        val charges = LongArray(2)
+        for (index in charges.indices) {
+            val meter = object : Cancellation, WorkMeter {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = this
+                override fun charge(units: Long) { charges[index] += units }
+            }
+            val counted = PolynomialArithmetic(meter)
+            if (index == 0) counted.principalSubresultants(left, right, 1)
+            else {
+                val pending = counted.preparePrincipalSubresultants(left, right, 1)
+                var result: List<Polynomial>? = null
+                while (result == null) result = pending.next()
+            }
+        }
+
+        assertEquals(charges[0], charges[1])
+    }
+
+    @Test
+    fun `solve cancellation terminates prepared subresultants`() {
+        var stopped = false
+        val counted = PolynomialArithmetic(Cancellation { stopped })
+        val pending = counted.preparePrincipalSubresultants(arithmetic.power(x, 3), arithmetic.add(x, y), 0)
+        assertNull(pending.next())
+        stopped = true
+
+        assertFailsWith<PolynomialInterrupted> { pending.next() }
+    }
 
     @Test
     fun `terms merge and cancel independent of producer mutation`() {

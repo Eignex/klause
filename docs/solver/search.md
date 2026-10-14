@@ -47,6 +47,14 @@ diagnostics from `SearchContext.executionControls`. Alternate coordinators suppl
 those services through the same contract. [Resource allowances](resources.md#component-execution-controls)
 owns their units, cancellation scopes and diagnostic precedence.
 
+Internal components with retained root preparation implement `PreparingSearchComponent`.
+Their cursor belongs to the post-seed context and returns no component verdict until
+preparation completes. A suspended cursor does not enter propagation, branching or
+model assembly. The enclosing handle resumes it with the same context and native
+allowance; closing discards it. [Portfolio preparation](portfolio.md#polynomial-root-preparation)
+defines polynomial checkpoints and the distinction between slice suspension and
+solve-wide cancellation.
+
 A conditioned run retains the decision level at which it opens. Restarts return
 to that level, and learned backjumps below it fall back to chronological traversal.
 Exhaustion is then conditional. The query owner retracts the condition after the

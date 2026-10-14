@@ -57,40 +57,69 @@ internal fun solveQfNra(
     params: QfNraParams = QfNraParams(),
     condition: PolynomialCondition = PolynomialCondition(),
 ): QfNraResult {
-    val work = QfNraWork(params)
-    val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
-    val algebraic = AlgebraicArithmetic(arithmetic)
-    return try {
-        arithmetic.step()
-        val conditioned = condition.apply(formula, boolCount, realCount, arithmetic::step)
-        conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
-        val fixed = condition.lower.filter { (id, value) ->
+    val query = QfNraQuery(formula, boolCount, realCount, params, condition)
+    while (true) query.next()?.let { return it }
+}
+
+internal class QfNraQuery(
+    formula: PolynomialRealFormula,
+    boolCount: Int,
+    realCount: Int,
+    params: QfNraParams,
+    condition: PolynomialCondition,
+) {
+    private val work = QfNraWork(params)
+    val stats: QfNraStats get() = work.snapshot()
+    private var result: QfNraResult? = null
+    private val preparation = sequence<QfNraResult?> {
+        val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        try {
             arithmetic.step()
-            condition.upper[id] == value
-        }
-        val normalized = PolynomialFormula.normalize(conditioned, arithmetic, fixed)
-        val witness = work.probe {
-            probeWitness(normalized, boolCount, realCount, arithmetic, algebraic, fixed)
-        }
-        if (witness != null) {
+            val conditioned = condition.apply(formula, boolCount, realCount, arithmetic::step)
+            conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
+            val fixed = condition.lower.filter { (id, value) ->
+                arithmetic.step()
+                condition.upper[id] == value
+            }
+            val normalized = PolynomialFormula.normalize(conditioned, arithmetic, fixed)
+            yield(null)
+            val witness = work.probe {
+                probeWitness(normalized, boolCount, realCount, arithmetic, algebraic, fixed)
+            }
+            if (witness != null) {
+                arithmetic.step()
+                yield(QfNraResult.Satisfiable(witness, work.snapshot()))
+                return@sequence
+            }
+            yield(null)
+            val polynomials = normalized.atoms.map {
+                arithmetic.step()
+                it.polynomial
+            }
+            val pending = PolynomialProjection.prepare(polynomials, realCount, arithmetic)
+            var projection: PolynomialProjection? = null
+            while (projection == null) {
+                projection = pending.next()
+                if (projection == null) yield(null)
+            }
+            work.projectedPolynomials = projection.polynomialCount
+            yield(null)
+            val assignment = searchCells(normalized, projection, boolCount, arithmetic, algebraic, work, fixed)
             arithmetic.step()
-            return QfNraResult.Satisfiable(witness, work.snapshot())
+            yield(if (assignment == null) QfNraResult.Unsatisfiable(work.snapshot())
+                else QfNraResult.Satisfiable(assignment, work.snapshot()))
+        } catch (_: PolynomialInterrupted) {
+            val reason = if (work.limitReached) QfNraReason.WorkLimit else QfNraReason.Interrupted
+            yield(QfNraResult.Unknown(reason, work.snapshot()))
+        } catch (stop: PolynomialResourceLimit) {
+            yield(QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), stop.resource))
         }
-        val polynomials = normalized.atoms.map {
-            arithmetic.step()
-            it.polynomial
-        }
-        val projection = PolynomialProjection.compute(polynomials, realCount, arithmetic)
-        work.projectedPolynomials = projection.polynomialCount
-        val assignment = searchCells(normalized, projection, boolCount, arithmetic, algebraic, work, fixed)
-        arithmetic.step()
-        if (assignment == null) QfNraResult.Unsatisfiable(work.snapshot())
-        else QfNraResult.Satisfiable(assignment, work.snapshot())
-    } catch (_: PolynomialInterrupted) {
-        val reason = if (work.limitReached) QfNraReason.WorkLimit else QfNraReason.Interrupted
-        QfNraResult.Unknown(reason, work.snapshot())
-    } catch (stop: PolynomialResourceLimit) {
-        QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), stop.resource)
+    }.iterator()
+
+    fun next(): QfNraResult? {
+        result?.let { return it }
+        return preparation.next().also { result = it }
     }
 }
 
