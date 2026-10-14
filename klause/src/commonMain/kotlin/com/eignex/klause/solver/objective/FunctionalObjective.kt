@@ -4,11 +4,21 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toDouble
+import com.eignex.klause.util.unaryMinus
 import kotlin.math.abs
 
 // Integer and Boolean definitions share a topological order and retain separate coordinate spaces.
@@ -112,7 +122,7 @@ internal class FunctionalObjective internal constructor(
     )
 
     /** Evaluate the cones over base value-getters and return the "lower is better" objective. */
-    private fun objValue(intBase: (Int) -> Long, boolBase: (Int) -> Boolean): Long {
+    private fun objValue(intBase: (Int) -> Long, boolBase: (Int) -> Boolean): BigInt {
         val v = coneMemo.evaluate(intBase, boolBase)
         return if (minimize) v else -v
     }
@@ -149,7 +159,7 @@ internal class FunctionalObjective internal constructor(
             )
         }
 
-        fun evaluate(intBase: (Int) -> Long, boolBase: (Int) -> Boolean): Long {
+        fun evaluate(intBase: (Int) -> Long, boolBase: (Int) -> Boolean): BigInt {
             val values = LongArray(ordered.size)
             val intOf: (Int) -> Long = { id ->
                 val slot = intSlots[id]
@@ -160,10 +170,17 @@ internal class FunctionalObjective internal constructor(
                 if (slot >= 0) values[slot] != 0L else boolBase(id)
             }
             for (i in ordered.indices) values[i] = ordered[i].compute(intOf, boolOf)
-            var total = constant
-            for (k in terms.indices) total += termCoeffs[k] * intOf(terms[k])
-            for (k in boolTerms.indices) if (boolOf(boolTerms[k])) total += boolTermCoeffs[k]
-            return total
+            try {
+                var total = constant
+                for (k in terms.indices) total = addExact(total, mulExact(termCoeffs[k], intOf(terms[k])))
+                for (k in boolTerms.indices) if (boolOf(boolTerms[k])) total = addExact(total, boolTermCoeffs[k])
+                return bigIntOf(total)
+            } catch (_: CheckedLongOverflowException) {
+                var total = bigIntOf(constant)
+                for (k in terms.indices) total += bigIntOf(termCoeffs[k]) * bigIntOf(intOf(terms[k]))
+                for (k in boolTerms.indices) if (boolOf(boolTerms[k])) total += bigIntOf(boolTermCoeffs[k])
+                return total
+            }
         }
     }
 
