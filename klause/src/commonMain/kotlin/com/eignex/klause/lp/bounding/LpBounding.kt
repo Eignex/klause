@@ -732,7 +732,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     } else {
         BigFraction.ofDouble(bound.nextUp()) ?: return false
     }
-    val improvingMax = objectiveCeiling?.let { minOf(it, incumbentMax) } ?: incumbentMax
+    val improvingMax = objectiveCeiling?.let { if (it < incumbentMax) it else incumbentMax } ?: incumbentMax
     val sourceConstant = relaxation.objectiveConstant
     val integralCutoff = ExactLpNumber.of(improvingMax).exactLong()
     if (integralCutoff != null) {
