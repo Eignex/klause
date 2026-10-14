@@ -24,8 +24,13 @@ internal class PolynomialFormula private constructor(
     val atoms: List<PolynomialAtom>,
     val booleanVariables: List<Int>,
 ) {
-    fun conjunctiveAtoms(arithmetic: PolynomialArithmetic, maximumAtoms: Int): List<PolynomialAtom>? {
+    fun conjunctiveAtoms(
+        arithmetic: PolynomialArithmetic,
+        maximumAtoms: Int,
+        atomIndices: MutableList<Int>? = null,
+    ): List<PolynomialAtom>? {
         val result = ArrayList<PolynomialAtom>()
+        val indices = if (atomIndices != null) ArrayList<Int>() else null
         val pending = ArrayDeque<Int>()
         val visited = HashSet<Int>()
         pending.addLast(root)
@@ -35,10 +40,20 @@ internal class PolynomialFormula private constructor(
             if (!visited.add(index)) continue
             when (val node = nodes[index]) {
                 is FormulaNode.Constant -> if (!node.value) return null
-                is FormulaNode.Atom -> result.add(atoms[node.atom])
+                is FormulaNode.Atom -> {
+                    result.add(atoms[node.atom])
+                    if (indices != null) {
+                        arithmetic.step()
+                        indices.add(node.atom)
+                    }
+                }
                 is FormulaNode.Not -> {
                     val child = nodes[node.child] as? FormulaNode.Atom ?: return null
                     val atom = atoms[child.atom]
+                    if (indices != null) {
+                        arithmetic.step()
+                        indices.add(child.atom)
+                    }
                     result.add(PolynomialAtom(atom.polynomial, when (atom.relation) {
                         PolynomialRelation.EQ -> PolynomialRelation.NE
                         PolynomialRelation.NE -> PolynomialRelation.EQ
@@ -58,6 +73,10 @@ internal class PolynomialFormula private constructor(
                 is FormulaNode.BooleanVariable -> return null
             }
             if (result.size > maximumAtoms) return null
+        }
+        if (indices != null) {
+            repeat(indices.size) { arithmetic.step() }
+            atomIndices?.addAll(indices)
         }
         return result
     }

@@ -439,7 +439,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
             "openHintRawIncidencesMax",
             "openHintRawVariablesMax",
             "openHintRawLedgerDebits",
-
+            "nraDyadicAttempts", "nraDyadicBases", "nraCoupledWorkDeclines", "nraDyadicPreExtractionDeclines",
         )
     }
 }

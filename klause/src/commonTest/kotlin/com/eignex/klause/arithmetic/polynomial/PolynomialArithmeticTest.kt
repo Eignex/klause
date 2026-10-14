@@ -6,6 +6,8 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -13,6 +15,92 @@ class PolynomialArithmeticTest {
     private val arithmetic = PolynomialArithmetic()
     private val x = Polynomial.variable(0)
     private val y = Polynomial.variable(1)
+
+    @Test
+    fun `monomial order compares powers at the greatest coordinate first`() {
+        for ((left, right, expected) in listOf(
+            Triple(emptyMap<Int, Int>(), emptyMap(), 0),
+            Triple(mapOf(3 to 1), emptyMap(), 1),
+            Triple(mapOf(0 to Int.MAX_VALUE), mapOf(Int.MAX_VALUE to 1), -1),
+            Triple(mapOf(7 to 2, 1 to 3), mapOf(7 to 2, 2 to 1), -1),
+            Triple(mapOf(7 to 3), mapOf(7 to 2, 0 to Int.MAX_VALUE), 1),
+            Triple(mapOf(Int.MAX_VALUE to Int.MAX_VALUE, 0 to 1),
+                mapOf(Int.MAX_VALUE to Int.MAX_VALUE, 1 to 1), -1),
+        )) {
+            val a = Monomial.of(left)
+            val b = Monomial.of(right)
+
+            assertEquals(expected, a.compareTo(b))
+            assertEquals(-expected, b.compareTo(a))
+        }
+    }
+
+    @Test
+    fun `canonical monomials retain equality and hashes across insertion order and zero powers`() {
+        for ((powers, equivalent) in listOf(
+            mapOf(5 to 3, 0 to 2) to mapOf(0 to 2, 5 to 3),
+            mapOf(0 to 2, 3 to 0, 5 to 3) to mapOf(5 to 3, 0 to 2),
+            mapOf(9 to 0) to emptyMap(),
+        )) {
+            val a = Monomial.of(powers)
+            val b = Monomial.of(equivalent)
+
+            assertEquals(a, b)
+            assertEquals(a.hashCode(), b.hashCode())
+            assertEquals(0, a.compareTo(b))
+        }
+        assertEquals(Monomial.ONE.hashCode(), Monomial.of(emptyMap()).hashCode())
+    }
+
+    @Test
+    fun `ordered monomial hashes distinguish exchanged coordinate and degree roles`() {
+        for ((coordinate, degree) in listOf(1 to 2, 3 to 5)) {
+            val a = Monomial.of(mapOf(coordinate to degree))
+            val b = Monomial.of(mapOf(degree to coordinate))
+
+            assertNotEquals(a, b)
+            assertNotEquals(a.hashCode(), b.hashCode())
+        }
+    }
+
+    @Test
+    fun `monomial variables expose fresh ascending views`() {
+        val monomial = Monomial.of(mapOf(9 to 1, 2 to 3, 6 to 2))
+
+        val first = monomial.variables
+        val second = monomial.variables
+
+        assertEquals(listOf(2, 6, 9), first)
+        assertEquals(first, second)
+        assertNotSame(first, second)
+    }
+
+    @Test
+    fun `canonical term ordering preserves coefficients at sparse extreme coordinates`() {
+        val low = Monomial.of(mapOf(0 to Int.MAX_VALUE))
+        val high = Monomial.of(mapOf(Int.MAX_VALUE to 1))
+        val polynomial = Polynomial.of(listOf(
+            PolynomialTerm(high, fraction(3)),
+            PolynomialTerm(Monomial.ONE, fraction(1)),
+            PolynomialTerm(low, fraction(2)),
+        ))
+
+        val terms = polynomial.terms
+
+        assertEquals(listOf(Monomial.ONE, low, high), terms.map { it.monomial })
+        assertEquals(listOf(fraction(1), fraction(2), fraction(3)), terms.map { it.coefficient })
+    }
+
+    @Test
+    fun `monomial multiplication rejects exponent overflow without changing its inputs`() {
+        val left = Monomial.of(mapOf(0 to Int.MAX_VALUE))
+        val right = Monomial.of(mapOf(0 to 1))
+
+        assertFailsWith<IllegalArgumentException> { left.times(right) }
+
+        assertEquals(Int.MAX_VALUE, left.exponent(0))
+        assertEquals(1, right.exponent(0))
+    }
 
     @Test
     fun `prepared multiplication publishes only the completed product`() {
@@ -79,13 +167,19 @@ class PolynomialArithmeticTest {
     fun `terms merge and cancel independent of producer mutation`() {
         val powers = mutableMapOf(0 to 2)
         val monomial = Monomial.of(powers)
+        val equivalent = Monomial.of(mapOf(0 to 2))
         val terms = mutableListOf(PolynomialTerm(monomial, BigFraction.ONE))
         val polynomial = Polynomial.of(terms)
 
         powers[0] = 7
+        powers[5] = 1
         terms.clear()
 
         assertEquals(2, polynomial.degree(0))
+        assertEquals(equivalent, monomial)
+        assertEquals(equivalent.hashCode(), monomial.hashCode())
+        assertEquals(0, equivalent.compareTo(monomial))
+        assertEquals(listOf(0), monomial.variables)
         assertEquals(Polynomial.ZERO, arithmetic.subtract(polynomial, polynomial))
     }
 

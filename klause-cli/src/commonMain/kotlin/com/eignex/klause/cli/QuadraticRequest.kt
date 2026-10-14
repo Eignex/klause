@@ -81,6 +81,13 @@ internal fun reportQuadraticOptimization(
             "nraLiftedCells" to execution.polynomialStats.liftedCells.toString(),
             "quadraticNumericalWork" to execution.numericalWork.toString(),
             "quadraticNativeWork" to execution.nativeWork.toString(),
+        ) + listOfNotNull(
+            execution.polynomialStats.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
+            execution.polynomialStats.dyadicBases?.let { "nraDyadicBases" to it.toString() },
+            execution.polynomialStats.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
+            execution.polynomialStats.dyadicPreExtractionDeclines?.let {
+                "nraDyadicPreExtractionDeclines" to it.toString()
+            },
         ) + execution.resource?.let { listOf("quadraticResource" to it.name) }.orEmpty())
     }
 }

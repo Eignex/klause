@@ -188,6 +188,11 @@ internal object SolveCore {
                         "nraWork" to native.workSpent.toString(),
                         "nraProjectedPolynomials" to native.projectedPolynomials.toString(),
                         "nraLiftedCells" to native.liftedCells.toString(),
+                    ) + listOfNotNull(
+                        native.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
+                        native.dyadicBases?.let { "nraDyadicBases" to it.toString() },
+                        native.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
+                        native.dyadicPreExtractionDeclines?.let { "nraDyadicPreExtractionDeclines" to it.toString() },
                     ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
                     output.onAllowanceStatistics(pairs)
                 }
@@ -224,6 +229,13 @@ internal object SolveCore {
                         "nraWork" to execution.stats.workSpent.toString(),
                         "nraProjectedPolynomials" to execution.stats.projectedPolynomials.toString(),
                         "nraLiftedCells" to execution.stats.liftedCells.toString(),
+                    ) + listOfNotNull(
+                        execution.stats.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
+                        execution.stats.dyadicBases?.let { "nraDyadicBases" to it.toString() },
+                        execution.stats.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
+                        execution.stats.dyadicPreExtractionDeclines?.let {
+                            "nraDyadicPreExtractionDeclines" to it.toString()
+                        },
                     ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty())
                 }
                 return

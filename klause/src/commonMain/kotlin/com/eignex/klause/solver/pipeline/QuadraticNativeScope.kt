@@ -21,6 +21,10 @@ internal class QuadraticNativeScope private constructor(
     private var quadraticWork = 0L
     private var projected = 0L
     private var lifted = 0L
+    private var dyadicAttempts: Long? = null
+    private var dyadicBases: Long? = null
+    private var coupledWorkDeclines: Long? = null
+    private var dyadicPreExtractionDeclines: Long? = null
     private val workers = mutableMapOf<Int, QuadraticNativeScope>()
     private var representationDecline: PolynomialTheoryResource? = null
     val resource: PolynomialTheoryResource? get() = ledger.lock.withLock { representationDecline }
@@ -34,8 +38,10 @@ internal class QuadraticNativeScope private constructor(
         if (root == null) ledger.quadraticWork else quadraticWork
     }
     val polynomialStats: PolynomialTheoryStats get() = ledger.lock.withLock {
-        if (root == null) PolynomialTheoryStats(ledger.projected, ledger.lifted, ledger.polynomialWork)
-        else PolynomialTheoryStats(projected, lifted, polynomialWork)
+        if (root == null) PolynomialTheoryStats(ledger.projected, ledger.lifted, ledger.polynomialWork,
+            ledger.dyadicAttempts, ledger.dyadicBases, ledger.coupledWorkDeclines, ledger.dyadicPreExtractionDeclines)
+        else PolynomialTheoryStats(projected, lifted, polynomialWork,
+            dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines)
     }
     val exhausted: Boolean get() = ledger.lock.withLock {
         params.maximumWork?.let { ledger.work >= it } == true ||
@@ -61,6 +67,22 @@ internal class QuadraticNativeScope private constructor(
         lifted = sum(lifted, stats.liftedCells)
         ledger.projected = sum(ledger.projected, stats.projectedPolynomials)
         ledger.lifted = sum(ledger.lifted, stats.liftedCells)
+        stats.dyadicAttempts?.let {
+            dyadicAttempts = sum(dyadicAttempts ?: 0, it)
+            ledger.dyadicAttempts = sum(ledger.dyadicAttempts ?: 0, it)
+        }
+        stats.dyadicBases?.let {
+            dyadicBases = sum(dyadicBases ?: 0, it)
+            ledger.dyadicBases = sum(ledger.dyadicBases ?: 0, it)
+        }
+        stats.coupledWorkDeclines?.let {
+            coupledWorkDeclines = sum(coupledWorkDeclines ?: 0, it)
+            ledger.coupledWorkDeclines = sum(ledger.coupledWorkDeclines ?: 0, it)
+        }
+        stats.dyadicPreExtractionDeclines?.let {
+            dyadicPreExtractionDeclines = sum(dyadicPreExtractionDeclines ?: 0, it)
+            ledger.dyadicPreExtractionDeclines = sum(ledger.dyadicPreExtractionDeclines ?: 0, it)
+        }
     }
 
     fun decline(resource: PolynomialResource) = ledger.lock.withLock {
@@ -102,6 +124,10 @@ internal class QuadraticNativeScope private constructor(
         var quadraticWork = 0L
         var projected = 0L
         var lifted = 0L
+        var dyadicAttempts: Long? = null
+        var dyadicBases: Long? = null
+        var coupledWorkDeclines: Long? = null
+        var dyadicPreExtractionDeclines: Long? = null
         val work: Long get() = sum(polynomialWork, quadraticWork)
     }
 }

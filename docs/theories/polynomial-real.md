@@ -329,8 +329,9 @@ and frontend routing remain caller responsibilities.
 Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
 coordinates. Repaired points can guide later repairs even when the full check fails.
-Nonlinear numeric conjunctions also propose coupled exact lines from a zero rational
-center. Source monomial co-occurrence selects coordinate groups. Unconditional affine
+Nonlinear numeric conjunctions also propose coupled exact lines from positive
+rational and zero centers on referenced unfixed coordinates. Source monomial co-occurrence
+selects coordinate groups. Unconditional affine
 equalities supply a rational completion and nullspace directions; guarded equalities
 provide no affine facts. Each direction changes at least two unfixed coordinates.
 A private parameter outside the original coordinate IDs substitutes the whole line
@@ -343,14 +344,67 @@ storage respects the kernel matrix cap. Optional representation declines retain 
 spent work and leave ordinary coordinate probing available. Affine row, completion,
 direction and substituted coefficients decline above the same 4,096-bit admission
 ceiling as input coefficients.
+A fresh inequality-only coupled entry with no consumed root queries can replace
+the one center with one complete dyadic point derived from source monomials.
+Completed conjunction indices carry the admitted source term counts, so sparse
+payload storage and sorting are charged before extraction. For more than one term,
+the sorting proxy charges the term count times its ceiling binary logarithm times
+one plus the declared coordinate count. Comparisons scan immutable canonical
+monomial arrays; the proxy prices those coordinate visits and term sorting without
+per-comparison coordinate copying or sorting. This pricing leaves more usable work
+inside the same private prefix; spent admission debt is never refunded. It is not
+an exact platform-sort comparison count, wall-time bound or allocation precharge.
+Initial admission and co-occurrence getters still sort atomically without a complete
+sort precharge; cache construction supplies no borrowed prepayment. Effective comparisons choose one
+positive term and require its exponent weight to dominate every negative term by
+a conservative rational-coefficient and term-count margin. Checked integer updates
+adjust positive power-of-two coordinate scales over at most four construction
+sweeps. A complete recheck of the selected rows precedes bounded exact shifts and
+point construction. Exponents admit numerator or denominator magnitudes up to the
+same 4,096-bit ceiling. Failed or incomplete construction retains the one center;
+unresolved positive equalities retain their affine completion and repair path.
+This sufficient sign proposal adds no center, scalar repair pass, root query or
+proposal allowance. All extraction, row arithmetic, storage, conversion and checks
+debit the same coupled native prefix immediately. The original sample checker
+alone accepts the point; domination supplies neither a verdict nor a source proof.
+Fixed and unused coordinates retain their source values. Containing interruption
+propagates through construction, while private phase exhaustion retains its charges
+and leaves scalar probing available.
+The positive center's whole-coordinate alternating direction and first co-occurrence
+direction precede the zero center's uniform line. Completed bases consume the same
+proposal ledger. Line cells near the center precede distant sections and sectors.
+Nonlinear and multi-coordinate affine guides precede coordinate bounds. Exact
+duplicate specialized polynomials share one root guide within a line; constant
+guides consume no root query. A degree or representation decline skips that guide
+only, retaining every source assertion in the complete point check.
 Equalities under negation or disjunction are proposal guides, never asserted facts.
 For a nonlinear conjunction of numeric inequalities and disequalities, an optional guide view
 complements directly negated atoms without changing the source formula. It excludes
 Boolean alternatives and unresolved positive equalities. Per-coordinate boundaries
-combine roots of the specialized source polynomials; root sections and rational
+combine roots of the specialized source polynomials. Within one boundary call at a
+fixed point and coordinate, exact duplicate source polynomials share one root query
+regardless of relation. A bounded local list charges payload comparisons and storage
+to the same arithmetic owner and is discarded after the call. Every effective relation
+remains independently scored and source-checked. Direct root queries retain their
+shared debit and exhaustion behavior. Root sections and rational
 interior sectors provide complete-point proposals. Negated denominator equalities
 therefore guide nonzero intervals rather than requiring a zero. Rejected points are
-ordered by the effective conjunctive relations. This path starts with a positive
+ordered by the effective conjunctive relations. A completed rejected coupled point
+with at least two nonzero referenced unfixed coordinates can replace this path's
+first positive rational center. One private snapshot retains the best completed
+effective-guide score, reusing exact source-atom signs from the complete point check.
+Directly negated guides retain their complemented relation and original atom index.
+An incomplete score or copy cannot replace the previous snapshot. Ranking and copying
+debit the same arithmetic owner; optional representation declines retain their charges,
+and interruption propagates to the existing phase owner.
+The snapshot belongs only to this normalized query and probe. Scalar repair consumes
+it once, preserving fixed and unused coordinates. The unchanged completed rejection
+needs no second initial point check, but every changed coordinate proposal receives
+a complete source check. Consumption polls the owner and respects exhausted query
+and proposal counters. Zero and negative-one fallback centers retain their existing
+order; the retained point creates no additional center, passes or allowance. Queries
+with Boolean alternatives or unresolved positive equalities retain their existing
+repair path. Without an eligible snapshot, inequality repair starts from the positive
 rational center, retains fixed coordinates and assigns zero to unused declarations.
 Affine-only normalized queries retain their uniform point checks and complete
 projection allowance; short conditioned relaxation checks do not spend it on sector repairs.
@@ -364,10 +418,13 @@ Uniform rational centers and coupled lines seed at most
 64 complete proposals and 32 coordinate root queries across four repair passes per
 center. Coupled lines use at most half of these shared proposal and query caps, leaving
 the remaining slots for coordinate repairs. Their native phase ends at the midpoint
-of the same 65,536-unit probe slice. A private phase stop retains every charge and
+of the same 65,536-unit probe slice. Each line spends at most four additional root
+queries and eight additional proposals within those cumulative caps. Centers and
+lines renew no allowance. A private phase stop retains every charge and
 continues scalar probing; a containing stop remains terminal even if its predicate
-later clears. Every specialized polynomial consumes
-one root-query slot. Root queries admit coordinate or line degree at most eight. One private slice of
+later clears. Each admitted unique nonconstant coupled guide consumes one root-query
+slot; coordinate repair queries retain their own shared debit. Root queries admit
+coordinate or line degree at most eight. One private slice of
 65,536 native units is debited to the containing query's cumulative work and caller
 meter. Rejected proposals, private exhaustion and optional representation declines
 leave complete CAD available. Parent stops are latched during the phase and withhold
@@ -375,6 +432,17 @@ publication; neither retraction nor a fresh proposal renews the invocation allow
 Sparse polynomial getters and atomic exact arithmetic can overrun a cooperative
 checkpoint; these counts do not impose a hard wall-time or all-allocation precharge.
 Kernel dense, matrix and checked-degree limits remain unchanged.
+
+Invocation snapshots separately observe eligible dyadic attempts, completed bases,
+coupled private-work declines and the subset occurring before all dyadic payloads
+are extracted. A completed base is not a source witness. Existing entry, return
+and interruption outcomes update these counters without extra work, queries or
+cancellation polls. A latched containing stop is not a private-work decline.
+Snapshots are immutable and merge observed counts with saturation; missing producer
+observations stay absent when no producer supplies them. A mixed aggregate sums only
+instrumented queries and does not establish coverage of its unobserved portions.
+These aggregate events identify
+execution stages, not the private cause of a failed proposal or an inner cost clock.
 
 Complete Collins projection followed by exact lifting partitions the real space
 into sign-invariant cells when probing supplies no witness. Refutation requires
