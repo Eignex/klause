@@ -11,6 +11,24 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `completed primary certificates survive optional candidate work exhaustion`() {
+        val source = LpBuilder().apply {
+            addVar(0L, 10L, cost = 1L)
+            addRealVar(0.0, 1.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val meter = MixedCertificateMeter(Cancellation.Never)
+        meter.reserve(1_999_240L)
+        val additional = ArrayList<LpDeductionCertificate>()
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(),
+            onAdditionalCertificate = { additional.add(it) }, sharedMeter = meter))
+
+        assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
+        assertTrue(additional.isEmpty())
+    }
+
+    @Test
     fun `objective expression fixing preserves exact integer and fractional defining multipliers`() {
         for (coefficient in listOf(1.0, 3.0)) {
             val source = LpBuilder().apply {
