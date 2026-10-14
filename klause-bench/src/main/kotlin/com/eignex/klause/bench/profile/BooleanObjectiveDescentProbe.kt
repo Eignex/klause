@@ -281,7 +281,8 @@ internal object BooleanObjectiveDescentProbe {
                     }
                     put("sourceHashes", buildJsonObject { put("model", digest) })
                     put("initialObjective", sourceObjective.evaluateExact(initial).toString())
-                    put("strictImprovements", if (value != null && value < sourceObjective.evaluateExact(initial)) 1 else 0)
+                    put("strictImprovements",
+                        if (value != null && value < sourceObjective.evaluateExact(initial)) 1 else 0)
                     put("targetRoot", root); put("targetDelta", delta)
                     put("rootPins", pins.numBools); put("pinsSatisfied", true)
                     put("initialHardCost", initialCost); put("finalHardCost", state.cost)
