@@ -175,12 +175,13 @@ closed ceiling before an incumbent exists. A point equal to the declared ceiling
 probe boxes cannot supply the ceiling; source scale, constants and scoped bounds
 remain part of the deduction. Ceiling arithmetic has bounded scalar admission
 and charges the containing node ledger without an additional LP query.
-Before an incumbent, a verified defining equality can eliminate the continuous
-objective reduced cost from the accepted dual vector. The candidate is checked
-against every exact endpoint and accepted only when its bound is at least as
-strong. It shares the node certificate allowance; a decline retains the completed
-certificate. This supplies integral reduced costs when a degenerate optimum
-leaves the objective seated at its continuous bound.
+A verified defining equality can eliminate the continuous objective reduced cost
+from the accepted dual vector before or after an incumbent. The candidate is checked
+against every exact endpoint. A weaker objective bound can still supply stronger
+conditional costs at an integral endpoint, so fixing retains that candidate while
+pruning selects the strongest complete bound. Without an additional fixing consumer,
+elimination replaces the original certificate only when its bound is at least as strong.
+It shares the node certificate allowance; a decline retains completed certificates.
 When fixing is requested, one additional candidate uses only the verified
 objective-defining equality. Its integral affine costs can bound a coordinate
 whose reduced cost vanishes in the stronger LP certificate. A metered exact comparison selects the stronger bound for pruning; both complete
@@ -190,9 +191,10 @@ decline on an absent endpoint. It shares the same work/allocation allowance and 
 and retains the defining row and its scoped premises. Candidate publication follows the
 final cancellation check; each consumer also applies certification policy admission.
 For an already integral source objective, the zero-dual box certificate supplies
-the objective candidate without a defining equality. One exact midpoint of the
-primary and objective dual vectors can strengthen conditional integral costs
-through endpoint cancellation. Every midpoint contribution is checked against the
+the objective candidate without a defining equality. When objective elimination
+supplies no alternative, one exact midpoint of the primary and objective dual vectors
+can strengthen conditional integral costs through endpoint cancellation.
+Every midpoint contribution is checked against the
 same source authority. At most three complete certificates participate: pruning
 uses the strongest admitted bound and fixing can use the other two. All candidates,
 selection and failed attempts share the unchanged node allowance; a decline keeps
