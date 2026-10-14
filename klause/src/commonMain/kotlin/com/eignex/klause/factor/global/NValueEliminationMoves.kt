@@ -23,9 +23,9 @@ internal class NValueEliminationMoves(
         // A searched input can rewrite a maintained coordinate in another value class.
         val network = state.invariants
         if (network != null && (
-            network.isDefinedInt(n) || xs.any { network.isDefinedInt(it) } ||
-                presents.any { network.isDefinedBool(Lit.variable(it)) }
-        )
+                network.isDefinedInt(n) || xs.any { network.isDefinedInt(it) } ||
+                    presents.any { network.isDefinedBool(Lit.variable(it)) }
+                )
         ) {
             return
         }
