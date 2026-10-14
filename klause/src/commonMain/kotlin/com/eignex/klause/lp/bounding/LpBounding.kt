@@ -687,7 +687,7 @@ internal fun LpEngine.sparseSafePrune(
     // an attained LP optimum. A declared objective ceiling also bounds feasible points before an incumbent.
     if (canFix && cert != null &&
         !cancellation() &&
-        observeNodeFixing(sink, "PRIMARY_FIXING") {
+        observeNodeFixing(sink, LpSolvePhase.NODE_PRIMARY_FIXING) {
             applySparseReducedCostFixing(boundRel, cert, session, bound, sink, objectiveVar,
                 objectiveAscending, learn, cancellation, objectiveCeiling)
         }
@@ -697,8 +697,8 @@ internal fun LpEngine.sparseSafePrune(
     if (canFix && cert != null) for ((index, candidate) in additionalCertificates.withIndex()) {
         if (cancellation()) return LpNodeOutcome(false, optimalBasis)
         val additional = solveContext.certificationPolicy.acceptNullable(LpCertifier.INTEGER, candidate) ?: continue
-        val stage = if (index == 0) "SECONDARY_FIXING" else "TERTIARY_FIXING"
-        if (observeNodeFixing(sink, stage) {
+        val phase = if (index == 0) LpSolvePhase.NODE_SECONDARY_FIXING else LpSolvePhase.NODE_TERTIARY_FIXING
+        if (observeNodeFixing(sink, phase) {
             applySparseReducedCostFixing(boundRel, additional, session, bound, sink, objectiveVar,
                 objectiveAscending, learn, cancellation, objectiveCeiling)
         }) {
@@ -708,8 +708,8 @@ internal fun LpEngine.sparseSafePrune(
     return LpNodeOutcome(false, optimalBasis)
 }
 
-private inline fun observeNodeFixing(sink: SolveStatsSink, stage: String, body: () -> Boolean): Boolean {
-    val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.NODE), LpSolvePhase.NODE_DEDUCTION)
+private inline fun observeNodeFixing(sink: SolveStatsSink, phase: LpSolvePhase, body: () -> Boolean): Boolean {
+    val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.NODE), phase)
     val before = sink.lp.fixed.read().sum
     var returned = false
     var conflict = false
@@ -725,7 +725,7 @@ private inline fun observeNodeFixing(sink: SolveStatsSink, stage: String, body: 
             fixes > 0 -> "FIXED"
             else -> "NONE"
         }
-        timer.finish("${stage}_$outcome", steps = fixes)
+        timer.finish(outcome, steps = fixes)
     }
 }
 
