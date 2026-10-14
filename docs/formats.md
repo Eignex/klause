@@ -19,6 +19,24 @@ representation and publication contracts live with their source format. The
 | MPS | [MPS semantics](formats/mps.md): decimal correspondence, exact certification and tolerances |
 | DIMACS, WCNF, OPB/WBO and XCSP3 | [Finite formats](formats/finite.md): encodings, objectives and source validation |
 
+## Arithmetic role preservation
+
+Arithmetic products retain every operand occurrence and the separate result role,
+including coordinates shared by multiple roles. Remapping preserves those positions;
+coordinate membership may deduplicate adjacency without changing the relation.
+Native projections and selected consumer encodings describe that same source equation.
+Conditioned linear encodings retain their captured pins and exact combined coefficients.
+See [local-search grading](solver/local-search.md#projections-and-preparation) and
+[theory encoding](theories.md#extension-roles-and-completeness).
+
+Schema multiplication, FlatZinc `int_times` and XCSP3 `mul` retain repeated operands
+and result aliases. MiniZinc fixed powers and bounded SMT-LIB integer powers use
+product chains; SMT-LIB exact polynomial expressions retain repeated operands directly.
+FlatZinc float representations preserve the same roles under their declared exact or
+grid semantics. MPS admits linear arithmetic; DIMACS and WCNF admit Boolean clauses,
+so neither has an arithmetic product path. OPB/WBO Boolean monomials use conjunction:
+repeated literals are idempotent and complementary literals make the term false.
+
 ## Solving coverage
 
 The solver supports finite constraints, linear arithmetic and polynomial real
