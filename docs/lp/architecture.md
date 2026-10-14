@@ -116,10 +116,13 @@ source units and do not acquire an integer objective lattice.
 A retained defining equality can prove that a bounded continuous objective is an
 integral affine expression. Its row premises then support strict integer cutoffs;
 the continuous declaration and domain-fixing targets retain their original types.
-After a successful root LP query, a mixed source model can project its rows onto
+After a successful LP query, a mixed source model can project its rows onto
 integral coordinates using exact endpoint sums. These feasibility certificates
 do not require an incumbent, add no LP query or cut row, and leave continuous
-coordinates with the numerical owner. Certification and the subsequent node
+coordinates with the numerical owner. Root queries consider all mixed rows;
+search queries restrict the pass to rows touched by narrowed finite endpoints
+or Boolean pins, with every retained consequence following the CP trail.
+Certification and the subsequent node
 objective candidates share the same cumulative allowance. The CP consumer owns
 the resulting domain changes and explanations; see [certification](certification.md).
 
@@ -155,7 +158,7 @@ using the retained LP point under the same root allowance.
 Search checks complete LP float coordinates through the caller's source tolerance
 verifier when supplied. Other proposals complete through the retained real-leaf
 owner before publication. A relaxation point supplies only a target, never witness authority.
-Production primal pricing recomputes scores. Root mixed-row feasibility certificates are a bounded
+Production primal pricing recomputes scores. Mixed-row feasibility certificates are a bounded
 post-query pass rather than a separate incremental theory owner. There is no
 conflict-weakening framework.
 

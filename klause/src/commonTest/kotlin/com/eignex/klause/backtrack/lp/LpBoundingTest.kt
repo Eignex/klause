@@ -68,6 +68,50 @@ class LpBoundingTest {
     }
 
     @Test
+    fun `mixed row feasibility fixes an integer domain under a supporting branch`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf(Linear(intArrayOf(0, 1), doubleArrayOf(1.0, 1.0),
+                intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.5)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.25))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5))
+        val session = PropagationSession(problem)
+        session.pinInt(1, 1)
+        val sink = SolveStatsSink(backend = "row-feasibility")
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session,
+                Double.POSITIVE_INFINITY, sink, Cancellation.Never, -1, true, learn = true)
+
+            assertFalse(result.prune)
+            assertEquals(IntDomain(0, 0), session.intDomain(0))
+        }
+    }
+
+    @Test
+    fun `mixed row deductions retract when their supporting branch is undone`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf(Linear(intArrayOf(0, 1), doubleArrayOf(1.0, 1.0),
+                intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.5)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.25))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5))
+        val session = PropagationSession(problem)
+        session.pinInt(1, 1)
+        val sink = SolveStatsSink(backend = "row-feasibility")
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            engine.sparseSafePrune(relaxer, session, Double.POSITIVE_INFINITY,
+                sink, Cancellation.Never, -1, true, learn = true)
+            assertEquals(IntDomain(0, 0), session.intDomain(0))
+
+            session.popToLevel(0)
+            val result = engine.sparseSafePrune(relaxer, session, Double.POSITIVE_INFINITY,
+                sink, Cancellation.Never, -1, true, learn = true)
+
+            assertFalse(result.prune)
+            assertEquals(IntDomain(0, 1), session.intDomain(0))
+        }
+    }
+
+    @Test
     fun `directly integral mixed fixing excludes equal incumbents when the objective range exceeds Long`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, Long.MAX_VALUE / 2L + 1L)),
             arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
