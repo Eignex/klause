@@ -9,8 +9,9 @@ separately at [eignex.com/docs/klause](https://eignex.com/docs/klause/).
 
 1. Read [system architecture](architecture.md) for the source-to-result flow and
    the responsibilities of each layer.
-2. Read [solver vision](vision.md) for the intended model breadth, paired portfolios
-   and independent proof verification, with [current execution contracts](vision.md#current-execution-contracts)
+2. Read [solver vision](vision.md) for the intended model breadth,
+   [high-level factors and composed reasoning](vision.md#high-level-factors-and-composed-reasoning),
+   paired portfolios and independent proof verification, with [current execution contracts](vision.md#current-execution-contracts)
    and [remaining work](vision.md#active-work-toward-the-vision) distinguished from
    [current coverage](formats.md#solving-coverage).
 3. Use [development](development.md) to build and contribute, or follow the

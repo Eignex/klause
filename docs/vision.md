@@ -35,6 +35,7 @@ Subsystem pages describe current guarantees; linked issues track residual work.
 
 | Area | Current implementation | Remaining work |
 |---|---|---|
+| Factor retention and composed reasoning | Frontends can decompose relations before mechanism selection; theory assembly and routing have specialized admission paths. | [Encoder foundation #2850](https://github.com/Eignex/klause/issues/2850) and [format migrations #2841](https://github.com/Eignex/klause/issues/2841) track implementation of the [factor and ownership requirements](#high-level-factors-and-composed-reasoning). |
 | Independent proof export | Exact numerical checks and supported source derivations are in memory. | [Proof-file support](#independently-checkable-proof-files) and a separate checker for entire original-source claims remain target capabilities. |
 
 ## Shared model breadth
@@ -54,6 +55,45 @@ engine parity. Shared breadth does not require equal filtering, scoring,
 performance or proof authority. The implementation gaps in
 [current coverage](formats.md#solving-coverage) are work to close; they do not define
 permanent exclusions from the portfolio requirement.
+
+## High-level factors and composed reasoning
+
+These target requirements are tracked by [#2850](https://github.com/Eignex/klause/issues/2850)
+and [#2841](https://github.com/Eignex/klause/issues/2841). They are not fully implemented.
+[Model preparation](model.md#engine-projections-and-factor-capabilities) and
+[theory composition](theories.md#shared-composition-contract) describe current execution.
+
+Frontends retain the strongest source factor available. Preparation selects its
+propagation, scoring, relaxation and theory mechanisms. An `Encoder` installs the
+factor's relation into a selected theory using direct support or a source-equivalent
+encoding. Generic equivalent encodings belong in `lowering`; private auxiliaries
+retain source mappings. Existing frontend decompositions must migrate to these
+consumer views across every applicable format.
+
+Variable ownership is separate from factor participation. Finite propagation owns
+Boolean and finite integer domains and their choices; arithmetic owns open integer
+and continuous state. A factor can use a `Propagator` and an `Encoder` together,
+alongside an `Invariant` and relaxation views. Joint linear reasoning can complement
+finite bound propagation, and finite globals can remain native beside real completion.
+Theories consuming finite variables preserve integrality, bounds and domain holes.
+Participating components must agree on the authoritative source assignment.
+
+An arithmetic relation or exact source coefficient does not by itself transfer
+unrelated finite variables or factors to theory search. Exact source authority,
+numerical proposal generation and execution ownership remain separate decisions.
+Selective encoding applies where a selected consumer needs a factor's relation;
+finite factors retain their other useful mechanisms.
+
+Providers distinguish direct support, equivalent lowering, conditioned support,
+relaxation-only support and unsupported relations. Conditions such as a fixed integer
+operand retain their premises and retract with shared search. Live arithmetic systems
+belong to shared `SearchComponent` instances; encoders retain prepared source data.
+Shared deductions carry reasons and follow the same assertion/retraction lifecycle.
+
+Every source factor must be enforced under its declared semantics before a solution
+is published. Relaxations and heuristic scores cannot replace source checks. Proof
+claims require coverage of the original source and active conditions, including
+agreement between participating components; unresolved required checks withhold them.
 
 ## Results and completeness
 

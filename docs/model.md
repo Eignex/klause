@@ -102,6 +102,10 @@ model settings. Search effort stays in the existing per-call backend parameters.
 
 ## Engine projections and factor capabilities
 
+The intended [factor retention and composed reasoning](vision.md#high-level-factors-and-composed-reasoning)
+contract separates variable ownership from concurrent factor mechanisms.
+The preparation and ownership rules below describe the implemented system.
+
 `Problem.prepareExecutionPlan()` selects immutable model-facing ownership and
 completion data before search. `PreparedSourcePlan` retains the original source
 object, canonical execution model, source declaration counts, coordinate mappings,

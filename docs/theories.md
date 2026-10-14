@@ -48,6 +48,11 @@ conditional infeasibility and global proof authority retain their distinct scope
 
 ## Shared composition contract
 
+The target [factor and ownership contract](vision.md#high-level-factors-and-composed-reasoning)
+allows finite propagation and theory encoding for the same source factor.
+[Encoder foundation #2850](https://github.com/Eignex/klause/issues/2850) tracks this
+extension; the composition rules below describe current execution.
+
 The pipeline selects ownership from the source model. A theory-owned integer is not
 materialized as a guessed finite domain. Real coordinates remain arithmetic-owned.
 When a model also contains finite factors, each engine projection retains the part
