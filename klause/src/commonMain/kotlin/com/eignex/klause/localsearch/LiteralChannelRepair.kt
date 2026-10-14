@@ -35,9 +35,20 @@ internal class LiteralChannelRepair(
 
     private fun proposePredicate(b: Int, desired: Boolean, depth: Int, remaining: Int): Int {
         if (depth >= MAX_DEPTH || remaining <= 0 || state.assumptions.isFrozenBool(b) ||
-            state.assignment.boolValue(b) == desired
+            !sink.allowsDefinedBool(b) || state.assignment.boolValue(b) == desired
         ) return 0
-        val predicate = state.invariants?.unaryPredicate(b) ?: return 0
+        val network = state.invariants ?: return 0
+        val literal = network.booleanLiteral(b)
+        if (literal != null) {
+            val source = Lit.variable(literal)
+            val target = desired == Lit.isPositive(literal)
+            if (state.assumptions.isFrozenBool(source) || state.assignment.boolValue(source) == target) return 0
+            if (!sink.allowsBool(source)) return proposePredicate(source, target, depth + 1, remaining)
+            val before = sink.size
+            sink.addBoolFlip(source)
+            return sink.size - before
+        }
+        val predicate = network.unaryPredicate(b) ?: return 0
         val domain = state.rootDomains[predicate.input]
         val equality = (predicate.op == LinearOp.EQ && desired) || (predicate.op == LinearOp.NE && !desired)
         if (equality) {

@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -18,6 +19,49 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LiteralChannelRepairTest {
+    @Test
+    fun `unit Boolean fold repairs backsolve signed and nested source literals`() {
+        for (positive in listOf(false, true)) {
+            val problem = Problem(3, 0, emptyArray(), emptyArray())
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+                BoolFoldDefinition(1, intArrayOf(Lit.make(0, positive)), true),
+                BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), true),
+            )))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = sweep.network(0, 3)
+            sweep.sweep(state.assignment, state.rootDomains)
+            state.recompute()
+            val desired = !state.assignment.boolValue(2)
+            val proposals = MoveSink().also { it.setInvariants(state.invariants) }
+
+            proposals.addChannelingBoolFlip(state, 2)
+            state.apply(proposals.list.single())
+
+            assertEquals(true, state.assignment.boolValue(0))
+            assertEquals(desired, state.assignment.boolValue(2))
+        }
+    }
+
+    @Test
+    fun `unit Boolean fold repairs respect source and output pins`() {
+        val problem = Problem(3, 0, emptyArray(), emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+            BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), true),
+        )))
+        for (pinned in 0..2) {
+            val assumptions = Assumptions(bools = mapOf(pinned to (pinned == 1)))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
+            state.invariants = sweep.network(0, 3)
+            sweep.sweep(state.assignment, state.rootDomains)
+            val proposals = MoveSink(assumptions).also { it.setInvariants(state.invariants) }
+
+            proposals.addChannelingBoolFlip(state, 2)
+
+            assertTrue(proposals.list.isEmpty())
+        }
+    }
+
     @Test
     fun `Boolean predicate repairs survive substituted integer pins`() {
         for ((initial, desired) in listOf(0L to true, 42L to false)) {

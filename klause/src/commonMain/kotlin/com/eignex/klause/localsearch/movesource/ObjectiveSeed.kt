@@ -11,9 +11,9 @@ import com.eignex.klause.solver.objective.LinearObjective
  * seeds single-variable moves directly on the objective's decision variables:
  *  - [LinearObjective]: a ±1 step on each nonzero-weight var in the direction its coefficient says
  *    reduces the objective, plus a flip on each nonzero-weight bool.
- *  - [FunctionalObjective]: geometric steps (±1, ±2, ±4, …, plus the domain endpoints) on each leaf
- *    var — its gradient lives in `deltaIfApplied`, not per-var coefficients, so we seed a spread of
- *    jump sizes and let the scoring keep the best.
+ *  - [FunctionalObjective]: Boolean leaf flips and geometric integer steps
+ *    (±1, ±2, ±4, …, plus the domain endpoints). Its gradient lives in `deltaIfApplied`,
+ *    so we seed a spread of jump sizes and let the scoring keep the best.
  *  - other objective shapes: nothing (no per-var direction without inspecting the shape).
  *
  * [Phase.Feasible]: the objective gradient only matters at `cost == 0`.
@@ -29,7 +29,7 @@ class ObjectiveSeed : MoveSource {
             is LinearObjective -> {
                 for (v in obj.boolWeightValues.indices) {
                     if (obj.boolWeightValues[v] == 0L) continue
-                    sink.addBoolFlip(v)
+                    sink.addChannelingBoolFlip(state, v)
                 }
                 for (v in obj.intCoefficientValues.indices) {
                     if (obj.intCoefficientValues[v] == 0L) continue
@@ -47,6 +47,7 @@ class ObjectiveSeed : MoveSource {
             }
 
             is FunctionalObjective -> {
+                for (v in obj.boolLeafVars) sink.addBoolFlip(v)
                 // No per-var direction a priori (gradient lives in deltaIfApplied), so seed
                 // geometric steps on each leaf var and let scoring keep the best. Pure ±1 descends
                 // a wide-domain coordinate objective far too slowly.
