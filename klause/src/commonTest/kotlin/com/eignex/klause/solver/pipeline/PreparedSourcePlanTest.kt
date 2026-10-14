@@ -36,6 +36,26 @@ import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
     @Test
+    fun `open source preparation retains selected deduction on its compact finite view`() {
+        val open = Bits(3).also { it.set(1) }
+        val row = AllDifferent(intArrayOf(0, 2), 0, 3)
+        val source = Problem(0, intBounds = IntBounds.fromModelBounds(
+            longArrayOf(1, 0, 0), longArrayOf(1, 0, 2), open, open,
+        ), factors = arrayOf(row, Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0)))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor !== row) BuiltInPropagationProjectionProvider.select(factor)
+            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The source relation is checked at a complete point.") { NoPropagator }
+        })
+
+        val prepared = assertIs<OpenSourcePreparation.Planned>(source.prepareOpenSource(
+            config = com.eignex.klause.presolve.PresolveConfig.NONE, projections = providers.prepare(source)))
+        val view = prepared.plan.cpProjection(prepared.model, prepared.plan.cpSourceDomains(prepared.model))
+
+        assertEquals(IntDomain(0, 2), view.problem.rootIntDomain(1))
+    }
+
+    @Test
     fun `complete admission does not require an available scorer`() {
         val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
         val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider { null })

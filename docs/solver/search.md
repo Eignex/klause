@@ -477,3 +477,10 @@ propagation state over original factors. Its work contributes to the invocation'
 CP work and time counters. If those factors have no complete original checker,
 the leaf stays indeterminate. Source-real checks remain the arithmetic completion's
 responsibility; objective overlays remain enforced by objective policy.
+
+Source preparation retains captured factor projection descriptors when selecting
+open ownership and optimization rounds. Domain closure retargets those descriptors
+without changing coordinate ownership. A factor rewrite reselects providers before
+constructing the compact CP view. Complete arithmetic still owns its original
+source predicates and exact certificates; a selected finite relaxation is a sound
+bounding view rather than source-completion authority.
