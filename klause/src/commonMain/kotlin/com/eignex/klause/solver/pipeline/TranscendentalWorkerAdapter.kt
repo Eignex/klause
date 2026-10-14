@@ -5,7 +5,6 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
 import com.eignex.klause.ir.TranscendentalProblem
-import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
@@ -93,6 +92,7 @@ internal class TranscendentalWorkerAdapter(
     }
 
     fun execute(): TranscendentalTheoryExecution {
+        check(!closed) { "transcendental worker is closed" }
         val result = when (engine) {
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> search()
             FiniteEngine.LOCAL_SEARCH -> walk(false)
@@ -128,91 +128,112 @@ internal class TranscendentalWorkerAdapter(
             PortfolioWorker.ofSolve("bt+exact-transcendental", arm, resumable = { completeHandle() }) { global, _ ->
                 completeHandle().use { requireNotNull(it.runSlice(global, Long.MAX_VALUE, -1)) }
             }
-        } else PortfolioWorker.ofSolve(
-            if (arm == 2) "alns+exact-transcendental" else "ls+exact-transcendental", arm,
-            countsInstructions = true,
-            resumable = { requireNotNull(neighborhoodWorker(arm).newResumableSolve()) },
-        ) { global, budget -> neighborhoodWorker(arm).solve(global, budget) }
-        if (arm == 2) worker.family = ArmFamily.Lns
-        return worker.bindEvidence(identity, provesResults = arm == 0).bindInvocation(requireNotNull(binding))
-    }
-
-    private fun neighborhoodWorker(arm: Int): PortfolioWorker = exactNeighborhoodWorker(
+        } else exactNeighborhoodWorker(
             if (arm == 2) "alns+exact-transcendental" else "ls+exact-transcendental", arm,
             objective = null, lifetime = external or params.strategy.localSearch.cancellation,
             timeout = params.timeout, exhausted = { service.exhausted || nodeBudget?.exhausted() == true },
             open = { neighborhood(arm == 2) },
         )
+        return worker.bindEvidence(identity, provesResults = arm == 0).bindInvocation(requireNotNull(binding))
+    }
 
-    internal fun completeHandle(): ResumableSolve = object : ResumableSolve, ReseedGuard {
-        override val canReseed: Boolean get() = false
-        private var closed = false
-        private var result: SolveResult? = null
-        private var global = Cancellation.Never
-        private var deadline = Cancellation.Never
-        private var end = Long.MAX_VALUE
-        private val lifetime = stop or params.strategy.backtrack.cancellation or Cancellation { global() }
-        private var component: TranscendentalSearchComponent? =
-            TranscendentalSearchComponent(source, service, root, params.maximumDepth)
-        private var session: SearchSession? = SearchSession(listOf(requireNotNull(component)),
-            cancellation = lifetime, branchers = listOf(requireNotNull(component)))
-        private var run: SearchRun? = requireNotNull(session).openRun(source.boolCount,
-            SearchSolveParams(minOf(params.strategy.backtrack.maxDecisions,
-                params.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE)),
-            decisionBudget = SearchDecisionBudget {
-                if (nodeBudget?.exhausted() == true) false else {
-                    nodeBudget?.spend()
-                    true
-                }
-            }, observer = object : SearchRunObserver {
-                override fun onCommit(decision: com.eignex.klause.solver.search.SearchDecision, decisionLevel: Int) {
-                    decisions++
-                }
-            }, nodePolicy = object : SearchNodePolicy {
-                override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
-                    if (deadline() || work >= end) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
-            }).also { it.pauseBeforeDecision = { deadline() || work >= end } }
-        override val isDone: Boolean get() = result != null
-        override val stats: SolveStats get() = SolveStats.EMPTY.copy(
-            search = SearchStats(nodes = SumResult(decisions.toDouble())))
-        override val work: Long get() = nativeWork + minOf(decisions, Long.MAX_VALUE - nativeWork)
+    internal fun completeHandle(): ResumableSolve {
+        check(!closed) { "transcendental worker is closed" }
+        return object : ResumableSolve, ReseedGuard {
+            override val canReseed: Boolean get() = false
+            private var closed = false
+            private var result: SolveResult? = null
+            private var global = Cancellation.Never
+            private var deadline = Cancellation.Never
+            private var end = Long.MAX_VALUE
+            private val lifetime = stop or params.strategy.backtrack.cancellation or Cancellation { global() }
+            private var component: TranscendentalSearchComponent? = null
+            private var session: SearchSession? = null
+            private var run: SearchRun? = null
 
-        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
-            result?.let { return it }
-            check(!closed) { "transcendental traversal is closed" }
-            this.global = global
-            if (lifetime()) return finish(SolveResult.Unknown(terminationReason(), stats))
-            if (sliceNodes == 0L || sliceMillis == 0L) return null
-            deadline = if (sliceMillis == Long.MAX_VALUE) Cancellation.Never
-                else Cancellation.after(sliceMillis.milliseconds)
-            end = if (sliceNodes < 0) Long.MAX_VALUE else work + minOf(sliceNodes, Long.MAX_VALUE - work)
-            return try {
-                when (val event = requireNotNull(run).next()) {
-                    is SearchRunEvent.Satisfied -> finish(SolveResult.Sat(
-                        capture(requireNotNull(event.model.valueOf(requireNotNull(component).witnessKey))), stats))
-                    SearchRunEvent.Exhausted -> finish(SolveResult.Unsat(stats = stats))
-                    SearchRunEvent.Paused -> null
-                    else -> finish(SolveResult.Unknown(terminationReason(), stats))
+            private fun openTraversal(rootUnknown: Boolean = false) {
+                component = TranscendentalSearchComponent(source, service, root, params.maximumDepth, rootUnknown)
+                session = SearchSession(listOf(requireNotNull(component)),
+                    cancellation = lifetime, branchers = listOf(requireNotNull(component)))
+                run = requireNotNull(session).openRun(
+                    source.boolCount,
+                    SearchSolveParams(minOf(params.strategy.backtrack.maxDecisions,
+                        params.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE)),
+                    decisionBudget = SearchDecisionBudget {
+                        if (nodeBudget?.exhausted() == true) false else {
+                            nodeBudget?.spend()
+                            true
+                        }
+                    },
+                    observer = object : SearchRunObserver {
+                        override fun onCommit(
+                            decision: com.eignex.klause.solver.search.SearchDecision, decisionLevel: Int,
+                        ) {
+                            decisions++
+                        }
+                    },
+                    nodePolicy = object : SearchNodePolicy {
+                        override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                            if (deadline() || work >= end) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
+                    },
+                ).also { it.pauseBeforeDecision = { deadline() || work >= end } }
+            }
+            override val isDone: Boolean get() = result != null
+            override val stats: SolveStats get() = SolveStats.EMPTY.copy(
+                search = SearchStats(nodes = SumResult(decisions.toDouble())))
+            override val work: Long get() = nativeWork + minOf(decisions, Long.MAX_VALUE - nativeWork)
+
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+                result?.let { return it }
+                check(!closed) { "transcendental traversal is closed" }
+                this.global = global
+                if (lifetime()) return finish(SolveResult.Unknown(terminationReason(), stats))
+                if (sliceNodes == 0L || sliceMillis == 0L) return null
+                deadline = if (sliceMillis == Long.MAX_VALUE) Cancellation.Never
+                    else Cancellation.after(sliceMillis.milliseconds)
+                end = if (sliceNodes < 0) Long.MAX_VALUE else work + minOf(sliceNodes, Long.MAX_VALUE - work)
+                return try {
+                    if (run == null) {
+                        if (source.boolCount == 0) {
+                            val checked = service.check(root, lifetime)
+                            when (checked) {
+                                is TranscendentalCheckResult.Witness -> return finish(SolveResult.Sat(
+                                    capture(checked.value), stats))
+                                TranscendentalCheckResult.Refuted -> return finish(SolveResult.Unsat(stats = stats))
+                                TranscendentalCheckResult.Unknown -> {
+                                    if (lifetime()) return finish(SolveResult.Unknown(terminationReason(), stats))
+                                    openTraversal(rootUnknown = true)
+                                }
+                            }
+                        } else openTraversal()
+                    }
+                    when (val event = requireNotNull(run).next()) {
+                        is SearchRunEvent.Satisfied -> finish(SolveResult.Sat(
+                            capture(requireNotNull(event.model.valueOf(requireNotNull(component).witnessKey))), stats))
+                        SearchRunEvent.Exhausted -> finish(SolveResult.Unsat(stats = stats))
+                        SearchRunEvent.Paused -> null
+                        else -> finish(SolveResult.Unknown(terminationReason(), stats))
+                    }
+                } finally {
+                    this.global = Cancellation.Never
+                    deadline = Cancellation.Never
                 }
-            } finally {
-                this.global = Cancellation.Never
+            }
+            private fun terminationReason(): TerminationReason =
+                if (global() && !stop() && !params.strategy.backtrack.cancellation()) {
+                    TerminationReason.Cancelled
+                } else reason()
+
+            private fun finish(value: SolveResult): SolveResult = value.also { result = it }
+            override fun close() {
+                if (closed) return
+                closed = true
+                run = null
+                session = null
+                component = null
+                global = Cancellation.Never
                 deadline = Cancellation.Never
             }
-        }
-        private fun terminationReason(): TerminationReason =
-            if (global() && !stop() && !params.strategy.backtrack.cancellation()) {
-                TerminationReason.Cancelled
-            } else reason()
-
-        private fun finish(value: SolveResult): SolveResult = value.also { result = it }
-        override fun close() {
-            if (closed) return
-            closed = true
-            run = null
-            session = null
-            component = null
-            global = Cancellation.Never
-            deadline = Cancellation.Never
         }
     }
 

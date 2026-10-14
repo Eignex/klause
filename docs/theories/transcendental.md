@@ -72,8 +72,10 @@ Each pipeline call captures its source conditions and creates fresh mutable theo
 and strategy state. A shared invocation plan owns its source coordinate mapping and
 satisfaction-only capabilities. Every materialized slot owns its service and retained
 traversal or neighborhood; its native service opens on first use, and closing an
-unused worker prevents later opening. Heuristic worker descriptors defer their
-neighborhood execution recipe until scheduled. No native workspace crosses workers. Checked publication
+unused worker prevents later opening. A complete worker without Boolean decisions
+checks its actual source root before allocating traversal storage. Only a completed
+native witness or refutation settles that root; an unresolved query enters shared
+traversal with its private outcome and retained charges. No native workspace crosses workers. Checked publication
 envelopes retain that actual invocation and immutable symbolic coordinates. A fresh
 invocation plan prevents a point checked under another call's strict real restrictions
 from being admitted by identity alone.

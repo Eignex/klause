@@ -710,7 +710,8 @@ Ubuntu analysis instance; its installation and runtime identity log stays under 
 `checker=transcendental` checks a saved bundle with `sources` and `results` arrays in
 the `TranscendentalSourceProbe` schema. It uses the independent rational/symbolic
 ground checker, requires original source hashes, and reports unsupported witnesses
-separately. This mode needs only Python's standard library and checks no UNSAT proof.
+separately. Its parser shares the pinned Z3 dependency; use `preparePython=true` on
+an analysis instance without the checker environment. This mode checks no UNSAT proof.
 
 These entry points can run as committed-code lab profiles with explicit AWS host,
 one machine and one parallel command. Use the lab client with

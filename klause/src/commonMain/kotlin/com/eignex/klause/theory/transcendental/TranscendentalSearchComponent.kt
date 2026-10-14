@@ -27,12 +27,13 @@ internal class TranscendentalSearchComponent(
     private val service: TranscendentalTheoryService,
     private val root: TranscendentalCondition = TranscendentalCondition(),
     private val maximumDepth: Int = 12,
+    rootUnknown: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
     val witnessKey = SearchModelKey(TranscendentalWitness::class)
     private val decisions = ArrayList<Pair<Int, TranscendentalSplit>>()
-    private var outcome: TranscendentalCheckResult? = null
+    private var outcome: TranscendentalCheckResult? = if (rootUnknown) TranscendentalCheckResult.Unknown else null
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
         if (decision is SearchDecision.Theory && decision.decision is TranscendentalSplit) {
