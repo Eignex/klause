@@ -562,3 +562,10 @@ mechanisms for sibling engines; projection selection contains no assignment payl
 
 An inert descriptor requires an explicit reason and cannot claim an exact check:
 its absent mechanism needs an enforcing peer or separate source certification.
+
+Open heuristic models retain their prepared scoring capture separately from the
+neutral source. Scoring preparation and candidate checks consume that capture;
+private pinned-point checks retain the selected descriptors after factor selection.
+Scheduling windows and dense-timeline admission restrictions apply to built-in
+scorers. A selected alternate scorer receives the actual move domains and owns its
+own numeric and resource limits.

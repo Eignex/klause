@@ -344,4 +344,12 @@ preparation. Its `factorProjections` snapshot survives objective rebinding and
 conditioned preparation. A `FinitePipelineRequest` carrying that plan applies the
 selection during deferred baking and subsequent finite engine construction. A
 complete strategy can remain admitted with exact deduction and unavailable scoring;
-a heuristic strategy needs its own supplied score and candidate-check authority.
+a heuristic strategy that scores factors needs its own supplied score and
+candidate-check authority. Exact conditioned neighborhoods use their complete
+component checks.
+
+`SourceStrategy.withProjectionProviders(providers)` retains the original model and
+schema mapping while selecting mechanisms separately for each invocation. Open
+heuristic models can use `LocalSearchModel.open(problem, selection, domains)` to
+bind a prepared capture to their actual move domains without allocating finite CP
+state. Selected factories remain private to each live worker.

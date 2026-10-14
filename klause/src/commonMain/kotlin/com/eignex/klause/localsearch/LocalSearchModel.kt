@@ -8,6 +8,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.solver.PreparedFactorProjections
 
 /**
  * What local search needs from a model: its factors, the domain each integer column moves over, and the pins
@@ -30,7 +31,12 @@ class LocalSearchModel private constructor(
     /** Whether random values are drawn near a column's current value rather than uniformly over its domain:
      *  set for domains whose endpoints a caller chose, where uniform draws land arbitrarily far out. */
     val anchoredSampling: Boolean,
+    internal val selection: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ) {
+    internal fun openProjection(): LocalSearchProblem = selection?.let {
+        LocalSearchProblem(problem, it, domains)
+    } ?: LocalSearchProblem(problem, domains)
+
     /**
      * The pins [assumptions] imply together with the root's own, or `null` when root reasoning refutes them. A
      * `null` is a proof only under [refutesModel].
@@ -75,6 +81,17 @@ class LocalSearchModel private constructor(
             )
         }
 
+        /** Open heuristic domains with the mechanism descriptors captured for [problem]. */
+        fun open(
+            problem: Problem,
+            selection: PreparedFactorProjections,
+            domains: Array<IntDomain> = Array(problem.numIntVars) { problem.declaredSearchDomain(it) },
+        ): LocalSearchModel {
+            selection.requireSource(problem)
+            require(domains.size == problem.numIntVars)
+            return LocalSearchModel(problem, searchWindows(domains), { it }, false, true, selection)
+        }
+
         /** [open] over [problem]'s declared ranges, every open side replaced by the edge of the 63-bit range. */
         fun open(problem: Problem): LocalSearchModel =
             open(problem, Array(problem.numIntVars) { problem.declaredSearchDomain(it) })
@@ -93,9 +110,12 @@ private fun Problem.declaredSearchDomain(v: Int): IntDomain {
     return IntDomain(lo, hi)
 }
 
-/** [domains] with every wide column of a [Cumulative] in its [scheduleWindow]; the same array when there is none. */
-private fun scheduleWindows(problem: Problem, domains: Array<IntDomain>): Array<IntDomain> {
-    val windowed = problem.factors.filterIsInstance<Cumulative>().flatMap { it.intVars.asIterable() }
+/** Window wide [Cumulative] columns only when their selected scorer uses the built-in dense timeline. */
+private fun scheduleWindows(problem: BakedProblem, domains: Array<IntDomain>): Array<IntDomain> {
+    val selection = problem.factorProjections
+    val windowed = problem.factors.indices.filter {
+        problem.factors[it] is Cumulative && selection?.usesBuiltInScoring(it) != false
+    }.flatMap { problem.factors[it].intVars.asIterable() }
         .filter { !isNarrow(domains[it]) }
     if (windowed.isEmpty()) return domains
     return domains.copyOf().also { copy -> for (v in windowed) copy[v] = scheduleWindow(domains[v]) }

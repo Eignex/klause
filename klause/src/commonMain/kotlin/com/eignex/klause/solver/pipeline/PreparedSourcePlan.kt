@@ -265,9 +265,10 @@ internal fun Problem.prepareExecutionPlan(
     preferFinite: Boolean,
     providers: FactorProjectionProviders = (this as? BakedProblem)?.projectionProviders
         ?: FactorProjectionProviders.Default,
+    projections: PreparedFactorProjections = (this as? BakedProblem)?.factorProjections
+        ?.takeIf { it.providers === providers } ?: providers.prepare(this),
 ): PreparedSourcePlan {
-    val projections = (this as? BakedProblem)?.factorProjections?.takeIf { it.providers === providers }
-        ?: providers.prepare(this)
+    projections.requireSource(this)
     val continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true
     if (factors.any { it is ContinuousProduct } ||
         (!preferFinite && !continuousObjective && factors.any { it is RealProduct })
@@ -296,7 +297,7 @@ internal fun Problem.preparedWithComponents(
         ProblemPipeline.FINITE_CP -> if (finiteRealCompletionSupported()) {
             checkedCompletionContract(ProcedureCompleteness.DECISION)
         } else unavailableContract(ExecutionDeclineCause.SOURCE_COMPLETION, "finite-real")
-        ProblemPipeline.UNSUPPORTED_OPEN -> unplacedArithmeticContract()
+        ProblemPipeline.UNSUPPORTED_OPEN -> unplacedArithmeticContract(ownership.factorProjections)
     }
     val completionNeeded = ownership.hasTheoryComponent || numRealVars != 0
     val completeSource = !completionNeeded || completion.support(ExecutionStrategy.COMPLETE).runnable

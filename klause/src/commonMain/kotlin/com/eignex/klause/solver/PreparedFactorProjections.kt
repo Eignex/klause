@@ -60,7 +60,7 @@ class PreparedFactorProjections internal constructor(
     fun forProblem(problem: Problem): PreparedFactorProjections =
         if (this.problem === problem) this else providers.prepare(problem)
 
-    internal fun forEngineView(view: Problem): PreparedFactorProjections = if (
+    internal fun forEngineView(view: Problem): PreparedFactorProjections = if (view === problem) this else if (
         view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
         view.numRealVars == problem.numRealVars && view.numFactors == problem.numFactors &&
         view.factors.indices.all { view.factors[it] === problem.factors[it] }

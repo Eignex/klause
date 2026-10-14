@@ -16,12 +16,13 @@ internal val completeAuthority = ExecutionClaimAuthority.entries.toSet()
 internal val sourceOperations = setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)
 internal val finiteOperations = ExecutionOperation.entries.toSet()
 
-internal fun Problem.unplacedArithmeticContract(): ComponentExecutionContract {
+internal fun Problem.unplacedArithmeticContract(projections: PreparedFactorProjections? = null):
+    ComponentExecutionContract {
     val missing = ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(), listOf(ExecutionDecline(
         ExecutionDeclineCause.SOURCE_COMPLETION, "unplaced-arithmetic",
         preparation = PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT)))
-    val checkedDiscrete = numRealVars == 0 && factors.all { factor ->
-        factor.executionCapabilities().assignmentCheck in setOf(
+    val checkedDiscrete = numRealVars == 0 && factors.indices.all { index ->
+        (projections?.capabilities(index) ?: factors[index].executionCapabilities()).assignmentCheck in setOf(
             AssignmentCheckCapability.EXACT, AssignmentCheckCapability.REDUNDANT)
     }
     val local = if (checkedDiscrete) ComponentStrategySupport(
