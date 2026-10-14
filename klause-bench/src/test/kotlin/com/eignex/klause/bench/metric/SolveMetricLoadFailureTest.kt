@@ -42,4 +42,16 @@ class SolveMetricLoadFailureTest {
             stats(failure),
         )
     }
+
+    @Test
+    fun `a failure record retains captured hashes when the source is unavailable`() {
+        val hashes = mapOf("model" to "captured-source-identity")
+
+        val record = SolveMetric.loadFailureRecord(
+            ref, SolverInvocation.KLAUSE, SolverInvocation.Settings(), Budget(1000), "now", null,
+            IllegalStateException("reference failed"), sourceHashes = hashes,
+        )
+
+        assertEquals(hashes, record.sourceHashes)
+    }
 }

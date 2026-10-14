@@ -277,6 +277,7 @@ internal object SolveMetric {
                 timestamp,
                 sha,
                 failure,
+                sourceHashes = hashes,
             )
             val record = loaded.copy(
                 command = "ERROR",
@@ -299,6 +300,7 @@ internal object SolveMetric {
         timestamp: String,
         sha: String?,
         failure: Throwable,
+        sourceHashes: Map<String, String>? = null,
     ): SolveRecord {
         val reason = (failure.message ?: failure::class.simpleName.orEmpty()).take(REASON_CAP).lineSequence()
             .map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" / ").take(REASON_CAP)
@@ -324,7 +326,7 @@ internal object SolveMetric {
                     failure.incompatibility?.let { put("sourceCompilerIncompatible", it) }
                 }
             },
-            sourceHashes = (failure as? MiniZincCompileFailure)?.sourceHashes
+            sourceHashes = sourceHashes ?: (failure as? MiniZincCompileFailure)?.sourceHashes
                 ?: runCatching { SolveEvidence.sourceHashes(ref) }.getOrDefault(emptyMap()),
             compilerIdentity = (failure as? MiniZincCompileFailure)?.compiler,
             gitSha = sha,
