@@ -662,7 +662,8 @@ class Portfolio(
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
         private val productive = BooleanArray(workers.size)
-        private val trialPreparationSegments = IntArray(workers.size)
+        private val trialPreparationTime = Array(workers.size) { Duration.ZERO }
+        private val preparationTimeLimit = baseSliceMillis.milliseconds * AUXILIARY_PREPARATION_ALLOWANCES
         private val trialSearchWork = LongArray(workers.size)
         private val trialSearchTime = Array(workers.size) { Duration.ZERO }
         private val trialTimeLimit = baseSliceMillis.milliseconds * AUXILIARY_SEARCH_TIME_ALLOWANCES
@@ -916,7 +917,7 @@ class Portfolio(
             val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
             if (unproductiveTrial) {
-                if (claim.preparing) trialPreparationSegments[arm]++
+                if (claim.preparing) trialPreparationTime[arm] += claim.trialTime
                 if (!claim.preparing) {
                     trialSearchTime[arm] += claim.trialTime
                     if (work > 0L) trialSearchWork[arm] += minOf(work, trialWorkLimit - trialSearchWork[arm])
@@ -945,7 +946,7 @@ class Portfolio(
             }
             if (unproductiveTrial && (trialSearchWork[arm] >= trialWorkLimit ||
                     trialSearchTime[arm] >= trialTimeLimit ||
-                    trialPreparationSegments[arm] >= AUXILIARY_PREPARATION_SEGMENTS)
+                    trialPreparationTime[arm] >= preparationTimeLimit)
             ) retire(arm)
         }
 
@@ -1156,7 +1157,7 @@ private const val REMAINING_SHARE = 0.5
 
 private const val AUXILIARY_SEARCH_WORK_ALLOWANCES = 12
 private const val AUXILIARY_SEARCH_TIME_ALLOWANCES = 4
-private const val AUXILIARY_PREPARATION_SEGMENTS = 12
+private const val AUXILIARY_PREPARATION_ALLOWANCES = 12
 
 // Most of an arm's time incumbent checks may take; see `Portfolio.minimize`.
 private const val CHECK_SHARE = 0.2
