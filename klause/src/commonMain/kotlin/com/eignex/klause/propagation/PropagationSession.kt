@@ -381,6 +381,8 @@ class PropagationSession private constructor(
      * decision level. Returns the cumulative implied set beyond the seed pins (or Unsat).
      * A seed refutation retains its complete applied prefix: propagated levels alone can
      * omit earlier assumptions that contributed through a reason chain.
+     * Cancellation stops before the next pin and sets [fixpointCancelled]; the applied
+     * prefix is incomplete and cannot certify the full assumption set.
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
@@ -394,12 +396,20 @@ class PropagationSession private constructor(
         val bk = assumptions.boolKeys
         val bv = assumptions.boolValues
         for (i in bk.indices) {
+            if (state.runCancelled || cancellation()) {
+                state.runCancelled = true
+                return computeImplied()
+            }
             val r = pushBool(bk[i], bv[i])
             if (r is PropagationResult.Unsat) return r.copy(conflictLevels = IntArray(i + 1) { it + 1 })
         }
         val ik = assumptions.intKeys
         val iv = assumptions.intValues
         for (i in ik.indices) {
+            if (state.runCancelled || cancellation()) {
+                state.runCancelled = true
+                return computeImplied()
+            }
             val r = pushInt(ik[i], iv[i])
             if (r is PropagationResult.Unsat) {
                 return r.copy(conflictLevels = IntArray(bk.size + i + 1) { it + 1 })

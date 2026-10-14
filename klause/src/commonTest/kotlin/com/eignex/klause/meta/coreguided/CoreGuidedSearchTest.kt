@@ -1,6 +1,7 @@
 package com.eignex.klause.meta.coreguided
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Cardinality
@@ -27,6 +28,9 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.PreparingSearchComponent
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,6 +43,96 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
+    @Test
+    fun `native segment interruption pauses before its containing allowance is exhausted`() {
+        val clock = TestTimeSource()
+        var interrupted = false
+        val params = BacktrackParams(componentFactory = {
+            listOf(object : PreparingSearchComponent {
+                override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+                    if (!interrupted) {
+                        interrupted = true
+                        clock += 2.seconds
+                    }
+                    yield(ComponentResult.Consistent)
+                }.iterator()
+            })
+        })
+        val objective = LinearObjective(longArrayOf(1))
+        val search = CoreGuidedSearch(Problem(1, 0, emptyArray(), emptyArray()).bake(), objective, params,
+            timeSource = clock)
+
+        val paused = search.runSlice(Cancellation.Never, 1_000L, -1L) { error("interrupted query") }
+
+        assertNull(paused)
+        assertTrue(interrupted)
+        assertFalse(search.isDone)
+        val resumed = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, 1_000L, -1L) {})
+        assertEquals(0L, objective.evaluateLong(resumed.sample))
+        search.close()
+    }
+
+    @Test
+    fun `native decision allowance exhaustion cannot reopen a core query`() {
+        val problem = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true))),
+        )).bake()
+        val objective = LinearObjective(longArrayOf(1))
+        for (params in listOf(
+            BacktrackParams(nativeSat = false, maxDecisions = 1L),
+            BacktrackParams(nativeSat = false, nodeBudget = NodeBudget(1L)),
+        )) {
+            val search = CoreGuidedSearch(problem, objective, params)
+
+            val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+            val charged = search.work
+            val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed decisions") }
+
+            assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
+            assertTrue(search.isDone)
+            assertEquals(stopped, resumed)
+            assertEquals(charged, search.work)
+            search.close()
+        }
+    }
+
+    @Test
+    fun `source verification observes the cumulative core active time allowance`() {
+        val clock = TestTimeSource()
+        val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val source = Problem(2, 0, emptyArray(), Array(2_049) { hard })
+        var augmented = false
+        var verificationFires = 0
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor != hard) BuiltInPropagationProjectionProvider.select(factor)
+            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
+                object : Propagator by delegate {
+                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                        if (state.problem.numBoolVars > source.numBoolVars) augmented = true
+                        else if (augmented) {
+                            if (verificationFires++ == 0) clock += 3.seconds
+                        }
+                        return delegate.propagate(state, factorId)
+                    }
+                }
+            }
+        })
+        val search = CoreGuidedSearch(source.bake(providers.prepare(source)), LinearObjective(longArrayOf(1, 1)),
+            BacktrackParams(nativeSat = false), maximumMillis = 2_000L, timeSource = clock)
+
+        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("unverified publication") }
+        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed verification") }
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
+        assertTrue(verificationFires in 1 until source.numFactors)
+        assertEquals(stopped, resumed)
+        assertEquals(BigFraction.ONE, search.lowerBound)
+        search.close()
+    }
+
     @Test
     fun `initial residual query retains the captured source projection and root deductions`() {
         val hard = Clause(intArrayOf(Lit.make(0, true)))

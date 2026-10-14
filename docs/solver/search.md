@@ -207,6 +207,8 @@ fallback. The fallback retains value mapping, matching, Hall reasons, pruning an
 cache publication in one private phase with borrowed state.
 
 Complete finite checks pin the full assignment and run a completed CP fixpoint.
+They stop after an interrupted root or before further coordinate pins when their
+cancellation token expires. Interrupted verification remains indeterminate.
 Local-search invariant satisfaction is a separate check from its graded score.
 Continuous arithmetic and floating objective scores require the existing source
 publication checks; a zero heuristic score is not an exact certificate.
@@ -347,6 +349,8 @@ Assumption cores retain the complete applied seed prefix when propagation refute
 or the full assumption set when a search tree is exhausted. Decision-level conflict
 summaries guide traversal; they do not enumerate every transitive assumption premise.
 Returned cores are jointly refuted with the hard model and need not be minimal.
+Assumption seeding stops before subsequent pins after cancellation or an interrupted
+fixpoint. Its applied prefix remains incomplete and cannot certify the full seed.
 
 Clause minimization reuses its redundancy memo storage within an analyzer. It clears
 the memo before each conflict because levels and antecedents belong to the frozen

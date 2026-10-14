@@ -93,7 +93,9 @@ internal fun FinitePipeline.portfolioExecutor(
 
 internal fun booleanIncumbentShares(workers: List<PortfolioWorker>): DoubleArray {
     if (workers.none { it.auxiliaryProof }) return DoubleArray(0)
-    val complete = workers.indices.filter { workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof }
+    val complete = workers.indices.filter {
+        workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof && !workers[it].improvementOnly
+    }
     if (complete.isEmpty()) return DoubleArray(0)
     val families = workers.map { it.family }.distinct().size
     val share = 1.0 / families / complete.size

@@ -33,7 +33,7 @@ internal class SelectedProjectionChecks(
         })
         val checker = PropagationSession(point, cancellation)
         val result = try {
-            checkPoint(model.numBoolVars, session, checker)
+            checkPoint(model.numBoolVars, session, checker, cancellation)
         } finally {
             session.recordProjectionCheck(checker)
         }
@@ -46,9 +46,11 @@ internal class SelectedProjectionChecks(
         booleans: Int,
         session: PropagationSession,
         checker: PropagationSession,
+        cancellation: Cancellation,
     ): ComponentCheck {
         if (checker.isUnsatAtRoot) return ComponentCheck.Infeasible()
         for (id in 0 until booleans) {
+            if (checker.fixpointCancelled || cancellation()) return ComponentCheck.Indeterminate
             if (checker.pinBool(id, session.boolValue(id) ?: false) is PropagationResult.Unsat) {
                 return ComponentCheck.Infeasible()
             }

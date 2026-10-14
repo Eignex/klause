@@ -44,7 +44,6 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.toDouble
 import kotlin.math.nextDown
-import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
@@ -145,7 +144,13 @@ internal class CoreGuidedSearch(
         val remainingMillis = maximumMillis?.let {
             (it.milliseconds - activeTime).inWholeMilliseconds.coerceAtLeast(0L)
         } ?: sliceMillis
-        val deadline = TimeSource.Monotonic.markNow() + minOf(sliceMillis, remainingMillis).milliseconds
+        val sliceDuration = minOf(sliceMillis, remainingMillis).milliseconds
+        val deadline = TimeSource.Monotonic.markNow() + sliceDuration
+        val segment = object : Cancellation {
+            override fun isCancelled(): Boolean =
+                deadline.hasPassedNow() || (activeSlice?.elapsedNow() ?: Duration.ZERO) >= sliceDuration
+            override fun deadline() = deadline
+        }
         val start = work
         val repaid = if (sliceNodes < 0L) 0L else minOf(workDebt, sliceNodes)
         workDebt -= repaid
@@ -160,14 +165,14 @@ internal class CoreGuidedSearch(
                 override fun propagation(units: Long) = charge(units)
                 override fun charge(units: Long) = recordPreparation(units)
             }
-            override fun isCancelled(): Boolean = token() || deadline.hasPassedNow() || allowanceExhausted ||
+            override fun isCancelled(): Boolean = token() || segment() || allowanceExhausted ||
                 (allowance >= 0L && work - start >= allowance)
             override fun deadline() = listOfNotNull(token.deadline(), deadline).minOrNull()
             override fun workMeter(): RootWorkMeter = meter
         }
         activeSlice = timeSource.markNow()
         try {
-            return advance(token, preparation, deadline, start, allowance, onIncumbent)
+            return advance(token, preparation, segment, start, allowance, onIncumbent)
         } finally {
             activeTime += checkNotNull(activeSlice).elapsedNow()
             activeSlice = null
@@ -178,11 +183,12 @@ internal class CoreGuidedSearch(
     private fun advance(
         token: Cancellation,
         preparation: Cancellation,
-        deadline: ComparableTimeMark,
+        segment: Cancellation,
         start: Long,
         allowance: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? {
+        val deadline = requireNotNull(segment.deadline())
         while (!preparation()) {
             if (initialIndex < objective.boolWeightValues.size) {
                 prepareObjective()
@@ -193,7 +199,7 @@ internal class CoreGuidedSearch(
                 extendCore()
                 if (core != null) continue
             }
-            if (token() || deadline.hasPassedNow()) return null
+            if (token() || segment()) return null
             val incumbent = best
             if (incumbent != null && bestValue == lowerBound) {
                 return finish(MinimizeResult.Optimal(incumbent, requireNotNull(bestValue).toDouble(), stats))
@@ -208,12 +214,17 @@ internal class CoreGuidedSearch(
             }
             val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
-            val traversalToken = token or Cancellation.until(deadline) or Cancellation { allowanceExhausted }
+            val traversalToken = token or Cancellation.until(deadline) or segment or Cancellation { allowanceExhausted }
             val result = handle.runSlice(traversalToken.withLifetime(lifetime), millis, remaining)
             if (result == null) {
                 return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
-            val paused = result is SolveResult.Unknown && result.reason == TerminationReason.Cancelled && !token()
+            val decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
+            val decisions = addWork(completedStats.search.nodes.sum.toLong(), handle.stats.search.nodes.sum.toLong())
+            val quotaExhausted = params.nodeBudget?.exhausted() == true || decisions >= decisionLimit
+            val paused = result is SolveResult.Unknown &&
+                (result.reason == TerminationReason.Cancelled || result.reason == TerminationReason.BudgetExhausted) &&
+                segment() && !token() && !quotaExhausted
             finishQuery(keepModel = paused)
             if (paused) {
                 return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
@@ -226,9 +237,13 @@ internal class CoreGuidedSearch(
                         BooleanArray(base.numBoolVars) { result.assignment.boolValue(it) },
                         result.assignment.ints,
                     )
-                    when (val verified = composedFixpoint(base, Candidate(sample, Unit), token, params.assumptions)) {
+                    when (val verified = composedFixpoint(
+                        base, Candidate(sample, Unit), traversalToken, params.assumptions,
+                    )) {
                         is Verification.Rejected -> throw UnsoundnessException(verified.reason)
-                        is Verification.Indeterminate -> return null
+                        is Verification.Indeterminate -> return if (allowanceExhausted) {
+                            finish(stopped(TerminationReason.BudgetExhausted))
+                        } else null
                         is Verification.Accepted -> Unit
                     }
                     val value = objective.evaluateExact(sample)
