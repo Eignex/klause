@@ -9,6 +9,7 @@ import com.eignex.klause.bench.source.CorpusFiles
 import java.io.File
 import java.util.Base64
 import java.util.concurrent.TimeUnit
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
