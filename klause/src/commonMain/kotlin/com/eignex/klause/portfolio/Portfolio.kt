@@ -661,8 +661,8 @@ class Portfolio(
         private val productive = BooleanArray(workers.size)
         private val trialPreparationSegments = IntArray(workers.size)
         private val trialSearchWork = LongArray(workers.size)
-        private val trialWorkLimit = baseSliceWork.coerceAtMost(Long.MAX_VALUE / AUXILIARY_SEARCH_SEGMENTS) *
-            AUXILIARY_SEARCH_SEGMENTS
+        private val trialWorkLimit = baseSliceWork.coerceAtMost(Long.MAX_VALUE / AUXILIARY_SEARCH_ALLOWANCES) *
+            AUXILIARY_SEARCH_ALLOWANCES
         private val preparationRevisits = BooleanArray(workers.size)
         private var continuingPreparation = -1
         private var nextPreparationArm = 0
@@ -938,7 +938,7 @@ class Portfolio(
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
             if (unproductiveTrial && (trialSearchWork[arm] >= trialWorkLimit ||
-                    trialPreparationSegments[arm] >= AUXILIARY_TRIAL_SEGMENTS)
+                    trialPreparationSegments[arm] >= AUXILIARY_PREPARATION_SEGMENTS)
             ) retire(arm)
         }
 
@@ -1147,8 +1147,8 @@ class Portfolio(
 // The share of the time a run has left that its arms' next segments may take together; see `Portfolio.segmentToken`.
 private const val REMAINING_SHARE = 0.5
 
-private const val AUXILIARY_SEARCH_SEGMENTS = 4
-private const val AUXILIARY_TRIAL_SEGMENTS = 12
+private const val AUXILIARY_SEARCH_ALLOWANCES = 4
+private const val AUXILIARY_PREPARATION_SEGMENTS = 12
 
 // Most of an arm's time incumbent checks may take; see `Portfolio.minimize`.
 private const val CHECK_SHARE = 0.2

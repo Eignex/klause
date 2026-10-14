@@ -203,7 +203,7 @@ segments. Productive arms return to the ordinary policy; unproductive arms retir
 without plateau reseeding. This budget belongs to the invocation and never renews
 native arithmetic quotas.
 
-## Polynomial root preparation
+### Polynomial root preparation
 
 Polynomial complete workers defer component initialization into their retained handle.
 Clausal optimization with additional components uses retained preparation instead of
