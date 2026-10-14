@@ -1181,7 +1181,9 @@ class LocalSearchState private constructor(
         val oldBestCost = bestCostSeen
         val oldTracking = activityTracking
         val oldExactObjective = (objective as? FunctionalObjective)?.evaluateExact(assignment)
-        val oldObjective = if (objective != null && objective !is LinearObjective && objective !is FunctionalObjective) {
+        val oldObjective = if (
+            objective != null && objective !is LinearObjective && objective !is FunctionalObjective
+        ) {
             objective.evaluate(assignment)
         } else {
             0.0
@@ -1222,7 +1224,8 @@ class LocalSearchState private constructor(
             val weighted = if (weights.allocated) weightedDegreeDelta(checkNotNull(degBefore)) else delta.toDouble()
             val objectiveDelta = when (objective) {
                 is LinearObjective -> probeLinearObjectiveDelta(objective)
-                is FunctionalObjective -> (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble()
+                is FunctionalObjective ->
+                    (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble()
                 null -> 0.0
                 else -> objective.evaluate(assignment) - oldObjective
             }
