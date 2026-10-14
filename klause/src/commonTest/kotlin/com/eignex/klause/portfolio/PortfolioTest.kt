@@ -2723,7 +2723,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `opening and search use one segment deadline`() {
+    fun `opening cost reduces the offered search allowance`() {
         var openingDeadline: ComparableTimeMark? = null
         var requestedMillis: Long? = null
         var remainingMillis: Long? = null
@@ -2737,8 +2737,6 @@ class PortfolioTest {
             ): MinimizeResult? {
                 slices++
                 requestedMillis = sliceMillis
-                remainingMillis =
-                    (checkNotNull(openingDeadline) - TimeSource.Monotonic.markNow()).inWholeMilliseconds
                 return MinimizeResult.Unknown(TerminationReason.Unsupported)
             }
         }
@@ -2749,6 +2747,8 @@ class PortfolioTest {
                 openingDeadline = params.cancellation.deadline()
                 val until = TimeSource.Monotonic.markNow() + 5.milliseconds
                 while (!until.hasPassedNow()) Unit
+                remainingMillis =
+                    (checkNotNull(openingDeadline) - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
                 return handle
             }
         }
