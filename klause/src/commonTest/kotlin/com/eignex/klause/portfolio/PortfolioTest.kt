@@ -2016,124 +2016,12 @@ class PortfolioTest {
 
             val result = Portfolio(workers, bandit).use {
                 it.incumbentProbeArms = setOf(1)
-                it.minimize(Cancellation { reached.size >= 7 })
+                it.minimize(Cancellation { reached.size >= 4 })
             }
 
             assertIs<MinimizeResult.BestFound>(result)
-            assertEquals(if (productive) listOf(0, 1, 1, 1, 1, 1, 1) else listOf(0, 1, 1, 1, 1, 0, 0), reached)
+            assertEquals(if (productive) listOf(0, 1, 1, 1) else listOf(0, 1, 0, 0), reached)
         }
-    }
-
-    @Test
-    fun `auxiliary trial completes preparation after admitting every sibling`() {
-        val reached = ArrayList<Int>()
-        val search = object : ResumableSearch {
-            var slices = 0
-            override val preparationPending: Boolean get() = slices < 3
-            override val isDone: Boolean get() = false
-            override val stats: SolveStats get() = SolveStats.EMPTY
-            override val work: Long get() = slices.toLong() * 5_000
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
-                reached += 1
-                slices++
-                return null
-            }
-        }
-        val workers = listOf(
-            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
-            trackingWorker("probe", 1, search),
-            trackingWorker("sibling", 2, ScriptedSearch({ false }) { reached += 2 }),
-        )
-
-        Portfolio.thompson(workers, reseedStaleThreshold = 0).use {
-            it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { reached.size >= 12 })
-        }
-
-        assertEquals(listOf(0, 1, 2), reached.take(3))
-        assertEquals(7, reached.count { it == 1 })
-    }
-
-    @Test
-    fun `auxiliary trial retains search through plateau reseeding`() {
-        var calls = 0
-        var slices = 0
-        val search = object : ResumableSearch {
-            private var closed = false
-            private var spent = 0L
-            override val isDone: Boolean get() = false
-            override val stats: SolveStats get() = SolveStats.EMPTY
-            override val work: Long get() = spent
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
-                check(!closed)
-                calls++
-                slices++
-                spent += sliceNodes
-                return null
-            }
-            override fun close() { closed = true }
-        }
-        val workers = listOf(
-            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { calls++ }),
-            trackingWorker("probe", 1, search).also { it.restartingSearch = true },
-        )
-
-        Portfolio.thompson(workers, reseedStaleThreshold = 1).use {
-            it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { calls >= 7 })
-        }
-
-        assertEquals(4, slices)
-    }
-
-    @Test
-    fun `debt only pauses do not end the auxiliary search trial`() {
-        val reached = ArrayList<Int>()
-        val search = object : ResumableSearch {
-            private var slices = 0
-            private var spent = 0L
-            override val isDone: Boolean get() = false
-            override val stats: SolveStats get() = SolveStats.EMPTY
-            override val work: Long get() = spent
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
-                reached += 1
-                if (slices++ >= 15) spent += sliceNodes
-                return null
-            }
-        }
-        val workers = listOf(
-            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
-            trackingWorker("probe", 1, search),
-        )
-
-        Portfolio.thompson(workers, reseedStaleThreshold = 0).use {
-            it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { reached.size >= 22 })
-        }
-
-        assertEquals(19, reached.count { it == 1 })
-        assertEquals(listOf(0, 0), reached.takeLast(2))
-    }
-
-    @Test
-    fun `auxiliary trial bounds preparation that cannot enter search`() {
-        val reached = ArrayList<Int>()
-        val workers = listOf(
-            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
-            trackingWorker("probe", 1, TrackingResumableSearch(null,
-                onRun = { reached += 1 }, preparationPending = true)),
-        )
-
-        Portfolio.thompson(workers, reseedStaleThreshold = 0).use {
-            it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { reached.size >= 16 })
-        }
-
-        assertEquals(12, reached.count { it == 1 })
-        assertEquals(listOf(0, 0, 0), reached.takeLast(3))
     }
 
     @Test

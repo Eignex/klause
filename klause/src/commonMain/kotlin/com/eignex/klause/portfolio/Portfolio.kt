@@ -408,7 +408,6 @@ class Portfolio(
                     openingFailure is SearchInitializationCancelled,
                 )
             }
-            claim.preparing = handle?.preparationPending == true
             var terminal: MinimizeResult? = null
             val failure: Throwable?
             val work: Long
@@ -524,7 +523,7 @@ class Portfolio(
                 }
                 if (handle != null && (worker.family.observable || worker.restartingSearch) &&
                     terminal == null && !failed &&
-                    incumbent.current() != null && run.reseedAllowed(arm)
+                    incumbent.current() != null
                 ) {
                     if (claim.improved) {
                         staleSegments[arm] = 0
@@ -604,7 +603,6 @@ class Portfolio(
         }
 
         var hadIncumbent = false
-        var preparing = false
         var improved = false
         var foundFirst = false
 
@@ -647,8 +645,6 @@ class Portfolio(
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
         private val productive = BooleanArray(workers.size)
-        private val trialSegments = IntArray(workers.size)
-        private val trialSearchSegments = IntArray(workers.size)
         private val preparationRevisits = BooleanArray(workers.size)
         private var continuingPreparation = -1
         private var nextPreparationArm = 0
@@ -668,9 +664,6 @@ class Portfolio(
         fun continuePreparation(arm: Int) {
             continuingPreparation = arm
         }
-
-        fun reseedAllowed(arm: Int): Boolean = !retired[arm] &&
-            !(improving && arm in incumbentProbeArms && !productive[arm])
 
         fun revisitPreparation(arm: Int) {
             if (!improving) preparationRevisits[arm] = true
@@ -772,10 +765,6 @@ class Portfolio(
         // within local search's feasibility share; a neighborhood needs an incumbent unless it is all that is left.
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
-            if (improving) {
-                eligibleArms.firstOrNull { it in incumbentProbeArms && !productive[it] &&
-                    !busy[it] && !retired[it] }?.let { return it }
-            }
             val preparing = continuingPreparation
             if (preparing >= 0 && !busy[preparing]) {
                 if (!retired[preparing] && preparing in eligibleArms &&
@@ -871,13 +860,9 @@ class Portfolio(
             val earned = ledger.settle(arm, work)
             val reward = if (failed) 0.0 else earned
             if (reward > 0.0 || claim.improved) productive[arm] = true
-            val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
+            val unproductiveProbe = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
-            if (unproductiveTrial) {
-                if (claim.preparing || work > 0L) trialSegments[arm]++
-                if (!claim.preparing && work > 0L) trialSearchSegments[arm]++
-            }
-            if (!unproductiveTrial) {
+            if (!unproductiveProbe) {
                 val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
                 bandit.update(arm, reward, weight)
                 families.record(policyFamily(arm), progressed = reward > 0.0, plateau = improving)
@@ -897,9 +882,7 @@ class Portfolio(
                 slice = grow(slice, maxSliceMillis)
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
-            if (unproductiveTrial && (trialSearchSegments[arm] >= AUXILIARY_SEARCH_SEGMENTS ||
-                    trialSegments[arm] >= AUXILIARY_TRIAL_SEGMENTS)
-            ) retire(arm)
+            if (unproductiveProbe) retire(arm)
         }
 
         /** Quarantine [claim]'s arm for its refuted claim: retire it, count the fault, and report it. Call under
@@ -1106,9 +1089,6 @@ class Portfolio(
 
 // The share of the time a run has left that its arms' next segments may take together; see `Portfolio.segmentToken`.
 private const val REMAINING_SHARE = 0.5
-
-private const val AUXILIARY_SEARCH_SEGMENTS = 4
-private const val AUXILIARY_TRIAL_SEGMENTS = 12
 
 // Most of an arm's time incumbent checks may take; see `Portfolio.minimize`.
 private const val CHECK_SHARE = 0.2
