@@ -409,8 +409,10 @@ deferred preparation. Search-time filtering retains STR2 explanations.
 
 LP explanations cite selected source bound witnesses and recursively expanded row,
 fixing and cutoff premises. Mixed-row feasibility certificates also provide
-integer domain bounds without an incumbent. Their reasons exclude the target's own
-endpoint and retain all supporting row and bound premises. Unexpressible numerical
+integer domain bounds without an incumbent. Interval reasons exclude the target's own
+endpoint and retain all supporting row and bound premises. Optional integer-residue
+checks retain both real interval sides and the prior target endpoint that delimits
+their excluded prefix or suffix. Unexpressible numerical
 scope withholds a consequence. Search-time row selection follows narrowed finite
 endpoints and Boolean pins; the resulting domain bounds retract on the CP trail.
 This bounded post-LP pass does not own incremental

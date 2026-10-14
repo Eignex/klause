@@ -83,8 +83,8 @@ retain closure continuation and their existing strict-refinement policy.
 Node deductions admit mixed structural columns under the retained exact authority.
 Mixed-row feasibility certificates project `A*x + s = b` onto each
 integral structural coordinate by bounding every other contribution at its exact
-minimizing or maximizing endpoint. The target's own endpoint is excluded from the
-premises. Absent supporting sides decline that projection; a missing target side
+minimizing or maximizing endpoint. Interval projection excludes the target's own
+endpoint from its premises. Absent supporting sides decline that projection; a missing target side
 does not. Origins reconstruct source coordinates before integer rounding. A strict
 supporting endpoint excludes equality when the projected bound is integral.
 The root pass considers all mixed rows. During search it considers rows incident
@@ -112,6 +112,16 @@ row scanning cannot consume their remaining allowance. When no objective operati
 is requested, the row pass runs before returning the feasibility result.
 Cancellation discards unpublished projections; resource decline can retain completed
 ones. The consumer charges row work and rounding to the containing LP ledger.
+After interval projections complete, fixed logical equalities can also restrict an
+integer target by the gcd lattice of the other integer terms. Exact finite real
+intervals, including strict endpoints, determine the admissible residue interval.
+At most sixteen integer values in the interval-tightened target box are checked;
+wide boxes and open supporting intervals decline this optional check. Prefix and
+suffix gcds, scalar arithmetic and checks share the existing allowance. These
+consequences cite both supporting endpoint directions and the previous target side
+that bounds the searched prefix or suffix. Their integer declarations must map to
+CP integer or Boolean coordinates; unsupported auxiliary or continuous mappings
+withhold the consequence. Continuous coordinates remain outside the fixing targets.
 Each certificate retains its exact-state identity, row and endpoint support. Bound
 rollback, foreign state or objective change prevents reuse. Reusable integer reasons
 cite the row and every supporting side. A consequence with unsupported

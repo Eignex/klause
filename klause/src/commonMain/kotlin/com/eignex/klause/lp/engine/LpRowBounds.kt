@@ -13,8 +13,9 @@ internal class LpRowBound internal constructor(
     val strict: Boolean,
     private val minimum: Boolean,
     private val terms: List<LpRowBoundTerm>,
+    private val lattice: Boolean = false,
 ) {
-    val supportCount: Int get() = terms.size - 1
+    val supportCount: Int get() = if (lattice) terms.size * 2 else terms.size - 1
     fun belongsTo(model: LpModel): Boolean = model.exactState === authority && authority.rows.row(row).active
 
     fun integerBound(): Long? = when {
@@ -25,8 +26,23 @@ internal class LpRowBound internal constructor(
     }
 
     fun forEachSupport(action: (Int, Boolean) -> Unit) {
+        if (lattice) {
+            action(column, !upper)
+            for (term in terms) if (term.column != column) {
+                action(term.column, true)
+                action(term.column, false)
+            }
+            return
+        }
         for (term in terms) if (term.column != column) {
             action(term.column, minimum == (term.coefficient.signum() > 0))
+        }
+    }
+
+    fun forEachIntegralSupport(action: (Int) -> Unit) {
+        if (!lattice) return
+        for (term in terms) if (term.column < authority.model.n && authority.model.column(term.column).integral) {
+            action(term.column)
         }
     }
 }
@@ -49,6 +65,8 @@ internal fun mixedRowBounds(
             meter.reserve(model.m.toLong() * 64L + 128L)
             val rows = Array(model.m) { ArrayList<LpRowBoundTerm>() }
             val mixed = BooleanArray(model.m)
+            meter.reserve(model.m.toLong() * 8L + 32L)
+            val ordinary = arrayOfNulls<List<LpRowBound>>(model.m)
             val selected = affectedColumns?.let { affectedRowMask(state, it, meter) }
             for (column in 0 until model.n) {
                 meter.step()
@@ -76,17 +94,30 @@ internal fun mixedRowBounds(
                 val terms = rows[row].toList() + LpRowBoundTerm(model.slackCol(row), BigFraction.ONE, 1L)
                 val integral = integralRowBounds(state, row, terms, meter)
                 if (integral != null) {
+                    ordinary[row] = integral
                     completed.addAll(integral)
                     continue
                 }
                 val minimum = rowEndpointSum(state, terms, true, meter)
                 val maximum = rowEndpointSum(state, terms, false, meter)
+                meter.reserve(128L)
+                val projected = ArrayList<LpRowBound>()
                 for (term in terms) {
                     meter.step()
                     if (term.column >= model.n || !state.model.column(term.column).integral) continue
-                    projectRowBound(state, row, term, terms, minimum, true, meter)?.let(completed::add)
-                    projectRowBound(state, row, term, terms, maximum, false, meter)?.let(completed::add)
+                    projectRowBound(state, row, term, terms, minimum, true, meter)?.let(projected::add)
+                    projectRowBound(state, row, term, terms, maximum, false, meter)?.let(projected::add)
                 }
+                ordinary[row] = projected
+                completed.addAll(projected)
+            }
+            for (row in rows.indices) {
+                meter.step()
+                if (!mixed[row] || !state.rows.row(row).active) continue
+                val bounds = ordinary[row] ?: continue
+                meter.reserve(160L + (rows[row].size + 1L) * 16L)
+                val terms = rows[row].toList() + LpRowBoundTerm(model.slackCol(row), BigFraction.ONE, 1L)
+                completed.addAll(rowLatticeBounds(state, row, terms, bounds, meter))
             }
             completed
         }

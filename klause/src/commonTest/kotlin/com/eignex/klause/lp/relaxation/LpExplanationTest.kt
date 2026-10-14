@@ -45,6 +45,46 @@ import kotlin.test.assertTrue
 
 class LpExplanationTest {
     @Test
+    fun `row residue reasons cite the prior target endpoint`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(0, 1), doubleArrayOf(3.0, 4.0), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.EQ, 5.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val session = PropagationSession(problem)
+        session.implyIntAtMost(0, 1L)
+        val relaxation = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 0L))).build(session)
+        val bound = mixedRowBounds(relaxation.model).first {
+            it.column == relaxation.intColOf[0] && it.upper && it.integerBound() == 0L
+        }
+
+        val reason = assertNotNull(LpExplanation.rowBoundReason(relaxation, bound, session))
+
+        assertTrue(session.boundLeLit(0, 1L, positive = false) in reason)
+    }
+
+    @Test
+    fun `row residue reasons withhold a separately scoped real interval side`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(0, 1), doubleArrayOf(3.0, 4.0), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.EQ, 5.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val session = PropagationSession(problem)
+        val original = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 0L))).build(session)
+        val trail = LpBoundTrail(assertNotNull(original.model.authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(original.colRealId.indexOf(0), true,
+            ExactLpSide(ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(0.5)))), 7L))
+        val child = original.withModel(assertNotNull(trail.state.toWorkingModel()))
+        val bound = mixedRowBounds(child.model).first {
+            it.column == child.intColOf[0] && it.upper && it.integerBound() == -1L
+        }
+
+        val reason = LpExplanation.rowBoundReason(child, bound, session)
+
+        assertNull(reason)
+    }
+
+    @Test
     fun `row projection reasons withhold a separately scoped continuous endpoint`() {
         for (endpoint in listOf(0.0, 0.25)) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),

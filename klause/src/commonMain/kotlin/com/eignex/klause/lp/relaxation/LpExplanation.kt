@@ -166,6 +166,16 @@ internal object LpExplanation {
 
     fun rowBoundReason(relaxation: LpRelaxation, cert: LpRowBound, session: PropagationSession): IntArray? {
         if (!cert.belongsTo(relaxation.model)) return null
+        var integralSupport = true
+        cert.forEachIntegralSupport { column ->
+            val variable = relaxation.colVarId.getOrNull(column) ?: -1
+            val count = if (relaxation.colIsBool.getOrNull(column) == true) session.problem.numBoolVars
+                else session.problem.numIntVars
+            if (variable !in 0 until count || relaxation.colRealId.getOrNull(column)?.let { it >= 0 } == true) {
+                integralSupport = false
+            }
+        }
+        if (!integralSupport) return null
         val lits = IntArrayList()
         val seen = IntHashSet()
         if (!addRowPremiseLits(lits, seen, relaxation, intArrayOf(cert.row), session)) return null

@@ -10,6 +10,91 @@ import kotlin.test.assertTrue
 
 class LpRowBoundsTest {
     @Test
+    fun `a real interval with no integer row activity yields a conflict bound`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val y = addVar(0L, 1L)
+            val r = addRealVar(0.25, 0.75)
+            addRow(intArrayOf(x, y, r), longArrayOf(1L, 1L, 1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+        val bounds = mixedRowBounds(model)
+
+        assertTrue(bounds.any { it.column == 0 && it.upper && it.integerBound() == -1L })
+    }
+
+    @Test
+    fun `integer row residues exclude a binary endpoint left by interval projection`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val y = addVar(0L, 2L)
+            val r = addRealVar(0.0, 1.0)
+            addRow(intArrayOf(x, y, r), longArrayOf(3L, 4L, 1L), Relation.EQ, 5L)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+        val bounds = mixedRowBounds(model)
+
+        assertTrue(bounds.any { it.column == 0 && it.upper && it.integerBound() == 0L })
+    }
+
+    @Test
+    fun `integer row residues retain source shifts and signed coefficients`() {
+        for (sign in listOf(-1L, 1L)) {
+            val source = LpBuilder().apply {
+                val x = addVar(3L, 4L)
+                val y = addVar(0L, 2L)
+                val r = addRealVar(0.0, 1.0)
+                addRow(intArrayOf(x, y, r), longArrayOf(3L * sign, 4L, 1L), Relation.EQ,
+                    if (sign > 0L) 14L else -7L)
+            }.build(Sense.MINIMIZE)
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+            val bounds = mixedRowBounds(model)
+
+            assertTrue(bounds.any { it.column == 0 && it.upper == (sign > 0L) &&
+                it.integerBound() == if (sign > 0L) 3L else 4L })
+        }
+    }
+
+    @Test
+    fun `integer row residues decline an absent real interval endpoint`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val y = addVar(0L, 2L)
+            val r = addRealVar(0.0, null)
+            addRow(intArrayOf(x, y, r), longArrayOf(3L, 4L, 1L), Relation.EQ, 5L)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+        val bounds = mixedRowBounds(model)
+
+        assertTrue(bounds.none { it.column == 0 && it.integerBound() == 0L })
+    }
+
+    @Test
+    fun `strict real endpoints exclude an equal integer residue`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val y = addVar(0L, 2L)
+            val r = addRealVar(0.0, 1.0)
+            addRow(intArrayOf(x, y, r), longArrayOf(3L, 4L, 1L), Relation.EQ, 5L)
+        }.build(Sense.MINIMIZE)
+        val exact = assertNotNull(source.authoritativeModel())
+        val real = exact.column(2)
+        val changed = exact.withBoundColumns(List(exact.numVars) {
+            if (it == 2) real.copy(bounds = real.bounds.copy(upper = real.bounds.upper?.copy(strict = true)))
+            else exact.column(it)
+        })
+        val model = assertNotNull(LpExactState(changed).toWorkingModel())
+
+        val bounds = mixedRowBounds(model)
+
+        assertTrue(bounds.any { it.column == 0 && it.upper && it.integerBound() == -1L })
+    }
+
+    @Test
     fun `integral only rows do not exhaust the mixed projection allowance`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
