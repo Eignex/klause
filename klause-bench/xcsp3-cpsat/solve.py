@@ -30,6 +30,8 @@ def read_model(path):
             # A conflict excludes only its matching tuple, including wildcard coordinates.
             # Negated native tables can lose permitted pairs after source-domain exclusions.
             for entry in tuples:
+                if len(entry) != len(variables):
+                    raise ValueError("conflict tuple arity differs from its source scope")
                 self.cpm_model += cp.any([
                     variable != value for variable, value in zip(variables, entry)
                     if not isinstance(value, _Star)
