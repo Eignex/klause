@@ -1515,12 +1515,22 @@ class PortfolioTest {
     }
 
     @Test
-    fun `restarting traversal reseeds after equivalent full work segments`() {
-        for (divisor in listOf(1, 4)) {
+    fun `restarting traversal reseeds after equivalent base work segments`() {
+        for ((divisor, growth) in listOf(1 to 1.0, 4 to 1.0, 1 to 2.0, 4 to 2.0)) {
             var slices = 0
+            val offers = ArrayList<Long>()
             val source = ScriptedSearch({ it == 0 }) { slices++ }
             val handle = object : ResumableSearch by source {
-                override val work: Long get() = source.work / divisor
+                override val work: Long get() = slices * 5_000L / divisor
+                override fun runSlice(
+                    global: Cancellation,
+                    sliceMillis: Long,
+                    sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? {
+                    offers += sliceNodes
+                    return source.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                }
             }
             val workers = listOf(
                 trackingWorker("restarting", 0, handle).also { it.restartingSearch = true },
@@ -1534,12 +1544,13 @@ class PortfolioTest {
                 override fun reset() = Unit
             }
 
-            val result = Portfolio(workers, bandit, baseSliceWork = 5_000L, maxSliceWork = 5_000L,
-                sliceGrowth = 1.0).use {
+            val result = Portfolio(workers, bandit, baseSliceWork = 5_000L, maxSliceWork = 20_000L,
+                sliceGrowth = growth).use {
                 it.minimize(Cancellation { slices >= 1 + 3 * divisor })
             }
 
             assertEquals(1L, result.stats.portfolio.arms.first().reseeds)
+            assertEquals(if (growth == 1.0) 5_000L else 20_000L, offers.max())
         }
     }
 

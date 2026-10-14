@@ -106,7 +106,7 @@ class Portfolio(
     private val lsInstructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
     /**
      * Non-improving segments before an observable arm reseeds; scheduled restarting backtrack arms count
-     * equivalent full-work segments. Whole lanes count each positive-work return. `0` disables re-seeding.
+     * equivalent base work segments. Whole lanes count each positive-work return. `0` disables re-seeding.
      */
     private val reseedStaleThreshold: Int = 3,
     /**
@@ -531,7 +531,7 @@ class Portfolio(
                         reseedStaleThreshold > 0
                     ) {
                         staleCredits[arm] += if (!claim.whole && worker.family == ArmFamily.Backtrack) {
-                            minOf(work.toDouble() / claim.sliceWork, 1.0)
+                            minOf(work.toDouble() / baseSliceWork, 1.0)
                         } else 1.0
                         if (staleCredits[arm] >= reseedStaleThreshold) {
                             val closed = runCatching { run.closeHandle(arm) }

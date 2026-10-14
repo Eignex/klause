@@ -243,9 +243,10 @@ work.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3, with 0 disabling it. Scheduled restart-configured
-backtrack arms count equivalent full-work segments: a time-capped return contributes
-its charged work divided by its offered work, capped at one. Short fragments cannot
-destroy retained traversal with less search than a full stale allowance. Observable
+backtrack arms count equivalent base work segments: a time-capped return contributes
+its charged work divided by the configured base work, capped at one. Shared offer
+growth does not enlarge that plateau allowance. Short fragments cannot destroy retained
+traversal with less search than a full stale allowance. Observable
 families and whole lanes count each positive-work return as one segment. Debt-only
 pauses do not advance plateau counters. Accepted improvements clear accumulated credit. Backends can
 defer reseeding while bounded preparation owns pending work; session ownership wrappers
