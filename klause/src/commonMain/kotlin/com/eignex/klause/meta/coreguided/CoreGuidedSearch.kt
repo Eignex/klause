@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
 import com.eignex.klause.backtrack.ResumableSatisfaction
 import com.eignex.klause.backtrack.composedFixpoint
+import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -44,7 +45,9 @@ import com.eignex.klause.util.plus
 import com.eignex.klause.util.toDouble
 import kotlin.math.nextDown
 import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 internal class CoreGuidedSearch(
@@ -53,8 +56,13 @@ internal class CoreGuidedSearch(
     private val params: BacktrackParams,
     private val stratify: Boolean = false,
     private val maximumWork: Long? = null,
+    private val maximumMillis: Long? = null,
+    private val timeSource: TimeSource = TimeSource.Monotonic,
 ) : ResumableSearch,
     ReseedGuard {
+    private val opened = timeSource.markNow()
+    private var activeTime = Duration.ZERO
+    private var activeSlice: TimeMark? = null
     private val lifetime = params.cancellation.lifetimeCancellation()
     private val factors = ArrayList<Factor>().apply {
         addAll(base.factors)
@@ -87,21 +95,22 @@ internal class CoreGuidedSearch(
     private var coreCursor = 0
     private var coreLiterals = IntArray(0)
     private var coreEncoded = false
-    private var pendingThreshold: ThresholdTail? = null
     private var completedCores = 0L
     private var largestCore = 0
 
-    private class ThresholdTail(val counter: CoreGuidedThreshold, val minimum: Int, val weight: BigInt)
+    private class ThresholdTail(val literals: IntArray, val minimum: Int, val weight: BigInt)
 
     init {
         require(maximumWork == null || maximumWork >= 0L) { "core work limit must be nonnegative" }
+        require(maximumMillis == null || maximumMillis >= 0L) { "core time limit must be nonnegative" }
         require(eligible(base, objective)) { "core-guided search needs a finite Boolean objective" }
+        activeTime = opened.elapsedNow()
     }
 
     internal val lowerBound: BigFraction get() = BigFraction.of(lower, BIG_ONE)
     override val isDone: Boolean get() = terminal != null
     override val stats: SolveStats get() = completedStats.mergedWith(query?.stats ?: SolveStats.EMPTY).copy(
-        coreGuided = CoreGuidedStats(completedCores, largestCore, lower),
+        coreGuided = CoreGuidedStats(completedCores, largestCore, lower, maximumWork, maximumMillis),
     )
     override val work: Long get() {
         val live = query?.stats?.search?.propagationWork?.sum?.toLong() ?: 0L
@@ -110,7 +119,8 @@ internal class CoreGuidedSearch(
         return addWork(addWork(completedWork, query?.work ?: 0L),
             addWork(preparationVisits / PROPAGATION_WORK_PER_NODE, carried))
     }
-    private val workExhausted: Boolean get() = maximumWork?.let { work >= it } == true
+    private val allowanceExhausted: Boolean get() = maximumWork?.let { work >= it } == true ||
+        maximumMillis?.let { activeTime + (activeSlice?.elapsedNow() ?: Duration.ZERO) >= it.milliseconds } == true
     override val initialWork: Long = work
     override val canReseed: Boolean get() = false
     override val preparationPending: Boolean
@@ -130,8 +140,11 @@ internal class CoreGuidedSearch(
         if (base.rootDeductions is PropagationResult.Unsat) {
             return finish(MinimizeResult.Infeasible(stats = stats))
         }
-        if (workExhausted) return finish(stopped(TerminationReason.BudgetExhausted))
-        val deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
+        if (allowanceExhausted) return finish(stopped(TerminationReason.BudgetExhausted))
+        val remainingMillis = maximumMillis?.let {
+            (it.milliseconds - activeTime).inWholeMilliseconds.coerceAtLeast(0L)
+        } ?: sliceMillis
+        val deadline = TimeSource.Monotonic.markNow() + minOf(sliceMillis, remainingMillis).milliseconds
         val start = work
         val repaid = if (sliceNodes < 0L) 0L else minOf(workDebt, sliceNodes)
         workDebt -= repaid
@@ -146,14 +159,17 @@ internal class CoreGuidedSearch(
                 override fun propagation(units: Long) = charge(units)
                 override fun charge(units: Long) = recordPreparation(units)
             }
-            override fun isCancelled(): Boolean = token() || deadline.hasPassedNow() ||
+            override fun isCancelled(): Boolean = token() || deadline.hasPassedNow() || allowanceExhausted ||
                 (allowance >= 0L && work - start >= allowance)
             override fun deadline() = listOfNotNull(token.deadline(), deadline).minOrNull()
             override fun workMeter(): RootWorkMeter = meter
         }
+        activeSlice = timeSource.markNow()
         try {
             return advance(token, preparation, deadline, start, allowance, onIncumbent)
         } finally {
+            activeTime += checkNotNull(activeSlice).elapsedNow()
+            activeSlice = null
             if (offered >= 0L) workDebt = addWork(workDebt, (work - start - offered).coerceAtLeast(0L))
         }
     }
@@ -182,21 +198,23 @@ internal class CoreGuidedSearch(
                 return finish(MinimizeResult.Optimal(incumbent, requireNotNull(bestValue).toDouble(), stats))
             }
             if (allowance >= 0L && work - start >= allowance) {
-                return if (workExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
+                return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
             val handle = query ?: try {
                 openQuery(preparation.withLifetime(lifetime)).also { query = it }
             } catch (_: SearchInitializationCancelled) {
-                return if (workExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
+                return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
             val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
             val result = handle.runSlice(preparation.withLifetime(lifetime), millis, remaining)
-            if (result == null) return null
+            if (result == null) {
+                return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
+            }
             val paused = result is SolveResult.Unknown && result.reason == TerminationReason.Cancelled && !token()
             finishQuery(keepModel = paused)
             if (paused) {
-                return if (workExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
+                return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
             when (result) {
                 is SolveResult.Unknown -> return finish(stopped(result.reason))
@@ -255,7 +273,7 @@ internal class CoreGuidedSearch(
                 }
             }
         }
-        return if (workExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
+        return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
     }
 
     private fun prepareObjective() {
@@ -277,27 +295,9 @@ internal class CoreGuidedSearch(
 
     private fun extendCore() {
         val selected = requireNotNull(core)
-        val pending = pendingThreshold
-        if (pending != null) {
-            val literal = pending.counter.advance(pending.minimum, allocate = {
-                recordPreparation(1L)
-                Lit.make(nextBool++, true)
-            }, clause = {
-                recordPreparation(1L + it.size)
-                factors.add(Clause(it))
-            }, charge = ::recordPreparation) ?: return
-            val id = Lit.variable(literal)
-            weights[id] = pending.weight
-            if (pending.minimum < pending.counter.literals.size) {
-                tails[id] = ThresholdTail(pending.counter, pending.minimum + 1, pending.weight)
-            }
-            pendingThreshold = null
-        }
         if (!coreEncoded) {
             coreEncoded = true
-            if (selected.size > 1) {
-                pendingThreshold = ThresholdTail(CoreGuidedThreshold(coreLiterals), 2, coreWeight)
-            }
+            if (selected.size > 1) appendThreshold(coreLiterals, 2, coreWeight)
             return
         }
         val end = minOf(selected.size, coreCursor + 256)
@@ -307,10 +307,7 @@ internal class CoreGuidedSearch(
             val residual = requireNotNull(weights[id]) - coreWeight
             if (residual == BIG_ZERO) {
                 weights.remove(id)
-                tails.remove(id)?.let {
-                    pendingThreshold = it
-                    return
-                }
+                tails.remove(id)?.let { appendThreshold(it.literals, it.minimum, it.weight) }
             } else {
                 weights[id] = residual
             }
@@ -320,6 +317,15 @@ internal class CoreGuidedSearch(
         val maximum = maximumWeight() ?: coreWeight
         threshold = if (current < maximum) current else maximum
         core = null
+    }
+
+    private fun appendThreshold(literals: IntArray, minimum: Int, weight: BigInt) {
+        val aux = nextBool++
+        factors.add(ReifiedCardinality(aux, literals, min = minimum, max = literals.size))
+        weights[aux] = weight
+        recordPreparation(1L + literals.size)
+        // A latent higher threshold implies its frontier; spending the frontier exposes its successor.
+        if (minimum < literals.size) tails[aux] = ThresholdTail(literals, minimum + 1, weight)
     }
 
     private fun maximumWeight(below: BigInt? = null): BigInt? {
@@ -418,7 +424,6 @@ internal class CoreGuidedSearch(
         if (closed) return
         finishQuery()
         queryModel = null
-        pendingThreshold = null
         tails.clear()
         weights.clear()
         factors.clear()

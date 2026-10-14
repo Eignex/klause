@@ -216,6 +216,66 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 class PortfolioTest {
 
     @Test
+    fun `bounded proof preparation preserves ordinary policy choices and work offers`() {
+        fun trace(auxiliary: Boolean, auxiliaryFirst: Boolean): List<Pair<Int, Long>> {
+            val reached = ArrayList<Pair<Int, Long>>()
+            val finderBase = ScriptedSearch({ it == 0 }) {}
+            val finder = object : ResumableSearch by finderBase {
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                    reached += 0 to sliceNodes
+                    return finderBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                }
+            }
+            val retainedBase = ScriptedSearch({ false }) {}
+            val retained = object : ResumableSearch by retainedBase {
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                    reached += 1 to sliceNodes
+                    return retainedBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                }
+            }
+            var visits = 0
+            val proofBase = ScriptedSearch({ false }) { visits++ }
+            val proof = object : ResumableSearch by proofBase {
+                override val preparationPending: Boolean get() = visits < 2
+                override val stats: SolveStats get() = SolveStats(
+                    search = SearchStats(glueClauses = SumResult(visits * 1_000.0)),
+                )
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                    proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                    return if (visits < 3) null else MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                }
+            }
+            val workers = mutableListOf(
+                trackingWorker("finder", 0, finder).also { it.family = ArmFamily.LocalSearch },
+                trackingWorker("retained", 1, retained),
+            )
+            if (auxiliary) {
+                workers.add(if (auxiliaryFirst) 0 else workers.size,
+                    trackingWorker("proof", 2, proof).also { it.auxiliaryProof = true })
+            }
+
+            val result = Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+                it.minimize(Cancellation { reached.size >= 16 })
+            }
+
+            if (auxiliary) {
+                val schedule = result.stats.portfolio.arms.single { it.label == "proof" }
+                assertEquals(3L, schedule.segments)
+                assertEquals(15_000L, schedule.work)
+                assertEquals(3_000.0, schedule.credit["Glue"])
+            }
+            return reached
+        }
+
+        for (auxiliaryFirst in listOf(false, true)) {
+            assertEquals(trace(false, auxiliaryFirst), trace(true, auxiliaryFirst))
+        }
+    }
+
+    @Test
     fun `run duration includes every one shot segment and witness verification`() {
         for (optimize in listOf(false, true)) {
             val clock = TestTimeSource()
