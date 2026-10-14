@@ -55,6 +55,14 @@ allowance; closing discards it. [Portfolio preparation](portfolio.md#polynomial-
 defines polynomial checkpoints and the distinction between slice suspension and
 solve-wide cancellation.
 
+Solution-guided LP bounding may read verified peer values before its first local
+witness. During that descent, the peer values precede saved phases and numerical
+LP value preferences; variable selection and all branch alternatives remain intact.
+An admitted local witness ends that ordering priority. LP-free search retains its
+first descent before importing solution-guided peers. Importing a hint retains the
+trail and learned state and supplies no local incumbent, pruning or publication
+authority.
+
 ### Lazy branch selection
 
 `SearchBranchProposal` supplies exhaustive, mutually exclusive alternatives without

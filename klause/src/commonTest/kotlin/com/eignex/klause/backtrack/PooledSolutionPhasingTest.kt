@@ -53,6 +53,47 @@ class PooledSolutionPhasingTest {
     }
 
     @Test
+    fun `LP bounding search reads pooled values before its first local witness`() {
+        val objectives = ArrayList<Double>()
+        var firstRead: Int? = null
+        val exchange = hintExchange()
+        val params = BacktrackParams(
+            variableSelector = InputOrder,
+            valueSelector = SolutionGuided(IndomainMin),
+            phaseSaving = true,
+            solutionPhasing = true,
+            lpPlan = LpPlan(bounding = true, branching = true, rootBudgetMillis = 0L, rootCutHarvest = false),
+            pooledIncumbents = IncumbentSource {
+                if (firstRead == null) firstRead = objectives.size
+                exchange.current()
+            },
+            onEvent = { if (it is SearchEvent.Incumbent) objectives += it.objective },
+        )
+
+        BacktrackSolver(problem().bake()).minimize(LinearObjective(boolWeights = weights), params)
+
+        assertEquals(0, firstRead)
+    }
+
+    @Test
+    fun `LP value guidance does not admit an infeasible pooled point`() {
+        val objective = LinearObjective(boolWeights = weights)
+        val params = BacktrackParams(
+            valueSelector = SolutionGuided(IndomainMin),
+            phaseSaving = true,
+            solutionPhasing = true,
+            lpPlan = LpPlan(bounding = true, branching = true, rootBudgetMillis = 0L, rootCutHarvest = false),
+            pooledIncumbents = IncumbentExchange.minimizing<Sample>().apply {
+                offer(Sample(BooleanArray(8), LongArray(0)), 0.0)
+            },
+        )
+
+        val result = BacktrackSolver(problem().bake()).minimize(objective, params)
+
+        assertEquals(optimum, objective.evaluate(assertNotNull(result.assignment)))
+    }
+
+    @Test
     fun `the pooled incumbent is read once per restart`() {
         var polls = 0
         var restarts = 0

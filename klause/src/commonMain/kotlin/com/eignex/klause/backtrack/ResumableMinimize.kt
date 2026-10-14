@@ -345,7 +345,7 @@ internal class ResumableMinimize(
             LpEngine(
                 problem, objective, params.lpParams(), sink, solver.lpSolveContext, deferred = true,
                 nodeWorkAllowance = {
-                    if (pausable && !preparationPending && externalCutoff() != Double.POSITIVE_INFINITY) {
+                    if (pausable && !preparationPending && externalCutoff().isFinite()) {
                         slice.remainingLpWork()
                     } else null
                 },
@@ -1236,9 +1236,9 @@ internal class ResumableMinimize(
         override fun onResume(context: SearchContext): SearchRunDisposition {
             boundExchange.applySharedFloor()
             val local = incumbents.current()
-            if (local != null && params.valueSelector is SolutionGuided) {
-                pooledIncumbents?.poll()?.takeIf { it.objective < local.objective.display }?.let {
-                    brancher.importPooledSolution(it.assignment, guideValues = true)
+            if (params.valueSelector is SolutionGuided && (local != null || lpEngine.params.lpPlan.bounding)) {
+                pooledIncumbents?.poll()?.takeIf { local == null || it.objective < local.objective.display }?.let {
+                    brancher.importPooledSolution(it.assignment, guideValues = true, preferValues = local == null)
                 }
             }
             return SearchRunDisposition.Continue

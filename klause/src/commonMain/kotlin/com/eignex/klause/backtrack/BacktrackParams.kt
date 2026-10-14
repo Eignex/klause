@@ -271,6 +271,7 @@ data class BacktrackParams(
      * the assignment reorders value trials (out-of-domain integers are clamped), so a peer's solution can
      * never make this search unsound. After its first admitted incumbent, [SolutionGuided] value selection
      * adopts better pooled incumbents when optimization resumes, without restarting traversal.
+     * LP-bounding search may prefer those values before its first local witness.
      * `null` (default) disables it.
      */
     val pooledIncumbents: IncumbentSource<Sample, Double>? = null,
