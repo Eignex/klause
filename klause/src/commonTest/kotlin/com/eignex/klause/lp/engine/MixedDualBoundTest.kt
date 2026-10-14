@@ -11,6 +11,24 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `mixed rational bounds remain available without an integral objective lattice`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            val free = addRealVar(null, null)
+            val objective = addRealVar(0.0, 10.0, cost = 1.0)
+            addRealRow(intArrayOf(x, free), doubleArrayOf(3.0, -3.0), Relation.EQ, 3.0)
+            addRealRow(intArrayOf(free, objective), doubleArrayOf(1.0, -1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val duals = doubleArrayOf(-1.0 / 3.0, -1.0)
+        val certificate = assertNotNull(nodeDualCertificate(model, duals))
+
+        val lower = certifiedTightObjectiveLowerBound(model, duals, certificate, null, ProductionLpCertificationPolicy)
+
+        assertEquals(-1.0, lower)
+    }
+
+    @Test
     fun `reconstructed mixed duals require exact cancellation on free continuous columns`() {
         for (coefficient in listOf(-3.0, -3.0000000001)) {
             val source = LpBuilder().apply {
