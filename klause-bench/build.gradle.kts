@@ -60,7 +60,28 @@ val checkNativeVmSymbols = tasks.register<Exec>("checkNativeVmSymbols") {
     inputs.files("tools/read_native_vm_symbols.py", "tools/test_read_native_vm_symbols.py")
 }
 
-tasks.named("check") { dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols) }
+val checkNativeVmDemangler = tasks.register<Exec>("checkNativeVmDemangler") {
+    group = "verification"
+    description = "Test public native demangler buffers and provider binding."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_native_vm_demangler.py")
+    inputs.files("tools/native_vm_demangler.py", "tools/test_native_vm_demangler.py",
+        "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
+}
+
+val checkNativeVmSignatures = tasks.register<Exec>("checkNativeVmSignatures") {
+    group = "verification"
+    description = "Test immutable captured native signature matching and failures."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_read_native_vm_signatures.py")
+    inputs.files("tools/read_native_vm_signatures.py", "tools/test_read_native_vm_signatures.py",
+        "tools/native_vm_demangler.py", "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
+}
+
+tasks.named("check") {
+    dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
+        checkNativeVmDemangler, checkNativeVmSignatures)
+}
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
