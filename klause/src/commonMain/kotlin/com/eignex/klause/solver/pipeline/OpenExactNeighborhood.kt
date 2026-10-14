@@ -80,7 +80,9 @@ internal class OpenExactNeighborhood(
         if ((params.timeout or params.cancellation or cancellation)()) return ExactNeighborhoodResult.Undecided
         val sample = result.sample
         val checked = try {
-            if (sample.exactInts?.any { !it.fitsLong() } == true || model.factors.any { it is ExactSearchRow || it is EncodedTheoryFactor }) {
+            if (sample.exactInts?.any { !it.fitsLong() } == true ||
+                model.factors.any { it is ExactSearchRow || it is EncodedTheoryFactor }
+            ) {
                 verifyRealCoordinates(model, sample)
             } else {
                 verifyOpenWitness(model, sample)

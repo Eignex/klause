@@ -86,14 +86,17 @@ class Encoder(
         require(support == EncoderSupport.CONDITIONED || (integerConditions.isEmpty() && booleanConditions.isEmpty()))
     }
 
-    internal fun remapped(mapping: VarRemap): Encoder = Encoder(support,
-        integerConditions.map { requireNotNull(mapping.int(it)) { "removed encoding condition" } },
-        booleanConditions.mapKeys { requireNotNull(mapping.bool(it.key)) { "removed encoding condition" } }, installer)
+    internal fun remapped(mapping: VarRemap): Encoder {
+        if (integerConditions.isEmpty() && booleanConditions.isEmpty()) return this
+        return Encoder(support,
+            integerConditions.map { requireNotNull(mapping.int(it)) { "removed encoding condition" } },
+            booleanConditions.mapKeys { requireNotNull(mapping.bool(it.key)) { "removed encoding condition" } }, installer)
+    }
 
     /** Whether this descriptor enforces the unconditioned source relation. */
     val enforcesSource: Boolean get() = support == EncoderSupport.DIRECT || support == EncoderSupport.EQUIVALENT
 
-    /** Install the whole relation atomically, or decline without publishing a partial relation. */
+    /** Install into a private receiving scope; the caller commits it only when no decline is returned. */
     fun install(factor: Factor, encoding: TheoryEncoding): EncoderDecline? {
         if (!enforcesSource && support != EncoderSupport.CONDITIONED) return EncoderDecline.UNSUPPORTED
         if (integerConditions.any { encoding.fixedInteger(it) == null } ||

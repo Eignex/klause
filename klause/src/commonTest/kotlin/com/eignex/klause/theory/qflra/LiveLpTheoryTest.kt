@@ -639,7 +639,7 @@ class LiveLpTheoryTest {
                     }
                 }
             }
-            assertEquals(if (scenario == "decline") 3 else 1, created, scenario)
+            assertEquals(1, created, scenario)
             assertEquals(created, closed, scenario)
         }
     }

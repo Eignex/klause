@@ -2,7 +2,8 @@
 
 Mixed linear constraints couple integer and real coordinates in one source model.
 The linear relaxation checks real feasibility, and integer branching enforces the
-source integrality requirements. A feasible continuous point is not enough to
+source integrality requirements for open integer columns. Finite choices come from
+the authoritative finite owner. A feasible continuous point is not enough to
 accept the mixed model.
 
 This theory follows the [shared theory contract](../theories.md) and uses the same
@@ -13,9 +14,9 @@ linear machinery as [linear integer](linear-integer.md) and
 
 Every theory-owned factor must have an admitted exact linear form. Integer and
 real source namespaces stay distinct, including through lowering, reductions and
-witness reconstruction. Open integer ranges remain theory-owned. Supported finite
-factors can remain in a separate finite projection when the ownership plan admits
-that composition.
+witness reconstruction. Open integer ranges remain theory-owned. Finite declarations retain their domain state and choices, including holes. A bounded
+linear factor can participate in both propagation and selected theory encoding.
+Unrelated finite factors retain their own enforcement path.
 
 A finite integer × real product becomes linear once its integer operand is fixed.
 That leaf-completion case does not admit an unfixed bilinear factor into the open
