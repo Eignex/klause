@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.localsearch.LocalSearchModel
 
 class FlatZincIntConstraintsTest {
 
@@ -178,7 +179,7 @@ class FlatZincIntConstraintsTest {
         val baked = parsed.problem.bake()
         val variable = parsed.intVarsByName.getValue("x")
 
-        val pins = baked.rootPins(Assumptions.None.withInt(variable, 3000000000))
+        val pins = LocalSearchModel.of(baked).pinsUnder(Assumptions.None.withInt(variable, 3000000000))
 
         assertNotNull(pins)
     }
