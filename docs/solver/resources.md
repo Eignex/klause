@@ -105,13 +105,14 @@ visits one per 18000. Fractional LP and propagation marks survive slices and the
 preparation-to-search transition. Overspend debt is settled once and repaid by later
 slices. A nested private search leaves debt ownership with its containing budget.
 Relative counters and saturating additions prevent a large allowance from wrapping.
-Retained finite optimization converts the slice's remaining work to an optional
+Retained finite optimization behind a finite external cutoff converts the slice's remaining work to an optional
 node-LP operation cap, subtracting fractional LP work already charged. The adapter
 supplies native units to the model-facing LP owner, which takes the smaller of that
 cap and its containing effort allowance. Required leaf completion and preparation
 keep their own allowances. Retained numerical owner construction uses the containing
 effort allowance; the slice cap applies to its floating queries. Atomic kernel work
 can still overspend; the slice carries that debt through the existing accounting.
+Search before a finite external cutoff retains its containing native effort allowance.
 
 `Cancellation` and `WorkMeter` live in the neutral `util` package within `klause`. Their units come
 from the caller's adapter; they contain no portfolio pricing. Composing tokens carries

@@ -344,7 +344,11 @@ internal class ResumableMinimize(
         lpEngine = resources.own(
             LpEngine(
                 problem, objective, params.lpParams(), sink, solver.lpSolveContext, deferred = true,
-                nodeWorkAllowance = { if (pausable && !preparationPending) slice.remainingLpWork() else null },
+                nodeWorkAllowance = {
+                    if (pausable && !preparationPending && externalCutoff() != Double.POSITIVE_INFINITY) {
+                        slice.remainingLpWork()
+                    } else null
+                },
             ),
         )
         lpEngine.preparation().forEach { yield(Unit) }

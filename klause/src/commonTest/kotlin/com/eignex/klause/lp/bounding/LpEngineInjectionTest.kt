@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -17,6 +19,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
@@ -140,6 +143,28 @@ class LpEngineInjectionTest {
         assertFalse(pruned)
         assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > 500L)
         assertEquals(500L, assertNotNull(factory.floatAllowances.single()).work)
+    }
+
+    @Test
+    fun `sliced LP queries receive a native slice cap only behind a finite external cutoff`() {
+        for (cutoff in listOf(Double.POSITIVE_INFINITY, 100.0)) {
+            val problem = boundedProblem()
+            val factory = RecordingLpEngineFactory()
+            val params = BacktrackParams(
+                lpPlan = LpPlan(bounding = true, rootCutHarvest = false),
+                objectiveBoundSupplier = { cutoff },
+            )
+            val solver = BacktrackSolver(problem.bake(), LpSolveContext(factory, decline))
+
+            solver.resumable(LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)), params).use { search ->
+                while (factory.floatAllowances.isEmpty() && !search.isDone) {
+                    search.runSlice(Cancellation.Never, 1_000L, 64L) {}
+                }
+            }
+
+            assertTrue(factory.floatAllowances.isNotEmpty())
+            assertEquals(cutoff.isFinite(), factory.floatAllowances.first() != null)
+        }
     }
 
     @Test
