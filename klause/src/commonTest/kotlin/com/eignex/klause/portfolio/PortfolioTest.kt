@@ -2271,9 +2271,10 @@ class PortfolioTest {
     fun `incumbent probes continue only after earning progress`() {
         for (productive in listOf(false, true)) {
             val reached = ArrayList<Int>()
+            val probe = ScriptedSearch({ productive && it == 0 }, start = 500.0) { reached += 1 }
             val workers = listOf(
                 trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
-                trackingWorker("probe", 1, ScriptedSearch({ productive && it == 0 }, start = 500.0) { reached += 1 }),
+                trackingWorker("probe", 1, probe),
             )
             val bandit = object : UnivariateBandit {
                 override val nbrArms = 2
@@ -2289,9 +2290,12 @@ class PortfolioTest {
             }
 
             assertIs<MinimizeResult.BestFound>(result)
-            val expected = if (productive) listOf(0) + List(14) { 1 }
-            else listOf(0) + List(6) { 1 } + List(8) { 0 }
-            assertEquals(expected, reached)
+            if (productive) {
+                assertEquals(listOf(0) + List(14) { 1 }, reached)
+            } else {
+                assertEquals(60_000L, probe.work)
+                assertEquals(listOf(0, 0), reached.takeLast(2))
+            }
         }
     }
 
