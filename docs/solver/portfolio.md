@@ -285,10 +285,10 @@ when every objective term is Boolean and the model has no continuous columns.
 On one lane with another complete worker, the automatically appended core worker
 joins after the first checked incumbent and after each ordinary complete worker has
 spent one base of charged work since the latest checked improvement, or after the
-original initial pool retires. Every improvement renews that sibling search window,
-including after the core service has started. A charged core turn also renews that
-window before its next continuation; private state and lifetime limits survive the
-pause. Unspent
+original initial pool retires. Improvements renew that initial search window until
+the proof service starts. Each charged core turn then renews sibling coverage before
+its next continuation; further incumbent improvements do not erase that continuation
+credit. Private state and lifetime limits survive the pause. Unspent
 work offers and debt repayments do not establish that coverage. Sibling complete and heuristic
 workers retain their initial coverage, seed positions and family policy. Before the
 first witness, ordinary complete siblings reserve one family share of elapsed time,
