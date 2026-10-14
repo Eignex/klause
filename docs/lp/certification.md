@@ -91,8 +91,10 @@ The root pass considers all mixed rows. During search it considers rows incident
 to Boolean pins or integer endpoints narrowed from their source declarations.
 Row selection and visits charge the containing ledger, and selected rows retain
 their complete support. An empty touched-column set needs no matrix scan.
-The pass builds a bounded sparse row view once per admitted query and retains only
-completed coordinate certificates. Integral-valued coefficients, endpoints, right-hand
+The pass identifies mixed rows from continuous column entries before building its
+bounded sparse row view. Integral-only rows allocate no projection terms; selection
+and matrix visits still charge the shared allowance. It retains only completed
+coordinate certificates. Integral-valued coefficients, endpoints, right-hand
 sides and target origins admit checked Int128 endpoint sums and comparisons. Continuous
 declarations remain continuous. Only productive projections materialize rational values;
 each row query owns reusable fixed-width accumulators, which are cleared between
