@@ -696,7 +696,9 @@ internal fun LpEngine.sparseSafePrune(
     ) {
         return LpNodeOutcome(true, null)
     }
-    val objectiveCert = objectiveCertificate?.let { solveContext.certificationPolicy.acceptNullable(LpCertifier.INTEGER, it) }
+    val objectiveCert = objectiveCertificate?.let {
+        solveContext.certificationPolicy.acceptNullable(LpCertifier.INTEGER, it)
+    }
     if (canFix && cert != null && objectiveCert != null && !cancellation() &&
         applySparseReducedCostFixing(boundRel, objectiveCert, session, bound, sink, objectiveVar,
             objectiveAscending, learn, cancellation, objectiveCeiling)
