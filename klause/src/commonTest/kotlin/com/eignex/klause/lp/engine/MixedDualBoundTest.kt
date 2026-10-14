@@ -11,6 +11,23 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `a supported continuous endpoint does not hide an integral fixing direction`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val r = addRealVar(0.0, 2.0, cost = 1.0)
+            addRow(intArrayOf(x, r), longArrayOf(-2L, 1L), Relation.GE, 0L)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val additional = ArrayList<LpDeductionCertificate>()
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
+            onAdditionalCertificate = { additional.add(it) }))
+
+        assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
+        assertTrue(additional.any { it.fixSteps(0, 1L, 0L) == 0L })
+    }
+
+    @Test
     fun `completed primary certificates survive optional candidate work exhaustion`() {
         val source = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)
