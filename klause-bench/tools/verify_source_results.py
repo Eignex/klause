@@ -533,6 +533,7 @@ def check(cases, source_root=None, progress=None, witness_only=False):
                 result["verdictCheck"] = "source unsat"
             else:
                 witness = record.get("finalWitness")
+                objective_witness_verified = False
                 if witness is not None and is_smt:
                     witness_scope = record["proven"] and record["kind"] == "optimize"
                     if witness_scope:
@@ -560,6 +561,9 @@ def check(cases, source_root=None, progress=None, witness_only=False):
                                                      record.get("exactObjective") is not None,
                                                      witness), "point objective differs from reported objective"
                         result["objectiveCheck"] = "source point objective matches"
+                        objective_witness_verified = exact_feasible and z3.is_true(z3.simplify(
+                            mps_point(objective, variables, values) ==
+                            (-rational(reported_objective) if maximize else rational(reported_objective))))
                     if exact:
                         assert exact_feasible, record["problem"]
                     else:
@@ -576,10 +580,11 @@ def check(cases, source_root=None, progress=None, witness_only=False):
                     value = rational(reported_objective)
                     if maximize:
                         value = -value
-                    solver.push()
-                    solver.add(query(objective == value))
-                    require_verdict(solver, z3.sat, record["problem"], 'claimed source objective feasibility')
-                    solver.pop()
+                    if not objective_witness_verified:
+                        solver.push()
+                        solver.add(query(objective == value))
+                        require_verdict(solver, z3.sat, record["problem"], 'claimed source objective feasibility')
+                        solver.pop()
                     solver.push()
                     solver.add(query(objective < value))
                     require_verdict(solver, z3.unsat, record["problem"], 'strictly better source objective exclusion')

@@ -28,6 +28,18 @@ class ProofCheckTest(unittest.TestCase):
         self.assertEqual(result['witness'], 'exact source feasible')
         self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
 
+    def test_exact_mps_objective_witness_establishes_attainment_without_sat_search(self):
+        solver = z3.Solver()
+        query = solver.check
+        case = self.case(suite='mps-core', objective='-1/10', exactObjective='-1/10', finalWitness='v x=1')
+        with mock.patch.object(proof_check.z3, 'Solver', return_value=solver), \
+                mock.patch.object(solver, 'check', side_effect=lambda: z3.unknown if query() == z3.sat else query()):
+            result = self.check(case, self.mps_source)
+
+        self.assertEqual(result['witness'], 'exact source feasible')
+        self.assertEqual(result['objectiveCheck'], 'source point objective matches')
+        self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
+
     def test_complete_source_witness_establishes_sat_when_unpinned_query_is_unknown(self):
         solver = z3.Solver()
         query = solver.check
