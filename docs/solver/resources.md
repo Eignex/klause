@@ -154,6 +154,58 @@ unknown and cannot prove exhaustion. Open routing maps representation decline to
 timeout and cancellation distinct. Slice pauses remain traversal lifecycle events;
 they do not renew lifetime controls or become refutations.
 
+Optional difference guard propagation charges its sparse indexes, buffer cells,
+path edge visits, exact heap operations and copied explanations to the existing
+component token. Queries borrow a completed feasible point and grant no additional
+work or time. Stopped queries invalidate their scratch and publish no partial fact;
+structural or arithmetic representation decline leaves ordinary complete checks
+intact. Mutable graph and query state remains with its finite or open search owner.
+One guard propagation batches external cancellation polls over at most 64 primitive
+visits when its token has no attached meter. Native exhaustion is checked at each
+charge and poll. An attached meter retains eager polling after every debit; live
+deadline and meter metadata are delegated without snapshotting. Entry, bulk allocation,
+kernel completion, explanation copying and nonpublication exits force a containing
+poll. The final proof poll immediately precedes implication delivery; completed source
+facts remain valid if a later enclosing callback stops. An observed stop is latched
+only for that operation. Completed atomic heap or buffer operations retain their
+charges and expose no result after abandonment.
+
+Difference feasibility can reuse a completed private numerical seed with exact
+source-node identity. Node comparisons and initial-value copies charge the same
+component token. Repair and predecessor-cycle walks poll that owner; a numerical
+decline can use one cold fallback only while the containing owner remains live.
+Every spent charge and the original deadline remain in force. A stopped repair
+publishes no point, model or conflict, and optional seed storage is released even
+when hint indexing declines.
+
+Source-gate indexing and each sparse dependency consultation charge the opening
+token, with at most 65,536 index or consultation entries. Definition recognition
+has the same bounded visit allowance and charges input copies, canonical sorting
+and candidate comparisons. Nested and n-ary definitions retain every implication
+pair and the full reverse clause. No gate values survive a consultation, and no
+Boolean or arithmetic invocation or allowance is created by this adapter.
+
+Optional semantic-clause indexing uses the remaining storage and recognition visits
+of that same index. It retains complete definition clause identities and sparse gate
+parent and semantic-clause incidences; an incomplete index is discarded without
+releasing admitted forward hints or the graph proof owner. A consultation shares its
+65,536 entry and visit boundary across forward evaluation and both hypotheses. Live
+pin and primitive reads are memoized for that consultation only. Primitive comparisons
+may perform already-owned scalar work; memoization avoids repeating those calls, not
+their charges. All structural visits, comparisons and allocation entries debit the
+opening token. No additional graph solve, LP query or allowance is created.
+Forward recognition charges the first implication-pair lookup before reserving or
+allocating the complete operand buffer. Failed first pairs spend only their actual
+scanned work; completed definitions retain all pair, copy, sort and distinctness charges.
+An available direct primitive preference bypasses semantic scoring after the existing
+owner and point-lifetime checks, without reconsulting its producer.
+
+Hint usage accounting has a fixed set of invocation-owned counters. Recording an
+index outcome or branch consultation performs constant work and does not poll,
+charge or reconsult a numerical producer. Immutable snapshots retain outcomes after
+private provider cleanup; cumulative snapshots are read without re-adding them.
+Independent solve-slice merges add usage counters with saturating arithmetic.
+
 Custom contexts retain the cancellation-only default for compatibility. Alternate
 coordinators inject persistent controls to retain deadline metadata, accounting
 and typed diagnostics across component callbacks.

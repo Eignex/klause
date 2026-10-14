@@ -20,8 +20,38 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
+    @Test
+    fun `an expanded conditional equality releases its arithmetic placeholder`() {
+        val parsed = SmtLib.parse(
+            "(declare-const b Bool) (assert (= (ite b 1 2) 1))",
+        )
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        session.initialize()
+        val result = session.solve(parsed.model.numBoolVars)
+
+        assertEquals(0, parsed.model.numIntVars)
+        assertIs<SearchResult.Satisfied>(result)
+    }
+
+    @Test
+    fun `unused difference equality gates release their arithmetic reads`() {
+        val parsed = SmtLib.parse(
+            """
+                (declare-const x Int) (declare-const y Int)
+                (assert (let ((s (ite (= (- x y) 3) 1 2))) (= (ite true 1 s) 1)))
+            """.trimIndent(),
+        )
+
+        assertTrue(parsed.model.factors.all { it.intVars.isEmpty() })
+    }
+
     @Test
     fun `a covered identity default excludes its old selector values without expansion`() {
         val builder = Compiler.Builder(

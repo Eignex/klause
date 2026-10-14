@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.ShortestPaths
+import com.eignex.klause.arithmetic.difference.checkedDifferenceSum
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -16,6 +17,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.differenceFragmentOf
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
@@ -24,8 +26,8 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.contribute
-import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.bigIntOf
 
 /** Incremental difference-logic search component. */
 class DifferenceSearchComponent private constructor(
@@ -59,6 +61,11 @@ class DifferenceSearchComponent private constructor(
         RootBoundPlan(variables)
     }
     private var assignment: Sample? = null
+    private var hintEdges: Map<Int, List<DifferenceEdge>>? = null
+    private var hintPoint: HintPoint? = null
+    private var potentialSeed: PotentialSeed? = null
+    private var guardPropagation: DifferenceGuardPropagation? = null
+    private var guardPreparationComplete = false
 
     constructor(
         model: Problem,
@@ -74,20 +81,86 @@ class DifferenceSearchComponent private constructor(
         "unsupported selected difference encoding"
     }.also { projections.requireSource(model) }, modelIntVars, intArrayOf())
 
-    override fun initialize(context: SearchContext): ComponentResult = when (val bounds = publishRootBounds(context)) {
-        ComponentResult.Consistent -> propagate(context)
-        else -> bounds
+    override fun initialize(context: SearchContext): ComponentResult {
+        potentialSeed = null
+        hintPoint = null
+        guardPropagation?.retract()
+        return when (val bounds = publishRootBounds(context)) {
+            ComponentResult.Consistent -> propagate(context)
+            else -> bounds
+        }
     }
 
     override fun propagate(context: SearchContext): ComponentResult {
+        hintPoint = null
+        var interrupted = false
+        fun stopped(): Boolean {
+            if (!interrupted) interrupted = context.cancelled() || context.executionControls.exhausted
+            return interrupted
+        }
+        fun abandon(): ComponentResult {
+            potentialSeed = null
+            return ComponentResult.Indeterminate
+        }
+        if (stopped()) return abandon()
         val fragment = fragment(context) ?: return ComponentResult.Consistent
         val active = BooleanArray(fragment.edges.size) { edge ->
             val guard = fragment.edges[edge].guard
             guard == DifferenceEdge.ALWAYS || context.boolValue(Lit.variable(guard)) == Lit.isPositive(guard)
         }
-        val cycle = fragment.graph().negativeCycle(active, context::cancelled)
-            ?: return ComponentResult.Consistent
-        return ComponentResult.Conflict(cycleExplanation(fragment, cycle))
+        val graph = fragment.graph()
+        if (!guardPreparationComplete && model.numBoolVars > 0) {
+            val owner = context.executionControls.cancellation
+            val preparationStop = object : Cancellation {
+                override fun isCancelled(): Boolean = stopped()
+                override fun deadline() = owner.deadline()
+                override fun workMeter() = owner.workMeter()
+            }
+            guardPropagation = base?.let {
+                DifferenceGuardPropagation.create(it, model.numBoolVars, preparationStop)
+            }
+            if (stopped()) return abandon()
+            guardPreparationComplete = true
+        }
+        var point: LongArray? = null
+        var cycle: IntArray? = null
+        potentialSeed?.let { seed ->
+            val stop = context.executionControls.cancellation
+            stop.charge(fragment.nodes.size.toLong())
+            if (!stopped() && seed.nodes.contentEquals(fragment.nodes)) {
+                stop.charge(fragment.numNodes.toLong())
+                if (!stopped()) {
+                    when (val outcome = graph.potentials(active, ::stopped, seed.values, { cycle = it })) {
+                        is Potentials.Found -> point = outcome.values
+                        Potentials.Infeasible -> Unit
+                        Potentials.Abandoned -> potentialSeed = null
+                    }
+                }
+            } else {
+                potentialSeed = null
+            }
+        }
+        if (stopped()) return abandon()
+        cycle = cycle?.takeIf { validCycle(fragment, active, it, context, ::stopped) }
+        if (point == null && cycle == null && !stopped()) {
+            potentialSeed = null
+            cycle = graph.negativeCycleWithPotential(active, ::stopped) { point = it }
+            cycle = cycle?.takeIf { validCycle(fragment, active, it, context, ::stopped) }
+        }
+        if (stopped()) return abandon()
+        cycle?.let {
+            val explanation = cycleExplanation(fragment, it)
+            if (stopped()) return abandon()
+            return ComponentResult.Conflict(explanation)
+        }
+        val completePoint = point ?: return ComponentResult.Consistent
+        potentialSeed = PotentialSeed(fragment.nodes, completePoint)
+        val result = guardPropagation?.propagate(fragment, completePoint, context) ?: ComponentResult.Consistent
+        if (result is ComponentResult.Indeterminate || stopped()) return abandon()
+        if (hintEdges != null && result is ComponentResult.Consistent) {
+            hintPoint = HintPoint(fragment, completePoint, context)
+        }
+        return result
     }
 
     override fun check(context: SearchContext): ComponentCheck {
@@ -121,6 +194,84 @@ class DifferenceSearchComponent private constructor(
 
     override fun retract(decisionLevel: Int) {
         assignment = null
+        hintPoint = null
+        guardPropagation?.retract()
+    }
+
+    internal fun potentialHints(
+        stop: Cancellation,
+        maxEdges: Int = MAX_HINT_EDGES,
+    ): Pair<IntArray, SearchCandidateHints>? {
+        val fragment = base ?: return null
+        if (fragment.edges.size > maxEdges || stop()) return null
+        val groups = LinkedHashMap<Int, MutableList<DifferenceEdge>>()
+        for (edge in fragment.edges) {
+            stop.charge(1)
+            if (stop()) return null
+            if (edge.guard == DifferenceEdge.ALWAYS) continue
+            val variable = Lit.variable(edge.guard)
+            if (variable !in 0 until model.numBoolVars) return null
+            groups.getOrPut(variable) { ArrayList(2) }.add(edge)
+        }
+        if (groups.isEmpty()) return null
+        stop.charge(groups.size.toLong())
+        if (stop()) return null
+        val variables = groups.keys.toIntArray()
+        hintEdges = groups
+        return variables to SearchCandidateHints(::preferredBool)
+    }
+
+    internal fun releasePotentialHints() {
+        hintEdges = null
+        hintPoint = null
+        guardPropagation = null
+        guardPreparationComplete = false
+    }
+
+    internal fun releaseSearchState() {
+        potentialSeed = null
+        assignment = null
+        releasePotentialHints()
+    }
+
+    internal fun potentialHintAvailable(): Boolean = hintPoint?.let {
+        it.context.decisionLevel == it.level && !it.context.executionControls.exhausted
+    } == true
+
+    internal fun potentialHintBool(variable: Int): Boolean? {
+        val point = hintPoint ?: return null
+        if (!potentialHintAvailable()) return null
+        return point.context.boolValue(variable)
+    }
+
+    private fun preferredBool(variable: Int): Boolean? {
+        val point = hintPoint ?: return null
+        if (point.context.decisionLevel != point.level) return null
+        val edges = hintEdges?.get(variable) ?: return null
+        var positive = true
+        var negative = true
+        var hasPositive = false
+        var hasNegative = false
+        for (edge in edges) {
+            val context = point.context
+            context.executionControls.cancellation.charge(1)
+            if (context.cancelled() || context.executionControls.exhausted) {
+                context.requestCancellationPoll()
+                return null
+            }
+            val from = point.values[point.fragment.nodeOf(edge.source)]
+            val to = point.values[point.fragment.nodeOf(edge.target)]
+            val bound = from + edge.bound
+            if (((from xor bound) and (edge.bound xor bound)) < 0L) return null
+            if (Lit.isPositive(edge.guard)) {
+                hasPositive = true
+                positive = positive && to <= bound
+            } else {
+                hasNegative = true
+                negative = negative && to <= bound
+            }
+        }
+        return if (!hasPositive || !hasNegative || positive == negative) null else positive
     }
 
     override fun contributeModel(model: SearchModel, context: SearchContext) {
@@ -212,6 +363,30 @@ class DifferenceSearchComponent private constructor(
         return SearchExplanation(guards.distinct().map(Lit::negate).toIntArray())
     }
 
+    private fun validCycle(
+        fragment: DifferenceFragment,
+        active: BooleanArray,
+        cycle: IntArray,
+        context: SearchContext,
+        stopped: () -> Boolean,
+    ): Boolean {
+        if (cycle.isEmpty()) return false
+        var sum = 0L
+        for (index in cycle.indices) {
+            context.executionControls.cancellation.charge(1)
+            if (stopped()) return false
+            val edgeIndex = cycle[index]
+            val next = cycle[(index + 1) % cycle.size]
+            if (edgeIndex !in fragment.edges.indices || next !in fragment.edges.indices || !active[edgeIndex]) {
+                return false
+            }
+            val edge = fragment.edges[edgeIndex]
+            if (edge.source != fragment.edges[next].target) return false
+            sum = checkedDifferenceSum(sum, edge.bound) ?: return false
+        }
+        return sum < 0L
+    }
+
     private fun unconstrainedValues(context: SearchContext): LongArray = LongArray(model.numIntVars) { variable ->
         context.intLowerBound(variable) ?: when {
             model.intBounds.hasLower(variable) -> model.intBounds.lower(variable)
@@ -224,6 +399,8 @@ class DifferenceSearchComponent private constructor(
     internal companion object {
         // Root cooperation is optional; keep its worst-case relaxation work small and deterministic.
         private const val MAX_ROOT_BOUND_RELAXATIONS = 65_536L
+        // Hint incidences have a bounded private index; declining it leaves complete graph coverage intact.
+        private const val MAX_HINT_EDGES = 65_536
 
         fun withRootBounds(
             model: Problem,
@@ -233,4 +410,10 @@ class DifferenceSearchComponent private constructor(
     }
 
     private data class RootBoundPlan(val variables: IntArray)
+
+    private class PotentialSeed(val nodes: IntArray, val values: LongArray)
+
+    private class HintPoint(val fragment: DifferenceFragment, val values: LongArray, val context: SearchContext) {
+        val level = context.decisionLevel
+    }
 }

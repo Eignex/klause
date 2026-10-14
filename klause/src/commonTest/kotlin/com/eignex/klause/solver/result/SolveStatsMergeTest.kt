@@ -10,6 +10,47 @@ import kotlin.test.assertTrue
 class SolveStatsMergeTest {
 
     @Test
+    fun `legacy hint copies preserve immutable usage and merge it across workers`() {
+        val usage = OpenHintUsageStats(indexesAdmitted = 1, componentSelections = 3, gateSelections = 3,
+            clauseIndexesAdmitted = 1, clauseConsultations = 3, clauseSelections = 2, clauseDeclines = 1)
+        val original = OpenHintStats(draws = 1, steeredSplits = 2, usage = usage)
+
+        val copied = original.copy(steeredSplits = 7)
+        val replaced = copied.copy(usage = OpenHintUsageStats())
+        val merged = SolveStats(openHints = original).mergedWith(SolveStats(openHints = copied)).openHints
+
+        assertEquals(usage, copied.usage)
+        assertEquals(OpenHintUsageStats(), replaced.usage)
+        assertEquals(2L, merged.draws)
+        assertEquals(9L, merged.steeredSplits)
+        assertEquals(OpenHintUsageStats(indexesAdmitted = 2, componentSelections = 6, gateSelections = 6,
+            clauseIndexesAdmitted = 2, clauseConsultations = 6, clauseSelections = 4, clauseDeclines = 2), merged.usage)
+        assertEquals(OpenHintStats(), OpenHintStats(0, 0, 0, 0, 0))
+        assertTrue(original != replaced)
+    }
+
+    @Test
+    fun `usage snapshots remain immutable and do not add repeated cumulative observations`() {
+        val sink = OpenHintUsageSink()
+        sink.index(HintIndexOutcome.ADMITTED)
+        sink.componentConsulted()
+        sink.componentSelected(primitive = false, gate = true)
+        val first = sink.snapshot()
+
+        assertEquals(first, sink.snapshot())
+        sink.index(HintIndexOutcome.STOPPED)
+        val second = sink.snapshot()
+
+        assertEquals(0L, first.stoppedIndexes)
+        assertEquals(1L, second.stoppedIndexes)
+        assertEquals(1L, second.indexesAdmitted)
+        assertEquals(1L, second.componentSelections)
+        assertEquals(Long.MAX_VALUE,
+            OpenHintUsageStats(componentSelections = Long.MAX_VALUE)
+                .mergedWith(OpenHintUsageStats(componentSelections = 1)).componentSelections)
+    }
+
+    @Test
     fun `local search phase times add across workers without losing missing phases`() {
         val left = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("seeding" to 7L, "selection" to 11L)))
         val right = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("preparation" to 3L, "selection" to 13L)))

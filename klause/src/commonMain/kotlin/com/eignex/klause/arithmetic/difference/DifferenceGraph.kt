@@ -50,6 +50,14 @@ internal class DifferenceGraph(val numVars: Int) {
      * Null reports no deduction; it does not prove consistency.
      */
     fun negativeCycle(active: BooleanArray? = null, cancelled: () -> Boolean = { false }): IntArray? {
+        return negativeCycleWithPotential(active, cancelled, null)
+    }
+
+    fun negativeCycleWithPotential(
+        active: BooleanArray?,
+        cancelled: () -> Boolean,
+        onFeasible: ((LongArray) -> Unit)?,
+    ): IntArray? {
         val n = numVars
         if (n == 0 || size == 0) return null
         // The virtual source makes every distance start finite and equal, which is exactly what a
@@ -58,6 +66,7 @@ internal class DifferenceGraph(val numVars: Int) {
         val predEdge = IntArray(n) { -1 }
         var changed = -1
         var untilPoll = POLL_INTERVAL
+        var overflow = false
         repeat(n + 1) {
             if (cancelled()) return null
             changed = -1
@@ -72,14 +81,20 @@ internal class DifferenceGraph(val numVars: Int) {
                 val relaxed = dist[u] + weight[e]
                 // A relaxation that overflows is not a real improvement; the guard keeps a wrapped
                 // sum from inventing a cycle that the constraints do not contain.
-                if (addOverflows(dist[u], weight[e])) continue
+                if (addOverflows(dist[u], weight[e])) {
+                    overflow = true
+                    continue
+                }
                 if (relaxed < dist[v]) {
                     dist[v] = relaxed
                     predEdge[v] = e
                     changed = v
                 }
             }
-            if (changed == -1) return null // a full pass with no improvement ⇒ no negative cycle
+            if (changed == -1) {
+                if (onFeasible != null && !overflow && !cancelled()) onFeasible(dist)
+                return null
+            }
         }
         return extractCycle(changed, predEdge)
     }
@@ -115,19 +130,33 @@ internal class DifferenceGraph(val numVars: Int) {
                 }
             }
             if (!changed) return Potentials.Found(dist)
-            if (hasNegativePredecessorCycle(predecessor, onNegativeCycle)) return Potentials.Infeasible
+            val negative = hasNegativePredecessorCycle(predecessor, cancelled, onNegativeCycle)
+                ?: return Potentials.Abandoned
+            if (cancelled()) return Potentials.Abandoned
+            if (negative) return Potentials.Infeasible
         }
         return Potentials.Infeasible
     }
 
     private fun hasNegativePredecessorCycle(
         predecessor: IntArray,
+        cancelled: () -> Boolean,
         onNegativeCycle: ((IntArray) -> Unit)?,
-    ): Boolean {
+    ): Boolean? {
+        if (cancelled()) return null
         val visited = IntArray(numVars) { -1 }
+        var untilPoll = POLL_INTERVAL
         for (start in 0 until numVars) {
+            if (--untilPoll <= 0) {
+                untilPoll = POLL_INTERVAL
+                if (cancelled()) return null
+            }
             var vertex = start
             while (visited[vertex] == -1 && predecessor[vertex] >= 0) {
+                if (--untilPoll <= 0) {
+                    untilPoll = POLL_INTERVAL
+                    if (cancelled()) return null
+                }
                 visited[vertex] = start
                 vertex = from[predecessor[vertex]]
             }
@@ -136,6 +165,10 @@ internal class DifferenceGraph(val numVars: Int) {
             var sum = 0L
             var overflow = false
             do {
+                if (--untilPoll <= 0) {
+                    untilPoll = POLL_INTERVAL
+                    if (cancelled()) return null
+                }
                 val edge = predecessor[vertex]
                 if (addOverflows(sum, weight[edge])) overflow = true
                 sum += weight[edge]
@@ -146,10 +179,15 @@ internal class DifferenceGraph(val numVars: Int) {
                     // The predecessor walk already verified a simple, closed cycle with a checked negative sum.
                     val edges = IntArrayList()
                     do {
+                        if (--untilPoll <= 0) {
+                            untilPoll = POLL_INTERVAL
+                            if (cancelled()) return null
+                        }
                         val edge = predecessor[vertex]
                         edges.add(edge)
                         vertex = from[edge]
                     } while (vertex != cycleStart)
+                    if (cancelled()) return null
                     onNegativeCycle(edges.toIntArray())
                 }
                 return true

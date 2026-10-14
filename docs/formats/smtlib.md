@@ -52,6 +52,9 @@ Asserted and reified equalities between an integer conditional result and a cons
 can lower directly to Boolean tests of its branches. Completed conditional definitions and equality
 results are shared within one parse; nested definitions are traversed iteratively.
 Primitive equality literals are shared across source uses and branch expansion.
+Reified pairwise unit integer differences use lower/upper comparison gates with complete
+Boolean-definition ownership. A deferred conditional equality keeps one arithmetic
+placeholder, which is removed only after its branch expansion completes.
 Comparisons finish open decision lists before expanding their branch tests.
 Constant branch images of at most 1,024 distinct values can reject a comparison
 before visiting its definition tree; unknown or larger images retain exact fallback.

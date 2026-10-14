@@ -1,5 +1,7 @@
 package com.eignex.klause.arithmetic.difference
 
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -9,6 +11,102 @@ import kotlin.test.assertTrue
 
 // Conflict explanations require a closed cycle with negative total weight.
 class DifferenceGraphTest {
+
+    @Test
+    fun `exact path queries retain original edges across feasible reweighting`() {
+        val source = intArrayOf(0, 1)
+        val edges = DifferencePathEdges(source, intArrayOf(1, 2), longArrayOf(-2, -3),
+            intArrayOf(0, 1, 2, 2), intArrayOf(0, 1))
+        val scratch = DifferencePathScratch(3)
+        for (potential in listOf(longArrayOf(0, -2, -5), longArrayOf(0, -4, -9))) {
+            val result = differenceShortestPaths(edges, booleanArrayOf(true, true), potential,
+                0, intArrayOf(2), scratch)
+
+            assertEquals(DifferencePathCompletion.Completed, result)
+            assertEquals(listOf(1, 0), scratch.pathTo(2, source)?.toList())
+        }
+    }
+
+    @Test
+    fun `a cancelled path query withholds a previously completed path and retains its work`() {
+        val source = intArrayOf(0, 1)
+        val edges = DifferencePathEdges(source, intArrayOf(1, 2), longArrayOf(-2, -3),
+            intArrayOf(0, 1, 2, 2), intArrayOf(0, 1))
+        val scratch = DifferencePathScratch(3)
+        val point = longArrayOf(0, -2, -5)
+        assertEquals(DifferencePathCompletion.Completed,
+            differenceShortestPaths(edges, booleanArrayOf(true, true), point, 0, intArrayOf(2), scratch))
+        var work = 0L
+        val meter = WorkMeter { work += it }
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 3L
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val result = differenceShortestPaths(edges, booleanArrayOf(true, true), point,
+            0, intArrayOf(2), scratch, stop)
+
+        assertEquals(DifferencePathCompletion.Abandoned, result)
+        assertNull(scratch.pathTo(2, source))
+        assertTrue(work >= 3L)
+    }
+
+    @Test
+    fun `invalid reduced weights and overflowing transforms supply no path`() {
+        val source = intArrayOf(0)
+        for ((weight, point) in listOf(
+            -1L to longArrayOf(0, 0),
+            Long.MIN_VALUE to longArrayOf(0, Long.MIN_VALUE),
+            Long.MAX_VALUE to longArrayOf(1, 0),
+            0L to longArrayOf(Long.MAX_VALUE, Long.MIN_VALUE),
+        )) {
+            val edges = DifferencePathEdges(source, intArrayOf(1), longArrayOf(weight),
+                intArrayOf(0, 1, 1), intArrayOf(0))
+            val scratch = DifferencePathScratch(2)
+
+            val result = differenceShortestPaths(edges, booleanArrayOf(true), point, 0, intArrayOf(1), scratch)
+
+            assertEquals(DifferencePathCompletion.Declined, result)
+            assertNull(scratch.pathTo(1, source))
+        }
+    }
+
+    @Test
+    fun `a completed cycle sweep retains potentials for its active edges`() {
+        val graph = graph(3, Triple(0, 1, -2L), Triple(1, 2, -3L), Triple(2, 0, -1L))
+        var values: LongArray? = null
+
+        val cycle = graph.negativeCycleWithPotential(booleanArrayOf(true, true, false), { false }) { values = it }
+
+        assertNull(cycle)
+        val point = assertNotNull(values)
+        assertTrue(point[1] <= point[0] - 2L)
+        assertTrue(point[2] <= point[1] - 3L)
+    }
+
+    @Test
+    fun `a negative cycle supplies no feasible potential`() {
+        var values: LongArray? = null
+
+        val cycle = graph(2, Triple(0, 1, -1L), Triple(1, 0, -1L))
+            .negativeCycleWithPotential(null, { false }) { values = it }
+
+        assertNotNull(cycle)
+        assertNull(values)
+    }
+
+    @Test
+    fun `stopped and overflowing sweeps withhold potential guidance`() {
+        for (cancelled in listOf(false, true)) {
+            var values: LongArray? = null
+
+            val cycle = graph(3, Triple(0, 1, Long.MIN_VALUE), Triple(1, 2, -1L))
+                .negativeCycleWithPotential(null, { cancelled }) { values = it }
+
+            assertNull(cycle)
+            assertNull(values)
+        }
+    }
 
     /** `x − y ≤ c` for each triple, in insertion order. */
     private fun graph(numVars: Int, vararg edges: Triple<Int, Int, Long>): DifferenceGraph {
@@ -76,6 +174,24 @@ class DifferenceGraphTest {
         val result = g.potentials(initial = longArrayOf(Long.MIN_VALUE, 0L))
 
         assertEquals(Potentials.Abandoned, result)
+    }
+
+    @Test
+    fun `an interrupted predecessor walk exports no cycle`() {
+        for (transient in listOf(false, true)) {
+            val graph = DifferenceGraph(9_000)
+            repeat(9_000) { graph.addEdge(it, (it + 1) % 9_000, -1L) }
+            var polls = 0
+            var cycle: IntArray? = null
+
+            val result = graph.potentials(cancelled = {
+                polls++
+                if (transient) polls == 4 else polls >= 4
+            }, onNegativeCycle = { cycle = it })
+
+            assertEquals(Potentials.Abandoned, result)
+            assertNull(cycle)
+        }
     }
 
     @Test

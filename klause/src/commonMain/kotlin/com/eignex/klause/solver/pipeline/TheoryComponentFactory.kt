@@ -65,8 +65,10 @@ internal fun ComponentPlan.theoryComponentFactory(
         ProblemPipeline.DIFFERENCE_THEORY -> {
             val owned = theoryIntVars
             val finite = cpIntVars
-            val factory: (SearchComponentOpening) -> List<SearchComponent> = { _: SearchComponentOpening ->
-                listOf(DifferenceSearchComponent.withRootBounds(fragment, owned, finite))
+            val factory: (SearchComponentOpening) -> List<SearchComponent> = { opening ->
+                val component = DifferenceSearchComponent.withRootBounds(fragment, owned, finite)
+                opening.own(AutoCloseable { component.releaseSearchState() })
+                listOf(component)
             }
             factory
         }

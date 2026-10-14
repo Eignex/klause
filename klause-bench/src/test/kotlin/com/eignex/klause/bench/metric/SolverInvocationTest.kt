@@ -1,10 +1,6 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.report.Reports
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,8 +9,27 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 class SolverInvocationTest {
+
+    @Test
+    fun `source hint admission and selections survive ordinary SMT protocol capture`() {
+        val lines = "; openHintIndexVisitLimit=1\n; openHintComponentConsulted=0\n; openHintGateSelected=0\nunknown"
+
+        val result = SolverInvocation.invoke(listOf("sh", "-c", "printf '%s\\n' '$lines'"),
+            SolverInvocation.Dialect.SMT_LIB)
+        val decoded = Reports.json.decodeFromString<SolverInvocation.Result>(Reports.json.encodeToString(result))
+
+        assertEquals(null, decoded.feasible)
+        assertEquals("1", decoded.stats["openHintIndexVisitLimit"])
+        assertEquals("0", decoded.stats["openHintComponentConsulted"])
+        assertEquals("0", decoded.stats["openHintGateSelected"])
+        assertEquals(null, decoded.stats["openHintDraws"])
+    }
 
     @Test
     fun `exact FlatZinc objective comments override decimal display`() {

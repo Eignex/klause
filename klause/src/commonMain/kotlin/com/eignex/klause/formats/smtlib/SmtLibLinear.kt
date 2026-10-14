@@ -12,6 +12,7 @@ import com.eignex.klause.lowering.addExact
 import com.eignex.klause.lowering.constRelationHolds
 import com.eignex.klause.lowering.intCombDiff
 import com.eignex.klause.lowering.linCombDiff
+import com.eignex.klause.lowering.reifyDifferenceLinear
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.wideConstHolds
@@ -95,7 +96,7 @@ internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb):
     if (op == "=") conditionalEquality(a, b)?.let { return it }
     val linOp = relLinearOp(op)
     return when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
-        is LinRelation.LongRel -> reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound).also {
+        is LinRelation.LongRel -> reifyIntegerRelation(rel, linOp).also {
             noteEqAtom(it, linOp, rel.coeffs, rel.vars, rel.bound)
         }
 
@@ -105,6 +106,18 @@ internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb):
             reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound)
         }
     }
+}
+
+private fun Compiler.Builder.reifyIntegerRelation(rel: LinRelation.LongRel, op: LinearOp): Int {
+    val difference = rel.vars.size == 2 && (rel.coeffs[0] == 1L || rel.coeffs[0] == -1L) &&
+        rel.coeffs[1] == -rel.coeffs[0]
+    if (!difference || (op != LinearOp.EQ && op != LinearOp.NE)) {
+        return reifyLinear(rel.coeffs, rel.vars, op, rel.bound)
+    }
+    val start = factors.size
+    val literal = reifyDifferenceLinear(rel.coeffs, rel.vars, op, rel.bound)
+    conditionalEqualities.definePredicate(Lit.variable(literal), factors.subList(start, factors.size))
+    return literal
 }
 
 private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {

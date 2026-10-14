@@ -479,6 +479,21 @@ vendor BLAS, external libraries or MiniZinc compiler. Capture those separately.
 
 ## Saved results
 
+Ordinary CLI statistics expose `openHintIndexAdmitted`, index decline categories,
+and caller/component consultation and selection counters separately from
+`openHintDraws` and `openHintSteered`. Component usage can be present without a
+Boolean draw. A selected hint is a first-polarity preference, including agreement
+with ordinary order; it is not a source witness or a committed-decision count.
+Primitive and gate selections classify outer consultations, not recursive leaf
+reads. Missing fields in older records are unavailable rather than observed zero.
+Use the same record's route, index outcome and usage to establish feature coverage.
+
+`openHintClauseIndexAdmitted` and `openHintClauseIndexDeclined` describe the optional
+semantic index separately from the forward index. `openHintClauseConsulted`,
+`openHintClauseSelected` and `openHintClauseDeclined` count actual two-hypothesis
+consultations; declines include ties, missing point support and representation stops.
+These observations retain both Boolean alternatives and certify no source verdict.
+
 Each problem writes `<problem>.out` and `<problem>.json` under ignored
 `output/<config>/`. Records retain verdict, objective direction, proof status,
 statistics and portfolio attribution. `solve-one` writes load failures too:

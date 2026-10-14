@@ -431,8 +431,6 @@ internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pai
                 "openReductionNs" to "$reductionNanos",
             )
         } + with(stats.openHints) {
-            // Only a run that drew a hint has anything to say about one, so every other open solve reports
-            // no hint block rather than a zeroed one.
             if (draws == 0L) {
                 emptyList()
             } else {
@@ -444,7 +442,7 @@ internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pai
                     "openHintMoves" to "$moves",
                 )
             }
-        } + smtStatPairs(stats, solveTimeMs)
+        } + openHintUsageStatPairs(stats) + smtStatPairs(stats, solveTimeMs)
     }
 
 /** Exact SMT-theory lane counters, with rates only when their denominator is meaningful. */
@@ -590,5 +588,30 @@ internal fun nodeBudgetStatPairs(budget: NodeBudget?): List<Pair<String, String>
         "nodeBudgetLimit" to budget.limit.toString(),
         "nodeBudgetSpent" to spent.toString(),
         "nodeBudgetRemaining" to (budget.limit - spent).coerceAtLeast(0L).toString(),
+    )
+}
+
+internal fun openHintUsageStatPairs(stats: SolveStats): List<Pair<String, String>> = with(stats.openHints.usage) {
+    if (this == com.eignex.klause.solver.result.OpenHintUsageStats()) return emptyList()
+    listOf(
+        "openHintNoProvider" to "$noProvider",
+        "openHintIndexAdmitted" to "$indexesAdmitted",
+        "openHintIndexSourceLimit" to "$sourceLimitDeclines",
+        "openHintIndexStorageLimit" to "$storageDeclines",
+        "openHintIndexVisitLimit" to "$visitDeclines",
+        "openHintIndexInvalidPrimitive" to "$invalidPrimitiveDeclines",
+        "openHintIndexStopped" to "$stoppedIndexes",
+        "openHintIndexAborted" to "$abortedIndexes",
+        "openHintCallerConsulted" to "$callerConsultations",
+        "openHintCallerSelected" to "$callerSelections",
+        "openHintComponentConsulted" to "$componentConsultations",
+        "openHintComponentSelected" to "$componentSelections",
+        "openHintPrimitiveSelected" to "$primitiveSelections",
+        "openHintGateSelected" to "$gateSelections",
+        "openHintClauseIndexAdmitted" to "$clauseIndexesAdmitted",
+        "openHintClauseIndexDeclined" to "$clauseIndexesDeclined",
+        "openHintClauseConsulted" to "$clauseConsultations",
+        "openHintClauseSelected" to "$clauseSelections",
+        "openHintClauseDeclined" to "$clauseDeclines",
     )
 }
