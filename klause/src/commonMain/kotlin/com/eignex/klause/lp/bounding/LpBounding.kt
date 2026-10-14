@@ -586,7 +586,7 @@ internal fun LpEngine.sparseSafePrune(
             nodeDualCertificate(
                 boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
                 eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
-                onObjectiveCertificate = if (canFix) { { objectiveCertificate = it } } else null,
+                onAdditionalCertificate = if (canFix) { { objectiveCertificate = it } } else null,
             ),
         ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.

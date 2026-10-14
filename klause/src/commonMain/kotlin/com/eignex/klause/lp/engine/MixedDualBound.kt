@@ -11,7 +11,7 @@ internal fun nodeDualCertificate(
     cancellation: Cancellation = Cancellation.Never,
     observer: LpCertificationObserver? = null,
     eliminateContinuousObjective: Boolean = false,
-    onObjectiveCertificate: ((LpDeductionCertificate) -> Unit)? = null,
+    onAdditionalCertificate: ((LpDeductionCertificate) -> Unit)? = null,
 ): LpDeductionCertificate? {
     if (!model.hasContinuous) return integerCertify(model, duals, observer = observer)
     val meter = MixedCertificateMeter(cancellation)
@@ -49,7 +49,7 @@ internal fun nodeDualCertificate(
     } else {
         null
     }
-    val objectiveCertificate = if (onObjectiveCertificate != null && certificate != null && rows != null) {
+    val objectiveCertificate = if (onAdditionalCertificate != null && certificate != null && rows != null) {
         try {
             meter.attempt(observer, "OBJECTIVE_EXPRESSION") {
                 objectiveExpressionCertificate(model, rows.single(), meter)
@@ -60,11 +60,27 @@ internal fun nodeDualCertificate(
     } else {
         null
     }
-    val accepted = fixingCertificate ?: certificate
+    val primary = fixingCertificate ?: certificate
+    val accepted = if (primary != null && objectiveCertificate != null) {
+        try {
+            meter.attempt(observer, "OBJECTIVE_SELECT") {
+                if (meter.less(primary.exactObjectiveBound(), objectiveCertificate.exactObjectiveBound())) {
+                    objectiveCertificate
+                } else {
+                    primary
+                }
+            }
+        } catch (_: LpProjectionStop) {
+            primary
+        }
+    } else {
+        primary
+    }
+    val additional = if (accepted === objectiveCertificate) primary else objectiveCertificate
     observer?.observe(LpCertifier.INTEGER, accepted != null, LpCertifierCost.Metered(meter.work))
     if (cancellation()) return null
-    if (objectiveCertificate != null && rows != null) {
-        onObjectiveCertificate?.invoke(IntegralObjectiveCertificate(objectiveCertificate, rows))
+    if (additional != null && rows != null) {
+        onAdditionalCertificate?.invoke(IntegralObjectiveCertificate(additional, rows))
     }
     return if (accepted != null && rows != null) IntegralObjectiveCertificate(accepted, rows) else accepted
 }
@@ -342,6 +358,13 @@ private class MixedCertificateMeter(private val cancellation: Cancellation) {
         val words = (bits.toLong() + 63L) / 64L
         charge(1L + words * words, 64L + (bits.toLong() + 7L) / 4L, matrix = false)
         return value
+    }
+
+    fun less(left: BigFraction, right: BigFraction): Boolean {
+        val a = read(left)
+        val b = read(right)
+        charge(16L, 128L, matrix = false)
+        return a < b
     }
 
     fun add(left: BigFraction, right: BigFraction): BigFraction = read(read(left) + read(right))
