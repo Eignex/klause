@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
@@ -279,8 +280,11 @@ class EncoderTest {
 
     @Test
     fun `bounded fractional rows admit their retained finite and arithmetic peers`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(
-            Linear(intArrayOf(0), doubleArrayOf(0.5), intArrayOf(), doubleArrayOf(), LinearOp.EQ, 0.5),
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(
+            ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(0.5), intArrayOf(), doubleArrayOf(),
+                LinearOp.GE, 0.5),
+            ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(0.5), intArrayOf(), doubleArrayOf(),
+                LinearOp.LE, 0.5),
         ))
         val prepared = source.prepareExecutionPlan()
         val plan = assertNotNull(prepared.componentPlan)

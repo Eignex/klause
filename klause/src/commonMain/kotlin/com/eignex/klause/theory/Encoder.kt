@@ -90,7 +90,9 @@ class Encoder(
         if (integerConditions.isEmpty() && booleanConditions.isEmpty()) return this
         return Encoder(support,
             integerConditions.map { requireNotNull(mapping.int(it)) { "removed encoding condition" } },
-            booleanConditions.mapKeys { requireNotNull(mapping.bool(it.key)) { "removed encoding condition" } }, installer)
+            booleanConditions.mapKeys { requireNotNull(mapping.bool(it.key)) { "removed encoding condition" } },
+            installer,
+        )
     }
 
     /** Whether this descriptor enforces the unconditioned source relation. */
