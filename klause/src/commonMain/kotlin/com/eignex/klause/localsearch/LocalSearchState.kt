@@ -17,6 +17,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
@@ -27,6 +28,8 @@ import com.eignex.klause.util.ExactIntegerSum
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.toDouble
 import kotlin.random.Random
 
 /** Initial weight for factors the model declared implied (redundant / symmetry-breaking). An
@@ -1177,7 +1180,8 @@ class LocalSearchState private constructor(
         val oldCost = cost
         val oldBestCost = bestCostSeen
         val oldTracking = activityTracking
-        val oldObjective = if (objective != null && objective !is LinearObjective) {
+        val oldExactObjective = (objective as? FunctionalObjective)?.evaluateExact(assignment)
+        val oldObjective = if (objective != null && objective !is LinearObjective && objective !is FunctionalObjective) {
             objective.evaluate(assignment)
         } else {
             0.0
@@ -1218,6 +1222,7 @@ class LocalSearchState private constructor(
             val weighted = if (weights.allocated) weightedDegreeDelta(checkNotNull(degBefore)) else delta.toDouble()
             val objectiveDelta = when (objective) {
                 is LinearObjective -> probeLinearObjectiveDelta(objective)
+                is FunctionalObjective -> (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble()
                 null -> 0.0
                 else -> objective.evaluate(assignment) - oldObjective
             }
