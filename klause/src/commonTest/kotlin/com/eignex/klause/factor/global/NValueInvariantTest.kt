@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -632,8 +633,7 @@ class NValueInvariantTest {
                 Clause(intArrayOf(Lit.make(5, false), Lit.make(3, true))),
                 Clause(intArrayOf(Lit.make(5, false), Lit.make(4, true))),
                 Clause(intArrayOf(Lit.make(5, true), Lit.make(3, false), Lit.make(4, false))),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(5, true))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(5, false))),
+                Xor(intArrayOf(Lit.make(2, true), Lit.make(5, true)), 1),
             ),
         )
         val state = LocalSearchState(LocalSearchModel.open(p), Random(3))

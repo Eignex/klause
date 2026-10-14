@@ -2,6 +2,7 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -49,6 +50,7 @@ internal class NValueClauseCompletion(
                     factor.literals.map(::repair).filterNotNull().distinct()
                 }
                 is ReifiedLinear -> channelRepairs(factor)
+                is Xor -> xorRepairs(factor)
                 else -> emptyList()
             }
             if (choices.size != 1) continue
@@ -106,6 +108,20 @@ internal class NValueClauseCompletion(
             Move.BoolFlip(row.auxBoolVar)
         } else null
         return listOfNotNull(integer, indicator)
+    }
+
+    private fun xorRepairs(factor: Xor): List<Move> {
+        var parity = 0
+        val odd = IntHashSet()
+        for (literal in factor.literals) {
+            if (holds(literal)) parity = parity xor 1
+            val b = Lit.variable(literal)
+            if (!odd.add(b)) odd.remove(b)
+        }
+        if (parity == factor.targetParity) return emptyList()
+        return factor.boolVars.filter { it in odd }.map {
+            repair(Lit.make(it, !assignment.boolValue(it)))
+        }.filterNotNull().distinct()
     }
 
     private fun predicateRepair(row: ReifiedLinear, desired: Boolean): Move.IntSet? {
@@ -179,7 +195,9 @@ internal class NValueClauseCompletion(
     private fun enqueueFactor(fid: Int) {
         if (pending.size >= MAX_FACTOR_VISITS) return
         val factor = state.problem.factors[fid]
-        if (factor is Clause || (factor is ReifiedLinear && predicateValue(factor) != null)) pending += fid
+        if (factor is Clause || factor is Xor ||
+            (factor is ReifiedLinear && predicateValue(factor) != null)
+        ) pending += fid
     }
 
     private fun holds(literal: Int): Boolean = Lit.evaluate(literal, assignment.boolValue(Lit.variable(literal)))
