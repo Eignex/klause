@@ -159,6 +159,7 @@ object PresolvePipeline {
         // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
         // bake would reach. Coupled wide columns can feed repeated bound narrowing; an isolated
         // wide output with bounded integer inputs uses the ordinary bake instead.
+        val sourceProjections = projections?.forEngineView(sourceProblem)
         val wideCoupling = needsWideDomainLp(sourceProblem)
         val rootInfeasible = if (!prepared.infeasible && wideCoupling) {
             lpRootInfeasibleReporting(
@@ -168,6 +169,7 @@ object PresolvePipeline {
                 preBakeSlice(cancellation, presolveBudget),
                 zeroObjectivePricing,
                 randomSeed,
+                projections = sourceProjections,
             )
         } else {
             LpRootInfeasibleResult(infeasible = false, stats = LpStats())
@@ -202,6 +204,7 @@ object PresolvePipeline {
                 zeroObjectivePricing,
                 randomSeed,
                 minimumSpan = sourceProblem.settings.largeSpanThreshold,
+                projections = sourceProjections,
             )
         } else {
             LpRootBoundsResult(sourceProblem, LpStats())

@@ -53,6 +53,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
@@ -101,10 +102,13 @@ internal class LpEngine(
     internal val sink: SolveStatsSink,
     internal val solveContext: LpSolveContext = LpSolveContext.Production,
     private val deferred: Boolean = false,
+    private val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ) : AutoCloseable {
+    init { projections?.requireSource(problem) }
+
     private var closed = false
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
-        if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) {
+        if (projections?.builtInRelaxation == false) {
             CpToLpRelaxation(problem, objective, realResidual = true, projections = null)
         } else null
     }
@@ -163,6 +167,7 @@ internal class LpEngine(
             ),
             sink,
             solveContext,
+            projections = projections,
         )
     }
 
@@ -229,7 +234,7 @@ internal class LpEngine(
                 suppressedHullFactors = suppressedHullFactors,
                 auxiliarySources = auxiliarySources,
                 deferred = deferred,
-                projections = (problem as? BakedProblem)?.factorProjections,
+                projections = projections,
             )
         } else {
             null
