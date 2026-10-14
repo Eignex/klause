@@ -3,9 +3,18 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -21,6 +30,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class PreparedSearchRegistrationTest {
@@ -89,6 +99,59 @@ class PreparedSearchRegistrationTest {
         search.close()
 
         assertEquals(listOf(1, 0), closed)
+    }
+
+    @Test
+    fun `a selected inert clause is checked without reinstalling default deduction`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The original clause is checked at the complete point.") { NoPropagator }
+        })
+        val ownership = source.componentPlan(providers.prepare(source), preferFinite = true)
+        val prepared = PreparedSearchComponents(ownership, source, emptyMap())
+
+        for (value in listOf(false, true)) prepared.open().use { search ->
+            assertIs<ComponentResult.Consistent>(search.session.initialize())
+            assertNull(search.session.boolValue(0))
+            assertIs<ComponentResult.Consistent>(search.session.push(SearchDecision.Bool(Lit.make(0, value))))
+
+            if (value) assertIs<ComponentCheck.Feasible>(search.session.check())
+            else assertIs<ComponentCheck.Infeasible>(search.session.check())
+        }
+    }
+
+    @Test
+    fun `prepared openings keep mutable custom deduction private`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 1))))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) {
+                object : Propagator {
+                    private var owner: PropagationState? = null
+                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                        if (owner == null) owner = state
+                        check(owner === state) { "mutable deduction belongs to one live state" }
+                        return true
+                    }
+                }
+            }
+        })
+        val ownership = source.componentPlan(providers.prepare(source), preferFinite = true)
+        val prepared = PreparedSearchComponents(ownership, source, emptyMap())
+
+        prepared.open().use { first ->
+            assertIs<ComponentResult.Consistent>(first.session.initialize())
+            assertIs<ComponentResult.Consistent>(first.session.push(SearchDecision.Bool(0)))
+            prepared.open().use { sibling ->
+                assertIs<ComponentResult.Consistent>(sibling.session.initialize())
+                assertIs<ComponentResult.Consistent>(sibling.session.push(SearchDecision.Bool(1)))
+                assertIs<ComponentCheck.Feasible>(sibling.session.check())
+            }
+
+            assertIs<ComponentCheck.Feasible>(first.session.check())
+            assertEquals(true, first.session.boolValue(0))
+        }
+
     }
 
     @Test

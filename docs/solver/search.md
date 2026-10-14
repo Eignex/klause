@@ -120,7 +120,7 @@ probe-count scope and cooperative deadline limits.
 
 [PropagationSession](../../klause/src/commonMain/kotlin/com/eignex/klause/propagation/PropagationSession.kt)
 owns the finite-domain trail and fixpoint. Sessions over one immutable model can share
-its propagation projection and occurrence indexes. Incremental payloads, scratch arrays,
+built-in stateless propagation projections and occurrence indexes. Incremental payloads, scratch arrays,
 watchers and failure contexts belong to each state. Failure clauses and premise-variable
 sets use separate state storage, leaving reversible payloads intact; each fire clears
 its previous failure, and undo discards pending failure context. The native SAT lane
@@ -484,3 +484,9 @@ without changing coordinate ownership. A factor rewrite reselects providers befo
 constructing the compact CP view. Complete arithmetic still owns its original
 source predicates and exact certificates; a selected finite relaxation is a sound
 bounding view rather than source-completion authority.
+
+Prepared CP registrations reuse built-in stateless projection data and open custom
+mutable deduction mechanisms separately for each session. A clause assigned to a
+custom CP projection is omitted from the shared default clause propagator. The
+Boolean peer retains canonical Boolean coordinates and branching; complete point
+checks retain the clause's original source authority when selected filtering is inert.
