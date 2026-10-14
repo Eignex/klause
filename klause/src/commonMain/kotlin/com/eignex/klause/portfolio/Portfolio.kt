@@ -929,7 +929,7 @@ class Portfolio(
                     if (work > 0L) trialSearchWork[arm] += minOf(work, trialWorkLimit - trialSearchWork[arm])
                 }
             }
-            if (!unproductiveTrial && !workers[arm].auxiliaryProof) {
+            if ((!unproductiveTrial || claim.probing) && !workers[arm].auxiliaryProof) {
                 val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
                 bandit.update(arm, reward, weight)
                 families.record(policyFamily(arm), progressed = reward > 0.0, plateau = improving)
