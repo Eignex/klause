@@ -30,7 +30,7 @@ for index, row in enumerate(json.loads((out / "request.json").read_text())):
     values = [int(value) for value in witness.findtext("values").split()]
     assert len(names) == len(values) and len(set(names)) == len(names)
     assignment = dict(zip(names, values))
-    for mode in ["default", "source-pins", "native-pins", "no-sat-presolve", "expanded-negative-tables"]:
+    for mode in ["default", "source-pins", "no-model-presolve", "keep-all", "no-probing", "no-substitution"]:
         callbacks = namespace["read_model"](str(source))
         model = callbacks.cpm_model
         assert {var.id for var in callbacks.cpm_variables} == set(assignment)
@@ -55,7 +55,12 @@ for index, row in enumerate(json.loads((out / "request.json").read_text())):
                 if var in assignment:
                     solver.ort_model.add(native == assignment[var])
         (out / f"{index}-{mode}.cpmodel").write_text(str(solver.ort_model.proto))
-        options = {"cp_model_use_sat_presolve": False} if mode == "no-sat-presolve" else {}
+        options = {
+            "no-model-presolve": {"cp_model_presolve": False},
+            "keep-all": {"keep_all_feasible_solutions_in_presolve": True},
+            "no-probing": {"cp_model_probing_level": 0},
+            "no-substitution": {"presolve_substitution_level": 0},
+        }.get(mode, {})
         solved = solver.solve(time_limit=10, num_workers=1, random_seed=1, log_search_progress=True, **options)
         receipt = {
             "index": index, "problem": row["problem"], "sourceSha256": row["sourceSha256"], "mode": mode,
