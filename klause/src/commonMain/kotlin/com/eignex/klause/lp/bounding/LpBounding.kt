@@ -741,7 +741,9 @@ private fun LpEngine.applyMixedRowBounds(
         else narrowedRowColumns(relaxation, session, cancellation)
     val projected = solveContext.certificationPolicy.acceptNullable(
         LpCertifier.INTEGER,
-        mixedRowBounds(relaxation.model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), meter, affectedColumns),
+        mixedRowBounds(
+            relaxation.model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), meter, affectedColumns,
+        ),
     ).orEmpty()
     noteNodeOverhead(meter.work - initialWork)
     return observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
