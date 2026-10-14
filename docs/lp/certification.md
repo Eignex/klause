@@ -108,8 +108,8 @@ lattice when a declared equality eliminates it into an integral affine expressio
 The bounded check considers at most eight defining equalities, verifies every
 remaining coefficient and constant in minimized source units, and includes column
 origins, objective scale and the external constant. Inequalities, fractional
-expressions and logical sides narrowed away from their declared equality cannot
-supply this lattice. Its defining row remains a premise even with zero dual
+expressions, separately scoped logical sides and sides narrowed away from their
+declared equality cannot supply this lattice. Its defining row remains a premise even with zero dual
 weight. The lattice authorizes strict integer cutoffs and equality pruning without
 changing continuous column declarations or fixing those coordinates. Optional
 lattice checking shares the certificate allowance; a decline preserves a completed
