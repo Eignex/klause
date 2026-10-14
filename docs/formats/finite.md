@@ -73,3 +73,9 @@ force each penalty false when any source literal is true, so every feasible
 lowered point carries the exact original soft-clause cost. Nonuniform weighted objectives retain relaxation
 variables for their soft clauses. A unit also retains that encoding if folding its
 cost would overflow a coefficient or constant. Empty soft clauses contribute fixed cost.
+
+Lowering retains each explicit penalty's exact Boolean definition in
+[WcnfProblem.boolFolds](../../klause/src/commonMain/kotlin/com/eignex/klause/formats/dimacs/DimacsDecoder.kt):
+the conjunction of the complemented source literals. Consumers can use this metadata
+with the shared Boolean definition mechanisms; the equivalence clauses remain the
+authority for feasible source costs.

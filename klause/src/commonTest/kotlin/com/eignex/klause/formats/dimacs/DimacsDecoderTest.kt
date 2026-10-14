@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.dimacs
 
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.propagate
@@ -8,8 +9,49 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 class DimacsDecoderTest {
+    @Test
+    fun `wide unit penalty definitions retain exact feasible cost`() {
+        val decoded = Dimacs.parseWcnf("9007199254740993 1 0\n7 -2 0\n").toProblem()
+        val sweep = assertNotNull(DefinitionalSweep.infer(decoded.problem, boolFolds = decoded.boolFolds))
+        val assignment = Assignment(decoded.problem.numBoolVars, 0)
+        assignment.setBool(1, true)
+
+        sweep.sweep(assignment, emptyArray(), decoded.problem.factors)
+
+        assertEquals(9007199254741000L, decoded.objective.toLinearObjective().evaluateLong(assignment))
+    }
+
+    @Test
+    fun `penalty definitions preserve original costs across weighted and hard clauses`() {
+        for (text in listOf(
+            "3 1 0\n7 -2 0\n",
+            "h 1 -2 0\n3 1 -2 0\n7 -1 2 0\n5 -1 0\n2 0\n",
+        )) {
+            val decoded = Dimacs.parseWcnf(text).toProblem()
+            val sweep = assertNotNull(DefinitionalSweep.infer(decoded.problem, boolFolds = decoded.boolFolds))
+            val objective = decoded.objective.toLinearObjective()
+            val assignment = Assignment(decoded.problem.numBoolVars, 0)
+            for (bits in 0..3) {
+                val first = bits and 1 != 0
+                val second = bits and 2 != 0
+                assignment.setBool(0, first)
+                assignment.setBool(1, second)
+                sweep.sweep(assignment, emptyArray(), decoded.problem.factors)
+                val expected = if (text.startsWith("h")) {
+                    (if (!first && second) 3L else 0L) +
+                        (if (first && !second) 7L else 0L) + (if (first) 5L else 0L) + 2L
+                } else {
+                    (if (!first) 3L else 0L) + (if (second) 7L else 0L)
+                }
+
+                assertEquals(expected, objective.evaluateLong(assignment))
+            }
+        }
+    }
+
     @Test
     fun `unit costs preserve both polarities and repeated clauses`() {
         val decoded = Dimacs.parseWcnf("2 1 0\n2 -1 0\n2 1 0\n2 -2 0\n4 0\n").toProblem()

@@ -641,6 +641,7 @@ internal object Suites {
         format = Format.WCNF
         license = "internal"
         vendored("maxsat-tiny", Category.OPTIMIZATION, Expected.Opt(1L))
+        vendored("weighted-penalty-complements", Category.OPTIMIZATION, Expected.Opt(5L))
     }
 
     private val opbCore = suite("opb-core", "Curated pseudo-Boolean OPB") {

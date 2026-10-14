@@ -187,3 +187,8 @@ Source SHA-256 is
 `ab64d949341580bf5ea6c556e6d708b2285f40593f0de49b881f15869aa4d88e`;
 fixture SHA-256 is
 `e8353427783116d2980f3b0c05579d493fb072e92c18d38008fec458c3f840f7`.
+
+The self-authored [weighted penalty complement fixture](../../klause-bench/smoke-corpus/dimacs/weighted-penalty-complements.wcnf)
+in `wcnf-core` combines nonuniform unit/nonunit costs, a hard clause with repeated
+literals, a source alias and a tautological soft clause. Its exact optimum is 5
+at `(x1, x2, x3) = (1, 0, 1)`.
