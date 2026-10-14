@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -13,8 +14,34 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 class RepairChainsTest {
+
+    @Test
+    fun `clause repair ranking includes maintained Boolean consequences`() {
+        val problem = Problem(5, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+        ))
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+        )))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = sweep.network(0, 5)
+        sweep.sweep(state.assignment, state.rootDomains)
+        state.recompute()
+        val proposals = MoveSink().also { it.setInvariants(state.invariants) }
+
+        val picked = state.pickChainRepair(0, IntHashSet(), proposals)
+
+        assertEquals(Move.BoolFlip(0), picked)
+        state.apply(assertNotNull(picked))
+        assertEquals(0L, state.cost)
+    }
 
     @Test
     fun `chain repair scoring matches clause deltas after real moves`() {

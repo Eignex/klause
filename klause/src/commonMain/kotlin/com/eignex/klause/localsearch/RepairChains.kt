@@ -281,7 +281,7 @@ internal fun LocalSearchState.pickChainRepair(target: Int, pinnedSlots: IntHashS
 
             else -> if (slotOf(m) in pinnedSlots) continue@outer
         }
-        val d = if (m is Move.BoolFlip && repairChainClauseOnly) {
+        val d = if (m is Move.BoolFlip && repairChainClauseOnly && invariants?.readsBool(m.varId) != true) {
             boolBreakCount[m.varId].toLong() - boolMakeCount[m.varId]
         } else {
             netDelta(m)
