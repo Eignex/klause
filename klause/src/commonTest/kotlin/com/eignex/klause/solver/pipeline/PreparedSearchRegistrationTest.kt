@@ -151,7 +151,6 @@ class PreparedSearchRegistrationTest {
             assertIs<ComponentCheck.Feasible>(first.session.check())
             assertEquals(true, first.session.boolValue(0))
         }
-
     }
 
     @Test

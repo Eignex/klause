@@ -645,6 +645,11 @@ internal class CpToLpRelaxation(
 
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private var cumulativeRelaxation: CumulativeRelaxation? = null
+    private val builtInFamilySource: Problem by lazy {
+        if (projections?.builtInRelaxation != false) problem else problem.withFactors(
+            problem.factors.filterIndexed { id, _ -> projections.usesBuiltInRelaxation(id) }.toTypedArray(),
+        )
+    }
 
     /**
      * Whether this relaxer emits no row whose coefficients depend on the live domains, the
@@ -667,7 +672,7 @@ internal class CpToLpRelaxation(
     fun preparation(): Iterator<Unit> = sequence {
         if (cumulative || diffn) {
             val owner = CumulativeRelaxation(
-                problem, includeCumulative = cumulative, includeDiffn = diffn, deferred = true,
+                builtInFamilySource, includeCumulative = cumulative, includeDiffn = diffn, deferred = true,
             )
             owner.preparation().forEach { yield(Unit) }
             cumulativeRelaxation = owner.takeIf { it.applicable }
@@ -778,7 +783,7 @@ internal class CpToLpRelaxation(
     ): LpRelaxation = Assembler(domains, cancellation = cancellation).assemble(extraCuts)
 
     private val timeIndexedViews by lazy {
-        if (cumulativeTimeIndexed && !objectiveCone) schedulingViews(problem) else emptyList()
+        if (cumulativeTimeIndexed && !objectiveCone) schedulingViews(builtInFamilySource) else emptyList()
     }
 
     val emissionRegions: List<LpEmissionRegion> by lazy {
@@ -787,7 +792,9 @@ internal class CpToLpRelaxation(
             if (!objectiveCone) {
                 if (circuitArcs) {
                     for (id in problem.factors.indices) {
-                        if (problem.factors[id] is Circuit) add(LpEmissionRegion(LpEmissionKind.CIRCUIT, id))
+                        if (problem.factors[id] is Circuit && projections?.usesBuiltInRelaxation(id) != false) {
+                            add(LpEmissionRegion(LpEmissionKind.CIRCUIT, id))
+                        }
                     }
                 }
                 cumulativeRelaxation?.plans?.indices?.forEach {
@@ -1229,7 +1236,7 @@ internal class CpToLpRelaxation(
                         checkCancellation()
                         currentFactorId = factorId
                         currentEmissionRoute = 1L
-                        if (factor is Circuit) {
+                        if (factor is Circuit && projections?.usesBuiltInRelaxation(factorId) != false) {
                             if (factor.subcircuit) buildSubcircuitArcs(factor) else buildCircuitArcs(factor)
                         }
                         attributeRows(factorId)
@@ -1419,6 +1426,7 @@ internal class CpToLpRelaxation(
         private fun buildBooleanRlt() {
             var rltColumns = 0
             for ((factorId, f) in problem.factors.withIndex()) {
+                if (projections?.usesBuiltInRelaxation(factorId) == false) continue
                 currentFactorId = factorId
                 currentEmissionRoute = 2L
                 if (rltColumns >= MAX_RLT_COLUMNS) break
