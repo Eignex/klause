@@ -314,7 +314,12 @@ The prefix recurrence `p(i, k) = p(i-1, k) or (p(i-1, k-1) and literal(i))` uses
 clauses in both directions, so a frontier equals the source count predicate. Prefix
 entries checkpoint in batches of 256; completed clauses remain private until the
 whole core update finishes. Clausal source models retain native SAT propagation
-through these private frontiers. Core weight updates publish their floor only after completion.
+through these private frontiers. A completed assumption refutation raises the exact floor before private frontier
+construction. That refutation proves at least one selected residual term is true;
+its minimum weight therefore strengthens the source floor independently of the
+next encoding. Cancellation retains this completed bound while unfinished prefix
+clauses and weight transitions stay private. Query construction waits for the
+whole transformation; an existing checked point equal to the floor needs no further encoding.
 Uncancelled residual weights stay active. This identity covers overlapping cores and
 cores containing thresholds from earlier rounds. Production core searches assume
 all positive residual terms together, so unavoidable violations can establish a
@@ -332,7 +337,8 @@ objective range beyond exact binary64 integers therefore withhold source termina
 proof certificates while retaining checked points and downward-rounded shared
 floors. Their direct retained handle still compares its exact objective and bound.
 Cancellation publishes neither a partial encoding
-nor an unfinished refutation. Core encoding checkpoints retain their cursor, and
+nor an unfinished refutation; a completed refutation retains its floor even when
+subsequent encoding is interrupted. Core encoding checkpoints retain their cursor, and
 objective and core encoding visits, augmented-root construction and propagation
 charge the core arm at the propagation work rate. Query construction receives the
 current segment deadline and remaining work allowance; native propagation polls

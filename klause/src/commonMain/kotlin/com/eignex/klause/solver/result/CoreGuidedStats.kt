@@ -5,9 +5,9 @@ import com.eignex.klause.util.compareTo
 
 /** Core-search observations in the invocation's original objective units; telemetry carries no proof authority. */
 data class CoreGuidedStats(
-    /** Completed core transformations. */
+    /** Completed core refutations. */
     val cores: Long = 0L,
-    /** Largest completed core, including residual threshold terms. */
+    /** Largest refuted core, including residual threshold terms. */
     val largestCore: Int = 0,
     /** Exact accumulated objective floor, absent when no core worker ran. */
     val lowerBound: BigInt? = null,
