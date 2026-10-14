@@ -175,6 +175,13 @@ internal object Xcsp3CpSatReference {
         val result = when {
             v == null -> undecided(cmd, stdout, "no JSON verdict ($error)")
             v.exit == "ERROR" -> undecided(cmd, stdout, v.error ?: "unknown")
+            v.exit in setOf("OPTIMAL", "FEASIBLE", "UNSATISFIABLE") && v.cpModelPresolve != false ->
+                undecided(cmd, stdout, "source-preserving native settings are missing")
+            v.exit in setOf("OPTIMAL", "FEASIBLE") && Xcsp3SourceValidation.candidate(stdout) == null ->
+                undecided(cmd, stdout, "complete source witness is missing")
+            v.exit in setOf("OPTIMAL", "FEASIBLE") && v.maximize != null &&
+                v.exactObjective?.toBigIntegerOrNull() == null ->
+                undecided(cmd, stdout, "exact integer objective is missing")
             else -> decided(cmd, stdout, v)
         }
         return result.copy(stats = result.stats + ("referenceVersion" to identity))

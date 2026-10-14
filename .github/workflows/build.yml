@@ -31,6 +31,11 @@ jobs:
           python3 -m pip install -r klause-bench/tools/requirements-source-checks.txt
           python3 -m unittest discover -s klause-bench/tools -p 'test_verify*source_results.py'
 
+      - name: Test XCSP3 reference importer
+        run: |
+          docker build -t klause-xcsp3-cpsat:source-preserving-v2 klause-bench/xcsp3-cpsat
+          docker run --rm --entrypoint python -v "$PWD/klause-bench/xcsp3-cpsat:/tests:ro" -w /tests klause-xcsp3-cpsat:source-preserving-v2 test_solve.py
+
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:

@@ -335,6 +335,44 @@ and retain installed-build provenance when supported by the selected revision.
 XCSP3 references accept only `cp-sat`; `solve-one backend=reference solver=cp-sat`
 uses the CPMpy importer and OR-Tools engine. Unsupported solver names are rejected
 before invocation and cannot supply a reference verdict under another engine's label.
+The `xcsp3-source-preserving-v2` policy uses the pinned packages in
+[`xcsp3-cpsat/requirements.txt`](xcsp3-cpsat/requirements.txt) and the
+`klause-xcsp3-cpsat:source-preserving-v2` image. Native CP-SAT model presolve is
+disabled for every source: it can falsely refute a source-preserved model even when
+the same encoded model accepts direct source-variable pins. Parsing, source
+domains, constraints, objectives and native search remain authoritative.
+The image digest, importer policy, worker count and solver seed distinguish cache
+entries. Records retain effective `referenceSeed`, `referenceWorkers` and
+`cpModelPresolve` settings, complete original-variable `finalWitness`, raw output
+identity and `exactObjective`. Emitted `o` and `v` lines precede the final JSON
+verdict. Feasible claims without a complete witness and proofs with incompatible
+native settings are undecided. Native optimum/refutation statuses remain reference
+claims; a source-checked witness certifies feasibility and its objective only.
+
+Build and inspect an owned reference image through the lab client on a pinned
+revision, on the host providing Docker:
+
+```sh
+./deploy/lab profile com.eignex.klause.bench.profile.Xcsp3ReferenceImage <ref> "build XCSP3 reference image" lab 1200 build
+```
+
+Without `build`, that profile inspects the legacy `latest` image. It retains the
+image identity, installed importer/parser bytes, dependency versions and installed
+bench provenance. Importer behavior regressions run in the ordinary build gate;
+they cover matrix axes, weighted expression sums, contradictions, unconstrained
+source variables and objectives beyond binary64 precision.
+
+`bench.profile.Xcsp3ReferenceReplay` accepts `request64=<base64 JSON array>` of at
+most sixteen `{suite,problem,sourceSha256,witness,objective}` entries. It resolves
+original XCSP sources through the catalog and requires their hashes to match.
+The default diagnoses the legacy image; `image=current` diagnoses the maintained
+image. It retains original bytes, parsed-witness violations, exact objective,
+native model text, runtime identities and solver outcomes under ordinary, pinned
+and isolated presolve settings. `mode=reduce` weakens the legacy native diagnostic
+model while retaining a supplied witness, with at most 120 bounded solver calls;
+its reduced models are diagnostic derivatives, never original-source reference
+rows or independently checked proofs. Independently validate supplied and newly
+returned witnesses against the original XML with the source checker.
 Check failed, unsupported and missing cases before interpreting comparisons.
 Lab agreement and regression confirmation remain recorded-result evidence;
 [independent source validation](#source-validation) defines stronger checks.

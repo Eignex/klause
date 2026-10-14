@@ -62,6 +62,60 @@ class SolveTest(unittest.TestCase):
         self.assertEqual(5, result["objective"])
         self.assertTrue(result["maximize"])
 
+    def test_expression_sums_preserve_the_source_objective_and_witness(self):
+        xml = """<instance format="XCSP3" type="COP">
+          <variables><array id="x" size="[2]">0..2</array></variables>
+          <constraints><extension><list>x[]</list><conflicts>(0,1)(1,0)</conflicts></extension>
+            <sum><list>eq(x[0],0) eq(x[1],0)</list><coeffs>2 3</coeffs><condition>(ge,2)</condition></sum>
+          </constraints><objectives><maximize type="sum"><list>eq(x[0],2) eq(x[1],2)</list>
+            <coeffs>5 7</coeffs></maximize></objectives>
+        </instance>"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "expression-sum.xml"
+            path.write_text(xml)
+            result = solve(path, 1, 1)
+        self.assertEqual("OPTIMAL", result["exit"])
+        self.assertEqual("7", result["exactObjective"])
+        self.assertEqual({"x[0]": 0, "x[1]": 2}, result["witness"])
+
+    def test_contradictory_expression_sums_remain_infeasible(self):
+        xml = """<instance format="XCSP3" type="CSP">
+          <variables><var id="x">0..1</var></variables>
+          <constraints><sum><list>eq(x,0)</list><condition>(eq,1)</condition></sum>
+            <sum><list>eq(x,1)</list><condition>(eq,1)</condition></sum></constraints>
+        </instance>"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "contradictory.xml"
+            path.write_text(xml)
+            result = solve(path, 1, 1)
+        self.assertEqual("UNSATISFIABLE", result["exit"])
+        self.assertIsNone(result["witness"])
+
+    def test_witnesses_include_unconstrained_source_variables(self):
+        xml = """<instance format="XCSP3" type="CSP">
+          <variables><var id="x">1</var><var id="unused">4 9</var></variables>
+          <constraints><intension>eq(x,1)</intension></constraints>
+        </instance>"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "unconstrained.xml"
+            path.write_text(xml)
+            result = solve(path, 1, 1)
+        self.assertEqual("FEASIBLE", result["exit"])
+        self.assertEqual(1, result["witness"]["x"])
+        self.assertIn(result["witness"]["unused"], [4, 9])
+
+    def test_objective_retains_integers_beyond_binary64_precision(self):
+        xml = """<instance format="XCSP3" type="COP">
+          <variables><var id="x">0..1</var></variables>
+          <objectives><maximize type="sum"><list>x</list><coeffs>9007199254740993</coeffs></maximize></objectives>
+        </instance>"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "wide-objective.xml"
+            path.write_text(xml)
+            result = solve(path, 1, 1)
+        self.assertEqual("OPTIMAL", result["exit"])
+        self.assertEqual("9007199254740993", result["exactObjective"])
+
 
 if __name__ == "__main__":
     unittest.main()
