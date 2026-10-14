@@ -412,7 +412,8 @@ internal class WitnessProbe(
                         for (variable in variables) {
                             repeat(termCount + 1) { arithmetic.step() }
                             if (atom.polynomial.degree(variable) > MAX_WITNESS_DEGREE) continue
-                            // An original coordinate-degree bound limits optional proposals, not kernel representation limits.
+                            // An original coordinate-degree bound limits optional proposals,
+                            // not kernel representation limits.
                             val roots = roots(atom.polynomial, variable, point) ?: return null
                             for (root in roots) {
                                 if (exhausted) return null
@@ -423,7 +424,10 @@ internal class WitnessProbe(
                                 var score = 0
                                 for (comparison in formula.atoms) {
                                     arithmetic.step()
-                                    if (comparison.holds(algebraic.sign(algebraic.evaluate(comparison.polynomial, proposed)))) {
+                                    if (comparison.holds(
+                                            algebraic.sign(algebraic.evaluate(comparison.polynomial, proposed)),
+                                        )
+                                    ) {
                                         score++
                                     }
                                 }
