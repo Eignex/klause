@@ -11,6 +11,28 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `finite cancellation prioritizes rows changed by integral bounds`() {
+        val source = assertNotNull(LpBuilder().apply {
+            val z = addVar(0L, 1L)
+            val x = addVar(0L, 2L)
+            val first = addRealVar(0.0, 2.0, cost = 1.0)
+            val second = addRealVar(0.0, 4.0, cost = 1.0)
+            addRealRow(intArrayOf(z, first), doubleArrayOf(-0.5, 1.0), Relation.GE, 0.0)
+            addRealRow(intArrayOf(x, second), doubleArrayOf(-2.0, 1.0), Relation.GE, 0.0)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+        val model = assertNotNull(trail.state.toWorkingModel())
+        val additional = ArrayList<LpDeductionCertificate>()
+
+        assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0, 0.0),
+            onAdditionalCertificate = { additional.add(it) }))
+
+        assertTrue(additional.any { it.fixSteps(1, 1L, 0L) == 0L })
+    }
+
+    @Test
     fun `a supported continuous endpoint does not hide an integral fixing direction`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)
