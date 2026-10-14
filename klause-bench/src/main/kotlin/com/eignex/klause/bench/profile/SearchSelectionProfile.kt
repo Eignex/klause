@@ -104,7 +104,7 @@ internal object SearchSelectionProfile {
                     val initialized = session.initialize()
                     val run = session.openRun(parsed.model.numBoolVars, branchSelection = selection,
                         observer = object : SearchRunObserver {
-                            override fun onCommit(decision: SearchDecision, level: Int) {
+                            override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                                 choices += decision.toString()
                             }
                         })
