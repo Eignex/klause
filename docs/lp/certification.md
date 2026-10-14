@@ -81,13 +81,17 @@ cumulative allowances, with unchanged dimension and pivot caps. Nonzero objectiv
 retain closure continuation and their existing strict-refinement policy.
 
 Node deductions admit mixed structural columns under the retained exact authority.
-At the root, mixed-row feasibility certificates project `A*x + s = b` onto each
+Mixed-row feasibility certificates project `A*x + s = b` onto each
 integral structural coordinate by bounding every other contribution at its exact
 minimizing or maximizing endpoint. The target's own endpoint is excluded from the
 premises. Absent supporting sides decline that projection; a missing target side
 does not. Origins reconstruct source coordinates before integer rounding. A strict
 supporting endpoint excludes equality when the projected bound is integral.
-The pass builds a bounded sparse row view once per root query and retains only
+The root pass considers all mixed rows. During search it considers rows incident
+to Boolean pins or integer endpoints narrowed from their source declarations.
+Row selection and visits charge the containing ledger, and selected rows retain
+their complete support. An empty touched-column set needs no matrix scan.
+The pass builds a bounded sparse row view once per admitted query and retains only
 completed coordinate certificates. An exact comparison of the existing endpoint's
 row contribution with the residual skips division and source-coordinate reconstruction
 when the projection cannot tighten that endpoint. Strict equality retains the same
@@ -97,9 +101,9 @@ Cancellation discards unpublished projections; resource decline can retain compl
 ones. The consumer charges row work and rounding to the containing LP ledger.
 Each certificate retains its exact-state identity, row and endpoint support. Bound
 rollback, foreign state or objective change prevents reuse. Reusable integer reasons
-cite the row and every supporting side. A root consequence with unsupported
-continuous or logical scope is withheld from CP, whose root lifetime must cover
-every numerical premise. Continuous coordinates are
+cite the row and every supporting side. A consequence with unsupported
+continuous or logical scope is withheld from CP. The CP trail retracts deductions
+with their supporting branches. Continuous coordinates are
 never fixing targets. The `NODE_ROW_FIXING` phase records actual domain reductions
 separately from objective-relative fixing. This pass supplies no objective bound
 or source-completion claim and requires no additional numerical solve.
