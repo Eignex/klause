@@ -190,7 +190,52 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
     }
 
     override fun unimplementedCase(vararg objects: Any?): Any =
-        throw UnsupportedOperationException("expression sums or meta-constraints are outside direct-sum range checking")
+        decline("unsupported callback")
+
+    override fun buildCtrSum(id: String, trees: Array<XNode<XVarInteger>>, condition: Condition) {
+        checkExpressionSum(trees) { 1 }
+    }
+
+    override fun buildCtrSum(id: String, trees: Array<XNode<XVarInteger>>, coeffs: IntArray, condition: Condition) {
+        require(trees.size == coeffs.size)
+        checkExpressionSum(trees) { coeffs[it] }
+    }
+
+    override fun buildCtrSum(
+        id: String,
+        trees: Array<XNode<XVarInteger>>,
+        coeffs: Array<XVarInteger>,
+        condition: Condition,
+    ) {
+        require(trees.size == coeffs.size)
+        checkExpressionSum(trees) { assignment.getValue(coeffs[it].id) }
+    }
+
+    private fun checkExpressionSum(trees: Array<XNode<XVarInteger>>, coefficient: (Int) -> Int) {
+        var total = BigInteger.ZERO
+        for (i in trees.indices) {
+            val value = boundedExpression(trees[i])
+            check(trees[i], value)
+            val term = value * BigInteger.valueOf(coefficient(i).toLong())
+            // The pinned checker multiplies in Long before accumulating in BigInteger.
+            term.longValueExact()
+            total += term
+        }
+        integer(total, "expression sum")
+    }
+
+    private fun boundedExpression(tree: XNode<*>): BigInteger {
+        val operands = tree.sons.orEmpty().map { boundedExpression(it) }
+        if (tree.type.name == "ADD" || tree.type.name == "MUL") {
+            operands.fold(if (tree.type.name == "ADD") BigInteger.ZERO else BigInteger.ONE) { total, operand ->
+                val next = if (tree.type.name == "ADD") total + operand else total * operand
+                next.longValueExact()
+                next
+            }
+        }
+        if (tree.type.name == "DIST") (operands[0] - operands[1]).longValueExact()
+        return exact(tree).also { it.longValueExact() }
+    }
 
     override fun buildCtrSum(id: String, list: Array<XVarInteger>, condition: Condition) {
         checkSum(list) { 1 }

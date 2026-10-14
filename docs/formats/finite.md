@@ -58,6 +58,8 @@ output constraints remain authoritative during local-search definition maintenan
 
 The benchmark's opt-in XCSP source checker evaluates the final assignment against
 the original XML and exact source objective, independently of Klause lowering.
+Bounded expression sums audit exact terms and coefficients before the checker's
+fixed-width evaluation. Unsupported or overflowing arithmetic declines checking.
 Checked witnesses and reported proof claims remain distinct; supported syntax,
 record fields and the saved-output validation command are defined in the
 [benchmark validation contract](../../klause-bench/README.md#source-validation).

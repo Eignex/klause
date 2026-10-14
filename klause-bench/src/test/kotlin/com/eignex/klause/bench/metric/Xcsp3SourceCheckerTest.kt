@@ -312,12 +312,100 @@ class Xcsp3SourceCheckerTest {
     }
 
     @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "add(x,0) y||1 2|eq,3|valid",
+        "add(x,0) add(y,0)||1 2|eq,3|valid",
+        "eq(x,1) eq(y,2)|2 3|1 2|ge,5|valid",
+        "eq(x,1) eq(y,2)|2 3|0 2|ge,5|invalid",
+        "add(x,0) add(y,0)|c d|1 2|eq,0|valid",
+        "add(x,0) add(y,0)|c d|2 2|eq,0|invalid",
+        "add(x,0) add(y,0)|2x2|1 2|eq,6|valid",
+        "add(x,0) y||1 2|eq,c|invalid",
+        "add(x,0) y||1 1|eq,c|valid",
+        "add(x,0) y||1500000000 1500000000|le,0|unknown",
+        "add(x,0) y||-1073741824 -1073741824|ge,-2147483648|valid",
+        "add(x,0) y||1073741823 1073741824|le,2147483647|valid",
+        "mul(x,x) neg(mul(y,y))||1500000000 1500000000|eq,0|valid",
+        "mul(x,x) neg(mul(y,y))|5 5|1500000000 1500000000|eq,0|unknown",
+        "mul(x,x) neg(mul(y,y))|c c|2147483647 2147483647|eq,0|valid",
+        "mul(x,x) neg(mul(y,y))|c c|2147483647 2147483646|eq,0|unknown",
+        "mul(x,x,x) neg(mul(y,y,y))||1500000000 1500000000|eq,0|unknown",
+        "sub(mul(x,x,x),mul(x,x,x)) y||1500000000 0|eq,0|unknown",
+        "add(9223372036854775807,1,-9223372036854775807) y||0 0|eq,1|unknown",
+        "pow(x,2) y||0 0|eq,0|unknown",
+        "div(x,y) x||0 0|eq,0|unknown",
+    ])
+    fun `expression sums require bounded exact terms and a signed integer total`(
+        expressions: String,
+        coefficients: String?,
+        values: String,
+        condition: String,
+        status: String,
+    ) {
+        val model = File.createTempFile("xcsp-expression-sum-", ".xml")
+        try {
+            val coeffs = coefficients?.let { "<coeffs>$it</coeffs>" }.orEmpty()
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables>
+                    <var id="x">-2000000000..2147483647</var><var id="y">-2000000000..2147483647</var>
+                    <var id="c">2</var><var id="d">-1</var>
+                  </variables>
+                  <constraints><sum><list>$expressions</list>$coeffs<condition>($condition)</condition></sum></constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>x y c d</list><values>$values 2 -1</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals(status, checked.status, checked.reason)
+            if (status == "valid") assertNotNull(checked.checkedWitness) else assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "<block><sum><list>eq(x[0],1) eq(x[1],1)</list><condition>(eq,2)</condition></sum></block>|valid",
+        "<group><sum><list>eq(%0,1) eq(%1,1)</list><condition>(eq,2)</condition></sum>" +
+            "<args>x[0] x[1]</args></group>|valid",
+        "<slide><list>x[]</list><sum><list>eq(%0,1) eq(%1,1)</list>" +
+            "<condition>(eq,2)</condition></sum></slide>|valid",
+        "<group><sum><list>%0 %1</list><coeffs>%...</coeffs><condition>(eq,5)</condition></sum>" +
+            "<args>eq(x[0],1) eq(x[1],1) 2 3</args></group>|valid",
+        "<group><sum><list>%0 %1</list><condition>(eq,1)</condition></sum>" +
+            "<args>eq(x[0],1) eq(x[1],1)</args></group>|invalid",
+    ])
+    fun `expanded expression sums check every source row`(constraint: String, status: String) {
+        val model = File.createTempFile("xcsp-expanded-expression-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables><array id="x" size="[2]">0..1</array></variables>
+                  <constraints>$constraint</constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>x[0] x[1]</list><values>1 1</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals(status, checked.status, checked.reason)
+            if (status == "valid") assertNotNull(checked.checkedWitness) else assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = [
-        "<sum><list>add(x,0) y</list><condition>(eq,0)</condition></sum>",
-        "<sum><list>add(x,0) add(y,0)</list><condition>(eq,0)</condition></sum>",
         "<or><sum><list>x y</list><condition>(eq,0)</condition></sum><intension>eq(x,y)</intension></or>",
     ])
-    fun `expression sums and logical meta constraints remain unchecked`(constraint: String) {
+    fun `logical meta constraints remain unchecked`(constraint: String) {
         val model = File.createTempFile("xcsp-unsupported-range-", ".xml")
         try {
             model.writeText(
