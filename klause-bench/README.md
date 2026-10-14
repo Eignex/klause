@@ -337,10 +337,11 @@ uses the CPMpy importer and OR-Tools engine. Unsupported solver names are reject
 before invocation and cannot supply a reference verdict under another engine's label.
 The `xcsp3-source-preserving-v2` policy uses the pinned packages in
 [`xcsp3-cpsat/requirements.txt`](xcsp3-cpsat/requirements.txt) and the
-`klause-xcsp3-cpsat:source-preserving-v2` image. Native CP-SAT model presolve is
-disabled for every source: it can falsely refute a source-preserved model even when
-the same encoded model accepts direct source-variable pins. Parsing, source
-domains, constraints, objectives and native search remain authoritative.
+`klause-xcsp3-cpsat:source-preserving-v2` image. Negative extension tables encode each forbidden tuple as a disjunction of
+coordinate disequalities; wildcard coordinates contribute no comparison. This
+preserves every permitted source pair after unary exclusions and avoids the
+native negated-table conversion. Positive extension tables keep their native
+encoding. Native model presolve and search remain enabled.
 The image digest, importer policy, worker count and solver seed distinguish cache
 entries. Records retain effective `referenceSeed`, `referenceWorkers` and
 `cpModelPresolve` settings, complete original-variable `finalWitness`, raw output
