@@ -142,7 +142,8 @@ class ProductEncodingTest {
             assertEquals(listOf(0), model.finiteFactorIndices)
             assertEquals(source.numIntVars, model.finite.numIntVars)
             for (id in 0 until source.numIntVars) {
-                assertEquals(source.declaredIntDomains[id], model.finite.declaredIntDomains[id])
+                assertEquals(assertNotNull(source.declaredIntDomains.declaredOrNull(id)),
+                    assertNotNull(model.finite.declaredIntDomains.declaredOrNull(id)))
             }
             assertEquals(0, model.encodingAttributions.first().sourceFactorIndex)
             for (x in listOf(-1L, 0L, 1L, 3L)) for (y in listOf(-1L, 0L, 1L, 3L)) {
