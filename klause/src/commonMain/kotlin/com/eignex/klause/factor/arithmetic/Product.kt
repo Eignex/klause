@@ -21,9 +21,8 @@ import com.eignex.klause.util.plus
 import com.eignex.klause.util.unaryMinus
 
 /**
- * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
- * via an unsigned shift-and-add multiplier on absolute values, then conditionally negates the
- * product based on the operand sign bits.
+ * `a * b = result` over signed integer domains. Repeated operands and result aliases retain
+ * their source roles in finite propagation, local-search scoring and coordinate remapping.
  *
  * No payload: the product is recomputed in O(1) from the current assignment on each query.
  */

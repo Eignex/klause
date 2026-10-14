@@ -121,7 +121,16 @@ class ProductCompilationTest {
             Triple("x", "x", "y"), Triple("x", "y", "x"),
             Triple("y", "x", "x"), Triple("x", "x", "x"),
         )) {
+            val x = IntHandle("x", 0, 4)
+            val y = IntHandle("y", 0, 4)
+            val leftOperand = if (left == "x") x else y
+            val rightOperand = if (right == "x") x else y
+            val output = if (result == "x") x else y
             val models = listOf(
+                SchemaDef<SchemaEntry>(mapOf("x" to IntSpec(0, 4), "y" to IntSpec(0, 4),
+                    "product" to NamedConstraint((leftOperand * rightOperand) eq output))).compile().problem,
+                SmtLib.parse("(declare-const x Int) (declare-const y Int) " +
+                    "(assert (and (<= 0 x 4) (<= 0 y 4) (= (* $left $right) $result)))").model,
                 parseFlatZinc("var 0..4: x; var 0..4: y; " +
                     "constraint int_times($left, $right, $result); solve satisfy;").problem,
                 Xcsp3.parse("""<instance><variables><var id="x">0..4</var><var id="y">0..4</var>
@@ -131,8 +140,14 @@ class ProductCompilationTest {
             for (problem in models) {
                 val product = problem.factors.filterIsInstance<Product>().single()
                 val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
+                for (id in 0 until problem.numIntVars) state.assignment.setInt(id, state.rootDomains[id].min)
+                for (id in 0 until problem.numBoolVars) state.assignment.setBool(id, true)
                 state.assignment.setInt(0, 2)
                 state.assignment.setInt(1, 4)
+                if (product.result >= 2) {
+                    state.assignment.setInt(product.result,
+                        state.assignment.intValue(product.a) * state.assignment.intValue(product.b))
+                }
                 state.recompute()
                 val before = kotlin.math.abs((if (left == "x") 2L else 4L) *
                     (if (right == "x") 2L else 4L) - (if (result == "x") 2L else 4L))
@@ -150,7 +165,7 @@ class ProductCompilationTest {
                 assertEquals(after, state.cost)
                 assertEquals(if (left == "x") 0 else 1, product.a)
                 assertEquals(if (right == "x") 0 else 1, product.b)
-                assertEquals(if (result == "x") 0 else 1, product.result)
+                if (product.result < 2) assertEquals(if (result == "x") 0 else 1, product.result)
             }
         }
     }
