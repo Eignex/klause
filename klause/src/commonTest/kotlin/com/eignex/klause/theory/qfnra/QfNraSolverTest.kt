@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
@@ -13,10 +14,143 @@ import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
+
+    @Test
+    fun `coupled sector proposals move both coordinates from a zero product`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (>= (* x y) 1) (> x 0) (> y 0)))
+            (check-sat)
+        """.trimIndent())
+        val arithmetic = PolynomialArithmetic()
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic))
+
+        val assignment = assertIs<QfNraAssignment>(probe.coupled(
+            requireNotNull(formula.conjunctiveAtoms(arithmetic, 128)),
+            listOf(BigFraction.ZERO, BigFraction.ZERO), emptyMap(),
+        ))
+
+        assertEquals(BigFraction.ONE, assignment.realValue(0).rational)
+        assertEquals(BigFraction.ONE, assignment.realValue(1).rational)
+    }
+
+    @Test
+    fun `affine nullspace proposals preserve a relation while entering its positive interior`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (= (+ x y) 1) (> x 0) (> y 0) (> (* x y) 0)))
+            (check-sat)
+        """.trimIndent())
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount,
+        ))
+
+        val x = result.assignment.realValue(0)
+        val y = result.assignment.realValue(1)
+        assertEquals(1, algebraic.sign(x))
+        assertEquals(1, algebraic.sign(y))
+        assertEquals(BigFraction.ONE, algebraic.add(x, y).rational)
+        assertEquals(0L, result.stats.projectedPolynomials)
+    }
+
+    @Test
+    fun `coupled proposals cannot release a fixed zero coordinate`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (declare-const z Real)
+            (assert (and (>= (* x y) 1) (> y 0) (> z 0)))
+            (check-sat)
+        """.trimIndent())
+        val arithmetic = PolynomialArithmetic()
+        val fixed = mapOf(0 to BigFraction.ZERO)
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic, fixed)
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic))
+
+        val assignment = probe.coupled(requireNotNull(formula.conjunctiveAtoms(arithmetic, 128)),
+            List(3) { BigFraction.ZERO }, fixed)
+
+        assertNull(assignment)
+    }
+
+    @Test
+    fun `guarded affine equalities do not restrict another satisfying alternative`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (or (= (+ x y) 0) (= (+ x y) 2)) (> (* x y) 0) (> x 0) (> y 0)))
+            (check-sat)
+        """.trimIndent())
+
+        val result = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount,
+        ))
+
+        assertEquals(1, algebraic.sign(result.assignment.realValue(0)))
+        assertEquals(1, algebraic.sign(result.assignment.realValue(1)))
+        assertEquals(BigFraction.ofLong(2), algebraic.add(
+            result.assignment.realValue(0), result.assignment.realValue(1),
+        ).rational)
+    }
+
+    @Test
+    fun `containing work limit withholds a coupled witness without replenishing its allowance`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (= (+ x y) 1) (> x 0) (> y 0) (> (* x y) 0)))
+            (check-sat)
+        """.trimIndent())
+        val completed = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount,
+        ))
+        val limit = completed.stats.workSpent - 1
+        var spent = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+        }
+
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(cancellation, maximumWork = limit))
+
+        assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(result).reason)
+        assertEquals(limit, spent)
+        assertEquals(spent, result.stats.workSpent)
+    }
+
+    @Test
+    fun `coupled repairs share query and proposal exhaustion with coordinate repairs`() {
+        for (exhaustProposals in listOf(false, true)) {
+            val source = SmtLibPolynomial.parse("""
+                (declare-const x Real)
+                (declare-const y Real)
+                (assert (and (>= (* x y) 1) (> x 0) (> y 0)))
+                (check-sat)
+            """.trimIndent())
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+            val algebraic = AlgebraicArithmetic(arithmetic)
+            val probe = WitnessProbe(formula, source.boolCount, arithmetic, algebraic)
+            val zero = mapOf(0 to algebraic.rational(BigFraction.ZERO), 1 to algebraic.rational(BigFraction.ZERO))
+            if (exhaustProposals) repeat(64) { assertNull(probe.candidate(zero)) }
+            else repeat(32) { probe.roots(formula.atoms.first().polynomial, 0, zero) }
+
+            val assignment = probe.coupled(requireNotNull(formula.conjunctiveAtoms(arithmetic, 128)),
+                listOf(BigFraction.ZERO, BigFraction.ZERO), emptyMap())
+
+            assertNull(assignment)
+        }
+    }
 
     @Test
     fun `disequality guards admit a narrow rational witness without matrix storage`() {

@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
@@ -216,21 +217,23 @@ private fun probeWitness(
         }
     }
     val conjunctive = formula.conjunctiveAtoms(arithmetic, MAX_WITNESS_ATOMS)
+    val probe = WitnessProbe(formula, boolCount, arithmetic, algebraic)
+    if (nonlinear && conjunctive != null) {
+        val point = List(realCount) { id ->
+            arithmetic.step()
+            fixed[id] ?: BigFraction.ZERO
+        }
+        probe.candidate(point.mapIndexed { id, value -> id to algebraic.rational(value) }.toMap())?.let { return it }
+        probe.coupled(conjunctive, point, fixed)?.let { return it }
+    }
     if (nonlinear && conjunctive != null && conjunctive.none {
             arithmetic.step()
             it.relation == PolynomialRelation.EQ && !it.polynomial.isZero
         }
     ) {
         return probeInequalityWitness(
-            formula, conjunctive, boolCount, realCount, arithmetic, algebraic, fixed, terms, termCounts,
+            conjunctive, realCount, arithmetic, algebraic, fixed, terms, termCounts, probe,
         )
-    }
-    var proposals = 0
-    var attemptedAxes = 0
-    fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? {
-        arithmetic.step()
-        proposals++
-        return checkSample(formula, point, boolCount, arithmetic, algebraic)
     }
     for (center in listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.MINUS_ONE)) {
         val point = LinkedHashMap<Int, AlgebraicReal>()
@@ -238,8 +241,8 @@ private fun probeWitness(
             arithmetic.step()
             point[id] = algebraic.rational(fixed[id] ?: center)
         }
-        if (proposals == MAX_WITNESS_PROPOSALS) return null
-        candidate(point)?.let { return it }
+        if (probe.exhausted) return null
+        probe.candidate(point)?.let { return it }
         for (pass in 0 until MAX_WITNESS_PASSES) {
             var repaired = false
             for ((atom, variables, termCount) in axes) {
@@ -250,18 +253,14 @@ private fun probeWitness(
                 for (variable in variables) {
                     repeat(termCount + 1) { arithmetic.step() }
                     if (atom.polynomial.degree(variable) > MAX_WITNESS_DEGREE) continue
-                    if (attemptedAxes == MAX_WITNESS_AXES) return null
-                    attemptedAxes++
-                    val residual = algebraic.specialize(atom.polynomial, variable, point)
-                    if (residual.isZero || residual.degree <= 0) continue
                     // An original coordinate-degree bound limits optional proposals, not kernel representation limits.
-                    val roots = algebraic.roots(residual)
+                    val roots = probe.roots(atom.polynomial, variable, point) ?: return null
                     for (root in roots) {
-                        if (proposals == MAX_WITNESS_PROPOSALS) return null
+                        if (probe.exhausted) return null
                         repeat(realCount + 1) { arithmetic.step() }
                         val proposed = LinkedHashMap(point)
                         proposed[variable] = root
-                        candidate(proposed)?.let { return it }
+                        probe.candidate(proposed)?.let { return it }
                         var score = 0
                         for (comparison in formula.atoms) {
                             arithmetic.step()
@@ -288,15 +287,14 @@ private fun probeWitness(
 }
 
 private fun probeInequalityWitness(
-    formula: PolynomialFormula,
     guides: List<PolynomialAtom>,
-    boolCount: Int,
     realCount: Int,
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     fixed: Map<Int, BigFraction>,
     terms: Int,
     termCounts: Map<Polynomial, Int>,
+    probe: WitnessProbe,
 ): QfNraAssignment? {
     repeat(terms * (realCount + 1) + realCount + 1) { arithmetic.step() }
     val byCoordinate = Array(realCount) { ArrayList<Pair<PolynomialAtom, Int>>() }
@@ -307,7 +305,6 @@ private fun probeInequalityWitness(
             byCoordinate[variable].add(atom to termCounts.getValue(atom.polynomial))
         }
     }
-    val probe = InequalityWitnessProbe(formula, boolCount, arithmetic, algebraic)
     for (center in listOf(BigFraction.ONE, BigFraction.ZERO, BigFraction.MINUS_ONE)) {
         val point = LinkedHashMap<Int, AlgebraicReal>()
         for (id in 0 until realCount) {
@@ -357,7 +354,7 @@ private fun probeInequalityWitness(
     return null
 }
 
-private class InequalityWitnessProbe(
+internal class WitnessProbe(
     private val formula: PolynomialFormula,
     private val boolCount: Int,
     private val arithmetic: PolynomialArithmetic,
@@ -368,9 +365,202 @@ private class InequalityWitnessProbe(
     val exhausted: Boolean get() = proposals == MAX_WITNESS_PROPOSALS
 
     fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? {
+        if (exhausted) return null
         arithmetic.step()
         proposals++
         return checkSample(formula, point, boolCount, arithmetic, algebraic)
+    }
+
+    fun roots(
+        polynomial: Polynomial,
+        variable: Int,
+        point: Map<Int, AlgebraicReal>,
+    ): List<AlgebraicReal>? {
+        if (queries == MAX_WITNESS_AXES) return null
+        queries++
+        val residual = algebraic.specialize(polynomial, variable, point)
+        return if (residual.isZero || residual.degree <= 0) emptyList() else algebraic.roots(residual)
+    }
+
+    fun coupled(
+        atoms: List<PolynomialAtom>,
+        seed: List<BigFraction>,
+        fixed: Map<Int, BigFraction>,
+    ): QfNraAssignment? = try {
+        coupledDirections(atoms, seed, fixed)
+    } catch (_: PolynomialResourceLimit) {
+        null
+    }
+
+    private fun coupledDirections(
+        atoms: List<PolynomialAtom>,
+        seed: List<BigFraction>,
+        fixed: Map<Int, BigFraction>,
+    ): QfNraAssignment? {
+        val active = LinkedHashSet<Int>()
+        val groups = LinkedHashSet<List<Int>>()
+        val affine = ArrayList<Polynomial>()
+        for (atom in atoms) {
+            arithmetic.step()
+            var linear = true
+            for (term in atom.polynomial.terms) {
+                arithmetic.step()
+                val variables = term.monomial.variables.filter { arithmetic.step(); it !in fixed }
+                active.addAll(variables)
+                if (variables.size > 1) groups.add(variables)
+                if (variables.size > 1 || variables.any { term.monomial.exponent(it) != 1 }) linear = false
+            }
+            if (linear && atom.relation == PolynomialRelation.EQ && !atom.polynomial.isZero) {
+                affine.add(atom.polynomial)
+            }
+        }
+        if (active.size < 2) return null
+        val variables = active.sorted()
+        val rows = affineRows(affine, variables) ?: return null
+        val pivots = rows.map { row ->
+            variables.indices.first { column -> arithmetic.step(); !row[column].isZero }
+        }
+        val free = variables.indices.filter { arithmetic.step(); it !in pivots }
+        val base = seed.toMutableList()
+        for ((index, row) in rows.withIndex()) {
+            var value = row.last()
+            for (column in free) {
+                arithmetic.step()
+                val product = row[column] * base[variables[column]]
+                arithmetic.step()
+                value -= product
+            }
+            base[variables[pivots[index]]] = value
+        }
+        if (rows.isNotEmpty()) {
+            candidate(base.mapIndexed { id, value -> id to algebraic.rational(value) }.toMap())?.let { return it }
+        }
+        val orderedGroups = LinkedHashSet<List<Int>>()
+        orderedGroups.add(variables)
+        orderedGroups.addAll(groups)
+        for (column in free) orderedGroups.add(listOf(variables[column]))
+        val seen = HashSet<List<BigFraction>>()
+        for (group in orderedGroups) for (alternating in listOf(false, true)) {
+            if (queries >= MAX_WITNESS_AXES / 2 || proposals >= MAX_WITNESS_PROPOSALS / 2) return null
+            val direction = MutableList(seed.size) { arithmetic.step(); BigFraction.ZERO }
+            for ((index, variable) in group.withIndex()) {
+                arithmetic.step()
+                if (variables.indexOf(variable) in free) {
+                    direction[variable] = if (alternating && index and 1 != 0) BigFraction.MINUS_ONE else BigFraction.ONE
+                }
+            }
+            for ((index, row) in rows.withIndex()) {
+                var value = BigFraction.ZERO
+                for (column in free) {
+                    arithmetic.step()
+                    val product = row[column] * direction[variables[column]]
+                    arithmetic.step()
+                    value -= product
+                }
+                direction[variables[pivots[index]]] = value
+            }
+            if (direction.count { arithmetic.step(); !it.isZero } < 2 || !seen.add(direction)) continue
+            coupledLine(atoms, base, direction)?.let { return it }
+        }
+        return null
+    }
+
+    private fun affineRows(polynomials: List<Polynomial>, variables: List<Int>): List<Array<BigFraction>>? {
+        if (polynomials.isEmpty()) return emptyList()
+        arithmetic.matrixCells(polynomials.size.toLong(), variables.size.toLong() + 1)
+        val rows = polynomials.map { polynomial ->
+            Array(variables.size + 1) { column ->
+                arithmetic.step()
+                if (column == variables.size) polynomial.coefficient(Monomial.ONE).negated()
+                else polynomial.coefficient(Monomial.of(mapOf(variables[column] to 1)))
+            }
+        }.toMutableList()
+        var rank = 0
+        for (column in variables.indices) {
+            val pivot = (rank until rows.size).firstOrNull { arithmetic.step(); !rows[it][column].isZero }
+                ?: continue
+            val swap = rows[rank]
+            rows[rank] = rows[pivot]
+            rows[pivot] = swap
+            arithmetic.step()
+            val inverse = rows[rank][column].reciprocal()
+            for (entry in column..variables.size) {
+                arithmetic.step()
+                rows[rank][entry] = rows[rank][entry] * inverse
+            }
+            for (row in rows.indices) {
+                arithmetic.step()
+                if (row == rank || rows[row][column].isZero) continue
+                val factor = rows[row][column]
+                for (entry in column..variables.size) {
+                    arithmetic.step()
+                    val product = factor * rows[rank][entry]
+                    arithmetic.step()
+                    rows[row][entry] = rows[row][entry] - product
+                }
+            }
+            rank++
+        }
+        for (row in rank until rows.size) {
+            arithmetic.step()
+            if (!rows[row].last().isZero) return null
+        }
+        return rows.take(rank)
+    }
+
+    private fun coupledLine(
+        atoms: List<PolynomialAtom>,
+        base: List<BigFraction>,
+        direction: List<BigFraction>,
+    ): QfNraAssignment? {
+        // The private parameter lies outside every original ID, so substitutions cannot capture each other.
+        val parameter = base.size
+        val replacements = base.indices.map { id ->
+            arithmetic.add(Polynomial.constant(base[id]), arithmetic.scale(Polynomial.variable(parameter), direction[id]))
+        }
+        val boundaries = ArrayList<AlgebraicReal>()
+        for (atom in atoms) {
+            if (queries >= MAX_WITNESS_AXES / 2) break
+            var degree = 0
+            for (term in atom.polynomial.terms) {
+                var sum = 0
+                for (id in term.monomial.variables) {
+                    arithmetic.step()
+                    if (!direction[id].isZero) {
+                        val exponent = term.monomial.exponent(id)
+                        if (exponent > MAX_WITNESS_DEGREE - sum) return null
+                        sum += exponent
+                    }
+                }
+                degree = maxOf(degree, sum)
+            }
+            if (degree == 0) continue
+            var residual = atom.polynomial
+            for (id in atom.polynomial.variables) {
+                arithmetic.step()
+                residual = arithmetic.substitute(residual, id, replacements[id])
+            }
+            for (root in roots(residual, parameter, emptyMap()) ?: return null) {
+                arithmetic.step()
+                boundaries.add(root)
+            }
+        }
+        val roots = distinctRoots(boundaries)
+        for (cell in 0..2 * roots.size) {
+            if (proposals >= MAX_WITNESS_PROPOSALS / 2) return null
+            val root = cell / 2
+            val sample = if (cell and 1 != 0) roots[root] else algebraic.rational(
+                algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)),
+            )
+            val point = base.indices.associateWith { id ->
+                arithmetic.step()
+                if (direction[id].isZero) algebraic.rational(base[id]) else algebraic.add(
+                    algebraic.rational(base[id]), algebraic.multiply(algebraic.rational(direction[id]), sample),
+                )
+            }
+            candidate(point)?.let { return it }
+        }
+        return null
     }
 
     fun boundaries(
@@ -378,20 +568,20 @@ private class InequalityWitnessProbe(
         variable: Int,
         point: Map<Int, AlgebraicReal>,
     ): List<AlgebraicReal>? {
-        val roots = ArrayList<AlgebraicReal>()
+        val boundaries = ArrayList<AlgebraicReal>()
         for ((atom, termCount) in atoms) {
             arithmetic.step()
             repeat(termCount + 1) { arithmetic.step() }
             if (atom.polynomial.degree(variable) > MAX_WITNESS_DEGREE) continue
-            if (queries == MAX_WITNESS_AXES) return null
-            queries++
-            val residual = algebraic.specialize(atom.polynomial, variable, point)
-            if (residual.isZero || residual.degree <= 0) continue
-            for (root in algebraic.roots(residual)) {
+            for (root in roots(atom.polynomial, variable, point) ?: return null) {
                 arithmetic.step()
-                roots.add(root)
+                boundaries.add(root)
             }
         }
+        return distinctRoots(boundaries)
+    }
+
+    private fun distinctRoots(roots: MutableList<AlgebraicReal>): List<AlgebraicReal> {
         roots.sortWith(Comparator { left, right -> algebraic.compare(left, right) })
         val distinct = ArrayList<AlgebraicReal>()
         for (root in roots) {
