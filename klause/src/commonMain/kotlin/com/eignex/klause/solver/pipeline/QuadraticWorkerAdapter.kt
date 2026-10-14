@@ -54,7 +54,9 @@ internal class QuadraticWorkerAdapter(
     private val identity = ModelIdentity.of(request.preparedPlan.originalSource, objective)
     private val completion = QuadraticBranchCompletion(request, model, objective, sense, params, native)
     private val sink = SolveStatsSink("quadratic").also { it.start() }
-    private val finite = model.finite.bake(native.polynomial)
+    private val finite = request.preparedPlan.finiteFactorProjections?.let { selected ->
+        model.finite.bake(selected.forEngineView(model.finite), native.polynomial)
+    } ?: model.finite.bake(native.polynomial)
     private val sourceBoolCount = request.problem.sourceBoolCount
     private val sourceRealCount = request.problem.sourceRealCount
     private var incumbent: QuadraticIncumbent? = null
