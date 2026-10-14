@@ -97,14 +97,15 @@ internal class LocalSearchEngine(
     }
 
     private val problem: Problem = model.problem
-    internal var projection: LocalSearchPreparation = LocalSearchPreparation(problem, model.domains)
+    internal var projection: LocalSearchPreparation =
+        LocalSearchPreparation(problem, model.domains, selection = model.selection)
     internal var invariantNetwork = InvariantNetworkPreparation(
         definitionalSweep, problem.numIntVars, problem.numBoolVars,
     )
 
     // A finite projection may require theory-owned completion before publication.
     private val completion: CandidateCompletion? = completion
-    private val unscoredCandidateCheck = UnscoredCandidateCheck(problem).takeIf { it.required }
+    private val unscoredCandidateCheck = UnscoredCandidateCheck(problem, model.selection).takeIf { it.required }
 
     /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
      *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each
@@ -1264,14 +1265,21 @@ internal class LocalSearchEngine(
 internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = false): Boolean {
     val problem = model.problem
     if (problem.numRealVars != 0 && !completes) return false
-    if (problem.factors.any {
-            it.executionCapabilities().assignmentCheck == AssignmentCheckCapability.UNSUPPORTED &&
-                it.variables.reals.isNotEmpty()
+    val selection = model.selection
+    if (problem.factors.indices.any { id ->
+            val capabilities = selection?.capabilities(id) ?: problem.factors[id].executionCapabilities()
+            capabilities.scoring == com.eignex.klause.solver.ScoringCapability.UNSUPPORTED ||
+                (capabilities.assignmentCheck == AssignmentCheckCapability.UNSUPPORTED &&
+                    problem.factors[id].variables.reals.isNotEmpty())
         }
     ) return false
     val domains = model.domains
     if (domains.all(::isNarrow)) return true
-    return problem.factors.none { factor -> factor is Cumulative && factor.intVars.any { !isNarrow(domains[it]) } }
+    return problem.factors.indices.none { id ->
+        val factor = problem.factors[id]
+        factor is Cumulative && selection?.usesBuiltInScoring(id) != false &&
+            factor.intVars.any { !isNarrow(domains[it]) }
+    }
 }
 
 // Whether this objective's integer sum can pass the 64-bit range over [domains].

@@ -146,6 +146,10 @@ internal object PresolveShared {
             // reasoning and the search its objective-cutoff bound on exactly those columns.
             packedOpenIntLo = problem.intBounds.openLowerBits,
             packedOpenIntHi = problem.intBounds.openUpperBits,
+            projectionProviders = problem.projectionProviders,
+            projectionSelection = problem.factorProjections?.let { captured ->
+                { view -> captured.forEngineView(view) }
+            },
         )
         // An already-folded pass view never bakes (nothing reads `Problem.baked`), so [RootBaker.reseed] leaves
         // it untouched; with no probing tier enabled the plain base bake stands. Otherwise the reseed runs

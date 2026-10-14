@@ -8,6 +8,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
@@ -119,7 +120,10 @@ object FinitePipeline {
         // A source rewrite moves factor ownership with the factors, so the routing plan no longer indexes
         // the model the engine is built from; an untouched model keeps the plan routing already built.
         val plan = if (prepared.changed) {
-            requireNotNull(prepared.problem.prepareExecutionPlan(prepared.objective, preferFinite = true).componentPlan)
+            requireNotNull(prepared.problem.prepareExecutionPlan(
+                request.preparedPlan.factorProjections?.providers ?: FactorProjectionProviders.Default,
+                prepared.objective, preferFinite = true,
+            ).componentPlan)
         } else {
             request.componentPlan
         }
@@ -133,13 +137,16 @@ object FinitePipeline {
             request.cancellation,
             request.zeroObjectivePricing,
             request.randomSeed,
+            request.preparedPlan.factorProjections,
         )
         val finiteModel = if (outcome.stats.infeasible) {
             outcome.problem
-        } else if (outcome.changed) {
-            outcome.problem.bake(request.solveCancellation)
         } else {
-            request.problem.bake(request.solveCancellation)
+            val model = if (outcome.changed) outcome.problem else request.problem
+            val projections = (model as? BakedProblem)?.factorProjections
+                ?: request.preparedPlan.factorProjections?.forEngineView(model)
+            if (projections == null) model.bake(request.solveCancellation)
+            else model.bake(projections, request.solveCancellation)
         }
         return FinitePipelinePreparation(
             problem = finiteModel,

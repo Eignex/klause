@@ -9,6 +9,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.closeOpenBounds
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.result.OpenHintStats
@@ -254,6 +255,7 @@ class OpenTheoryEngine internal constructor(
         solutionSetSensitive: Boolean,
         presolveCancellation: Cancellation,
         presolveBudget: PresolveBudget?,
+        projections: PreparedFactorProjections? = null,
     ) : this(
         route,
         { cancellation ->
@@ -262,6 +264,7 @@ class OpenTheoryEngine internal constructor(
                 solutionSetSensitive = solutionSetSensitive,
                 cancellation = cancellation,
                 budget = presolveBudget,
+                projections = projections,
             )
         },
         presolveCancellation,

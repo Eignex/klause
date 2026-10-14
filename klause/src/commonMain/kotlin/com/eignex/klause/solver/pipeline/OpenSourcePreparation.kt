@@ -5,6 +5,7 @@ import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 
@@ -43,7 +44,9 @@ internal fun Problem.prepareOpenSource(
     solutionSetSensitive: Boolean = false,
     cancellation: Cancellation = Cancellation.Never,
     budget: PresolveBudget? = null,
+    projections: PreparedFactorProjections? = null,
 ): OpenSourcePreparation {
+    projections?.requireSource(this)
     val preparation = budget?.orSpent(cancellation) ?: cancellation
     val prepared = PresolvePipeline.prepareSource(
         this,
@@ -54,7 +57,7 @@ internal fun Problem.prepareOpenSource(
         budget,
     )
     if (prepared.infeasible) return OpenSourcePreparation.Refuted(prepared)
-    return prepared.planned(prepared.problem)
+    return prepared.planned(prepared.problem, projections)
 }
 
 /**
@@ -64,8 +67,11 @@ internal fun Problem.prepareOpenSource(
  * complete theory component selected for this invocation; routing a newly bounded model to the finite
  * lane remains the frontend's policy decision.
  */
-internal fun PreparedSource.planned(model: Problem): OpenSourcePreparation.Planned {
-    val plan = model.componentPlan()
+internal fun PreparedSource.planned(
+    model: Problem,
+    projections: PreparedFactorProjections? = null,
+): OpenSourcePreparation.Planned {
+    val plan = projections?.forEngineView(model)?.let { model.componentPlan(it) } ?: model.componentPlan()
     require(
         plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
             plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN,

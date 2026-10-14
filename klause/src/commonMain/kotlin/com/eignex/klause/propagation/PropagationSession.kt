@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -65,6 +66,14 @@ class PropagationSession private constructor(
         nativeSat: Boolean = false,
         pbLearning: Boolean = false,
     ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection)
+
+    internal fun checkSelectedProjection(): ComponentCheck =
+        projection.selection?.originalChecks?.check(this, cancellation) ?: ComponentCheck.Feasible
+
+    internal fun recordProjectionCheck(checker: PropagationSession) {
+        state.work += checker.work
+        state.propagationNanos += checker.propagationNanos
+    }
 
     private val state: PropagationState =
         preparedState ?: PropagationState(

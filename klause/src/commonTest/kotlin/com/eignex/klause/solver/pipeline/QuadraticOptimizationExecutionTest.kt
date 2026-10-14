@@ -4,6 +4,15 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealProblem
@@ -30,6 +39,31 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
 class QuadraticOptimizationExecutionTest {
+    @Test
+    fun `quadratic finite preparation opens the selected source deduction`() {
+        val clause = Clause(intArrayOf(0))
+        val source = Problem(1, 1, arrayOf(IntDomain(1, 1)), arrayOf(clause, RealProduct(0, 0, 0, 1.0, 1.0)),
+            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+        var opened = 0
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor !== clause) BuiltInPropagationProjectionProvider.select(factor)
+            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The original clause is checked at complete points.") {
+                opened++
+                NoPropagator
+            }
+        })
+        val request = source.prepareExecutionPlan(providers).polynomialRequest()
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+
+        val result = OpenTheoryPipeline.minimize(request, objective, engine = FiniteEngine.BACKTRACK).result
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result)
+        assertEquals(true, optimum.incumbent.sample.boolValue(0))
+        assertTrue(opened > 0)
+    }
+
     @Test
     fun `continuous rational optimum is published with a matching exact bound`() {
         val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,

@@ -5,8 +5,10 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.ScoringCapability
+import com.eignex.klause.solver.defaultExecutionCapabilities
 import com.eignex.klause.solver.executionCapabilities
 
 internal val witnessAuthority = setOf(ExecutionClaimAuthority.WITNESS)
@@ -14,12 +16,13 @@ internal val completeAuthority = ExecutionClaimAuthority.entries.toSet()
 internal val sourceOperations = setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)
 internal val finiteOperations = ExecutionOperation.entries.toSet()
 
-internal fun Problem.unplacedArithmeticContract(): ComponentExecutionContract {
+internal fun Problem.unplacedArithmeticContract(projections: PreparedFactorProjections? = null):
+    ComponentExecutionContract {
     val missing = ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(), listOf(ExecutionDecline(
         ExecutionDeclineCause.SOURCE_COMPLETION, "unplaced-arithmetic",
         preparation = PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT)))
-    val checkedDiscrete = numRealVars == 0 && factors.all { factor ->
-        factor.executionCapabilities().assignmentCheck in setOf(
+    val checkedDiscrete = numRealVars == 0 && factors.indices.all { index ->
+        (projections?.capabilities(index) ?: factors[index].executionCapabilities()).assignmentCheck in setOf(
             AssignmentCheckCapability.EXACT, AssignmentCheckCapability.REDUNDANT)
     }
     val local = if (checkedDiscrete) ComponentStrategySupport(
@@ -58,7 +61,28 @@ internal fun Problem.finiteComponentContract(
     ownership: ComponentPlan?,
     sourceCompletion: Boolean,
     exactNeighborhood: Boolean,
+    projections: PreparedFactorProjections? = null,
 ): ComponentExecutionContract {
+    projections?.requireSource(this)
+    fun capabilities(index: Int) = projections?.capabilities(index) ?: this.factors[index].executionCapabilities()
+    fun completeCheck(index: Int): Boolean {
+        val factor = this.factors[index]
+        val selected = capabilities(index)
+        if (selected.propagationCheck == AssignmentCheckCapability.EXACT) return true
+        if (factor.variables.reals.isNotEmpty()) {
+            return selected.propagationCheck == AssignmentCheckCapability.SOURCE_CERTIFICATION && sourceCompletion
+        }
+        return projections?.requiresOriginalCheck(index) == true &&
+            factor.defaultExecutionCapabilities().propagationCheck == AssignmentCheckCapability.EXACT
+    }
+    fun scoreCheck(index: Int): Boolean = when (capabilities(index).assignmentCheck) {
+        AssignmentCheckCapability.EXACT, AssignmentCheckCapability.REDUNDANT -> true
+        AssignmentCheckCapability.SOURCE_CERTIFICATION -> if (this.factors[index].variables.reals.isNotEmpty()) {
+            sourceCompletion
+        } else completeCheck(index)
+        AssignmentCheckCapability.UNSUPPORTED -> completeCheck(index)
+    }
+
     fun refusal(cause: ExecutionDeclineCause, index: Int? = null): ComponentStrategySupport =
         ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(),
             listOf(ExecutionDecline(cause, "finite", index)))
@@ -68,14 +92,10 @@ internal fun Problem.finiteComponentContract(
                 ownership?.intOwner(column) == IntVariableOwner.THEORY
         } }
     val unsupportedPropagation = factors.firstOrNull {
-        this.factors[it].executionCapabilities().propagation == PropagationCapability.UNSUPPORTED
+        capabilities(it).propagation == PropagationCapability.UNSUPPORTED
     }
-    val missingCheck = factors.firstOrNull { index ->
-        val capabilities = this.factors[index].executionCapabilities()
-        capabilities.propagationCheck == AssignmentCheckCapability.UNSUPPORTED ||
-            capabilities.assignmentCheck == AssignmentCheckCapability.UNSUPPORTED ||
-            (capabilities.assignmentCheck == AssignmentCheckCapability.SOURCE_CERTIFICATION && !sourceCompletion)
-    }
+    val missingCheck = factors.firstOrNull { !completeCheck(it) }
+    val missingScoreCheck = factors.firstOrNull { !scoreCheck(it) }
     val complete = when {
         incompleteProjection -> refusal(ExecutionDeclineCause.FINITE_PROJECTION)
         unsupportedPropagation != null -> refusal(ExecutionDeclineCause.FINITE_PROJECTION, unsupportedPropagation)
@@ -83,11 +103,11 @@ internal fun Problem.finiteComponentContract(
         else -> ComponentStrategySupport(ProcedureCompleteness.DECISION, completeAuthority)
     }
     val missingScore = factors.firstOrNull {
-        this.factors[it].executionCapabilities().scoring == ScoringCapability.UNSUPPORTED
+        capabilities(it).scoring == ScoringCapability.UNSUPPORTED
     }
     val unsupportedTimeline = factors.firstOrNull { index ->
         val factor = this.factors[index]
-        factor is Cumulative && factor.intVars.any { column ->
+        factor is Cumulative && projections?.usesBuiltInScoring(index) != false && factor.intVars.any { column ->
             !intBounds.hasLower(column) || intBounds.lower(column) !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()
         }
     }
@@ -95,7 +115,8 @@ internal fun Problem.finiteComponentContract(
         exactNeighborhood -> if (complete.runnable) {
             ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority)
         } else complete
-        missingCheck != null -> refusal(ExecutionDeclineCause.SOURCE_COMPLETION, missingCheck)
+        unsupportedPropagation != null -> refusal(ExecutionDeclineCause.FINITE_PROJECTION, unsupportedPropagation)
+        missingScoreCheck != null -> refusal(ExecutionDeclineCause.SOURCE_COMPLETION, missingScoreCheck)
         missingScore != null -> refusal(ExecutionDeclineCause.HEURISTIC_PROJECTION, missingScore)
         unsupportedTimeline != null -> refusal(ExecutionDeclineCause.HEURISTIC_PROJECTION, unsupportedTimeline)
         else -> ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority)

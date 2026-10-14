@@ -120,13 +120,15 @@ probe-count scope and cooperative deadline limits.
 
 [PropagationSession](../../klause/src/commonMain/kotlin/com/eignex/klause/propagation/PropagationSession.kt)
 owns the finite-domain trail and fixpoint. Sessions over one immutable model can share
-its propagation projection and occurrence indexes. Incremental payloads, scratch arrays,
+built-in stateless propagation projections and occurrence indexes. Incremental payloads, scratch arrays,
 watchers and failure contexts belong to each state. Failure clauses and premise-variable
 sets use separate state storage, leaving reversible payloads intact; each fire clears
 its previous failure, and undo discards pending failure context. The native SAT lane
 keeps its own state and leaves general CP failure storage unallocated.
 
-`FactorExecutionCapabilities` inventories each built-in family's execution routes.
+Prepared capability summaries read the selected projection descriptors. Built-in
+providers declare their existing execution routes; replacements supply their own
+filtering, scoring and check roles.
 `SOUND_FILTERING`, `BOUNDS_FILTERING` and `DOMAIN_FILTERING` describe deduction
 mechanisms; they do not promise full consistency at every size or resource limit.
 AllDifferent filtering selects its cached incremental path before the full matching
@@ -452,3 +454,44 @@ from truncating an evidenced sub-millisecond measurement. The
 pipeline, declared theory and reported backend without extending search clocks.
 
 `openReductionNs` is zero when the cap is off or no reduction pass is needed.
+
+## Selected propagation projections
+
+`PropagationProjectionProvider` selects a source-bound factory and its filtering and
+pinned-assignment-check capabilities during preparation. Engine projection creation
+rejects a factory whose `NoPropagator` result disagrees with its declared inert role.
+An unsupported role refuses construction. Alternative deductions must remain sound
+for the original factor, including watcher subscriptions and explanations.
+
+Packed SAT propagation requires built-in selected clause descriptors. Replaced
+clause deduction uses the general CP lane so native propagation cannot bypass it;
+unchanged delegated descriptors retain native eligibility. Built-in mechanisms
+retain owner-local table/MDD preparation.
+
+An inert descriptor requires an explicit reason and cannot claim an exact check:
+its absent mechanism needs an enforcing peer or separate source certification.
+
+Selected partial or inert finite deduction keeps an original-source check at a
+complete point. The prepared check plan is immutable; each point uses a private
+propagation state over original factors. Its work contributes to the invocation's
+CP work and time counters. If those factors have no complete original checker,
+the leaf stays indeterminate. Source-real checks remain the arithmetic completion's
+responsibility; objective overlays remain enforced by objective policy.
+
+Source preparation retains captured factor projection descriptors when selecting
+open ownership and optimization rounds. Domain closure retargets those descriptors
+without changing coordinate ownership. A factor rewrite reselects providers before
+constructing the compact CP view. Complete arithmetic still owns its original
+source predicates and exact certificates; a selected finite relaxation is a sound
+bounding view rather than source-completion authority.
+
+Prepared CP registrations reuse built-in stateless projection data and open custom
+mutable deduction mechanisms separately for each session. A clause assigned to a
+custom CP projection is omitted from the shared default clause propagator. The
+Boolean peer retains canonical Boolean coordinates and branching; complete point
+checks retain the clause's original source authority when selected filtering is inert.
+
+Polynomial and quadratic workers retain the prepared finite-factor descriptors when
+opening their private finite projection. Exact arithmetic still checks its original
+source fragment; finite-provider selection does not replace that authority or its
+resumable lifecycle. See [the polynomial route](../theories/polynomial-real.md).

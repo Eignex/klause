@@ -61,7 +61,7 @@ class LocalSearchState private constructor(
         model: LocalSearchModel,
         rng: Random,
         assumptions: Assumptions = Assumptions.None,
-        projection: LocalSearchProblem = LocalSearchProblem(model.problem, model.domains),
+        projection: LocalSearchProblem = model.openProjection(),
     ) : this(model, rng, assumptions, projection, LocalSearchBuffers.preparation(model.problem).filterNotNull().first())
 
     internal companion object {
@@ -133,7 +133,9 @@ class LocalSearchState private constructor(
 
     // Clause degrees are binary, so their maintained break/make counts sum the exact raw delta.
     internal val repairChainClauseOnly: Boolean by lazy(LazyThreadSafetyMode.NONE) {
-        problem.factors.all { it is Clause }
+        (projection.selection == null ||
+            projection.selection.builtInScoring) &&
+            problem.factors.all { it is Clause }
     }
 
     /** The problem's invariants, aliased so the hot LS loops read `factors` directly. */

@@ -14,6 +14,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.objective.LinearObjective
@@ -136,6 +137,7 @@ class OpenTheoryMinimizer internal constructor(
     private val solutionSetSensitive: Boolean = false,
     private val presolveCancellation: Cancellation = Cancellation.Never,
     private val presolveBudget: PresolveBudget? = null,
+    private val projections: PreparedFactorProjections? = null,
 ) {
 
     constructor(model: Problem, objective: LinearObjective) : this(
@@ -153,7 +155,11 @@ class OpenTheoryMinimizer internal constructor(
     private val source: Problem
 
     // The route the descent plans under, which the objective row may leave outside every complete open theory.
-    private val plannedRoute: ProblemPipeline by lazy { source.boundedForPlanning().componentPlan().theoryPipeline }
+    private val plannedRoute: ProblemPipeline by lazy {
+        val planning = source.boundedForPlanning()
+        (projections?.forEngineView(planning)?.let { planning.componentPlan(it) }
+            ?: planning.componentPlan()).theoryPipeline
+    }
 
     private val route: ProblemPipeline by lazy {
         // A row at PLANNING_RHS carries no potential, so a model whose rows were all differences leaves
@@ -317,7 +323,7 @@ class OpenTheoryMinimizer internal constructor(
             // Ownership stays selected from the model as prepared, not from the closed one below. Closing a
             // column does not move a factor between components, but it does change what `componentPlan` reads:
             // a descent whose every side closed would select the finite route, which no round of it can run.
-            val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning()).plan
+            val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning(), projections).plan
             // Close the open sides once for the whole descent. Every round decides this model plus a strictly
             // tighter objective row, and a row only removes solutions, so a bound proved here holds for every
             // round below it. Leaving the close to the rounds has each one re-derive the same bounds from the

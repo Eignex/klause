@@ -2,11 +2,11 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.InvariantNetworkPreparation
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchPreparation
-import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
@@ -217,7 +217,7 @@ object PortfolioBuilder {
             nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
             localSearchProjection = LocalSearchPreparation(
                 problem, LocalSearchModel.of(problem).domains, concurrency.lock(),
-            ),
+            ).takeIf { it.shareable },
             localSearchInvariants = InvariantNetworkPreparation(
                 definitionalSweep, problem.numIntVars, problem.numBoolVars, concurrency.lock(),
             ),

@@ -2,6 +2,8 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
@@ -11,8 +13,10 @@ internal class LocalSearchPreparation(
     problem: Problem,
     domains: Array<IntDomain>?,
     private val lock: Mutex = Concurrency.Strict.lock(),
+    selection: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ) {
-    private val steps = LocalSearchProblem.preparation(problem, domains)
+    val shareable: Boolean = selection == null || selection.builtInScoring
+    private val steps = LocalSearchProblem.preparation(problem, domains, selection)
     private var completed: LocalSearchProblem? = null
 
     fun get(cancellation: Cancellation): LocalSearchProblem? {

@@ -241,3 +241,28 @@ never reuse approximate numeric factors as exact factors. Unavailable updated-ow
 hints decline before expensive identity traversal. Exact fill is recomputed,
 zero pivots reorder exactly, and only complete exact rank determination establishes
 singularity.
+
+## Selected factor relaxation providers
+
+`RelaxationProjectionProvider` selects model-facing emitters from immutable factor
+data. The descriptor declares whether it supplies a sound relaxation; absent or
+`NONE` selections emit no rows. A custom emitter must preserve every original
+source solution under the builder's declared bounds and row premises. Numerical
+feature gates, source attribution and the engine's closed dependency list still apply.
+
+`CpToLpRelaxation` can consume a prepared selection in its factor emission loop.
+Built-in emission retains its linear-row caches and existing gates. Custom emitters
+are rebuilt against live domains and disable retained-layout eligibility; their
+coefficients cannot be assumed independent of the current node.
+
+A selected sound relaxation supplies bounds and refutations, rather than source
+feasibility by itself. Real leaf completion retains the original built-in source
+rows, using the existing private LP owner and native allowances. Replacement real
+projections require a source-coordinate check before publication; an unavailable
+or rejected completion stays indeterminate. Omitting a selected relaxation row
+cannot remove the original source constraint from the witness check.
+
+Circuit arcs and Boolean RLT rows use only factors retaining built-in relaxation
+descriptors. Scheduling family preparation reads the corresponding built-in factor
+subset, including its linking rows. Replacing or omitting those descriptors cannot
+reinstall their default family rows outside the selected emission loop.

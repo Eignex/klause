@@ -7,6 +7,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SourceIntDomains
 import com.eignex.klause.ir.withStorage
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -54,6 +56,8 @@ class BakedProblem private constructor(
     modelBounds: IntBounds?,
     internal val cancellation: Cancellation,
     settings: ProblemSettings,
+    internal val projectionProviders: FactorProjectionProviders?,
+    private val projectionSelection: ((Problem) -> PreparedFactorProjections)?,
 ) : Problem(
     settings = settings,
     numBoolVars = numBoolVars,
@@ -74,6 +78,10 @@ class BakedProblem private constructor(
     realLower = realLower,
     realUpper = realUpper,
 ) {
+    internal val factorProjections: PreparedFactorProjections? by lazy {
+        projectionSelection?.invoke(this) ?: projectionProviders?.prepare(this)
+    }
+
     /** Deductions established while constructing this propagation projection. */
     internal val rootDeductions: PropagationResult = rootBake(this, seedDeductions, cancellation)
 
@@ -136,6 +144,8 @@ class BakedProblem private constructor(
         cancellation: Cancellation = Cancellation.Never,
         alreadyFolded: Boolean = false,
         settings: ProblemSettings = ProblemSettings(),
+        projectionProviders: FactorProjectionProviders? = null,
+        projectionSelection: ((Problem) -> PreparedFactorProjections)? = null,
     ) : this(
         settings = settings,
         numBoolVars = numBoolVars,
@@ -161,6 +171,8 @@ class BakedProblem private constructor(
         packedOpenIntHi = packedOpenIntHi,
         modelBounds = modelBounds,
         cancellation = cancellation,
+        projectionProviders = projectionProviders,
+        projectionSelection = projectionSelection,
     )
 
     internal constructor(
@@ -182,6 +194,8 @@ class BakedProblem private constructor(
         cancellation: Cancellation = Cancellation.Never,
         alreadyFolded: Boolean = false,
         settings: ProblemSettings = ProblemSettings(),
+        projectionProviders: FactorProjectionProviders? = null,
+        projectionSelection: ((Problem) -> PreparedFactorProjections)? = null,
     ) : this(
         settings = settings,
         numBoolVars = numBoolVars,
@@ -201,5 +215,7 @@ class BakedProblem private constructor(
         modelBounds = modelBounds,
         cancellation = cancellation,
         alreadyFolded = alreadyFolded,
+        projectionProviders = projectionProviders,
+        projectionSelection = projectionSelection,
     )
 }
