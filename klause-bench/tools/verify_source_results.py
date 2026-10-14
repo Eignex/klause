@@ -459,13 +459,16 @@ def source_query_solver(constraints, variables, is_smt, objective):
         booleans = {variable.get_id(): z3.FreshBool('source_binary') for variable in variables.values()}
         try:
             if objective is not None:
-                binary_source_weights(binary_source_terms(objective, booleans)[0])
-            translated = [binary_source_predicate(constraint, booleans) for constraint in constraints]
+                weights, _ = binary_source_weights(binary_source_terms(objective, booleans)[0])
+                binary = len(set(weights.values())) <= 1
+            if binary:
+                translated = [binary_source_predicate(constraint, booleans) for constraint in constraints]
         except ValueError:
             binary = False
         else:
-            constraints = translated
-            query = lambda expression: binary_source_predicate(expression, booleans)
+            if binary:
+                constraints = translated
+                query = lambda expression: binary_source_predicate(expression, booleans)
     solver = z3.SolverFor('QF_FD') if binary else z3.Solver()
     solver.set(timeout=120000)
     solver.add(*constraints)
