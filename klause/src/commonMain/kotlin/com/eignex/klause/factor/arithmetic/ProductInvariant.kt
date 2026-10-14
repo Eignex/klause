@@ -8,6 +8,7 @@ import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.util.Int128
 
 internal class ProductInvariant(private val a: Int, private val b: Int, private val result: Int) : Invariant {
 
@@ -15,7 +16,7 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
-        return saturatedMul(av, bv) != rv
+        return residual(av, bv, rv) != 0L
     }
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
@@ -57,7 +58,7 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
-        if (saturatedMul(av, bv) == rv) return
+        if (residual(av, bv, rv) == 0L) return
         val rTarget = saturatedMul(av, bv)
         val rDomain = state.rootDomains[result]
         val rClamped = rDomain.clamp(rTarget)
@@ -93,8 +94,22 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         }
     }
 
-    // |x·y − r| without wrapping, so a product past the Long range still reads as violated.
-    private fun residual(x: Long, y: Long, r: Long): Long = distance(saturatedMul(x, y), r)
+    // Capping after subtraction preserves a nonzero residual at signed-word endpoints.
+    private fun residual(x: Long, y: Long, r: Long): Long {
+        val product = x * y
+        if (x == 0L || (product / x == y && !(x == -1L && y == Long.MIN_VALUE))) {
+            return distance(product, r)
+        }
+        val exact = Int128()
+        exact.addProduct(x, y)
+        if (r == Long.MIN_VALUE) {
+            exact.addLong(Long.MAX_VALUE)
+            exact.addLong(1L)
+        } else {
+            exact.addLong(-r)
+        }
+        return if (exact.fitsLong()) distance(exact.toLong(), 0L) else Long.MAX_VALUE
+    }
 
     private fun residualAfterSet(state: LocalSearchState, intVar: Int, value: Long): Long = residual(
         if (intVar == a) value else state.assignment.intValue(a),
