@@ -57,6 +57,10 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.portfolio.verifyRealCoordinates
+import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
@@ -381,6 +385,8 @@ internal fun leafRealFeasibility(
     pricing: LpPricingOptions = LpPricingOptions(),
     toleranceCheck: ((Sample) -> Boolean)? = null,
 ): LeafRealResult {
+    val encoded = problem.selectedFactorProjections().finiteLinearModel(sample, cancellation)
+        ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
     val relaxation = CpToLpRelaxation(problem, objective).build(SampleDomains(sample))
     // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
     // large factorization, so an unbounded solve could outlast the whole budget. A solve cut short returns
@@ -397,7 +403,7 @@ internal fun leafRealFeasibility(
         },
         floatOffset = relaxation.objectiveConstant.toDouble(),
     )
-    return relaxation.leafResult(certified, problem, objective, sample, sink)
+    return relaxation.leafResult(certified, problem, objective, sample, sink).checkedEncoding(encoded, sample)
 }
 
 internal fun LpRelaxation.leafResult(
@@ -1627,4 +1633,10 @@ internal class CpToLpRelaxation(
             return LpRowPremises(pv.toIntArray(), BooleanArray(pu.size) { pu[it] }, pt.toLongArray())
         }
     }
+}
+
+internal fun LeafRealResult.checkedEncoding(encoded: Problem, sample: Sample): LeafRealResult {
+    if (exactReals == null || verdict == LpVerdict.INFEASIBLE) return this
+    val checked = verifyRealCoordinates(encoded, sample.copy(reals = reals, exactReals = exactReals))
+    return if (checked is Verification.Accepted) this else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
 }

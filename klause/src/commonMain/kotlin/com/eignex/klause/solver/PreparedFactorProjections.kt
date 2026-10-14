@@ -3,16 +3,20 @@ package com.eignex.klause.solver
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.ScoringProjection
 import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.RelaxationProjection
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.SelectedProjectionChecks
+import com.eignex.klause.theory.EncodedTheoryFactor
+import com.eignex.klause.theory.installLinearFactor
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncodingTarget
 
@@ -31,12 +35,22 @@ class PreparedFactorProjections internal constructor(
         Array(problem.numFactors) { providers.scoring.select(problem.factors[it]) },
     private val relaxation: Array<RelaxationProjection?> =
         Array(problem.numFactors) { providers.relaxation.select(problem.factors[it]) },
-    private val encoders: Map<EncodingTarget, Array<Encoder>> = EncodingTarget.entries.associateWith { target ->
+    private val encoders: Map<EncodingTarget, Array<Encoder>> = providers.encodingTargets.associateWith { target ->
         Array(problem.numFactors) { providers.encoder.select(problem.factors[it], target) }
     },
 ) {
     /** Immutable whole-relation selection in this canonical source's factor namespace. */
     fun encoder(factorId: Int, target: EncodingTarget): Encoder = encoders.getValue(target)[factorId]
+
+    private val linearEncodings: Map<EncodingTarget, Array<EncodedTheoryFactor?>> by lazy {
+        listOf(EncodingTarget.LINEAR, EncodingTarget.DIFFERENCE).associateWith { target ->
+            Array(problem.numFactors) { installLinearFactor(it, target) }
+        }
+    }
+
+    internal fun preparedLinearEncoding(factorId: Int, target: EncodingTarget): EncodedTheoryFactor? =
+        linearEncodings[target]?.get(factorId) ?: if (target !in linearEncodings) installLinearFactor(factorId, target)
+        else null
 
     private val declarations = Array(problem.numFactors) { id ->
         FactorExecutionCapabilities(
@@ -74,7 +88,7 @@ class PreparedFactorProjections internal constructor(
         view.factors.indices.all { view.factors[it] === problem.factors[it] }
     ) projected(view, IntArray(view.numFactors) { it }) else forProblem(view)
 
-    internal fun projected(view: Problem, factorIndices: IntArray): PreparedFactorProjections {
+    internal fun projected(view: Problem, factorIndices: IntArray, remap: VarRemap? = null): PreparedFactorProjections {
         require(factorIndices.size == view.numFactors && factorIndices.all { it in problem.factors.indices }) {
             "projection factor mapping differs from its prepared source"
         }
@@ -82,7 +96,10 @@ class PreparedFactorProjections internal constructor(
             Array(factorIndices.size) { propagation[factorIndices[it]] },
             Array(factorIndices.size) { scoring[factorIndices[it]] },
             Array(factorIndices.size) { relaxation[factorIndices[it]] },
-            encoders.mapValues { (_, selected) -> Array(factorIndices.size) { selected[factorIndices[it]] } })
+            encoders.mapValues { (_, selected) -> Array(factorIndices.size) {
+                val encoder = selected[factorIndices[it]]
+                if (remap == null) encoder else encoder.remapped(remap)
+            } })
     }
 
     internal fun withAppendedFactors(view: Problem): PreparedFactorProjections {
@@ -164,3 +181,6 @@ class PreparedFactorProjections internal constructor(
         relaxation[factorId]?.emit(problem.factors[factorId], builder, linear)
     }
 }
+
+internal fun Problem.selectedFactorProjections(): PreparedFactorProjections =
+    (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this)

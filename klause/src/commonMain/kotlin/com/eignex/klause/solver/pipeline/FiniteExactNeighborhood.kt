@@ -5,10 +5,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.theory.linearTheoryModel
+import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -34,14 +32,12 @@ internal class FiniteExactNeighborhood(
     private val certify: (Sample) -> Unit,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val linear = requireNotNull(
-        (source.factorProjections ?: FactorProjectionProviders.Default.prepare(source)).linearTheoryModel(
-            EncodingTarget.LINEAR,
-            fixedIntegers = (0 until source.numIntVars).associate { SourceIntId(it) to fixed.exactIntValue(it) },
-        ),
+        (source.factorProjections ?: FactorProjectionProviders.Default.prepare(source))
+            .finiteLinearModel(fixed, Cancellation.Never),
     ) { "finite neighborhood requires complete conditioned encoders" }.withIntDomains(source.rootIntDomainsInPlace)
         .let { encoded -> encoded.withFactors(encoded.factors + Array(source.numBoolVars) { id ->
             Clause(intArrayOf(Lit.make(id, fixed.boolValue(id))))
-        }, source.impliedFactorMask?.let { it + BooleanArray(source.numBoolVars) }) }
+        }) }
     private val adapter = OpenExactNeighborhood(linear, params, objective)
     val exhausted: Boolean get() = adapter.exhausted
 

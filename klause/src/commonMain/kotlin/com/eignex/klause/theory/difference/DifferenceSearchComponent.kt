@@ -8,6 +8,10 @@ import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.differenceFragmentOf
 import com.eignex.klause.solver.search.ComponentCheck
@@ -58,7 +62,16 @@ class DifferenceSearchComponent private constructor(
     constructor(
         model: Problem,
         modelIntVars: IntArray = IntArray(model.numIntVars) { it },
-    ) : this(model, modelIntVars, intArrayOf())
+    ) : this(model, model.selectedFactorProjections(), modelIntVars)
+
+    /** Open one combined graph from selected, completely enforced source relations. */
+    constructor(
+        model: Problem,
+        projections: PreparedFactorProjections,
+        modelIntVars: IntArray = IntArray(model.numIntVars) { it },
+    ) : this(requireNotNull(projections.linearTheoryModel(EncodingTarget.DIFFERENCE)) {
+        "unsupported selected difference encoding"
+    }.also { projections.requireSource(model) }, modelIntVars, intArrayOf())
 
     override fun initialize(context: SearchContext): ComponentResult = when (val bounds = publishRootBounds(context)) {
         ComponentResult.Consistent -> propagate(context)

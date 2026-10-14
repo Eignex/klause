@@ -148,3 +148,10 @@ owns cumulative scope composition.
 source formulas and create fresh execution state for each call. Original Boolean
 pins and exact integer windows are captured without changing that source. Refutations
 cover the actual supplied scope; a neighborhood failure cannot refute its parent.
+
+Prepared encoders and installed source relations retain no cancellation token or live
+component owner. Each arithmetic opening owns its combined assertions and native
+resources. Finite conditioned encoding captures one immutable discrete point; another
+point receives its own installation. Published coordinates outlive both installations.
+Retraction removes active guard and fixing premises before results can be reused, while
+the containing check, decision and native-work allowances remain cumulative.

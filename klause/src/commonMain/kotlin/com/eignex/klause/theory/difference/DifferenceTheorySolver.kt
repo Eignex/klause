@@ -5,6 +5,10 @@ import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.differenceFragmentOf
 import com.eignex.klause.solver.search.SearchExplanation
@@ -14,11 +18,17 @@ import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
 
 /** Complete open integer difference-logic solver. */
-class DifferenceTheorySolver(override val model: Problem) : Theory<Sample> {
-    private val fragment = differenceFragmentOf(model.factors, model.numIntVars, model.intBounds)
+class DifferenceTheorySolver(
+    override val model: Problem,
+    projections: PreparedFactorProjections = model.selectedFactorProjections(),
+) : Theory<Sample> {
+    private val encoded = requireNotNull(projections.linearTheoryModel(EncodingTarget.DIFFERENCE)) {
+        "unsupported selected difference encoding"
+    }.also { projections.requireSource(model) }
+    private val fragment = differenceFragmentOf(encoded.factors, model.numIntVars, model.intBounds)
 
     init {
-        require(supportsCompleteDifferenceTheory(model.factors, model.numIntVars, model.intBounds)) {
+        require(supportsCompleteDifferenceTheory(encoded.factors, model.numIntVars, model.intBounds)) {
             "difference-theory search requires complete difference coverage over an open integer model"
         }
     }

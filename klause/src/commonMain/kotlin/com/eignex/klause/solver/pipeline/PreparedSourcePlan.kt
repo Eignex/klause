@@ -294,7 +294,7 @@ internal fun Problem.preparedWithComponents(
         ProblemPipeline.EXACT_LRA -> checkedCompletionContract(ProcedureCompleteness.DECISION)
         ProblemPipeline.EXACT_LIRA -> checkedCompletionContract(ProcedureCompleteness.EXHAUSTIVE)
         ProblemPipeline.DIFFERENCE_THEORY -> checkedCompletionContract(ProcedureCompleteness.EXHAUSTIVE)
-        ProblemPipeline.FINITE_CP -> if (finiteRealCompletionSupported()) {
+        ProblemPipeline.FINITE_CP -> if (finiteRealCompletionSupported(ownership.factorProjections)) {
             checkedCompletionContract(ProcedureCompleteness.DECISION)
         } else unavailableContract(ExecutionDeclineCause.SOURCE_COMPLETION, "finite-real")
         ProblemPipeline.UNSUPPORTED_OPEN -> unplacedArithmeticContract(ownership.factorProjections)
@@ -334,7 +334,8 @@ internal fun Problem.preparePolynomialExecutionPlan(
 ): PreparedSourcePlan {
     projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
-    val polynomial = if (openInteger) null else SharedPolynomialModel.lower(this, sourceFormula, formulaForFactor, projections)
+    val polynomial = if (openInteger) null else
+        SharedPolynomialModel.lower(this, sourceFormula, formulaForFactor, projections)
     val cause = when {
         openInteger -> PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER
         polynomial == null -> PreparedPlanDecline.POLYNOMIAL_ENCODING

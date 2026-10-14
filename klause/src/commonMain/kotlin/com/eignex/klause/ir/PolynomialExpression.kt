@@ -8,14 +8,23 @@ import com.eignex.klause.util.isZero
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.unaryMinus
 
-internal sealed interface PolynomialExpression {
-    class Constant private constructor(val numerator: BigInt, val denominator: BigInt) : PolynomialExpression {
+/** Immutable engine-neutral polynomial syntax over the coordinate scope supplied by its owner. */
+sealed interface PolynomialExpression {
+    /** Reduced rational coefficient with a positive denominator. */
+    class Constant private constructor(
+        /** Exact numerator. */
+        val numerator: BigInt,
+        /** Exact positive denominator. */
+        val denominator: BigInt,
+    ) : PolynomialExpression {
         override fun equals(other: Any?): Boolean =
             this === other || (other is Constant && numerator == other.numerator && denominator == other.denominator)
 
         override fun hashCode(): Int = 31 * numerator.hashCode() + denominator.hashCode()
 
+        /** Exact coefficient construction. */
         companion object {
+            /** Normalize a rational coefficient without floating conversion. */
             fun of(numerator: BigInt, denominator: BigInt = BIG_ONE): Constant {
                 require(!denominator.isZero()) { "zero polynomial coefficient denominator" }
                 val divisor = numerator.gcd(denominator)
@@ -25,25 +34,39 @@ internal sealed interface PolynomialExpression {
         }
     }
 
-    data class Variable(val id: SourceRealId) : PolynomialExpression
+    /** A coordinate in the owning source or private projection scope. */
+    data class Variable(
+        /** Typed coordinate within that scope. */
+        val id: SourceRealId,
+    ) : PolynomialExpression
 
+    /** An ordered sum; an empty sum denotes zero. */
     class Sum(operands: List<PolynomialExpression>) : PolynomialExpression {
         private val values = operands.toTypedArray()
+        /** Captured operands in syntax order. */
         val operands: List<PolynomialExpression> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Sum && polynomialExpressionsEqual(this, other)
         private val hash = 31 * values.contentHashCode() + 1
         override fun hashCode(): Int = hash
     }
 
+    /** An ordered product; an empty product denotes one. */
     class Product(operands: List<PolynomialExpression>) : PolynomialExpression {
         private val values = operands.toTypedArray()
+        /** Captured operands in syntax order. */
         val operands: List<PolynomialExpression> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Product && polynomialExpressionsEqual(this, other)
         private val hash = 31 * values.contentHashCode() + 2
         override fun hashCode(): Int = hash
     }
 
-    class Power(val base: PolynomialExpression, val exponent: Int) : PolynomialExpression {
+    /** A nonnegative fixed integer exponent in neutral polynomial syntax. */
+    class Power(
+        /** Base expression. */
+        val base: PolynomialExpression,
+        /** Nonnegative exponent. */
+        val exponent: Int,
+    ) : PolynomialExpression {
         private val hash = 31 * base.hashCode() + exponent
         override fun hashCode(): Int = hash
         override fun equals(other: Any?): Boolean =

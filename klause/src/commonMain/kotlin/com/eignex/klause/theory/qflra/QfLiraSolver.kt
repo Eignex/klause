@@ -45,6 +45,10 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.search.AssembledSearchModel
@@ -165,7 +169,16 @@ class ExactLiraSearchComponent private constructor(
     constructor(
         model: Problem,
         modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
-    ) : this(legacyExactLiraSource(model), modelContribution)
+    ) : this(model, model.selectedFactorProjections(), modelContribution)
+
+    /** Open private exact state from the selected whole source relations. */
+    constructor(
+        model: Problem,
+        projections: PreparedFactorProjections,
+        modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
+    ) : this(legacyExactLiraSource(requireNotNull(projections.linearTheoryModel(EncodingTarget.LINEAR)) {
+        "unsupported selected exact linear encoding"
+    }.also { projections.requireSource(model) }), modelContribution)
 
     private val model = preparedSource.model
     private var smtStats: SmtStatsSink? = null

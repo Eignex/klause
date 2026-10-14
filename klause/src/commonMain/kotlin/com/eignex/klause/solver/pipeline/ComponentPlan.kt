@@ -15,7 +15,6 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
-import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
 
@@ -150,7 +149,7 @@ class ComponentPlan internal constructor(
                 realLower = doubleArrayOf(),
                 realUpper = doubleArrayOf(),
                 projectionProviders = factorProjections.providers,
-                projectionSelection = { view -> factorProjections.projected(view, factorIds.toIntArray()) },
+                projectionSelection = { view -> factorProjections.projected(view, factorIds.toIntArray(), mapping) },
             ),
             sourceToCp,
             cpToSource,
@@ -172,12 +171,15 @@ class ComponentPlan internal constructor(
     /** Source view consumed by the selected theory component. */
     fun theoryFragment(spec: Problem): Problem = fragment(spec) { it != FactorOwner.CP }
 
-    internal fun encodedTheoryFragment(spec: Problem): Problem? {
-        requireBelongsTo(spec)
+    private val encodedFragment: Problem? by lazy {
         val target = if (theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) EncodingTarget.DIFFERENCE
         else EncodingTarget.LINEAR
-        return factorProjections.linearTheoryModel(target,
-            factorOwners.indices.filter { factorOwners[it] != FactorOwner.CP })
+        factorProjections.linearTheoryModel(target, factorOwners.indices.filter { factorOwners[it] != FactorOwner.CP })
+    }
+
+    internal fun encodedTheoryFragment(spec: Problem): Problem? {
+        requireBelongsTo(spec)
+        return encodedFragment
     }
 
     // Shared clauses stay out because the shared clause component enforces them in the same session.
@@ -249,13 +251,12 @@ class ComponentPlan internal constructor(
         val owners = Array(factorOwners.size) { index ->
             val factor = spec.factors[index]
             if (factorOwners[index] == FactorOwner.CP && factor.variables.reals.isNotEmpty()) {
-                if (!factor.exactTheoryOwnable) return null
+                if (!factorProjections.encoder(index, EncodingTarget.LINEAR).enforcesSource) return null
                 FactorOwner.THEORY
             } else factorOwners[index]
         }
         val kept = owners.indices.filter { owners[it] != FactorOwner.CP }
-        val fragment = spec.withFactors(Array(kept.size) { spec.factors[kept[it]] },
-            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
+        val fragment = factorProjections.linearTheoryModel(EncodingTarget.LINEAR, kept) ?: return null
         val route = when {
             fragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
             fragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA

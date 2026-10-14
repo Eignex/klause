@@ -8,15 +8,16 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Term
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 
 internal class EncodedTheoryFactor(
     val source: Factor,
-    val sourceFactorIndex: Int,
     override val linearForm: LinearForm,
-    val integerConditions: Map<SourceIntId, BigInt>,
+    val attribution: EncodingAttribution,
 ) : Factor by source
 
 internal fun PreparedFactorProjections.linearTheoryModel(
@@ -27,18 +28,45 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
 ): Problem? {
     require(target != EncodingTarget.POLYNOMIAL)
+    val integerPins = fixedIntegers.toMap()
+    val booleanPins = fixedBooleans.toMap()
     val factors = ArrayList<Factor>(indices.size)
     for (index in indices) {
-        val source = problem.factors[index]
-        val encoding = LinearTheoryEncoding(target, index, fixedIntegers, fixedBooleans, cancellation)
-        if (encoder(index, target).install(source, encoding) != null) return null
-        val form = encoding.form ?: return null
-        factors += if (form === source.linearForm && fixedIntegers.isEmpty()) source else {
-            EncodedTheoryFactor(source, index, form, fixedIntegers.toMap())
-        }
+        val relation = if (integerPins.isEmpty() && booleanPins.isEmpty() && cancellation === Cancellation.Never) {
+            preparedLinearEncoding(index, target)
+        } else installLinearFactor(index, target, integerPins, booleanPins, cancellation)
+        factors += relation ?: return null
     }
     return problem.withFactors(factors.toTypedArray(),
         problem.impliedFactorMask?.let { mask -> BooleanArray(indices.size) { mask[indices[it]] } })
+}
+
+internal fun PreparedFactorProjections.installLinearFactor(
+    index: Int,
+    target: EncodingTarget,
+    integerPins: Map<SourceIntId, BigInt> = emptyMap(),
+    booleanPins: Map<SourceBoolId, Boolean> = emptyMap(),
+    cancellation: Cancellation = Cancellation.Never,
+): EncodedTheoryFactor? {
+    val source = problem.factors[index]
+    val encoding = LinearTheoryEncoding(target, index, integerPins, booleanPins, cancellation)
+    if (encoder(index, target).install(source, encoding) != null) return null
+    val form = encoding.form ?: return null
+    require(form.rows.all { row ->
+        (row.activator == LinearRow.ALWAYS || row.activator in source.boolVars) &&
+            (0 until row.size).all { term ->
+                val ref = row.ref(term)
+                when {
+                    Term.isInt(ref) -> Term.intVar(ref) in source.intVars
+                    Term.isReal(ref) -> Term.realVar(ref) in source.variables.reals
+                    else -> (Term.lit(ref) ushr 1) in source.boolVars
+                }
+            }
+    }) { "an encoding must retain the source factor's coordinate membership" }
+    return EncodedTheoryFactor(source, form, EncodingAttribution(index,
+        source.boolVars.map(::SourceBoolId), source.intVars.map(::SourceIntId),
+        source.variables.reals.map(::SourceRealId), integerConditions = integerPins,
+        booleanConditions = booleanPins))
 }
 
 private class LinearTheoryEncoding(

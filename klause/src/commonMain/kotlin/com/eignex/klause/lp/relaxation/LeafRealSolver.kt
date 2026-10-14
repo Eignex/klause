@@ -9,6 +9,8 @@ import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
@@ -23,6 +25,7 @@ internal class LeafRealSolver(
     context: LpSolveContext = LpSolveContext.Production,
     pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
+    private val encoders = problem.selectedFactorProjections()
     private val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, objective, projections = null))
     private var trail = LpBoundTrail(LpRetainedSources.emptyModel())
     private val solvers = LpSolveSession(context, pricing, componentSplit)
@@ -38,6 +41,8 @@ internal class LeafRealSolver(
         check(!closed) { "real leaf solver is closed" }
         require(sample.numIntVars == problem.numIntVars && sample.numBoolVars == problem.numBoolVars)
         if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        val encoded = encoders.finiteLinearModel(sample, cancellation)
+            ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxation = try {
             relaxation(sample, cancellation)
         } catch (_: LpAssemblyCancelled) {
@@ -52,7 +57,7 @@ internal class LeafRealSolver(
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
         )
-        return relaxation.leafResult(certified, problem, objective, sample, sink)
+        return relaxation.leafResult(certified, problem, objective, sample, sink).checkedEncoding(encoded, sample)
     }
 
     private fun relaxation(sample: Sample, cancellation: Cancellation): LpRelaxation? {

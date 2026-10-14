@@ -24,7 +24,8 @@ internal fun ComponentPlan.theoryComponent(
     spec: Problem,
     smtStats: SmtStatsSink? = null,
     theorySolveStop: Cancellation? = null,
-): TheoryComponent? = openTheoryComponent(encodedTheoryFragment(spec) ?: theoryFragment(spec), smtStats, theorySolveStop)
+): TheoryComponent? =
+    openTheoryComponent(encodedTheoryFragment(spec) ?: theoryFragment(spec), smtStats, theorySolveStop)
 
 @Suppress("TooGenericExceptionCaught") // Invocation cleanup preserves an arbitrary primary failure.
 internal fun ComponentPlan.openTheoryComponent(

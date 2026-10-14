@@ -319,7 +319,7 @@ from scalar telemetry and from a ray's private base.
 ## Projection provider extensions
 
 `FactorProjectionProviders` groups engine-owned `PropagationProjectionProvider`,
-`ScoringProjectionProvider` and `RelaxationProjectionProvider` selectors. Their
+`ScoringProjectionProvider`, `RelaxationProjectionProvider` and `EncoderProvider` selectors. Their
 selected descriptors pair declared participation and check authority with the
 implementation factory or emitter. Providers may delegate unmatched factors to
 the built-in selector without editing central dispatch. Null refuses propagation
@@ -331,6 +331,30 @@ Prepare once with `providers.prepare(problem)` and pass the source-associated
 contains no mutable workspace; its factory must return a private mechanism or a
 stateless projection using state-owned payloads. Source membership, soundness,
 exact checks and scoring delta consistency remain extension obligations.
+
+`encoder.select(factor, target)` returns a prepared `Encoder`. Direct/equivalent
+support authorizes the complete relation; conditioned support also declares required
+integer fixings or Boolean pins. The receiving `TheoryEncoding` captures those source
+conditions, installs the full relation and owns private coordinate allocation.
+Relaxation-only and unsupported support decline enforcing installation. Resource
+and missing-condition declines remain explicit `EncoderDecline` outcomes. Extensions
+keep installers deterministic over immutable factor data and must preserve every
+source solution, guards, strictness and reconstruction.
+
+`encodingTargets` adds consumer languages to the built-in linear, difference and
+polynomial targets captured by `prepare`. `PreparedFactorProjections.encoder` exposes
+the selected descriptor without opening live state. Linear/difference components accept
+that capture directly; normal source strategies install it through shared preparation.
+Coordinate projections remap declared conditions while factories use supplied view
+coordinates. Source rewrites reselect, and objective rebinding retains the capture.
+
+`PolynomialExpression` and `PolynomialRealFormula` are immutable neutral syntax.
+Coordinates belong to their owning source or private projection scope. Use the
+receiving encoding's typed `integer`/`real` mappings and `conditional` allocator;
+private polynomial reals are not original source declarations. `EncodingAttribution`
+retains original coordinates, integer embeddings, private auxiliaries and scope pins.
+The shared witness assembler still requires complete, unique original coordinates.
+An encoding provides no independent proof certificate solely by being installed.
 
 Finite facades accept `problem.bake(providers)` for invocation-specific selection.
 The baked projection carries immutable factories, and each live search allocates its
