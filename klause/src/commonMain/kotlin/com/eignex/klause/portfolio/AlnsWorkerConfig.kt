@@ -98,6 +98,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
             maxDestroyFraction = profile.maxDestroyFraction,
             pooledIncumbents = matchedPools?.solutions,
             acceptanceFor = acceptanceFactory(),
+            literalSweep = definitionalSweep,
         )
         val params = LocalSearchParams(
             randomSeed = seed + index,

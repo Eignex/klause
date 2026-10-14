@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.PooledIncumbents
@@ -122,6 +123,7 @@ internal class Alns(
      *  assignment. Version-gated; importing is skipped when the run carries assumption pins. Null leaves the
      *  run private. */
     val pooledIncumbents: IncumbentExchange<Sample, Double>? = null,
+    private val literalSweep: DefinitionalSweep? = null,
 ) : ResumableOptimizer<LocalSearchParams> {
 
     init {
@@ -304,8 +306,11 @@ internal class Alns(
                 }
                 val destroyed = destroyOperators[destroyIdx]
                     .destroy(rng, inner.problem, incumbent, objective, destroyFraction)
+                val booleanScope = if (literalSweep == null) destroyed.bools else {
+                    literalSweep.expandUnitBooleanScope(destroyed.bools, params.cancellation) ?: break
+                }
                 val freed = FreedVars(
-                    destroyed.bools.filterNot(params.assumptions::isFrozenBool).toIntArray(),
+                    booleanScope.filterNot(params.assumptions::isFrozenBool).toIntArray(),
                     destroyed.ints.filterNot(params.assumptions::isFrozenInt).toIntArray(),
                 )
                 if (freed.isEmpty) {
