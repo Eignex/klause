@@ -521,24 +521,15 @@ internal fun LpEngine.sparseSafePrune(
     val rowMeter = if (problem.numRealVars > 0 &&
         (problem.numIntVars > 0 || problem.numBoolVars > 0)
     ) MixedCertificateMeter(cancellation) else null
-    if (rowMeter != null) {
-        val affectedColumns = if (session.decisionLevel == 0) null
-            else narrowedRowColumns(relaxation, session, cancellation)
-        val projected = solveContext.certificationPolicy.acceptNullable(
-            LpCertifier.INTEGER,
-            mixedRowBounds(model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), rowMeter, affectedColumns),
-        ).orEmpty()
-        noteNodeOverhead(rowMeter.work)
-        if (observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
-            applyRowBounds(relaxation, projected, session, sink, learn, cancellation)
-        }) return LpNodeOutcome(true, null)
-        if (cancellation()) return LpNodeOutcome(false, optimalBasis)
-    }
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
     val objectiveCeiling = if (canPrune) null else singleObjectiveCeiling(relaxation, cancellation)
     val canFix = canPrune || objectiveCeiling != null
     if (!canFix && !canPropagate) {
+        if (rowMeter != null && applyMixedRowBounds(relaxation, session, sink, learn, cancellation, rowMeter)) {
+            return LpNodeOutcome(true, null)
+        }
+        if (cancellation()) return LpNodeOutcome(false, optimalBasis)
         val constant = cutPool.constantContradiction() ?: return LpNodeOutcome(false, optimalBasis)
         return when (val outcome = solveSelectedCuts(
             session, LpCutOutcome.Solved(relaxation, result), listOf(constant), cancellation, sink, learn,
@@ -656,8 +647,10 @@ internal fun LpEngine.sparseSafePrune(
         cert,
         sink.lp.certificationObserver(LpRoute.NODE),
         solveContext.certificationPolicy,
-    )
-        ?: return LpNodeOutcome(false, optimalBasis)
+    ) ?: run {
+        val prune = rowMeter != null && applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter)
+        return LpNodeOutcome(prune, if (prune) null else optimalBasis)
+    }
     val full = checkNotNull(BigFraction.ofDouble(lower)) + BigFraction.ofLong(boundRel.objectiveConstant)
     val sourceRange = sourceObjectiveRange(boundRel)
     val cutoff = if (canPrune && sourceRange != null) enclosingCutoff(bound) else null
@@ -727,7 +720,33 @@ internal fun LpEngine.sparseSafePrune(
             return LpNodeOutcome(true, null)
         }
     }
+    if (rowMeter != null && applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter)) {
+        return LpNodeOutcome(true, null)
+    }
     return LpNodeOutcome(false, optimalBasis)
+}
+
+@Suppress("LongParameterList")
+private fun LpEngine.applyMixedRowBounds(
+    relaxation: LpRelaxation,
+    session: PropagationSession,
+    sink: SolveStatsSink,
+    learn: Boolean,
+    cancellation: Cancellation,
+    meter: MixedCertificateMeter,
+): Boolean {
+    if (cancellation()) return false
+    val initialWork = meter.work
+    val affectedColumns = if (session.decisionLevel == 0) null
+        else narrowedRowColumns(relaxation, session, cancellation)
+    val projected = solveContext.certificationPolicy.acceptNullable(
+        LpCertifier.INTEGER,
+        mixedRowBounds(relaxation.model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), meter, affectedColumns),
+    ).orEmpty()
+    noteNodeOverhead(meter.work - initialWork)
+    return observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
+        applyRowBounds(relaxation, projected, session, sink, learn, cancellation)
+    }
 }
 
 private fun LpEngine.narrowedRowColumns(
