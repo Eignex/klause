@@ -120,11 +120,16 @@ Ordinary clock polling uses the shared 64-call/4096-work stride; work-metered
 cancellation stays immediate and publication polls directly.
 Continuous terms use their exact finite minimizing endpoint, including strict
 interval infima/suprema, and absent sides never acquire a probe-box premise.
-When rounded multipliers decline, one continued-fraction reconstruction candidate
-uses the same allowance and cancellation stride. Its recurrence steps are charged.
+When rounded multipliers decline, an exact endpoint repair can cancel a continuous
+reduced cost that requires an absent bound. It adjusts only an active row containing
+that single continuous coordinate, preserves the logical column's endpoint signs,
+and then verifies every reduced cost and source endpoint again. Rows coupling
+several continuous coordinates cannot supply this repair. A remaining decline
+admits one continued-fraction reconstruction candidate under the same allowance
+and cancellation stride. All scans, scalar arithmetic and recurrence steps are charged.
 Approximation only proposes the multipliers: every reduced cost and endpoint
 contribution is checked exactly, including zero reduced cost on a free column.
-Node-deduction phase outcomes distinguish completed integer, rounded, reconstructed
+Node-deduction phase outcomes distinguish completed integer, rounded, endpoint-repaired, reconstructed
 and objective-integrality checks from missing endpoints, scalar width, resource
 limits and cancellation. They time existing attempts without additional numerical
 queries; their counts do not add to certifier invocation or work totals.
