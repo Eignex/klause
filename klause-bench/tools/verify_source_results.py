@@ -343,10 +343,29 @@ def require_verdict(solver, expected, problem, purpose):
 
 
 def source_query_solver(constraints, variables, is_smt):
-    bounds = {z3.simplify(constraint).sexpr() for constraint in constraints} if not is_smt else set()
+    bounds = {variable.get_id(): set() for variable in variables.values()}
+    if not is_smt:
+        for constraint in constraints:
+            comparison = z3.simplify(constraint)
+            kind = comparison.decl().kind()
+            if kind not in (z3.Z3_OP_GE, z3.Z3_OP_LE):
+                continue
+            left, right = comparison.children()
+            if z3.is_int_value(left) or z3.is_rational_value(left):
+                left, right = right, left
+                kind = z3.Z3_OP_LE if kind == z3.Z3_OP_GE else z3.Z3_OP_GE
+            if left.decl().kind() == z3.Z3_OP_TO_REAL:
+                left = left.arg(0)
+            if left.get_id() not in bounds or not (z3.is_int_value(right) or z3.is_rational_value(right)):
+                continue
+            value = fractions.Fraction(str(right))
+            if kind == z3.Z3_OP_GE and value == 0:
+                bounds[left.get_id()].add('lower')
+            if kind == z3.Z3_OP_LE and value == 1:
+                bounds[left.get_id()].add('upper')
     binary = not is_smt and bool(variables) and all(
-        z3.is_int(variable) and z3.simplify(variable >= rational(0)).sexpr() in bounds and
-        z3.simplify(variable <= rational(1)).sexpr() in bounds for variable in variables.values())
+        z3.is_int(variable) and bounds[variable.get_id()] == {'lower', 'upper'}
+        for variable in variables.values())
     solver = z3.SolverFor('QF_FD') if binary else z3.Solver()
     solver.set(timeout=120000)
     solver.add(*constraints)
