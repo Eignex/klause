@@ -294,8 +294,8 @@ workers retain their initial coverage, seed positions and family policy. Before 
 first witness, ordinary complete siblings reserve one family share of elapsed time,
 split equally; that reservation ends at the first checked incumbent. Existing source
 reservations keep priority. The deferred
-core worker receives one base slice of cumulative native work and at most two seconds
-of active time for its whole lifetime, including construction, preparation and query
+core worker receives a base work allowance per turn and at most two seconds
+of cumulative active time for its whole lifetime, including construction, preparation and query
 reopens. Its bounded continuations use base slices after ordinary initial admission
 without drawing from or aging the ordinary family/arm policy. Ordinary initial probes
 retain their deadline division and the shared allowance ladder does not grow for
@@ -356,7 +356,9 @@ current segment deadline and remaining work allowance; native propagation polls
 from the first batch. A segment interrupted inside propagation discards its private
 traversal and retains the immutable query snapshot, completed cores and residual
 weights. Its partial search supplies no refutation. A later segment reopens the
-query with the cumulative decision allowance. Its immutable baked snapshot
+query with the cumulative decision allowance. A work pause between completed fixpoints
+retains the live traversal; the work boundary is separate from the propagation interruption
+token. Its immutable baked snapshot
 survives interrupted traversal construction; the next segment opens a fresh traversal
 over that snapshot without repeating the bake. Atomic allocations and factor calls
 can overrun cooperative boundaries. Query propagation fractions and slice overspend

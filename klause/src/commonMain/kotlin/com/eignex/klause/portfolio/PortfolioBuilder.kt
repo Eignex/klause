@@ -89,7 +89,7 @@ object PortfolioBuilder {
             }
             FinitePortfolioFactory(armId, family) { index, seed, budget ->
                 val admitted = if (config is CoreGuidedWorkerConfig && deferCore) {
-                    config.withWorkLimit(scenario.sliceWork)
+                    config.withActiveTimeLimit()
                 } else config
                 val bounded = budget?.let(admitted::withNodeBudget) ?: admitted
                 bounded.materialize(

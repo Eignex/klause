@@ -40,6 +40,28 @@ import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
     @Test
+    fun `private assumption traversal resumes across decision work pauses`() {
+        val problem = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true))),
+        )).bake()
+        val objective = LinearObjective(longArrayOf(1))
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = false))
+        var result: MinimizeResult? = null
+
+        repeat(10) {
+            if (result == null) result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) {}
+        }
+
+        val optimal = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(1L, objective.evaluateLong(optimal.sample))
+        assertTrue(optimal.sample.boolValue(1) || optimal.sample.boolValue(2))
+        assertTrue(optimal.sample.boolValue(3) || optimal.sample.boolValue(4))
+        search.close()
+    }
+
+    @Test
     fun `active preparation time cannot renew after an interrupted opening`() {
         val clock = TestTimeSource()
         val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
