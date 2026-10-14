@@ -436,6 +436,15 @@ the heuristic instruction ledger. Exact objective cutoffs require strict source
 improvement. Only checked completions publish witnesses or best-found incumbents.
 Repair refutations and exhausted windows carry no source proof authority.
 
+Generated linear neighborhoods initialize their private completion root before
+preparing a Boolean center. Known root values replace the default false values;
+free Booleans keep that default. The copied prefix stays private across slice
+interruptions, and no generated condition is checked before the copy completes.
+Each Boolean visit spends heuristic instructions and the shared move allowance;
+root preparation retains the completion owner's native work and deadlines.
+Explicit caller conditions retain their pins and can contradict root facts.
+Root values guide proposals only; complete source checks still authorize witnesses.
+
 The quadratic source adapter uses the same condition/completion contract with
 exact algebraic objective ordering. Single-coordinate releases and adaptive block
 releases repair finite assignments and continuous windows together. Native repair

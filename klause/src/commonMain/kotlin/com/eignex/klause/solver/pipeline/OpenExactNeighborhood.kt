@@ -115,7 +115,9 @@ internal class OpenExactNeighborhood(
             nodeBudget = params.nodeBudget, maximumMoves = minOf(maximumMoves, params.maxFlips),
             maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
             maximumImprovementMoves = maximumImprovementMoves, nativeWork = { work },
-            completionStats = { stats }, onClose = ::close)
+            completionStats = { stats }, onClose = ::close,
+            prepareBooleanCenter = if (completion === this) queries::prepareBooleanCenter else null,
+            rootBooleanValue = queries::rootBooleanValue)
 
     private fun coordinates(sample: Sample): List<BigFraction> =
         List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } + sample.exactReals.orEmpty()

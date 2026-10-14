@@ -45,6 +45,8 @@ internal class ExactNeighborhood(
     private val nativeWork: () -> Long = { 0 },
     private val completionStats: () -> SolveStats = { SolveStats.EMPTY },
     private val onClose: () -> Unit = {},
+    private val prepareBooleanCenter: ((Cancellation) -> Boolean)? = null,
+    private val rootBooleanValue: (Int) -> Boolean? = { null },
 ) : AutoCloseable {
     private val random = Random(seed)
     private var centers = centers.toList()
@@ -60,6 +62,8 @@ internal class ExactNeighborhood(
     private var stalls = 0L
     private var charged = 0L
     private var closed = false
+    private var booleanCenterPrepared = prepareBooleanCenter == null
+    private var nextCenterBoolean = 0
     val stats: SolveStats get() = sink.snapshot().mergedWith(completionStats())
     val work: Long get() = charged
 
@@ -83,6 +87,28 @@ internal class ExactNeighborhood(
         val end = charged + minOf(allowance.coerceAtLeast(0), Long.MAX_VALUE - charged)
         while (!cancellation() && charged < end && moves < maximumMoves && charged < maximumInstructions &&
             !improvementAllowanceSpent() && nodeBudget?.exhausted() != true) {
+            if (!booleanCenterPrepared) {
+                val before = nativeWork()
+                val prepared = requireNotNull(prepareBooleanCenter)(cancellation)
+                charge(ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong())
+                if (cancellation()) return searchAllowanceSpent()
+                if (!prepared) {
+                    moves++
+                    charge(1)
+                    sink.ls.recordCompletion(refuted = false, undecided = true)
+                    sink.ls.recordWork(moves, 0, stalls)
+                    continue
+                }
+                while (nextCenterBoolean < boolCount) {
+                    if (cancellation() || charged >= end || charged >= maximumInstructions ||
+                        nodeBudget?.exhausted() == true) return searchAllowanceSpent()
+                    rootBooleanValue(nextCenterBoolean)?.let { bools[nextCenterBoolean] = it }
+                    nextCenterBoolean++
+                    charge(1)
+                }
+                booleanCenterPrepared = true
+                continue
+            }
             val total = centers.size + boolCount
             val operator = operator()
             val count = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
@@ -95,8 +121,7 @@ internal class ExactNeighborhood(
             val result = completion.check(ExactNeighborhoodCondition(pins, lower, upper, value), cancellation)
             moves++
             val cost = 1 + ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong()
-            charged += minOf(cost, Long.MAX_VALUE - charged)
-            nodeBudget?.spendMoves(cost)
+            charge(cost)
             sink.ls.recordCompletion(
                 result is ExactNeighborhoodResult.Refuted, result is ExactNeighborhoodResult.Undecided,
             )
@@ -119,8 +144,15 @@ internal class ExactNeighborhood(
             sink.ls.recordWork(moves, 0, stalls)
             if (total == 0) return true
         }
-        return moves >= maximumMoves || charged >= maximumInstructions ||
-            improvementAllowanceSpent() || nodeBudget?.exhausted() == true
+        return searchAllowanceSpent()
+    }
+
+    private fun searchAllowanceSpent(): Boolean = moves >= maximumMoves || charged >= maximumInstructions ||
+        improvementAllowanceSpent() || nodeBudget?.exhausted() == true
+
+    private fun charge(cost: Long) {
+        charged += minOf(cost, Long.MAX_VALUE - charged)
+        nodeBudget?.spendMoves(cost)
     }
 
     private fun improvementAllowanceSpent(): Boolean = incumbent != null &&

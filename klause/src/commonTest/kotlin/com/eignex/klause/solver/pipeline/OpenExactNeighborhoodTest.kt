@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.SolveResult
@@ -28,6 +30,83 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class OpenExactNeighborhoodTest {
+    @Test
+    fun `generated Boolean centers respect required source root values`() {
+        for (value in listOf(true, false)) {
+            val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, value)))),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+            val adapter = OpenExactNeighborhood(source, TheoryParams())
+
+            val result = adapter.search(adaptive = false, maximumMoves = 1).use { search ->
+                search.advance(Cancellation.Never, 1000)
+                search.solveResult(TerminationReason.BudgetExhausted)
+            }
+
+            val sample = assertIs<SolveResult.Sat>(result).assignment
+            assertEquals(value, sample.boolValue(0))
+            assertEquals(BigFraction.ZERO, sample.exactReals?.single())
+            assertEquals(1.0, result.stats.ls.completions.sum)
+        }
+    }
+
+    @Test
+    fun `explicit contrary Boolean pins still refute after generated center preparation`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val plan = source.componentPlan()
+        val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
+            plan.search(source, emptyMap(), cancellation = stop)
+        }
+
+        queries.use {
+            assertTrue(it.prepareBooleanCenter(Cancellation.Never))
+            assertEquals(true, it.rootBooleanValue(0))
+            val condition = ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap())
+
+            assertIs<ExactNeighborhoodResult.Refuted>(it.check(condition, Cancellation.Never))
+            assertEquals(true, it.rootBooleanValue(0))
+        }
+    }
+
+    @Test
+    fun `independent generated centers retain their own source root values`() {
+        val firstSource = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val secondSource = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false)))),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val first = OpenExactNeighborhood(firstSource, TheoryParams())
+        val second = OpenExactNeighborhood(secondSource, TheoryParams())
+        val firstResult = first.search(adaptive = false, maximumMoves = 1).use { search ->
+            search.advance(Cancellation.Never, 1000)
+            search.solveResult(TerminationReason.BudgetExhausted)
+        }
+
+        val secondResult = second.search(adaptive = false, maximumMoves = 1).use { search ->
+            search.advance(Cancellation.Never, 1000)
+            search.solveResult(TerminationReason.BudgetExhausted)
+        }
+
+        assertTrue(assertIs<SolveResult.Sat>(firstResult).assignment.boolValue(0))
+        assertFalse(assertIs<SolveResult.Sat>(secondResult).assignment.boolValue(0))
+    }
+
+    @Test
+    fun `generated Boolean centers exclude retracted query assignments`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val adapter = OpenExactNeighborhood(source, TheoryParams())
+        val pinned = adapter.check(ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
+            Cancellation.Never)
+        assertTrue(assertIs<ExactNeighborhoodResult.Witness>(pinned).sample.boolValue(0))
+
+        val result = adapter.search(adaptive = false, maximumMoves = 1).use { search ->
+            search.advance(Cancellation.Never, 1000)
+            search.solveResult(TerminationReason.BudgetExhausted)
+        }
+
+        assertFalse(assertIs<SolveResult.Sat>(result).assignment.boolValue(0))
+    }
+
     @Test
     fun `native neighborhood checking retains the supplied runtime publication`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
