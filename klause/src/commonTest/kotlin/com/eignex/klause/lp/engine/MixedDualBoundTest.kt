@@ -11,6 +11,23 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `node bounds retain a stronger complete objective equality candidate`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val r = addRealVar(0.0, 1.0, cost = 1.0)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        var additional: LpDeductionCertificate? = null
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(-1.0),
+            onAdditionalCertificate = { additional = it }))
+
+        assertEquals(BigFraction.ZERO, certificate.exactObjectiveBound())
+        assertEquals(BigFraction.ofLong(-1L), assertNotNull(additional).exactObjectiveBound())
+    }
+
+    @Test
     fun `cancellation at admission withholds an additional objective certificate`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)
@@ -29,7 +46,7 @@ class MixedDualBoundTest {
         }
 
         val certificate = nodeDualCertificate(model, doubleArrayOf(0.0), Cancellation { cancelled }, observer,
-            onObjectiveCertificate = { published = true })
+            onAdditionalCertificate = { published = true })
 
         assertNull(certificate)
         assertFalse(published)
@@ -47,7 +64,7 @@ class MixedDualBoundTest {
         var objectiveCertificate: LpDeductionCertificate? = null
 
         val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
-            onObjectiveCertificate = { objectiveCertificate = it }))
+            onAdditionalCertificate = { objectiveCertificate = it }))
 
         assertEquals(BigFraction.ONE, certificate.exactObjectiveBound())
         assertEquals(BigFraction.ZERO, certificate.exactReducedCost(0))
@@ -135,7 +152,7 @@ class MixedDualBoundTest {
 
         var published = false
         val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
-            onObjectiveCertificate = { published = true }))
+            onAdditionalCertificate = { published = true }))
 
         assertNull(certificate.integralObjectiveRows())
         assertFalse(published)
