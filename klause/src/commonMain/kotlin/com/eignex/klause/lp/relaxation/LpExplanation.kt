@@ -334,7 +334,16 @@ internal object LpExplanation {
     ): Boolean {
         if (!cert.belongsTo(relaxation.model, observer)) return false
         val integralRows = cert.integralObjectiveRows()
+        val state = relaxation.model.exactState
         val rows = (0 until relaxation.model.m).filter {
+            if (state != null) {
+                val column = relaxation.model.slackCol(it)
+                val sign = cert.reducedCostSign(column)
+                if (sign != 0) {
+                    val support = state.activeSide(column, sign < 0) ?: return false
+                    if (support.witness >= 0L || support.side.premises != null) return false
+                }
+            }
             cert.dualNonzeroRow(it) || integralRows?.contains(it) == true
         }.toIntArray()
         return addRowPremiseLits(lits, seen, relaxation, rows, session)

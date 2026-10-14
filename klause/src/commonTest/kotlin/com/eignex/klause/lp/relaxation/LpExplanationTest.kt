@@ -46,6 +46,34 @@ import kotlin.test.assertTrue
 
 class LpExplanationTest {
     @Test
+    fun `objective reasons withhold separately scoped logical endpoint support`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(Linear(intArrayOf(0), doubleArrayOf(-2.0), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.GE, 0.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val source = assertNotNull(LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            val r = addRealVar(0.0, 2.0, cost = 1.0)
+            addRow(intArrayOf(x, r), longArrayOf(-2L, 1L), Relation.GE, 0L)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val slack = source.column(source.n)
+        val bounds = slack.bounds.copy(lower = slack.bounds.lower?.copy(
+            premises = ExactLpPremises(emptyList(), listOf(0)),
+        ))
+        val scoped = source.withBoundColumns(List(source.numVars) {
+            if (it == source.n) slack.copy(bounds = bounds) else source.column(it)
+        })
+        val model = assertNotNull(LpExactState(scoped).toWorkingModel())
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(-1.0)))
+        val relaxation = LpRelaxation(model, intArrayOf(0, -1), booleanArrayOf(false, false), 0L,
+            intArrayOf(0), intArrayOf(), colRealId = intArrayOf(-1, 0))
+
+        val reason = LpExplanation.objectiveBoundReason(relaxation, certificate, PropagationSession(problem))
+
+        assertNull(reason)
+    }
+
+    @Test
     fun `finite endpoint cancellation reasons require scoped row premises`() {
         for (backed in listOf(false, true)) {
             val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
