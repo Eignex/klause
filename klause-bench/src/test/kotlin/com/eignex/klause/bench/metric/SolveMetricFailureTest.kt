@@ -30,7 +30,8 @@ class SolveMetricFailureTest {
 
     private fun persisted(failure: Throwable): SolveRecord {
         val (record, raw) = SolveMetric.solve(
-            entry, SolverInvocation.KLAUSE, settings, Budget(1000), UUID.randomUUID().toString(), "timestamp", "revision",
+            entry, SolverInvocation.KLAUSE, settings, Budget(1000),
+            UUID.randomUUID().toString(), "timestamp", "revision",
             installedBuild = { build },
             invoke = { _, _, _, _, _ -> throw failure },
         )
@@ -80,7 +81,8 @@ class SolveMetricFailureTest {
 
     @Test
     fun `caught solve failures retain a nested cause on disk`() {
-        val failure = IllegalStateException("solve failed", IOException("launcher missing", IllegalArgumentException("path")))
+        val cause = IOException("launcher missing", IllegalArgumentException("path"))
+        val failure = IllegalStateException("solve failed", cause)
 
         val record = persisted(failure)
 
