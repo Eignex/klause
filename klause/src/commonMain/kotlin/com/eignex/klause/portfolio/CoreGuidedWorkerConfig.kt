@@ -16,13 +16,13 @@ import com.eignex.klause.solver.result.SharingChannel
 
 internal class CoreGuidedWorkerConfig(
     private val nodeBudget: NodeBudget? = null,
-    private val edit: ((BacktrackParams) -> BacktrackParams)? = null,
     private val maximumWork: Long? = null,
+    private val edit: ((BacktrackParams) -> BacktrackParams)? = null,
 ) : WorkerConfig {
     override val label: String get() = "core-guided"
-    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = CoreGuidedWorkerConfig(budget, edit, maximumWork)
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = CoreGuidedWorkerConfig(budget, maximumWork, edit)
 
-    internal fun withWorkLimit(work: Long): CoreGuidedWorkerConfig = CoreGuidedWorkerConfig(nodeBudget, edit, work)
+    internal fun withWorkLimit(work: Long): CoreGuidedWorkerConfig = CoreGuidedWorkerConfig(nodeBudget, work, edit)
 
     override fun materialize(
         problem: BakedProblem,
