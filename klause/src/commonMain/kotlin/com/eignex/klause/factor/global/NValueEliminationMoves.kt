@@ -159,12 +159,12 @@ internal class NValueEliminationMoves(
             if (parts.size >= MAX_COORDINATES || !sink.allowsInt(variable)) return null
             val occurrences = state.projection.intOccurrences[variable]
             if (occurrences.size > MAX_INDEX_OCCURRENCES) return null
-            val elements = occurrences.mapNotNull { fid ->
-                val element = state.problem.factors[fid] as? Element ?: return@mapNotNull null
-                element.takeIf {
-                    it.idx == variable && it.arrIsVars &&
-                        state.invariants?.elementResultDefinition(it.result)?.factor === it
-                }
+            val elements = ArrayList<Element>()
+            for (fid in occurrences) {
+                val element = state.problem.factors[fid] as? Element ?: continue
+                if (element.idx == variable && element.arrIsVars &&
+                    state.invariants?.elementResultDefinition(element.result)?.factor === element
+                ) elements += element
             }
             val candidates = if (representatives.size <= MAX_SPLIT_TARGETS) representatives else {
                 List(MAX_SPLIT_TARGETS) { representatives[state.rng.nextInt(representatives.size)] }
