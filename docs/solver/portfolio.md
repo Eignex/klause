@@ -316,7 +316,9 @@ opens its retained core handle. Delegated satisfaction operations use the backin
 backtrack solver without transferring optimization-session ownership to it.
 
 Weights, negative-coefficient offsets and the accumulated lower bound use arbitrary-precision
-integers. A refuted core charges its minimum residual weight. Its violation count `s`
+integers. Unpinned Boolean objective terms use their signed source violation literals
+directly. Caller-pinned terms use equivalent private selectors so query assumptions
+cannot overwrite source pins. A refuted core charges its minimum residual weight. Its violation count `s`
 is replaced by `1 + sum(k = 2..n, s >= k)` using exact reified cardinality thresholds;
 only the first unspent threshold of each count is materialized. Higher thresholds
 remain latent at the count's original weight and imply its active frontier. A partial

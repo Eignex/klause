@@ -71,8 +71,8 @@ class CoreGuidedSearchTest {
 
     @Test
     fun `core work allowance includes preparation and cannot renew on resume`() {
-        val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
-        val objective = LinearObjective(LongArray(1024) { 1L })
+        val problem = Problem(8192, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(LongArray(8192) { 1L })
         val search = CoreGuidedSearch(problem, objective, BacktrackParams(), maximumWork = 1L)
 
         val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("unprepared witness") }
@@ -90,8 +90,8 @@ class CoreGuidedSearchTest {
 
     @Test
     fun `exhausted preparation slice pauses before decisions and resumes the same objective`() {
-        val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
-        val objective = LinearObjective(LongArray(1024) { 1L })
+        val problem = Problem(8192, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(LongArray(8192) { 1L })
         val search = CoreGuidedSearch(problem, objective, BacktrackParams())
 
         val paused = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { error("unfinished preparation") }
@@ -109,6 +109,23 @@ class CoreGuidedSearchTest {
         )
         assertEquals(0L, objective.evaluateLong(optimal.sample))
         search.close()
+    }
+
+    @Test
+    fun `caller pins remain hard for either objective polarity`() {
+        val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
+        for (weight in listOf(-5L, 5L)) {
+            for (pin in listOf(false, true)) {
+                val objective = LinearObjective(longArrayOf(weight))
+                val params = BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to pin)))
+
+                val result = CoreGuidedSolver(problem).minimize(objective, params)
+
+                val optimal = assertIs<MinimizeResult.Optimal>(result)
+                assertEquals(pin, optimal.sample.boolValue(0))
+                assertEquals(if (pin) weight else 0L, objective.evaluateLong(optimal.sample))
+            }
+        }
     }
 
     @Test
