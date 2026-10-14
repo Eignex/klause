@@ -184,13 +184,16 @@ private fun blendedCertificate(
     meter: MixedCertificateMeter,
 ): LpDeductionCertificate? {
     val state = model.exactState ?: return null
-    meter.reserve(model.m * 24L)
-    val a = primary.exactMultipliers()
-    val b = objective.exactMultipliers()
-    if (a == b) return null
+    meter.reserve(model.m * 8L)
     val half = BigFraction.ofLong(2L).reciprocal()
-    val y = List(model.m) { meter.multiply(meter.add(a[it], b[it]), half) }
-    return mixedCertificate(model, state, y, meter)
+    var different = false
+    val y = List(model.m) { row ->
+        val a = meter.multiplier(primary, row)
+        val b = meter.multiplier(objective, row)
+        if (a != b) different = true
+        meter.multiply(meter.add(a, b), half)
+    }
+    return if (different) mixedCertificate(model, state, y, meter) else null
 }
 
 private fun objectiveExpressionCertificate(
@@ -236,8 +239,8 @@ private fun objectiveEliminationCertificate(
         }
     }
     if (objective < 0) return null
-    meter.reserve(model.m * 24L)
-    val y = certificate.exactMultipliers().toMutableList()
+    meter.reserve(model.m * 8L)
+    val y = MutableList(model.m) { meter.multiplier(certificate, it) }
     var residual = meter.read(model.exactCost(objective))
     var definingCoefficient = BigFraction.ZERO
     model.forEachRationalColumn(objective) { r, coefficient ->
@@ -322,6 +325,7 @@ internal class MixedDualBound(
     override fun usesRationalArithmetic(): Boolean = true
     override fun belongsTo(model: LpModel, observer: LpCertificationObserver?): Boolean = model.exactState === authority
     override fun exactMultipliers(): List<BigFraction> = multipliers.toList()
+    override fun exactMultiplier(row: Int): BigFraction = multipliers[row]
     override fun exactReducedCost(col: Int): BigFraction = reduced[col]
     override fun exactObjectiveBound(): BigFraction = bound
     override fun dualNonzeroRow(row: Int): Boolean = !multipliers[row].isZero
@@ -399,6 +403,11 @@ private class MixedCertificateMeter(private val cancellation: Cancellation) {
         val b = read(right)
         charge(16L, 128L, matrix = false)
         return a < b
+    }
+
+    fun multiplier(certificate: LpDeductionCertificate, row: Int): BigFraction {
+        charge(64L, 512L, matrix = false)
+        return read(certificate.exactMultiplier(row))
     }
 
     fun add(left: BigFraction, right: BigFraction): BigFraction = read(read(left) + read(right))
