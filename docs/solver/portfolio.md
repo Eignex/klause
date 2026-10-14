@@ -242,8 +242,12 @@ work.
 ## Reseeding and arm failures
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
-`reseed-stale-threshold` defaults to 3 non-improving segments with fresh charged work,
-with 0 disabling it. Debt-only pauses do not advance plateau counters. Backends can
+`reseed-stale-threshold` defaults to 3, with 0 disabling it. Scheduled restart-configured
+backtrack arms count equivalent full-work segments: a time-capped return contributes
+its charged work divided by its offered work, capped at one. Short fragments cannot
+destroy retained traversal with less search than a full stale allowance. Observable
+families and whole lanes count each positive-work return as one segment. Debt-only
+pauses do not advance plateau counters. Accepted improvements clear accumulated credit. Backends can
 defer reseeding while bounded preparation owns pending work; session ownership wrappers
 forward that guard. A bounded preparation that earns an accepted incumbent improvement
 can continue across ordinary slices before the adaptive policy chooses again. Explicit

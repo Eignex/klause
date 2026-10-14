@@ -1515,6 +1515,35 @@ class PortfolioTest {
     }
 
     @Test
+    fun `restarting traversal reseeds after equivalent full work segments`() {
+        for (divisor in listOf(1, 4)) {
+            var slices = 0
+            val source = ScriptedSearch({ it == 0 }) { slices++ }
+            val handle = object : ResumableSearch by source {
+                override val work: Long get() = source.work / divisor
+            }
+            val workers = listOf(
+                trackingWorker("restarting", 0, handle).also { it.restartingSearch = true },
+                trackingWorker("retained", 1, TrackingResumableSearch(null)),
+            )
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = 2
+                override val random = Random(0)
+                override fun choose() = 0
+                override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+                override fun reset() = Unit
+            }
+
+            val result = Portfolio(workers, bandit, baseSliceWork = 5_000L, maxSliceWork = 5_000L,
+                sliceGrowth = 1.0).use {
+                it.minimize(Cancellation { slices >= 1 + 3 * divisor })
+            }
+
+            assertEquals(1L, result.stats.portfolio.arms.first().reseeds)
+        }
+    }
+
+    @Test
     fun `zero work pauses do not count as plateau segments`() {
         for (restarting in listOf(false, true)) {
             var slices = 0
