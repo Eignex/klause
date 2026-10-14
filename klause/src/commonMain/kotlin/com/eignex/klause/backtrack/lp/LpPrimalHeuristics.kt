@@ -17,6 +17,7 @@ import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.random.Random
+import kotlin.time.TimeSource
 
 /**
  * LP-rounding primal heuristic on the sparse revised-simplex path: solve the root relaxation,
@@ -34,11 +35,19 @@ import kotlin.random.Random
  * yields null.
  */
 internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
+    val started = TimeSource.Monotonic.markNow()
+    var outcome = "RELAXATION_DECLINED"
     val session = PropagationSession(problem, cancellation)
     try {
-        if (session.isUnsatAtRoot) return null
+        if (session.isUnsatAtRoot) {
+            outcome = "DISCRETE_ROOT_REJECTED"
+            return null
+        }
         val relaxation = CpToLpRelaxation(problem, objective).build(session)
-        if (relaxation.model.n == 0) return null
+        if (relaxation.model.n == 0) {
+            outcome = "EMPTY_RELAXATION"
+            return null
+        }
         val result = try {
             val simplex = dualSimplex(relaxation.model, cancellation)
             try {
@@ -55,9 +64,16 @@ internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: 
         } ?: return null
         val primal = result.primal
         val sample = pinToward(session, relaxation) { col -> if (col in 0 until primal.size) primal[col] else null }
-        return sample.takeUnless { session.fixpointCancelled || cancellation() }
+        val cancelled = session.fixpointCancelled || cancellation()
+        outcome = when {
+            cancelled -> "CANCELLED"
+            sample == null -> "PINNING_DECLINED"
+            else -> "PROPOSED"
+        }
+        return sample.takeUnless { cancelled }
     } finally {
         primalPropagationWork += session.work
+        sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)
     }
 }
 
@@ -153,18 +169,23 @@ internal fun LpEngine.lpFeasibilityPump(
             perturbRounding(relaxation, primal, intTarget, boolTarget, flips, rng)
             seen.add(pumpKey(intTarget, boolTarget))
         }
+        val started = TimeSource.Monotonic.markNow()
         val session = PropagationSession(problem, cancellation)
+        var outcome = "PINNING_DECLINED"
         try {
             if (!session.isUnsatAtRoot) {
                 val sample = pinToward(session, relaxation) { col ->
                     targetOfCol(relaxation, intTarget, boolTarget, col)
                 }
                 if (sample != null && !session.fixpointCancelled && !cancellation()) {
+                    outcome = "PROPOSED"
                     accept(sample)?.let { return it }
                 }
             }
         } finally {
             primalPropagationWork += session.work
+            if (session.fixpointCancelled) outcome = "CANCELLED"
+            sink.lp.observePrimalPhase("PRIMAL_PUMP_ROUND", outcome, started.elapsedNow().inWholeNanoseconds)
         }
         val distance = distanceObjective(relaxation, intTarget, boolTarget) ?: return null // nothing to pump
         solved = solveRelaxation(distance, cancellation) ?: return null

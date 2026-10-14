@@ -698,6 +698,40 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `root proposal diagnostics distinguish improving and cutoff declined completions`() {
+        for ((cutoff, expected) in listOf(0.5 to "NON_IMPROVING", 1.0 to "IMPROVING")) {
+            val fixture = UnresolvedRealLeafFixture(true)
+            fixture.acceptProof = { _, _ -> true }
+            val params = fixture.params.copy(maxDecisions = 0L, objectiveBoundSupplier = { cutoff },
+                lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
+
+            fixture.solver.resumable(fixture.objective, params).use { search ->
+                search.runSlice(Cancellation.Never, 1000L, 100_000L) {}
+                val phase = assertNotNull(search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"])
+
+                assertTrue(phase.calls > 0L)
+                assertEquals(mapOf(expected to phase.calls), phase.outcomes)
+            }
+        }
+    }
+
+    @Test
+    fun `root proposal diagnostics retain an uncertified completion outcome`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+        val params = fixture.params.copy(maxDecisions = 0L,
+            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
+
+        fixture.solver.resumable(fixture.objective, params).use { search ->
+            search.runSlice(Cancellation.Never, 1000L, 100_000L) {}
+            val phase = assertNotNull(search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"])
+
+            assertTrue(phase.calls > 0L)
+            assertEquals(mapOf("REAL_INDETERMINATE" to phase.calls), phase.outcomes)
+        }
+    }
+
+    @Test
     fun `mixed pumping improves an integral rounding before tree branching`() {
         val problem = Problem(
             0, 3, Array(3) { IntDomain(0, 1) },

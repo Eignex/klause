@@ -846,30 +846,42 @@ internal class ResumableMinimize(
     private fun verifiedLpProposal(
         proposal: Sample,
         cancellation: Cancellation = params.cancellation,
+        onDecline: ((String) -> Unit)? = null,
     ): Candidate<Sample, Double>? {
-        if (params.componentFactory != null) return null
-        if (cancellation() || proposal.numBoolVars != problem.numBoolVars ||
-            proposal.numIntVars != problem.numIntVars
-        ) {
+        fun decline(outcome: String): Candidate<Sample, Double>? {
+            onDecline?.invoke(outcome)
             return null
+        }
+        if (params.componentFactory != null) return decline("EXTRA_COMPONENTS")
+        if (cancellation()) return decline("CANCELLED")
+        if (proposal.numBoolVars != problem.numBoolVars || proposal.numIntVars != problem.numIntVars) {
+            return decline("INVALID_COORDINATES")
         }
         val onWork: (Long) -> Unit = { proposalPropagationWork += it }
         val sample = if (problem.numRealVars > 0 && proposal.numRealVars == 0) {
             val discrete = composedFixpoint(problem, Candidate(proposal, Unit), cancellation,
                 params.assumptions, onWork)
-            if (discrete !is Verification.Accepted || cancellation()) return null
+            if (discrete !is Verification.Accepted) {
+                return decline(if (discrete is Verification.Rejected) "DISCRETE_REJECTED" else "DISCRETE_INDETERMINATE")
+            }
+            if (cancellation()) return decline("CANCELLED")
             val real = completeLeaf(proposal, cancellation)
             if (real.verdict !in listOf(LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM)) {
-                return null
+                return decline("REAL_${real.verdict.name}")
             }
             proposal.copy(reals = real.reals, exactReals = real.exactReals)
         } else proposal
         val budget = cancellation or Cancellation.after(LP_VERIFY_BUDGET)
-        if (budget()) return null
+        if (budget()) return decline("CANCELLED")
         val verifier = ComposedSampleVerifier(problem, objective, budget,
             params.assumptions, onWork, params.toleranceCheck)
         val verdict = verifier.verify(Candidate(sample, objective.evaluate(sample)))
-        return if (budget()) null else (verdict as? Verification.Accepted)?.candidate
+        if (budget()) return decline("CANCELLED")
+        return when (verdict) {
+            is Verification.Accepted -> verdict.candidate
+            is Verification.Rejected -> decline("VERIFICATION_REJECTED")
+            is Verification.Indeterminate -> decline("VERIFICATION_INDETERMINATE")
+        }
     }
 
     /**
@@ -958,12 +970,26 @@ internal class ResumableMinimize(
         boundExchange.publishGlobalVarBounds()
         if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
             fun accept(proposal: Sample): Sample? {
-                val accepted = verifiedLpProposal(proposal, rootToken) ?: return null
-                val cutoff = minOf(bestObj, externalCutoff())
-                if (cutoff.isNaN()) return null
-                val exact = exactSourceObjective(objective, accepted.assignment, params.toleranceCheck)
-                val improving = exact?.let { beatsCutoff(it, cutoff) } ?: (accepted.objective < cutoff)
-                return accepted.assignment.takeIf { improving && !rootToken() }
+                val started = TimeSource.Monotonic.markNow()
+                var outcome = "FAILED"
+                try {
+                    val accepted = verifiedLpProposal(proposal, rootToken) { outcome = it } ?: return null
+                    val cutoff = minOf(bestObj, externalCutoff())
+                    if (cutoff.isNaN()) {
+                        outcome = "INVALID_CUTOFF"
+                        return null
+                    }
+                    val exact = exactSourceObjective(objective, accepted.assignment, params.toleranceCheck)
+                    val improving = exact?.let { beatsCutoff(it, cutoff) } ?: (accepted.objective < cutoff)
+                    outcome = when {
+                        !improving -> "NON_IMPROVING"
+                        rootToken() -> "CANCELLED"
+                        else -> "IMPROVING"
+                    }
+                    return accepted.assignment.takeIf { outcome == "IMPROVING" }
+                } finally {
+                    sink.lp.observePrimalPhase("PRIMAL_PROPOSAL", outcome, started.elapsedNow().inWholeNanoseconds)
+                }
             }
             val seed = lpEngine.lpRoundingProbe(objective, rootToken)?.let(::accept)
                 ?: lpEngine.lpFeasibilityPump(objective, rootToken,

@@ -445,6 +445,14 @@ can use the current peer's discrete assignment as its first target. Continuous
 coordinates are completed independently; the peer target remains a proposal and
 must improve the available cutoff before publication.
 
+Root primal diagnostics distinguish rounding and pump pinning from proposal
+completion and cutoff admission. `PRIMAL_ROUNDING_ROOT` and
+`PRIMAL_PUMP_ROUND_ROOT` record whether a discrete proposal was produced;
+`PRIMAL_PROPOSAL_ROOT` distinguishes discrete verification, real completion,
+final verification, cancellation and non-improving outcomes. Their phase times
+are inclusive and overlap native solve and verification phases. These observations
+carry no witness or proof authority.
+
 [Theory contracts](../theories.md) define the fragment-specific checks and evidence.
 Difference graphs, exact linear systems and polynomial completion keep their own
 state while sharing the traversal's source facts and decision lifetime. Integer
