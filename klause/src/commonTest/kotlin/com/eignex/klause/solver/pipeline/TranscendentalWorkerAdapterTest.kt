@@ -1,7 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
+import com.eignex.klause.ir.TranscendentalFunction
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.SolveResult
@@ -19,6 +23,38 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TranscendentalWorkerAdapterTest {
+    @Test
+    fun `an unresolved numeric root retains its charges across slices`() {
+        val x = TranscendentalExpression.Variable(SourceRealId(0))
+        val source = TranscendentalProblem(TranscendentalFormula.Atom(
+            TranscendentalExpression.Function(TranscendentalFunction.EXP, x), PolynomialRelation.EQ, x),
+            emptyMap(), mapOf("x" to 0), emptyMap())
+        val params = TranscendentalTheoryParams(maximumDepth = 1)
+        val adapter = TranscendentalWorkerAdapter(source, params, FiniteEngine.BACKTRACK)
+
+        val sliced = adapter.completeHandle().use { handle ->
+            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1))
+            assertTrue(adapter.nativeWork > 0)
+            assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1))
+        }
+        val unsliced = TranscendentalWorkerAdapter(source, params, FiniteEngine.BACKTRACK).use { it.execute() }
+
+        assertIs<OpenTheoryResult.Unknown>(unsliced.result)
+        assertEquals(unsliced.workSpent, adapter.nativeWork)
+        assertEquals(unsliced.result.stats.search.nodes, sliced.stats.search.nodes)
+        adapter.close()
+    }
+
+    @Test
+    fun `closing an unused source worker prevents opening a traversal`() {
+        val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
+        val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
+        adapter.close()
+
+        assertFailsWith<IllegalStateException> { adapter.completeHandle() }
+        assertEquals(0L, adapter.nativeWork)
+    }
+
     @Test
     fun `a sliced refuted Boolean branch retains its feasible sibling`() {
         val source = TranscendentalProblem(TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
