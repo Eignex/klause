@@ -51,8 +51,9 @@ class MixedDualBoundTest {
 
         assertEquals(BigFraction.ONE, certificate.exactObjectiveBound())
         assertEquals(BigFraction.ZERO, certificate.exactReducedCost(0))
-        assertEquals(0L, assertNotNull(objectiveCertificate).fixSteps(0, 1L, 0L))
-        assertEquals(BigFraction.ZERO, objectiveCertificate?.exactReducedCost(2))
+        val objectiveCert = assertNotNull(objectiveCertificate)
+        assertEquals(0L, objectiveCert.fixSteps(0, 1L, 0L))
+        assertEquals(BigFraction.ZERO, objectiveCert.exactReducedCost(2))
     }
 
     @Test
