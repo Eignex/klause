@@ -327,7 +327,11 @@ Cancellation publishes neither a partial encoding
 nor an unfinished refutation. Core encoding checkpoints retain their cursor, and
 objective and core encoding visits, augmented-root construction and propagation
 charge the core arm at the propagation work rate. Query construction receives the
-current segment deadline and remaining work allowance. Its immutable baked snapshot
+current segment deadline and remaining work allowance; native propagation polls
+from the first batch. A segment interrupted inside propagation discards its private
+traversal and retains the immutable query snapshot, completed cores and residual
+weights. Its partial search supplies no refutation. A later segment reopens the
+query with the cumulative decision allowance. Its immutable baked snapshot
 survives interrupted traversal construction; the next segment opens a fresh traversal
 over that snapshot without repeating the bake. Atomic allocations and factor calls
 can overrun cooperative boundaries. Query propagation fractions and slice overspend
