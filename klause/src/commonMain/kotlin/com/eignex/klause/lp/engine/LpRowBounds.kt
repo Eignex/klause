@@ -55,7 +55,7 @@ internal fun mixedRowBounds(
                 for (entry in state.model.columnEntries(column)) {
                     meter.step()
                     if (entry.number.value.isZero || selected?.get(entry.row) == false) continue
-                    meter.reserve(32L)
+                    meter.reserve(64L)
                     val integer = entry.number.exactLong()
                     val coefficient = if (integer == null) meter.read(entry.number.value) else entry.number.value
                     rows[entry.row].add(LpRowBoundTerm(column, coefficient, integer))
@@ -65,7 +65,7 @@ internal fun mixedRowBounds(
             for (row in rows.indices) {
                 meter.step()
                 if (!mixed[row] || !state.rows.row(row).active) continue
-                meter.reserve(32L + (rows[row].size + 1L) * 8L)
+                meter.reserve(160L + (rows[row].size + 1L) * 16L)
                 val terms = rows[row].toList() + LpRowBoundTerm(model.slackCol(row), BigFraction.ONE, 1L)
                 val integral = integralRowBounds(state, row, terms, meter)
                 if (integral != null) {
