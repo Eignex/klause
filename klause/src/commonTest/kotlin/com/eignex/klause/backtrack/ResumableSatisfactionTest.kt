@@ -23,6 +23,25 @@ import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
     @Test
+    fun `closing a deferred root disposes its peer once`() {
+        var closed = 0
+        val component = object : PreparingSearchComponent, AutoCloseable {
+            override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> =
+                sequenceOf(ComponentResult.Consistent).iterator()
+            override fun close() { closed++ }
+        }
+        val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(
+            BacktrackParams(componentFactory = { listOf(component) }),
+        )
+        assertNull(search.runSlice(Cancellation.Never, 0L, 1L))
+
+        search.close()
+        search.close()
+
+        assertEquals(1, closed)
+    }
+
+    @Test
     fun `component preparation waits for a slice and initializes once`() {
         var batches = 0
         val component = object : PreparingSearchComponent {
