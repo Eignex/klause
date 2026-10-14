@@ -464,7 +464,9 @@ internal class WitnessProbe(
             for ((index, variable) in group.withIndex()) {
                 arithmetic.step()
                 if (variables.indexOf(variable) in free) {
-                    direction[variable] = if (alternating && index and 1 != 0) BigFraction.MINUS_ONE else BigFraction.ONE
+                    direction[variable] = if (alternating && index and 1 != 0) {
+                        BigFraction.MINUS_ONE
+                    } else BigFraction.ONE
                 }
             }
             for ((index, row) in rows.withIndex()) {
@@ -547,7 +549,9 @@ internal class WitnessProbe(
         val parameter = base.size
         if (base.any { !admittedFraction(it) } || direction.any { !admittedFraction(it) }) return null
         val replacements = base.indices.map { id ->
-            arithmetic.add(Polynomial.constant(base[id]), arithmetic.scale(Polynomial.variable(parameter), direction[id]))
+            arithmetic.add(
+                Polynomial.constant(base[id]), arithmetic.scale(Polynomial.variable(parameter), direction[id]),
+            )
         }
         val boundaries = ArrayList<AlgebraicReal>()
         for (atom in atoms) {
