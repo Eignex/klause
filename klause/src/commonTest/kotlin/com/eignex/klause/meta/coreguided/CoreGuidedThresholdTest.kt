@@ -33,6 +33,8 @@ class CoreGuidedThresholdTest {
                 val sample = assertIs<SolveResult.Sat>(result).assignment
                 val count = literals.count { Lit.evaluate(it, pins.getValue(Lit.variable(it))) }
                 assertEquals(count >= minimum, sample.boolValue(Lit.variable(frontier)))
+                val opposite = pins + (Lit.variable(frontier) to (count < minimum))
+                assertIs<SolveResult.Unsat>(solver.solve(BacktrackParams(assumptions = Assumptions(bools = opposite))))
             }
         }
     }
