@@ -344,11 +344,11 @@ class Portfolio(
             if (before != null) {
                 if (claim.hadIncumbent) {
                     val reward = incumbents.gain(before.objective, candidate.objective)
-                    run.ledger.credit(claim.arm, Signal.Improvement, reward)
+                    run.ledgerFor(claim.arm).credit(claim.arm, Signal.Improvement, reward)
                 }
             } else if (!claim.foundFirst) {
                 claim.foundFirst = true
-                run.ledger.credit(claim.arm, Signal.FirstSolution, 1.0)
+                run.ledgerFor(claim.arm).credit(claim.arm, Signal.FirstSolution, 1.0)
             }
         }
 
@@ -634,7 +634,15 @@ class Portfolio(
         /** The run's token: the caller's, stopped early once any lane settles the run. */
         val token: Cancellation = cancellation.alsoStoppedBy(stopped)
         private val earnable = workers.map { it.signals }
-        val ledger = RewardLedger(workers.size) { arm, signal -> signal in earnable[arm] }
+        val ledger = RewardLedger(workers.size) { arm, signal ->
+            !workers[arm].auxiliaryProof && signal in earnable[arm]
+        }
+        private val proofLedger = if (workers.any { it.auxiliaryProof }) {
+            RewardLedger(workers.size) { arm, signal -> workers[arm].auxiliaryProof && signal in earnable[arm] }
+        } else null
+
+        fun ledgerFor(arm: Int): RewardLedger = if (workers[arm].auxiliaryProof) checkNotNull(proofLedger) else ledger
+        private val proofProgress = proofLedger?.let { ProgressCredit(workers.size) }
         private val progress = ProgressCredit(workers.size)
         val log = ScheduleLog(workers)
 
@@ -722,7 +730,8 @@ class Portfolio(
             if (remaining == 0) return@locked null
             val dedicated = lanes == workers.size
             val eligible = eligibleArms()
-            val probe = if (dedicated) null else eligible.firstOrNull { !probed[it] && !busy[it] && !retired[it] }
+            val probe = if (dedicated) null else eligible.filter { !probed[it] && !busy[it] && !retired[it] }
+                .minByOrNull { if (workers[it].auxiliaryProof) 1 else 0 }
             val revisit = if (dedicated || improving || eligible.any { !probed[it] && !retired[it] }) {
                 null
             } else {
@@ -742,7 +751,8 @@ class Portfolio(
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
-            val probing = probe != null || (improving && arm in incumbentProbeArms && !productive[arm])
+            val probing = probe != null || workers[arm].auxiliaryProof ||
+                (improving && arm in incumbentProbeArms && !productive[arm])
             busy[arm] = true
             Claim(
                 arm,
@@ -750,7 +760,7 @@ class Portfolio(
                 if (probing || revisit != null) baseSliceMillis else slice,
                 if (probing || revisit != null) baseSliceWork else sliceWork,
                 whole = dedicated,
-                probeCount = eligible.size,
+                probeCount = eligible.count { !workers[it].auxiliaryProof }.coerceAtLeast(1),
                 preparationRevisit = revisit != null,
             )
         }
@@ -765,6 +775,9 @@ class Portfolio(
         // within local search's feasibility share; a neighborhood needs an incumbent unless it is all that is left.
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
+            eligibleArms.firstOrNull {
+                workers[it].auxiliaryProof && !busy[it] && !retired[it]
+            }?.let { return it }
             val preparing = continuingPreparation
             if (preparing >= 0 && !busy[preparing]) {
                 if (!retired[preparing] && preparing in eligibleArms &&
@@ -810,6 +823,7 @@ class Portfolio(
         fun startImprovementPhase() {
             improving = true
             ledger.resetPhase()
+            proofLedger?.resetPhase()
             (bandit as? DiscountedThompson)?.fade(phaseRetention)
         }
 
@@ -845,6 +859,7 @@ class Portfolio(
             phase: String,
         ) {
             val arm = claim.arm
+            val account = ledgerFor(arm)
             armWork[arm] += if (work > 0L) work else claim.sliceWork
             if (stats != null) {
                 if (cumulative) {
@@ -852,17 +867,18 @@ class Portfolio(
                 } else {
                     completedStats[arm] = (completedStats[arm] ?: SolveStats.EMPTY).mergedWith(stats)
                 }
-                progress.observe(ledger, arm, stats)
+                val observer = if (workers[arm].auxiliaryProof) checkNotNull(proofProgress) else progress
+                observer.observe(account, arm, stats)
             }
             contributions?.drain { kind, origin, amount ->
-                if (origin in workers.indices) ledger.credit(origin, kind.signal, amount)
+                if (origin in workers.indices) ledgerFor(origin).credit(origin, kind.signal, amount)
             }
-            val earned = ledger.settle(arm, work)
+            val earned = account.settle(arm, work)
             val reward = if (failed) 0.0 else earned
             if (reward > 0.0 || claim.improved) productive[arm] = true
             val unproductiveProbe = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
-            if (!unproductiveProbe) {
+            if (!unproductiveProbe && !workers[arm].auxiliaryProof) {
                 val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
                 bandit.update(arm, reward, weight)
                 families.record(policyFamily(arm), progressed = reward > 0.0, plateau = improving)
@@ -870,10 +886,11 @@ class Portfolio(
             // Credit an arm earns while others run, from peers using what it shared, pays out now as one segment's
             // evidence: an arm the policy has stopped picking would otherwise hold it forever.
             for (other in workers.indices) {
-                if (other == arm || busy[other] || retired[other] || !ledger.hasPending(other)) continue
-                val idleReward = ledger.settleIdle(other, claim.sliceWork)
+                val idleAccount = ledgerFor(other)
+                if (other == arm || busy[other] || retired[other] || !idleAccount.hasPending(other)) continue
+                val idleReward = idleAccount.settleIdle(other, claim.sliceWork)
                 if (idleReward > 0.0) productive[other] = true
-                bandit.update(other, idleReward, 1.0)
+                if (!workers[other].auxiliaryProof) bandit.update(other, idleReward, 1.0)
             }
             log.record(arm, work, claim.started.elapsedNow().inWholeMilliseconds, reward, failed)
             if (failed && failure != null && failure !is UnsoundnessException) log.failure(arm, failure, phase)
@@ -910,7 +927,7 @@ class Portfolio(
                 .fold(SolveStats.EMPTY) { acc, snapshot -> acc.mergedWith(snapshot) }
             return stats.copy(
                 run = stats.run.copy(wallMs = started.elapsedNow().inWholeMilliseconds),
-                portfolio = log.stats(ledger).copy(
+                portfolio = log.stats(ledger, proofLedger ?: ledger).copy(
                     profile = profile, reseedStaleThreshold = reseedStaleThreshold,
                     baseSliceWork = baseSliceWork, maxSliceWork = maxSliceWork, sliceGrowth = sliceGrowth,
                 ),

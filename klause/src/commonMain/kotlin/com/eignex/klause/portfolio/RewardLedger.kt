@@ -235,7 +235,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
 
     /** The schedule so far, with each arm's credit read from [ledger]. Replicas of one arm share a
      *  worker label, so the second and later ones are numbered to keep each arm's report its own. */
-    fun stats(ledger: RewardLedger): PortfolioStats {
+    fun stats(ledger: RewardLedger, proofLedger: RewardLedger = ledger): PortfolioStats {
         val seen = HashMap<String, Int>()
         return PortfolioStats(
             workers.indices.map { arm ->
@@ -256,7 +256,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                     failures = failures[arm],
                     failure = diagnostics[arm],
                     faults = faults[arm],
-                    credit = ledger.creditOf(arm),
+                    credit = (if (workers[arm].auxiliaryProof) proofLedger else ledger).creditOf(arm),
                     sharing = workers[arm].sharingMeter?.snapshot() ?: SharingStats(),
                 )
             },

@@ -35,8 +35,40 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
+    @Test
+    fun `active preparation time cannot renew after an interrupted opening`() {
+        val clock = TestTimeSource()
+        val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val source = Problem(2, 0, emptyArray(), arrayOf(hard))
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor != hard) BuiltInPropagationProjectionProvider.select(factor)
+            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
+                object : Propagator by delegate {
+                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                        if (state.problem.numBoolVars > source.numBoolVars) clock += 3.seconds
+                        return delegate.propagate(state, factorId)
+                    }
+                }
+            }
+        })
+        val search = CoreGuidedSearch(source.bake(providers.prepare(source)), LinearObjective(longArrayOf(1, 1)),
+            BacktrackParams(), maximumMillis = 2_000L, timeSource = clock)
+
+        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("expired preparation") }
+        val charged = search.work
+        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("renewed active time") }
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
+        assertEquals(stopped, resumed)
+        assertEquals(charged, search.work)
+        search.close()
+    }
+
     @Test
     fun `core work allowance includes preparation and cannot renew on resume`() {
         val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()

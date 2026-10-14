@@ -88,7 +88,9 @@ currency, including work stopped during construction. Preparation does not spend
 solve-wide decisions or moves. The containing core handle settles query overspend
 once and retains fractional charges across rounds; its nested traversal does not
 repay the same debt. An automatically deferred single-lane core worker has one base
-slice of cumulative work, independent of later scheduler growth. Explicit core
+slice of cumulative work and two seconds of cumulative active time, independent of
+later scheduler growth. Idle waits spend no active time; construction and every
+retained slice do. Expiry keeps completed checked floors and returns a budget stop. Explicit core
 selection and parallel slots retain their ordinary allowances. See [core search](portfolio.md#boolean-objective-core-search).
 
 Slice pricing belongs to solver policy: LP work costs one node per 600 units,
