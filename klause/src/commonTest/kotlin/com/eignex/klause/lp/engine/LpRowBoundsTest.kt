@@ -10,6 +10,64 @@ import kotlin.test.assertTrue
 
 class LpRowBoundsTest {
     @Test
+    fun `integral valued real endpoints preserve strict source coordinate projection`() {
+        for (origin in listOf(0L, 3L)) for (sign in listOf(-1.0, 1.0)) for (strict in listOf(false, true)) {
+            val source = LpBuilder().apply {
+                val x = addVar(origin, origin + 2L)
+                val r = addRealVar(0.0, 1.0)
+                addRealRow(intArrayOf(x, r), doubleArrayOf(sign, 1.0), Relation.GE,
+                    if (sign > 0.0) origin.toDouble() + 2.0 else -origin.toDouble(), strict = strict)
+            }.build(Sense.MINIMIZE)
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+            val bound = mixedRowBounds(model).single()
+
+            assertEquals(sign < 0.0, bound.upper)
+            assertEquals(strict, bound.strict)
+            assertEquals(origin + if (!strict) 1L else if (sign > 0.0) 2L else 0L, bound.integerBound())
+        }
+    }
+
+    @Test
+    fun `integral row products beyond Long retain exact coordinate bounds`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L)
+            val r = addRealVar(0.0, 1.0)
+            addRow(intArrayOf(x, r), longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE), Relation.LE, Long.MAX_VALUE)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+        val bound = mixedRowBounds(model).single()
+
+        assertTrue(bound.upper)
+        assertEquals(1L, bound.integerBound())
+    }
+
+    @Test
+    fun `signed row accumulator overflow retains exact rational projection`() {
+        val source = assertNotNull(LpBuilder().apply {
+            val x = addVar(0L, 2L)
+            val r = addRealVar(0.0, 1.0)
+            val s = addRealVar(0.0, 1.0)
+            val t = addRealVar(0.0, 1.0)
+            addRow(intArrayOf(x, r, s, t), longArrayOf(1L, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE),
+                Relation.LE, 1L)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val columns = List(source.numVars) { column ->
+            val original = source.column(column)
+            if (column in 1..3) original.copy(bounds = original.bounds.copy(
+                upper = ExactLpSide(ExactLpNumber.of(Long.MAX_VALUE)),
+            )) else original
+        }
+        val model = assertNotNull(LpExactState(source.withBoundColumns(columns)).toWorkingModel())
+
+        val bound = mixedRowBounds(model).single()
+
+        assertTrue(bound.upper)
+        assertEquals(1L, bound.integerBound())
+    }
+
+    @Test
     fun `mixed rows project fractional real endpoints onto both integer bound directions`() {
         for (sign in listOf(-1.0, 1.0)) {
             val source = LpBuilder().apply {
