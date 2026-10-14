@@ -158,6 +158,7 @@ object OpenTheoryPipeline {
             request.solutionSetSensitive,
             request.presolveCancellation,
             request.presolveBudget,
+            request.preparedPlan.factorProjections,
         )
         val prepared = source.prepared
         val sourceStats = prepared.stats.takeIf { prepared.changed || it.infeasible }
@@ -260,6 +261,7 @@ object OpenTheoryPipeline {
         request.solutionSetSensitive,
         request.presolveCancellation,
         request.presolveBudget,
+        request.preparedPlan.factorProjections,
     )
 
     /**
@@ -483,5 +485,6 @@ object OpenTheoryPipeline {
             request.solutionSetSensitive,
             request.presolveCancellation,
             request.presolveBudget,
+            request.preparedPlan.factorProjections,
         )
 }
