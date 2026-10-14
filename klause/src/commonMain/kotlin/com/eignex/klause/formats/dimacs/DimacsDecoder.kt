@@ -83,7 +83,7 @@ fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.prob
             factors.add(Clause(intArrayOf(Lit.make(relax, positive = false), Lit.negate(literal))))
         }
         boolFolds.add(BoolFoldDefinition(
-            relax, IntArray(soft.literals.size) { Lit.negate(soft.literals[it]) }, isAnd = true,
+            relax, soft.literals.map { Lit.negate(it) }.distinct().toIntArray(), isAnd = true,
         ))
         weights[relax++] = soft.weight
     }

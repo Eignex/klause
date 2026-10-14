@@ -1,17 +1,62 @@
 package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.toLinearObjective
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class DimacsDecoderTest {
+    @Test
+    fun `repeated unit penalties repair through their source literal`() {
+        for (literal in listOf(1, -1)) {
+            val decoded = Dimacs.parseWcnf("3 $literal $literal 0\n7 -2 0\n").toProblem()
+            val sweep = assertNotNull(DefinitionalSweep.infer(decoded.problem, boolFolds = decoded.boolFolds))
+            val state = LocalSearchState(LocalSearchModel.open(decoded.problem), Random(3))
+            state.assignment.setBool(0, literal < 0)
+            state.invariants = sweep.network(0, decoded.problem.numBoolVars)
+            sweep.sweep(state.assignment, state.rootDomains)
+            state.recompute()
+            val proposals = MoveSink().also { it.setInvariants(state.invariants) }
+
+            proposals.addChannelingBoolFlip(state, decoded.boolFolds.first().out)
+            state.apply(proposals.list.single())
+
+            assertEquals(literal > 0, state.assignment.boolValue(0))
+            assertEquals(0L, state.cost)
+            assertEquals(0L, decoded.objective.toLinearObjective().evaluateLong(state.assignment))
+        }
+    }
+
+    @Test
+    fun `opposite soft literals retain a zero tautology penalty`() {
+        val decoded = Dimacs.parseWcnf("3 1 1 -1 -1 0\n7 -2 0\n").toProblem()
+        val sweep = assertNotNull(DefinitionalSweep.infer(decoded.problem, boolFolds = decoded.boolFolds))
+        val state = LocalSearchState(LocalSearchModel.open(decoded.problem), Random(3))
+        state.invariants = sweep.network(0, decoded.problem.numBoolVars)
+        for (value in listOf(false, true)) {
+            state.assignment.setBool(0, value)
+            sweep.sweep(state.assignment, state.rootDomains)
+            state.recompute()
+            val proposals = MoveSink().also { it.setInvariants(state.invariants) }
+
+            proposals.addChannelingBoolFlip(state, decoded.boolFolds.first().out)
+
+            assertTrue(proposals.list.isEmpty())
+            assertEquals(0L, decoded.objective.toLinearObjective().evaluateLong(state.assignment))
+        }
+    }
+
     @Test
     fun `wide unit penalty definitions retain exact feasible cost`() {
         val decoded = Dimacs.parseWcnf("9007199254740993 1 0\n7 -2 0\n").toProblem()

@@ -80,7 +80,8 @@ Lowering retains each explicit penalty's exact Boolean definition in
 [WcnfProblem.boolFolds](../../klause/src/commonMain/kotlin/com/eignex/klause/formats/dimacs/DimacsDecoder.kt):
 the conjunction of the complemented source literals. Consumers can use this metadata
 with the shared Boolean definition mechanisms; the equivalence clauses remain the
-authority for feasible source costs.
+authority for feasible source costs. Repeated literals occur once in each definition;
+opposite polarities remain distinct.
 
 The WCNF CLI forwards these definitions to the objective view. Unit penalties join
 the maintained Boolean sweep, so Boolean objective-leaf moves update the source
