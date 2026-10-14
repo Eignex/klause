@@ -16,7 +16,8 @@ import z3
 
 SMT_CORPUS_SUITES = frozenset(("smtlib-qfidl", "smtlib-qflia", "smtlib-qflira", "smtlib-qflra", "smtlib-qfrdl"))
 SMT_SUITES = SMT_CORPUS_SUITES | {"smtlib-core"}
-SOURCE_SUITES = SMT_SUITES | {"mps-core", "miplib3"}
+MPS_CORPUS_SUITES = frozenset(("miplib2003", "miplib2010", "miplib2017", "orlib"))
+SOURCE_SUITES = SMT_SUITES | MPS_CORPUS_SUITES | {"mps-core", "miplib3"}
 
 
 def expressions(text):
@@ -299,7 +300,7 @@ def source(case, archive, source_root=None):
     suite, name = case["problem"]["suite"], case["record"]["problem"]
     if suite not in SOURCE_SUITES:
         raise ValueError(f"unsupported source suite {suite}")
-    if suite in SMT_CORPUS_SUITES and source_root is None:
+    if suite in (SMT_CORPUS_SUITES | MPS_CORPUS_SUITES) and source_root is None:
         raise ValueError(f"source suite {suite} requires --source-root with hash-named original bytes")
     if source_root is not None:
         digest = case["record"]["sourceHashes"]["model"]
@@ -341,11 +342,14 @@ def require_verdict(solver, expected, problem, purpose):
         raise AssertionError(f'{problem}: {purpose} expected {expected}, got {actual}{reason}')
 
 
-def check(cases, source_root=None, progress=None):
+def check(cases, source_root=None, progress=None, witness_only=False):
     archive, results, cache, sources = [], [], {}, {}
     for case in cases:
         assert case["status"] == "DONE" and case.get("record"), "incomplete case"
         record = case["record"]
+        if witness_only:
+            assert record["feasible"] is True and record.get("finalWitness") is not None, \
+                "witness-only checking requires a reported feasible witness"
         exact = exact_mode(case)
         reported_objective = record.get("exactObjective")
         if reported_objective is None:
@@ -364,6 +368,9 @@ def check(cases, source_root=None, progress=None):
             continue
         result = {"sourceHashVerified": True, "reportedFeasible": record["feasible"],
                   "reportedProven": record["proven"], "witness": "absent"}
+        if witness_only:
+            result["verificationScope"] = "witness-only"
+            result["proofCertificateChecked"] = False
         if record["feasible"] is None:
             assert not record["proven"] and reported_objective is None
             result["verdictCheck"] = "no claimed verdict"
@@ -428,7 +435,7 @@ def check(cases, source_root=None, progress=None):
                         assert accepted, "MPS point exceeds source tolerance"
                     if not exact_feasible:
                         require_verdict(solver, z3.sat, record["problem"], 'source feasibility')
-                if record["proven"] and record["kind"] == "optimize":
+                if record["proven"] and record["kind"] == "optimize" and not witness_only:
                     assert reported_objective is not None and objective is not None
                     value = rational(reported_objective)
                     if maximize:
@@ -460,6 +467,7 @@ if __name__ == '__main__':
     parser.add_argument('--source-root', type=pathlib.Path, help='Original uncompressed sources named <record sourceHashes.model>.txt; required for SMT corpus suites, otherwise fetch the canonical core or MIPLIB source.')
     parser.add_argument('--output', type=pathlib.Path)
     parser.add_argument('--progress', type=pathlib.Path, help='Flush completed per-record checks as JSON lines, preserving the checked prefix if a later record fails.')
+    parser.add_argument('--witness-only', action='store_true', help='Check actual feasible witnesses and objectives, preserving reported proof claims without checking them.')
     args = parser.parse_args()
     opener = gzip.open if args.cases.suffix == '.gz' else lzma.open if args.cases.suffix == '.xz' else open
     with opener(args.cases, 'rt') as stream:
@@ -474,9 +482,9 @@ if __name__ == '__main__':
             def progress(entry):
                 stream.write(json.dumps(entry, sort_keys=True) + '\n')
                 stream.flush()
-            checks = check(cases, args.source_root, progress)
+            checks = check(cases, args.source_root, progress, witness_only=args.witness_only)
     else:
-        checks = check(cases, args.source_root)
+        checks = check(cases, args.source_root, witness_only=args.witness_only)
     result = json.dumps(checks, indent=2, sort_keys=True) + '\n'
     if args.output:
         args.output.write_text(result)
