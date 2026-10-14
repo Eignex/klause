@@ -110,11 +110,16 @@ remains local to the numerical scope. Bounds and certificates cannot survive a
 foreign exact state, rollback or objective change.
 For a single cost-bearing structural coordinate, a source-valid finite maximizing
 endpoint bounds every feasible objective value. Reduced-cost fixing can use this
-closed ceiling before an incumbent exists, or combine it with a tighter improving
-cutoff. A point equal to the declared ceiling remains feasible. Missing sides and
+closed ceiling before an incumbent exists. A point equal to the declared ceiling remains feasible. Missing sides and
 probe boxes cannot supply the ceiling; source scale, constants and scoped bounds
 remain part of the deduction. Ceiling arithmetic has bounded scalar admission
 and charges the containing node ledger without an additional LP query.
+Before an incumbent, a verified defining equality can eliminate the continuous
+objective reduced cost from the accepted dual vector. The candidate is checked
+against every exact endpoint and accepted only when its bound is at least as
+strong. It shares the node certificate allowance; a decline retains the completed
+certificate. This supplies integral reduced costs when a degenerate optimum
+leaves the objective seated at its continuous bound.
 For a nonintegral objective, node pruning compares the exact certified bound in
 minimized source units with an enclosing rational incumbent cutoff. It uses the
 unrounded objective without an integer objective atom, so the prune has no

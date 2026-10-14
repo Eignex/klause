@@ -10,6 +10,7 @@ internal fun nodeDualCertificate(
     duals: DoubleArray,
     cancellation: Cancellation = Cancellation.Never,
     observer: LpCertificationObserver? = null,
+    eliminateContinuousObjective: Boolean = false,
 ): LpDeductionCertificate? {
     if (!model.hasContinuous) return integerCertify(model, duals, observer = observer)
     val meter = MixedCertificateMeter(cancellation)
@@ -36,9 +37,21 @@ internal fun nodeDualCertificate(
     } else {
         null
     }
-    observer?.observe(LpCertifier.INTEGER, certificate != null, LpCertifierCost.Metered(meter.work))
+    val fixingCertificate = if (eliminateContinuousObjective && certificate != null && rows != null) {
+        try {
+            meter.attempt(observer, "OBJECTIVE_ELIMINATION") {
+                objectiveEliminationCertificate(model, certificate, rows.single(), meter)
+            }?.takeIf { it.exactObjectiveBound() >= certificate.exactObjectiveBound() }
+        } catch (_: LpProjectionStop) {
+            null
+        }
+    } else {
+        null
+    }
+    val accepted = fixingCertificate ?: certificate
+    observer?.observe(LpCertifier.INTEGER, accepted != null, LpCertifierCost.Metered(meter.work))
     if (cancellation()) return null
-    return if (certificate != null && rows != null) IntegralObjectiveCertificate(certificate, rows) else certificate
+    return if (accepted != null && rows != null) IntegralObjectiveCertificate(accepted, rows) else accepted
 }
 
 private class IntegralObjectiveCertificate(
@@ -113,6 +126,35 @@ private fun integralObjectiveAfterRow(
     }
     constant = meter.add(meter.multiply(constant, scale.reciprocal()), source.objective.externalConstant.value)
     return ExactLpNumber.of(constant).exactLong() != null
+}
+
+private fun objectiveEliminationCertificate(
+    model: LpModel,
+    certificate: LpDeductionCertificate,
+    row: Int,
+    meter: MixedCertificateMeter,
+): LpDeductionCertificate? {
+    val state = model.exactState ?: return null
+    var objective = -1
+    for (column in 0 until model.n) {
+        meter.step()
+        if (!state.model.column(column).integral && !model.exactCost(column).isZero) {
+            if (objective >= 0) return null
+            objective = column
+        }
+    }
+    if (objective < 0) return null
+    meter.reserve(model.m * 24L)
+    val y = certificate.exactMultipliers().toMutableList()
+    var residual = meter.read(model.exactCost(objective))
+    var definingCoefficient = BigFraction.ZERO
+    model.forEachRationalColumn(objective) { r, coefficient ->
+        residual = meter.add(residual, meter.multiply(y[r], coefficient).negated())
+        if (r == row) definingCoefficient = meter.read(coefficient)
+    }
+    if (residual.isZero || definingCoefficient.isZero) return null
+    y[row] = meter.add(y[row], meter.multiply(residual, definingCoefficient.reciprocal()))
+    return mixedCertificate(model, state, y, meter)
 }
 
 private fun mixedCertificate(

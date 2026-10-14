@@ -511,7 +511,7 @@ internal fun LpEngine.sparseSafePrune(
     val optimalBasis = result.basis
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
-    val objectiveCeiling = singleObjectiveCeiling(relaxation, cancellation)
+    val objectiveCeiling = if (canPrune) null else singleObjectiveCeiling(relaxation, cancellation)
     val canFix = canPrune || objectiveCeiling != null
     if (!canFix && !canPropagate) {
         val constant = cutPool.constantContradiction() ?: return LpNodeOutcome(false, optimalBasis)
@@ -584,6 +584,7 @@ internal fun LpEngine.sparseSafePrune(
             LpCertifier.INTEGER,
             nodeDualCertificate(
                 boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
+                eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
             ),
         ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
@@ -674,9 +675,8 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    // Reduced-cost fixing on the exact certified Lagrangian and reduced costs needs a finite incumbent
-    // for the improving gap, but not an attained LP optimum: the certificate inequality holds for any
-    // rounded dual vector.
+    // A certified Lagrangian bounds every point below the source cutoff without requiring
+    // an attained LP optimum. A declared objective ceiling also bounds feasible points before an incumbent.
     if (canFix && cert != null &&
         !cancellation() &&
         applySparseReducedCostFixing(

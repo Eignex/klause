@@ -11,6 +11,26 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `defining equalities expose integral reduced costs at a degenerate continuous objective seat`() {
+        for (sign in listOf(-1.0, 1.0)) {
+            val source = LpBuilder().apply {
+                val x = addVar(0L, 10L)
+                val r = addRealVar(if (sign > 0.0) 0.0 else -3.0,
+                    if (sign > 0.0) 3.0 else 0.0, cost = sign)
+                addRealRow(intArrayOf(x, r), doubleArrayOf(-3.0 * sign, 1.0), Relation.EQ, 0.0)
+            }.build(Sense.MINIMIZE)
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+            val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0),
+                eliminateContinuousObjective = true))
+
+            assertEquals(1L, certificate.fixSteps(0, 3L, 0L))
+            assertEquals(BigFraction.ZERO, certificate.exactReducedCost(1))
+            assertNull(certificate.fixSteps(1, 3L, 0L))
+        }
+    }
+
+    @Test
     fun `mixed rational bounds remain available without an integral objective lattice`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 10L)
