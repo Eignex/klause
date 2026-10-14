@@ -82,6 +82,14 @@ internal class SliceBudget(
         return if (workBounded) (nodeAllowance - sliceSpent()).coerceAtLeast(0L) else -1L
     }
 
+    fun remainingLpWork(): Long? {
+        val nodes = remainingNodes()
+        if (nodes < 0L) return null
+        val fractional = (lpWork() - lpWorkMark).coerceAtLeast(0L)
+        val allowance = nodes.coerceAtMost(Long.MAX_VALUE / LP_WORK_PER_NODE) * LP_WORK_PER_NODE
+        return (allowance - fractional).coerceAtLeast(0L)
+    }
+
     /** Work spent so far: nodes plus LP and propagation work, charged or not. */
     fun spent(): Long = addWork(
         addWork(nodeCount(), lpWork() / LP_WORK_PER_NODE), propagationWork() / PROPAGATION_WORK_PER_NODE,

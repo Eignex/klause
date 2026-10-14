@@ -9,6 +9,48 @@ import kotlin.test.assertTrue
 class SliceBudgetTest {
 
     @Test
+    fun `remaining native LP allowance accounts for fractional work and decisions`() {
+        var nodes = 0L
+        var work = 0L
+        val slice = SliceBudget({ nodes }, { work })
+        slice.begin(Long.MAX_VALUE, 2L)
+
+        work = LP_WORK_PER_NODE - 1L
+        nodes = 1L
+
+        assertEquals(1L, slice.remainingLpWork())
+    }
+
+    @Test
+    fun `native LP allowance saturates without wrapping`() {
+        val slice = SliceBudget({ 0L }, { 0L })
+        slice.begin(Long.MAX_VALUE, Long.MAX_VALUE)
+
+        assertEquals(Long.MAX_VALUE / LP_WORK_PER_NODE * LP_WORK_PER_NODE, slice.remainingLpWork())
+    }
+
+    @Test
+    fun `unbounded slices supply no native LP cap`() {
+        val slice = SliceBudget({ 0L }, { 0L })
+        slice.begin(Long.MAX_VALUE, -1L)
+
+        assertEquals(null, slice.remainingLpWork())
+    }
+
+    @Test
+    fun `repaid debt reduces the native LP allowance`() {
+        var work = 0L
+        val slice = SliceBudget({ 0L }, { work })
+        slice.begin(Long.MAX_VALUE, 1L)
+        work = 3L * LP_WORK_PER_NODE
+        slice.noteOverspend()
+
+        slice.begin(Long.MAX_VALUE, 4L)
+
+        assertEquals(2L * LP_WORK_PER_NODE, slice.remainingLpWork())
+    }
+
+    @Test
     fun `search inherits preparation charges and overspend`() {
         var work = 0L
         val preparation = SliceBudget({ 0L }, { 0L }, { work })

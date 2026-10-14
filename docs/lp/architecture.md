@@ -126,6 +126,11 @@ a cancelled optional root phase contributes only completed certified deductions.
 `lp-variable-shaving` and `lp-prune-hulls` are explicit backtrack overrides;
 `lp-root-cuts=false` disables root harvesting while retaining node separation.
 Curated satisfaction pools require `lp-root-cuts=true` to enable harvesting.
+Finite optimization adapters may supply a remaining native-work cap for optional
+node queries. The LP owner combines it with its persistent effort allowance without
+renewing either scope. A capped query that cannot certify a bound supplies no pruning
+authority; required leaf completion retains its own budget. See
+[slice accounting](../solver/resources.md).
 
 Problem-level presolve/inprocessing and LP root harvesting are reused. There
 is no general problem presolve inside the tree or elimination of shared variable

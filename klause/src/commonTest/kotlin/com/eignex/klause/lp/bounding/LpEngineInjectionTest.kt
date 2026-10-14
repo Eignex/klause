@@ -101,6 +101,46 @@ class LpEngineInjectionTest {
     }
 
     @Test
+    fun `node queries use the smaller containing and offered native allowances`() {
+        val problem = boundedProblem()
+        var allowance: Long? = null
+        val engine = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
+            LpParams(lpPlan = LpPlan(bounding = true), solveBudgetMillis = 4L),
+            SolveStatsSink(backend = "slice-cap"),
+            nodeWorkAllowance = { allowance },
+        )
+
+        engine.use {
+            it.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
+            for ((offered, expected) in listOf(null to 15_000L, 30_000L to 15_000L, 500L to 500L, 0L to 1L)) {
+                allowance = offered
+                assertEquals(expected, it.nodeWorkBudget())
+            }
+        }
+    }
+
+    @Test
+    fun `optional node construction receives the offered native work cap`() {
+        val problem = boundedProblem()
+        val factory = RecordingLpEngineFactory()
+        val engine = LpEngine(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "native-slice-cap"),
+            LpSolveContext(factory, decline),
+            nodeWorkAllowance = { 500L },
+        )
+
+        val pruned = engine.use { it.pruneNode(PropagationSession(problem), 1.5, -1, true) }
+
+        assertFalse(pruned)
+        assertEquals(500L, factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit)
+    }
+
+    @Test
     fun `node construction and certification stay isolated per engine`() {
         val problem = boundedProblem()
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
