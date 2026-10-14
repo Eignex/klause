@@ -158,13 +158,17 @@ internal class ResumableMinimize(
     private val startMark = TimeSource.Monotonic.markNow()
 
     // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
+    private var proposalPropagationWork = 0L
     private var clausePrimal: MonotoneClausePrimal? = null
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
     private val slice = SliceBudget(
         { sink.search.searchWork + (clausePrimal?.work ?: 0L) },
         { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork },
-        { if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L },
+        {
+            (if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L) +
+                (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L) + proposalPropagationWork
+        },
         preparationBudget,
         ownsWorkDebt = ownsWorkDebt,
     )
@@ -844,10 +848,28 @@ internal class ResumableMinimize(
         cancellation: Cancellation = params.cancellation,
     ): Candidate<Sample, Double>? {
         if (params.componentFactory != null) return null
+        if (cancellation() || proposal.numBoolVars != problem.numBoolVars ||
+            proposal.numIntVars != problem.numIntVars
+        ) {
+            return null
+        }
+        val onWork: (Long) -> Unit = { proposalPropagationWork += it }
+        val sample = if (problem.numRealVars > 0 && proposal.numRealVars == 0) {
+            val discrete = composedFixpoint(problem, Candidate(proposal, Unit), cancellation,
+                params.assumptions, onWork)
+            if (discrete !is Verification.Accepted || cancellation()) return null
+            val real = completeLeaf(proposal, cancellation)
+            if (real.verdict !in listOf(LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM)) {
+                return null
+            }
+            proposal.copy(reals = real.reals, exactReals = real.exactReals)
+        } else proposal
         val budget = cancellation or Cancellation.after(LP_VERIFY_BUDGET)
-        val verifier = ComposedSampleVerifier(problem, objective, budget)
-        val verdict = verifier.verify(Candidate(proposal, objective.evaluate(proposal)))
-        return (verdict as? Verification.Accepted)?.candidate
+        if (budget()) return null
+        val verifier = ComposedSampleVerifier(problem, objective, budget,
+            params.assumptions, onWork, params.toleranceCheck)
+        val verdict = verifier.verify(Candidate(sample, objective.evaluate(sample)))
+        return if (budget()) null else (verdict as? Verification.Accepted)?.candidate
     }
 
     /**
@@ -934,20 +956,13 @@ internal class ResumableMinimize(
         // arm's (root propagation + shaving), before any incumbent-relative fixing runs.
         boundExchange.importGlobalVarBounds()
         boundExchange.publishGlobalVarBounds()
-        // These primal heuristics seed an integer incumbent from the LP/rounding without solving the
-        // residual real LP, so their sample carries no continuous values and is not certified real-
-        // feasible. With LP-only continuous variables only the leaf verdict may surface a
-        // solution (it validates the reals and attaches them); skip the heuristics there rather than
-        // spend the root budget on proposals [publishLpProposal] would refuse anyway.
+        if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
+            fun accept(proposal: Sample): Sample? = verifiedLpProposal(proposal, rootToken)?.assignment
+            val seed = lpEngine.lpRoundingProbe(objective, rootToken)?.let(::accept)
+                ?: lpEngine.lpFeasibilityPump(objective, rootToken, ::accept)
+            if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+        }
         if (problem.numRealVars == 0) {
-            // LP-rounding primal heuristic: seed an incumbent before search so the bound prunes and
-            // reduced-cost fixing bite from the first node.
-            if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
-                // Single-shot rounding first; if it can't land a feasible point, pump toward one.
-                val seed = lpEngine.lpRoundingProbe(objective, rootToken)
-                    ?: lpEngine.lpFeasibilityPump(objective, rootToken)
-                if (seed != null) publishLpProposal(seed)?.let { return it }
-            }
             // Best-first incumbent search runs only if rounding and feasibility pumping yield no incumbent.
             if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
                 lpEngine.lbTreeSearch(objective, rootToken, params.assumptions)?.let { seed ->

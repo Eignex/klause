@@ -29,38 +29,44 @@ import kotlin.random.Random
  * of the LP's confidence — least-fractional integers and most-decisive Booleans first — so the values
  * the relaxation is surest about propagate first and steer the rest. And when a rounding conflicts the
  * other side of the LP value is tried before giving up, recovering assignments a one-shot round drops.
- * Every variable still ends pinned to a single value, so a returned snapshot is a complete feasible
- * point, which the caller re-derives from the composed model before it may stand; a variable that
- * conflicts both ways yields null.
+ * Every discrete variable ends pinned to a single value. The caller re-derives discrete feasibility
+ * and completes any continuous coordinates before publication; a variable that conflicts both ways
+ * yields null.
  */
 internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
-    val session = PropagationSession(problem)
-    if (session.isUnsatAtRoot) return null
-    val relaxation = CpToLpRelaxation(problem, objective).build(session)
-    if (relaxation.model.n == 0) return null
-    val result = try {
-        val simplex = dualSimplex(relaxation.model, cancellation)
-        try {
-            simplex.solve()
-        } finally {
+    val session = PropagationSession(problem, cancellation)
+    try {
+        if (session.isUnsatAtRoot) return null
+        val relaxation = CpToLpRelaxation(problem, objective).build(session)
+        if (relaxation.model.n == 0) return null
+        val result = try {
+            val simplex = dualSimplex(relaxation.model, cancellation)
             try {
-                observeRootSolve(simplex)
+                simplex.solve()
             } finally {
-                simplex.close()
+                try {
+                    observeRootSolve(simplex)
+                } finally {
+                    simplex.close()
+                }
             }
-        }
-    } catch (_: CheckedLongOverflowException) {
-        return null
-    } ?: return null
-    val primal = result.primal
-    return pinToward(session, relaxation) { col -> if (col in 0 until primal.size) primal[col] else null }
+        } catch (_: CheckedLongOverflowException) {
+            return null
+        } ?: return null
+        val primal = result.primal
+        val sample = pinToward(session, relaxation) { col -> if (col in 0 until primal.size) primal[col] else null }
+        return sample.takeUnless { session.fixpointCancelled || cancellation() }
+    } finally {
+        primalPropagationWork += session.work
+    }
 }
 
 /**
  * Pin every variable toward the value [targetOf] gives its LP column — the LP point for the rounding
  * probe, the rounded target for the feasibility pump — most-confident first and with the two-sided
  * fallback of [pinIntTowardLp], then snapshot. Every variable ends pinned to a single value, so a
- * non-null result is a complete feasible assignment; null when a variable conflicts both ways.
+ * non-null result covers the discrete assignment; null when a variable conflicts both ways.
+ * Continuous feasibility remains the caller's completion duty.
  */
 internal fun LpEngine.pinToward(
     session: PropagationSession,
@@ -107,13 +113,17 @@ private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo:
  * rounded target sits at a declared bound — every Boolean and any integer rounded to its bound — and
  * omits interior integer targets, whose `|x − t|` is not linear; this only steers the search, never
  * affects soundness (a returned [Sample] is a fully-pinned, propagation-feasible assignment the caller
- * still re-evaluates). Stops at the first feasible rounding or the round cap. A repeated rounding
+ * still re-evaluates). Stops at the first rounding admitted by [accept] or the round cap. A repeated rounding
  * (cycle) triggers a Fischetti–Glover–Lodi perturbation ([perturbRounding]) — flip the most-fractional
  * coordinates and keep pumping — up to [PUMP_MAX_RESTARTS] times before giving up. Re-solves prefer the
  * primal pass ([LpSolver.solvePrimal], phase-1 included) and fall back to the dual
  * [LpSolver.solve].
  */
-internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation: Cancellation): Sample? {
+internal fun LpEngine.lpFeasibilityPump(
+    objective: LinearObjective,
+    cancellation: Cancellation,
+    accept: (Sample) -> Sample? = { it },
+): Sample? {
     var solved = solveRelaxation(objective, cancellation) ?: return null
     val seen = HashSet<String>()
     val rng = Random(params.randomSeed ?: 0L)
@@ -138,10 +148,18 @@ internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation
             perturbRounding(relaxation, primal, intTarget, boolTarget, flips)
             seen.add(pumpKey(intTarget, boolTarget))
         }
-        val session = PropagationSession(problem)
-        if (!session.isUnsatAtRoot) {
-            val sample = pinToward(session, relaxation) { col -> targetOfCol(relaxation, intTarget, boolTarget, col) }
-            if (sample != null) return sample // rounding realized into a feasible incumbent
+        val session = PropagationSession(problem, cancellation)
+        try {
+            if (!session.isUnsatAtRoot) {
+                val sample = pinToward(session, relaxation) { col ->
+                    targetOfCol(relaxation, intTarget, boolTarget, col)
+                }
+                if (sample != null && !session.fixpointCancelled && !cancellation()) {
+                    accept(sample)?.let { return it }
+                }
+            }
+        } finally {
+            primalPropagationWork += session.work
         }
         val distance = distanceObjective(relaxation, intTarget, boolTarget) ?: return null // nothing to pump
         solved = solveRelaxation(distance, cancellation) ?: return null
@@ -199,7 +217,7 @@ private fun LpEngine.solveRelaxation(
     obj: LinearObjective,
     cancellation: Cancellation,
 ): Pair<LpRelaxation, DoubleArray>? {
-    val session = PropagationSession(problem)
+    val session = PropagationSession(problem, cancellation)
     if (session.isUnsatAtRoot) return null
     val relaxation = CpToLpRelaxation(problem, obj).build(session)
     if (relaxation.model.n == 0) return null

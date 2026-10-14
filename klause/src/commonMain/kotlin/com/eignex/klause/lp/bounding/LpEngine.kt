@@ -111,6 +111,7 @@ internal class LpEngine(
     init { projections?.requireSource(problem) }
 
     private var closed = false
+    internal var primalPropagationWork: Long = 0L
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
         if (projections?.builtInRelaxation == false) {
             CpToLpRelaxation(problem, objective, realResidual = true, projections = null)

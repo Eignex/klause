@@ -66,6 +66,22 @@ class LpPrimalHeuristicsFeasibilityPumpTest {
     }
 
     @Test
+    fun `the pump continues after the consumer declines a rounding`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val sink = SolveStatsSink(backend = "pump-test")
+        var proposals = 0
+
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            assertNotNull(engine.lpFeasibilityPump(objective, Cancellation.Never) { sample ->
+                if (++proposals == 1) null else sample
+            })
+        }
+
+        assertTrue(proposals > 1)
+    }
+
+    @Test
     fun `the rounding probe attributes its solve to root work`() {
         val problem = Problem(
             0,

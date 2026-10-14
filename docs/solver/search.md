@@ -430,7 +430,12 @@ A component's partial consistency check or relaxation witness does not accept a
 complete source assignment. Every participating owner must finish its required
 check before publication. Extra theory components also constrain finite LP primal
 proposals and transferred initial candidates; ordinary traversal remains available
-when a proposal cannot be completed.
+when a proposal cannot be completed. Mixed root rounding and feasibility-pump
+proposals first satisfy the discrete fixpoint under caller assumptions, then obtain
+continuous coordinates from the retained real-leaf owner. Only a complete checked
+witness reaches incumbent admission; an incomplete or unbounded completion does not
+publish a heuristic result. The pump can continue after a declined completion under
+its existing root allowance.
 
 [Theory contracts](../theories.md) define the fragment-specific checks and evidence.
 Difference graphs, exact linear systems and polynomial completion keep their own

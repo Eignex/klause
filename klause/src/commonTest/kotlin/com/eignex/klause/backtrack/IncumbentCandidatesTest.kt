@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
@@ -90,6 +91,28 @@ class IncumbentCandidatesTest {
         val verdict = verifier(problem(), Cancellation { true })
             .verify(Candidate(sample(b0 = true, x0 = 1, x1 = 2), 3.0))
         assertIs<Verification.Indeterminate>(verdict, "an unfinished fixpoint decides nothing either way")
+    }
+
+    @Test
+    fun `proposal verification rejects a value outside caller assumptions`() {
+        val proposal = sample(b0 = true, x0 = 1, x1 = 2)
+        val verifier = ComposedSampleVerifier(problem(), objective, Cancellation.Never,
+            assumptions = Assumptions(ints = mapOf(0 to 2L)))
+
+        assertIs<Verification.Rejected>(verifier.verify(Candidate(proposal, 3.0)))
+    }
+
+    @Test
+    fun `proposal verification charges propagation for accepted and rejected assignments`() {
+        for (x0 in listOf(1L, 3L)) {
+            var work = 0L
+            val proposal = sample(b0 = true, x0 = x0, x1 = 2)
+            val verifier = ComposedSampleVerifier(problem(), objective, Cancellation.Never, onWork = { work += it })
+
+            verifier.verify(Candidate(proposal, objective.evaluate(proposal)))
+
+            assertTrue(work > 0L)
+        }
     }
 
     @Test
