@@ -2285,11 +2285,11 @@ class PortfolioTest {
 
             val result = Portfolio(workers, bandit).use {
                 it.incumbentProbeArms = setOf(1)
-                it.minimize(Cancellation { reached.size >= 7 })
+                it.minimize(Cancellation { reached.size >= 15 })
             }
 
             assertIs<MinimizeResult.BestFound>(result)
-            assertEquals(if (productive) listOf(0, 1, 1, 1, 1, 1, 1) else listOf(0, 1, 1, 1, 1, 0, 0), reached)
+            assertEquals(if (productive) listOf(0) + List(14) { 1 } else listOf(0) + List(12) { 1 } + listOf(0, 0), reached)
         }
     }
 
@@ -2317,11 +2317,11 @@ class PortfolioTest {
 
         Portfolio.thompson(workers, reseedStaleThreshold = 0).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { reached.size >= 12 })
+            it.minimize(Cancellation { reached.size >= 20 })
         }
 
         assertEquals(listOf(0, 1, 2), reached.take(3))
-        assertEquals(7, reached.count { it == 1 })
+        assertEquals(15, reached.count { it == 1 })
     }
 
     @Test
@@ -2351,15 +2351,15 @@ class PortfolioTest {
 
         Portfolio.thompson(workers, reseedStaleThreshold = 1).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { calls >= 7 })
+            it.minimize(Cancellation { calls >= 15 })
         }
 
-        assertEquals(4, slices)
+        assertEquals(12, slices)
     }
 
     @Test
     fun `auxiliary search trial retires after its charged work allowance`() {
-        for ((charge, expectedSlices) in listOf(2L to 14, 7L to 4, Long.MAX_VALUE to 1)) {
+        for ((charge, expectedSlices) in listOf(2L to 42, 7L to 12, Long.MAX_VALUE to 1)) {
             val reached = ArrayList<Int>()
             val search = object : ResumableSearch {
                 private var spent = 0L
@@ -2432,10 +2432,10 @@ class PortfolioTest {
 
         Portfolio.thompson(workers, reseedStaleThreshold = 0).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { reached.size >= 22 })
+            it.minimize(Cancellation { reached.size >= 30 })
         }
 
-        assertEquals(19, reached.count { it == 1 })
+        assertEquals(27, reached.count { it == 1 })
         assertEquals(listOf(0, 0), reached.takeLast(2))
     }
 

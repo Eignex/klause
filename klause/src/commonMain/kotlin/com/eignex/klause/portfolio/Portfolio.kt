@@ -665,9 +665,9 @@ class Portfolio(
         private val trialPreparationSegments = IntArray(workers.size)
         private val trialSearchWork = LongArray(workers.size)
         private val trialSearchTime = Array(workers.size) { Duration.ZERO }
-        private val trialTimeLimit = baseSliceMillis.milliseconds * AUXILIARY_SEARCH_ALLOWANCES
-        private val trialWorkLimit = baseSliceWork.coerceAtMost(Long.MAX_VALUE / AUXILIARY_SEARCH_ALLOWANCES) *
-            AUXILIARY_SEARCH_ALLOWANCES
+        private val trialTimeLimit = baseSliceMillis.milliseconds * AUXILIARY_SEARCH_TIME_ALLOWANCES
+        private val trialWorkLimit = baseSliceWork.coerceAtMost(Long.MAX_VALUE / AUXILIARY_SEARCH_WORK_ALLOWANCES) *
+            AUXILIARY_SEARCH_WORK_ALLOWANCES
         private val preparationRevisits = BooleanArray(workers.size)
         private var continuingPreparation = -1
         private var nextPreparationArm = 0
@@ -1154,7 +1154,8 @@ class Portfolio(
 // The share of the time a run has left that its arms' next segments may take together; see `Portfolio.segmentToken`.
 private const val REMAINING_SHARE = 0.5
 
-private const val AUXILIARY_SEARCH_ALLOWANCES = 4
+private const val AUXILIARY_SEARCH_WORK_ALLOWANCES = 12
+private const val AUXILIARY_SEARCH_TIME_ALLOWANCES = 4
 private const val AUXILIARY_PREPARATION_SEGMENTS = 12
 
 // Most of an arm's time incumbent checks may take; see `Portfolio.minimize`.
