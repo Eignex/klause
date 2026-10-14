@@ -30,6 +30,7 @@ internal fun reconstructRational(
     value: Double,
     maxDenominator: Long = DEFAULT_MAX_DENOMINATOR,
     tolerance: Double = DEFAULT_TOLERANCE,
+    onStep: (() -> Unit)? = null,
 ): Rational? {
     if (!value.isFinite() || maxDenominator < 1L || !tolerance.isFinite() || tolerance < 0.0) return null
     if (abs(value) >= Long.MAX_VALUE.toDouble()) return null
@@ -46,6 +47,7 @@ internal fun reconstructRational(
     var rest = magnitude - floor(magnitude)
 
     repeat(MAX_TERMS) {
+        onStep?.invoke()
         if (abs(num.toDouble() / den.toDouble() - magnitude) <= tolerance) {
             return Rational(if (negative) -num else num, den)
         }
