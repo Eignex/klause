@@ -5,6 +5,7 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
 import com.eignex.klause.ir.TranscendentalProblem
+import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
@@ -132,6 +133,7 @@ internal class TranscendentalWorkerAdapter(
             countsInstructions = true,
             resumable = { requireNotNull(neighborhoodWorker(arm).newResumableSolve()) },
         ) { global, budget -> neighborhoodWorker(arm).solve(global, budget) }
+        if (arm == 2) worker.family = ArmFamily.Lns
         return worker.bindEvidence(identity, provesResults = arm == 0).bindInvocation(requireNotNull(binding))
     }
 
