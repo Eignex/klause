@@ -149,8 +149,12 @@ internal object SourceAgreementProfile {
         session: SearchSession,
         points: MutableList<AssembledSearchModel>,
     ): String {
+        when (session.initialize()) {
+            ComponentResult.Consistent -> Unit
+            is ComponentResult.Conflict -> return "exhausted"
+            ComponentResult.Indeterminate -> return "indeterminate"
+        }
         if (case.guarded) {
-            if (session.initialize() != ComponentResult.Consistent) return "indeterminate"
             for (value in listOf(true, false)) {
                 session.popTo(0)
                 if (session.push(SearchDecision.Bool(if (value) 0 else 1)) != ComponentResult.Consistent ||
@@ -205,9 +209,9 @@ internal object SourceAgreementProfile {
         private val descriptor = ExecutionComponentDescriptor::class.java.declaredConstructors
             .single { it.parameterCount == 9 }
         private val factory = registration.getDeclaredConstructor(Problem::class.java,
-            ExecutionComponentDescriptor::class.java, kotlin.jvm.functions.Function1::class.java)
+            ExecutionComponentDescriptor::class.java, Class.forName("kotlin.jvm.functions.Function1"))
         private val collection = registrations.getDeclaredConstructor(Problem::class.java, List::class.java)
-        private val open = registrations.getMethod("open", java.lang.Long.TYPE, Cancellation::class.java,
+        private val open = registrations.getMethod("open", Long::class.java, Cancellation::class.java,
             SearchLearnedDbParams::class.java,
             Class.forName("com.eignex.klause.solver.result.SmtStatsSink"), Cancellation::class.java)
         fun open(source: Problem, stop: Cancellation, maxChecks: Long): PlannedSearch {
