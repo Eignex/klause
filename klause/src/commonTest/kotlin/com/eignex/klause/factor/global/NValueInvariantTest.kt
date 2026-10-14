@@ -15,6 +15,8 @@ import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.buildRepairChain
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
@@ -528,7 +530,7 @@ class NValueInvariantTest {
     }
 
     @Test
-    fun `repairs reconcile repeated classes after an objective bound lowers the count`() {
+    fun `directed repairs reconcile repeated classes after an objective bound lowers the count`() {
         val p = Problem(
             0,
             7,
@@ -557,7 +559,10 @@ class NValueInvariantTest {
         assertEquals(1L, state.cost)
 
         state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
-        val move = state.moveSink.list.first { state.netDelta(it) == -1L }
+        val repairs = MoveSink(state.assumptions).also { it.setInvariants(state.invariants) }
+        val move = state.moveSink.list.mapNotNull { first ->
+            state.buildRepairChain(first, 8, repairs)?.let { Move.Compound(it) }
+        }.first { state.netDelta(it) == -1L }
         assertEquals(before, state.assignment.snapshot())
         state.apply(move)
 
@@ -567,6 +572,43 @@ class NValueInvariantTest {
         assertEquals(0L, state.cost)
         state.recompute()
         assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `count reduction reconciles repeated classes within the callers directed walk`() {
+        for (seed in listOf(3, 17, 41)) {
+            val p = Problem(
+                0, 6,
+                arrayOf(
+                    IntDomain(1, 2), IntDomain(0, 1), IntDomain(0, 1),
+                    IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4),
+                ),
+                arrayOf<Factor>(
+                    NValue(0, intArrayOf(1, 2, 3, 4)),
+                    Linear(intArrayOf(1, 1, 1, 1, -1), intArrayOf(1, 2, 3, 4, 5), LinearOp.EQ, 0),
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(p), Random(seed))
+            for ((v, value) in listOf(0 to 2L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L, 5 to 2L)) {
+                state.assignment.setInt(v, value)
+            }
+            state.recompute()
+            val before = state.assignment.snapshot()
+            assertEquals(1L, state.cost)
+
+            val parts = state.buildRepairChain(Move.IntSet(0, 1), 8, MoveSink(state.assumptions))
+            val move = Move.Compound(assertNotNull(parts))
+            assertEquals(before, state.assignment.snapshot())
+            assertEquals(1L, state.cost)
+            state.apply(move)
+
+            assertEquals(1L, state.assignment.intValue(0))
+            assertEquals(1, (1..4).map { state.assignment.intValue(it) }.distinct().size)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
     }
 
     @Test

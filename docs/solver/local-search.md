@@ -319,7 +319,9 @@ may reconcile affected Boolean clauses on a scratch assignment. At most four sam
 candidates use that bounded reconciliation, sharing root-predicate and fold indexes.
 The candidate with the least resulting model cost may use the
 existing directed repair-chain mechanism to reconcile regressed
-surrounding constraints. Zero-delta moves need completion only at an infeasible assignment.
+surrounding constraints during structured generation. Repair generation supplies class
+seeds and zero-cost scratch reconciliations to its caller's walk and never starts another walk;
+this preserves the caller's live degree baseline. Zero-delta moves need completion only at an infeasible assignment.
 Clause, XOR and unary-channel reconciliation inspects at most 512 queued factor occurrences and appends at
 most 32 primitive writes. A violated clause with one eligible repair can flip a searched
 flag or set a searched integer to satisfy a maintained unary equality (or falsify a
