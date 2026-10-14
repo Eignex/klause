@@ -106,6 +106,7 @@ internal class LpEngine(
     internal val solveContext: LpSolveContext = LpSolveContext.Production,
     private val deferred: Boolean = false,
     internal val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
+    private val nodeWorkAllowance: () -> Long? = { null },
 ) : AutoCloseable {
     init { projections?.requireSource(problem) }
 
@@ -171,6 +172,7 @@ internal class LpEngine(
             sink,
             solveContext,
             projections = projections,
+            nodeWorkAllowance = nodeWorkAllowance,
         ).also { it.structuralCutSupport = structuralCutSupport }
     }
 
@@ -418,7 +420,13 @@ internal class LpEngine(
             else -> lpWorkBudget.ops()
         }
         // A solve limit of 0 means unbounded, so a spent allowance still leaves one operation.
-        val remaining = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: return budget
+        val containing = lpEffortGovernor.remainingWork()
+        val offered = nodeWorkAllowance()
+        val remaining = when {
+            containing == null -> offered
+            offered == null -> containing
+            else -> minOf(containing, offered)
+        }?.coerceAtLeast(1L) ?: return budget
         return if (budget == 0L) remaining else minOf(budget, remaining)
     }
 
