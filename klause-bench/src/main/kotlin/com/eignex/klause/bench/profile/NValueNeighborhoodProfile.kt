@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
@@ -92,8 +93,10 @@ object NValueNeighborhoodProfile {
             ?.takeIf { it.isThreadAllocatedMemorySupported }
         val thread = Thread.currentThread().threadId()
         val runs = ArrayList<FactorRun>()
+        val model = LocalSearchModel.of(baked)
+        val pins = requireNotNull(model.pinsUnder(Assumptions.None))
         for (maintained in listOf(false, true)) {
-            val state = LocalSearchState(LocalSearchModel.of(baked), Random(seed))
+            val state = LocalSearchState(model, Random(seed), assumptions = pins)
             if (maintained) {
                 state.invariants = entry.definitionalSweep?.network(problem.numIntVars, problem.numBoolVars)
                 state.moveSink.setInvariants(state.invariants)
@@ -103,7 +106,7 @@ object NValueNeighborhoodProfile {
             for ((fid, factor) in problem.factors.withIndex()) {
                 if (factor !is NValue) continue
                 val originalDistinct = distinct(state, factor)
-                val sink = MoveSink().also { it.setInvariants(state.invariants) }
+                val sink = MoveSink(pins).also { it.setInvariants(state.invariants) }
                 var ns = 0L
                 var bytes = 0L
                 var emitted = 0
