@@ -3,9 +3,11 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchIntValue
@@ -16,8 +18,8 @@ import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
-import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.PreparedExactLiraComponentFactory
+import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.Cancellation
 
 /** Builds the theory component selected by this plan. */
@@ -52,15 +54,18 @@ internal fun ComponentPlan.theoryComponentFactory(
     fun exact(
         opening: SearchComponentOpening,
         contribution: (ExactLiraAssignment, SearchModel) -> Unit,
-    ): List<SearchComponent> = listOf(
-        (preparedSource()?.open(cpIntVars, contribution) ?: ExactLiraSearchComponent(
-            fragment, fragment.selectedFactorProjections(), cpIntVars, contribution,
-        )).also { component ->
+    ): List<SearchComponent> {
+        val factory = preparedSource() ?: prepareExactLiraSource(fragment, opening.cancellation)
+        if (factory == null) return listOf(object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult = ComponentResult.Indeterminate
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
+        })
+        return listOf(factory.open(cpIntVars, contribution).also { component ->
             opening.ownComponent(component)
             component.useSolveStop(opening.theorySolveStop)
             opening.smtStats?.let(component::observeWith)
-        },
-    )
+        })
+    }
     return when (theoryPipeline) {
         ProblemPipeline.DIFFERENCE_THEORY -> {
             val owned = theoryIntVars

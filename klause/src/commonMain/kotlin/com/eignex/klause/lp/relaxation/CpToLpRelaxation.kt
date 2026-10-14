@@ -51,19 +51,21 @@ import com.eignex.klause.lp.statesBinary
 import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
+import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.portfolio.verifyRealCoordinates
-import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.solver.selectedFactorProjections
+import com.eignex.klause.theory.encodingSourceRealCount
+import com.eignex.klause.theory.finiteLinearModel
+import com.eignex.klause.theory.privateLinearCompletion
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -404,7 +406,8 @@ internal fun leafRealFeasibility(
         },
         floatOffset = relaxation.objectiveConstant.toDouble(),
     )
-    return relaxation.leafResult(certified, problem, objective, sample, sink).checkedEncoding(encoded, sample)
+    return relaxation.leafResult(certified, problem, objective, sample, sink)
+        .checkedEncoding(encoded, sample, cancellation)
 }
 
 internal fun LpRelaxation.leafResult(
@@ -1636,8 +1639,18 @@ internal class CpToLpRelaxation(
     }
 }
 
-internal fun LeafRealResult.checkedEncoding(encoded: Problem, sample: Sample): LeafRealResult {
+internal fun LeafRealResult.checkedEncoding(
+    encoded: Problem,
+    sample: Sample,
+    cancellation: Cancellation,
+): LeafRealResult {
     if (exactReals == null || verdict == LpVerdict.INFEASIBLE) return this
-    val checked = verifyRealCoordinates(encoded, sample.copy(reals = reals, exactReals = exactReals))
-    return if (checked is Verification.Accepted) this else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    val point = sample.copy(reals = reals, exactReals = exactReals)
+    if (encoded.encodingSourceRealCount != encoded.numRealVars) {
+        return if (privateLinearCompletion(encoded, point, cancellation) == true) this
+        else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    }
+    val checked = verifyRealCoordinates(encoded, point)
+    return if (!cancellation() && checked is Verification.Accepted) this
+    else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
 }

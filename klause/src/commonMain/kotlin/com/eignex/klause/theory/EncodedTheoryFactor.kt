@@ -37,6 +37,7 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     fixedIntegers: Map<SourceIntId, BigInt> = emptyMap(),
     cancellation: Cancellation = Cancellation.Never,
     fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
+    onDecline: (EncoderDecline) -> Unit = {},
 ): Problem? {
     require(target != EncodingTarget.POLYNOMIAL)
     val integerPins = fixedIntegers.toMap()
@@ -45,7 +46,7 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     val origins = ArrayList<Int>()
     val allocator = EncodingRealAllocator(problem.numRealVars)
     for (index in indices) {
-        val relations = installLinearFactor(index, target, integerPins, booleanPins, cancellation, allocator)
+        val relations = installLinearFactor(index, target, integerPins, booleanPins, cancellation, allocator, onDecline)
             ?: return null
         factors += relations
         repeat(relations.size) { origins += index }
@@ -63,6 +64,7 @@ internal fun PreparedFactorProjections.installLinearFactor(
     booleanPins: Map<SourceBoolId, Boolean> = emptyMap(),
     cancellation: Cancellation = Cancellation.Never,
     allocator: EncodingRealAllocator = EncodingRealAllocator(problem.numRealVars),
+    onDecline: (EncoderDecline) -> Unit = {},
 ): List<EncodedTheoryFactor>? {
     val source = problem.factors[index]
     val sourceIndex = (source as? EncodedTheoryFactor)?.attribution?.sourceFactorIndex ?: index
@@ -83,12 +85,23 @@ internal fun PreparedFactorProjections.installLinearFactor(
     val encoding = LinearTheoryEncoding(target, sourceIndex, integerPins, booleanPins, cancellation,
         booleans, integers, reals, allocator)
     val forms = try {
-        if (encoder(index, target).install(source, encoding) != null) return null
-        encoding.finish() ?: return null
+        val decline = encoder(index, target).install(source, encoding)
+        if (decline != null) {
+            onDecline(decline)
+            return null
+        }
+        encoding.finish() ?: run {
+            onDecline(EncoderDecline.UNSUPPORTED)
+            return null
+        }
     } catch (_: LinearEncodingInterrupted) {
+        onDecline(EncoderDecline.RESOURCE)
         return null
     }
-    if (cancellation()) return null
+    if (cancellation()) {
+        onDecline(EncoderDecline.RESOURCE)
+        return null
+    }
     val attribution = if (source is EncodedTheoryFactor && integerPins.isEmpty() && booleanPins.isEmpty() &&
         encoding.auxiliaryDefinitions().isEmpty() && encoding.guardDefinitions().isEmpty() &&
         encoding.realAuxiliaries.isEmpty()
@@ -112,7 +125,7 @@ private class LinearTheoryEncoding(
     private val reals: Set<Int>,
     private val allocator: EncodingRealAllocator,
 ) : TheoryEncoding {
-    private val owner = Any()
+    private val owner = EncodingNamespace()
     private val formulas = ArrayList<LinearEncodingFormula>()
     private val auxiliaries = ArrayList<EncodingAffineExpression?>()
     private val guards = ArrayList<LinearEncodingFormula?>()
@@ -133,12 +146,12 @@ private class LinearTheoryEncoding(
     override fun realAuxiliary(): EncodingRealAuxiliary {
         require(target == EncodingTarget.LINEAR) { "private real coordinates require a linear consumer" }
         lowering.checkpoint()
-        return EncodingRealAuxiliary(owner, allocator.allocate()).also { realAuxiliaries += it.coordinate }
+        return owner.realAuxiliary(allocator.allocate()).also { realAuxiliaries += it.coordinate }
     }
 
     override fun auxiliary(): EncodingAuxiliary {
         lowering.checkpoint()
-        return EncodingAuxiliary(owner, auxiliaries.size).also { auxiliaries += null }
+        return owner.auxiliary(auxiliaries.size).also { auxiliaries += null }
     }
 
     override fun define(auxiliary: EncodingAuxiliary, expression: EncodingAffineExpression) {
@@ -150,7 +163,7 @@ private class LinearTheoryEncoding(
 
     override fun guard(): EncodingGuard {
         lowering.checkpoint()
-        return EncodingGuard(owner, guards.size).also { guards += null }
+        return owner.guard(guards.size).also { guards += null }
     }
 
     override fun define(guard: EncodingGuard, formula: LinearEncodingFormula) {
@@ -170,9 +183,14 @@ private class LinearTheoryEncoding(
         for (index in auxiliaries.indices) expand(checkNotNull(auxiliaries[index]), setOf(index))
         for (index in guards.indices) clauses(checkNotNull(guards[index]), setOf(index))
         usedReals.clear()
-        val forms = lowering.forms(lowering.and(formulas.map { clauses(it) }))
+        val clauses = lowering.and(formulas.map { clauses(it) })
         require(usedReals.containsAll(realAuxiliaries)) { "unattributed private real coordinate" }
-        return forms
+        val unchanged = formulas.singleOrNull() as? LinearEncodingFormula.Relation
+        if (unchanged != null && auxiliaries.isEmpty() && guards.isEmpty() && realAuxiliaries.isEmpty()) {
+            lowering.checkpoint()
+            return listOf(unchanged.form)
+        }
+        return lowering.forms(clauses)
     }
 
     private fun validate(reference: Int) {

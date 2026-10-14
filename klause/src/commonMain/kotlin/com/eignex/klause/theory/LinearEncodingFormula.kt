@@ -6,21 +6,21 @@ import com.eignex.klause.simplex.exact.BigFraction
 
 /** A private affine value, allocated and defined by one receiving installation scope. */
 class EncodingAuxiliary internal constructor(
-    internal val owner: Any,
+    internal val owner: EncodingNamespace,
     /** Position in this installation's immutable reconstruction definitions. */
     val index: Int,
 )
 
 /** A private existential real coordinate, constrained by one installation's complete formula. */
 class EncodingRealAuxiliary internal constructor(
-    internal val owner: Any,
+    internal val owner: EncodingNamespace,
     /** Typed private coordinate retained in the installed attribution. */
     val coordinate: TheoryRealId,
 )
 
 /** A private Boolean formula name, allocated and defined by one receiving installation scope. */
 class EncodingGuard internal constructor(
-    internal val owner: Any,
+    internal val owner: EncodingNamespace,
     /** Position in this installation's immutable Boolean definitions. */
     val index: Int,
 )

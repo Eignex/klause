@@ -25,6 +25,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
 import com.eignex.klause.solver.pipeline.PreparedExecutionKind
+import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.TheoryParams
@@ -98,6 +99,9 @@ class SourceStrategy internal constructor(
                 (OpenTheoryPipeline.execute(route.request, scope.theory, engine) as OpenTheoryExecution.Satisfy).result
             }
             is SourceProblemRoute.UnsupportedOpen -> {
+                if (route.preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
+                    return OpenTheoryResult.Unknown(TerminationReason.BudgetExhausted, SolveStats.EMPTY)
+                }
                 if (!scope.supportsOpen(engine)) {
                     return scope.unsupported()
                 }

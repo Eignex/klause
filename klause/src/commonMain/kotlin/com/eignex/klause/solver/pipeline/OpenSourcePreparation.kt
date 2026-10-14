@@ -7,6 +7,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.util.Cancellation
 
 /** An open source model after the shared preparation phase, with the route selected from the result. */
@@ -81,7 +82,8 @@ internal fun PreparedSource.planned(
     } else selected
     require(
         (plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
-            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN) || cancellation(),
+            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN) || cancellation() ||
+            plan.encodingDecline == EncoderDecline.RESOURCE,
     ) {
         "source preparation left the model without an open-theory route"
     }

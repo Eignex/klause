@@ -1,5 +1,7 @@
 package com.eignex.klause.theory
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
@@ -16,8 +18,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.PolynomialExpression
+import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.FloatSpec
@@ -28,6 +34,7 @@ import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
@@ -35,11 +42,14 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
 import com.eignex.klause.solver.pipeline.FactorOwner
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FiniteExactNeighborhood
 import com.eignex.klause.solver.pipeline.IntVariableOwner
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
@@ -266,6 +276,167 @@ class EncoderTest {
     }
 
     @Test
+    fun `private real disequalities use scoped branches without publishing private coordinates`() {
+        val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.NE, 0.0)
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(row), numRealVars = 1,
+            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (target != EncodingTarget.LINEAR) BuiltInEncoderProvider.select(factor, target)
+            else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                val private = encoding.realAuxiliary()
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                    EncodingLinearTerm.source(Term.ofRealVar(0), BigFraction.MINUS_ONE),
+                )), LinearOp.EQ, BigFraction.ZERO))
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                )), LinearOp.NE, BigFraction.ZERO))
+                null
+            }
+        })
+        val plan = source.prepareExecutionPlan(providers)
+        val request = OpenTheoryRequest(source, componentPlan = assertNotNull(plan.componentPlan), preparedPlan = plan)
+            .withPresolve(PresolveConfig.NONE)
+
+        val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request)).result
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertTrue(witness.realValue(0) != "0")
+        assertFailsWith<IndexOutOfBoundsException> { witness.realValue(1) }
+    }
+
+    @Test
+    fun `affine auxiliary expansion preserves aliases across typed source namespaces`() {
+        val row = Linear(intArrayOf(0, 0), doubleArrayOf(1.0, 2.0), intArrayOf(0), doubleArrayOf(-1.0),
+            LinearOp.EQ, 3.0)
+        val source = Problem(0, 1, arrayOf(IntDomain(2, 2)), arrayOf<Factor>(row), numRealVars = 1,
+            realLower = doubleArrayOf(3.0), realUpper = doubleArrayOf(3.0))
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (target != EncodingTarget.LINEAR) BuiltInEncoderProvider.select(factor, target)
+            else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                val private = encoding.auxiliary()
+                encoding.define(private, EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.source(Term.ofIntVar(0), BigFraction.ONE),
+                    EncodingLinearTerm.source(Term.ofIntVar(0), BigFraction.ofLong(2)),
+                    EncodingLinearTerm.source(Term.ofRealVar(0), BigFraction.MINUS_ONE),
+                )))
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                )), LinearOp.EQ, BigFraction.ofLong(3)))
+                null
+            }
+        })
+        val plan = source.prepareExecutionPlan(providers)
+        val request = OpenTheoryRequest(source, componentPlan = assertNotNull(plan.componentPlan), preparedPlan = plan)
+            .withPresolve(PresolveConfig.NONE)
+
+        val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request)).result
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals("2", witness.intValue(0))
+        assertEquals("3", witness.realValue(0))
+        assertEquals(IntVariableOwner.CP, plan.componentPlan!!.intOwner(0))
+    }
+
+    @Test
+    fun `finite numerical completion checks private encodings at the original source point`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (target != EncodingTarget.LINEAR) BuiltInEncoderProvider.select(factor, target)
+            else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                val private = encoding.realAuxiliary()
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                    EncodingLinearTerm.source(Term.ofRealVar(0), BigFraction.MINUS_ONE),
+                )), LinearOp.EQ, BigFraction.ZERO))
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                )), LinearOp.EQ, BigFraction.ONE))
+                null
+            }
+        })
+
+        val result = BacktrackSolver(source.bake(providers)).solve(BacktrackParams())
+
+        val sample = assertIs<SolveResult.Sat>(result).assignment
+        assertEquals(listOf(BigFraction.ONE), sample.exactReals)
+        assertEquals(1, sample.reals.size)
+    }
+
+    @Test
+    fun `finite neighborhood retries a cancelled conditioned installation without leaking auxiliaries`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        var interrupt = true
+        var cancelled = false
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (target != EncodingTarget.LINEAR) BuiltInEncoderProvider.select(factor, target)
+            else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
+                val private = encoding.realAuxiliary()
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                    EncodingLinearTerm.source(Term.ofRealVar(0), BigFraction.MINUS_ONE),
+                )), LinearOp.EQ, BigFraction.ZERO))
+                encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                    EncodingLinearTerm.auxiliary(private, BigFraction.ONE),
+                )), LinearOp.EQ, BigFraction.ONE))
+                if (interrupt) {
+                    interrupt = false
+                    cancelled = true
+                }
+                null
+            }
+        })
+        val fixed = Sample(BooleanArray(0), LongArray(0))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        val token = Cancellation { cancelled }
+        val queries = FiniteExactNeighborhood(source.bake(providers), fixed, TheoryParams(), null) {}
+
+        val witness = queries.use {
+            assertIs<ExactNeighborhoodResult.Undecided>(it.check(condition, token))
+            cancelled = false
+            assertIs<ExactNeighborhoodResult.Witness>(it.check(condition, token)).sample
+        }
+
+        assertEquals(listOf(BigFraction.ONE), witness.exactReals)
+        assertEquals(1, witness.reals.size)
+    }
+
+    @Test
+    fun `guard definitions reject missing duplicate cyclic and foreign attribution`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+        ))
+        var foreign: EncodingGuard? = null
+        for (kind in listOf("missing", "duplicate", "cyclic", "foreign")) {
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    val guard = encoding.guard()
+                    val definition = LinearEncodingFormula.Relation(assertNotNull(view.linearForm))
+                    when (kind) {
+                        "missing" -> foreign = guard
+                        "cyclic" -> encoding.define(guard, LinearEncodingFormula.Guard(guard))
+                        "duplicate" -> {
+                            encoding.define(guard, definition)
+                            encoding.define(guard, definition)
+                        }
+                        else -> encoding.define(assertNotNull(foreign), definition)
+                    }
+                    encoding.linearFormula(LinearEncodingFormula.Guard(guard))
+                    null
+                }
+            })
+
+            assertFailsWith<IllegalArgumentException> {
+                providers.prepare(source).linearTheoryModel(EncodingTarget.LINEAR)
+            }
+        }
+    }
+
+    @Test
     fun `actual preparation discards construction cancelled inside a selected installer`() {
         val source = assertIs<SmtLibInput.Linear>(SmtLibAdmission.parse(
             "(declare-const x Real) (assert (= x 1))",
@@ -394,6 +565,33 @@ class EncoderTest {
         val fragment = prepared.linearTheoryModel(EncodingTarget.LINEAR, cancellation = Cancellation { true })
 
         assertNull(fragment)
+    }
+
+    @Test
+    fun `polynomial installations reject auxiliaries borrowed from another factor scope`() {
+        val first = ContinuousProduct(0, 0, 0)
+        val second = ContinuousProduct(1, 1, 1)
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(first, second), numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        var borrowed: PolynomialExpression? = null
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (target != EncodingTarget.POLYNOMIAL) selected
+            else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                if (view === first) {
+                    val value = encoding.real(SourceRealId(0))
+                    borrowed = encoding.conditional(PolynomialRealFormula.Atom(value, PolynomialRelation.GE,
+                        PolynomialExpression.Constant.of(bigIntOf(0))), value, value)
+                    selected.install(view, encoding)
+                } else {
+                    encoding.polynomial(PolynomialRealFormula.Atom(assertNotNull(borrowed), PolynomialRelation.EQ,
+                        encoding.real(SourceRealId(1))))
+                    null
+                }
+            }
+        })
+
+        assertFailsWith<IllegalArgumentException> { source.prepareExecutionPlan(providers) }
     }
 
     @Test

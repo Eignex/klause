@@ -135,13 +135,16 @@ internal class OpenExactNeighborhood(
         maximumMoves: Long = Long.MAX_VALUE,
         completion: ExactNeighborhoodCompletion = this,
         maximumImprovementMoves: Long? = null,
+        nativeWork: () -> Long = { work },
+        completionStats: () -> SolveStats = { stats },
+        onClose: () -> Unit = ::close,
     ): ExactNeighborhood =
         ExactNeighborhood(model.numBoolVars, centers(), completion, objective,
             coordinateValues = { sample -> coordinates(sample) }, adaptive = adaptive, seed = seed,
             nodeBudget = params.nodeBudget, maximumMoves = minOf(maximumMoves, params.maxFlips),
             maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
-            maximumImprovementMoves = maximumImprovementMoves, nativeWork = { work },
-            completionStats = { stats }, onClose = ::close,
+            maximumImprovementMoves = maximumImprovementMoves, nativeWork = nativeWork,
+            completionStats = completionStats, onClose = onClose,
             prepareBooleanCenter = if (completion === this) queries::prepareBooleanCenter else null,
             rootBooleanValue = queries::rootBooleanValue)
 

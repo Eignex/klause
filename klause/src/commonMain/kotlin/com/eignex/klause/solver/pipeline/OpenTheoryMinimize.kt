@@ -24,6 +24,7 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
@@ -304,8 +305,14 @@ class OpenTheoryMinimizer internal constructor(
             // Preparation is the descent's first phase, so the caller's stop reaches it and its own summary is
             // what a run refuted here has to report — there is no round behind it to carry one.
             sink.start()
-            sink.backend = route.backendName()
             val stop = presolveCancellation or params.cancellation or params.timeout or global
+            if (stop()) {
+                sink.stop()
+                verdict = standing(if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
+                    sink.snapshot())
+                return null
+            }
+            sink.backend = route.backendName()
             val prepared = PresolvePipeline.prepareSource(
                 source,
                 presolveConfig,
@@ -324,6 +331,17 @@ class OpenTheoryMinimizer internal constructor(
             // column does not move a factor between components, but it does change what `componentPlan` reads:
             // a descent whose every side closed would select the finite route, which no round of it can run.
             val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning(), projections, stop).plan
+            if (stop() || boundedPlan.encodingDecline == EncoderDecline.RESOURCE) {
+                sink.presolve = prepared.stats.takeIf { prepared.changed || it.infeasible }
+                sink.stop()
+                val reason = when {
+                    params.timeout() -> TerminationReason.Timeout
+                    stop() -> TerminationReason.Cancelled
+                    else -> TerminationReason.BudgetExhausted
+                }
+                verdict = standing(reason, sink.snapshot())
+                return null
+            }
             // Close the open sides once for the whole descent. Every round decides this model plus a strictly
             // tighter objective row, and a row only removes solutions, so a bound proved here holds for every
             // round below it. Leaving the close to the rounds has each one re-derive the same bounds from the
@@ -377,6 +395,7 @@ class OpenTheoryMinimizer internal constructor(
                 OpenSourcePreparation.Planned(opened.prepared, spec, plan),
                 presolveCancellation,
                 reuseOpeningBoundAttempt,
+                declaredRoute = opened.boundedPlan.theoryPipeline,
             )
             reuseOpeningBoundAttempt = false
             return ResumableOpenTheory(engine, params, state)

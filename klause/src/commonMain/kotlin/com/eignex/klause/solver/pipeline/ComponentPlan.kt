@@ -14,6 +14,7 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.EncodedTheoryFactor
+import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.theory.qflra.supportsExactLira
@@ -57,6 +58,7 @@ class ComponentPlan internal constructor(
         factorOwners[it] == FactorOwner.THEORY
     },
     private val installedFragment: Problem? = null,
+    internal val encodingDecline: EncoderDecline? = null,
 ) {
     init {
         factorProjections.requireSource(source)
@@ -235,13 +237,15 @@ class ComponentPlan internal constructor(
         }
         val selection = if (appended) factorProjections.replacedLast(spec)
         else factorProjections.projected(spec, IntArray(spec.numFactors) { it })
+        var decline: EncoderDecline? = null
         val fragment = if (appended) {
-            selection.linearTheoryModel(encodingTarget(), selectedTheoryFactorIndices(), cancellation = cancellation)
+            selection.linearTheoryModel(encodingTarget(), selectedTheoryFactorIndices(), cancellation = cancellation,
+                onDecline = { decline = it })
         } else installedFragment?.let { it.rebindEncoding(spec, it.factors, it.impliedFactorMask) }
         return ComponentPlan(spec, intOwners, factorOwners,
             if (appended && hasTheoryComponent && fragment == null) ProblemPipeline.UNSUPPORTED_OPEN
             else theoryPipeline,
-            unplaceable, selection, encodingFactors, fragment)
+            unplaceable, selection, encodingFactors, fragment, decline)
     }
 
     private fun requireSamePrefix(spec: Problem, count: Int) {
@@ -429,9 +433,13 @@ fun Problem.componentPlan(
         factorOwners[index] == FactorOwner.CP && factors[index].variables.reals.isNotEmpty()
     }
     val kept = factors.indices.filter { encoded[it] || factorOwners[it] == FactorOwner.SHARED }
-    val fragment = projections.linearTheoryModel(EncodingTarget.LINEAR, kept, cancellation = cancellation)
+    var linearDecline: EncoderDecline? = null
+    var differenceDecline: EncoderDecline? = null
+    val fragment = projections.linearTheoryModel(EncodingTarget.LINEAR, kept, cancellation = cancellation,
+        onDecline = { linearDecline = it })
     val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE,
-        kept.filter { factorOwners[it] != FactorOwner.SHARED }, cancellation = cancellation)
+        kept.filter { factorOwners[it] != FactorOwner.SHARED }, cancellation = cancellation,
+        onDecline = { differenceDecline = it })
     val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
     val route = when {
         cancellation() -> ProblemPipeline.UNSUPPORTED_OPEN
@@ -445,7 +453,11 @@ fun Problem.componentPlan(
     }
     return ComponentPlan(this, intOwners, factorOwners, route,
         unownedOpenColumn?.let { unplaceable(it, projections, numRealVars != 0) }, projections, encoded,
-        if (route == ProblemPipeline.DIFFERENCE_THEORY) differenceFragment else fragment)
+        if (route == ProblemPipeline.DIFFERENCE_THEORY) differenceFragment else fragment,
+        if (route != ProblemPipeline.UNSUPPORTED_OPEN) null
+        else if (cancellation() || linearDecline == EncoderDecline.RESOURCE ||
+            differenceDecline == EncoderDecline.RESOURCE) EncoderDecline.RESOURCE
+        else linearDecline ?: differenceDecline)
 }
 
 /**

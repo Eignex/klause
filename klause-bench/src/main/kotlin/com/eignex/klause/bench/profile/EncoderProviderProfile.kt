@@ -1,8 +1,11 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.SmtLibProblem
@@ -18,9 +21,13 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
@@ -46,9 +53,11 @@ object EncoderProviderProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("inputs", "repeats", "warmups", "seed") })
+        require(options.keys.all { it in setOf("inputs", "repeats", "warmups", "seed", "parser") })
         val repeats = options["repeats"]?.toInt() ?: 3
         val warmups = options["warmups"]?.toInt() ?: 1
+        val parser = options["parser"] ?: "admission"
+        require(parser in setOf("admission", "factor"))
         val seed = options["seed"]?.toLong() ?: 1L
         require(repeats in 1..100 && warmups in 0..10)
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
@@ -64,6 +73,7 @@ object EncoderProviderProfile {
             put("javaVersion", System.getProperty("java.version"))
             put("javaOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
             put("processors", Runtime.getRuntime().availableProcessors())
+            put("parser", parser)
             put("seed", seed)
             put("repeats", repeats)
             put("warmups", warmups)
@@ -78,8 +88,12 @@ object EncoderProviderProfile {
         val checker = SmtStreamChecker(output)
         for ((index, input) in inputs.withIndex()) {
             val bytes = input.readBytes()
-            val parsed = SmtLibAdmission.parse(bytes.decodeToString())
-            require(parsed is SmtLibInput.Linear) { "input is not a factor-admitted SMT source: $input" }
+            val problem = if (parser == "factor") SmtLib.parse(bytes.decodeToString()) else {
+                val parsed = SmtLibAdmission.parse(bytes.decodeToString())
+                require(parsed is SmtLibInput.Linear) { "input is not a factor-admitted SMT source: $input" }
+                parsed.problem
+            }
+            resourceControl(problem, bytes, output.resolve("$index-resource").apply { mkdirs() })
             for (round in -warmups until repeats) {
                 val results = ArrayList<String>()
                 for (alternate in if (round % 2 == 0) listOf(false, true) else listOf(true, false)) {
@@ -96,14 +110,25 @@ object EncoderProviderProfile {
                     }
                     val providers = providers(alternate) { installations++ }
                     val started = System.nanoTime()
-                    val route = parsed.problem.model.pipelineRoute(providers, routePureRealToTheory = true,
+                    val route = problem.model.pipelineRoute(providers, routePureRealToTheory = true,
                         routeLinearToTheory = true, boundCancellation = stop)
-                    val result = if (route is SourceProblemRoute.OpenTheory) {
-                        val execution = OpenTheoryPipeline.execute(route.request,
-                            TheoryParams(cancellation = stop, randomSeed = seed), FiniteEngine.BACKTRACK)
-                        require(execution is OpenTheoryExecution.Satisfy)
-                        execution.result
-                    } else error("source did not retain its exact route: $route")
+                    val result = when (route) {
+                        is SourceProblemRoute.OpenTheory -> {
+                            val execution = OpenTheoryPipeline.execute(route.request,
+                                TheoryParams(cancellation = stop, randomSeed = seed), FiniteEngine.BACKTRACK)
+                            require(execution is OpenTheoryExecution.Satisfy)
+                            execution.result
+                        }
+                        is SourceProblemRoute.PolynomialTheory -> OpenTheoryPipeline.execute(route.request,
+                            PolynomialTheoryParams(cancellation = stop, strategy = PolynomialStrategyParams(
+                                backtrack = BacktrackParams(randomSeed = seed))), FiniteEngine.BACKTRACK).result
+                        is SourceProblemRoute.Finite -> BacktrackSolver.source(problem.model)
+                            .withProjectionProviders(providers).solve(BacktrackParams(cancellation = stop,
+                                randomSeed = seed))
+                        SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
+                        is SourceProblemRoute.UnsupportedOpen ->
+                            error("unsupported source route: ${route.preparedPlan.decline}")
+                    }
                     val elapsed = System.nanoTime() - started
                     val verdict = when (result) {
                         is OpenTheoryResult.Sat -> "sat"
@@ -111,7 +136,7 @@ object EncoderProviderProfile {
                         is OpenTheoryResult.Unknown -> "unknown"
                     }
                     results += verdict
-                    val stdout = if (result is OpenTheoryResult.Sat) render(parsed.problem, result.assignment)
+                    val stdout = if (result is OpenTheoryResult.Sat) render(problem, result.assignment)
                         else "$verdict\n"
                     directory.resolve("stdout").writeText(stdout)
                     directory.resolve("measurement.json").writeText(buildJsonObject {
@@ -138,12 +163,52 @@ object EncoderProviderProfile {
         }
     }
 
+    private fun resourceControl(problem: SmtLibProblem, source: ByteArray, directory: File) {
+        var cancelled = false
+        var installations = 0
+        var work = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = cancelled
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        val selected = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val descriptor = BuiltInEncoderProvider.select(factor, target)
+            if (!descriptor.enforcesSource) descriptor else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                installations++
+                val result = descriptor.install(view, encoding)
+                encoding.cancellation.charge(1)
+                cancelled = true
+                check(encoding.cancellation()) { "installer cannot observe the containing token" }
+                result
+            }
+        })
+        val route = problem.model.pipelineRoute(selected, routeLinearToTheory = true, boundCancellation = stop)
+        val decline = (route as? SourceProblemRoute.UnsupportedOpen)?.preparedPlan?.decline
+        if (installations != 0) check(decline == PreparedPlanDecline.RESOURCE) {
+            "interrupted construction was admitted"
+        }
+        directory.resolve("source.smt2").writeBytes(source)
+        directory.resolve("measurement.json").writeText(buildJsonObject {
+            put("revision", Reports.readGitSha())
+            put("sourceSha256", sha256(source))
+            put("nativeWork", work)
+            put("installations", installations)
+            put("outcome", if (installations == 0) "inapplicable" else "resource")
+            put("independentProofCheck", false)
+        }.toString())
+    }
+
     private fun providers(alternate: Boolean, installed: () -> Unit): FactorProjectionProviders =
         FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
             val selected = BuiltInEncoderProvider.select(factor, target)
-            if (alternate && target == EncodingTarget.DIFFERENCE) Encoder(EncoderSupport.UNSUPPORTED)
+            if (alternate && target == EncodingTarget.POLYNOMIAL && selected.enforcesSource) {
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    installed()
+                    selected.install(view, encoding)
+                }
+            } else if (alternate && target == EncodingTarget.DIFFERENCE) Encoder(EncoderSupport.UNSUPPORTED)
             else if (!alternate || target != EncodingTarget.LINEAR || !selected.enforcesSource ||
-                factor.linearForm!!.rows.any { it.activator != LinearRow.ALWAYS }
+                factor.linearForm?.rows?.any { it.activator != LinearRow.ALWAYS } != false
             ) selected else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
                 installed()
                 val form = requireNotNull(view.linearForm)
