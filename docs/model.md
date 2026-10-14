@@ -180,6 +180,13 @@ source construction does not issue certificates or normalize proof payloads.
 [Library API](api.md#source-aware-strategy-entry-points) defines the supported controls
 and distinguishes the retained finite facades.
 
+Explicit registered arithmetic collections retain one declared numeric coordinate
+owner and guard each participant's contributions against that declaration. Their
+agreement participant reads the existing immutable assembly and checks peer source
+conditions at those values. See [coordinate agreement](solver/search.md#arithmetic-coordinate-agreement)
+for admission, incompleteness and proof scope; typed witness decoding remains the
+publication mechanism described below.
+
 ## Search state ownership
 
 Shared search exchanges Boolean literals, semantic integer bounds and typed opaque

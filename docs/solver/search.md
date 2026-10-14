@@ -145,6 +145,43 @@ their optional branching, model-blocking and conflict-resolution capabilities.
 Repeated opening shares read-only source data and completed projections, preserving
 the default component and branch order.
 
+## Arithmetic coordinate agreement
+
+Prepared registration collections with several arithmetic completion groups install
+`SourceCoordinateAgreementComponent` after their ordinary participants. Each group
+must implement `SourceCoordinateAgreement`; unsupported groups leave the combined
+result indeterminate. Standard preparation retains one combined arithmetic owner
+and installs no agreement participant or contribution guards.
+
+The exact-linear adapter exchanges normalized source bounds through the neutral
+atom registry. Peers enforce the same predicates, including strictness, guarded
+rows, arbitrary-precision integers and active branch conditions. Published facts
+stay at their shared decision level; retraction removes conditions whose premises
+disappear. Their source validity belongs to the publishing adapter. Unexplained
+publications cannot provide missing antecedents for shared learning.
+
+Each source integer/real coordinate has one declared registration owner. Explicit
+peer collections guard numeric contributions against those declarations; duplicate
+keys remain rejected by normal assembly. After fragment checks, agreement reads
+that existing immutable typed snapshot and validates it against each peer's current
+source rows and conditions. It neither decodes another witness nor combines private
+fragment points. A peer requirement can constrain an owner's completion; a rejected
+chosen point alone does not refute all other source completions.
+
+Rational linear agreement admits exact integers and rational real coordinates.
+Missing, oversized, algebraic/symbolic or otherwise unsupported contributions remain
+indeterminate rather than rounded. Combined ownership remains the default for those
+fragments. Source deductions that prove a conflict can refute their active scope;
+global exhaustion still requires complete traversal coverage and source proof
+admission. Agreement participation itself supplies neither general theory
+combination, procedure completeness nor optimization/bound authority.
+
+Agreement uses the existing invocation cancellation, complete-check accounting and
+caller native work meter. It opens no fresh solver, ledger or allowance. Scalar-row
+normalization and atomic arithmetic can overspend cooperatively; interruption
+withholds a witness. All native peers remain owned by the invocation resource
+registry, and published snapshots outlive their producers.
+
 ## Finite propagation
 
 Fresh presolve rebuilds retain the originating cancellation token and accounting

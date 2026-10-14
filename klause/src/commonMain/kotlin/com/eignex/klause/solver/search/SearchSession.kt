@@ -554,6 +554,14 @@ class SearchSession(
     private fun addFalseLiteral(clause: MutableSet<Int>, literal: Int): Boolean =
         isFalseLiteral(literal) && literal xor 1 !in clause && (literal in clause || clause.add(literal))
 
+    private var coordinateOwners: Map<SearchComponent, SearchCoordinateOwnership>? = null
+
+    internal fun restrictCoordinateContributions(owners: Map<SearchComponent, SearchCoordinateOwnership>) {
+        check(!initializationStarted) { "coordinate ownership is bound before initialization" }
+        check(coordinateOwners == null) { "coordinate ownership is bound once" }
+        coordinateOwners = owners.toMap()
+    }
+
     /** Assemble a complete model from the active components at the current shared level. */
     fun model(): AssembledSearchModel {
         val values = LinkedHashMap<Any, Any>()
@@ -565,7 +573,11 @@ class SearchSession(
             }
         }
         trail.contributeModel(model)
-        singleComponent?.contributeModel(model, this) ?: components.forEach { it.contributeModel(model, this) }
+        singleComponent?.contributeModel(model, this) ?: coordinateOwners?.let { owners ->
+            components.forEach { component ->
+                component.contributeModel(owners[component]?.model(model) ?: model, this)
+            }
+        } ?: components.forEach { it.contributeModel(model, this) }
         return AssembledSearchModel(values)
     }
 
