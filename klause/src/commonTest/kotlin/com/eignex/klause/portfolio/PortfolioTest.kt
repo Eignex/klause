@@ -2284,7 +2284,7 @@ class PortfolioTest {
                 override fun reset() = Unit
             }
 
-            val result = Portfolio(workers, bandit).use {
+            val result = Portfolio(workers, bandit, maxSliceWork = 5_000L).use {
                 it.incumbentProbeArms = setOf(1)
                 it.minimize(Cancellation { reached.size >= 15 })
             }
@@ -2321,7 +2321,7 @@ class PortfolioTest {
             trackingWorker("sibling", 2, ScriptedSearch({ false }) { reached += 2 }),
         )
 
-        Portfolio.thompson(workers, reseedStaleThreshold = 0).use {
+        Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
             it.incumbentProbeArms = setOf(1)
             it.minimize(Cancellation { reached.size >= 20 })
         }
@@ -2355,7 +2355,7 @@ class PortfolioTest {
             trackingWorker("probe", 1, search).also { it.restartingSearch = true },
         )
 
-        Portfolio.thompson(workers, reseedStaleThreshold = 1).use {
+        Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 1).use {
             it.incumbentProbeArms = setOf(1)
             it.minimize(Cancellation { calls >= 15 })
         }
@@ -2366,7 +2366,10 @@ class PortfolioTest {
 
     @Test
     fun `auxiliary search trial retires after its charged work allowance`() {
-        for ((charge, expectedSlices) in listOf(2L to 42, 7L to 12, Long.MAX_VALUE to 1)) {
+        for ((maximum, charge, expectedSlices) in listOf(
+            Triple(7L, 2L, 42), Triple(7L, 7L, 12), Triple(21L, 2L, 126), Triple(21L, 7L, 36),
+            Triple(Long.MAX_VALUE, Long.MAX_VALUE, 1),
+        )) {
             val reached = ArrayList<Int>()
             val search = object : ResumableSearch {
                 private var spent = 0L
@@ -2385,7 +2388,7 @@ class PortfolioTest {
                 trackingWorker("probe", 1, search),
             )
 
-            Portfolio.thompson(workers, baseSliceWork = 7, reseedStaleThreshold = 0).use {
+            Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = maximum, reseedStaleThreshold = 0).use {
                 it.incumbentProbeArms = setOf(1)
                 it.minimize(Cancellation { reached.size >= expectedSlices + 3 })
             }
@@ -2439,7 +2442,7 @@ class PortfolioTest {
                 trackingWorker("probe", 1, search),
             )
 
-            Portfolio.thompson(workers, reseedStaleThreshold = 0).use {
+            Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
                 it.incumbentProbeArms = setOf(1)
                 it.minimize(Cancellation { reached.size >= 30 })
             }
@@ -2491,7 +2494,7 @@ class PortfolioTest {
                 override fun reset() = Unit
             }
 
-            Portfolio(workers, bandit, reseedStaleThreshold = 0).use {
+            Portfolio(workers, bandit, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
                 it.incumbentProbeArms = setOf(2)
                 it.minimize(Cancellation { reached.count { arm -> arm < 2 } >= 30 })
             }
@@ -2525,7 +2528,7 @@ class PortfolioTest {
                 listOf(finder, retained, auxiliary)
             }
 
-            Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+            Portfolio.thompson(workers, seed = 0, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
                 it.incumbentProbeArms = setOf(if (admittedBeforeIncumbent) 0 else 2)
                 it.minimize(Cancellation { reached.size >= 16 })
             }
@@ -2592,7 +2595,7 @@ class PortfolioTest {
             it.minimize(Cancellation { finderSlices >= 2 })
         }
 
-        assertEquals(List(12) { 7L }, allowances)
+        assertEquals(List(36) { 7L }, allowances)
     }
 
     @Test
