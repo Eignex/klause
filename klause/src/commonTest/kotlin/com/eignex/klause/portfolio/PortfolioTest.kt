@@ -2501,21 +2501,33 @@ class PortfolioTest {
     }
 
     @Test
-    fun `auxiliary trial permits heuristic family work before completing`() {
-        val reached = ArrayList<Int>()
-        val workers = listOf(
-            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }).also {
-                it.family = ArmFamily.LocalSearch
-            },
-            trackingWorker("probe", 1, ScriptedSearch({ false }) { reached += 1 }),
-        )
+    fun `auxiliary trial preserves subsequent retained policy choices`() {
+        fun choices(continueTrial: Boolean): List<Int> {
+            val reached = ArrayList<Int>()
+            val probe = ScriptedSearch({ false }) {}
+            val trial = object : ResumableSearch by probe {
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                    probe.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                    return if (continueTrial) null else MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                }
+            }
+            val workers = listOf(
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }).also {
+                    it.family = ArmFamily.LocalSearch
+                },
+                trackingWorker("retained", 1, ScriptedSearch({ false }) { reached += 1 }),
+                trackingWorker("probe", 2, trial),
+            )
 
-        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-            it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { reached.size >= 30 })
+            Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+                it.incumbentProbeArms = setOf(2)
+                it.minimize(Cancellation { reached.size >= 16 })
+            }
+            return reached
         }
 
-        assertTrue(reached.subList(2, reached.lastIndexOf(1)).contains(0))
+        assertEquals(choices(false), choices(true))
     }
 
     @Test

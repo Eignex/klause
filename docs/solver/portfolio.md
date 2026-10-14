@@ -195,10 +195,11 @@ See [search](search.md#finite-propagation) and [resource allowances](resources.m
 
 An auxiliary incumbent probe retains preparation and a search trial after an incumbent
 arrives. Every initial sibling admission precedes its continuation. The unproductive
-trial uses its selected family's current allowance, clipped to its remaining work
+trial uses the current ordinary allowance, clipped to its remaining work
 and time budget, and preserves the other arms'
-policy evidence. Fresh trial work competes through the ordinary family selector;
-zero-work continuations resume directly. Ordinary retained-worker segments advance
+policy evidence. Trial continuations run before ordinary policy selection, preserving
+the retained policy's random stream after every initial sibling has been admitted.
+Explicit minimum shares retain precedence. Ordinary retained-worker segments advance
 the shared allowance ladder; an unproductive trial preserves it even when charging
 fresh work. Search work after
 preparation is capped at twelve base work allowances and four base time allowances;

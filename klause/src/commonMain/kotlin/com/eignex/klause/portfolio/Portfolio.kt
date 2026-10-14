@@ -671,7 +671,6 @@ class Portfolio(
             AUXILIARY_SEARCH_WORK_ALLOWANCES
         private val preparationRevisits = BooleanArray(workers.size)
         private var continuingPreparation = -1
-        private var continuingTrial = -1
         private var nextPreparationArm = 0
 
         // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
@@ -814,10 +813,10 @@ class Portfolio(
             eligibleArms.firstOrNull {
                 workers[it].auxiliaryProof && !busy[it] && !retired[it]
             }?.let { return it }
-            val trial = continuingTrial
-            if (trial >= 0 && !busy[trial]) {
-                if (!retired[trial] && trial in eligibleArms && !productive[trial]) return trial
-                continuingTrial = -1
+            if (improving) {
+                eligibleArms.firstOrNull {
+                    it in incumbentProbeArms && !productive[it] && !busy[it] && !retired[it]
+                }?.let { return it }
             }
             val preparing = continuingPreparation
             if (preparing >= 0 && !busy[preparing]) {
@@ -832,9 +831,6 @@ class Portfolio(
             val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
             val family = families.choose(eligible)
             val candidates = free.filter { policyFamily(it) == family }
-            if (improving) {
-                candidates.firstOrNull { it in incumbentProbeArms && !productive[it] }?.let { return it }
-            }
             // Complete-search progress can remain invisible until a leaf; shared deductions do not
             // establish which search will reach the first witness.
             if (!improving && !family.observable) return candidates.minBy { armWork[it] }
@@ -927,8 +923,6 @@ class Portfolio(
             val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
             if (unproductiveTrial) {
-                if (work == 0L) continuingTrial = arm
-                else if (continuingTrial == arm) continuingTrial = -1
                 if (claim.preparing) trialPreparationTime[arm] += claim.trialTime
                 if (!claim.preparing) {
                     trialSearchTime[arm] += claim.trialTime
