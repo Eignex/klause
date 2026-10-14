@@ -473,6 +473,7 @@ internal class BacktrackBrancher(
     private val rng = Random(params.randomSeed ?: Random.Default.nextLong())
     private val onEvent = params.onEvent
     private var restartCount = 0L
+    private var preferImportedSolution = false
 
     init {
         if (params.phaseSaving || params.targetPhasing) {
@@ -492,10 +493,13 @@ internal class BacktrackBrancher(
             ?: variables.pick(session, rng)
             ?: return null
         if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
-        val ordered = branching.orderValues(
+        val preferred = branching.orderValues(
             variable,
             phase.applyPhase(variable, values.values(session, variable, rng), rng),
         )
+        val ordered = if (preferImportedSolution && values is SolutionGuided) {
+            values.guide(session, variable, preferred)
+        } else preferred
         val alternatives = when (variable) {
             is VarRef.Bool -> ordered.map { value ->
                 require(value == 0L || value == 1L) { "Boolean selector produced $value" }
@@ -568,13 +572,17 @@ internal class BacktrackBrancher(
     }
 
     fun onSolution(sample: Sample) {
+        preferImportedSolution = false
         variables.onSolution(sample)
         values.onSolution(sample)
         phase.onSolution(sample)
     }
 
-    fun importPooledSolution(sample: Sample, guideValues: Boolean = false) {
-        if (guideValues && values is SolutionGuided) values.onSolution(sample)
+    fun importPooledSolution(sample: Sample, guideValues: Boolean = false, preferValues: Boolean = false) {
+        if (guideValues && values is SolutionGuided) {
+            values.onSolution(sample)
+            preferImportedSolution = preferValues
+        }
         phase.onSolution(sample)
     }
 

@@ -33,15 +33,28 @@ class SolutionGuided(private val base: ValueSelector) : ValueSelector {
     private var bools: BooleanArray? = null
     private var ints: LongArray? = null
 
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> {
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> =
+        guide(session, varRef) { base.values(session, varRef, rng) }
+
+    internal fun guide(
+        session: PropagationSession,
+        varRef: VarRef,
+        fallback: Sequence<Long>,
+    ): Sequence<Long> = guide(session, varRef) { fallback }
+
+    private inline fun guide(
+        session: PropagationSession,
+        varRef: VarRef,
+        fallback: () -> Sequence<Long>,
+    ): Sequence<Long> {
         val savedBools = bools
         val savedInts = ints
-        if (savedBools == null || savedInts == null) return base.values(session, varRef, rng)
+        if (savedBools == null || savedInts == null) return fallback()
         val saved: Long = when (varRef) {
             is VarRef.Bool -> if (varRef.varId < savedBools.size && savedBools[varRef.varId]) 1L else 0L
 
             is VarRef.IntVar -> {
-                if (varRef.varId >= savedInts.size) return base.values(session, varRef, rng)
+                if (varRef.varId >= savedInts.size) return fallback()
                 savedInts[varRef.varId]
             }
         }
@@ -52,9 +65,9 @@ class SolutionGuided(private val base: ValueSelector) : ValueSelector {
             is VarRef.IntVar -> saved in session.intDomain(varRef.varId)
         }
         return if (savedFeasible) {
-            sequenceOf(saved) + base.values(session, varRef, rng).filter { it != saved }
+            sequenceOf(saved) + fallback().filter { it != saved }
         } else {
-            base.values(session, varRef, rng)
+            fallback()
         }
     }
 
