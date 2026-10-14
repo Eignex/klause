@@ -15007,6 +15007,7 @@ final class com.eignex.klause.solver/Assignment { // com.eignex.klause.solver/As
 }
 
 final class com.eignex.klause.solver/FactorProjectionProviders { // com.eignex.klause.solver/FactorProjectionProviders|null[0]
+    constructor <init>() // com.eignex.klause.solver/FactorProjectionProviders.<init>|<init>(){}[0]
     constructor <init>(com.eignex.klause.propagation/PropagationProjectionProvider = ..., com.eignex.klause.localsearch/ScoringProjectionProvider = ..., com.eignex.klause.lp/RelaxationProjectionProvider = ...) // com.eignex.klause.solver/FactorProjectionProviders.<init>|<init>(com.eignex.klause.propagation.PropagationProjectionProvider;com.eignex.klause.localsearch.ScoringProjectionProvider;com.eignex.klause.lp.RelaxationProjectionProvider){}[0]
     constructor <init>(com.eignex.klause.propagation/PropagationProjectionProvider = ..., com.eignex.klause.localsearch/ScoringProjectionProvider = ..., com.eignex.klause.lp/RelaxationProjectionProvider = ..., com.eignex.klause.theory/EncoderProvider, kotlin.collections/Set<com.eignex.klause.theory/EncodingTarget> = ...) // com.eignex.klause.solver/FactorProjectionProviders.<init>|<init>(com.eignex.klause.propagation.PropagationProjectionProvider;com.eignex.klause.localsearch.ScoringProjectionProvider;com.eignex.klause.lp.RelaxationProjectionProvider;com.eignex.klause.theory.EncoderProvider;kotlin.collections.Set<com.eignex.klause.theory.EncodingTarget>){}[0]
 
