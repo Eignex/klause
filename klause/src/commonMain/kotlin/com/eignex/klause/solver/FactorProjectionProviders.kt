@@ -8,6 +8,8 @@ import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.EncoderProvider
 
 /**
  * Engine-owned mechanism selection for one preparation. Providers borrow immutable factor data;
@@ -20,6 +22,8 @@ class FactorProjectionProviders(
     val scoring: ScoringProjectionProvider = BuiltInScoringProjectionProvider,
     /** Selects sound model-facing linear relaxation emission. */
     val relaxation: RelaxationProjectionProvider = BuiltInRelaxationProjectionProvider,
+    /** Selects complete source relation installation in shared arithmetic components. */
+    val encoder: EncoderProvider = BuiltInEncoderProvider,
 ) {
     /** Built-in mechanisms with their existing source behavior and numerical gates. */
     companion object {

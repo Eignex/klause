@@ -13,6 +13,8 @@ import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.SelectedProjectionChecks
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncodingTarget
 
 /**
  * Immutable source-associated mechanism selection. Factories are retained, never mutable workspaces;
@@ -29,7 +31,13 @@ class PreparedFactorProjections internal constructor(
         Array(problem.numFactors) { providers.scoring.select(problem.factors[it]) },
     private val relaxation: Array<RelaxationProjection?> =
         Array(problem.numFactors) { providers.relaxation.select(problem.factors[it]) },
+    private val encoders: Map<EncodingTarget, Array<Encoder>> = EncodingTarget.entries.associateWith { target ->
+        Array(problem.numFactors) { providers.encoder.select(problem.factors[it], target) }
+    },
 ) {
+    /** Immutable whole-relation selection in this canonical source's factor namespace. */
+    fun encoder(factorId: Int, target: EncodingTarget): Encoder = encoders.getValue(target)[factorId]
+
     private val declarations = Array(problem.numFactors) { id ->
         FactorExecutionCapabilities(
             propagation[id]?.capability ?: PropagationCapability.UNSUPPORTED,
@@ -73,7 +81,8 @@ class PreparedFactorProjections internal constructor(
         return PreparedFactorProjections(view, providers,
             Array(factorIndices.size) { propagation[factorIndices[it]] },
             Array(factorIndices.size) { scoring[factorIndices[it]] },
-            Array(factorIndices.size) { relaxation[factorIndices[it]] })
+            Array(factorIndices.size) { relaxation[factorIndices[it]] },
+            encoders.mapValues { (_, selected) -> Array(factorIndices.size) { selected[factorIndices[it]] } })
     }
 
     internal fun withAppendedFactors(view: Problem): PreparedFactorProjections {
@@ -90,7 +99,9 @@ class PreparedFactorProjections internal constructor(
             },
             Array(view.numFactors) {
                 if (it < problem.numFactors) relaxation[it] else providers.relaxation.select(view.factors[it])
-            })
+            }, encoders.mapValues { (target, selected) -> Array(view.numFactors) {
+                if (it < problem.numFactors) selected[it] else providers.encoder.select(view.factors[it], target)
+            } })
     }
 
     internal fun appended(view: Problem): PreparedFactorProjections {
@@ -99,7 +110,8 @@ class PreparedFactorProjections internal constructor(
         return PreparedFactorProjections(view, providers,
             propagation + providers.propagation.select(extra),
             scoring + providers.scoring.select(extra),
-            relaxation + providers.relaxation.select(extra))
+            relaxation + providers.relaxation.select(extra),
+            encoders.mapValues { (target, selected) -> selected + providers.encoder.select(extra, target) })
     }
 
     internal fun requireSource(problem: Problem) {
@@ -124,7 +136,9 @@ class PreparedFactorProjections internal constructor(
             },
             Array(view.numFactors) {
                 if (it == last) providers.relaxation.select(view.factors[it]) else relaxation[it]
-            })
+            }, encoders.mapValues { (target, selected) -> Array(view.numFactors) {
+                if (it == last) providers.encoder.select(view.factors[it], target) else selected[it]
+            } })
     }
 
     internal fun requiresOriginalScoringCheck(factorId: Int): Boolean = scoring[factorId]?.builtIn == false &&

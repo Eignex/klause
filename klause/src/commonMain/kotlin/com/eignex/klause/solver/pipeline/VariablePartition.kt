@@ -1,8 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.pipeline.isTheoryOwnable
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.linearTheoryModel
+import com.eignex.klause.ir.IntegralConstants
 
 /** Partition integer variables by whether finite-domain search must branch on them. */
 class VariablePartition(private val searchRequired: BooleanArray) {
@@ -30,13 +33,20 @@ class VariablePartition(private val searchRequired: BooleanArray) {
  * One pass, not a fixpoint: the demand is a static per-factor declaration, so pulling a column into the
  * search set never changes what another factor declares, and one pass is already the closure.
  */
-fun Problem.variablePartition(): VariablePartition = variablePartition(numIntVars, factors, numRealVars != 0)
+fun Problem.variablePartition(): VariablePartition = variablePartition(FactorProjectionProviders.Default.prepare(this))
 
-private fun variablePartition(numIntVars: Int, factors: Array<Factor>, hasRealColumns: Boolean): VariablePartition {
+internal fun Problem.variablePartition(projections: PreparedFactorProjections): VariablePartition {
     val searchRequired = BooleanArray(numIntVars)
-    for (f in factors) {
-        if (f.isTheoryOwnable(hasRealColumns)) continue
-        for (v in f.variables.ints) if (v < numIntVars) searchRequired[v] = true
+    for ((index, factor) in factors.withIndex()) {
+        if (projections.theoryOwnable(index, numRealVars != 0)) continue
+        for (variable in factor.variables.ints) if (variable < numIntVars) searchRequired[variable] = true
     }
     return VariablePartition(searchRequired)
+}
+
+internal fun PreparedFactorProjections.theoryOwnable(index: Int, hasRealColumns: Boolean): Boolean {
+    if (!encoder(index, EncodingTarget.LINEAR).enforcesSource) return false
+    if (hasRealColumns) return true
+    val factor = linearTheoryModel(EncodingTarget.LINEAR, listOf(index))?.factors?.single() ?: return false
+    return factor.intVars.isNotEmpty() && factor.linearForm!!.rows.all { it.constants is IntegralConstants }
 }

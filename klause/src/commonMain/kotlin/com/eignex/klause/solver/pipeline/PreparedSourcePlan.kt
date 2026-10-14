@@ -334,7 +334,7 @@ internal fun Problem.preparePolynomialExecutionPlan(
 ): PreparedSourcePlan {
     projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
-    val polynomial = if (openInteger) null else SharedPolynomialModel.lower(this, sourceFormula, formulaForFactor)
+    val polynomial = if (openInteger) null else SharedPolynomialModel.lower(this, sourceFormula, formulaForFactor, projections)
     val cause = when {
         openInteger -> PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER
         polynomial == null -> PreparedPlanDecline.POLYNOMIAL_ENCODING

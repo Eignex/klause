@@ -1,14 +1,14 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -33,16 +33,15 @@ internal class FiniteExactNeighborhood(
     objective: LinearObjective?,
     private val certify: (Sample) -> Unit,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
-    private val linear = source.withIntDomains(source.rootIntDomainsInPlace).withFactors(
-        source.factors.map { factor ->
-            if (factor is RealProduct) ExactSearchRow.of(
-                intArrayOf(Term.ofRealVar(factor.result), Term.ofRealVar(factor.realOperand)),
-                listOf(BigFraction.ONE, BigFraction.ZERO - BigFraction.ofLong(fixed.intValue(factor.intOperand))),
-                LinearOp.EQ, BigFraction.ZERO,
-            ) else factor
-        }.toTypedArray() + Array(source.numBoolVars) { id -> Clause(intArrayOf(Lit.make(id, fixed.boolValue(id)))) },
-        source.impliedFactorMask?.let { it + BooleanArray(source.numBoolVars) },
-    )
+    private val linear = requireNotNull(
+        (source.factorProjections ?: FactorProjectionProviders.Default.prepare(source)).linearTheoryModel(
+            EncodingTarget.LINEAR,
+            fixedIntegers = (0 until source.numIntVars).associate { SourceIntId(it) to fixed.exactIntValue(it) },
+        ),
+    ) { "finite neighborhood requires complete conditioned encoders" }.withIntDomains(source.rootIntDomainsInPlace)
+        .let { encoded -> encoded.withFactors(encoded.factors + Array(source.numBoolVars) { id ->
+            Clause(intArrayOf(Lit.make(id, fixed.boolValue(id))))
+        }, source.impliedFactorMask?.let { it + BooleanArray(source.numBoolVars) }) }
     private val adapter = OpenExactNeighborhood(linear, params, objective)
     val exhausted: Boolean get() = adapter.exhausted
 
