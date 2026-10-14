@@ -63,6 +63,7 @@ class SourceCoordinateAgreementComponent(
         }
         return if (context.cancelled()) ComponentCheck.Indeterminate else ComponentCheck.Feasible
     }
+
     private fun declined(context: SearchContext): ComponentCheck {
         if (!context.cancelled() && context.executionControls.stopCause == null) {
             context.executionControls.reportStop(SearchStopCause.RepresentationDecline)
