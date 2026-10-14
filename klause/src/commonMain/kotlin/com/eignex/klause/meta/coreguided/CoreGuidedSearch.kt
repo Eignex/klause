@@ -183,9 +183,11 @@ internal class CoreGuidedSearch(
             }
             val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
-            val result = handle.runSlice(token, millis, remaining)
+            val result = handle.runSlice(preparation.withLifetime(lifetime), millis, remaining)
             if (result == null) return null
-            finishQuery()
+            val paused = result is SolveResult.Unknown && result.reason == TerminationReason.Cancelled && !token()
+            finishQuery(keepModel = paused)
+            if (paused) return null
             when (result) {
                 is SolveResult.Unknown -> return finish(stopped(result.reason))
 
@@ -314,6 +316,7 @@ internal class CoreGuidedSearch(
                 params.copy(
                     assumptions = params.assumptions.mergedWith(softPins),
                     cancellation = token,
+                    propagationCancelFloor = 0,
                     maxDecisions = (
                         minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE) -
                             completedStats.search.nodes.sum.toLong()
@@ -357,12 +360,12 @@ internal class CoreGuidedSearch(
         params.objectiveLowerBoundSink?.invoke(value)
     }
 
-    private fun finishQuery() {
+    private fun finishQuery(keepModel: Boolean = false) {
         val handle = query ?: return
         handle.close()
         settleQuery(handle.stats, handle.work)
         query = null
-        queryModel = null
+        if (!keepModel) queryModel = null
     }
 
     private fun settleQuery(queryStats: SolveStats, queryWork: Long) {
