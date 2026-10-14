@@ -120,8 +120,8 @@ checked defining equality; its row remains part of the support. Additional
 candidates share the same allowance and return complete certificates separately.
 A finite minimizing endpoint also permits a candidate that cancels its nonzero
 continuous reduced cost through an active singleton-continuous row. Logical
-endpoint signs must remain supported, and the complete adjusted vector is checked
-again. At most eight row adjustments are tried, returning one completed candidate.
+endpoint signs must remain supported, with no separately scoped or unsupported
+logical side, and the complete adjusted vector is checked again. At most eight row adjustments are tried, returning one completed candidate.
 The operation requires a primary certificate, independently of an objective lattice
 or objective-expression candidate. A charged eligibility scan precedes workspace
 allocation. This candidate can expose an integral fixing direction even when the original
@@ -146,8 +146,9 @@ products share the arithmetic allowance. These deductions retain both endpoint
 directions of other terms and the prior target side bounding the searched prefix
 or suffix. Their integer declarations must map to CP integer or Boolean variables.
 
-`LpExplanation` admits a row consequence only with complete row and endpoint
-premises. Separately scoped real or logical sides without a supported CP
+`LpExplanation` admits row consequences and objective explanations only with
+complete row and endpoint premises. Nonzero logical reduced costs also require
+their supporting side to match the declared side without separate scope. Separately scoped real or logical sides without a supported CP
 interpretation withhold it. Certificate identity binds all deductions to their
 exact state; pop, bound changes and objective edits prevent reuse across states.
 The caller owns applying consequences and retracting them with their scope.
