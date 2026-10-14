@@ -352,6 +352,8 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
         when {
             factor is Clause && projections.usesBuiltInPropagation(i) -> FactorOwner.SHARED
             factor is Clause -> FactorOwner.CP
+            completeTheory == ProblemPipeline.DIFFERENCE_THEORY &&
+                projections.encoder(i, EncodingTarget.DIFFERENCE).enforcesSource -> FactorOwner.THEORY
             completeTheory == ProblemPipeline.EXACT_LIRA &&
                 projections.encoder(i, EncodingTarget.LINEAR).enforcesSource -> FactorOwner.THEORY
             projections.theoryOwnable(i, numRealVars != 0) -> FactorOwner.THEORY
@@ -361,8 +363,11 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
     val theoryKept = factorOwners.indices.filter { factorOwners[it] != FactorOwner.CP }
     val theoryFragment = projections.linearTheoryModel(EncodingTarget.LINEAR, theoryKept)
     val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE, theoryKept)
+    val unownedRealFactor = factorOwners.indices.any { index ->
+        factorOwners[index] == FactorOwner.CP && factors[index].variables.reals.isNotEmpty()
+    }
     val route = when {
-        unownedOpenColumn >= 0 -> ProblemPipeline.UNSUPPORTED_OPEN
+        unownedOpenColumn >= 0 || unownedRealFactor -> ProblemPipeline.UNSUPPORTED_OPEN
 
         theoryFragment?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
 

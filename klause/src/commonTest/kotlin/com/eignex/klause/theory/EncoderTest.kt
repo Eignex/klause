@@ -19,6 +19,12 @@ import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
+import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
+import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
+import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
+import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
@@ -151,4 +157,51 @@ class EncoderTest {
         assertEquals(PreparedExecutionKind.DECLINED, plan.kind)
         assertFalse(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
     }
+    @Test
+    fun `guarded provider installation retracts a refuted query before its sibling`() {
+        val input = assertIs<SmtLibInput.Linear>(SmtLibAdmission.parse(
+            "(declare-const b Bool) (declare-const x Real) " +
+                "(assert (or (not b) (>= x 1))) (assert (= x 0))",
+        ))
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (!selected.enforcesSource) selected else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                selected.install(view, encoding)
+            }
+        })
+        val source = input.problem.model
+        val plan = source.prepareExecutionPlan(providers)
+        val queries = OpenExactNeighborhood(source, TheoryParams(), preparedSource = plan)
+
+        queries.use {
+            val refuted = it.check(ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
+                Cancellation.Never)
+            val sibling = it.check(ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap()),
+                Cancellation.Never)
+
+            assertIs<ExactNeighborhoodResult.Refuted>(refuted)
+            assertFalse(assertIs<ExactNeighborhoodResult.Witness>(sibling).sample.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `difference provider replacement combines factors in one graph`() {
+        val input = assertIs<SmtLibInput.Linear>(SmtLibAdmission.parse(
+            "(declare-const x Int) (declare-const y Int) " +
+                "(assert (<= (- x y) 0)) (assert (<= (- y x) (- 1)))",
+        ))
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (target != EncodingTarget.DIFFERENCE) Encoder(EncoderSupport.UNSUPPORTED)
+            else BuiltInEncoderProvider.select(factor, target)
+        })
+        val source = input.problem.model
+        val plan = source.prepareExecutionPlan(providers)
+        val ownership = assertNotNull(plan.componentPlan)
+
+        val result = ownership.search(source, emptyMap()).use { it.session.solve(source.numBoolVars) }
+
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, ownership.theoryPipeline)
+        assertIs<SearchResult.Exhausted>(result)
+    }
+
 }
