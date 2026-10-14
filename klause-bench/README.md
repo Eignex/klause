@@ -222,6 +222,15 @@ SMT stream checker validates every complete witness outside the measured span.
 These instrumented policy diagnostics provide no independent refutation proof and
 stay separate from ordinary CLI cost comparisons.
 
+`bench.profile.NValueNeighborhoodProfile` obtains a CP incumbent, then measures bounded
+structured proposals for each original NValue factor with per-move definitions disabled
+and enabled. Use `suite=<id> problem=<name> seed=17 timeout=10000 calls=32`; the timeout
+applies to incumbent acquisition and calls is capped at 256. It retains the incumbent,
+installed-build provenance, proposal time/allocation totals, maintained input counts and
+the residual factor kinds of proposed cardinality reductions under `$OUT`. Proposal
+generation must leave the incumbent unchanged. Scoring and incumbent acquisition are
+outside proposal timing. This probes the neighborhood at a captured feasible point;
+it does not measure portfolio reachability, independent source validity or end-to-end gains.
 
 `bench.profile.CompletionInitializationProfile` measures actual internal repair consumers
 without adding a published library debug API. It generates a hybrid finite-domain and
