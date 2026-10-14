@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import java.io.File
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.Files
@@ -10,6 +11,7 @@ import java.util.Base64
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -24,6 +26,7 @@ import kotlinx.serialization.json.put
 internal object SmtWitnessValidation {
     internal const val MAX_REQUEST_BYTES = 48 * 1024
     internal const val MAX_PAYLOAD_BYTES = 32 * 1024
+    internal const val MAX_GZIP_SOURCE_BYTES = 4 * 1024 * 1024
     internal const val MAX_CASES = 16
     private const val TIMEOUT_SECONDS = 1200L
     private const val REAP_SECONDS = 15L
@@ -173,7 +176,8 @@ internal object SmtWitnessValidation {
             require(row.keys == setOf("id", "source", "model"))
             val id = string(row, "id")
             require(Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,63}").matches(id))
-            Input(id, payload(row.getValue("source").jsonObject), payload(row.getValue("model").jsonObject))
+            Input(id, payload(row.getValue("source").jsonObject, source = true),
+                payload(row.getValue("model").jsonObject))
         }
         require(inputs.map { it.id }.distinct().size == inputs.size) { "case ids must be unique" }
         return inputs
@@ -185,17 +189,26 @@ internal object SmtWitnessValidation {
         return primitive.content
     }
 
-    private fun payload(objectValue: JsonObject): ByteArray {
-        require(objectValue.keys == setOf("bytes", "sha256", "base64"))
+    private fun payload(objectValue: JsonObject, source: Boolean = false): ByteArray {
+        val compressed = "encoding" in objectValue
+        require(objectValue.keys == if (compressed) setOf("bytes", "sha256", "base64", "encoding")
+            else setOf("bytes", "sha256", "base64"))
+        if (compressed) require(string(objectValue, "encoding") == "gzip") { "unsupported payload encoding" }
         val count = objectValue.getValue("bytes").jsonPrimitive
         val size = requireNotNull(count.intOrNull)
-        require(!count.isString && size in 1..MAX_PAYLOAD_BYTES)
+        val limit = if (compressed && source) MAX_GZIP_SOURCE_BYTES else MAX_PAYLOAD_BYTES
+        require(!count.isString && size in 1..limit)
         val expected = string(objectValue, "sha256")
         require(Regex("[0-9a-f]{64}").matches(expected))
         val encoded = string(objectValue, "base64")
         require(encoded.length <= MAX_REQUEST_BYTES)
-        val raw = Base64.getDecoder().decode(encoded)
-        require(Base64.getEncoder().encodeToString(raw) == encoded)
+        val transport = Base64.getDecoder().decode(encoded)
+        require(Base64.getEncoder().encodeToString(transport) == encoded)
+        val raw = if (compressed) try {
+            GZIPInputStream(transport.inputStream()).use { it.readNBytes(size + 1) }
+        } catch (error: IOException) {
+            throw IllegalArgumentException("invalid gzip payload", error)
+        } else transport
         require(raw.size == size && hash(raw) == expected) { "payload bytes or hash differ" }
         return raw
     }

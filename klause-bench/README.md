@@ -952,7 +952,14 @@ this shape compactly, without whitespace or duplicate keys, before base64 encodi
 Replace `N` and `M` with integer byte counts. Requests allow at most 16 distinct
 case IDs, 32 KiB per source or model and 48 KiB for the complete encoded request.
 These bounds can exclude large original inputs; validation never drops coordinates
-or rewrites a source/model to fit. No catalog scan, solver call or reference search
+or rewrites a source/model to fit. A payload may add `"encoding":"gzip"`
+and encode gzip bytes in `base64`, while `bytes` and `sha256` describe its original
+uncompressed bytes. A gzip source is bounded to 4 MiB after inflation; a gzip model
+retains the 32 KiB model limit. Raw sources and models, payload base64 and the complete
+encoded request retain their existing limits. Inflation stops at the declared size
+plus one byte. Unknown encodings, noncanonical base64, truncated or corrupt gzip
+streams and original byte/hash mismatches are refused before child execution.
+No catalog scan, solver call or reference search
 runs. The main retains the verbatim inputs and packaged checker identities under
 `$OUT/smt-witness-validation`, then provisions the SHA-256-pinned Z3 4.15.3.0
 Python wheel in a private Linux x86-64 runtime without global installation.
