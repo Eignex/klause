@@ -52,7 +52,7 @@ internal object BooleanObjectiveDescentProbe {
             require(parts.size == 2)
             parts[0] to parts[1]
         }
-        require(options.keys - setOf("prepareMs", "timeout", "conditional") ==
+        require(options.keys - setOf("prepareMs", "timeout", "conditional", "conditionalClosure") ==
             setOf("suite", "problem", "sha256", "witness64", "work"))
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -60,7 +60,10 @@ internal object BooleanObjectiveDescentProbe {
         val timeout = options["timeout"]?.toLong() ?: 5000L
         val prepareMs = options["prepareMs"]?.toLong() ?: 500L
         val conditional = options["conditional"]?.toInt() ?: 0
+        require(options["conditionalClosure"] in listOf(null, "true", "false"))
+        val closedRepairs = options["conditionalClosure"] == "true"
         require(conditional in 0..32)
+        require(!closedRepairs || conditional > 0)
         require(timeout in 1..60_000 && prepareMs in 1..5000)
         val ref = Catalog.uncapped(suite).problems.single { it.name == name }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
@@ -113,6 +116,7 @@ internal object BooleanObjectiveDescentProbe {
             val rows = conditionalRepairs(
                 problem, objective, sweep, initial, roots, conditional, work, timeout,
                 suite, name, digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct,
+                closedRepairs,
             )
             out.resolve("cases.json").writeText(rows.toString() + "\n")
             return
@@ -217,6 +221,7 @@ internal object BooleanObjectiveDescentProbe {
         originalBools: Int,
         sourceObjective: LinearObjective,
         reconstruct: (Sample) -> Sample,
+        closedRepairs: Boolean,
     ) = buildJsonArray {
         val setupStarted = System.nanoTime()
         val pins = requireNotNull(LocalSearchModel.of(problem.bake()).pinsUnder(Assumptions.None))
@@ -227,6 +232,8 @@ internal object BooleanObjectiveDescentProbe {
         base.invariants = sweep.network(0, problem.numBoolVars)
         base.recompute()
         require(base.cost == 0L)
+        val graph = if (closedRepairs) BinaryRepairGraph.prepare(problem, pins,
+            Cancellation.after(timeout.milliseconds)) else null
         val targets = roots.filter { !pins.isFrozenBool(it) }.mapNotNull { v ->
             val delta = requireNotNull(base.objectiveDelta(objective, Move.BoolFlip(v)))
             if (delta < 0.0) v to delta else null
@@ -240,17 +247,24 @@ internal object BooleanObjectiveDescentProbe {
             val state = LocalSearchState(model, Random(3), assumptions, base.projection)
             for (v in 0 until problem.numBoolVars) state.assignment.setBool(v, initial.boolValue(v))
             assumptions.forEachBool { id, value -> state.assignment.setBool(id, value) }
+            val closure = graph?.let { BinaryRepairClosure(it, assumptions) }
+            val seedCancellation = Cancellation.after(timeout.milliseconds)
+            val seedRejected = closure?.seed(state, root, !initial.boolValue(root), seedCancellation) == false
+            val seedCancelled = seedRejected && seedCancellation.isCancelled()
             sweep.sweep(state.assignment, state.rootDomains, problem.factors, assumptions::isFrozenBool)
             state.invariants = sweep.network(0, problem.numBoolVars)
             state.recompute()
+            if (!seedRejected && graph != null) check(graph.violations(state) == 0L)
             val initialCost = state.cost
-            val strategy = LocalSearchCatalog.byLabel("cbls/fixed").strategy
-            val materializeNanos = System.nanoTime() - materializeStarted
             val cancellation = Cancellation.after(timeout.milliseconds)
+            val recipe = LocalSearchCatalog.byLabel("cbls/fixed").strategy
+            val strategy = closure?.wrap(recipe, cancellation) ?: recipe
+            val materializeNanos = System.nanoTime() - materializeStarted
             val started = System.nanoTime()
             var moves = 0L
             var stalled = false
-            while (state.cost != 0L && moves < work && !cancellation.isCancelled()) {
+            var bestHardCost = state.cost
+            while (!seedRejected && state.cost != 0L && moves < work && !cancellation.isCancelled()) {
                 val move = strategy.pickMove(state)
                 if (move == null) {
                     stalled = true
@@ -258,10 +272,16 @@ internal object BooleanObjectiveDescentProbe {
                 }
                 state.apply(move)
                 moves++
+                bestHardCost = minOf(bestHardCost, state.cost)
             }
             val elapsedNanos = System.nanoTime() - started
             assumptions.forEachBool { id, value -> check(state.assignment.boolValue(id) == value) }
-            val feasible = state.cost == 0L
+            val binaryCost = graph?.violations(state)
+            if (!seedRejected && binaryCost != null) check(binaryCost == 0L)
+            val incrementalCost = state.cost
+            state.recompute()
+            check(state.cost == incrementalCost)
+            val feasible = !seedRejected && state.cost == 0L
             val sourceSample = if (feasible) reconstruct(state.assignment.snapshot()) else null
             val value = sourceSample?.let(sourceObjective::evaluateExact)
             add(buildJsonObject {
@@ -286,14 +306,27 @@ internal object BooleanObjectiveDescentProbe {
                     put("targetRoot", root); put("targetDelta", delta)
                     put("rootPins", pins.numBools); put("pinsSatisfied", true)
                     put("initialHardCost", initialCost); put("finalHardCost", state.cost)
+                    put("bestHardCost", bestHardCost)
+                    put("closedRepairs", closedRepairs); put("closureSeedRejected", seedRejected)
+                    put("closureSeedCancelled", seedCancelled)
+                    put("binaryHardCost", binaryCost?.let { JsonPrimitive(it) } ?: JsonNull)
+                    put("binaryEdges", graph?.edgeCount ?: 0); put("binaryUnits", graph?.units?.size ?: 0)
+                    put("closureCalls", closure?.candidateCalls ?: 0)
+                    put("closureRejected", closure?.rejected ?: 0); put("closureCancelled", closure?.cancelled ?: 0)
+                    put("closureFacts", closure?.factVisits ?: 0); put("closureEdges", closure?.edgeVisits ?: 0)
+                    put("closureLargestMove", closure?.largestMove ?: 0)
                     put("nativeWitnesses", if (feasible) 1 else 0)
                     put("sharedSetupNanos", sharedSetupNanos); put("materializeNanos", materializeNanos)
                     put("elapsedNanos", elapsedNanos); put("workLimit", work); put("timeoutMillis", timeout)
                     put("stalled", stalled); put("cancelled", cancellation.isCancelled())
-                    put("stats", buildJsonObject { put("lsMoves", moves); put("lsRestarts", 0) })
+                    put("stats", buildJsonObject {
+                        put("lsMoves", moves); put("lsPrimitiveFlips", state.step); put("lsRestarts", 0)
+                    })
                 })
             })
-            println("conditional root=$root delta=$delta initialHard=$initialCost finalHard=${state.cost} " +
+            println("conditional root=$root closed=$closedRepairs rejectedSeed=$seedRejected " +
+                "delta=$delta initialHard=$initialCost bestHard=$bestHardCost finalHard=${state.cost} " +
+                "closureRejected=${closure?.rejected} largestMove=${closure?.largestMove} " +
                 "sourceObjective=$value moves=$moves elapsedNanos=$elapsedNanos")
         }
         println("conditional targets=${targets.size} requested=$count sharedSetupNanos=$sharedSetupNanos")
