@@ -5,6 +5,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 internal interface LpDeductionCertificate {
     fun belongsTo(model: LpModel, observer: LpCertificationObserver? = null): Boolean
     fun exactMultipliers(): List<BigFraction>
+    fun exactMultiplier(row: Int): BigFraction
     fun exactReducedCost(col: Int): BigFraction
     fun exactObjectiveBound(): BigFraction
     fun integralObjectiveRows(): IntArray? = null

@@ -136,6 +136,9 @@ same source authority. At most three complete certificates participate: pruning
 uses the strongest admitted bound and fixing can use the other two. All candidates,
 selection and failed attempts share the unchanged node allowance; a decline keeps
 completed candidates. No additional LP query or row admission is required.
+Multiplier reads charge construction before each entry and poll the shared
+cancellation stride; candidate generation does not materialize an unmetered
+multiplier snapshot. Original-source capture retains its complete snapshot API.
 For a nonintegral objective, node pruning compares the exact certified bound in
 minimized source units with an enclosing rational incumbent cutoff. It uses the
 unrounded objective without an integer objective atom, so the prune has no

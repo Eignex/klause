@@ -162,7 +162,9 @@ internal class IntegerCertificate(
     /** A copy of `N = 2ᵏ · objective` (the exact scaled objective numerator); see [objectiveScaleBits]. */
     fun objectiveNumerator(): Int128 = numerator.copy()
 
-    override fun exactMultipliers(): List<BigFraction> = mult.map { BigFraction.of(bigIntOf(it), bigIntOf(scale)) }
+    override fun exactMultipliers(): List<BigFraction> = mult.indices.map(::exactMultiplier)
+
+    override fun exactMultiplier(row: Int): BigFraction = BigFraction.of(bigIntOf(mult[row]), bigIntOf(scale))
 
     /** Whether row [row] carries nonzero dual weight (for non-global-row premise citation). */
     override fun dualNonzeroRow(row: Int): Boolean = mult[row] != 0L
