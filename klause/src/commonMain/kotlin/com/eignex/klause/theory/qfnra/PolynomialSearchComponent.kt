@@ -5,6 +5,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.FiniteFactorEnforcement
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchContext
@@ -28,23 +29,15 @@ internal class PolynomialSearchComponent(
     private var outcome: QfNraResult? = null
 
     private var attached = false
-    private var finiteSource: Problem? = null
-    private var finiteFactors: Set<Int> = emptySet()
+    private var finiteEnforcement: FiniteFactorEnforcer? = null
 
     fun useFiniteEnforcement(source: Problem, factors: Set<Int>) {
-        check(!attached && finiteSource == null)
-        require(factors.all { it in source.factors.indices })
-        finiteSource = source
-        finiteFactors = factors.toSet()
+        check(!attached && finiteEnforcement == null)
+        finiteEnforcement = FiniteFactorEnforcement(source, factors)
     }
 
-    override fun enforcingFiniteFactors(problem: Problem): Set<Int> {
-        val source = finiteSource ?: return emptySet()
-        return if (problem.numBoolVars == source.numBoolVars && problem.numIntVars == source.numIntVars &&
-            problem.numFactors >= source.numFactors &&
-            source.factors.indices.all { problem.factors[it] === source.factors[it] }
-        ) finiteFactors else emptySet()
-    }
+    override fun enforcingFiniteFactors(problem: Problem): Set<Int> =
+        finiteEnforcement?.enforcingFiniteFactors(problem).orEmpty()
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
         invalidate()

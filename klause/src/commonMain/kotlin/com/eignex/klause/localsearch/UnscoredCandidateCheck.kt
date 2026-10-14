@@ -17,10 +17,12 @@ import com.eignex.klause.util.Cancellation
 internal class UnscoredCandidateCheck(
     problem: Problem,
     private val selection: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
+    enforcingPeers: Set<Int> = emptySet(),
 ) {
     private val factorIds = problem.factors.indices.filter {
-        (selection?.capabilities(it) ?: problem.factors[it].executionCapabilities()).assignmentCheck ==
-            AssignmentCheckCapability.UNSUPPORTED || selection?.requiresOriginalScoringCheck(it) == true
+        it !in enforcingPeers &&
+            ((selection?.capabilities(it) ?: problem.factors[it].executionCapabilities()).assignmentCheck ==
+                AssignmentCheckCapability.UNSUPPORTED || selection?.requiresOriginalScoringCheck(it) == true)
     }.toIntArray()
     private val unchecked = if (factorIds.isEmpty()) null else
         problem.withFactors(Array(factorIds.size) { problem.factors[factorIds[it]] })

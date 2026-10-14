@@ -32,6 +32,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.util.Cancellation
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -105,7 +106,8 @@ internal class LocalSearchEngine(
 
     // A finite projection may require theory-owned completion before publication.
     private val completion: CandidateCompletion? = completion
-    private val unscoredCandidateCheck = UnscoredCandidateCheck(problem, model.selection).takeIf { it.required }
+    private val unscoredCandidateCheck = UnscoredCandidateCheck(problem, model.selection,
+        (completion as? FiniteFactorEnforcer)?.enforcingFiniteFactors(problem).orEmpty()).takeIf { it.required }
 
     /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
      *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each
