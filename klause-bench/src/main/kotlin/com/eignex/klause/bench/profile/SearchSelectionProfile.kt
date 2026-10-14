@@ -5,6 +5,7 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBranchSelection
@@ -99,7 +100,7 @@ internal object SearchSelectionProfile {
                         }
                     }
                     val session = SearchComponentSet(listOf(arithmetic), proposals = listOf(proposal))
-                        .session(cancellation = stop)
+                        .session(cancellation = stop, atoms = SearchAtomRegistry(parsed.model.numBoolVars))
                     val initialized = session.initialize()
                     val run = session.openRun(parsed.model.numBoolVars, branchSelection = selection,
                         observer = object : SearchRunObserver {
