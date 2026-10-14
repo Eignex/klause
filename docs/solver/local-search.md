@@ -151,6 +151,14 @@ must be satisfied and proposes with its own sink owner attribution; complete mov
 scoring retains feasibility and objective authority. Explicit uniform and elected
 source scopes keep their separate selection policies.
 
+Tabu aspiration with the improving criterion admits a move that lowers violations.
+At feasibility it also admits a strictly improving objective move whose complete
+model delta is zero, independently of the objective shaping coefficient. Equal or
+worse objectives, unsupported objective deltas and moves introducing violations
+retain their tabu restriction. This permits monotone envelope descent after a
+recent coordinate write; tabu cannot trap a feasible improving compound behind
+unrelated zero-objective candidates.
+
 ### Element results
 
 Hinted native Element results are maintained from their indexes and selected cells.

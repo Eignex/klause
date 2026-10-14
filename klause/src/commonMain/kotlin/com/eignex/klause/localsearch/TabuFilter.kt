@@ -101,8 +101,7 @@ data class TabuFilter(
  * Per-move criterion that admits a tabu move despite the tenure check. The standard
  * literature aspiration is "tabu move M is permitted if M leads to a state strictly better
  * than the best known so far"; we approximate that with [OrImproving], which admits a
- * tabu move iff its [LocalSearchState.netDelta] is strictly negative (i.e. it would lower
- * the current violation count).
+ * tabu move that lowers violations or strictly improves the objective while preserving feasibility.
  */
 sealed interface AspirationCriterion {
     /** True iff [move] is currently tabu. */
@@ -113,9 +112,15 @@ sealed interface AspirationCriterion {
         override fun admitsTabu(state: LocalSearchState, move: Move): Boolean = false
     }
 
-    /** Admit a tabu move if it strictly improves the current cost (`netDelta < 0`). */
+    /** Admit a tabu move that lowers violations or improves a feasible objective without adding violations. */
     data object OrImproving : AspirationCriterion {
-        override fun admitsTabu(state: LocalSearchState, move: Move): Boolean = state.netDelta(move) < 0
+        override fun admitsTabu(state: LocalSearchState, move: Move): Boolean {
+            val delta = state.netDelta(move)
+            if (delta < 0L) return true
+            if (state.cost != 0L || delta != 0L) return false
+            val objective = state.shaping.objective ?: return false
+            return (state.objectiveDelta(objective, move) ?: 0.0) < 0.0
+        }
     }
 
     /** Standard literature aspiration: admit a tabu move if it would lead to a cost

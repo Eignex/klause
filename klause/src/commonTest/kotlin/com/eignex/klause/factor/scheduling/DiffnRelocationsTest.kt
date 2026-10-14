@@ -4,10 +4,12 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.AspirationCriterion
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.TabuFilter
 import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
@@ -19,6 +21,34 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class DiffnRelocationsTest {
+    @Test
+    fun `cbls admits improving packing envelopes after a recent envelope write`() {
+        val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
+        val rows = listOf(
+            Linear(longArrayOf(1, -1), intArrayOf(0, 4), LinearOp.LE, -2),
+            Linear(longArrayOf(1, -1), intArrayOf(1, 4), LinearOp.LE, -3),
+        ) + List(256) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 12) }
+        val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0),
+            IntDomain(0, 20))
+        val state = LocalSearchState(LocalSearchModel.open(Problem(0, 5, domains, listOf(factor) + rows)), Random(43))
+        val values = longArrayOf(5, 10, 0, 0, 14)
+        values.forEachIndexed { v, value -> state.assignment.setInt(v, value) }
+        state.recompute()
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 1))
+        state.shaping.objective = objective
+        state.apply(Move.IntSet(4, 13))
+        val strategy = Cbls(tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving))
+
+        val move = assertNotNull(strategy.pickMove(state))
+
+        assertTrue(checkNotNull(state.objectiveDelta(objective, move)) < 0.0)
+        assertEquals(0L, state.netDelta(move))
+        state.apply(move)
+        state.recompute()
+        assertEquals(0L, state.cost)
+        assertTrue(state.assignment.intValue(4) < 13L)
+    }
+
     @Test
     fun `default cbls improves a packing envelope among arithmetic rows`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
