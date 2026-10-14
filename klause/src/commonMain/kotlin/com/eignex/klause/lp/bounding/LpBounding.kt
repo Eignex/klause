@@ -17,8 +17,10 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
+import com.eignex.klause.lp.engine.LpRowBound
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.MixedCertificateMeter
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.authoritativeModel
@@ -27,9 +29,9 @@ import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.checkedLpConflict
 import com.eignex.klause.lp.engine.checkedLpWitness
+import com.eignex.klause.lp.engine.exactBits
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactConstant
-import com.eignex.klause.lp.engine.exactBits
 import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.finiteExactInput
@@ -37,6 +39,7 @@ import com.eignex.klause.lp.engine.floorLong
 import com.eignex.klause.lp.engine.hasIntegralObjective
 import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.engine.lpConditioning
+import com.eignex.klause.lp.engine.mixedRowBounds
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.engine.nodeDualCertificate
@@ -515,6 +518,20 @@ internal fun LpEngine.sparseSafePrune(
     hints?.record(relaxation, result.primal, result.duals)
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
     val optimalBasis = result.basis
+    val rootMeter = if (session.decisionLevel == 0 && problem.numRealVars > 0 &&
+        (problem.numIntVars > 0 || problem.numBoolVars > 0)
+    ) MixedCertificateMeter(cancellation) else null
+    if (rootMeter != null) {
+        val projected = solveContext.certificationPolicy.acceptNullable(
+            LpCertifier.INTEGER,
+            mixedRowBounds(model, cancellation, sink.lp.certificationObserver(LpRoute.NODE), rootMeter),
+        ).orEmpty()
+        noteNodeOverhead(rootMeter.work)
+        if (observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
+            applyRowBounds(relaxation, projected, session, sink, learn, cancellation)
+        }) return LpNodeOutcome(true, null)
+        if (cancellation()) return LpNodeOutcome(false, optimalBasis)
+    }
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
     val objectiveCeiling = if (canPrune) null else singleObjectiveCeiling(relaxation, cancellation)
@@ -593,6 +610,7 @@ internal fun LpEngine.sparseSafePrune(
                 boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
                 eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
                 onAdditionalCertificate = if (canFix) { { additionalCertificates.add(it) } } else null,
+                sharedMeter = rootMeter,
             ),
         ).also {
             // The node path is where certification actually happens; the certified wrapper is not on it.
@@ -708,6 +726,52 @@ internal fun LpEngine.sparseSafePrune(
         }
     }
     return LpNodeOutcome(false, optimalBasis)
+}
+
+@Suppress("CyclomaticComplexMethod")
+internal fun LpEngine.applyRowBounds(
+    relaxation: LpRelaxation,
+    bounds: List<LpRowBound>,
+    session: PropagationSession,
+    sink: SolveStatsSink,
+    learn: Boolean,
+    cancellation: Cancellation,
+): Boolean {
+    if (session.decisionLevel != 0) return false
+    for (certificate in bounds) {
+        if (cancellation()) return false
+        if (!certificate.belongsTo(relaxation.model)) continue
+        val column = certificate.column
+        val variable = relaxation.colVarId.getOrNull(column) ?: continue
+        if (variable < 0 || relaxation.model.colContinuous[column]) continue
+        val threshold = certificate.integerBound() ?: continue
+        noteNodeOverhead(48L)
+        val bool = relaxation.colIsBool[column]
+        val pinned = if (bool) session.boolValue(variable) else null
+        val minimum = if (bool) { if (pinned == true) 1L else 0L } else session.intDomain(variable).min
+        val maximum = if (bool) { if (pinned == false) 0L else 1L } else session.intDomain(variable).max
+        if ((certificate.upper && threshold >= maximum) || (!certificate.upper && threshold <= minimum)) continue
+        noteNodeOverhead(certificate.supportCount.toLong() * LpNodeOverhead.FIXING)
+        val support = LpExplanation.rowBoundReason(relaxation, certificate, session) ?: continue
+        val reason = support.takeIf { learn && !bool }
+        val result = when {
+            bool && (threshold < minimum && certificate.upper || threshold > maximum && !certificate.upper) -> {
+                sink.lp.observePrune()
+                return true
+            }
+            bool -> session.implyBool(variable, !certificate.upper)
+            certificate.upper && reason != null -> session.implyIntAtMostWithReason(variable, threshold, reason)
+            certificate.upper -> session.implyIntAtMost(variable, threshold)
+            reason != null -> session.implyIntAtLeastWithReason(variable, threshold, reason)
+            else -> session.implyIntAtLeast(variable, threshold)
+        }
+        if (result is PropagationResult.Unsat) {
+            sink.lp.observePrune()
+            return true
+        }
+        sink.lp.observeFix()
+    }
+    return false
 }
 
 private inline fun observeNodeFixing(sink: SolveStatsSink, phase: LpSolvePhase, body: () -> Boolean): Boolean {

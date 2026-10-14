@@ -46,6 +46,28 @@ import kotlin.test.assertTrue
 
 class LpBoundingTest {
     @Test
+    fun `mixed row feasibility fixes an integer root domain before an incumbent`() {
+        for (sign in listOf(-1.0, 1.0)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+                arrayOf(Linear(intArrayOf(0), doubleArrayOf(sign), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, if (sign > 0.0) 0.75 else -0.25)),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.25))
+            val objective = LinearObjective(intCoefficients = longArrayOf(sign.toLong()),
+                realCoefficients = doubleArrayOf(0.5))
+            val session = PropagationSession(problem)
+            val sink = SolveStatsSink(backend = "row-feasibility")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session,
+                    Double.POSITIVE_INFINITY, sink, Cancellation.Never, -1, true)
+
+                assertFalse(result.prune)
+                val value = if (sign > 0.0) 1L else 0L
+                assertEquals(IntDomain(value, value), session.intDomain(0))
+            }
+        }
+    }
+
+    @Test
     fun `directly integral mixed fixing excludes equal incumbents when the objective range exceeds Long`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, Long.MAX_VALUE / 2L + 1L)),
             arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0),
