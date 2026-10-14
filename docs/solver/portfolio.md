@@ -310,6 +310,9 @@ pools admit the core worker immediately. Explicit backtrack pools keep their req
 this objective-only mechanism directly. The worker retains the active
 assumption traversal across slices, closes it before changing the encoding, and keeps
 all source constraints and caller assumptions in every round. Rebuilt private models
+are needed only after adding selector clauses or core thresholds. The initial residual
+query reuses the baked source model, including its root deductions and captured projections.
+Augmented models
 retain the original captured [projection descriptors](../model.md#engine-projections-and-factor-capabilities),
 including factories bound to remapped engine-view factors, and select only added factors
 through the source invocation's providers. Built-in providers keep their direct construction path. Auxiliary selector
