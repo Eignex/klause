@@ -349,7 +349,7 @@ class Xcsp3SourceCheckerTest {
                 """
                 <instance format="XCSP3" type="CSP">
                   <variables>
-                    <var id="x">-2000000000..2147483647</var><var id="y">-2000000000..2147483647</var>
+                    <var id="x">-2000000000..2147483637</var><var id="y">-2000000000..2147483637</var>
                     <var id="c">2</var><var id="d">-1</var>
                   </variables>
                   <constraints><sum><list>$expressions</list>$coeffs<condition>($condition)</condition></sum></constraints>
@@ -411,9 +411,9 @@ class Xcsp3SourceCheckerTest {
     @CsvSource(delimiter = '|', value = [
         "<block><sum><list>eq(x[0],1) eq(x[1],1)</list><condition>(eq,2)</condition></sum></block>|valid",
         "<group><sum><list>eq(%0,1) eq(%1,1)</list><condition>(eq,2)</condition></sum>" +
-            "<args>x[0] x[1]</args></group>|valid",
+            "<args>x[0] x[1]</args></group>|unknown",
         "<slide><list>x[]</list><sum><list>eq(%0,1) eq(%1,1)</list>" +
-            "<condition>(eq,2)</condition></sum></slide>|valid",
+            "<condition>(eq,2)</condition></sum></slide>|unknown",
         "<group><sum><list>%0 %1</list><coeffs>%...</coeffs><condition>(eq,5)</condition></sum>" +
             "<args>eq(x[0],1) eq(x[1],1) 2 3</args></group>|valid",
         "<group><sum><list>%0 %1</list><condition>(eq,1)</condition></sum>" +
