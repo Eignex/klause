@@ -99,35 +99,69 @@ and deferred hints retain precedence. A component preference only reorders the
 two sides of an already selected Boolean split; propagation and complete component
 checks retain authority. The provider belongs to its opening and completed partial
 fixpoint, including retraction and close lifetime. A source-clause adapter recognizes
-complete signed conjunction definitions of two or more inputs, including nested gates
-and disjunctions expressed by signed De Morgan inputs. Primitive preferences remain
+complete signed conjunction definitions of two or more inputs, including nested gates and
+disjunctions expressed by signed De Morgan inputs. Primitive preferences remain
 the leaves. Each consultation evaluates a bounded dependency closure with sparse
 private storage charged to the opening token; no values survive the consultation.
 Every definition retains its full reverse clause and every implication pair.
 Recognition checks its first required implication pair before allocating or charging
 the complete operand buffer. A missing first pair skips that candidate; admission
 still requires every pair, canonical operands and an unambiguous definition.
+Strictly increasing operand variable IDs establish canonical distinctness during
+the charged pair-and-copy pass; other orders retain sorting and distinctness checks.
 Missing leaves, incomplete or ambiguous definitions, cycles and cancellation supply
 no derived gate preference. The adapter performs no second Boolean or arithmetic search.
-
+Built-in exact-linear point guidance uses the existing `openHintFlips` opt-in.
+Its null default skips point-row registration, capture enablement and source-index
+construction. Explicit zero permits bounded construction observations but supplies
+no component preference to traversal. A positive allowance permits guidance after
+caller or deferred preferences decline. The flip ceiling still bounds only the
+Boolean draw; point and index work retain their original owners and limits.
+Custom registered providers retain their own existing admission and lifetime.
 The default integer difference opening installs no point hint provider; its ordinary
 Boolean polarity selection is independent of optional internal adapter composition.
+An opt-in live-point provider first completes a sparse incidence index over all
+original source clauses. The opening owns the index and borrows those clauses
+read-only. Every source literal ID is validated, including the suffix;
+a declined core exports no prefix preferences. Passive construction observations
+retain known source sizes and actually completed clause, validated-literal,
+incidence and distinct-variable prefixes. These maxima describe preparation progress,
+not source coverage; raw ledger debits are separate from completed operations.
+Unobserved construction fields remain absent, independently of index admission.
+With no structural profile, every clause remains an ordinary source constraint.
+Unrecognized Boolean partners stay unknown, except for current search pins and
+the selected polarity hypothesis.
+Raw scoring derives no gate meaning, uniqueness or absence. It can guide declared
+Boolean choices through registered primitive comparisons without a gate definition.
 
-An opt-in internal point provider can also compare both values of the selected Boolean
-against the original shared clauses. Index construction records hook presence before
-initialization; consultation requires a live point before and after its charged work.
+Optional gate recognition uses only the same index's remaining visits and storage.
+Every full reverse clause, implication pair, canonical operand set, global ambiguity
+check and acyclic qualification must complete before a profile is installed. Failed
+profile preparation discards all partial gates, parents and definition flags while
+retaining the independently completed raw core. A completed profile excludes its
+qualified definition clause identities from scoring and preserves ambiguous/cyclic
+gate declines. Original clause incidences are reused rather than rebuilt.
+Legacy providers without a live-point hook retain forward-only gate recognition;
+an explicit zero semantic-storage limit also retains that path.
+
 An available direct primitive preference retains its polarity without semantic scoring.
-Declared Boolean choices and compound gates can use the semantic comparison.
 Live pins come from the search context, including publications awaiting delivery to a
-component. Complete unambiguous acyclic definitions supply only structure and are
-excluded from scoring by their stable source clause identities. Their clauses remain
-fully enforced by search. Unknown partners stay unknown: a clause is satisfied by a
-known true literal, broken only when all literals are known false, and otherwise
-unresolved. Comparisons require the same usable primitive point support on both sides,
-prefer fewer broken clauses, then more definitely satisfied clauses. Ties and optional
-representation declines retain the forward preference. A hypothetical compound output
-can differ from its point-derived value; it supplies no arithmetic fact or feasibility
-claim. Ordinary fixpoint and complete source checks still validate either branch.
+component. A semantic consultation compares both selected Boolean values using the
+same current point; primitive and pin reads are memoized within that consultation.
+A clause is satisfied by a known true literal, broken only when every literal is
+known false, and otherwise unresolved. Comparisons require usable primitive point
+support on both sides, prefer fewer broken clauses, then more definitely satisfied
+clauses. Ties and optional representation declines retain the forward preference.
+A hypothetical Boolean output supplies no arithmetic fact or feasibility claim;
+ordinary fixpoint and complete source checks validate either branch.
+
+The opening retains the provider until close. If the raw core itself reaches a
+private representation bound, a fully validated primitive-only wrapper can survive.
+Its live-point hook is checked during consultations. Source-size, invalid source
+IDs and containing stops withhold the wrapper. A containing stop remains latched
+through construction even if a later token poll returns false. Closing discards the
+core, optional profile and primitive reference. Construction and consultations retain
+all spent work and create no indexing retry or allowance.
 
 Source-index outcomes and eligible Boolean split consultations are separate from
 the optional Boolean proposal's draw counters. The invocation retains one outcome
@@ -137,6 +171,13 @@ supplies no preference. A non-null preference counts a selected first polarity e
 when it agrees with the delegate, and preserves the complementary alternative.
 Primitive and compound gate selections describe the outer consultation, not recursive
 leaf reads. These observations do not certify a committed decision or source witness.
+Applicability observations retain the first unavailable live-point hook, an outer
+variable absent from the forward primitive and gate domains, and a raw primitive
+callback returning no preference before owner masking. Cached values do not repeat
+the producer observation. These stages are not a partition of final declines: an
+uncovered forward variable can still select through semantic clauses, and an
+unavailable point or primitive decline does not identify its internal cause.
+Observation reuses existing branch results, calls and charged visits.
 
 Fractional source integers split at exact floor/ceiling thresholds. CP decisions use
 Long values; open theories use arbitrary-precision thresholds. Stable complementary

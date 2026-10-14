@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
@@ -15,16 +16,22 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBoolValue
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchExactRealValue
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -32,8 +39,270 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class PreparedSearchRegistrationTest {
+    @Test
+    fun `default exact openings do no hint preparation while zero retains the positive preparation trace`() {
+        val source = Problem(
+            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 4)),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        val prepared = kotlin.test.assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        var positiveTrace: List<String>? = null
+        for (allowance in listOf(1L, 0L, null)) {
+            val trace = ArrayList<String>()
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean { trace += "poll"; return false }
+                override fun workMeter(): WorkMeter = WorkMeter { trace += "charge:$it" }
+            }
+            val stats = SmtStatsSink()
+            val resources = SearchInvocationResources()
+            val opening = SearchComponentOpening(stop, stats, null, resources, allowance)
+            val factory = kotlin.test.assertNotNull(source.componentPlan().theoryComponentFactory(source) { prepared })
+            try {
+                factory(opening)
+                val hints = opening.candidateHints(source)
+                when (allowance) {
+                    null -> {
+                        assertTrue(trace.isEmpty())
+                        assertSame(SearchCandidateHints.None, hints)
+                        assertEquals(null, stats.hintUsage.snapshot().rawLedgerDebits)
+                    }
+                    0L -> {
+                        assertEquals(positiveTrace, trace)
+                        assertSame(SearchCandidateHints.None, hints)
+                        assertEquals(2L, stats.hintUsage.snapshot().rawClausesMax)
+                    }
+                    else -> {
+                        assertTrue(trace.isNotEmpty())
+                        assertNotEquals(SearchCandidateHints.None, hints)
+                        positiveTrace = trace.toList()
+                    }
+                }
+            } finally {
+                resources.close()
+            }
+        }
+    }
+
+    @Test
+    fun `explicit hint preparation keeps providers owned without overriding live state or caller precedence`() {
+        for ((openingAllowance, providerAllowance, exposed) in listOf(
+            Triple(0L, 0L, false), Triple(1L, 1L, true), Triple(0L, null, true),
+        )) {
+            val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2))))
+            var stopped = false
+            var available = false
+            var releases = 0
+            var calls = 0
+            val resources = SearchInvocationResources()
+            val stats = SmtStatsSink()
+            val opening = SearchComponentOpening(Cancellation { stopped }, stats, null, resources, openingAllowance)
+            opening.registerCandidateHints(intArrayOf(0, 1), SearchCandidateHints { calls++; false },
+                { releases++ }, { available }, openHintFlips = providerAllowance)
+            val hints = opening.candidateHints(source)
+            assertEquals(1L, stats.hintUsage.snapshot().indexesAdmitted)
+            assertEquals(0, releases)
+            assertNull(hints.preferredBool(0))
+            val caller = observedCandidateHints(SearchCandidateHints { true }, hints, stats.hintUsage)
+            available = true
+            assertEquals(true, caller.preferredBool(0))
+            assertEquals(0, calls)
+
+            assertEquals(if (exposed) false else null, hints.preferredBool(0))
+
+            assertEquals(if (exposed) 1 else 0, calls)
+            stopped = true
+            assertNull(hints.preferredBool(0))
+            assertEquals(if (exposed) 1 else 0, calls)
+            resources.close()
+            resources.close()
+            assertEquals(1, releases)
+            stopped = false
+            assertNull(hints.preferredBool(0))
+            assertEquals(if (exposed) 1 else 0, calls)
+        }
+    }
+
+    @Test
+    fun `a declined structural index keeps its primitive provider owned until close`() {
+        val width = 22000
+        val target = Lit.make(2, true)
+        val source = Problem(width + 3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.negate(target), Lit.make(0, true))),
+            Clause(intArrayOf(Lit.negate(target), Lit.make(1, true))),
+            Clause(intArrayOf(target, Lit.make(0, false), Lit.make(1, false))),
+            Clause(IntArray(width) { Lit.make(it + 3, true) }),
+        ))
+        val resources = SearchInvocationResources()
+        val stats = SmtStatsSink()
+        val opening = SearchComponentOpening(Cancellation.Never, stats, null, resources)
+        var available = false
+        var releases = 0
+        var calls = 0
+        opening.registerCandidateHints(intArrayOf(0, 1), SearchCandidateHints { calls++; false },
+            { releases++ }, { available })
+
+        val hints = opening.candidateHints(source)
+
+        assertNotEquals(SearchCandidateHints.None, hints)
+        assertEquals(0, releases)
+        assertEquals(0, calls)
+        assertNull(hints.preferredBool(0))
+        val caller = observedCandidateHints(SearchCandidateHints { true }, hints, stats.hintUsage)
+        assertEquals(true, caller.preferredBool(0))
+        assertEquals(0, calls)
+        available = true
+        val component = observedCandidateHints(SearchCandidateHints.None, hints, stats.hintUsage)
+        assertEquals(false, component.preferredBool(0))
+        assertNull(component.preferredBool(2))
+        assertEquals(1, calls)
+        assertEquals(1L, stats.hintUsage.snapshot().visitDeclines)
+        assertEquals(0L, stats.hintUsage.snapshot().indexesAdmitted)
+        assertEquals(1L, stats.hintUsage.snapshot().primitiveSelections)
+        assertEquals(0L, stats.hintUsage.snapshot().gateSelections)
+        assertEquals(0L, stats.hintUsage.snapshot().clauseConsultations)
+        available = false
+        assertNull(component.preferredBool(0))
+        resources.close()
+        resources.close()
+        assertEquals(1, releases)
+        assertNull(hints.preferredBool(0))
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun `invalid or stopped primitive admission still releases the registered provider`() {
+        for (stopped in listOf(false, true)) {
+            val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2))))
+            val resources = SearchInvocationResources()
+            val opening = SearchComponentOpening(Cancellation { stopped }, null, null, resources)
+            var released = false
+            var calls = 0
+            opening.registerCandidateHints(intArrayOf(0, 2), SearchCandidateHints { calls++; true },
+                { released = true }, { true })
+
+            val hints = opening.candidateHints(source)
+
+            assertSame(SearchCandidateHints.None, hints)
+            assertTrue(released)
+            assertEquals(0, calls)
+            resources.close()
+            assertEquals(0, calls)
+        }
+    }
+
+    @Test
+    fun `a declared Boolean follows semantic implications of a live partial real point`() {
+        val source = Problem(
+            numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(0, 4)),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        for ((allowance, callerWins, guided) in listOf(
+            Triple(null, false, false), Triple(0L, false, false),
+            Triple(1L, false, true), Triple(1L, true, false),
+        )) {
+            val stats = SmtStatsSink()
+            source.componentPlan().search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+                SearchLearnedDbParams(), stats, openHintFlips = allowance).use { planned ->
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+                if (allowance == null || allowance == 0L) assertSame(SearchCandidateHints.None, planned.candidateHints)
+                val caller = if (callerWins) SearchCandidateHints { false }
+                    else SearchCandidateHints.None
+
+                val result = assertIs<SearchResult.Satisfied>(planned.session.solve(3,
+                    SearchSolveParams(maxDecisions = 2), candidateHints = observedCandidateHints(
+                        caller, planned.candidateHints, stats.hintUsage)))
+
+                assertEquals(guided, result.model.valueOf(SearchBoolValue(0)))
+                assertEquals(guided, result.model.valueOf(SearchBoolValue(1)))
+                assertEquals(!guided, result.model.valueOf(SearchBoolValue(2)))
+            }
+            val usage = stats.hintUsage.snapshot()
+            assertEquals(if (guided) 1L else 0L, usage.clauseSelections)
+            if (allowance == null) {
+                assertEquals(1L, usage.noProvider)
+                assertEquals(null, usage.rawClausesMax)
+                assertEquals(null, usage.rawLedgerDebits)
+            } else {
+                assertEquals(2L, usage.rawClausesMax)
+                assertTrue(kotlin.test.assertNotNull(usage.rawLedgerDebits) > 0)
+            }
+            if (allowance == 0L) assertEquals(0L, usage.componentSelections)
+            if (callerWins) {
+                assertTrue(usage.callerSelections > 0)
+                assertEquals(0L, usage.componentSelections)
+            }
+        }
+    }
+
+    @Test
+    fun `an earlier nested signed source gate reuses partial real point preferences`() {
+        for (positive in listOf(false, true)) {
+            val target = Lit.make(0, positive)
+            val inner = Lit.make(1, false)
+            val left = Lit.make(2, true)
+            val right = Lit.make(3, false)
+            val last = Lit.make(4, true)
+            val source = Problem(
+                numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                    ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                    ReifiedRealLinear(3, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                    ReifiedRealLinear(4, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                    Clause(intArrayOf(Lit.negate(inner), left)),
+                    Clause(intArrayOf(Lit.negate(inner), right)),
+                    Clause(intArrayOf(inner, Lit.negate(left), Lit.negate(right))),
+                    Clause(intArrayOf(Lit.negate(target), inner)),
+                    Clause(intArrayOf(Lit.negate(target), last)),
+                    Clause(intArrayOf(target, Lit.negate(inner), Lit.negate(last))),
+                ),
+            )
+            val stats = SmtStatsSink()
+            source.componentPlan().search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+                SearchLearnedDbParams(), stats, openHintFlips = 1L).use { planned ->
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+                assertEquals(positive, planned.candidateHints.preferredBool(0))
+
+                val result = assertIs<SearchResult.Satisfied>(planned.session.solve(5,
+                    SearchSolveParams(maxDecisions = 1), candidateHints = observedCandidateHints(
+                        SearchCandidateHints.None, planned.candidateHints, stats.hintUsage)))
+
+                assertEquals(positive, result.model.valueOf(SearchBoolValue(0)))
+                assertEquals(BigFraction.ZERO, result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
+            }
+            assertEquals(1L, stats.hintUsage.snapshot().indexesAdmitted)
+            assertEquals(1L, stats.hintUsage.snapshot().componentConsultations)
+            assertEquals(1L, stats.hintUsage.snapshot().componentSelections)
+            assertEquals(0L, stats.hintUsage.snapshot().primitiveSelections)
+            assertEquals(1L, stats.hintUsage.snapshot().gateSelections)
+        }
+    }
+
     @Test
     fun `partial factory construction releases earlier peers and scratch resources`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())

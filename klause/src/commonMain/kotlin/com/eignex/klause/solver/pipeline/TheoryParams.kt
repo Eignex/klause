@@ -45,6 +45,12 @@ data class TheoryParams(
      * switch: it runs the producer under an allowance it cannot reach a proposal within, which is what
      * separates the producer's own cost from the proposal's effect.
      *
+     * This existing opt-in also controls built-in linear partial-point guidance. Null skips its row
+     * registration, capture enablement and source index. Zero permits bounded construction observations
+     * but publishes no component preference; a positive value permits those preferences after caller
+     * or deferred hints decline. Construction and arithmetic comparisons retain their existing owners
+     * and limits; this flip ceiling supplies no separate allowance for them.
+     *
      * This is a ceiling on the draw, not an allowance beside [openWorkLimit]: the draw may spend only
      * what that budget has left and what it spends is charged there, so the traversal of a hinted run
      * gets the budget minus the draw.

@@ -142,6 +142,10 @@ observation. The extended value copy can replace usage, and value equality and
 independent-slice merging include it. The first five destructured values remain the
 draw counters. Usage includes the source index, component consultations and optional
 semantic-clause comparisons, independently of the optional Boolean draw allowance.
+Applicability observations record existing early live-point absence, forward
+coordinate coverage and raw primitive callback absence. They describe stages;
+semantic scoring may select after forward coverage is absent. Cached reads and
+owner-masked non-null preferences do not create raw producer-absence observations.
 
 Experimental composition includes `PreparedSourcePlan` and its inspectable component,
 operation and strategy admission contracts, `ComponentPlan`, CP projection planning, shared

@@ -64,6 +64,15 @@ internal fun ComponentPlan.theoryComponentFactory(
             opening.ownComponent(component)
             component.useSolveStop(opening.theorySolveStop)
             opening.smtStats?.let(component::observeWith)
+            if (opening.openHintFlips != null) {
+                component.partialPointHints(opening.cancellation)?.let { (variables, hints) ->
+                    opening.registerCandidateHints(
+                        variables, hints, component::releasePartialPointHints,
+                        component::partialPointHintAvailable, component::partialPointHintBool,
+                        openHintFlips = opening.openHintFlips,
+                    )
+                }
+            }
         })
     }
     return when (theoryPipeline) {

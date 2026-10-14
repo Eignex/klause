@@ -88,7 +88,7 @@ internal class OpenExactNeighborhood(
         if (!source.prepareSource(stop)) return null
         return source.open(maxChecks = params.maxLeaves, cancellation = stop,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
-            smtStats = state.smt, theorySolveStop = stop)
+            smtStats = state.smt, theorySolveStop = stop, openHintFlips = params.openHintFlips)
     }
 
     fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T =

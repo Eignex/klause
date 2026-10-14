@@ -10,9 +10,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.solver.search.SearchCandidateHints
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -21,6 +21,456 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenBooleanCandidateTest {
+
+    @Test
+    fun `construction observations preserve completed prefixes and the exact owner trace`() {
+        for (scenario in 0..3) {
+            var reference: Pair<List<String>, Boolean>? = null
+            for (observed in listOf(false, true)) {
+                var work = 0L
+                val trace = ArrayList<String>()
+                val failure = IllegalStateException("raw debit callback failed")
+                val stop = object : Cancellation {
+                    override fun isCancelled(): Boolean { trace += "poll"; return scenario == 2 && work >= 14 }
+                    override fun workMeter(): WorkMeter = WorkMeter {
+                        trace += "charge:$it"
+                        if (scenario == 3 && it == 5L) throw failure
+                        work += it
+                    }
+                }
+                val clauses = listOf(Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(1, if (scenario == 1) 6 else 4)), Clause(intArrayOf(0, 1)))
+                val usage = if (observed) OpenHintUsageSink() else null
+                var hints: SourceConjunctionHints? = null
+                var threw = false
+
+                try {
+                    hints = SourceConjunctionHints.create(clauses, 3, intArrayOf(1, 2),
+                        SearchCandidateHints { trace += "primitive"; true }, stop,
+                        usage = usage, available = { trace += "live"; true })
+                } catch (actual: IllegalStateException) {
+                    kotlin.test.assertSame(failure, actual)
+                    threw = true
+                }
+                val actual = trace.toList() to (hints != null)
+                if (!observed) reference = actual else assertEquals(reference, actual)
+                assertEquals(scenario == 3, threw)
+                assertTrue("primitive" !in trace && "live" !in trace)
+                if (usage != null) {
+                    val stats = usage.snapshot()
+                    assertEquals(3L, stats.sourceBooleansMax)
+                    assertEquals(3L, stats.sourceClausesMax)
+                    assertEquals(2L, stats.sourcePrimitiveEntriesMax)
+                    when (scenario) {
+                        0 -> {
+                            assertEquals(3L, stats.rawClausesMax)
+                            assertEquals(6L, stats.rawLiteralsMax)
+                            assertEquals(4L, stats.rawIncidencesMax)
+                            assertEquals(3L, stats.rawVariablesMax)
+                            assertEquals(1L, stats.clauseIndexesAdmitted)
+                        }
+                        1 -> {
+                            assertEquals(1L, stats.rawClausesMax)
+                            assertEquals(3L, stats.rawLiteralsMax)
+                            assertEquals(3L, stats.rawIncidencesMax)
+                            assertEquals(2L, stats.rawVariablesMax)
+                            assertEquals(1L, stats.invalidPrimitiveDeclines)
+                        }
+                        2 -> {
+                            assertEquals(0L, stats.rawClausesMax)
+                            assertEquals(1L, stats.rawLiteralsMax)
+                            assertEquals(0L, stats.rawIncidencesMax)
+                            assertEquals(0L, stats.rawVariablesMax)
+                            assertEquals(1L, stats.stoppedIndexes)
+                        }
+                        else -> {
+                            assertEquals(0L, stats.rawClausesMax)
+                            assertEquals(0L, stats.rawLiteralsMax)
+                            assertEquals(0L, stats.rawIncidencesMax)
+                            assertEquals(0L, stats.rawVariablesMax)
+                            assertEquals(5L, stats.rawLedgerDebits)
+                            assertEquals(5L, work)
+                            assertEquals(1L, stats.abortedIndexes)
+                        }
+                    }
+                    if (scenario != 0) assertEquals(0L, stats.clauseIndexesAdmitted)
+                    assertTrue(assertNotNull(stats.rawLedgerDebits) > 0)
+                }
+                hints?.close()
+            }
+        }
+    }
+
+    @Test
+    fun `complete raw clauses steer a declared choice after structural visits expire`() {
+        val clauses = listOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 4))) +
+            List(5000) { Clause(intArrayOf(6, 8, 10)) }
+        var available = true
+        var firstPoint = false
+        val calls = IntArray(6)
+        var work = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        val usage = OpenHintUsageSink()
+        val hints = assertNotNull(SourceConjunctionHints.create(
+            clauses, 6, intArrayOf(1, 2), SearchCandidateHints {
+                calls[it]++
+                if (it == 1) firstPoint else !firstPoint
+            }, stop, usage = usage, available = { available },
+        ))
+        val constructionWork = work
+
+        assertTrue(constructionWork in 1L..SourceConjunctionHints.MAX_INDEX_ENTRIES.toLong())
+        assertContentEquals(IntArray(6), calls)
+        assertEquals(1L, usage.snapshot().visitDeclines)
+        assertEquals(1L, usage.snapshot().clauseIndexesAdmitted)
+        assertEquals(false, hints.preferredBool(0))
+        assertContentEquals(intArrayOf(0, 1, 1, 0, 0, 0), calls)
+        assertTrue(work > constructionWork)
+        firstPoint = true
+        assertEquals(true, hints.preferredBool(0))
+        assertContentEquals(intArrayOf(0, 2, 2, 0, 0, 0), calls)
+        assertEquals(2L, usage.snapshot().clauseSelections)
+        available = false
+        assertNull(hints.preferredBool(0))
+        hints.close()
+        assertNull(hints.preferredBool(0))
+    }
+
+    @Test
+    fun `a declined global profile supplies raw polarity without publishing prefix gates`() {
+        val clauses = listOf(
+            Clause(intArrayOf(1, 2)), Clause(intArrayOf(1, 4)), Clause(intArrayOf(0, 3, 5)),
+        ) + List(5000) { Clause(intArrayOf(6, 8, 10)) }
+        val usage = OpenHintUsageSink()
+        val hints = assertNotNull(SourceConjunctionHints.create(
+            clauses, 6, intArrayOf(1, 2), SearchCandidateHints { false },
+            Cancellation.Never, usage = usage, available = { true },
+        ))
+
+        assertEquals(false, observedCandidateHints(SearchCandidateHints.None, hints, usage).preferredBool(0))
+        assertEquals(1L, usage.snapshot().visitDeclines)
+        assertEquals(1L, usage.snapshot().forwardUncovered)
+        assertEquals(1L, usage.snapshot().clauseSelections)
+        assertEquals(1L, usage.snapshot().componentSelections)
+        assertEquals(0L, usage.snapshot().gateSelections)
+        hints.close()
+    }
+
+    @Test
+    fun `raw clause preferences include the entire late source suffix`() {
+        val clauses = listOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 4))) +
+            List(5000) { Clause(intArrayOf(6, 8, 10)) } +
+            listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 2)))
+        val usage = OpenHintUsageSink()
+        val hints = assertNotNull(SourceConjunctionHints.create(
+            clauses, 6, intArrayOf(1, 2), SearchCandidateHints { it == 2 },
+            Cancellation.Never, usage = usage, available = { true },
+        ))
+
+        assertEquals(true, hints.preferredBool(0))
+        assertEquals(1L, usage.snapshot().visitDeclines)
+        assertEquals(1L, usage.snapshot().clauseSelections)
+        hints.close()
+    }
+
+    @Test
+    fun `a single containing stop withholds the completed raw core and retains its debt`() {
+        val clauses = listOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 4))) +
+            List(5000) { Clause(intArrayOf(6, 8, 10)) }
+        var work = 0L
+        var stoppedOnce = false
+        var calls = 0
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean {
+                if (work < 45000L || stoppedOnce) return false
+                stoppedOnce = true
+                return true
+            }
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        val usage = OpenHintUsageSink()
+
+        val hints = SourceConjunctionHints.create(
+            clauses, 6, intArrayOf(1, 2), SearchCandidateHints { calls++; true },
+            stop, usage = usage, available = { true },
+        )
+
+        assertNull(hints)
+        assertTrue(stoppedOnce)
+        assertTrue(work >= 45000L)
+        assertEquals(0, calls)
+        assertEquals(1L, usage.snapshot().clauseIndexesAdmitted)
+        assertEquals(1L, usage.snapshot().stoppedIndexes)
+        assertEquals(0L, usage.snapshot().indexesAdmitted)
+    }
+
+    @Test
+    fun `a raw source with an invalid late literal exports no prefix preference`() {
+        val clauses = listOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 4)), Clause(intArrayOf(6)))
+        var calls = 0
+        val usage = OpenHintUsageSink()
+
+        val hints = SourceConjunctionHints.create(
+            clauses, 3, intArrayOf(1, 2), SearchCandidateHints { calls++; true },
+            Cancellation.Never, usage = usage, available = { true },
+        )
+
+        assertNull(hints)
+        assertEquals(0, calls)
+        assertEquals(0L, usage.snapshot().clauseIndexesAdmitted)
+        assertEquals(1L, usage.snapshot().invalidPrimitiveDeclines)
+    }
+
+    @Test
+    fun `hint observations distinguish unavailable points uncovered variables and producer declines`() {
+        var available = false
+        var calls = 0
+        val usage = OpenHintUsageSink()
+        val hints = assertNotNull(SourceConjunctionHints.create(
+            emptyList(), 2, intArrayOf(0), SearchCandidateHints { calls++; null },
+            Cancellation.Never, usage = usage, available = { available },
+        ))
+
+        assertNull(hints.preferredBool(0))
+        assertEquals(0, calls)
+        available = true
+        assertNull(hints.preferredBool(1))
+        assertEquals(0, calls)
+        assertNull(hints.preferredBool(0))
+
+        assertEquals(1, calls)
+        assertEquals(1L, usage.snapshot().earlyPointUnavailable)
+        assertEquals(1L, usage.snapshot().forwardUncovered)
+        assertEquals(1L, usage.snapshot().primitiveProviderNone)
+        hints.close()
+    }
+
+    @Test
+    fun `an uncovered forward variable can select semantically while producer declines are memoized`() {
+        for (value in listOf(false, null)) {
+            var calls = 0
+            val usage = OpenHintUsageSink()
+            val hints = assertNotNull(SourceConjunctionHints.create(
+                listOf(Clause(intArrayOf(0, 2))), 2, intArrayOf(0),
+                SearchCandidateHints { calls++; value }, Cancellation.Never,
+                usage = usage, available = { true },
+            ))
+
+            val preferred = hints.preferredBool(1)
+
+            assertEquals(if (value == null) null else true, preferred)
+            assertEquals(1, calls)
+            assertEquals(1L, usage.snapshot().forwardUncovered)
+            assertEquals(if (value == null) 1L else 0L, usage.snapshot().primitiveProviderNone)
+            assertEquals(1L, usage.snapshot().clauseConsultations)
+            assertEquals(if (value == null) 0L else 1L, usage.snapshot().clauseSelections)
+            hints.close()
+        }
+    }
+
+    @Test
+    fun `hint observations preserve preferences callback order and charged work`() {
+        for (scenario in 0..3) {
+            var reference: Triple<Boolean?, List<String>, Long>? = null
+            for (observed in listOf(false, true)) {
+                var stopped = false
+                var work = 0L
+                val trace = ArrayList<String>()
+                val stop = object : Cancellation {
+                    override fun isCancelled(): Boolean { trace += "stop"; return stopped }
+                    override fun workMeter(): WorkMeter = WorkMeter { trace += "charge:$it"; work += it }
+                }
+                val usage = if (observed) OpenHintUsageSink() else null
+                val hints = assertNotNull(SourceConjunctionHints.create(
+                    emptyList(), 2, intArrayOf(0), SearchCandidateHints {
+                        trace += "primitive"
+                        if (scenario == 3) stopped = true
+                        if (scenario == 2) null else false
+                    }, stop, usage = usage, available = { trace += "live"; scenario != 0 },
+                ))
+                trace.clear()
+                work = 0L
+
+                val preferred = hints.preferredBool(if (scenario == 1) 1 else 0)
+                val actual = Triple(preferred, trace.toList(), work)
+
+                if (!observed) reference = actual else assertEquals(reference, actual)
+                assertNull(preferred)
+                assertEquals(if (scenario >= 2) 1 else 0, trace.count { it == "primitive" })
+                if (usage != null) {
+                    assertEquals(if (scenario == 0) 1L else 0L, usage.snapshot().earlyPointUnavailable)
+                    assertEquals(if (scenario == 1) 1L else 0L, usage.snapshot().forwardUncovered)
+                    assertEquals(if (scenario == 2) 1L else 0L, usage.snapshot().primitiveProviderNone)
+                }
+                hints.close()
+            }
+        }
+    }
+
+    @Test
+    fun `structural visit decline retains live primitive leaves without partial gates`() {
+        val width = 22000
+        val target = Lit.make(2, true)
+        val clauses = listOf(
+            Clause(intArrayOf(Lit.negate(target), Lit.make(0, true))),
+            Clause(intArrayOf(Lit.negate(target), Lit.make(1, true))),
+            Clause(intArrayOf(target, Lit.make(0, false), Lit.make(1, false))),
+            Clause(IntArray(width) { Lit.make(it + 3, true) }),
+        )
+        for (interruption in 0..2) {
+            var available = false
+            var stopped = false
+            var calls = 0
+            var value = true
+            val usage = OpenHintUsageSink()
+            val hints = assertNotNull(SourceConjunctionHints.create(
+                clauses, width + 3, intArrayOf(0, 1), SearchCandidateHints {
+                    calls++
+                    if (interruption == 1) available = false
+                    if (interruption == 2) stopped = true
+                    value
+                }, Cancellation { stopped }, usage = usage, available = { available },
+            ))
+
+            assertEquals(1L, usage.snapshot().visitDeclines)
+            assertEquals(0L, usage.snapshot().indexesAdmitted)
+            assertNull(hints.preferredBool(0))
+            assertEquals(0, calls)
+            available = true
+            assertNull(hints.preferredBool(2))
+            assertEquals(0, calls)
+            assertEquals(if (interruption == 0) true else null, hints.preferredBool(0))
+            assertEquals(1, calls)
+            if (interruption == 0) {
+                value = false
+                assertEquals(false, hints.preferredBool(0))
+                available = false
+                assertNull(hints.preferredBool(0))
+            }
+            assertEquals(0L, usage.snapshot().clauseConsultations)
+            hints.close()
+            assertNull(hints.preferredBool(0))
+            assertNull(hints.preferredBool(2))
+        }
+    }
+
+    @Test
+    fun `source limits retain primitive fallback independently of legacy gate admission`() {
+        val primitiveCount = SourceConjunctionHints.MAX_INDEX_ENTRIES / 2
+        val clauses = ArrayList<Clause>()
+        for (right in 1..primitiveCount + 1) {
+            clauses += Clause(intArrayOf(0, Lit.make(right, true)))
+        }
+        for (live in listOf<(() -> Boolean)?>(null, { true })) {
+            var calls = 0
+            val usage = OpenHintUsageSink()
+            val hints = SourceConjunctionHints.create(
+                clauses, primitiveCount + 2, IntArray(primitiveCount) { it },
+                SearchCandidateHints { calls++; false }, Cancellation.Never,
+                usage = usage, available = live,
+            )
+
+            if (live == null) {
+                assertNull(hints)
+                assertEquals(1L, usage.snapshot().storageDeclines)
+                assertEquals(0, calls)
+            } else {
+                val retained = assertNotNull(hints)
+                assertEquals(false, retained.preferredBool(0))
+                assertNull(retained.preferredBool(primitiveCount + 1))
+                assertEquals(1L, usage.snapshot().visitDeclines)
+                assertEquals(1, calls)
+                retained.close()
+            }
+            assertEquals(0L, usage.snapshot().indexesAdmitted)
+        }
+    }
+
+    @Test
+    fun `primitive fallback requires complete validation and an opening hook`() {
+        val width = 22000
+        val clauses = listOf(Clause(IntArray(width) { Lit.make(it, true) }))
+        var calls = 0
+        val primitive = SearchCandidateHints { calls++; true }
+        val invalid = OpenHintUsageSink()
+        val oversized = OpenHintUsageSink()
+        val stopped = OpenHintUsageSink()
+        val legacy = OpenHintUsageSink()
+
+        assertNull(SourceConjunctionHints.create(clauses, width, intArrayOf(0, width), primitive,
+            Cancellation.Never, usage = invalid, available = { true }))
+        assertNull(SourceConjunctionHints.create(clauses, width,
+            IntArray(SourceConjunctionHints.MAX_INDEX_ENTRIES + 1), primitive,
+            Cancellation.Never, usage = oversized, available = { true }))
+        assertNull(SourceConjunctionHints.create(clauses, width, intArrayOf(0), primitive,
+            Cancellation { true }, usage = stopped, available = { true }))
+        assertNull(SourceConjunctionHints.create(clauses, width, intArrayOf(0), primitive,
+            Cancellation.Never, usage = legacy))
+
+        assertEquals(0, calls)
+        assertEquals(1L, invalid.snapshot().invalidPrimitiveDeclines)
+        assertEquals(1L, oversized.snapshot().sourceLimitDeclines)
+        assertEquals(1L, stopped.snapshot().stoppedIndexes)
+        assertEquals(1L, legacy.snapshot().visitDeclines)
+    }
+
+    @Test
+    fun `raw construction retains spent indexing work and yields to a containing stop`() {
+        val width = 22000
+        val clauses = listOf(Clause(IntArray(width) { Lit.make(it, true) }))
+        var work = 0L
+        var limit = Long.MAX_VALUE
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= limit
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        var calls = 0
+        val primitive = SearchCandidateHints { calls++; true }
+        val baseline = assertNotNull(SourceConjunctionHints.create(
+            clauses, width, intArrayOf(0), primitive, stop, available = { false },
+        ))
+        val spent = work
+        baseline.close()
+        work = 0
+        limit = spent - 1
+        val usage = OpenHintUsageSink()
+
+        assertNull(SourceConjunctionHints.create(clauses, width, intArrayOf(0), primitive, stop,
+            usage = usage, available = { false }))
+
+        assertTrue(work >= limit)
+        assertTrue(work <= spent)
+        assertEquals(0, calls)
+        assertEquals(1L, usage.snapshot().stoppedIndexes)
+        assertEquals(0L, usage.snapshot().indexesAdmitted)
+        assertEquals(0L, usage.snapshot().rawClausesMax)
+        assertTrue(assertNotNull(usage.snapshot().rawLiteralsMax) in 1 until width.toLong())
+        assertTrue(assertNotNull(usage.snapshot().rawIncidencesMax) <= assertNotNull(usage.snapshot().rawLiteralsMax))
+        assertEquals(usage.snapshot().rawIncidencesMax, usage.snapshot().rawVariablesMax)
+        assertTrue(assertNotNull(usage.snapshot().rawLedgerDebits) > 0)
+    }
+
+    @Test
+    fun `an ordered wide conjunction retains every leaf within the recognition allowance`() {
+        val width = 4096
+        val target = Lit.make(width, true)
+        val clauses = ArrayList<Clause>()
+        for (input in 0 until width) clauses += Clause(intArrayOf(Lit.negate(target), Lit.make(input, true)))
+        clauses += Clause(intArrayOf(target, *IntArray(width) { Lit.make(it, false) }))
+        var falseLeaf = -1
+        val hints = assertNotNull(SourceConjunctionHints.create(
+            clauses, width + 1, IntArray(width) { it },
+            SearchCandidateHints { it != falseLeaf }, Cancellation.Never,
+        ))
+
+        assertEquals(true, hints.preferredBool(width))
+        falseLeaf = width - 1
+        assertEquals(false, hints.preferredBool(width))
+        hints.close()
+    }
 
     @Test
     fun `a wide unrelated clause preserves recognition of a later complete gate`() {

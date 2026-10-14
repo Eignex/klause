@@ -65,6 +65,243 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `integer only sources retain traversal without optional real point hint work`() {
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val model = Problem(
+            numBoolVars = 1, intBounds = openBounds(),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            assertNull(component.partialPointHints(stop))
+            assertEquals(0L, charged)
+        }
+    }
+
+    @Test
+    fun `completed partial points prefer the original comparison polarity`() {
+        for (op in LinearOp.entries) for (strict in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                    object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0) {
+                        override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                            LinearRow.ofColumns(intArrayOf(), intArrayOf(0),
+                                RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0)),
+                                    0.0, strict), op, activator = 0),
+                        ))
+                    },
+                ),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val expected = when (op) {
+                    LinearOp.LE, LinearOp.GE -> !strict
+                    LinearOp.EQ -> true
+                    LinearOp.NE -> false
+                }
+
+                assertEquals(expected, hints.preferredBool(0))
+                assertIs<ComponentCheck.Indeterminate>(component.check(session))
+                assertNull(session.boolValue(0))
+                val result = assertIs<SearchResult.Satisfied>(session.solve(1, candidateHints = hints))
+                val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+                assertEquals(expected, witness.boolValue(0))
+                assertEquals(BigFraction.ZERO, witness.reals.single())
+            }
+        }
+    }
+
+    @Test
+    fun `partial point hints read source coordinates before auxiliary columns`() {
+        val model = Problem(
+            numBoolVars = 1, intBounds = openBounds(0), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 2.0), realUpper = doubleArrayOf(1.0, 2.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.EQ, 5.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, 2.0), LinearOp.GE, 6.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertEquals(false, hints.preferredBool(0))
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1, candidateHints = hints))
+            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            assertEquals(listOf(BigFraction.ONE, BigFraction.ofLong(2)), witness.reals)
+        }
+    }
+
+    @Test
+    fun `point hints require Boolean terms and follow their source scope`() {
+        for (positive in listOf(false, true)) {
+            val declaration = object : Factor by ReifiedRealLinear(
+                1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
+            ) {
+                override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                    TaggedLinearRow(
+                        intArrayOf(Term.ofLit(Lit.make(0, positive)), Term.ofRealVar(0)),
+                        RealConstants(RealConsts(doubleArrayOf(1.0)), RealConsts(doubleArrayOf(1.0)), 1.0, false),
+                        LinearOp.GE, activator = 1,
+                    ),
+                ))
+            }
+            val model = Problem(
+                numBoolVars = 3, intBounds = openBounds(0), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(declaration, Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertNull(hints.preferredBool(1))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+                assertEquals(!positive, hints.preferredBool(1))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+                assertEquals(!positive, hints.preferredBool(1))
+
+                session.popTo(0)
+
+                assertNull(hints.preferredBool(1))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertEquals(positive, hints.preferredBool(1))
+                component.releasePartialPointHints()
+                assertNull(hints.preferredBool(1))
+            }
+        }
+    }
+
+    @Test
+    fun `interrupted point evaluation spends the existing meter and publishes no hints`() {
+        var halted = false
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = halted
+            override fun workMeter(): WorkMeter = WorkMeter { units ->
+                charged += units
+                if (units >= 4L) halted = true
+            }
+        }
+        val model = Problem(
+            numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(stop)).second
+            component.useSolveStop(stop)
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+
+            assertIs<ComponentResult.Indeterminate>(session.initialize())
+
+            assertTrue(charged > 0L)
+            assertNull(hints.preferredBool(0))
+            assertNull(component.lpMetrics)
+        }
+    }
+
+    @Test
+    fun `contradictory primitive proposals decline their shared activator`() {
+        val model = Problem(
+            numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(hints.preferredBool(0))
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `containing cancellation withholds hints under a separate theory token`() {
+        var cancelled = false
+        val model = Problem(
+            numBoolVars = 1, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            component.useSolveStop(Cancellation.Never)
+            val session = SearchSession(listOf(component), cancellation = Cancellation { cancelled },
+                atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(true, hints.preferredBool(0))
+
+            cancelled = true
+
+            assertNull(hints.preferredBool(0))
+            assertNull(session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `an unresolved member cannot borrow another row preference for its activator`() {
+        val declaration = object : Factor by ReifiedRealLinear(
+            0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0,
+        ) {
+            override val linearForm: LinearForm = LinearForm.Conjunction(listOf(
+                LinearRow.ofColumns(intArrayOf(), intArrayOf(0),
+                    RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0)), 0.0, false),
+                    LinearOp.LE, activator = 0),
+                TaggedLinearRow(
+                    intArrayOf(Term.ofLit(Lit.make(1, true)), Term.ofRealVar(0)),
+                    RealConstants(RealConsts(doubleArrayOf(1.0)), RealConsts(doubleArrayOf(1.0)), 0.0, false),
+                    LinearOp.LE, activator = 0,
+                ),
+            ))
+        }
+        val model = Problem(
+            numBoolVars = 2, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(declaration, Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertNull(hints.preferredBool(0))
+            assertNull(session.boolValue(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertEquals(true, hints.preferredBool(0))
+            session.popTo(0)
+            assertNull(hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertNull(hints.preferredBool(0))
+        }
+    }
+
+    @Test
     fun `partial difference checks and complete source witnesses need no LP owner`() {
         val model = Problem(
             numBoolVars = 2,

@@ -149,6 +149,27 @@ internal class ExactRowForm(
 ) {
     private val ordered = ExactOrderedTerms(terms)
 
+    fun hintComparison(
+        booleanValue: (Int) -> Boolean?,
+        admit: (BigFraction) -> Boolean,
+        preflight: (BigFraction, BigFraction) -> Boolean,
+    ): ExactComparison? {
+        if (!admit(rhs) || terms.values.any { !admit(it) }) return null
+        var bound = rhs
+        for (k in booleanLiterals.indices) {
+            val literal = booleanLiterals[k]
+            val value = booleanValue(Lit.variable(literal)) ?: return null
+            val coefficient = booleanCoefficients[k]
+            if (!admit(coefficient)) return null
+            if (value == Lit.isPositive(literal)) {
+                if (!preflight(bound, coefficient)) return null
+                bound -= coefficient
+                if (!admit(bound)) return null
+            }
+        }
+        return ExactComparison(terms, bound, relation, strict, hasReals, ordered)
+    }
+
     /** The comparison the row states when its activator holds [truth] under [booleanValue]. */
     fun comparison(truth: Boolean, booleanValue: (Int) -> Boolean): ExactComparison {
         var bound = rhs
