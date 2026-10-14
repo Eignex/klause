@@ -175,7 +175,6 @@ internal class CoreGuidedSearch(
             if (core != null) {
                 extendCore()
                 if (core != null) continue
-                publishLowerBound()
             }
             if (token() || deadline.hasPassedNow()) return null
             val incumbent = best
@@ -244,6 +243,15 @@ internal class CoreGuidedSearch(
                     coreEncoded = false
                     coreLiterals = IntArray(selected.size) { Lit.make(selected[it], true) }
                     factors.add(Clause(coreLiterals))
+                    lower += coreWeight
+                    completedCores++
+                    largestCore = maxOf(largestCore, selected.size)
+                    publishLowerBound()
+                    best?.let { sample ->
+                        if (bestValue == lowerBound) {
+                            return finish(MinimizeResult.Optimal(sample, requireNotNull(bestValue).toDouble(), stats))
+                        }
+                    }
                 }
             }
         }
@@ -308,9 +316,6 @@ internal class CoreGuidedSearch(
             }
         }
         if (coreCursor < selected.size) return
-        lower += coreWeight
-        completedCores++
-        largestCore = maxOf(largestCore, selected.size)
         val current = threshold ?: coreWeight
         val maximum = maximumWeight() ?: coreWeight
         threshold = if (current < maximum) current else maximum
