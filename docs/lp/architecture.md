@@ -95,6 +95,9 @@ factor-based scheduling. Admission scans charge the containing work allowance an
 LP effort ledger and poll cancellation.
 The effort ladder's cut ceiling follows admission without restarting reward
 windows or re-probe counters. Unavailable separation uses the bound tier.
+The curated sequential default portfolio supplies an aggressive LP companion for
+ordinary integer linear models; [portfolio admission](../solver/portfolio.md#lp-arm-admission)
+defines its scheduling and overrides. Candidate availability supplies no proof authority.
 Source mapping must discharge each rounding premise and retain inherited parent
 guards before root sharing. Root and node separation keep their existing round,
 depth, pool and work allowances.

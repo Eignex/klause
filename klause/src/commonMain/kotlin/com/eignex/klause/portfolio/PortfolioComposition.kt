@@ -392,7 +392,27 @@ internal object PortfolioComposition {
         if (alns) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
         // Appending retains the incumbent cores and every existing worker's seed position.
         continuousLpArm(scenario, facts, arms)?.let { arms += it }
+        integerLinearLpArm(scenario, facts, arms)?.let { arms += it }
         return arms
+    }
+
+    private fun integerLinearLpArm(
+        scenario: PortfolioScenario,
+        facts: ProblemFacts,
+        arms: List<WorkerConfig>,
+    ): BacktrackWorkerConfig? {
+        if (!facts.integerLinear || facts.continuousObjective || scenario.cores != 1 ||
+            scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
+            scenario.lsPool != null || scenario.btPool != null || scenario.btEdit != null ||
+            scenario.annotationArm != null || arms.lastOrNull()?.label == "lp-default" ||
+            arms.any { it.label == "lp-aggressive" }
+        ) return null
+        val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-aggressive" }
+            ?: return null
+        return BacktrackWorkerConfig(
+            recipe.capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+            scenario.zeroObjectivePricing,
+        )
     }
 
     private fun finiteDescentArms(

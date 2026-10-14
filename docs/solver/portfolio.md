@@ -307,6 +307,17 @@ lanes retain their selected recipes.
 
 ### LP arm admission
 
+A curated sequential mixed finite optimization pool with at least six configured
+slots appends an applicable aggressive LP companion for models composed entirely
+of ordinary integer linear rows and an objective over integer coordinates. Existing worker positions
+and seeds remain stable. Size and technique ceilings control applicability; assembled
+column integrality and source mapping control cut work. The companion also runs
+under a cuts-off ceiling, allowing separation to vary without removing its bound
+search. Explicit pools, annotations, backtrack edits and parallel or single-engine
+execution keep their requested composition. Containing time/work allowances and
+LP governors remain unchanged. See [ordinary tableau admission](../lp/architecture.md).
+An existing auxiliary default LP arm retains its admission and staging.
+
 Continuous-column optimization models rank the default LP backtrack arm after the SAT
 guard and conflict-driven core. A curated sequential mixed optimization pool with at
 least six configured slots appends an applicable default LP arm when its configured
