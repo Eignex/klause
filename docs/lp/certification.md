@@ -92,7 +92,7 @@ Node-deduction phase outcomes distinguish completed integer, rounded, reconstruc
 and objective-integrality checks from missing endpoints, scalar width, resource
 limits and cancellation. They time existing attempts without additional numerical
 queries; their counts do not add to certifier invocation or work totals.
-Primary, secondary and tertiary fixing phases record elapsed time and actual
+Distinct primary, secondary and tertiary fixing phase keys record elapsed time and actual
 domain reductions as steps, with separate conflict/unchanged/failure outcomes.
 These diagnostic counts do not change the certificate or its admission.
 The combined node bound retains a downward projection of a complete rational
