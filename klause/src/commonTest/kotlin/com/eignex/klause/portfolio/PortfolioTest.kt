@@ -2467,29 +2467,50 @@ class PortfolioTest {
     }
 
     @Test
-    fun `an unproductive incumbent probe preserves retained worker choices`() {
+    fun `unproductive auxiliary work does not update retained arm bandit evidence`() {
         for (seed in 0L..3L) {
-            val retained = ArrayList<List<Int>>()
-            for (auxiliary in listOf(false, true)) {
-                val reached = ArrayList<Int>()
-                val workers = mutableListOf(
-                    trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
-                    trackingWorker("idle", 1, ScriptedSearch({ false }) { reached += 1 }).also {
-                        it.family = ArmFamily.LocalSearch
-                    },
-                )
-                if (auxiliary) workers += trackingWorker("probe", 2, ScriptedSearch({ false }) { reached += 2 })
-
-                Portfolio.thompson(workers, seed = seed, reseedStaleThreshold = 0).use {
-                    if (auxiliary) it.incumbentProbeArms = setOf(2)
-                    it.minimize(Cancellation { reached.count { arm -> arm < 2 } >= 30 })
-                }
-
-                retained += reached.filter { it < 2 }
+            val reached = ArrayList<Int>()
+            val updates = ArrayList<Int>()
+            val workers = listOf(
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+                trackingWorker("idle", 1, ScriptedSearch({ false }) { reached += 1 }).also {
+                    it.family = ArmFamily.LocalSearch
+                },
+                trackingWorker("probe", 2, ScriptedSearch({ false }) { reached += 2 }),
+            )
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = 3
+                override val random = Random(seed)
+                override fun choose() = 0
+                override fun update(armIndex: Int, value: Double, weight: Double) { updates += armIndex }
+                override fun reset() = Unit
             }
 
-            assertEquals(retained[0], retained[1])
+            Portfolio(workers, bandit, reseedStaleThreshold = 0).use {
+                it.incumbentProbeArms = setOf(2)
+                it.minimize(Cancellation { reached.count { arm -> arm < 2 } >= 30 })
+            }
+
+            assertEquals(reached.filter { it < 2 }, updates)
         }
+    }
+
+    @Test
+    fun `auxiliary trial permits heuristic family work before completing`() {
+        val reached = ArrayList<Int>()
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }).also {
+                it.family = ArmFamily.LocalSearch
+            },
+            trackingWorker("probe", 1, ScriptedSearch({ false }) { reached += 1 }),
+        )
+
+        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+            it.incumbentProbeArms = setOf(1)
+            it.minimize(Cancellation { reached.size >= 30 })
+        }
+
+        assertTrue(reached.subList(2, reached.lastIndexOf(1)).contains(0))
     }
 
     @Test

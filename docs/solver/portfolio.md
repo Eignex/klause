@@ -195,7 +195,9 @@ See [search](search.md#finite-propagation) and [resource allowances](resources.m
 
 An auxiliary incumbent probe retains preparation and a search trial after an incumbent
 arrives. Every initial sibling admission precedes its continuation. The unproductive
-trial uses base slices and preserves the other arms' policy evidence. Search work after
+trial uses base slices within its selected family and preserves the other arms'
+policy evidence. Fresh trial work competes through the ordinary family selector;
+zero-work continuations resume directly. Search work after
 preparation is capped at twelve base work allowances and four base time allowances;
 atomic overspend consumes the trial instead of buying additional fresh segments.
 The separate time cap bounds a handle that reports no charged work. Charged debt
