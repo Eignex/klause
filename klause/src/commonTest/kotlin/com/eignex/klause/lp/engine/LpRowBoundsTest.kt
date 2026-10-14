@@ -10,6 +10,33 @@ import kotlin.test.assertTrue
 
 class LpRowBoundsTest {
     @Test
+    fun `integral only rows do not exhaust the mixed projection allowance`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val integralRows = 1024
+        val columns = List(32) { column ->
+            List(integralRows) { row -> ExactLpEntry(row, one) } +
+                if (column == 0) listOf(ExactLpEntry(integralRows, one)) else emptyList()
+        } + listOf(listOf(ExactLpEntry(integralRows, one)))
+        val source = ExactLpModel(
+            columns,
+            List(integralRows) { ExactLpNumber.of(32L) } + one,
+            List(32) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) } +
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero),
+                    ExactLpSide(ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(0.25))))), integral = false) +
+                List(integralRows) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) } +
+                ExactLpColumn(ExactLpBounds(upper = ExactLpSide(zero))),
+            List(integralRows + 1) { ExactLpRow() }, ExactLpObjective(List(33 + integralRows + 1) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+
+        val bound = mixedRowBounds(model).single()
+
+        assertEquals(0, bound.column)
+        assertEquals(1L, bound.integerBound())
+    }
+
+    @Test
     fun `row projections retain independent bounds across integral coordinates`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 5L)

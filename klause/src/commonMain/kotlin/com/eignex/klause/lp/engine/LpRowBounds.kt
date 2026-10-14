@@ -52,14 +52,21 @@ internal fun mixedRowBounds(
             val selected = affectedColumns?.let { affectedRowMask(state, it, meter) }
             for (column in 0 until model.n) {
                 meter.step()
+                if (state.model.column(column).integral) continue
                 for (entry in state.model.columnEntries(column)) {
                     meter.step()
-                    if (entry.number.value.isZero || selected?.get(entry.row) == false) continue
+                    if (!entry.number.value.isZero && selected?.get(entry.row) != false) mixed[entry.row] = true
+                }
+            }
+            for (column in 0 until model.n) {
+                meter.step()
+                for (entry in state.model.columnEntries(column)) {
+                    meter.step()
+                    if (entry.number.value.isZero || !mixed[entry.row]) continue
                     meter.reserve(64L)
                     val integer = entry.number.exactLong()
                     val coefficient = if (integer == null) meter.read(entry.number.value) else entry.number.value
                     rows[entry.row].add(LpRowBoundTerm(column, coefficient, integer))
-                    if (!state.model.column(column).integral) mixed[entry.row] = true
                 }
             }
             for (row in rows.indices) {
