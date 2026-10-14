@@ -285,7 +285,9 @@ when every objective term is Boolean and the model has no continuous columns.
 Explicit backtrack pools keep their requested recipes; `core-guided` selects
 this objective-only mechanism directly. The worker retains the active
 assumption traversal across slices, closes it before changing the encoding, and keeps
-all source constraints and caller assumptions in every round. Auxiliary selector
+all source constraints and caller assumptions in every round. Rebuilt private models
+select fresh descriptors through the source invocation's [projection providers](../model.md#engine-projections-and-factor-capabilities);
+built-in providers keep their direct construction path. Auxiliary selector
 clauses and core thresholds remain private; their learned clauses never enter shared
 source clause channels.
 

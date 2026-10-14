@@ -14,6 +14,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -271,9 +272,15 @@ internal class CoreGuidedSearch(
             intDomains = base.rootIntDomains(),
             factors = factors,
             modelBounds = base.intBounds,
-        ).bake(token)
+        )
+        val providers = base.projectionProviders
+        val baked = if (providers == null || providers == FactorProjectionProviders.Default) {
+            problem.bake(token)
+        } else {
+            problem.bake(providers, token)
+        }
         return try {
-            BacktrackSolver(problem).resumableSolve(
+            BacktrackSolver(baked).resumableSolve(
                 params.copy(
                 assumptions = params.assumptions.mergedWith(softPins),
                 cancellation = token,
