@@ -90,7 +90,8 @@ internal object SourceAgreementProfile {
             File(System.getProperty("java.home"), "bin/java").path,
             "-Xmx3g", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
             "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector",
-            "-XX:StartFlightRecording=filename=${output.resolve("measured-profile.jfr")},settings=profile,dumponexit=true",
+            "-XX:StartFlightRecording=filename=${output.resolve("measured-profile.jfr")}," +
+                "settings=profile,dumponexit=true",
         )
         for (name in listOf("klause.workspace.root", "klause.bench.corpusCache")) {
             System.getProperty(name)?.let { command += "-D$name=$it" }
