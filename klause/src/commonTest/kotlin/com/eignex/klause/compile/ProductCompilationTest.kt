@@ -111,4 +111,44 @@ class ProductCompilationTest {
         }
     }
 
+    @Test
+    fun `source result aliases retain full grading after compilation`() {
+        for ((left, right, result) in listOf(
+            Triple("x", "x", "y"), Triple("x", "y", "x"),
+            Triple("y", "x", "x"), Triple("x", "x", "x"),
+        )) {
+            val models = listOf(
+                parseFlatZinc("var 0..4: x; var 0..4: y; " +
+                    "constraint int_times($left, $right, $result); solve satisfy;").problem,
+                Xcsp3.parse("""<instance><variables><var id="x">0..4</var><var id="y">0..4</var>
+                    </variables><constraints><intension>eq($result,mul($left,$right))</intension>
+                    </constraints></instance>""").problem,
+            )
+            for (problem in models) {
+                val product = problem.factors.filterIsInstance<Product>().single()
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
+                state.assignment.setInt(0, 2)
+                state.assignment.setInt(1, 4)
+                state.recompute()
+                val before = kotlin.math.abs((if (left == "x") 2L else 4L) *
+                    (if (right == "x") 2L else 4L) - (if (result == "x") 2L else 4L))
+                val after = kotlin.math.abs((if (left == "x") 3L else 4L) *
+                    (if (right == "x") 3L else 4L) - (if (result == "x") 3L else 4L))
+                assertEquals(before, state.cost)
+                val predicted = state.netDelta(Move.IntSet(0, 3))
+
+                state.apply(Move.IntSet(0, 3))
+                val committed = state.cost
+                state.recompute()
+
+                assertEquals(after - before, predicted)
+                assertEquals(after, committed)
+                assertEquals(after, state.cost)
+                assertEquals(if (left == "x") 0 else 1, product.a)
+                assertEquals(if (right == "x") 0 else 1, product.b)
+                assertEquals(if (result == "x") 0 else 1, product.result)
+            }
+        }
+    }
+
 }
