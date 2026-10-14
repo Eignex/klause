@@ -29,7 +29,7 @@ internal fun nodeDualCertificate(
     } catch (_: LpProjectionStop) {
         null
     }
-    val rows = if (certificate != null && !model.hasIntegralObjective()) {
+    val rows = if (!model.hasIntegralObjective() && (certificate != null || onAdditionalCertificate != null)) {
         try {
             meter.attempt(observer, "OBJECTIVE_INTEGRAL") { integralObjectiveRows(model, meter) }
         } catch (_: LpProjectionStop) {
@@ -49,7 +49,7 @@ internal fun nodeDualCertificate(
     } else {
         null
     }
-    val objectiveCertificate = if (onAdditionalCertificate != null && certificate != null && rows != null) {
+    val objectiveCertificate = if (onAdditionalCertificate != null && rows != null) {
         try {
             meter.attempt(observer, "OBJECTIVE_EXPRESSION") {
                 objectiveExpressionCertificate(model, rows.single(), meter)
@@ -74,7 +74,7 @@ internal fun nodeDualCertificate(
             primary
         }
     } else {
-        primary
+        primary ?: objectiveCertificate
     }
     val additional = if (accepted === objectiveCertificate) primary else objectiveCertificate
     observer?.observe(LpCertifier.INTEGER, accepted != null, LpCertifierCost.Metered(meter.work))
