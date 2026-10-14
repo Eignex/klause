@@ -34,6 +34,26 @@ application {
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
 }
 
+val checkNativeVmMetadata = tasks.register<Exec>("checkNativeVmMetadata") {
+    group = "verification"
+    description = "Test native VM metadata read boundaries."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_read_native_vm_metadata.py")
+    inputs.files("tools/read_native_vm_metadata.py", "tools/test_read_native_vm_metadata.py",
+        "tools/native_vm_loaded_module.py")
+}
+
+val checkNativeVmLoadedModule = tasks.register<Exec>("checkNativeVmLoadedModule") {
+    group = "verification"
+    description = "Test compiler-free loaded module identity and read bounds."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_native_vm_loaded_module.py")
+    inputs.files("tools/read_native_vm_metadata.py", "tools/native_vm_loaded_module.py",
+        "tools/test_native_vm_loaded_module.py")
+}
+
+tasks.named("check") { dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule) }
+
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
     from("tools") {
