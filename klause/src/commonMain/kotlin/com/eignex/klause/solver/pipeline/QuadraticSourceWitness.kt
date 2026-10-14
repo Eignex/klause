@@ -70,7 +70,10 @@ private fun checkQuadraticIrWitness(
         return SourceEvidenceCheck.Rejected("quadratic finite source integer is outside its declared range")
     }
     val discrete = Sample(point.bools, point.ints)
-    when (val checked = composedFixpoint(model.finite.bake(cancellation), Candidate(discrete, Unit), cancellation)) {
+    val finite = plan.finiteFactorProjections?.let { model.finite.bake(it, cancellation) }
+        ?: model.finite.bake(cancellation)
+    when (val checked = composedFixpoint(finite, Candidate(discrete, Unit), cancellation,
+        enforcingPeers = model.finiteEnforcingFactors)) {
         is Verification.Rejected -> return SourceEvidenceCheck.Rejected(checked.reason)
         is Verification.Indeterminate -> return SourceEvidenceCheck.Unavailable(checked.reason)
         is Verification.Accepted -> Unit

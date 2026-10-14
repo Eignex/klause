@@ -18,9 +18,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -47,6 +47,7 @@ internal class PolynomialWorkerAdapter(
     private val finite: BakedProblem = binding.preparedPlan.finiteFactorProjections?.let { selected ->
         model.finite.bake(selected.forEngineView(model.finite), this.cancellation)
     } ?: model.finite.bake(this.cancellation)
+    private val enforcingFactors = model.finiteEnforcingFactors
     private val fixed = if (params.assumptions.isEmpty) finite.fixedDiscreteSample() else {
         finite.conditionedRoot(params.assumptions, this.cancellation).fixedDiscreteSample()
     }
@@ -84,7 +85,7 @@ internal class PolynomialWorkerAdapter(
                         value
                     },
                 ))
-            }
+            }.also { it.useFiniteEnforcement(model.finite, enforcingFactors) }
         },
     )
 
@@ -95,7 +96,8 @@ internal class PolynomialWorkerAdapter(
     private var refutedCondition: PolynomialCondition? = null
 
     private val completion = CandidateCompletion { candidate, stop ->
-        when (composedFixpoint(finite, Candidate(candidate, Unit), cancellation or stop, params.assumptions)) {
+        when (composedFixpoint(finite, Candidate(candidate, Unit), cancellation or stop, params.assumptions,
+            enforcingPeers = enforcingFactors)) {
             is Verification.Rejected -> return@CandidateCompletion Completion.Refuted(work = 1)
             is Verification.Indeterminate -> return@CandidateCompletion Completion.Undecided(work = 1)
             is Verification.Accepted -> Unit

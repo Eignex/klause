@@ -36,7 +36,8 @@ internal class PolynomialExactNeighborhood(
         if (condition.cutoff != null && objectiveValue != null && objectiveValue >= condition.cutoff) {
             return ExactNeighborhoodResult.Refuted
         }
-        when (composedFixpoint(finite, Candidate(fixed, Unit), cancellation, assumptions)) {
+        when (composedFixpoint(finite, Candidate(fixed, Unit), cancellation, assumptions,
+            enforcingPeers = model.finiteEnforcingFactors)) {
             is Verification.Rejected -> return ExactNeighborhoodResult.Refuted
             is Verification.Indeterminate -> return ExactNeighborhoodResult.Undecided
             is Verification.Accepted -> Unit

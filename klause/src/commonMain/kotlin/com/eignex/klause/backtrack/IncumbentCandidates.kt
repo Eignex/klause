@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.SelectedProjectionChecks
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
@@ -195,6 +196,16 @@ internal fun <V> composedFixpoint(
     cancellation: Cancellation,
     assumptions: Assumptions = Assumptions.None,
     onWork: (Long) -> Unit = {},
+): Verification<Sample, V> = composedFixpoint(problem, candidate, cancellation, assumptions,
+    enforcingPeers = emptySet(), onWork = onWork)
+
+internal fun <V> composedFixpoint(
+    problem: Problem,
+    candidate: Candidate<Sample, V>,
+    cancellation: Cancellation,
+    assumptions: Assumptions = Assumptions.None,
+    enforcingPeers: Set<Int>,
+    onWork: (Long) -> Unit = {},
 ): Verification<Sample, V> {
     val sample = candidate.assignment
     val session = PropagationSession(problem, cancellation)
@@ -219,7 +230,11 @@ internal fun <V> composedFixpoint(
         // Sticky across every fixpoint above: a cut one leaves the state under-propagated, so a
         // surviving assignment proves nothing.
         if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
-        return when (session.checkSelectedProjection()) {
+        val checks = session.projection.selection?.let { selection ->
+            if (enforcingPeers.isEmpty()) selection.originalChecks
+            else SelectedProjectionChecks(selection, enforcingPeers)
+        }
+        return when (session.checkSelectedProjection(checks = checks)) {
             ComponentCheck.Feasible -> Verification.Accepted(candidate)
             is ComponentCheck.Infeasible -> Verification.Rejected("original source check refutes the assignment")
             ComponentCheck.Indeterminate ->

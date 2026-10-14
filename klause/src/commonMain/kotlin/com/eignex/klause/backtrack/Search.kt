@@ -33,6 +33,7 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
@@ -219,6 +220,8 @@ internal class CpSatisfactionTraversal(
             lp?.let { components += it.component }
             components += params.componentFactory?.invoke().orEmpty()
             components.forEach(resources::ownComponent)
+            cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
+                .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
             deferredRoot = deferredInitialization && components.any { it is PreparingSearchComponent }
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
                 cancellation = if (deferredRoot) propagationCancellation else params.cancellation,

@@ -26,6 +26,7 @@ import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.theory.BuiltInEncoderProvider

@@ -242,7 +242,11 @@ Polynomial preparation installs required relations and connected, completely enc
 finite relations through the selected encoders into one combined formula. A finite
 relation without a propagator requires a complete encoder; relaxation-only support
 cannot fill that gap. Optional arithmetic participation retains its finite propagator
-and finite coordinate owner. Unrelated finite coordinates receive no polynomial embedding. Integer embeddings and private Boolean-choice
+and finite coordinate owner. Unrelated finite coordinates receive no polynomial embedding or reserved numeric
+slot. Required encoder-only finite relations can select the polynomial route from
+capabilities even without a built-in product factor. A mandatory installed polynomial
+peer can complete source checking for an opaque finite filter; using that finite
+projection alone retains its original checking obligation. Integer embeddings and private Boolean-choice
 auxiliaries retain typed source correspondence and factor attribution. Their defining
 guards are conjoined with the relation; source publication excludes private auxiliaries.
 Generic linear-to-polynomial equivalence belongs to `lowering`. Exact source checks
