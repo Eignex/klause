@@ -286,8 +286,13 @@ reuses existing loop results and ledger state without scans, polls or producer c
 
 Polynomial witness term-sort pricing uses cached linear monomial comparisons within
 the same private native prefix. Changing that estimate changes usable headroom,
-without refunding admission work or renewing the containing ledger. Atomic initial
-getters remain outside a complete allocation or sort precharge; see
+without refunding admission work or renewing the containing ledger. Private completed
+admission payloads can replace repeated coupled getter extraction and sorting, with
+new retention, mapping and consultation charged to the same owner. Only charges for
+actually skipped getters and sorts are omitted; direct or incomplete metadata keeps
+its legacy extraction charges. The mapping is private to one normalized query and
+coupled entry. Atomic initial getters remain outside a complete allocation or sort
+precharge; see
 [polynomial probing](../theories/polynomial-real.md#decision-procedure).
 
 Linear repair completion retains the same native check, decision and work ledgers

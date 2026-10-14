@@ -346,16 +346,26 @@ direction and substituted coefficients decline above the same 4,096-bit admissio
 ceiling as input coefficients.
 A fresh inequality-only coupled entry with no consumed root queries can replace
 the one center with one complete dyadic point derived from source monomials.
-Completed conjunction indices carry the admitted source term counts, so sparse
-payload storage and sorting are charged before extraction. For more than one term,
-the sorting proxy charges the term count times its ceiling binary logarithm times
-one plus the declared coordinate count. Comparisons scan immutable canonical
-monomial arrays; the proxy prices those coordinate visits and term sorting without
-per-comparison coordinate copying or sorting. This pricing leaves more usable work
-inside the same private prefix; spent admission debt is never refunded. It is not
-an exact platform-sort comparison count, wall-time bound or allocation precharge.
-Initial admission and co-occurrence getters still sort atomically without a complete
-sort precharge; cache construction supplies no borrowed prepayment. Effective comparisons choose one
+Completed private source admission retains its already extracted immutable term
+payloads. Completed conjunction indices map them to the same normalized atom and
+exact polynomial identity, with the admitted payload counts. Only the admission
+producer creates this state; constructor and direct coupled calls accept no payload
+lists. Source retention, bounded mapping copies and identity consultations charge
+the same probe owner. The mapping is consumed by one coupled entry and cleared on
+exit or interruption; another query's conditions and fixings prepare fresh payloads.
+Co-occurrence and guide preparation reuse those terms while retaining their traversal
+and arithmetic charges. Specialized line polynomials retain fresh extraction.
+
+Dyadic preparation reuses a matched payload without repeating its getter allocation
+or sorting charges. Missing, inconsistent or direct-call metadata retains the legacy
+extraction and pricing path. For more than one extracted term, the sorting proxy
+charges the term count times its ceiling binary logarithm times one plus the declared
+coordinate count. Comparisons scan immutable canonical monomial arrays. Reuse changes
+usable work inside the same private prefix; it refunds no admission debt and retains
+all actually performed storage, traversal, conversion and source-check work. The
+proxy is not an exact platform-sort comparison count, wall-time bound or allocation
+precharge. Initial admission getters still sort atomically without a complete sort
+precharge; retained payloads supply no borrowed prepayment. Effective comparisons choose one
 positive term and require its exponent weight to dominate every negative term by
 a conservative rational-coefficient and term-count margin. Checked integer updates
 adjust positive power-of-two coordinate scales over at most four construction
