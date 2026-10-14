@@ -372,6 +372,10 @@ private fun finiteEndpointCancellation(
             val cost = meter.read(model.exactCost(slack))
             val sides = model.exactBounds(slack)
             if ((sides.lower == null && proposed < cost) || (sides.upper == null && proposed > cost)) continue
+            if (proposed != cost) {
+                val support = state.activeSide(slack, proposed > cost) ?: continue
+                if (support.witness >= 0L || support.side.premises != null) continue
+            }
             if (attempts++ == 8) return null
             val previous = y[entry.row]
             y[entry.row] = proposed
