@@ -18,7 +18,13 @@ internal class NValueEliminationMoves(
     private val presents: IntArray,
     private val present: (LocalSearchState, Int) -> Boolean,
 ) {
-    fun propose(state: LocalSearchState, factorId: Int, distinct: Int, sink: MoveSink) {
+    fun propose(
+        state: LocalSearchState,
+        factorId: Int,
+        distinct: Int,
+        sink: MoveSink,
+        allowRepairChain: Boolean = true,
+    ) {
         if (distinct < 2) return
         // A searched input can rewrite a maintained coordinate in another value class.
         val network = state.invariants
@@ -72,7 +78,7 @@ internal class NValueEliminationMoves(
                 }
             }
         }
-        completion?.let { completeMove(state, it, sink, distinct - 1) }
+        completion?.let { completeMove(state, it, sink, distinct - 1, allowRepairChain) }
     }
 
     private fun classRepresentatives(state: LocalSearchState): List<Int> {
@@ -185,13 +191,21 @@ internal class NValueEliminationMoves(
         return if (eligible.size == 1) eligible[0] else Move.Compound(eligible)
     }
 
-    private fun completeMove(state: LocalSearchState, move: Move, sink: MoveSink, expectedDistinct: Int) {
+    private fun completeMove(
+        state: LocalSearchState,
+        move: Move,
+        sink: MoveSink,
+        expectedDistinct: Int,
+        allowRepairChain: Boolean,
+    ) {
         val firstParts = if (move is Move.Compound) move.parts else listOf(move)
         if (firstParts.size > MAX_COMPLETED_PARTS || !preservesCount(state, firstParts, expectedDistinct)) return
         if (state.netDelta(move) == -state.cost) {
             sink.addCompound(firstParts)
             return
         }
+        // Repair proposals can be requested while the caller owns a live repair walk.
+        if (!allowRepairChain) return
         val repairs = MoveSink(state.assumptions.withInt(n, state.assignment.intValue(n)))
         repairs.setInvariants(state.invariants)
         repairs.setOwners(state.seeding.ownerInt)
