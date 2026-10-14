@@ -88,7 +88,10 @@ object PortfolioBuilder {
                 is AlnsWorkerConfig -> ArmFamily.Lns
             }
             FinitePortfolioFactory(armId, family) { index, seed, budget ->
-                val bounded = budget?.let(config::withNodeBudget) ?: config
+                val admitted = if (config is CoreGuidedWorkerConfig && deferCore) {
+                    config.withWorkLimit(scenario.sliceWork)
+                } else config
+                val bounded = budget?.let(admitted::withNodeBudget) ?: admitted
                 bounded.materialize(
                     problem, index, armId, seed, scenario.lsLambda, objective, lsObjective,
                     definitionalSweep, onEvent, pools,

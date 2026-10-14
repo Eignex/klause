@@ -38,6 +38,25 @@ import kotlin.test.assertTrue
 
 class CoreGuidedSearchTest {
     @Test
+    fun `core work allowance includes preparation and cannot renew on resume`() {
+        val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(LongArray(1024) { 1L })
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams(), maximumWork = 1L)
+
+        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("unprepared witness") }
+        val charged = search.work
+        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("renewed allowance") }
+
+        val unknown = assertIs<MinimizeResult.Unknown>(stopped)
+        assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
+        assertEquals(stopped, resumed)
+        assertEquals(charged, search.work)
+        assertTrue(charged >= 1L)
+        assertEquals(0.0, search.stats.search.nodes.sum)
+        search.close()
+    }
+
+    @Test
     fun `exhausted preparation slice pauses before decisions and resumes the same objective`() {
         val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(LongArray(1024) { 1L })

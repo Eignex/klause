@@ -87,7 +87,9 @@ Core-guided private encoding and augmented-model baking use the propagation visi
 currency, including work stopped during construction. Preparation does not spend
 solve-wide decisions or moves. The containing core handle settles query overspend
 once and retains fractional charges across rounds; its nested traversal does not
-repay the same debt. See [core search](portfolio.md#boolean-objective-core-search).
+repay the same debt. An automatically deferred single-lane core worker has one base
+slice of cumulative work, independent of later scheduler growth. Explicit core
+selection and parallel slots retain their ordinary allowances. See [core search](portfolio.md#boolean-objective-core-search).
 
 Slice pricing belongs to solver policy: LP work costs one node per 600 units,
 propagation work one per 4000 visits, inprocessing probes one per 12 and subsumption

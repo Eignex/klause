@@ -12,13 +12,13 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 
-internal class CoreGuidedSolver(override val problem: BakedProblem) :
+internal class CoreGuidedSolver(override val problem: BakedProblem, private val maximumWork: Long? = null) :
     Solver<BacktrackParams> by BacktrackSolver(problem),
     ResumableOptimizer<BacktrackParams> {
     override fun session(): Session<BacktrackParams> = StatelessSession(this)
 
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
-        CoreGuidedOptimizer(problem).resumable(objective, params)
+        CoreGuidedSearch(problem, objective, params, maximumWork = maximumWork)
 
     override fun minimize(objective: LinearObjective, params: BacktrackParams): MinimizeResult =
         resumable(objective, params).use { handle ->
