@@ -952,7 +952,7 @@ class Portfolio(
             log.record(arm, work, claim.started.elapsedNow().inWholeMilliseconds, reward, failed)
             if (failed && failure != null && failure !is UnsoundnessException) log.failure(arm, failure, phase)
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
-            if (!claim.probing && !claim.preparationRevisit && (!unproductiveTrial || work > 0L) &&
+            if (!claim.probing && !claim.preparationRevisit && !unproductiveTrial &&
                 !workers[arm].auxiliaryProof
             ) {
                 slice = grow(slice, maxSliceMillis)

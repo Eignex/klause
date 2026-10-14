@@ -2515,7 +2515,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `charged auxiliary continuations advance ordinary family allowances`() {
+    fun `auxiliary continuations preserve ordinary family allowances`() {
         for (charged in listOf(false, true)) {
             val clock = TestTimeSource()
             val allowances = ArrayList<Long>()
@@ -2543,12 +2543,12 @@ class PortfolioTest {
 
             portfolio.use { it.minimize(Cancellation { allowances.size >= 2 }) }
 
-            assertEquals(listOf(7L, if (charged) 21L else 7L), allowances)
+            assertEquals(listOf(7L, 7L), allowances)
         }
     }
 
     @Test
-    fun `auxiliary continuation uses grown allowances clipped to remaining trial work`() {
+    fun `auxiliary continuations reuse the current family allowance`() {
         val allowances = ArrayList<Long>()
         var finderSlices = 0
         val probe = ScriptedSearch({ false }) {}
@@ -2569,7 +2569,7 @@ class PortfolioTest {
             it.minimize(Cancellation { finderSlices >= 2 })
         }
 
-        assertEquals(listOf(7L, 7L, 10L, 15L, 21L, 21L, 3L), allowances)
+        assertEquals(List(12) { 7L }, allowances)
     }
 
     @Test
