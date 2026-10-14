@@ -215,6 +215,7 @@ internal class CoreGuidedSearch(
 
                 is SolveResult.Unsat -> {
                     val assumptions = result.assumptionCore
+                    recordPreparation(querySofts.size.toLong())
                     val selected = if (assumptions == null) {
                         querySofts
                     } else {
@@ -223,6 +224,7 @@ internal class CoreGuidedSearch(
                     }.toIntArray()
                     }
                     if (selected.isEmpty()) return finish(MinimizeResult.Infeasible(stats = stats))
+                    recordPreparation(3L * selected.size)
                     coreWeight = selected.map { requireNotNull(weights[it]) }.reduce { a, b -> if (a < b) a else b }
                     core = selected
                     coreCursor = 0

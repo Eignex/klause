@@ -77,6 +77,8 @@ object PortfolioBuilder {
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
         val configs = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
         val count = maxOf(configs.size, scenario.cores)
+        val deferCore = scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
+            scenario.btPool == null && configs.any { it is BacktrackWorkerConfig }
         val pools = poolsFor(scenario, problem, definitionalSweep, objective,
             clausePeers = (0 until count).count { configs[it % configs.size] is BacktrackWorkerConfig } > 1)
         return configs.mapIndexed { armId, config ->
@@ -92,8 +94,7 @@ object PortfolioBuilder {
                     definitionalSweep, onEvent, pools,
                 ).bindEvidence(ModelIdentity.of(problem, objective)).also {
                     it.improvementOnly = armId >= plan.firstSolutionCount ||
-                        (config is CoreGuidedWorkerConfig && scenario.cores == 1 &&
-                            scenario.engine == EngineMix.MIXED && scenario.btPool == null)
+                        (config is CoreGuidedWorkerConfig && deferCore)
                 }
             }
         }
