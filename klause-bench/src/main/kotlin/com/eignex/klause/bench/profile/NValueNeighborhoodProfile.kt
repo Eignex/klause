@@ -9,6 +9,7 @@ import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.NValue
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
@@ -35,6 +36,7 @@ object NValueNeighborhoodProfile {
     @Serializable
     private data class CompletionObservation(
         val cost: Long, val parts: List<String>, val residuals: Map<String, Int>, val clauses: Map<Int, List<String>>,
+        val elements: Map<Int, List<String>>,
     )
 
     @Serializable
@@ -266,8 +268,60 @@ object NValueNeighborhoodProfile {
         val completion = completionMethod.invoke(helper, move) as Move
         diagnostic.apply(completion)
         val parts = if (completion is Move.Compound) completion.parts else listOf(completion)
-        return CompletionObservation(diagnostic.cost, parts.map { it.toString() }, residuals(diagnostic),
-            clauseDependencies(diagnostic))
+        val cost = diagnostic.cost
+        val residuals = residuals(diagnostic)
+        val clauses = clauseDependencies(diagnostic)
+        val elements = elementDependencies(diagnostic, parts)
+        return CompletionObservation(cost, parts.map { it.toString() }, residuals, clauses, elements)
+    }
+
+    private fun elementDependencies(state: LocalSearchState, parts: List<Move>): Map<Int, List<String>> = buildMap {
+        var pins = state.assumptions
+        for (part in parts) {
+            pins = when (part) {
+                is Move.IntSet -> pins.withInt(part.varId, state.assignment.intValue(part.varId))
+                is Move.BoolFlip -> pins.withBool(part.varId, state.assignment.boolValue(part.varId))
+                else -> pins
+            }
+        }
+        val repairs = MoveSink(pins).also {
+            it.setInvariants(state.invariants)
+            it.setOwners(state.seeding.ownerInt)
+        }
+        val before = state.assignment.snapshot()
+        for (fid in 0 until state.problem.numFactors) {
+            if (size >= 16) break
+            val element = state.problem.factors[fid] as? Element ?: continue
+            if (!state.factors[fid].isViolated(state, fid)) continue
+            val index = state.assignment.intValue(element.idx)
+            val position = index - element.indexOffset
+            val descriptions = arrayListOf(
+                "idx=${element.idx} value=$index domain=${state.rootDomains[element.idx]} " +
+                    "defined=${state.invariants?.isDefinedInt(element.idx) == true}",
+                "result=${element.result} value=${state.assignment.intValue(element.result)} " +
+                    "domain=${state.rootDomains[element.result]} " +
+                    "defined=${state.invariants?.isDefinedInt(element.result) == true}",
+                "offset=${element.indexOffset} size=${element.arr.size} variables=${element.arrIsVars}",
+            )
+            if (position >= 0 && position < element.arr.size) {
+                val cell = element.arr[position.toInt()]
+                descriptions += if (element.arrIsVars) {
+                    val variable = cell.toInt()
+                    "selected=$variable value=${state.assignment.intValue(variable)} " +
+                        "domain=${state.rootDomains[variable]} " +
+                        "defined=${state.invariants?.isDefinedInt(variable) == true}"
+                } else "selectedConstant=$cell"
+            }
+            repairs.clear()
+            repairs.proposer = fid
+            state.factors[fid].proposeRepairMoves(state, fid, repairs)
+            for (repair in repairs.list.take(8)) {
+                state.apply(repair)
+                descriptions += "repair=$repair cost=${state.cost} residuals=${residuals(state)}"
+                restore(state, before)
+            }
+            put(fid, descriptions)
+        }
     }
 
     private fun residuals(state: LocalSearchState): Map<String, Int> = (0 until state.problem.numFactors)

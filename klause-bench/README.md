@@ -233,6 +233,9 @@ ordinary clause repairs while protecting every NValue coordinate and the count. 
 trace does not change the measured state's assignment or random stream. The
 diagnostics also invoke the internal scratch-completion component through its JVM
 constructor ABI on a separate state and record the resulting parts and full residuals.
+For up to 16 remaining Element factors it records the selected cell, coordinate domains
+and definition ownership, then grades up to eight ordinary repairs with the completed
+primitive writes pinned. These repair observations use only the separate diagnostic state.
 An ABI mismatch fails the probe instead of silently skipping that component.
 Proposal generation must leave the incumbent unchanged. Scoring and incumbent acquisition are
 outside proposal timing. This probes the neighborhood at a captured feasible point;
