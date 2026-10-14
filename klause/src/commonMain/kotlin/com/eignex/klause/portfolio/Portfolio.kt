@@ -592,7 +592,6 @@ class Portfolio(
         val whole: Boolean = false,
         val probeCount: Int = 1,
         val preparationRevisit: Boolean = false,
-        val initialProbe: Boolean = false,
     ) {
         /** The work a resumable handle's slice may spend; a negative allowance leaves it to the run's token. */
         val handleNodes: Long get() = if (whole) -1L else sliceWork
@@ -774,19 +773,23 @@ class Portfolio(
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
-            val probing = probe != null ||
-                (improving && arm in incumbentProbeArms && !productive[arm])
+            val probing = probe != null
+            val auxiliary = improving && arm in incumbentProbeArms && !productive[arm]
             val baseAllowance = probing || revisit != null || workers[arm].auxiliaryProof
+            val allowance = if (baseAllowance) baseSliceWork else sliceWork
+            val time = if (baseAllowance) baseSliceMillis else slice
+            val remainingTime = if (handles[arm]?.preparationPending != false) {
+                preparationTimeLimit - trialPreparationTime[arm]
+            } else trialTimeLimit - trialSearchTime[arm]
             busy[arm] = true
             Claim(
                 arm,
                 probing,
-                if (baseAllowance) baseSliceMillis else slice,
-                if (baseAllowance) baseSliceWork else sliceWork,
+                if (auxiliary) minOf(time, remainingTime.inWholeMilliseconds.coerceAtLeast(1L)) else time,
+                if (auxiliary) minOf(allowance, trialWorkLimit - trialSearchWork[arm]) else allowance,
                 whole = dedicated,
                 probeCount = eligible.count { !workers[it].auxiliaryProof }.coerceAtLeast(1),
                 preparationRevisit = revisit != null,
-                initialProbe = probe != null,
             )
         }
 
@@ -949,8 +952,7 @@ class Portfolio(
             log.record(arm, work, claim.started.elapsedNow().inWholeMilliseconds, reward, failed)
             if (failed && failure != null && failure !is UnsoundnessException) log.failure(arm, failure, phase)
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
-            val freshTrialAllocation = unproductiveTrial && !claim.initialProbe && work > 0L
-            if (((!claim.probing && !claim.preparationRevisit) || freshTrialAllocation) &&
+            if (!claim.probing && !claim.preparationRevisit && (!unproductiveTrial || work > 0L) &&
                 !workers[arm].auxiliaryProof
             ) {
                 slice = grow(slice, maxSliceMillis)

@@ -195,7 +195,8 @@ See [search](search.md#finite-propagation) and [resource allowances](resources.m
 
 An auxiliary incumbent probe retains preparation and a search trial after an incumbent
 arrives. Every initial sibling admission precedes its continuation. The unproductive
-trial uses base slices within its selected family and preserves the other arms'
+trial uses its selected family's current allowance, clipped to its remaining work
+and time budget, and preserves the other arms'
 policy evidence. Fresh trial work competes through the ordinary family selector;
 zero-work continuations resume directly. Paid family selections advance the ordinary
 allowance ladder; initial probes and zero-work continuation do not. Search work after
