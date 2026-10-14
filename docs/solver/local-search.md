@@ -310,8 +310,8 @@ model scoring and ordinary source publication checks remain required; NValue
 satisfaction alone establishes neither feasibility nor objective improvement.
 
 At a feasible assignment, the sampled elimination with the least positive whole-model
-cost delta may also use the existing directed repair-chain mechanism to reconcile
-regressed surrounding constraints. At most one completion follows at
+cost delta after move-sink filtering may also use the existing directed repair-chain
+mechanism to reconcile regressed surrounding constraints. At most one completion follows at
 most eight repair steps, protects the changed class and count coordinates, and offers
 only a complete zero-violation proposal with at most 128 primitive parts. Class
 coordinates carry indicators together; arithmetic rows reconcile their combined drift

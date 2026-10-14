@@ -136,7 +136,15 @@ internal class NValueEliminationMoves(
         if (!preservesCount(state, coordinatedParts, expectedDistinct)) return null
         val before = sink.size
         sink.addCompound(coordinatedParts)
-        return move.takeIf { sink.size > before }
+        if (sink.size == before) return null
+        val eligible = coordinatedParts.filter {
+            when (it) {
+                is Move.IntSet -> sink.allowsInt(it.varId)
+                is Move.BoolFlip -> sink.allowsBool(it.varId)
+                else -> true
+            }
+        }
+        return if (eligible.size == 1) eligible[0] else Move.Compound(eligible)
     }
 
     private fun completeMove(state: LocalSearchState, move: Move, sink: MoveSink, expectedDistinct: Int) {

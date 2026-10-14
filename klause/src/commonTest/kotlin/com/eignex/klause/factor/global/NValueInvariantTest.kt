@@ -9,6 +9,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -388,6 +389,87 @@ class NValueInvariantTest {
         assertEquals(1L, state.assignment.intValue(0))
         assertEquals(state.assignment.intValue(1), state.assignment.intValue(2))
         assertTrue(state.assignment.intValue(3) > 0L || state.assignment.intValue(4) > 0L)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `count channels use a free partner when another is foreign owned`() {
+        val p = Problem(
+            0,
+            8,
+            arrayOf(
+                IntDomain(1, 2),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            ),
+            arrayOf<Factor>(
+                NValue(0, intArrayOf(1, 2, 3, 4)),
+                AllDifferent(intArrayOf(5, 7)),
+                Linear(intArrayOf(1, -1, 1), intArrayOf(0, 5, 6), LinearOp.EQ, 0),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        state.seedImplicitFeasible()
+        for ((variable, value) in listOf(0 to 2L, 1 to 0L, 2 to 0L, 3 to 1L, 4 to 1L, 5 to 2L, 6 to 0L, 7 to 0L)) {
+            state.assignment.setInt(variable, value)
+        }
+        state.recompute()
+        state.moveSink.proposer = 0
+        val before = state.assignment.snapshot()
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+        val move = state.moveSink.list.first {
+            it is Move.Compound && Move.IntSet(0, 1) in it.parts && state.netDelta(it) == 0L
+        }
+        assertEquals(before, state.assignment.snapshot())
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(2L, state.assignment.intValue(5))
+        assertEquals(1L, state.assignment.intValue(6))
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `class elimination retains a maintained count indicator`() {
+        val p = Problem(
+            1,
+            3,
+            arrayOf(IntDomain(1, 2), IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf<Factor>(
+                NValue(0, intArrayOf(1, 1, 2, 2)),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        state.invariants = InvariantNetwork(
+            listOf(DefinitionalSweep.SweepNode.CmpReif(0, longArrayOf(1), intArrayOf(0), 1, LinearOp.EQ)),
+            3,
+            1,
+        )
+        for ((variable, value) in listOf(0 to 2L, 1 to 0L, 2 to 1L)) state.assignment.setInt(variable, value)
+        state.assignment.setBool(0, false)
+        state.recompute()
+        val before = state.assignment.snapshot()
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+        val move = state.moveSink.list.first {
+            it is Move.Compound && Move.IntSet(0, 1) in it.parts && state.netDelta(it) == 0L
+        }
+        assertEquals(before, state.assignment.snapshot())
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertTrue(state.assignment.boolValue(0))
         assertEquals(0L, state.cost)
         state.recompute()
         assertEquals(0L, state.cost)
