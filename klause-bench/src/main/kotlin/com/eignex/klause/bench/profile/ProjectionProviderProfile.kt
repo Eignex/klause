@@ -197,7 +197,8 @@ object ProjectionProviderProfile {
                     for (maximize in listOf(false, true)) {
                         val result = BacktrackSolver(baked).minimize(
                             if (maximize) objective.negated() else objective,
-                            params.copy(lpPlan = LpPlan(bounding = true), cancellation = Cancellation.after(30.seconds)),
+                            params.copy(lpPlan = LpPlan(bounding = true),
+                                cancellation = Cancellation.after(30.seconds)),
                         )
                         check(result is MinimizeResult.Optimal) { "optimization did not complete: $result" }
                         add(buildJsonObject {
