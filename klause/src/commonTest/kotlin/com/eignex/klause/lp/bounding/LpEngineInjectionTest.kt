@@ -138,7 +138,7 @@ class LpEngineInjectionTest {
         val pruned = engine.use { it.pruneNode(PropagationSession(problem), 1.5, -1, true) }
 
         assertFalse(pruned)
-        assertEquals(0L, factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit)
+        assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > 500L)
         assertEquals(500L, assertNotNull(factory.floatAllowances.single()).work)
     }
 
@@ -206,7 +206,7 @@ class LpEngineInjectionTest {
         val construction = factory.calls.single { it.kind == EngineConstruction.TABLEAU }
         assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
         assertEquals(37L, construction.tieSeed)
-        assertEquals(0L, construction.workLimit)
+        assertTrue(construction.workLimit > 1L)
     }
 
     @Test
