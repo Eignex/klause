@@ -26,6 +26,10 @@ import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.localsearch.BuiltInScoringProjectionProvider
+import com.eignex.klause.localsearch.NoInvariant
+import com.eignex.klause.localsearch.ScoringProjection
+import com.eignex.klause.localsearch.ScoringProjectionProvider
 import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
@@ -43,6 +47,7 @@ import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.ScoringCapability
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
@@ -134,7 +139,7 @@ class EncoderTest {
     fun `a required polynomial peer enforces an opaque finite filter in the same search`() {
         val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)
         val relation = object : Factor by row { override val linearForm: LinearForm? = null }
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(relation,
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 1)), arrayOf<Factor>(relation,
             RealProduct(0, 0, 1, 1.0, 1.0)), numRealVars = 2,
             realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
         val providers = FactorProjectionProviders(
@@ -142,6 +147,11 @@ class EncoderTest {
                 if (factor !== relation) BuiltInPropagationProjectionProvider.select(factor)
                 else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
                     "The required arithmetic peer supplies whole-relation enforcement.") { NoPropagator }
+            },
+            scoring = ScoringProjectionProvider { factor ->
+                if (factor !== relation) BuiltInScoringProjectionProvider.select(factor)
+                else ScoringProjection(ScoringCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "The required arithmetic completion certifies the zero-score proposal.") { _, _ -> NoInvariant }
             },
             encoder = EncoderProvider { factor, target ->
                 if (factor !== relation || target != EncodingTarget.POLYNOMIAL) {
@@ -155,11 +165,13 @@ class EncoderTest {
         )
         val plan = source.prepareExecutionPlan(providers)
 
-        val result = OpenTheoryPipeline.execute(plan.polynomialRequest(), engine = FiniteEngine.BACKTRACK).result
+        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH)) {
+            val result = OpenTheoryPipeline.execute(plan.polynomialRequest(), engine = engine).result
 
-        assertTrue(plan.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+            assertTrue(plan.capabilities.admission(engine).runnable)
+            assertEquals("1", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(0))
+        }
         assertEquals(listOf(0), plan.polynomialModel!!.finiteFactorIndices)
-        assertEquals("1", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(0))
         val standalone = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(relation))
         assertIs<SolveResult.Unknown>(BacktrackSolver(standalone.bake(providers)).solve())
     }

@@ -518,6 +518,12 @@ and callers must read the post-move degree for scoring. Reified linear invariant
 an internal fused payload-update and exact-degree path. Other invariants update payloads
 and then read their degree, independently of the returned apply value.
 
+A required polynomial candidate completion can certify finite factors with selected
+filtering or inert scoring. It identifies those factors against the retained source
+identities before local search omits a duplicate native point check. The combined
+polynomial formula must accept the unchanged finite point before publication. Other
+completion callbacks and standalone finite scoring retain their original checks.
+
 ## Continuous candidate completion
 
 A finite projection can use `CandidateCompletion` when the source also requires

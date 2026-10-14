@@ -26,6 +26,8 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.FiniteFactorEnforcement
+import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialSearchComponent
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
@@ -95,7 +97,7 @@ internal class PolynomialWorkerAdapter(
 
     private var refutedCondition: PolynomialCondition? = null
 
-    private val completion = CandidateCompletion { candidate, stop ->
+    private val candidateCompletion = CandidateCompletion { candidate, stop ->
         when (composedFixpoint(finite, Candidate(candidate, Unit), cancellation or stop, params.assumptions,
             enforcingPeers = enforcingFactors)) {
             is Verification.Rejected -> return@CandidateCompletion Completion.Refuted(work = 1)
@@ -119,6 +121,12 @@ internal class PolynomialWorkerAdapter(
             }
             is QfNraResult.Unknown -> Completion.Undecided(work = 1)
         }
+    }
+
+    private val finiteEnforcement = FiniteFactorEnforcement(model.finite, enforcingFactors)
+    private val completion = object : CandidateCompletion, FiniteFactorEnforcer by finiteEnforcement {
+        override fun complete(candidate: Sample, cancellation: Cancellation): Completion =
+            candidateCompletion.complete(candidate, cancellation)
     }
 
     private fun localSearch(): LocalSearchSolver = LocalSearchSolver(finite, completion = completion)

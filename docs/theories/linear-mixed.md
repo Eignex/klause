@@ -12,7 +12,9 @@ linear machinery as [linear integer](linear-integer.md) and
 
 ## Scope and boundaries
 
-Every theory-owned factor must have an admitted exact linear form. Integer and
+Every theory-owned factor must have an admitted complete selected linear encoding.
+Compound formulas and scoped real auxiliaries belong to the private projection;
+source publication retains the original declaration counts. Integer and
 real source namespaces stay distinct, including through lowering, reductions and
 witness reconstruction. Open integer ranges remain theory-owned. Finite declarations retain their domain state and choices, including holes. A bounded
 linear factor can participate in both propagation and selected theory encoding.

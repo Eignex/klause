@@ -25,13 +25,20 @@ owns mathematical operations; [search](../solver/search.md) owns finite traversa
 ### Shared model composition
 
 `PreparedSourcePlan` owns the shared source decomposition. Its captured
-`SharedPolynomialModel` installs selected polynomial encoders for continuous factors and retains finite
-factors, retaining original factor indices and integer embeddings for every strategy. Integer columns appearing in the continuous equations receive symbolic
+`SharedPolynomialModel` installs required selected polynomial encoders and connected
+finite encoders, retaining original factor indices and integer embeddings for every
+strategy. An encoder-only finite relation can select this route without a native
+product factor. A finite filter and a complete encoder can participate together;
+required peer checking replaces unavailable duplicate native point checks only in
+that composed invocation. Standalone finite projections keep their own source-check
+obligations. Integer columns appearing in the encoded equations receive symbolic
 real coordinates for conditioned queries; their source finite domains and global
 constraints remain in CP. Exact linear rows, Boolean reification, real bounds and
 integer/real products and `ContinuousProduct` become neutral polynomial formulas through
 the captured encoder provider. Generic equivalent row encoding belongs in `lowering`.
-Typed factor attribution records integer embeddings and private defining auxiliaries. AllDifferent, scheduling
+Typed factor attribution records integer embeddings and private defining auxiliaries.
+Only participating integers allocate numeric slots; unrelated finite variables retain
+finite ownership and receive no reserved numeric coordinate. AllDifferent, scheduling
 and other finite factors remain intact in the finite projection. Linear relaxation
 rows cannot stand in for a factor's semantics. Binary64 constants denote their exact
 binary rational values. Equal finite real bounds remain source equations and are
