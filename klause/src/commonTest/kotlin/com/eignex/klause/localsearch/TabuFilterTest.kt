@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -56,6 +57,48 @@ class TabuFilterTest {
         val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
         val out = filter.filter(state, moves)
         assertEquals(2, out.size, "OrImproving should admit the strictly-improving tabu move; got $out")
+    }
+
+    @Test
+    fun `aspiration admits a feasible objective improvement despite a recent write`() {
+        val state = smallState()
+        state.assignment.setBool(1, true)
+        state.recompute()
+        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(1, 0))
+        val filter = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
+        val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
+
+        val out = filter.filter(state, moves)
+
+        assertEquals(moves, out)
+    }
+
+    @Test
+    fun `objective aspiration rejects moves that break feasibility`() {
+        val state = smallState()
+        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(1, 0))
+        val filter = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
+        val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
+
+        val out = filter.filter(state, moves)
+
+        assertEquals(listOf<Move>(Move.BoolFlip(1)), out)
+    }
+
+    @Test
+    fun `objective aspiration rejects unchanged and worsening objectives`() {
+        for (coefficient in longArrayOf(0, -1)) {
+            val state = smallState()
+            state.assignment.setBool(1, true)
+            state.recompute()
+            state.shaping.objective = LinearObjective(boolWeights = longArrayOf(coefficient, 0))
+            val filter = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
+            val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
+
+            val out = filter.filter(state, moves)
+
+            assertEquals(listOf<Move>(Move.BoolFlip(1)), out)
+        }
     }
 
     @Test
