@@ -18,7 +18,9 @@ import kotlinx.serialization.json.jsonPrimitive
 internal object Xcsp3ReferenceReplay {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 1 && args[0].startsWith("request64="))
+        require(args.size in 1..2 && args[0].startsWith("request64="))
+        require(args.size == 1 || args[1] == "image=current")
+        val image = if (args.size == 1) "klause-xcsp3-cpsat:latest" else "klause-xcsp3-cpsat:source-model-v2"
         val encoded = args[0].substringAfter('=')
         require(encoded.length <= 64 * 1024)
         val request = Base64.getDecoder().decode(encoded)
@@ -42,7 +44,7 @@ internal object Xcsp3ReferenceReplay {
         val name = "xcsp3-reference-replay-${ProcessHandle.current().pid()}"
         val command = listOf("docker", "run", "--rm", "--name", name, "--network", "none", "--memory", "6g",
             "--memory-swap", "6g", "--cpus", "1", "--entrypoint", "python", "-v", "${out.absolutePath}:/out",
-            "klause-xcsp3-cpsat:latest", "/out/diagnose.py", "/out")
+            image, "/out/diagnose.py", "/out")
         out.resolve("command.json").writeText(Reports.json.encodeToString(command))
         val process = ProcessBuilder(command).redirectOutput(out.resolve("stdout"))
             .redirectError(out.resolve("stderr")).start()
