@@ -216,6 +216,38 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 class PortfolioTest {
 
     @Test
+    fun `unspent complete work offers do not admit a supplemental proof service`() {
+        var completeVisits = 0
+        var proofVisits = 0
+        val finder = trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) {}).also {
+            it.family = ArmFamily.LocalSearch
+        }
+        val completeBase = ScriptedSearch({ false }) { completeVisits++ }
+        val complete = object : ResumableSearch by completeBase {
+            override val work: Long get() = if (completeVisits < 2) 0L else completeBase.work
+        }
+        val proofBase = ScriptedSearch({ false }) {
+            assertTrue(completeVisits >= 2)
+            proofVisits++
+        }
+        val proof = object : ResumableSearch by proofBase {
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+            }
+        }
+        val workers = listOf(finder, trackingWorker("complete", 1, complete),
+            trackingWorker("proof", 2, proof).also { it.auxiliaryProof = true; it.improvementOnly = true })
+
+        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+            it.minimize(Cancellation { proofVisits > 0 })
+        }
+
+        assertEquals(1, proofVisits)
+    }
+
+    @Test
     fun `bounded proof preparation preserves ordinary policy choices and work offers`() {
         fun trace(auxiliary: Boolean, auxiliaryFirst: Boolean): List<Pair<Int, Long>> {
             val reached = ArrayList<Pair<Int, Long>>()

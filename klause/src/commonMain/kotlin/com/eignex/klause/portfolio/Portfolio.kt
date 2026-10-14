@@ -660,6 +660,7 @@ class Portfolio(
         // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
         private val armNanos = LongArray(workers.size)
         private val armWork = DoubleArray(workers.size)
+        private val chargedWork = LongArray(workers.size)
         private var totalNanos = 0L
         private var slice = baseSliceMillis
         private var sliceWork = baseSliceWork
@@ -767,7 +768,10 @@ class Portfolio(
 
         private fun eligibleArms(): List<Int> {
             val first = workers.indices.filter { !workers[it].improvementOnly }
-            return if (improving || first.all { retired[it] }) workers.indices.toList() else first
+            val eligible = if (improving || first.all { retired[it] }) workers.indices.toList() else first
+            val complete = first.filter { workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof }
+            val covered = complete.all { retired[it] || chargedWork[it] >= baseSliceWork }
+            return if (covered) eligible else eligible.filter { !workers[it].auxiliaryProof }
         }
 
         // The free arm furthest below its owed share, else the policy's pick among free arms: a family first, so a
@@ -860,6 +864,7 @@ class Portfolio(
         ) {
             val arm = claim.arm
             val account = ledgerFor(arm)
+            chargedWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - chargedWork[arm])
             armWork[arm] += if (work > 0L) work else claim.sliceWork
             if (stats != null) {
                 if (cumulative) {
