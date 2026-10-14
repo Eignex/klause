@@ -35,7 +35,7 @@ class PolynomialStrategyAdaptersTest {
     @Test
     fun `polynomial finite preparation opens the selected source deduction`() {
         val clause = Clause(intArrayOf(0))
-        val source = Problem(1, 0, emptyArray(), arrayOf(clause, RealProduct(0, 0, 0, 1.0, 1.0)),
+        val source = Problem(1, 1, arrayOf(IntDomain(1, 1)), arrayOf(clause, RealProduct(0, 0, 0, 1.0, 1.0)),
             numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
         var opened = 0
         val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
@@ -46,7 +46,7 @@ class PolynomialStrategyAdaptersTest {
                 NoPropagator
             }
         })
-        val request = source.pipelineRequest().copy(preparedPlan = source.prepareExecutionPlan(providers))
+        val request = source.prepareExecutionPlan(providers).polynomialRequest()
 
         val result = OpenTheoryPipeline.execute(request, engine = FiniteEngine.BACKTRACK).result
 
