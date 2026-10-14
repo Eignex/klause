@@ -38,7 +38,10 @@ select execution through the shared pipeline.
 
 ## Tolerance publication
 
-Finite default MPS solves can accept a continuous leaf by source tolerance. Rows use
+Finite default MPS solves can accept a complete continuous candidate by source tolerance.
+Root primal proposals can retain their LP float coordinates when the composed
+source check accepts the full point; rejected proposals retain real-completion
+fallback. These proposals carry the same tolerance witness guarantee. Rows use
 
 ```text
 1e-7 * max(1, abs(bound), sum(abs(a(i) * x(i))))

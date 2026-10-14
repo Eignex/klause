@@ -993,6 +993,7 @@ internal class ResumableMinimize(
             }
             val seed = lpEngine.lpRoundingProbe(objective, rootToken,
                 initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
+                toleranceReals = params.toleranceCheck != null,
                 accept = ::accept)
                 ?: lpEngine.lpFeasibilityPump(objective, rootToken,
                     initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
