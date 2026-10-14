@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.hasFiniteIntegerRanges
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -136,6 +137,18 @@ fun Problem.pipelineRoute(
     routeLinearToTheory,
 )
 
+/** Select the shared source route with per-invocation factor projection providers. */
+fun Problem.pipelineRoute(
+    providers: FactorProjectionProviders,
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
+    routePureRealToTheory: Boolean = false,
+    boundCancellation: Cancellation = Cancellation.Never,
+    routeLinearToTheory: Boolean = false,
+    onLpStats: ((LpStats) -> Unit)? = null,
+): SourceProblemRoute = pipelineRouteObserved(objective, maximize, routePureRealToTheory,
+    boundCancellation, onLpStats, routeLinearToTheory, providers)
+
 private fun Problem.pipelineRouteObserved(
     objective: LinearObjective?,
     maximize: Boolean,
@@ -143,8 +156,9 @@ private fun Problem.pipelineRouteObserved(
     boundCancellation: Cancellation,
     onLpStats: ((LpStats) -> Unit)?,
     routeLinearToTheory: Boolean,
+    providers: FactorProjectionProviders = FactorProjectionProviders.Default,
 ): SourceProblemRoute {
-    val source = prepareExecutionPlan()
+    val source = prepareExecutionPlan(providers)
     val initial = objective?.let { source.withObjective(it, maximize) } ?: source
     if (initial.kind == PreparedExecutionKind.POLYNOMIAL) {
         return SourceProblemRoute.PolynomialTheory(initial.polynomialRequest(), objective, maximize)
@@ -162,7 +176,8 @@ private fun Problem.pipelineRouteObserved(
     val finiteIntegerRanges = routed.hasFiniteIntegerRanges()
     val preferExact = routeLinearToTheory && (routed.supportsExactLra() || routed.supportsExactLira())
     val preferFinite = finiteIntegerRanges && !preferExact && (!routePureRealToTheory || !routed.supportsExactLra())
-    val prepared = routed.prepareExecutionPlan(this, objective, maximize, preferFinite)
+    val prepared = routed.prepareExecutionPlan(this, objective, maximize, preferFinite, providers,
+        requireNotNull(source.factorProjections).forEngineView(routed))
     val plan = requireNotNull(prepared.componentPlan)
     if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
         return SourceProblemRoute.Finite(routed, plan, prepared)

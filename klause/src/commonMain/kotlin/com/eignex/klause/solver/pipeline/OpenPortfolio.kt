@@ -38,8 +38,8 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toDouble
 import com.eignex.klause.util.toLongExact
 import kotlin.concurrent.atomics.AtomicReference
@@ -437,7 +437,9 @@ internal class OpenPortfolio(
             }
         }
         if (!searchesContinuousOnly && model.numIntVars == 0 && model.numBoolVars == 0) return emptyList()
-        val searchModel = LocalSearchModel.open(model)
+        val searchModel = preparedPlan.factorProjections?.forEngineView(model)?.let {
+            LocalSearchModel.open(model, it)
+        } ?: LocalSearchModel.open(model)
         if (!localSearchSupports(searchModel, completes = model.numRealVars > 0)) return emptyList()
         val start = model.lpSeed(searchModel.domains, cancellation or Cancellation.after(SEED_BUDGET))
         val profile = ProblemProfile.of(model, optimizing = objective != null)

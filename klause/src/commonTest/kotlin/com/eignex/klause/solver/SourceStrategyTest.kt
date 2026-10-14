@@ -8,18 +8,26 @@ import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.ScoringProjection
+import com.eignex.klause.localsearch.ScoringProjectionProvider
 import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.eq
@@ -51,6 +59,57 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SourceStrategyTest {
+    @Test
+    fun `a source invocation opens selected inert deduction and checks its witness`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
+        var openings = 0
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
+            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The original source is checked at complete points.") { openings++; NoPropagator }
+        })
+
+        val result = BacktrackSolver.source(source).withProjectionProviders(providers)
+            .solve(BacktrackParams(randomSeed = 1, maxDecisions = 10))
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertTrue(witness.intValue(0).toLong() in 1L..2L)
+        assertTrue(openings > 0)
+        assertEquals(IntDomain(0, 2), source.intDomainOrNull(0))
+    }
+
+    @Test
+    fun `a source scorer refusal does not refuse complete traversal`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
+        val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider { null })
+
+        val complete = BacktrackSolver.source(source).withProjectionProviders(providers).solve()
+        val local = LocalSearchSolver.source(source).withProjectionProviders(providers).solve()
+
+        assertTrue(assertIs<OpenTheoryResult.Sat>(complete).assignment.boolValue(0))
+        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(local).reason)
+    }
+
+    @Test
+    fun `an alternate scheduling scorer accepts starts outside the dense timeline range`() {
+        val lower = Int.MAX_VALUE.toLong() + 10
+        val source = Problem(0, 1, arrayOf(IntDomain(lower, lower + 2)),
+            arrayOf(Cumulative(intArrayOf(0), longArrayOf(1), longArrayOf(1), 1)))
+        val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider {
+            ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _, _ ->
+                object : Invariant {
+                    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
+                }
+            }
+        })
+
+        val result = LocalSearchSolver.source(source).withProjectionProviders(providers)
+            .solve(LocalSearchParams(randomSeed = 1, maxFlips = 1))
+
+        val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertTrue(witness.intValue(0).toLong() in lower..lower + 2)
+    }
+
     @Test
     fun `compiled squares preserve exact original coordinates through both strategies`() {
         val x = FloatHandle("x", -2.0, 2.0)

@@ -61,7 +61,7 @@ class LocalSearchState private constructor(
         model: LocalSearchModel,
         rng: Random,
         assumptions: Assumptions = Assumptions.None,
-        projection: LocalSearchProblem = LocalSearchProblem(model.problem, model.domains),
+        projection: LocalSearchProblem = model.openProjection(),
     ) : this(model, rng, assumptions, projection, LocalSearchBuffers.preparation(model.problem).filterNotNull().first())
 
     internal companion object {
