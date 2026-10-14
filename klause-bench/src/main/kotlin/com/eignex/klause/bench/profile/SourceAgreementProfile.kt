@@ -12,7 +12,6 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.solver.pipeline.ComponentResponsibility
 import com.eignex.klause.solver.pipeline.ExecutionComponentDescriptor
 import com.eignex.klause.solver.pipeline.PlannedSearch
-import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.AssembledSearchModel
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -209,7 +208,8 @@ internal object SourceAgreementProfile {
             ExecutionComponentDescriptor::class.java, kotlin.jvm.functions.Function1::class.java)
         private val collection = registrations.getDeclaredConstructor(Problem::class.java, List::class.java)
         private val open = registrations.getMethod("open", java.lang.Long.TYPE, Cancellation::class.java,
-            SearchLearnedDbParams::class.java, SmtStatsSink::class.java, Cancellation::class.java)
+            SearchLearnedDbParams::class.java,
+            Class.forName("com.eignex.klause.solver.result.SmtStatsSink"), Cancellation::class.java)
         fun open(source: Problem, stop: Cancellation, maxChecks: Long): PlannedSearch {
             val values = source.factors.indices.map { index ->
                 val fragment = source.withFactors(arrayOf(source.factors[index]))

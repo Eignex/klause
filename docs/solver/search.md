@@ -177,7 +177,8 @@ admission. Agreement participation itself supplies neither general theory
 combination, procedure completeness nor optimization/bound authority.
 
 Agreement uses the existing invocation cancellation, complete-check accounting and
-caller native work meter. It opens no fresh solver, ledger or allowance. Scalar-row
+caller native work meter, including coordinate reads and source-row discovery.
+It opens no fresh solver, ledger or allowance. Scalar-row
 normalization and atomic arithmetic can overspend cooperatively; interruption
 withholds a witness. All native peers remain owned by the invocation resource
 registry, and published snapshots outlive their producers.
