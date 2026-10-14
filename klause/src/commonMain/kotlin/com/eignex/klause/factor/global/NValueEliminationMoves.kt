@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.global
 
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.ir.floorOrNull
@@ -44,14 +45,18 @@ internal class NValueEliminationMoves(
         var completionDelta = Long.MAX_VALUE
         var coordinator: NValueClauseCompletion? = null
         val canComplete = state.cost == 0L || (state.violated.size == 1 && state.violated.contains(factorId))
-        val attempted = HashSet<Pair<Long, Long>>()
-        repeat(MAX_ATTEMPTS) {
+        val attempted = HashSet<List<Move.IntSet>>()
+        repeat(MAX_ATTEMPTS) { attempt ->
             if (emitted >= MAX_MOVES) return@repeat
             val from = representatives[state.rng.nextInt(representatives.size)]
             val old = state.assignment.intValue(from)
-            val target = sampleTarget(state, from, representatives) ?: return@repeat
-            if (!attempted.add(old to target)) return@repeat
-            val parts = classTargets(state, old, target, sink) ?: return@repeat
+            val parts = if (attempt % 2 == 0 && representatives.size > 2) {
+                splitClassTargets(state, old, representatives, sink)
+            } else {
+                val target = sampleTarget(state, from, representatives) ?: return@repeat
+                classTargets(state, old, target, sink)
+            } ?: return@repeat
+            if (!attempted.add(parts.toList())) return@repeat
             if (parts.any { it.varId == n && it.newValue != targetN }) return@repeat
             if (parts.none { it.varId == n } && targetN != state.assignment.intValue(n)) {
                 parts += Move.IntSet(n, targetN)
@@ -138,6 +143,56 @@ internal class NValueEliminationMoves(
             parts += Move.IntSet(variable, target)
         }
         return parts.takeIf { it.isNotEmpty() }
+    }
+
+    private fun splitClassTargets(
+        state: LocalSearchState,
+        old: Long,
+        representatives: List<Int>,
+        sink: MoveSink,
+    ): ArrayList<Move.IntSet>? {
+        val seen = IntHashSet()
+        val parts = ArrayList<Move.IntSet>()
+        for (i in xs.indices) {
+            val variable = xs[i]
+            if (!present(state, i) || state.assignment.intValue(variable) != old || !seen.add(variable)) continue
+            if (parts.size >= MAX_COORDINATES || !sink.allowsInt(variable)) return null
+            val occurrences = state.projection.intOccurrences[variable]
+            if (occurrences.size > MAX_INDEX_OCCURRENCES) return null
+            val elements = occurrences.mapNotNull { fid ->
+                val element = state.problem.factors[fid] as? Element ?: return@mapNotNull null
+                element.takeIf {
+                    it.idx == variable && it.arrIsVars &&
+                        state.invariants?.elementResultDefinition(it.result)?.factor === it
+                }
+            }
+            val candidates = if (representatives.size <= MAX_SPLIT_TARGETS) representatives else {
+                List(MAX_SPLIT_TARGETS) { representatives[state.rng.nextInt(representatives.size)] }
+            }
+            var target: Long? = null
+            var eligible = 0
+            for (representative in candidates) {
+                val value = state.assignment.intValue(representative)
+                if (value == old || value !in state.rootDomains[variable] ||
+                    elements.any { !admitsSelectedValue(state, it, value, sink) }
+                ) continue
+                eligible++
+                if (state.rng.nextInt(eligible) == 0) target = value
+            }
+            parts += Move.IntSet(variable, target ?: return null)
+        }
+        return parts.takeIf { it.isNotEmpty() }
+    }
+
+    private fun admitsSelectedValue(
+        state: LocalSearchState, element: Element, index: Long, sink: MoveSink,
+    ): Boolean {
+        val position = index - element.indexOffset
+        if (position < 0 || position >= element.arr.size) return false
+        val value = state.assignment.intValue(element.arr[position.toInt()].toInt())
+        if (value !in state.rootDomains[element.result]) return false
+        return (state.moveSink.allowsDefinedInt(element.result) && sink.allowsDefinedInt(element.result)) ||
+            value == state.assignment.intValue(element.result)
     }
 
     private fun queue(
@@ -237,6 +292,8 @@ internal class NValueEliminationMoves(
         const val MAX_MOVES = 4
         const val MAX_ATTEMPTS = 24
         const val MAX_COORDINATES = 32
+        const val MAX_SPLIT_TARGETS = 32
+        const val MAX_INDEX_OCCURRENCES = 256
         const val MAX_REPAIR_DEPTH = 8
         const val MAX_COMPLETED_PARTS = 128
     }

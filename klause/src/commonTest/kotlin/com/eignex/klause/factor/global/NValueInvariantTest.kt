@@ -5,12 +5,14 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.ElementResultDefinition
 import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
@@ -125,6 +127,89 @@ class NValueInvariantTest {
             state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
 
             assertTrue(state.moveSink.list.none { it is Move.Compound && Move.IntSet(0, 1) in it.parts })
+        }
+    }
+
+    @Test
+    fun `class elimination distributes aliased members among surviving values`() {
+        for (seed in listOf(3, 17, 41)) {
+            val p = Problem(
+                0, 5,
+                arrayOf(
+                    IntDomain(2, 3), IntDomain(0, 2).excludeValue(1), IntDomain(1, 2),
+                    IntDomain(0, 0), IntDomain(1, 1),
+                ),
+                arrayOf<Factor>(NValue(0, intArrayOf(1, 1, 2, 2, 3, 4))),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(p), Random(seed))
+            for ((v, value) in listOf(0 to 3L, 1 to 2L, 2 to 2L, 3 to 0L, 4 to 1L)) {
+                state.assignment.setInt(v, value)
+            }
+            state.recompute()
+            val before = state.assignment.snapshot()
+
+            state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+            val move = state.moveSink.list.first { candidate ->
+                candidate is Move.Compound && Move.IntSet(0, 2) in candidate.parts && state.netDelta(candidate) == 0L
+            }
+            assertEquals(before, state.assignment.snapshot())
+            state.apply(move)
+
+            assertEquals(0L, state.assignment.intValue(1))
+            assertEquals(1L, state.assignment.intValue(2))
+            assertEquals(2L, state.assignment.intValue(0))
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `distributed elimination respects maintained selected result domains and pins`() {
+        for (protection in listOf("none", "domain", "pin")) {
+            val p = Problem(
+                0, 10,
+                arrayOf(
+                    IntDomain(2, 3), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 0), IntDomain(1, 1),
+                    IntDomain(0, 0), IntDomain(1, 1), IntDomain(2, 2), IntDomain(0, 2).excludeValue(1),
+                    if (protection == "domain") IntDomain(2, 2) else IntDomain(1, 2),
+                ),
+                arrayOf<Factor>(
+                    NValue(0, intArrayOf(1, 2, 3, 4)),
+                    Element(1, 8, longArrayOf(5, 6, 7), true, 0),
+                    Element(2, 9, longArrayOf(5, 6, 7), true, 0),
+                ),
+            )
+            val pins = if (protection == "pin") Assumptions(ints = mapOf(9 to 2L)) else Assumptions.None
+            val state = LocalSearchState(LocalSearchModel.open(p), Random(3), pins)
+            state.invariants = InvariantNetwork(
+                listOf(
+                    ElementResultDefinition(p.factors[1] as Element),
+                    ElementResultDefinition(p.factors[2] as Element),
+                ),
+                10, 0,
+            )
+            for ((v, value) in listOf(
+                0 to 3L, 1 to 2L, 2 to 2L, 3 to 0L, 4 to 1L,
+                5 to 0L, 6 to 1L, 7 to 2L, 8 to 2L, 9 to 2L,
+            )) state.assignment.setInt(v, value)
+            state.recompute()
+            val before = state.assignment.snapshot()
+
+            state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+            val moves = state.moveSink.list.filter { candidate ->
+                candidate is Move.Compound && Move.IntSet(0, 2) in candidate.parts && state.netDelta(candidate) == 0L
+            }
+            assertEquals(before, state.assignment.snapshot())
+
+            if (protection == "none") {
+                state.apply(moves.first())
+                assertEquals(0L, state.assignment.intValue(1))
+                assertEquals(1L, state.assignment.intValue(2))
+                assertEquals(0L, state.cost)
+                state.recompute()
+                assertEquals(0L, state.cost)
+            } else assertTrue(moves.isEmpty())
         }
     }
 

@@ -294,7 +294,7 @@ domains and protected partners do not prevent later partners from absorbing the 
 
 Satisfied NValue factors supplement count-preserving coordinate moves with bounded
 value-class elimination. A proposal removes one distinct value, moving every present coordinate of one class to
-an existing value admitted by every participating root domain and reconciles the
+surviving values admitted by its root domain and reconciles the
 count for its equality or inequality mode. Repeated coordinates are changed once;
 count aliases are checked against the final distinct values. Frozen, maintained or
 foreign-owned changed coordinates decline the whole class. Absent positions do not
@@ -305,9 +305,13 @@ Count-decreasing repairs use the same bounded operator when NValue is the sole
 violation and a lowered count leaves repeated classes to reconcile, including
 objective bounds pursued as constraints.
 
-Each call samples at most 24 pairs over distinct present classes, filtering destinations
-by a representative root domain before whole-class admission, and offers at most four elimination moves,
-each changing at most 32 class coordinates plus the count and its channels. Channel
+Each call makes at most 24 attempts over distinct present classes and offers at most four elimination moves.
+Uniform proposals filter destinations by a representative root domain before whole-class admission.
+Alternating attempts can distribute a class among multiple surviving values. Each changed coordinate
+considers at most 32 destinations and 256 incident factors. A maintained variable-array Element result
+requires its selected cell value to fit the result's root domain and retained ownership or pin value.
+Aliases still receive one target; an unreachable member declines the class. Each proposal
+changes at most 32 class coordinates plus the count and its channels. Channel
 contributions protect all NValue coordinates from counter-shifts and carry equality
 indicators and binary channels. Proposals changing presence literals decline. Complete
 model scoring and ordinary source publication checks remain required; NValue
