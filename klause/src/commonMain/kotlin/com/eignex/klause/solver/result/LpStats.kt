@@ -488,6 +488,13 @@ internal fun LpStats.hasActivity(): Boolean =
 /** Mutable LP-stats accumulator, one per solve; snapshots into an [LpStats]. See [SolveStatsSink]. */
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private val phases = LinkedHashMap<String, LpPhaseStats>()
+
+    fun observePrimalPhase(stage: String, outcome: String, nanos: Long) {
+        val key = "${stage}_ROOT"
+        val delta = LpPhaseStats(calls = 1L, nanos = nanos, outcomes = mapOf(outcome to 1L))
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
     val solves: CountStat = CountStat()
     val pruned: CountStat = CountStat()
     val infeasible: CountStat = CountStat()
