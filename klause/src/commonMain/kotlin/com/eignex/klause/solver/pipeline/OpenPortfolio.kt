@@ -77,7 +77,8 @@ internal class OpenPortfolio(
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
     private val lifetime = theoryParams.cancellation or theoryParams.timeout
-    private val preparedPlan = preparedSource ?: request?.preparedPlan ?: model.prepareExecutionPlan()
+    private val preparedPlan = preparedSource ?: request?.preparedPlan ?:
+        model.prepareExecutionPlan(cancellation = lifetime)
     private val sourceModel = preparedPlan.originalSource as? Problem ?: model
 
     private fun workerParams(slot: PortfolioWorkerSlot): TheoryParams = theoryParams.copy(
@@ -93,6 +94,11 @@ internal class OpenPortfolio(
 
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
     fun solve(cancellation: Cancellation): OpenTheoryResult {
+        val stop = lifetime or cancellation
+        if (stop() || preparedPlan.decline == PreparedPlanDecline.RESOURCE) return OpenTheoryResult.Unknown(
+            if (stop()) theoryParams.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
+            SolveStats.EMPTY,
+        )
         val firstLocalArm = if (request != null) 1 else 0
         val localSearch = localSearchFactories(firstLocalArm, lifetime or cancellation, objective = null)
         val factories = buildList {
@@ -152,6 +158,11 @@ internal class OpenPortfolio(
         cancellation: Cancellation,
     ): OpenTheoryOptimum {
         val stop = lifetime or cancellation
+        if (stop() || preparedPlan.decline == PreparedPlanDecline.RESOURCE) return OpenTheoryOptimum.Bounded(
+            null, null,
+            if (stop()) theoryParams.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
+            SolveStats.EMPTY,
+        )
         descentVerdict.store(null)
         require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
             "the theory's descent minimizes no continuous column"

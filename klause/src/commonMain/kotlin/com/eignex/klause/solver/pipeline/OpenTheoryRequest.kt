@@ -17,6 +17,7 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.hasActivity
+import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -244,11 +245,14 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val prepared = preparedSource ?: model.prepareExecutionPlan(values?.original, values?.maximize ?: false)
+        val stop = params.cancellation or params.timeout
+        val prepared = preparedSource ?: model.prepareExecutionPlan(values?.original, values?.maximize ?: false,
+            cancellation = stop)
+        if (stop() || prepared.decline == PreparedPlanDecline.RESOURCE) return incompleteOpenExecution(objective,
+            if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted)
         val portfolio = OpenPortfolio(model, request = null, params, lanes = cores,
             searchesContinuousOnly = searchesContinuousOnly, sourceObjective = values, publication = publication,
             preparedSource = prepared)
-        val stop = params.cancellation or params.timeout
         if (objective == null) return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizer = null, stop))
     }
@@ -316,12 +320,8 @@ object OpenTheoryPipeline {
         }
     }
 
-    private fun unsupportedExecution(objective: LinearObjective?): OpenTheoryExecution = if (objective == null) {
-        OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY))
-    } else {
-        OpenTheoryExecution.Optimize(OpenTheoryOptimum.Bounded(
-            null, null, TerminationReason.Unsupported, SolveStats.EMPTY))
-    }
+    private fun unsupportedExecution(objective: LinearObjective?): OpenTheoryExecution =
+        incompleteOpenExecution(objective, TerminationReason.Unsupported)
 
     /**
      * Search [model], an open model no theory decides, the way [engine] asks: local search under
@@ -385,7 +385,14 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val prepared = preparedSource ?: model.preparedWithComponents(model.componentPlan(),
+        val stop = params.cancellation or params.timeout
+        if (stop()) return incompleteOpenExecution(objective, params.preparationStopReason(stop))
+        val selected = if (preparedSource == null) model.componentPlan(cancellation = stop) else null
+        if (stop() || selected?.encodingDecline == EncoderDecline.RESOURCE ||
+            preparedSource?.decline == PreparedPlanDecline.RESOURCE
+        ) return incompleteOpenExecution(objective,
+            if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted)
+        val prepared = preparedSource ?: model.preparedWithComponents(checkNotNull(selected),
             objective = values?.original, maximize = values?.maximize ?: false)
         val operation = if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE
         if (!prepared.capabilities.admission(engine, operation).runnable) return unsupportedExecution(objective)
@@ -488,3 +495,11 @@ object OpenTheoryPipeline {
             request.preparedPlan.factorProjections,
         )
 }
+
+internal fun TheoryParams.preparationStopReason(stop: Cancellation): TerminationReason =
+    if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
+    else TerminationReason.Cancelled
+
+internal fun incompleteOpenExecution(objective: LinearObjective?, reason: TerminationReason): OpenTheoryExecution =
+    if (objective == null) OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(reason, SolveStats.EMPTY))
+    else OpenTheoryExecution.Optimize(OpenTheoryOptimum.Bounded(null, null, reason, SolveStats.EMPTY))

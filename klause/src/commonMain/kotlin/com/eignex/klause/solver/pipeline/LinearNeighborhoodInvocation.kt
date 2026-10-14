@@ -10,6 +10,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 
 internal fun linearNeighborhoodInvocation(
     model: Problem,
@@ -22,13 +23,15 @@ internal fun linearNeighborhoodInvocation(
     publication: SourcePublicationObserver? = null,
 ): OpenTheoryExecution {
     val count = cores.coerceAtLeast(1)
-    val prepared = preparedSource ?: model.prepareExecutionPlan(objective)
+    val stop = params.cancellation or params.timeout
+    val prepared = preparedSource ?: model.prepareExecutionPlan(objective, cancellation = stop)
+    if (stop() || prepared.decline == PreparedPlanDecline.RESOURCE) return incompleteOpenExecution(objective,
+        if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted)
     val source = prepared.originalSource as? Problem ?: model
     val identity = ModelIdentity.of(source, objective)
     val context = sourceObjective?.context
     val binding = EngineInvocation(prepared, identity, objective,
         scope = context?.scope, condition = context?.scope?.condition)
-    val stop = params.cancellation or params.timeout
     val factories = List(count) { index ->
         PortfolioArmFactory(prepared, index, if (adaptive) ArmFamily.Lns else ArmFamily.LocalSearch,
             bind = { it.bindInvocation(binding) }) { slot ->
