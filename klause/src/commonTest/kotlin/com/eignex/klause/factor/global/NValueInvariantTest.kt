@@ -779,4 +779,57 @@ class NValueInvariantTest {
             assertEquals(0L, state.cost)
         }
     }
+
+    @Test
+    fun `class completion selects the merge with the least reconciled cost`() {
+        val p = Problem(
+            5, 7,
+            arrayOf(
+                IntDomain(2, 3), IntDomain(0, 0), IntDomain(1, 1), IntDomain(0, 2),
+                IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 1),
+            ),
+            arrayOf<Factor>(
+                NValue(0, intArrayOf(1, 2, 3)),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(4), LinearOp.EQ, 0),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
+                ReifiedLinear(3, intArrayOf(1), intArrayOf(5), LinearOp.EQ, 0),
+                ReifiedLinear(4, intArrayOf(1), intArrayOf(6), LinearOp.EQ, 0),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(4, true))),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        state.invariants = InvariantNetwork(
+            listOf(
+                DefinitionalSweep.SweepNode.CmpReif(0, longArrayOf(1), intArrayOf(3), 0, LinearOp.EQ),
+                DefinitionalSweep.SweepNode.CmpReif(1, longArrayOf(1), intArrayOf(4), 0, LinearOp.EQ),
+                DefinitionalSweep.SweepNode.CmpReif(2, longArrayOf(1), intArrayOf(3), 1, LinearOp.EQ),
+                DefinitionalSweep.SweepNode.CmpReif(3, longArrayOf(1), intArrayOf(5), 0, LinearOp.EQ),
+                DefinitionalSweep.SweepNode.CmpReif(4, longArrayOf(1), intArrayOf(6), 0, LinearOp.EQ),
+            ),
+            7, 5,
+        )
+        for ((v, value) in listOf(0 to 3L, 1 to 0L, 2 to 1L, 3 to 2L, 4 to 1L, 5 to 1L, 6 to 1L)) {
+            state.assignment.setInt(v, value)
+        }
+        state.recompute()
+        val before = state.assignment.snapshot()
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+        val move = state.moveSink.list.first { candidate ->
+            candidate is Move.Compound && Move.IntSet(0, 2) in candidate.parts && state.netDelta(candidate) == 0L
+        }
+        assertEquals(before, state.assignment.snapshot())
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(3))
+        assertEquals(0L, state.assignment.intValue(5))
+        assertEquals(0L, state.assignment.intValue(6))
+        assertEquals(2L, state.assignment.intValue(0))
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
 }
