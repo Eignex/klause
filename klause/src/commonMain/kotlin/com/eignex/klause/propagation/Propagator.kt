@@ -5,8 +5,9 @@ import com.eignex.klause.ir.Lit
 /**
  * The deductive contract of a constraint: propagation, watcher subscriptions, and conflict
  * explanation. Constructed from factor data by the CP engine and used by the propagation loop
- * ([com.eignex.klause.backtrack.BacktrackSolver]) when dispatching to factors. A projection can
- * serve several states; mutable work and failure premises belong to [PropagationState].
+ * ([com.eignex.klause.backtrack.BacktrackSolver]) when dispatching to factors. Built-in projections can
+ * serve several states; their mutable work and failure premises belong to [PropagationState].
+ * A selected custom factory can open a private mechanism for one live engine state.
  *
  * See `Factor` for the full constraint contract (structural + deductive + local-search).
  */

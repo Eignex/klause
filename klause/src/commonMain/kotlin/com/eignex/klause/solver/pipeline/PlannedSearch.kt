@@ -62,14 +62,16 @@ internal class PreparedSearchComponents(
 ) {
     private val fragment = plan.theoryFragment(spec)
     private val projection = if (plan.hasCpComponent) plan.cpProjection(spec, cpDomains) else null
-    private val propagation = projection?.let { PropagationProblem(it.problem) }
+    private val propagation = projection?.takeIf { it.problem.factorProjections?.nativePropagation != false }
+        ?.let { PropagationProblem(it.problem) }
     private var exactSource: PreparedExactLiraComponentFactory? = null
     var preparationWork: Long = 0
         private set
     var sourcePrepared: Boolean = false
         private set
 
-    private val clauses = spec.factors.filterIsInstance<Clause>()
+    private val clauses = spec.factors.indices.filter { plan.factorOwner(it) == FactorOwner.SHARED }
+        .mapNotNull { spec.factors[it] as? Clause }
     // CP owns its projected cardinalities; a second component would enforce them twice.
     private val cardinalities = spec.factors.indices
         .filter { plan.factorOwner(it) != FactorOwner.CP }
@@ -82,7 +84,7 @@ internal class PreparedSearchComponents(
             val descriptor = descriptors.first { it.responsibility == ComponentResponsibility.FINITE }
             selected += PreparedSearchRegistration(spec, descriptor) { opening ->
                 val cp = CpSearchComponent(
-                    PropagationSession(requireNotNull(propagation), opening.cancellation),
+                    PropagationSession(propagation ?: PropagationProblem(projection.problem), opening.cancellation),
                     IntArray(projection.problem.numIntVars) { local -> projection.sourceId(local) },
                 )
                 opening.ownComponent(cp)
