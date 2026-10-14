@@ -33,7 +33,9 @@ object NValueNeighborhoodProfile {
     private val completionMethod = completionType.getMethod("complete", Move::class.java)
 
     @Serializable
-    private data class CompletionObservation(val cost: Long, val parts: List<String>, val residuals: Map<String, Int>)
+    private data class CompletionObservation(
+        val cost: Long, val parts: List<String>, val residuals: Map<String, Int>, val clauses: Map<Int, List<String>>,
+    )
 
     @Serializable
     private data class RepairObservation(
@@ -208,14 +210,15 @@ object NValueNeighborhoodProfile {
                     descriptions += "b${node.out}=${state.assignment.boolValue(node.out)} " +
                         "${node::class.simpleName} boolInputs=${node.boolInputs.contentToString()} " +
                         "intInputs=${node.intInputs.contentToString()}"
-                    for (b in node.boolInputs) for (rowId in state.projection.boolOccurrences[b]) {
+                    for (b in node.boolInputs + intArrayOf(node.out)) for (rowId in state.projection.boolOccurrences[b]) {
                         val row = state.problem.factors[rowId] as? ReifiedLinear ?: continue
                         if (row.auxBoolVar != b) continue
                         val constants = row.integerConstants ?: continue
                         descriptions += "b$b=${state.assignment.boolValue(b)} ${row.op} " +
                             "vars=${row.vars.contentToString()} bound=${constants.bound} " +
                             "coeffs=${row.vars.indices.map { constants.coeff(it) }} " +
-                            "values=${row.vars.map { state.assignment.intValue(it) }}"
+                            "values=${row.vars.map { state.assignment.intValue(it) }} " +
+                            "domains=${row.vars.map { state.rootDomains[it].toString() }}"
                     }
                 }
             }
@@ -262,7 +265,8 @@ object NValueNeighborhoodProfile {
         val completion = completionMethod.invoke(helper, move) as Move
         diagnostic.apply(completion)
         val parts = if (completion is Move.Compound) completion.parts else listOf(completion)
-        return CompletionObservation(diagnostic.cost, parts.map { it.toString() }, residuals(diagnostic))
+        return CompletionObservation(diagnostic.cost, parts.map { it.toString() }, residuals(diagnostic),
+            clauseDependencies(diagnostic))
     }
 
     private fun residuals(state: LocalSearchState): Map<String, Int> = (0 until state.problem.numFactors)
