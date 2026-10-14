@@ -2286,7 +2286,11 @@ class PortfolioTest {
 
             val result = Portfolio(workers, bandit, maxSliceWork = 5_000L).use {
                 it.incumbentProbeArms = setOf(1)
-                it.minimize(Cancellation { reached.size >= 15 })
+                it.minimize(Cancellation {
+                    if (productive) reached.size >= 15 else {
+                        probe.work >= 60_000L && reached.takeLast(2) == listOf(0, 0)
+                    }
+                })
             }
 
             assertIs<MinimizeResult.BestFound>(result)
@@ -2323,11 +2327,47 @@ class PortfolioTest {
 
         Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { reached.size >= 20 })
+            it.minimize(Cancellation { reached.count { arm -> arm == 1 } >= 15 })
         }
 
         assertEquals(listOf(0, 1, 2), reached.take(3))
         assertEquals(15, reached.count { it == 1 })
+    }
+
+    @Test
+    fun `auxiliary continuations alternate with available ordinary work`() {
+        val reached = ArrayList<Int>()
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+            trackingWorker("probe", 1, ScriptedSearch({ false }) { reached += 1 }),
+            trackingWorker("sibling", 2, ScriptedSearch({ false }) { reached += 2 }),
+        )
+
+        Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
+            it.incumbentProbeArms = setOf(1)
+            it.minimize(Cancellation { reached.count { arm -> arm == 1 } >= 5 })
+        }
+
+        assertEquals(listOf(0, 1, 2), reached.take(3))
+        assertTrue(reached.zipWithNext().none { (first, second) -> first == 1 && second == 1 })
+    }
+
+    @Test
+    fun `auxiliary continuation proceeds when ordinary workers have retired`() {
+        val reached = ArrayList<Int>()
+        val incumbent = MinimizeResult.BestFound(Sample(BooleanArray(0), LongArray(0)), 1.0,
+            TerminationReason.BudgetExhausted)
+        val finder = TrackingResumableSearch(incumbent, incumbent, onRun = { reached += 0 })
+        val probe = ScriptedSearch({ false }) { reached += 1 }
+        val workers = listOf(trackingWorker("finder", 0, finder), trackingWorker("probe", 1, probe))
+
+        Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
+            it.incumbentProbeArms = setOf(1)
+            it.minimize(Cancellation.Never)
+        }
+
+        assertEquals(listOf(0) + List(12) { 1 }, reached)
+        assertEquals(60_000L, probe.work)
     }
 
     @Test
@@ -2390,7 +2430,9 @@ class PortfolioTest {
 
             Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = maximum, reseedStaleThreshold = 0).use {
                 it.incumbentProbeArms = setOf(1)
-                it.minimize(Cancellation { reached.size >= expectedSlices + 3 })
+                it.minimize(Cancellation {
+                    reached.count { arm -> arm == 1 } >= expectedSlices && reached.takeLast(2) == listOf(0, 0)
+                })
             }
 
             assertEquals(expectedSlices, reached.count { it == 1 })
@@ -2414,9 +2456,10 @@ class PortfolioTest {
             it.runTimeSource = clock
         }
 
-        portfolio.use { it.minimize(Cancellation { reached.size >= 6 }) }
+        portfolio.use { it.minimize(Cancellation { reached.count { arm -> arm == 1 } >= 3 && reached.takeLast(2) == listOf(0, 0) }) }
 
-        assertEquals(listOf(0, 1, 1, 1, 0, 0), reached)
+        assertEquals(3, reached.count { it == 1 })
+        assertEquals(listOf(0, 0), reached.takeLast(2))
     }
 
     @Test
@@ -2444,7 +2487,7 @@ class PortfolioTest {
 
             Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 0).use {
                 it.incumbentProbeArms = setOf(1)
-                it.minimize(Cancellation { reached.size >= 30 })
+                it.minimize(Cancellation { search.work >= 60_000L && reached.takeLast(2) == listOf(0, 0) })
             }
 
             assertEquals(60_000L, search.work)
@@ -2468,7 +2511,7 @@ class PortfolioTest {
             it.runTimeSource = clock
         }
 
-        portfolio.use { it.minimize(Cancellation { reached.size >= 11 }) }
+        portfolio.use { it.minimize(Cancellation { reached.count { arm -> arm == 1 } >= 8 && reached.takeLast(2) == listOf(0, 0) }) }
 
         assertEquals(8, reached.count { it == 1 })
         assertEquals(listOf(0, 0), reached.takeLast(2))
@@ -2553,7 +2596,11 @@ class PortfolioTest {
                     return finder.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
                 }
             }
-            val probe = ScriptedSearch({ false }) { clock += 1_000.milliseconds }
+            var probeSlices = 0
+            val probe = ScriptedSearch({ false }) {
+                probeSlices++
+                clock += 1_000.milliseconds
+            }
             val observedProbe = object : ResumableSearch by probe {
                 override val work: Long get() = if (charged) probe.work else 0L
             }
@@ -2567,9 +2614,10 @@ class PortfolioTest {
                 it.runTimeSource = clock
             }
 
-            portfolio.use { it.minimize(Cancellation { allowances.size >= 2 }) }
+            portfolio.use { it.minimize(Cancellation { allowances.size >= 4 }) }
 
-            assertEquals(listOf(7L, 7L), allowances)
+            assertEquals(listOf(7L, 7L, 14L, 21L), allowances)
+            assertTrue(probeSlices > 1)
         }
     }
 
@@ -2592,10 +2640,10 @@ class PortfolioTest {
 
         Portfolio.thompson(workers, baseSliceWork = 7, maxSliceWork = 21, reseedStaleThreshold = 0).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { finderSlices >= 2 })
+            it.minimize(Cancellation { allowances.sum() >= 252L && finderSlices >= 15 })
         }
 
-        assertEquals(List(36) { 7L }, allowances)
+        assertEquals(listOf(7L, 14L) + List(11) { 21L }, allowances)
     }
 
     @Test

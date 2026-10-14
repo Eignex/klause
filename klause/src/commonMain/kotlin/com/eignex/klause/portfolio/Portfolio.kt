@@ -663,6 +663,7 @@ class Portfolio(
         private val probed = BooleanArray(workers.size)
         private val productive = BooleanArray(workers.size)
         private val trialStarted = BooleanArray(workers.size)
+        private var auxiliaryContinuationAllowed = false
         private val trialPreparationTime = Array(workers.size) { Duration.ZERO }
         private val preparationTimeLimit = baseSliceMillis.milliseconds * AUXILIARY_PREPARATION_ALLOWANCES
         private val trialSearchWork = LongArray(workers.size)
@@ -814,24 +815,24 @@ class Portfolio(
             eligibleArms.firstOrNull {
                 workers[it].auxiliaryProof && !busy[it] && !retired[it]
             }?.let { return it }
-            if (improving) {
-                eligibleArms.firstOrNull {
-                    it in incumbentProbeArms && trialStarted[it] && !productive[it] && !busy[it] && !retired[it]
-                }?.let { return it }
-            }
+            val free = eligibleArms.filter { !busy[it] && !retired[it] }
+            if (free.isEmpty()) return -1
+            val trials = if (improving) free.filter {
+                it in incumbentProbeArms && trialStarted[it] && !productive[it]
+            } else emptyList()
+            val ordinary = free.filter { it !in trials }
+            if (trials.isNotEmpty() && (auxiliaryContinuationAllowed || ordinary.isEmpty())) return trials.first()
             val preparing = continuingPreparation
             if (preparing >= 0 && !busy[preparing]) {
-                if (!retired[preparing] && preparing in eligibleArms &&
+                if (preparing in ordinary &&
                     (handles[preparing] as? ReseedGuard)?.canContinuePreparation == true
                 ) return preparing
                 continuingPreparation = -1
             }
-            val free = eligibleArms.filter { !busy[it] && !retired[it] }
-            if (free.isEmpty()) return -1
-            val present = free.mapTo(LinkedHashSet()) { policyFamily(it) }
+            val present = ordinary.mapTo(LinkedHashSet()) { policyFamily(it) }
             val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
             val family = families.choose(eligible)
-            val candidates = free.filter { policyFamily(it) == family }
+            val candidates = ordinary.filter { policyFamily(it) == family }
             // Complete-search progress can remain invisible until a leaf; shared deductions do not
             // establish which search will reach the first witness.
             if (!improving && !family.observable) return candidates.minBy { armWork[it] }
@@ -923,6 +924,7 @@ class Portfolio(
             if (reward > 0.0 || claim.improved) productive[arm] = true
             val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
+            auxiliaryContinuationAllowed = !unproductiveTrial
             if (unproductiveTrial) {
                 trialStarted[arm] = true
                 if (claim.preparing) trialPreparationTime[arm] += claim.trialTime
