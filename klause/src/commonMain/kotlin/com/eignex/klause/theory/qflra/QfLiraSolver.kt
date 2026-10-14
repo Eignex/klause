@@ -318,7 +318,7 @@ class ExactLiraSearchComponent private constructor(
                 }
                 val atom = SourceBoundAtom.rationalSplit(context, terms, row.rhs, row.strict)
                     ?: return agreementDeclined(context)
-                if (context.boolValue(atom.positive.literal ushr 1) != true) {
+                if (context.boolValue(atom.positive.literal ushr 1) != (atom.positive.literal and 1 == 0)) {
                     val result = context.publish(SearchDecision.Theory(atom.positive))
                     if (result != ComponentResult.Consistent) return result
                 }
@@ -337,7 +337,7 @@ class ExactLiraSearchComponent private constructor(
             }
             val point = ArrayList<BigFraction>(model.numRealVars + model.numIntVars)
             for (variable in 0 until model.numRealVars) {
-                if (operationStop()) return coordinateDeclined(context)
+                if (operationStop()) return ComponentCheck.Indeterminate
                 val id = SourceRealId(variable)
                 if (values.valueOf(SearchExactAlgebraicRealValue(id)) != null ||
                     values.valueOf(SearchExactRealExpressionValue(id)) != null
@@ -345,7 +345,7 @@ class ExactLiraSearchComponent private constructor(
                 point += values.valueOf(SearchExactRealValue(id)) ?: return coordinateDeclined(context)
             }
             for (variable in 0 until model.numIntVars) {
-                if (operationStop()) return coordinateDeclined(context)
+                if (operationStop()) return ComponentCheck.Indeterminate
                 point += values.valueOf(SearchExactIntValue(SourceIntId(variable)))?.asFraction()
                     ?: return coordinateDeclined(context)
             }
@@ -361,7 +361,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun coordinateDeclined(context: SearchContext): ComponentCheck {
-        context.executionControls.reportStop(SearchStopCause.RepresentationDecline)
+        if (!operationStop()) context.executionControls.reportStop(SearchStopCause.RepresentationDecline)
         return ComponentCheck.Indeterminate
     }
 

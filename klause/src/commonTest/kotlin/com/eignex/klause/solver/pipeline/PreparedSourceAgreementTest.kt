@@ -16,6 +16,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.AssembledSearchModel
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchDecision
@@ -24,7 +25,10 @@ import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealExpressionValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.BIG_ONE
@@ -300,6 +304,25 @@ class PreparedSourceAgreementTest {
 
             assertTrue(cancelled)
             assertIs<ComponentCheck.Indeterminate>(result)
+        }
+    }
+
+    @Test
+    fun `source deductions respect a predicate registered in reverse polarity`() {
+        val template = SearchComponentSet(emptyList()).session(atoms = SearchAtomRegistry(0))
+        val bound = requireNotNull(SourceBoundAtom.rationalSplit(template,
+            listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ONE))
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchComponentSet(listOf(component)).session(atoms = SearchAtomRegistry(0))
+            val reversed = requireNotNull(session.registerAtom(bound.negative.payload, bound.positive.payload))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.publish(SearchDecision.Theory(reversed.positive)))
+
+            val result = component.shareSourcePredicates(session)
+
+            assertIs<ComponentResult.Conflict>(result)
         }
     }
 }
