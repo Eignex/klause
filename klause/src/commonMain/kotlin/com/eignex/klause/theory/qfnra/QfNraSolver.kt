@@ -86,7 +86,7 @@ internal class QfNraQuery(
             val normalized = PolynomialFormula.normalize(conditioned, arithmetic, fixed)
             yield(null)
             val witness = work.probe {
-                probeWitness(normalized, boolCount, realCount, arithmetic, algebraic, fixed)
+                probeWitness(normalized, boolCount, realCount, arithmetic, algebraic, fixed, work::coupled)
             }
             if (witness != null) {
                 arithmetic.step()
@@ -124,17 +124,19 @@ internal class QfNraQuery(
     }
 }
 
-private class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMeter {
+internal class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMeter {
     var projectedPolynomials: Long = 0
     var liftedCells: Long = 0
     private var spent: Long = 0
     private var probeEnd: Long? = null
+    private var coupledEnd: Long? = null
+    private var probeStart: Long = 0
     private var probeParentStopped = false
     val limitReached: Boolean get() = params.maximumWork?.let { spent >= it } == true
     override fun isCancelled(): Boolean {
         val stopped = limitReached || params.cancellation()
         if (probeEnd != null && stopped) probeParentStopped = true
-        return stopped || probeEnd?.let { spent >= it } == true
+        return stopped || probeEnd?.let { spent >= it } == true || coupledEnd?.let { spent >= it } == true
     }
     override fun deadline() = params.cancellation.deadline()
     override fun workMeter(): WorkMeter = this
@@ -145,6 +147,7 @@ private class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMet
     }
     fun probe(block: () -> QfNraAssignment?): QfNraAssignment? {
         check(probeEnd == null)
+        probeStart = spent
         probeEnd = spent + minOf(MAX_WITNESS_WORK, Long.MAX_VALUE - spent)
         probeParentStopped = false
         return try {
@@ -157,6 +160,18 @@ private class QfNraWork(private val params: QfNraParams) : Cancellation, WorkMet
             null
         } finally {
             probeEnd = null
+        }
+    }
+    fun coupled(block: () -> QfNraAssignment?): QfNraAssignment? {
+        check(probeEnd != null && coupledEnd == null)
+        coupledEnd = probeStart + minOf(MAX_WITNESS_WORK / 2, Long.MAX_VALUE - probeStart)
+        return try {
+            block()
+        } catch (stop: PolynomialInterrupted) {
+            if (probeParentStopped) throw stop
+            null
+        } finally {
+            coupledEnd = null
         }
     }
     fun snapshot(): QfNraStats = QfNraStats(projectedPolynomials, liftedCells, spent)
@@ -180,6 +195,7 @@ private fun probeWitness(
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     fixed: Map<Int, BigFraction>,
+    coupledPhase: (() -> QfNraAssignment?) -> QfNraAssignment?,
 ): QfNraAssignment? {
     arithmetic.step()
     if (realCount > MAX_WITNESS_REALS || boolCount > MAX_WITNESS_BOOLS ||
@@ -224,7 +240,7 @@ private fun probeWitness(
             fixed[id] ?: BigFraction.ZERO
         }
         probe.candidate(point.mapIndexed { id, value -> id to algebraic.rational(value) }.toMap())?.let { return it }
-        probe.coupled(conjunctive, point, fixed)?.let { return it }
+        coupledPhase { probe.coupled(conjunctive, point, fixed) }?.let { return it }
     }
     if (nonlinear && conjunctive != null && conjunctive.none {
             arithmetic.step()
@@ -427,8 +443,10 @@ internal class WitnessProbe(
             for (column in free) {
                 arithmetic.step()
                 val product = row[column] * base[variables[column]]
+                if (!admittedFraction(product)) return null
                 arithmetic.step()
                 value -= product
+                if (!admittedFraction(value)) return null
             }
             base[variables[pivots[index]]] = value
         }
@@ -454,8 +472,10 @@ internal class WitnessProbe(
                 for (column in free) {
                     arithmetic.step()
                     val product = row[column] * direction[variables[column]]
+                    if (!admittedFraction(product)) return null
                     arithmetic.step()
                     value -= product
+                    if (!admittedFraction(value)) return null
                 }
                 direction[variables[pivots[index]]] = value
             }
@@ -484,9 +504,11 @@ internal class WitnessProbe(
             rows[pivot] = swap
             arithmetic.step()
             val inverse = rows[rank][column].reciprocal()
+            if (!admittedFraction(inverse)) return null
             for (entry in column..variables.size) {
                 arithmetic.step()
                 rows[rank][entry] = rows[rank][entry] * inverse
+                if (!admittedFraction(rows[rank][entry])) return null
             }
             for (row in rows.indices) {
                 arithmetic.step()
@@ -495,8 +517,10 @@ internal class WitnessProbe(
                 for (entry in column..variables.size) {
                     arithmetic.step()
                     val product = factor * rows[rank][entry]
+                    if (!admittedFraction(product)) return null
                     arithmetic.step()
                     rows[row][entry] = rows[row][entry] - product
+                    if (!admittedFraction(rows[row][entry])) return null
                 }
             }
             rank++
@@ -508,6 +532,12 @@ internal class WitnessProbe(
         return rows.take(rank)
     }
 
+    private fun admittedFraction(value: BigFraction): Boolean {
+        arithmetic.step()
+        return value.num.magnitudeBitLength() <= MAX_WITNESS_BITS &&
+            value.den.magnitudeBitLength() <= MAX_WITNESS_BITS
+    }
+
     private fun coupledLine(
         atoms: List<PolynomialAtom>,
         base: List<BigFraction>,
@@ -515,6 +545,7 @@ internal class WitnessProbe(
     ): QfNraAssignment? {
         // The private parameter lies outside every original ID, so substitutions cannot capture each other.
         val parameter = base.size
+        if (base.any { !admittedFraction(it) } || direction.any { !admittedFraction(it) }) return null
         val replacements = base.indices.map { id ->
             arithmetic.add(Polynomial.constant(base[id]), arithmetic.scale(Polynomial.variable(parameter), direction[id]))
         }
@@ -539,6 +570,7 @@ internal class WitnessProbe(
             for (id in atom.polynomial.variables) {
                 arithmetic.step()
                 residual = arithmetic.substitute(residual, id, replacements[id])
+                if (residual.terms.any { !admittedFraction(it.coefficient) }) return null
             }
             for (root in roots(residual, parameter, emptyMap()) ?: return null) {
                 arithmetic.step()
