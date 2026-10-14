@@ -274,6 +274,21 @@ control must remain unknown; conflicting source equations are analytic UNSAT con
 and do not receive an independent proof check. JFR and construction are included in
 these diagnostic timings; they are not ordinary CLI throughput measurements.
 
+`bench.profile.EncoderProviderProfile` runs caller-supplied factor-admitted SMT files
+through normal source routing with default and private equivalent linear encoders.
+Pass `inputs=<comma-separated repository-relative or absolute paths> repeats=N warmups=N seed=N`.
+The private mode constrains scoped real auxiliaries with exact affine definitions and
+retains conjunction/disjunction structure; guarded rows keep their selected built-in
+encoding. Modes alternate in a measured JVM with one active processor, Serial GC and
+`-Xmx3g`, under a fresh ten-second deadline per invocation. The profile retains original
+source/output hashes, installation counts, charged native work, elapsed construction
+and execution time, source revision and runtime/classpath hashes. Each SAT stream is
+independently checked against the original source after measurement; UNSAT agreement
+supplies no independent proof verification. Run the committed profile on AWS through
+the documented lab client. These component/provider measurements include preparation
+and differ from ordinary whole-CLI timings; pair them with matched source-checked CLI
+controls before claiming end-to-end parity.
+
 `bench.profile.PublishedAbiSnapshot` captures compiler-generated JVM and Kotlin/Native
 published API declarations from the profile job's pinned checkout. It runs
 `:klause:updateKotlinAbi` remotely, retains both exact dumps, the generation log and
