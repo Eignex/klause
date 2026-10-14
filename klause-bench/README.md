@@ -235,7 +235,10 @@ diagnostics also invoke the internal scratch-completion component through its JV
 constructor ABI on a separate state and record the resulting parts and full residuals.
 For up to 16 remaining Element factors it records the selected cell, coordinate domains
 and definition ownership, then grades up to eight ordinary repairs with the completed
-primitive writes pinned. These repair observations use only the separate diagnostic state.
+primitive writes pinned. It also records up to 16 remaining reified linear rows, their
+indicator maintenance and pins, coefficients, values and root domains, and grades up to
+eight ordinary repairs per row with the same completed writes pinned.
+These repair observations use only the separate diagnostic state.
 An ABI mismatch fails the probe instead of silently skipping that component.
 Proposal generation must leave the incumbent unchanged. Scoring and incumbent acquisition are
 outside proposal timing. This probes the neighborhood at a captured feasible point;
