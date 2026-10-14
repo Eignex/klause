@@ -84,6 +84,10 @@ Ordinary clock polling uses the shared 64-call/4096-work stride; work-metered
 cancellation stays immediate and publication polls directly.
 Continuous terms use their exact finite minimizing endpoint, including strict
 interval infima/suprema, and absent sides never acquire a probe-box premise.
+When rounded multipliers decline, one continued-fraction reconstruction candidate
+uses the same allowance and cancellation stride. Its recurrence steps are charged.
+Approximation only proposes the multipliers: every reduced cost and endpoint
+contribution is checked exactly, including zero reduced cost on a free column.
 Objective scale and external constants map the rational bound and reduced costs
 to minimized source units. Rational cutoff and fixing arithmetic charges operand word-length
 squared to the containing node work ledger; fixed-width integer fixing keeps its
