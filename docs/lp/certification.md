@@ -92,7 +92,12 @@ to Boolean pins or integer endpoints narrowed from their source declarations.
 Row selection and visits charge the containing ledger, and selected rows retain
 their complete support. An empty touched-column set needs no matrix scan.
 The pass builds a bounded sparse row view once per admitted query and retains only
-completed coordinate certificates. An exact comparison of the existing endpoint's
+completed coordinate certificates. Integral-valued coefficients, endpoints, right-hand
+sides and target origins admit checked Int128 endpoint sums and comparisons. Continuous
+declarations remain continuous. Only productive projections materialize rational values;
+fractional data or fixed-width overflow falls back to the rational row pass under the
+remaining shared allowance. Failed attempts retain their charges. An exact comparison
+of the existing endpoint's
 row contribution with the residual skips division and source-coordinate reconstruction
 when the projection cannot tighten that endpoint. Strict equality retains the same
 admission rule. It shares the 128-bit scalar admission,

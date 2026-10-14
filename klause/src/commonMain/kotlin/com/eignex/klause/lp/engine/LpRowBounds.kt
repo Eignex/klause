@@ -31,7 +31,7 @@ internal class LpRowBound internal constructor(
     }
 }
 
-internal data class LpRowBoundTerm(val column: Int, val coefficient: BigFraction)
+internal data class LpRowBoundTerm(val column: Int, val coefficient: BigFraction, val integerCoefficient: Long?)
 
 internal fun mixedRowBounds(
     model: LpModel,
@@ -56,7 +56,9 @@ internal fun mixedRowBounds(
                     meter.step()
                     if (entry.number.value.isZero || selected?.get(entry.row) == false) continue
                     meter.reserve(32L)
-                    rows[entry.row].add(LpRowBoundTerm(column, meter.read(entry.number.value)))
+                    val integer = entry.number.exactLong()
+                    val coefficient = if (integer == null) meter.read(entry.number.value) else entry.number.value
+                    rows[entry.row].add(LpRowBoundTerm(column, coefficient, integer))
                     if (!state.model.column(column).integral) mixed[entry.row] = true
                 }
             }
@@ -64,7 +66,12 @@ internal fun mixedRowBounds(
                 meter.step()
                 if (!mixed[row] || !state.rows.row(row).active) continue
                 meter.reserve(32L + (rows[row].size + 1L) * 8L)
-                val terms = rows[row].toList() + LpRowBoundTerm(model.slackCol(row), BigFraction.ONE)
+                val terms = rows[row].toList() + LpRowBoundTerm(model.slackCol(row), BigFraction.ONE, 1L)
+                val integral = integralRowBounds(state, row, terms, meter)
+                if (integral != null) {
+                    completed.addAll(integral)
+                    continue
+                }
                 val minimum = rowEndpointSum(state, terms, true, meter)
                 val maximum = rowEndpointSum(state, terms, false, meter)
                 for (term in terms) {

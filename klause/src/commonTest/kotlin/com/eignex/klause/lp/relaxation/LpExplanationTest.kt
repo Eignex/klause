@@ -46,23 +46,25 @@ import kotlin.test.assertTrue
 class LpExplanationTest {
     @Test
     fun `row projection reasons withhold a separately scoped continuous endpoint`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
-            arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0),
-                LinearOp.GE, 0.75)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-        val session = PropagationSession(problem)
-        val original = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))).build(session)
-        val trail = LpBoundTrail(assertNotNull(original.model.authoritativeModel()))
-        assertTrue(trail.push())
-        val realColumn = original.colRealId.indexOf(0)
-        assertTrue(trail.assertBound(realColumn, true,
-            ExactLpSide(ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(0.25)))), 7L))
-        val child = original.withModel(assertNotNull(trail.state.toWorkingModel()))
-        val bound = mixedRowBounds(child.model).single()
+        for (endpoint in listOf(0.0, 0.25)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+                arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.GE, 1.0)),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+            val session = PropagationSession(problem)
+            val original = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))).build(session)
+            val trail = LpBoundTrail(assertNotNull(original.model.authoritativeModel()))
+            assertTrue(trail.push())
+            val realColumn = original.colRealId.indexOf(0)
+            assertTrue(trail.assertBound(realColumn, true,
+                ExactLpSide(ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(endpoint)))), 7L))
+            val child = original.withModel(assertNotNull(trail.state.toWorkingModel()))
+            val bound = mixedRowBounds(child.model).single()
 
-        val reason = LpExplanation.rowBoundReason(child, bound, session)
+            val reason = LpExplanation.rowBoundReason(child, bound, session)
 
-        assertNull(reason)
+            assertNull(reason)
+        }
     }
 
     @Test
