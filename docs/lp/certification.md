@@ -139,8 +139,13 @@ Approximation only proposes the multipliers: every reduced cost and endpoint
 contribution is checked exactly, including zero reduced cost on a free column.
 Node-deduction phase outcomes distinguish completed integer, rounded, endpoint-repaired, reconstructed
 and objective-integrality checks from missing endpoints, scalar width, resource
-limits and cancellation. They time existing attempts without additional numerical
-queries; their counts do not add to certifier invocation or work totals.
+limits and cancellation. They record elapsed time and consumed work for each existing
+attempt, including declined prefixes, without additional numerical queries. Phase work
+is a breakdown of the existing cumulative charge; it is not added to certifier or node
+work totals. Their counts do not add to certifier invocations.
+Outcome-specific phase entries retain this work breakdown alongside the aggregate
+node-deduction phase. These entries overlap the aggregate and must not be summed
+with it as additional work.
 Distinct primary, secondary and tertiary fixing phase keys record elapsed time and actual
 domain reductions as steps, with separate conflict/unchanged/failure outcomes.
 These diagnostic counts do not change the certificate or its admission.
