@@ -58,6 +58,7 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FiniteExactNeighborhood
 import com.eignex.klause.solver.pipeline.IntVariableOwner
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
+import com.eignex.klause.solver.pipeline.OpenPortfolio
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -71,6 +72,7 @@ import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.admission
 import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.linearNeighborhoodInvocation
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.polynomialRequest
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
@@ -1005,6 +1007,49 @@ class EncoderTest {
 
         assertEquals(PreparedPlanDecline.RESOURCE, plan.decline)
         assertEquals(1, installations)
+    }
+
+    @Test
+    fun `open heuristic entry points control selected encoder construction`() {
+        for (entry in listOf("routed", "legacy", "neighborhood", "portfolio")) {
+            val source = assertIs<SmtLibInput.Linear>(SmtLibAdmission.parse(
+                "(declare-const x Real) (assert (= x 1))",
+            )).problem.model
+            var cancelled = false
+            var installations = 0
+            var charged = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = cancelled
+                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            }
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (target != EncodingTarget.LINEAR || !selected.enforcesSource) selected
+                else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    installations++
+                    val decline = selected.install(view, encoding)
+                    encoding.cancellation.charge(1)
+                    cancelled = true
+                    decline
+                }
+            })
+            val model = source.bake(providers)
+            val params = TheoryParams(cancellation = stop)
+
+            val result = when (entry) {
+                "routed" -> assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.searchWithoutTheory(model,
+                    params, null, FiniteEngine.LOCAL_SEARCH, 1)).result
+                "legacy" -> assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.searchWithoutTheory(model,
+                    params, searchesContinuousOnly = true)).result
+                "neighborhood" -> assertIs<OpenTheoryExecution.Satisfy>(linearNeighborhoodInvocation(model,
+                    params, null, adaptive = false, cores = 1)).result
+                else -> OpenPortfolio(model, null, params, lanes = 1).solve(stop)
+            }
+
+            assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(result).reason, entry)
+            assertEquals(1, installations, entry)
+            assertTrue(charged > 0, entry)
+        }
     }
 
 }
