@@ -605,7 +605,7 @@ internal fun LpEngine.sparseSafePrune(
     }
     if (cancellation()) return LpNodeOutcome(false, null)
     val rationalCutoff = if (canPrune &&
-        (cert?.integralObjectiveRows() != null || !boundRel.model.hasIntegralObjective())
+        (cert?.let { permitsIntegralObjectiveCutoff(it) } == true || !boundRel.model.hasIntegralObjective())
     ) {
         BigFraction.ofDouble(bound.nextUp())
     } else {
@@ -616,7 +616,7 @@ internal fun LpEngine.sparseSafePrune(
         val words = (maxOf(Long.SIZE_BITS, exactBits(listOf(lower, rationalCutoff))) + 63L) / 64L
         noteNodeOverhead(4L * words * words)
         val full = lower + BigFraction.ofLong(boundRel.objectiveConstant)
-        val integralCutoff = if (cert.integralObjectiveRows() != null) enclosingCutoff(bound)?.ceilLong() else null
+        val integralCutoff = if (permitsIntegralObjectiveCutoff(cert)) enclosingCutoff(bound)?.ceilLong() else null
         if ((integralCutoff != null && full.ceilLong()?.let { it >= integralCutoff } == true) ||
             full >= rationalCutoff
         ) {
@@ -755,7 +755,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     val sourceRange = sourceObjectiveRange(relaxation)
     val incumbentMax = if (!bound.isFinite()) {
         objectiveCeiling ?: return false
-    } else if (sourceRange != null || cert.integralObjectiveRows() != null) {
+    } else if (sourceRange != null || permitsIntegralObjectiveCutoff(cert)) {
         val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
         if (ceiling == Long.MIN_VALUE) return false
         BigFraction.ofLong(ceiling - 1L)
@@ -970,6 +970,11 @@ internal fun reducedCostFixingReasons(
         supportLits.toIntArray(),
         session.boundLeLit(objectiveVar, objectiveVarMax, positive = false),
     )
+}
+
+private fun LpEngine.permitsIntegralObjectiveCutoff(cert: LpDeductionCertificate): Boolean {
+    val rows = cert.integralObjectiveRows() ?: return false
+    return rows.isNotEmpty() || problem.numRealVars > 0
 }
 
 private fun LpEngine.sourceObjectiveRange(relaxation: LpRelaxation): LongRange? {
