@@ -1,9 +1,9 @@
-"""Solve one XCSP3 instance with OR-Tools cp-sat via CPMpy and print a one-line JSON verdict.
+"""Solve one XCSP3 instance with OR-Tools cp-sat via CPMpy and emit source witnesses plus a JSON verdict.
 
 Python lives only inside this container; the JVM bench runs it per instance
 and parses the JSON off stdout. CPMpy reads the XCSP3 `.xml` and solves it with cp-sat directly — the
 same OR-Tools engine used for MiniZinc — so no XCSP3->FlatZinc conversion and nothing is written to
-disk. Usage: solve.py <instance.xml> <time_limit_seconds>.
+disk. Usage: solve.py <instance.xml> <time_limit_seconds> [workers] [seed].
 
 JSON fields: exit (OPTIMAL|FEASIBLE|UNSATISFIABLE|UNKNOWN|ERROR), runtime (seconds), objective (number
 or null for a CSP / no incumbent), maximize (bool or null). The bench maps these to a ReferenceEntry.
@@ -53,7 +53,6 @@ def solve(path, time_limit, workers, seed=3):
     solver.solve(time_limit=time_limit, num_workers=workers, random_seed=seed, cp_model_presolve=False)
     status = solver.status()
     exitstatus = str(status.exitstatus).rsplit(".", 1)[-1]
-    # objective_value() errors on a CSP (no objective) or when there is no incumbent yet.
     objective = None
     witness = None
     if obj is not None and exitstatus in ("OPTIMAL", "FEASIBLE"):
@@ -79,7 +78,7 @@ def main():
     time_limit = float(sys.argv[2]) if len(sys.argv) > 2 else 10.0
     workers = int(sys.argv[3]) if len(sys.argv) > 3 else 1
     seed = int(sys.argv[4]) if len(sys.argv) > 4 else 3
-    # Keep the real stdout for the JSON verdict only; CPMpy/parser chatter goes to stderr.
+    # Parser chatter stays separate from the source witness and JSON verdict.
     out = sys.stdout
     sys.stdout = sys.stderr
     try:

@@ -113,13 +113,17 @@ region. It exercises source lowering and complete search without a wall-clock bu
 
 [`test_solve.py`](../../klause-bench/xcsp3-cpsat/test_solve.py) contains self-authored
 constant and variable matrix fixtures, grouped conditions and axis-bound failures.
+Its weighted expression-sum, contradiction, unconstrained-variable and wide
+objective controls are self-authored Apache-2.0 sources. Full fetched XCSP sources
+and saved witness records remain external; their source hashes and independent
+checker receipts bind remote regression controls to original bytes.
 The reference importer uses column-count strides for row-major matrix selection
-and enforces both source index bounds. Its cache key includes the container image,
-importer policy and worker count; records retain the image and policy in
-`referenceVersion`. Changed importer identities replace older reference claims.
-Rebuild `klause-xcsp3-cpsat` from `klause-bench/xcsp3-cpsat` after importer changes.
-Run these regressions with
-`docker run --rm --entrypoint python -v "$PWD/klause-bench/xcsp3-cpsat:/tests:ro" -w /tests klause-xcsp3-cpsat:latest test_solve.py`.
+and enforces both source index bounds. Source-preserving reference records retain
+the installed image/importer identity, complete source assignment and exact integer
+objective; they disable native model presolve across the admitted input surface.
+See the [benchmark reference workflow](../../klause-bench/README.md#klause-lab)
+for image preparation, replay and the distinction between source witnesses and
+native proof claims.
 
 ## MPS source verifier
 
