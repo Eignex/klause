@@ -95,7 +95,10 @@ The pass builds a bounded sparse row view once per admitted query and retains on
 completed coordinate certificates. Integral-valued coefficients, endpoints, right-hand
 sides and target origins admit checked Int128 endpoint sums and comparisons. Continuous
 declarations remain continuous. Only productive projections materialize rational values;
-fractional data or fixed-width overflow falls back to the rational row pass under the
+each row query owns reusable fixed-width accumulators, which are cleared between
+coordinates and directions. Their allocation is charged once and arithmetic is charged
+per operation. Published certificates retain immutable rational values rather than scratch state.
+Fractional data or fixed-width overflow falls back to the rational row pass under the
 remaining shared allowance. Failed attempts retain their charges. An exact comparison
 of the existing endpoint's
 row contribution with the residual skips division and source-coordinate reconstruction
