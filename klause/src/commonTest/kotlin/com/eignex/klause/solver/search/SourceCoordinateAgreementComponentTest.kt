@@ -24,6 +24,8 @@ class SourceCoordinateAgreementComponentTest {
         val agreement = SourceCoordinateAgreementComponent(listOf(peer), { session.model() })
         session = SearchComponentSet(listOf(owner, peer, agreement)).session()
 
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
         val result = session.solve(0)
 
         assertIs<SearchResult.Indeterminate>(result)
