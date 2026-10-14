@@ -128,6 +128,14 @@ The objective candidate can also supply a bound when the proposed LP duals
 decline on an absent endpoint. It shares the same work/allocation allowance and endpoint checks,
 and retains the defining row and its scoped premises. Candidate publication follows the
 final cancellation check; each consumer also applies certification policy admission.
+For an already integral source objective, the zero-dual box certificate supplies
+the objective candidate without a defining equality. One exact midpoint of the
+primary and objective dual vectors can strengthen conditional integral costs
+through endpoint cancellation. Every midpoint contribution is checked against the
+same source authority. At most three complete certificates participate: pruning
+uses the strongest admitted bound and fixing can use the other two. All candidates,
+selection and failed attempts share the unchanged node allowance; a decline keeps
+completed candidates. No additional LP query or row admission is required.
 For a nonintegral objective, node pruning compares the exact certified bound in
 minimized source units with an enclosing rational incumbent cutoff. It uses the
 unrounded objective without an integer objective atom, so the prune has no
