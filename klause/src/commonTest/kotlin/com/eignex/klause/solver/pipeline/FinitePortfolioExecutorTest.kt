@@ -36,7 +36,9 @@ class FinitePortfolioExecutorTest {
                     val families = workers.map { it.family }.distinct().size
                     assertEquals(1.0 / families, shares.sum())
                     for ((index, worker) in workers.withIndex()) {
-                        assertEquals(worker.family == ArmFamily.Backtrack && !worker.auxiliaryProof, shares[index] > 0.0)
+                        assertEquals(
+                            worker.family == ArmFamily.Backtrack && !worker.auxiliaryProof, shares[index] > 0.0,
+                        )
                     }
                 } else assertTrue(shares.isEmpty())
             } finally {
