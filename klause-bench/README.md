@@ -1321,6 +1321,26 @@ The capture includes original record bytes, section/table hashes, scan completio
 partial records, errors and exits. The reader neither loads nor invokes the library,
 attaches no probes and supplies no task/root, code-size, timing or savings proof.
 
+### Captured native symbol signatures
+
+`com.eignex.klause.bench.profile.NativeVmSignatureVerification` accepts
+`report=<https URL>` and `report-sha256=<hash>` for a complete retained symbol
+report. The bounded download must match its hash and the pinned JVM library.
+The child hashes the target library without loading or invoking it.
+
+The public `__cxa_demangle` API supplies C++ names through the worker's installed
+provider. Its entry must bind to one exact named executable file mapping and
+loader-owned segment, with provider hashes and loaded-header bytes verified.
+Only the API-reported allocated buffer is read, with an explicit size limit;
+returned buffers are released on success and failure. Status, allocation size,
+provider metadata and partial/error captures are retained.
+
+Every original symbol record remains. Exact matches to the three source
+signatures are listed separately, preserving duplicates and excluding undefined
+or non-function definitions. A demangled signature supplies no proof of the
+actual argument registers, live task pointer, root association, clock/loss,
+code-size result or compiler saving. Validate those boundaries before probing.
+
 ### Table profiling
 
 ```sh
