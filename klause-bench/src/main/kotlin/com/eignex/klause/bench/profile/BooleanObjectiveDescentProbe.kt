@@ -13,8 +13,11 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
-import com.eignex.klause.portfolio.LocalSearchWorkerConfig
+import com.eignex.klause.portfolio.PortfolioBuilder
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
@@ -105,10 +108,12 @@ internal object BooleanObjectiveDescentProbe {
                         base.perMoveInvariants, base.seedImplicitOnRestart,
                     )
                     val materializeStarted = System.nanoTime()
-                    val worker = LocalSearchWorkerConfig(recipe).materialize(
-                        problem.bake(), 0, 0, 3L, 1.0, objective,
-                        if (functional) guide else null, sweep, null, null,
-                    )
+                    val worker = PortfolioBuilder.build(
+                        problem.bake(),
+                        PortfolioScenario(1, 1, Kind.COP, EngineMix.LOCAL_SEARCH,
+                            seed = 3L, lsPool = listOf({ recipe })),
+                        objective, if (functional) guide else null, sweep,
+                    ).single()
                     val materializeNanos = System.nanoTime() - materializeStarted
                     var best = initial
                     var bestValue = objective.evaluateExact(initial)
