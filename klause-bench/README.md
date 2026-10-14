@@ -1220,6 +1220,27 @@ finalize it. Packing runs after the profile body, outside solver timing. Consume
 must unpack and verify the manifest before source filtering or publication;
 compression establishes byte preservation, not source feasibility or performance.
 
+### Native VM layout metadata
+
+`com.eignex.klause.bench.profile.NativeVmMetadataVerification` inspects exported
+serviceability tables from the pinned Linux x86-64 JVM library in a separate
+unprivileged Python process. It verifies the library hash before loading and after
+reading. `dlinfo(RTLD_DI_LINKMAP)` supplies the loaded object's public address
+member; only that first `Elf64_Addr` is read after checking its readable mapping.
+No private loader structure members or host padding are mirrored.
+
+The loaded program-header bytes must match the pinned ELF file at the correct
+file offset. Metadata reads intersect loader-owned readable `PT_LOAD` segments
+with readable exact-file or private anonymous kernel mappings. Unrelated,
+ambiguous, unsupported or unreadable ranges remain refused. Exported offsets,
+strides and target type widths bound every field/table read. Raw tables, query
+outputs, mapping snapshots, hashes, errors and exits remain in the capture.
+
+The diagnostic needs no worker C compiler, creates no JVM in its metadata process,
+reads no compiler-task instance, attaches no probes and changes no settings.
+Layout metadata alone supplies no compilation-root attribution, clock/loss proof,
+elapsed time, code-size reconstruction or compiler saving.
+
 ### Table profiling
 
 ```sh
