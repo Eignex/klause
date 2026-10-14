@@ -8,10 +8,13 @@ import com.eignex.klause.solver.defaultExecutionCapabilities
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.Cancellation
 
-internal class SelectedProjectionChecks(selection: PreparedFactorProjections) {
+internal class SelectedProjectionChecks(
+    selection: PreparedFactorProjections,
+    enforcingPeers: Set<Int> = emptySet(),
+) {
     private val source = selection.problem
     private val factors = source.factors.indices.filter { id ->
-        selection.requiresOriginalCheck(id) && source.factors[id].variables.reals.isEmpty() &&
+        id !in enforcingPeers && selection.requiresOriginalCheck(id) && source.factors[id].variables.reals.isEmpty() &&
             source.factors[id] !is ObjectiveBoundFactor
     }
     private val available = factors.all {

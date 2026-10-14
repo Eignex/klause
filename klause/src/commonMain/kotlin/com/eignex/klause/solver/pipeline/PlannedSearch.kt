@@ -87,6 +87,10 @@ internal class PreparedSearchComponents(
                     PropagationSession(propagation ?: PropagationProblem(projection.problem), opening.cancellation),
                     IntArray(projection.problem.numIntVars) { local -> projection.sourceId(local) },
                 )
+                if (plan.hasTheoryComponent) {
+                    val factors = spec.factors.indices.filter { plan.factorOwner(it) == FactorOwner.CP }
+                    cp.useEnforcingPeers(factors.indices.filter { plan.factorEncoded(factors[it]) }.toSet())
+                }
                 opening.ownComponent(cp)
                 cp.rebase()
                 listOf(cp)
