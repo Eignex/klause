@@ -11,6 +11,28 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `a weaker objective elimination certificate fixes the opposite integer endpoint`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            val r = addRealVar(0.0, 3.0, cost = 1.0)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(-3.0, 1.0), Relation.EQ, 0.0)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val additional = ArrayList<LpDeductionCertificate>()
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(1.5, -4.5),
+            onAdditionalCertificate = { additional.add(it) }))
+
+        assertEquals(BigFraction.ofLong(3L), certificate.exactObjectiveBound())
+        assertEquals(BigFraction.ZERO, certificate.exactReducedCost(0))
+        val opposite = additional.single { it.reducedCostSign(0) < 0 }
+        assertEquals(assertNotNull(BigFraction.ofDouble(-10.5)), opposite.exactObjectiveBound())
+        assertEquals(9L, opposite.fixStepsAtCutoff(0, BigFraction.ofLong(3L), 0L))
+        assertEquals(BigFraction.ZERO, opposite.exactReducedCost(1))
+    }
+
+    @Test
     fun `endpoint repair supplies integral fixing without a continuous upper bound`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 3L)

@@ -53,11 +53,13 @@ internal fun nodeDualCertificate(
     } else {
         null
     }
-    val fixingCertificate = if (eliminateContinuousObjective && certificate != null && rows != null) {
+    val fixingCertificate = if ((eliminateContinuousObjective || onAdditionalCertificate != null) &&
+        certificate != null && rows != null
+    ) {
         try {
             meter.attempt(observer, "OBJECTIVE_ELIMINATION") {
                 objectiveEliminationCertificate(model, certificate, rows.single(), meter)
-            }?.takeIf { it.exactObjectiveBound() >= certificate.exactObjectiveBound() }
+            }
         } catch (_: LpProjectionStop) {
             null
         }
@@ -76,8 +78,15 @@ internal fun nodeDualCertificate(
     } else {
         null
     }
-    val primary = fixingCertificate ?: certificate
-    val blended = if (primary != null && objectiveCertificate != null) {
+    val primary = if (onAdditionalCertificate == null) {
+        fixingCertificate?.takeIf { it.exactObjectiveBound() >= checkNotNull(certificate).exactObjectiveBound() }
+            ?: certificate
+    } else {
+        certificate
+    }
+    val alternative = if (fixingCertificate != null && fixingCertificate !== primary) {
+        fixingCertificate
+    } else if (primary != null && objectiveCertificate != null) {
         try {
             meter.attempt(observer, "BLENDED") { blendedCertificate(model, primary, objectiveCertificate, meter) }
         } catch (_: LpProjectionStop) {
@@ -86,7 +95,7 @@ internal fun nodeDualCertificate(
     } else {
         null
     }
-    val candidates = listOfNotNull(primary, objectiveCertificate, blended)
+    val candidates = listOfNotNull(primary, objectiveCertificate, alternative)
     var accepted = candidates.firstOrNull()
     for (candidate in candidates) {
         val selected = accepted ?: continue
