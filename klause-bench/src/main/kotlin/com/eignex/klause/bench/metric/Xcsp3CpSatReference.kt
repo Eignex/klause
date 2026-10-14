@@ -16,8 +16,8 @@ import java.util.concurrent.atomic.AtomicLong
  * Returns [SolverInvocation.Result] for shared caching and scoring with MiniZinc runs.
  */
 internal object Xcsp3CpSatReference {
-    const val IMAGE = "klause-xcsp3-cpsat:latest"
-    const val VERSION = "xcsp3-matrix-row-major-v1"
+    const val IMAGE = "klause-xcsp3-cpsat:source-preserving-v2"
+    const val VERSION = "xcsp3-source-preserving-v2"
 
     /** Label on every reference container, so stragglers can be reaped (`docker kill --filter label`). */
     const val CONTAINER_LABEL = "klause-xcsp3-ref"
@@ -38,6 +38,10 @@ internal object Xcsp3CpSatReference {
         val objective: Double? = null,
         val maximize: Boolean? = null,
         val error: String? = null,
+        val exactObjective: String? = null,
+        val seed: Long? = null,
+        val workers: Int? = null,
+        val cpModelPresolve: Boolean? = null,
     )
 
     /** Kill any leftover reference containers (from an earlier interrupted run). Best-effort: a
@@ -84,10 +88,10 @@ internal object Xcsp3CpSatReference {
      *  fanning out to every core). The objective sense (`maximize`), unknowable without parsing the
      *  model, is carried back in `stats["maximize"]`. A compressed instance is mounted as a decompressed
      *  staged copy, since the container reads a plain file. */
-    fun run(ref: ProblemRef, budget: Budget, workers: Int): SolverInvocation.Result =
-        CorpusFiles.withPlainFile(CorpusFetcher.resolve(ref.source)) { run(it, budget, workers) }
+    fun run(ref: ProblemRef, budget: Budget, workers: Int, seed: Long): SolverInvocation.Result =
+        CorpusFiles.withPlainFile(CorpusFetcher.resolve(ref.source)) { run(it, budget, workers, seed) }
 
-    private fun run(xml: File, budget: Budget, workers: Int): SolverInvocation.Result {
+    private fun run(xml: File, budget: Budget, workers: Int, seed: Long): SolverInvocation.Result {
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
         // The process id keeps names apart across bench processes run side by side, one instance each, as a lab runs
         // them: each counts from 1, and docker refuses a name already in use.
@@ -112,6 +116,7 @@ internal object Xcsp3CpSatReference {
             "/in/${xml.name}",
             timeoutSec.toString(),
             workers.toString(),
+            seed.toString(),
         )
         // CPMpy's parser chatter goes to stderr. A pipe nobody drains fills and blocks the container until the
         // watchdog kills it, so it goes to a file, whose tail also explains a missing verdict.
@@ -188,9 +193,12 @@ internal object Xcsp3CpSatReference {
             timeToBestMs = timeMs.takeIf { feasible == true },
             timeToFirstFeasibleMs = timeMs.takeIf { feasible == true },
             proven = v.exit == "OPTIMAL" || v.exit == "UNSATISFIABLE",
-            stats = mapOf("solveTime" to (v.runtime?.toString() ?: "0"), "maximize" to v.maximize.toString()),
+            stats = mapOf("solveTime" to (v.runtime?.toString() ?: "0"), "maximize" to v.maximize.toString()) +
+                listOfNotNull(v.seed?.let { "referenceSeed" to "$it" }, v.workers?.let { "referenceWorkers" to "$it" },
+                    v.cpModelPresolve?.let { "cpModelPresolve" to "$it" }).toMap(),
             rawOutput = stdout,
             command = cmd.joinToString(" "),
+            exactObjective = v.exactObjective,
         )
     }
 

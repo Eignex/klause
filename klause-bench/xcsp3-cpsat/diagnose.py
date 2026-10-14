@@ -7,6 +7,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 out = pathlib.Path(sys.argv[1])
+reduce_model = len(sys.argv) == 3 and sys.argv[2] == "reduce"
 sys.argv = ["diagnose"]
 import cpmpy as cp
 from cpmpy.solvers import CPM_ortools
@@ -30,6 +31,50 @@ for index, row in enumerate(json.loads((out / "request.json").read_text())):
     values = [int(value) for value in witness.findtext("values").split()]
     assert len(names) == len(values) and len(set(names)) == len(names)
     assignment = dict(zip(names, values))
+    if reduce_model:
+        callbacks = namespace["read_model"](str(source))
+        original = callbacks.cpm_model
+        constraints = original.constraints
+        selected = list(range(len(constraints)))
+        attempts = []
+        def refuted(indices):
+            if len(attempts) >= 120:
+                return False
+            model = cp.Model([constraints[i] for i in indices])
+            model.solve(solver="ortools", time_limit=1, num_workers=1, random_seed=1)
+            status = str(model.status())
+            attempts.append({"constraints": indices, "status": status})
+            (out / "reduction-attempts.json").write_text(json.dumps(attempts))
+            return "UNSATISFIABLE" in status
+        assert refuted(selected), "the input model is not falsely refuted without an objective"
+        partitions = 2
+        while len(selected) > 1 and len(attempts) < 120:
+            size = (len(selected) + partitions - 1) // partitions
+            changed = False
+            for start in range(0, len(selected), size):
+                candidate = selected[:start] + selected[start + size:]
+                if refuted(candidate):
+                    selected = candidate
+                    partitions = max(2, partitions - 1)
+                    changed = True
+                    break
+            if not changed:
+                if partitions >= len(selected):
+                    break
+                partitions = min(len(selected), partitions * 2)
+        pins = [cpm == assignment[var.id] for var, cpm in callbacks.cpm_variables.items()]
+        for var, cpm in callbacks.cpm_variables.items():
+            cpm._value = assignment[var.id]
+        violations = [i for i in selected if constraints[i].value() != True]
+        pinned = cp.Model([constraints[i] for i in selected] + pins)
+        feasible = pinned.solve(solver="ortools", time_limit=10, num_workers=1, random_seed=1)
+        receipt = {"selected": selected, "constraints": [str(constraints[i]) for i in selected],
+                   "witnessViolations": violations, "pinnedFeasible": bool(feasible),
+                   "pinnedStatus": str(pinned.status()), "attempts": len(attempts),
+                   "sourceSha256": row["sourceSha256"], "derivedDiagnosticModel": True}
+        (out / "reduction.json").write_text(json.dumps(receipt, indent=2))
+        print(json.dumps(receipt), flush=True)
+        continue
     for mode in ["default", "source-pins", "no-model-presolve", "keep-all", "no-probing", "no-substitution"]:
         callbacks = namespace["read_model"](str(source))
         model = callbacks.cpm_model

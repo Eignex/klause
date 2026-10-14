@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -19,8 +20,8 @@ internal object Xcsp3ReferenceReplay {
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.size in 1..2 && args[0].startsWith("request64="))
-        require(args.size == 1 || args[1] == "image=current")
-        val image = if (args.size == 1) "klause-xcsp3-cpsat:latest" else "klause-xcsp3-cpsat:source-model-v2"
+        require(args.size == 1 || args[1] in setOf("image=current", "mode=reduce"))
+        val image = if (args.getOrNull(1) == "image=current") Xcsp3CpSatReference.IMAGE else "klause-xcsp3-cpsat:latest"
         val encoded = args[0].substringAfter('=')
         require(encoded.length <= 64 * 1024)
         val request = Base64.getDecoder().decode(encoded)
@@ -44,7 +45,7 @@ internal object Xcsp3ReferenceReplay {
         val name = "xcsp3-reference-replay-${ProcessHandle.current().pid()}"
         val command = listOf("docker", "run", "--rm", "--name", name, "--network", "none", "--memory", "6g",
             "--memory-swap", "6g", "--cpus", "1", "--entrypoint", "python", "-v", "${out.absolutePath}:/out",
-            image, "/out/diagnose.py", "/out")
+            image, "/out/diagnose.py", "/out") + if (args.getOrNull(1) == "mode=reduce") listOf("reduce") else emptyList()
         out.resolve("command.json").writeText(Reports.json.encodeToString(command))
         val process = ProcessBuilder(command).redirectOutput(out.resolve("stdout"))
             .redirectError(out.resolve("stderr")).start()

@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.report.Reports
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -12,7 +13,7 @@ internal object Xcsp3ReferenceImage {
         val out = File(requireNotNull(System.getenv("OUT"))).resolve("xcsp3-reference-image").apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
-        val image = if (args.isEmpty()) "klause-xcsp3-cpsat:latest" else "klause-xcsp3-cpsat:source-model-v2"
+        val image = if (args.isEmpty()) "klause-xcsp3-cpsat:latest" else Xcsp3CpSatReference.IMAGE
         if (args.isNotEmpty()) {
             run(out, "build", listOf("docker", "build", "-t", image,
                 root.resolve("klause-bench/xcsp3-cpsat").absolutePath), 600)

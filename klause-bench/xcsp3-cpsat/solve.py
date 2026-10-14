@@ -10,8 +10,9 @@ or null for a CSP / no incumbent), maximize (bool or null). The bench maps these
 """
 import json
 import sys
+from xml.sax.saxutils import escape
 
-VERSION = "xcsp3-matrix-row-major-v1"
+VERSION = "xcsp3-source-preserving-v2"
 
 
 def read_model(path):
@@ -33,31 +34,43 @@ def read_model(path):
     callbacks = RowMajorCallbacks()
     callbacks.force_exit = True
     CallbackerXCSP3(ParserXCSP3(path), callbacks).load_instance()
+    callbacks.cpm_model.source_variables = callbacks.cpm_variables
     return callbacks.cpm_model
 
 
-def solve(path, time_limit, workers):
+def solve(path, time_limit, workers, seed=3):
+    from cpmpy.solvers import CPM_ortools
+
     model = read_model(path)
     obj = getattr(model, "objective_", None)
     maximize = None if obj is None else not bool(getattr(model, "objective_is_min", True))
     # Pin cp-sat's own workers: the bench parallelizes across instances, so each container stays
     # single-worker and N concurrent solves can't fan out to every core (memory/CPU blow-up).
-    model.solve(solver="ortools", time_limit=time_limit, num_workers=workers)
-    status = model.status()
+    solver = CPM_ortools(model)
+    solver.user_vars.update(model.source_variables.values())
+    solver.solver_vars(list(model.source_variables.values()))
+    # Native presolve can refute models whose original-source witnesses satisfy the encoded constraints.
+    solver.solve(time_limit=time_limit, num_workers=workers, random_seed=seed, cp_model_presolve=False)
+    status = solver.status()
     exitstatus = str(status.exitstatus).rsplit(".", 1)[-1]
     # objective_value() errors on a CSP (no objective) or when there is no incumbent yet.
     objective = None
+    witness = None
     if obj is not None and exitstatus in ("OPTIMAL", "FEASIBLE"):
-        try:
-            objective = model.objective_value()
-        except Exception:  # noqa: BLE001
-            objective = None
+        objective = int(obj.value())
+    if exitstatus in ("OPTIMAL", "FEASIBLE"):
+        witness = {var.id: int(cpm.value()) for var, cpm in model.source_variables.items()}
     return {
         "version": VERSION,
         "exit": exitstatus,
         "runtime": status.runtime,
         "objective": objective,
         "maximize": maximize,
+        "exactObjective": None if objective is None else str(objective),
+        "witness": witness,
+        "seed": seed,
+        "workers": workers,
+        "cpModelPresolve": False,
     }
 
 
@@ -65,13 +78,22 @@ def main():
     path = sys.argv[1]
     time_limit = float(sys.argv[2]) if len(sys.argv) > 2 else 10.0
     workers = int(sys.argv[3]) if len(sys.argv) > 3 else 1
+    seed = int(sys.argv[4]) if len(sys.argv) > 4 else 3
     # Keep the real stdout for the JSON verdict only; CPMpy/parser chatter goes to stderr.
     out = sys.stdout
     sys.stdout = sys.stderr
     try:
-        result = solve(path, time_limit, workers)
+        result = solve(path, time_limit, workers, seed)
     except Exception as e:  # noqa: BLE001 — a parse/solve failure is a per-instance verdict, not a crash
         result = {"exit": "ERROR", "error": f"{type(e).__name__}: {e}", "version": VERSION}
+    if result.get("witness") is not None:
+        cost = result.get("exactObjective")
+        if cost is not None:
+            print("o " + cost, file=out)
+        names = " ".join(escape(name) for name in result["witness"])
+        values = " ".join(str(value) for value in result["witness"].values())
+        attribute = "" if cost is None else f' cost="{cost}"'
+        print(f"v <instantiation{attribute}><list>{names}</list><values>{values}</values></instantiation>", file=out)
     print(json.dumps(result), file=out)
 
 
