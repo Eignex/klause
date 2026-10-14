@@ -80,8 +80,8 @@ internal fun PreparedSource.planned(
         }
     } else selected
     require(
-        plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
-            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN || cancellation(),
+        (plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
+            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN) || cancellation(),
     ) {
         "source preparation left the model without an open-theory route"
     }

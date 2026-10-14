@@ -230,7 +230,10 @@ retain original factor attribution and typed coordinates. A compound installatio
 produce several conjunctions and disjunctions attributed to the same source factor.
 Private affine temporaries and Boolean formula names have exactly one acyclic definition
 in their receiving scope; exact expansion removes them before solving and retains their
-reconstruction definitions in the attribution. Source declaration counts remain unchanged; component openings own their
+reconstruction definitions in the attribution. Private existential real coordinates have their own allocation and attribution.
+Their assertions, disjunction decisions and disequality splits remain inside the exact
+component. Publication strips them, and source-coordinate agreement never names them.
+Source declaration counts remain unchanged; component openings own their
 combined graph, assertion scopes, LP state and resources. Conditioned finite completion
 captures the fixed discrete point without changing source declarations. Its pins do
 not authorize a refutation outside that scope.

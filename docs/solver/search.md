@@ -640,7 +640,12 @@ components. Admission and component construction consume the same selected captu
 ownership is independent of factor participation: finite declarations retain finite
 state and choices, while a propagator and encoder can consume one factor together.
 Component descriptors distinguish primary `factorIndices` from overlapping
-`participatingFactorIndices`, retaining one authoritative coordinate owner. Linear relations retain conjunction/disjunction structure, row activators,
+`participatingFactorIndices`, retaining one authoritative coordinate owner. Compound linear formulas lower to attributed conjunctions and disjunctions. Private
+real coordinates stay in the combined exact model; their disjunction and disequality
+decisions use component-owned atoms and retain the same decision-level retraction
+as source relations. Source predicate exchange excludes private terms. Exact witness
+publication strips private coordinates before typed source contribution. Linear
+relations retain conjunction/disjunction structure, row activators,
 Boolean terms, strictness and original factor attribution. Integer difference admission
 checks complete selected relations and the safety of their combined graph. Polynomial
 installation conjoins factor relations and all private auxiliary definitions before

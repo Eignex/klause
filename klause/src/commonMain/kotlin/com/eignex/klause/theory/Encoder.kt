@@ -129,6 +129,8 @@ interface TheoryEncoding {
     fun linear(form: LinearForm)
     /** Install a complete compound linear formula; private names belong to this receiving scope. */
     fun linearFormula(formula: LinearEncodingFormula): Unit = error("compound linear formulas unavailable")
+    /** Allocate a private real constrained by this installation's complete formula. */
+    fun realAuxiliary(): EncodingRealAuxiliary = error("private real coordinates unavailable")
     /** Allocate a private affine value, requiring exactly one acyclic definition before installation completes. */
     fun auxiliary(): EncodingAuxiliary = error("affine auxiliaries unavailable")
     /** Define a private affine value with exact source or scoped auxiliary terms. */

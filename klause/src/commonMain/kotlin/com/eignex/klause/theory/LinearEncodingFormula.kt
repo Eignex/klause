@@ -11,6 +11,13 @@ class EncodingAuxiliary internal constructor(
     val index: Int,
 )
 
+/** A private existential real coordinate, constrained by one installation's complete formula. */
+class EncodingRealAuxiliary internal constructor(
+    internal val owner: Any,
+    /** Typed private coordinate retained in the installed attribution. */
+    val coordinate: TheoryRealId,
+)
+
 /** A private Boolean formula name, allocated and defined by one receiving installation scope. */
 class EncodingGuard internal constructor(
     internal val owner: Any,
@@ -24,6 +31,8 @@ class EncodingLinearTerm private constructor(
     val reference: Int?,
     /** Scoped affine value, absent for a tagged source term. */
     val auxiliary: EncodingAuxiliary?,
+    /** Private existential real, absent for a source or affine term. */
+    val realAuxiliary: EncodingRealAuxiliary?,
     /** Exact coefficient, independent of numerical execution. */
     val coefficient: BigFraction,
 ) {
@@ -31,10 +40,13 @@ class EncodingLinearTerm private constructor(
     companion object {
         /** Reference a tagged source coordinate or literal. */
         fun source(reference: Int, coefficient: BigFraction): EncodingLinearTerm =
-            EncodingLinearTerm(reference, null, coefficient)
+            EncodingLinearTerm(reference, null, null, coefficient)
         /** Reference an auxiliary allocated by the receiving scope. */
         fun auxiliary(auxiliary: EncodingAuxiliary, coefficient: BigFraction): EncodingLinearTerm =
-            EncodingLinearTerm(null, auxiliary, coefficient)
+            EncodingLinearTerm(null, auxiliary, null, coefficient)
+        /** Reference an existential real allocated by the receiving scope. */
+        fun auxiliary(auxiliary: EncodingRealAuxiliary, coefficient: BigFraction): EncodingLinearTerm =
+            EncodingLinearTerm(null, null, auxiliary, coefficient)
     }
 }
 
