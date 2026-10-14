@@ -1428,6 +1428,18 @@ suffixes and failures are retained. There is no global installation or target
 library loading. Linear decoding establishes no control-flow or argument proof;
 do not derive private field offsets, task lifetime or compiler savings from it.
 
+`com.eignex.klause.bench.profile.NativeVmEntryRegisterVerification` accepts
+`entries=<https URL>`, `entries-sha256=<hash>`, `metadata=<https URL>` and
+`metadata-sha256=<hash>` for retained entry and exported-layout protocol reports.
+Both bounded inputs must match their hashes and the pinned library identity.
+The child verifies instruction-byte boundaries and compares reads through
+full-width incoming pointer copies with exported field owners, offsets and widths.
+Partial register writes invalidate aliases; control transfers and unsupported
+instructions stop the prefix review. Every original symbol remains, including
+unmatched contracts, unavailable entries and per-record errors. This comparison
+corroborates a source ABI contract; it supplies no live pointer, whole-function,
+task/root, return-size or savings proof and neither loads nor decodes a binary.
+
 ### Table profiling
 
 ```sh
