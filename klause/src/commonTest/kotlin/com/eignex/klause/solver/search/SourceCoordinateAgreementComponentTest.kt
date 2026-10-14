@@ -17,7 +17,8 @@ class SourceCoordinateAgreementComponentTest {
         val peer = object : SearchComponent, SourceCoordinateAgreement {
             override fun shareSourcePredicates(context: SearchContext): ComponentResult = ComponentResult.Consistent
             override fun checkSourceCoordinates(model: AssembledSearchModel, context: SearchContext): ComponentCheck =
-                if (model.valueOf(coordinate) == BigFraction.ONE) ComponentCheck.Feasible else ComponentCheck.Infeasible()
+                if (model.valueOf(coordinate) == BigFraction.ONE) ComponentCheck.Feasible
+                else ComponentCheck.Infeasible()
         }
         lateinit var session: SearchSession
         val agreement = SourceCoordinateAgreementComponent(listOf(peer), { session.model() })
