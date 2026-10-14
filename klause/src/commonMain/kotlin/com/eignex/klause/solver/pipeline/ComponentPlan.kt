@@ -452,7 +452,7 @@ fun Problem.componentPlan(
         else -> ProblemPipeline.UNSUPPORTED_OPEN
     }
     return ComponentPlan(this, intOwners, factorOwners, route,
-        unownedOpenColumn?.let { unplaceable(it, projections, numRealVars != 0) }, projections, encoded,
+        unownedOpenColumn?.let { unplaceable(it, projections, factorOwners) }, projections, encoded,
         if (route == ProblemPipeline.DIFFERENCE_THEORY) differenceFragment else fragment,
         if (route != ProblemPipeline.UNSUPPORTED_OPEN) null
         else if (cancellation() || linearDecline == EncoderDecline.RESOURCE ||
@@ -470,11 +470,11 @@ fun Problem.componentPlan(
 private fun unplaceable(
     column: Int,
     projections: PreparedFactorProjections,
-    hasRealColumns: Boolean,
+    factorOwners: Array<FactorOwner>,
 ): UnplaceableColumn {
     val factors = projections.problem.factors
     val culprit = factors.indices.firstOrNull { index ->
-        !projections.theoryOwnable(index, hasRealColumns) && factors[index].variables.ints.any { it == column }
+        factorOwners[index] == FactorOwner.CP && factors[index].variables.ints.any { it == column }
     } ?: -1
     return UnplaceableColumn(
         column,
