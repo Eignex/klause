@@ -305,7 +305,7 @@ class ExactLiraSearchComponent private constructor(
         beginOperation()
         return try {
             if (operationStop()) return ComponentResult.Indeterminate
-            val rows = reduction.sourceRows(bools, node, lpStop)
+            val rows = agreementSourceRows()
                 ?: return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
             for (row in rows) {
                 lpStop.charge(row.columns.size.toLong() + 1L)
@@ -337,6 +337,7 @@ class ExactLiraSearchComponent private constructor(
             }
             val point = ArrayList<BigFraction>(model.numRealVars + model.numIntVars)
             for (variable in 0 until model.numRealVars) {
+                lpStop.charge(1L)
                 if (operationStop()) return ComponentCheck.Indeterminate
                 val id = SourceRealId(variable)
                 if (values.valueOf(SearchExactAlgebraicRealValue(id)) != null ||
@@ -345,12 +346,15 @@ class ExactLiraSearchComponent private constructor(
                 point += values.valueOf(SearchExactRealValue(id)) ?: return coordinateDeclined(context)
             }
             for (variable in 0 until model.numIntVars) {
+                lpStop.charge(1L)
                 if (operationStop()) return ComponentCheck.Indeterminate
                 point += values.valueOf(SearchExactIntValue(SourceIntId(variable)))?.asFraction()
                     ?: return coordinateDeclined(context)
             }
+            lpStop.charge(point.size.toLong() + 1L)
+            if (operationStop()) return ComponentCheck.Indeterminate
             if (!point.admittedSourcePoint()) return coordinateDeclined(context)
-            val rows = reduction.sourceRows(bools, node, lpStop) ?: return coordinateDeclined(context)
+            val rows = agreementSourceRows() ?: return coordinateDeclined(context)
             lpStop.charge(rows.sumOf { it.columns.size.toLong() + 1L })
             if (!operationStop() && point.satisfiesSourceRows(rows, lpStop) && !operationStop()) {
                 ComponentCheck.Feasible
@@ -358,6 +362,12 @@ class ExactLiraSearchComponent private constructor(
         } finally {
             endOperation(context)
         }
+    }
+
+    private fun agreementSourceRows(): List<ExactRationalInequality>? {
+        lpStop.charge(model.numIntVars.toLong() + model.numRealVars + preparedRows.size + 1L)
+        if (operationStop()) return null
+        return reduction.sourceRows(bools, node, lpStop)
     }
 
     private fun coordinateDeclined(context: SearchContext): ComponentCheck {
