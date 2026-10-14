@@ -13,6 +13,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
@@ -185,9 +186,12 @@ internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
  *  the primal pass: the dual simplex cannot optimise an arbitrary objective (it leaves its dual-feasible
  *  start). */
 private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellation): Double? {
-    val session = PropagationSession(prob)
+    val selected = projections?.forEngineView(prob)
+    val session = PropagationSession(if (selected == null) PropagationProblem(prob)
+        else PropagationProblem(prob, selected))
     if (session.isUnsatAtRoot) return null
-    val relaxation = CpToLpRelaxation(prob, LinearObjective(intCoefficients = coeffs)).build(session)
+    val relaxation = CpToLpRelaxation(prob, LinearObjective(intCoefficients = coeffs), projections = selected)
+        .build(session)
     if (relaxation.model.n == 0) return null
     val simplex = dualSimplex(relaxation.model, token)
     val result = try {
@@ -220,7 +224,8 @@ private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: Cancellati
  *  [PropagationSession] bake — the no-bake analog of [safeMin], for pre-bake OBBT on wide domains. */
 private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Double? {
     val relaxation = try {
-        CpToLpRelaxation(problem, LinearObjective(intCoefficients = coeffs)).build(RootDomains(problem))
+        CpToLpRelaxation(problem, LinearObjective(intCoefficients = coeffs), projections = projections)
+            .build(RootDomains(problem))
     } catch (_: CheckedLongOverflowException) {
         return null
     }
