@@ -35,6 +35,7 @@ object NValueNeighborhoodProfile {
         val residuals: Map<String, Int>,
         val parts: Int,
         val clauseDependencies: Map<Int, List<String>>,
+        val repairTrace: List<Map<Int, List<String>>> = emptyList(),
     )
 
     @Serializable
@@ -146,12 +147,13 @@ object NValueNeighborhoodProfile {
                             val residuals = (0 until problem.numFactors)
                                 .filter { state.factors[it].isViolated(state, it) }
                                 .groupingBy { problem.factors[it]::class.simpleName ?: "Factor" }.eachCount()
-                            reductions += Proposal(
+                            val proposal = Proposal(
                                 nextDistinct, state.assignment.intValue(factor.n), state.cost,
                                 objective.evaluate(state.assignment), residuals,
                                 if (move is Move.Compound) move.parts.size else 1,
                                 clauseDependencies(state),
                             )
+                            reductions += proposal.copy(repairTrace = clauseRepairTrace(state, factor))
                         }
                         restore(state, sample)
                     }
@@ -201,6 +203,31 @@ object NValueNeighborhoodProfile {
             }
             put(fid, descriptions)
         }
+    }
+
+    private fun clauseRepairTrace(state: LocalSearchState, factor: NValue): List<Map<Int, List<String>>> {
+        if (state.cost == 0L) return emptyList()
+        val diagnostic = LocalSearchState(state.model, Random(0), state.assumptions, state.projection)
+        diagnostic.invariants = state.invariants
+        restore(diagnostic, state.assignment.snapshot())
+        var pins = diagnostic.assumptions
+        for (v in factor.xs + intArrayOf(factor.n)) pins = pins.withInt(v, diagnostic.assignment.intValue(v))
+        val repairs = MoveSink(pins).also {
+            it.setInvariants(diagnostic.invariants)
+            it.setOwners(state.seeding.ownerInt)
+        }
+        val trace = ArrayList<Map<Int, List<String>>>()
+        repeat(2) { _ ->
+            val fid = (0 until diagnostic.problem.numFactors).firstOrNull { id ->
+                diagnostic.problem.factors[id] is Clause && diagnostic.factors[id].isViolated(diagnostic, id)
+            } ?: return trace
+            repairs.clear()
+            diagnostic.factors[fid].proposeRepairMoves(diagnostic, fid, repairs)
+            val next = repairs.list.minByOrNull { diagnostic.netDelta(it) } ?: return trace
+            diagnostic.apply(next)
+            trace += clauseDependencies(diagnostic)
+        }
+        return trace
     }
 
     private fun distinct(state: LocalSearchState, factor: NValue): Int = factor.xs.indices.filter {

@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntObjectMap
 
 internal class NValueClauseCompletion(
     private val state: LocalSearchState,
@@ -17,11 +18,18 @@ internal class NValueClauseCompletion(
     protectedInts: IntArray,
 ) {
     private val network = checkNotNull(state.invariants)
+    private val folds = MutableIntObjectMap<DefinitionalSweep.SweepNode.BoolFold>().also { index ->
+        for (i in 0 until network.size) {
+            val fold = network.node(i) as? DefinitionalSweep.SweepNode.BoolFold ?: continue
+            index.put(fold.out, fold)
+        }
+    }
     private val assignment = Assignment(state.problem.numBoolVars, state.problem.numIntVars, state.problem.numRealVars)
     private val pinnedInts = IntHashSet().also { pins -> protectedInts.forEach { pins.add(it) } }
     private val pinnedBools = IntHashSet()
     private val pending = ArrayList<Int>()
     private val parts = ArrayList<Move>()
+    private var foldVisits = 0
 
     fun complete(move: Move): Move {
         state.assignment.copyInto(assignment)
@@ -40,16 +48,22 @@ internal class NValueClauseCompletion(
             val choices = clause.literals.map(::repair).filterNotNull().distinct()
             if (choices.size != 1) continue
             val next = choices[0]
-            parts += next
-            pin(next)
-            write(next)
-            propagate(listOf(next))
-            added++
+            val writes = if (next is Move.Compound) next.parts else listOf(next)
+            if (added + writes.size > MAX_WRITES) continue
+            for (part in writes) {
+                parts += part
+                pin(part)
+                write(part)
+            }
+            propagate(writes)
+            added += writes.size
         }
         return if (parts.size == 1) parts[0] else Move.Compound(parts)
     }
 
-    private fun repair(literal: Int): Move? {
+    private fun repair(literal: Int): Move? = repair(literal, 0)
+
+    private fun repair(literal: Int, depth: Int): Move? {
         val b = Lit.variable(literal)
         val desired = Lit.isPositive(literal)
         if (state.assumptions.isFrozenBool(b) || b in pinnedBools) return null
@@ -72,7 +86,22 @@ internal class NValueClauseCompletion(
             ) continue
             return Move.IntSet(variable, value)
         }
-        return null
+        if (depth >= MAX_FOLD_DEPTH || foldVisits >= MAX_FOLD_VISITS) return null
+        val fold = folds[b] ?: return null
+        if (fold.isAnd != desired || fold.ins.size > MAX_WRITES) return null
+        foldVisits++
+        val writes = ArrayList<Move>()
+        for (input in fold.ins) {
+            val required = if (desired) input else Lit.negate(input)
+            if (holds(required)) continue
+            val child = repair(required, depth + 1) ?: return null
+            writes += if (child is Move.Compound) child.parts else listOf(child)
+            if (writes.size > MAX_WRITES) return null
+        }
+        val distinct = writes.distinct()
+        val ints = distinct.filterIsInstance<Move.IntSet>()
+        if (ints.map { it.varId }.distinct().size != ints.size || distinct.isEmpty()) return null
+        return if (distinct.size == 1) distinct[0] else Move.Compound(distinct)
     }
 
     private fun pin(move: Move) {
@@ -128,5 +157,7 @@ internal class NValueClauseCompletion(
     private companion object {
         const val MAX_CLAUSE_VISITS = 512
         const val MAX_WRITES = 32
+        const val MAX_FOLD_DEPTH = 4
+        const val MAX_FOLD_VISITS = 32
     }
 }
