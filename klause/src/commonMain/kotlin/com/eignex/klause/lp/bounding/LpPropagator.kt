@@ -81,6 +81,7 @@ internal class LpPropagator(
     private val certificationObserver: LpCertificationObserver? = null,
     // Each bound edit costs the scoped solver a pass over the model's columns; the engine charges it as LP work.
     private val onEdit: (Long) -> Unit = {},
+    private val queryWorkAllowance: () -> Long? = { null },
 ) : SearchComponent,
     SearchBrancher,
     SearchBranchProposal,
@@ -341,8 +342,12 @@ internal class LpPropagator(
 
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
         solveOwned { current ->
-            val allowance = if (solved) effort().let { LpFloatAllowance(it.work, it.iterations) } else null
-            current.solveFloat(if (solved) null else warm, token, allowance).also { solved = true }
+            val offered = queryWorkAllowance()
+            val allowance = if (solved || offered != null) {
+                effort().let { LpFloatAllowance(offered ?: it.work, it.iterations) }
+            } else null
+            // An explicit query allowance uses the scoped owner's retained basis and factors.
+            current.solveFloat(if (allowance != null) null else warm, token, allowance).also { solved = true }
         }
 
     fun solve(token: Cancellation = cancellation, sparsePointRecovery: Boolean = false): CertifiedLpResult? =

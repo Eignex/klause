@@ -129,7 +129,8 @@ Curated satisfaction pools require `lp-root-cuts=true` to enable harvesting.
 Finite optimization adapters may supply a remaining native-work cap for optional
 node queries. The LP owner combines it with its persistent effort allowance without
 renewing either scope. A capped query that cannot certify a bound supplies no pruning
-authority; required leaf completion retains its own budget. See
+authority. Retained owner construction and required leaf completion retain their
+own budgets. See
 [slice accounting](../solver/resources.md).
 
 Problem-level presolve/inprocessing and LP root harvesting are reused. There

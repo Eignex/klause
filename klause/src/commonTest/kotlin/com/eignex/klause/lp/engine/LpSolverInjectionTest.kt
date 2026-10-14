@@ -24,6 +24,7 @@ internal data class EngineConstructionCall(
 internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = ProductionLpEngineFactory) :
     LpEngineFactory {
     val calls = ArrayList<EngineConstructionCall>()
+    val floatAllowances = ArrayList<LpFloatAllowance?>()
 
     override fun newGeneralSolver(
         model: LpModel,
@@ -93,7 +94,7 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
             zeroObjectivePricing = pricing.zeroObjective,
             tieSeed = pricing.tieSeed,
         )
-        return delegate.newPersistentSolver(
+        val solver = delegate.newPersistentSolver(
             model,
             cancellation,
             refactorUpdateLimit,
@@ -102,6 +103,12 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
             trackDegeneracy,
             pricing,
         )
+        return object : PersistentLpSolver by solver {
+            override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                floatAllowances += allowance
+                return solver.resolveBounds(allowance)
+            }
+        }
     }
 }
 

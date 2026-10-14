@@ -420,14 +420,14 @@ internal class LpEngine(
             else -> lpWorkBudget.ops()
         }
         // A solve limit of 0 means unbounded, so a spent allowance still leaves one operation.
-        val containing = lpEffortGovernor.remainingWork()
-        val offered = nodeWorkAllowance()
-        val remaining = when {
-            containing == null -> offered
-            offered == null -> containing
-            else -> minOf(containing, offered)
-        }?.coerceAtLeast(1L) ?: return budget
+        val remaining = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: return budget
         return if (budget == 0L) remaining else minOf(budget, remaining)
+    }
+
+    internal fun nodeQueryWorkBudget(): Long? {
+        val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
+        val containing = nodeWorkBudget()
+        return if (containing == 0L) offered else minOf(containing, offered)
     }
 
     // Work the current node's LP has charged, across its base, cut-augmented and recovery solves.
@@ -552,6 +552,7 @@ internal class LpEngine(
         },
         solveContext = solveContext,
         cancellation = params.cancellation,
+        queryWorkAllowance = ::nodeQueryWorkBudget,
     )
 
     internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {

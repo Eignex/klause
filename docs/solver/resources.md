@@ -109,8 +109,9 @@ Retained finite optimization converts the slice's remaining work to an optional
 node-LP operation cap, subtracting fractional LP work already charged. The adapter
 supplies native units to the model-facing LP owner, which takes the smaller of that
 cap and its containing effort allowance. Required leaf completion and preparation
-keep their own allowances. Atomic kernel work can still overspend; the slice carries
-that debt through the existing accounting.
+keep their own allowances. Retained numerical owner construction uses the containing
+effort allowance; the slice cap applies to its floating queries. Atomic kernel work
+can still overspend; the slice carries that debt through the existing accounting.
 
 `Cancellation` and `WorkMeter` live in the neutral `util` package within `klause`. Their units come
 from the caller's adapter; they contain no portfolio pricing. Composing tokens carries
