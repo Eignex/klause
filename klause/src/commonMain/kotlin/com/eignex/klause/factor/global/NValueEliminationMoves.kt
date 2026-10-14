@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.buildRepairChain
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongHashSet
 
@@ -269,14 +270,18 @@ internal class NValueEliminationMoves(
         }
         // Repair proposals can be requested while the caller owns a live repair walk.
         if (!allowRepairChain) return
-        var pins = state.assumptions.withInt(n, state.assignment.intValue(n))
+        val intPins = HashMap<Int, Long>()
+        val boolPins = HashMap<Int, Boolean>()
+        intPins[n] = state.assignment.intValue(n)
         for (part in firstParts) {
-            pins = when (part) {
-                is Move.IntSet -> pins.withInt(part.varId, part.newValue)
-                is Move.BoolFlip -> pins.withBool(part.varId, !state.assignment.boolValue(part.varId))
-                else -> pins
+            when (part) {
+                is Move.IntSet -> intPins[part.varId] = part.newValue
+                is Move.BoolFlip -> boolPins[part.varId] = !state.assignment.boolValue(part.varId)
+                else -> Unit
             }
         }
+        // Merge once to avoid copying root pins and deductions for every primitive write.
+        val pins = state.assumptions.mergedWith(Assumptions(bools = boolPins, ints = intPins))
         val repairs = MoveSink(pins)
         repairs.setInvariants(state.invariants)
         repairs.setOwners(state.seeding.ownerInt)
