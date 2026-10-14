@@ -6,8 +6,12 @@ import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchCoordinateOwnership
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SourceCoordinateAgreement
+import com.eignex.klause.solver.search.SourceCoordinateAgreementComponent
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.util.Cancellation
 
@@ -63,11 +67,32 @@ internal class PreparedSearchRegistrations(
         val resources = SearchInvocationResources()
         val opening = SearchComponentOpening(cancellation, smtStats, theorySolveStop, resources)
         try {
-            val components = registrations.flatMap { it.open(opening) }
+            val groups = registrations.map { it.open(opening) }
+            val components = groups.flatten()
+            val arithmetic = registrations.indices.filter {
+                registrations[it].descriptor.responsibility == ComponentResponsibility.COMPLETION
+            }
+            lateinit var session: SearchSession
+            val installed = if (arithmetic.size > 1) {
+                val participants = arithmetic.flatMap { groups[it].filterIsInstance<SourceCoordinateAgreement>() }
+                val supported = arithmetic.all { index ->
+                    groups[index].isNotEmpty() && groups[index].all { it is SourceCoordinateAgreement }
+                }
+                components + SourceCoordinateAgreementComponent(participants, { session.model() }, supported)
+            } else components
+            session = SearchComponentSet(installed).session(
+                maxChecks, cancellation, learnedDb, SearchAtomRegistry(boolCount),
+            )
+            if (arithmetic.size > 1) {
+                val owners = registrations.indices.flatMap { index ->
+                    val descriptor = registrations[index].descriptor
+                    val ownership = SearchCoordinateOwnership(descriptor.integerCoordinates, descriptor.realCoordinates)
+                    groups[index].map { it to ownership }
+                }.toMap()
+                session.restrictCoordinateContributions(owners)
+            }
             return PlannedSearch(
-                SearchComponentSet(components).session(
-                    maxChecks, cancellation, learnedDb, SearchAtomRegistry(boolCount),
-                ),
+                session,
                 components.filterIsInstance<CpSearchComponent>().firstOrNull(),
                 components.filterIsInstance<TheoryComponent>().firstOrNull(),
                 resources,

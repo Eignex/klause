@@ -205,3 +205,10 @@ checking cumulatively. Complete segment work includes native charges and decisio
 heuristic completion retains the exact-neighborhood instruction conversion. Complete
 native queries can overrun slices while retaining whole-invocation cancellation. A
 neighborhood slice interruption has no source-refutation authority.
+
+Explicit arithmetic coordinate agreement uses the containing execution controls and
+native complete-check allowance. Exact source-row exchange and point checking charge
+coefficient/row visits to the existing caller meter and poll its current invocation
+stop. No peer completion opens a fresh native allowance or replaces a slice token
+with a new lifetime token. Interruption and representation decline retain their
+separate incomplete diagnostics; a failed chosen point supplies no global proof.

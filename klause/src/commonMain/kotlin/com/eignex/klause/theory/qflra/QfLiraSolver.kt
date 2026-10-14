@@ -7,6 +7,8 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.complemented
 import com.eignex.klause.ir.indices
@@ -45,6 +47,7 @@ import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SourceLpWorkStats
+import com.eignex.klause.solver.search.AssembledSearchModel
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
@@ -54,6 +57,10 @@ import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExactAlgebraicRealValue
+import com.eignex.klause.solver.search.SearchExactIntValue
+import com.eignex.klause.solver.search.SearchExactRealExpressionValue
+import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchIntegerBound
@@ -64,6 +71,7 @@ import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
+import com.eignex.klause.solver.search.SourceCoordinateAgreement
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.solver.snapshotValues
@@ -150,6 +158,7 @@ class ExactLiraSearchComponent private constructor(
 ) : TheoryComponent,
     SearchBrancher,
     SearchBranchProposal,
+    SourceCoordinateAgreement,
     AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -292,6 +301,70 @@ class ExactLiraSearchComponent private constructor(
     }
     override fun propagate(context: SearchContext): ComponentResult = lp.propagate(context)
     override fun check(context: SearchContext): ComponentCheck = lp.check(context)
+    override fun shareSourcePredicates(context: SearchContext): ComponentResult {
+        beginOperation()
+        return try {
+            if (operationStop()) return ComponentResult.Indeterminate
+            val rows = reduction.sourceRows(bools, node, lpStop)
+                ?: return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
+            for (row in rows) {
+                lpStop.charge(row.columns.size.toLong() + 1L)
+                if (operationStop()) return ComponentResult.Indeterminate
+                val terms = row.columns.indices.map { index ->
+                    val column = row.columns[index]
+                    val source = if (column < model.numRealVars) SearchRealValue(column)
+                        else SearchIntValue(column - model.numRealVars)
+                    SourceBoundTerm(source, row.coefficients[index])
+                }
+                val atom = SourceBoundAtom.rationalSplit(context, terms, row.rhs, row.strict)
+                    ?: return agreementDeclined(context)
+                if (context.boolValue(atom.positive.literal ushr 1) != true) {
+                    val result = context.publish(SearchDecision.Theory(atom.positive))
+                    if (result != ComponentResult.Consistent) return result
+                }
+            }
+            ComponentResult.Consistent
+        } finally {
+            endOperation(context)
+        }
+    }
+
+    override fun checkSourceCoordinates(values: AssembledSearchModel, context: SearchContext): ComponentCheck {
+        beginOperation()
+        return try {
+            if (outcome != ComponentCheck.Feasible || operationStop() || !context.consumeCheck()) {
+                return ComponentCheck.Indeterminate
+            }
+            val point = ArrayList<BigFraction>(model.numRealVars + model.numIntVars)
+            for (variable in 0 until model.numRealVars) {
+                if (operationStop()) return ComponentCheck.Indeterminate
+                val id = SourceRealId(variable)
+                if (values.valueOf(SearchExactAlgebraicRealValue(id)) != null ||
+                    values.valueOf(SearchExactRealExpressionValue(id)) != null
+                ) return ComponentCheck.Indeterminate
+                point += values.valueOf(SearchExactRealValue(id)) ?: return ComponentCheck.Indeterminate
+            }
+            for (variable in 0 until model.numIntVars) {
+                if (operationStop()) return ComponentCheck.Indeterminate
+                point += values.valueOf(SearchExactIntValue(SourceIntId(variable)))?.asFraction()
+                    ?: return ComponentCheck.Indeterminate
+            }
+            if (!point.admittedSourcePoint()) return ComponentCheck.Indeterminate
+            val rows = reduction.sourceRows(bools, node, lpStop) ?: return ComponentCheck.Indeterminate
+            lpStop.charge(rows.sumOf { it.columns.size.toLong() + 1L })
+            if (!operationStop() && point.satisfiesSourceRows(rows, lpStop) && !operationStop()) {
+                ComponentCheck.Feasible
+            } else ComponentCheck.Indeterminate
+        } finally {
+            endOperation(context)
+        }
+    }
+
+    private fun agreementDeclined(context: SearchContext): ComponentResult {
+        context.executionControls.reportStop(SearchStopCause.RepresentationDecline)
+        return ComponentResult.Indeterminate
+    }
+
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
         beginOperation()
         return try {

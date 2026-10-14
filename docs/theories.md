@@ -58,6 +58,12 @@ Its neutral `SourceBoundAtom` describes exact source-coordinate predicates witho
 linear-theory or LP dependencies. Arithmetic adapters interpret the same normalized
 meaning; linear row conversion remains in the linear adapter. Shared Boolean naming
 alone supplies no agreement between independently chosen arithmetic witnesses.
+Explicit registered arithmetic peers use
+[coordinate agreement](solver/search.md#arithmetic-coordinate-agreement) to exchange
+admitted exact source predicates and check one authoritative typed point. Rational
+linear peers implement that protocol; unsupported combinations retain combined
+ownership or return indeterminate. Fragment participation is separate from procedure
+completeness and global claim authority.
 [Local search](solver/local-search.md#continuous-candidate-completion) owns candidate
 generation and requests completion before publication. [Portfolios](solver/portfolio.md)
 shares only accepted witnesses and justified deductions under the same source and
