@@ -10,6 +10,22 @@ import kotlin.test.assertTrue
 
 class LpRowBoundsTest {
     @Test
+    fun `row projections retain independent bounds across integral coordinates`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 5L)
+            val y = addVar(0L, 4L)
+            val r = addRealVar(0.0, 1.0)
+            addRow(intArrayOf(x, y, r), longArrayOf(1L, 2L, 1L), Relation.LE, 4L)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+
+        val bounds = mixedRowBounds(model)
+
+        assertEquals(listOf(0, 1), bounds.map { it.column })
+        assertEquals(listOf(4L, 2L), bounds.map { it.integerBound() })
+    }
+
+    @Test
     fun `integral valued real endpoints preserve strict source coordinate projection`() {
         for (origin in listOf(0L, 3L)) for (sign in listOf(-1.0, 1.0)) for (strict in listOf(false, true)) {
             val source = LpBuilder().apply {

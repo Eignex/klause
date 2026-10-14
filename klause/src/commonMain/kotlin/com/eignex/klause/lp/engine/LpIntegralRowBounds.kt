@@ -22,15 +22,16 @@ internal fun integralRowBounds(
     }
     val minimum = integralEndpointSum(state, terms, true, meter) ?: return null
     val maximum = integralEndpointSum(state, terms, false, meter) ?: return null
-    meter.reserve(128L)
+    meter.reserve(320L)
     val completed = ArrayList<LpRowBound>()
+    val scratch = IntegralRowScratch()
     for (term in terms) {
         meter.step()
         if (term.column >= state.model.n || !state.model.column(term.column).integral) continue
         for (direction in 0..1) {
             val minimizing = direction == 0
             val sum = if (minimizing) minimum else maximum
-            val projection = integralRowProjection(state, rhs, term, sum, minimizing, meter) ?: return null
+            val projection = integralRowProjection(state, rhs, term, sum, minimizing, meter, scratch) ?: return null
             val value = projection.value ?: continue
             meter.reserve(80L)
             completed.add(LpRowBound(state, row, term.column, projection.upper, value,
@@ -47,6 +48,12 @@ private data class IntegralRowProjection(
     val strict: Boolean = false,
 )
 private val EMPTY_INTEGRAL_ROW_PROJECTION = IntegralRowProjection()
+
+private class IntegralRowScratch {
+    val residual = Int128()
+    val contribution = Int128()
+    val difference = Int128()
+}
 
 private fun integralEndpointSum(
     state: LpExactState,
@@ -88,16 +95,23 @@ private fun integralRowProjection(
     sum: IntegralEndpointSum,
     minimum: Boolean,
     meter: MixedCertificateMeter,
+    scratch: IntegralRowScratch,
 ): IntegralRowProjection? {
     meter.step()
     val coefficient = checkNotNull(term.integerCoefficient)
     val own = integralEndpoint(state, term.column, coefficient, minimum)
     if (sum.missing > if (own == null) 1 else 0) return EMPTY_INTEGRAL_ROW_PROJECTION
-    meter.reserve(64L)
-    val residual = Int128().apply {
-        addLong(rhs)
-        subtract(sum.value)
-        if (own != null) addProduct(coefficient, own.number.exactLong() ?: return null)
+    val residual = scratch.residual
+    meter.step()
+    residual.clear()
+    meter.step()
+    residual.addLong(rhs)
+    meter.step()
+    residual.subtract(sum.value)
+    if (own != null) {
+        val endpoint = own.number.exactLong() ?: return null
+        meter.step()
+        residual.addProduct(coefficient, endpoint)
     }
     if (residual.overflow) return null
     val upper = minimum == (coefficient > 0L)
@@ -105,7 +119,7 @@ private fun integralRowProjection(
     val bounds = state.model.column(term.column).bounds
     val previous = if (upper) bounds.upper else bounds.lower
     if (previous != null) {
-        val tightens = integralProjectionTightens(residual, coefficient, previous, minimum, strict, meter)
+        val tightens = integralProjectionTightens(residual, coefficient, previous, minimum, strict, meter, scratch)
             ?: return null
         if (!tightens) return EMPTY_INTEGRAL_ROW_PROJECTION
     }
@@ -127,11 +141,21 @@ private fun integralProjectionTightens(
     minimum: Boolean,
     strict: Boolean,
     meter: MixedCertificateMeter,
+    scratch: IntegralRowScratch,
 ): Boolean? {
     val endpoint = previous.number.exactLong() ?: return null
-    meter.reserve(96L)
-    val contribution = Int128().apply { addProduct(coefficient, endpoint) }
-    val difference = residual.copy().apply { subtract(contribution) }
+    val contribution = scratch.contribution
+    val difference = scratch.difference
+    meter.step()
+    contribution.clear()
+    meter.step()
+    contribution.addProduct(coefficient, endpoint)
+    meter.step()
+    difference.clear()
+    meter.step()
+    difference.add(residual)
+    meter.step()
+    difference.subtract(contribution)
     if (difference.overflow) return null
     val equal = difference.hi == 0L && difference.lo == 0L
     val weaker = if (minimum) difference.isNonNegative() && !equal else !difference.isNonNegative()
