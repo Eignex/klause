@@ -320,11 +320,18 @@ internal class PolynomialArithmetic(
         return degree + 1
     }
 
-    private fun matrix(size: Long): Array<Array<Polynomial>> {
+    fun matrixCells(rows: Long, columns: Long) {
+        require(rows >= 0 && columns >= 0)
         step()
-        if (size > Int.MAX_VALUE || size * size > (limits.maxMatrixCells ?: Long.MAX_VALUE)) {
+        if (rows > Int.MAX_VALUE || columns > Int.MAX_VALUE ||
+            columns != 0L && rows > (limits.maxMatrixCells ?: Long.MAX_VALUE) / columns
+        ) {
             throw PolynomialResourceLimit(PolynomialResource.MATRIX_CELLS)
         }
+    }
+
+    private fun matrix(size: Long): Array<Array<Polynomial>> {
+        matrixCells(size, size)
         return Array(size.toInt()) {
             step()
             Array(size.toInt()) { Polynomial.ZERO }
