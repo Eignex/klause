@@ -328,6 +328,9 @@ Changes to searched usage flags carry their incident unary reified equalities an
 disequalities. A channel with one eligible repair can update its searched indicator
 or set its searched integer to the exact equality value. Other channel choices remain
 with ordinary directed repair.
+Effective unary predicates fold singleton root-domain columns in rows of at most
+32 terms. The remaining column must have coefficient `1` or `-1`; constant arithmetic
+is exact, and a target outside the signed 64-bit range declines the repair.
 XOR repairs consider only variables with an odd number of literal occurrences and
 require one eligible repair, including an inverse repair through a maintained fold.
 All counted coordinates and the count remain protected. Auxiliary writes respect pins,

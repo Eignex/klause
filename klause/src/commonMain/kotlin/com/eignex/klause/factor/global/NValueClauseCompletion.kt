@@ -12,6 +12,12 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.negate
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 
 internal class NValueClauseCompletion(
     private val state: LocalSearchState,
@@ -31,6 +37,8 @@ internal class NValueClauseCompletion(
     private val pending = ArrayList<Int>()
     private val parts = ArrayList<Move>()
     private var foldVisits = 0
+    private data class Predicate(val variable: Int, val value: Long)
+    private val predicates = HashMap<ReifiedLinear, Predicate?>()
 
     fun complete(move: Move): Move {
         state.assignment.copyInto(assignment)
@@ -98,8 +106,8 @@ internal class NValueClauseCompletion(
     }
 
     private fun channelRepairs(row: ReifiedLinear): List<Move> {
-        val value = predicateValue(row) ?: return emptyList()
-        val equal = assignment.intValue(row.vars[0]) == value
+        val predicate = predicate(row) ?: return emptyList()
+        val equal = assignment.intValue(predicate.variable) == predicate.value
         val actual = if (row.op == LinearOp.EQ) equal else !equal
         val desired = assignment.boolValue(row.auxBoolVar)
         if (actual == desired) return emptyList()
@@ -126,22 +134,39 @@ internal class NValueClauseCompletion(
 
     private fun predicateRepair(row: ReifiedLinear, desired: Boolean): Move.IntSet? {
         if (!((row.op == LinearOp.EQ && desired) || (row.op == LinearOp.NE && !desired))) return null
-        val value = predicateValue(row) ?: return null
-        val variable = row.vars[0]
+        val predicate = predicate(row) ?: return null
+        val value = predicate.value
+        val variable = predicate.variable
         if (variable in pinnedInts || !sink.allowsInt(variable) || value !in state.rootDomains[variable] ||
             value == assignment.intValue(variable)
         ) return null
         return Move.IntSet(variable, value)
     }
 
-    private fun predicateValue(row: ReifiedLinear): Long? {
-        if (row.vars.size != 1 || (row.op != LinearOp.EQ && row.op != LinearOp.NE)) return null
+    private fun predicate(row: ReifiedLinear): Predicate? {
+        if (predicates.containsKey(row)) return predicates[row]
+        return normalize(row).also { predicates[row] = it }
+    }
+
+    private fun normalize(row: ReifiedLinear): Predicate? {
+        if (row.vars.size > MAX_PREDICATE_TERMS || (row.op != LinearOp.EQ && row.op != LinearOp.NE)) return null
         val constants = row.integerConstants ?: return null
-        return when {
-            constants.coeff(0) == 1L -> constants.bound
-            constants.coeff(0) == -1L && constants.bound != Long.MIN_VALUE -> -constants.bound
-            else -> null
+        var variable = -1
+        var coefficient = 0L
+        var bound = bigIntOf(constants.bound)
+        for (i in row.vars.indices) {
+            val domain = state.rootDomains[row.vars[i]]
+            if (domain.min == domain.max) {
+                if (domain.min != 0L) bound -= bigIntOf(constants.coeff(i)) * bigIntOf(domain.min)
+            } else {
+                if (variable >= 0) return null
+                variable = row.vars[i]
+                coefficient = constants.coeff(i)
+            }
         }
+        if (variable < 0 || (coefficient != 1L && coefficient != -1L)) return null
+        val value = if (coefficient == 1L) bound else bound.negate()
+        return if (value.fitsLong()) Predicate(variable, value.toLongExact()) else null
     }
 
     private fun pin(move: Move) {
@@ -196,7 +221,7 @@ internal class NValueClauseCompletion(
         if (pending.size >= MAX_FACTOR_VISITS) return
         val factor = state.problem.factors[fid]
         if (factor is Clause || factor is Xor ||
-            (factor is ReifiedLinear && predicateValue(factor) != null)
+            (factor is ReifiedLinear && predicate(factor) != null)
         ) pending += fid
     }
 
@@ -207,5 +232,6 @@ internal class NValueClauseCompletion(
         const val MAX_WRITES = 32
         const val MAX_FOLD_DEPTH = 4
         const val MAX_FOLD_VISITS = 32
+        const val MAX_PREDICATE_TERMS = 32
     }
 }
