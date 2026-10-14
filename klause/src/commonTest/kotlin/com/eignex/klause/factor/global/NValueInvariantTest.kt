@@ -734,8 +734,12 @@ class NValueInvariantTest {
                     NValue(0, intArrayOf(1, 2, 3, 4)),
                     ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
                     ReifiedLinear(1, intArrayOf(1), intArrayOf(4), LinearOp.EQ, 1),
-                    ReifiedLinear(2, intArrayOf(1, -1), if (constantFirst) intArrayOf(7, 5) else intArrayOf(5, 7), LinearOp.NE, 0),
-                    ReifiedLinear(2, intArrayOf(1, -1), if (constantFirst) intArrayOf(7, 6) else intArrayOf(6, 7), LinearOp.NE, 0),
+                    ReifiedLinear(
+                        2, intArrayOf(1, -1), if (constantFirst) intArrayOf(7, 5) else intArrayOf(5, 7), LinearOp.NE, 0,
+                    ),
+                    ReifiedLinear(
+                        2, intArrayOf(1, -1), if (constantFirst) intArrayOf(7, 6) else intArrayOf(6, 7), LinearOp.NE, 0,
+                    ),
                     Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
                     Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
