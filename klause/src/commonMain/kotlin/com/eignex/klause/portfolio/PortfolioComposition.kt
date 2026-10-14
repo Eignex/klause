@@ -402,7 +402,7 @@ internal object PortfolioComposition {
         if (scenario.kind == Kind.COP && facts.booleanObjective && scenario.btPool == null &&
             arms.none { it.label == BacktrackArm.CoreGuided.label }
         ) {
-            arms += CoreGuidedWorkerConfig(scenario.nodeBudget, scenario.btEdit)
+            arms += CoreGuidedWorkerConfig(scenario.nodeBudget, edit = scenario.btEdit)
         }
         return arms
     }
