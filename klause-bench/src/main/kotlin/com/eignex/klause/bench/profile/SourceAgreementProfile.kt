@@ -275,6 +275,13 @@ internal object SourceAgreementProfile {
                     Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.GE, lower),
                     Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, expected),
                 )))
+            val conflicting = "(set-logic QF_LIA)\n(declare-const x Int)\n(assert (= x $start))\n" +
+                "(assert (= x $bound))\n(check-sat)\n"
+            result += SourceCase(if (negative) "conflicting-wide-negative" else "conflicting-wide-positive",
+                conflicting, Problem(0, intBounds = declarations.intBounds, factors = arrayOf(
+                    Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, lower),
+                    Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, expected),
+                )))
         }
         val guarded = "(set-logic QF_LRA)\n(declare-const b Bool)\n(declare-const x Real)\n" +
             "(assert (>= x 0))\n(assert (<= x 2))\n(assert (= b (>= x 1)))\n(check-sat)\n(get-model)\n"
