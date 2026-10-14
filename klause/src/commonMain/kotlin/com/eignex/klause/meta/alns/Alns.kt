@@ -307,7 +307,11 @@ internal class Alns(
                 val destroyed = destroyOperators[destroyIdx]
                     .destroy(rng, inner.problem, incumbent, objective, destroyFraction)
                 val booleanScope = if (literalSweep == null) destroyed.bools else {
-                    literalSweep.expandUnitBooleanScope(destroyed.bools, params.cancellation) ?: break
+                    literalSweep.expandUnitBooleanScope(destroyed.bools, params.cancellation)
+                }
+                if (booleanScope == null) {
+                    iter++
+                    break
                 }
                 val freed = FreedVars(
                     booleanScope.filterNot(params.assumptions::isFrozenBool).toIntArray(),

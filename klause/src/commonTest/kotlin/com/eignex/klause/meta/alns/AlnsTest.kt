@@ -47,6 +47,45 @@ import kotlin.test.assertTrue
 class AlnsTest {
 
     @Test
+    fun `cancelled literal scope expansion consumes its charged iteration once`() {
+        val problem = Problem(301, 0, emptyArray(), emptyArray()).bake()
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = (0 until 300).map {
+            BoolFoldDefinition(it + 1, intArrayOf(Lit.make(it, true)), true)
+        }))
+        val initial = Sample(BooleanArray(301), LongArray(0))
+        val objective = LinearObjective(boolWeights = LongArray(301) { if (it == 0) 1 else 0 })
+        var expanding = false
+        var polls = 0
+        var destroys = 0
+        var repairs = 0
+        val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
+                MinimizeResult.BestFound(initial, objective.evaluate(initial), TerminationReason.BudgetExhausted)
+        }
+        val alns = Alns(
+            inner = inner,
+            destroyOperators = listOf(DestroyOperator { _, _, _, _, _ ->
+                destroys++
+                expanding = true
+                FreedVars(intArrayOf(0), intArrayOf())
+            }),
+            repairOperators = listOf(RepairOperator { context -> repairs++; context.incumbent }),
+            maxIterations = 1,
+            flipsPerIteration = 8,
+            literalSweep = sweep,
+        )
+
+        alns.resumable(objective, LocalSearchParams()).use { handle ->
+            val first = handle.runSlice(Cancellation { expanding && ++polls >= 2 }, Long.MAX_VALUE) {}
+            val result = assertNotNull(first ?: handle.runSlice(Cancellation.Never, Long.MAX_VALUE) {})
+
+            assertEquals(8L, result.stats.alns.outerAllowance)
+            assertEquals(1, destroys)
+            assertEquals(0, repairs)
+        }
+    }
+
+    @Test
     fun `unit literal neighborhoods release source and nested output aliases together`() {
         val problem = Problem(3, 0, emptyArray(), listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
