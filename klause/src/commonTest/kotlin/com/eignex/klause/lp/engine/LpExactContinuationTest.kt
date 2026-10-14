@@ -189,22 +189,114 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `strict closure is not a source witness`() {
+    fun `strict satisfaction continuation verifies an interior source point`() {
         val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val one = ExactLpNumber.of(1L)
+        for (upper in listOf(false, true)) {
+            val source = ExactLpModel(
+                listOf(emptyList()), emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = !upper), ExactLpSide(one, strict = upper)))),
+                emptyList(), ExactLpObjective(listOf(zero)),
+            )
+            val model = assertNotNull(LpExactState(source).toWorkingModel())
 
-        val result = continueExactLp(model, Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)))
+            val result = continueExactLp(
+                model, Basis(intArrayOf(), arrayOf(if (upper) VarStatus.AT_UPPER else VarStatus.AT_LOWER)),
+            )
+
+            val point = assertNotNull(result.witness).primal.single()
+            assertTrue(point > BigFraction.ZERO && point < BigFraction.ONE)
+            assertTrue(result.metrics.success)
+            assertNull(result.conflict)
+        }
+    }
+
+    @Test
+    fun `nonzero objectives retain strict closure verification`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(one)))),
+            emptyList(), ExactLpObjective(listOf(one)),
+        )
+
+        val result = continueExactLp(
+            assertNotNull(LpExactState(source).toWorkingModel()), Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
+        )
 
         assertNull(result.witness)
         assertNull(result.conflict)
         assertEquals(ContinuationDecline.CANDIDATE, result.metrics.decline)
+    }
+
+    @Test
+    fun `strict conflict verifies its scoped bound witnesses`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(zero),
+            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
+            listOf(ExactLpRow(global = false, premises = ExactLpPremises(emptyList(), listOf(9)))),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.assertBound(0, false, ExactLpSide(zero, strict = true), 11L))
+        assertTrue(trail.assertBound(1, false, ExactLpSide(zero), 12L))
+        val state = trail.state
+
+        val result = continueExactLp(
+            assertNotNull(state.toWorkingModel()), Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER)),
+        )
+
+        assertNull(result.witness)
+        assertNotNull(result.conflict)
+        val support = assertNotNull(result.support)
+        assertTrue(support.state === state)
+        assertEquals(setOf(11L, 12L), support.sides.map { it.witness }.toSet())
+        assertEquals(listOf(9), assertNotNull(support.rows.single().second.premises).literalEntries())
+    }
+
+    @Test
+    fun `retracting a strict side restores the closed endpoint`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(1L))))),
+            emptyList(), ExactLpObjective(listOf(zero)),
+        )
+        val trail = LpBoundTrail(source)
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val cache = LpExactContinuationCache()
+        trail.push()
+        assertTrue(trail.assertBound(0, false, ExactLpSide(zero, strict = true), 11L))
+        val strict = continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache)
+        trail.pop(0)
+
+        val closed = continueExactLp(assertNotNull(trail.state.toWorkingModel()), basis, cache)
+
+        assertTrue(assertNotNull(strict.witness).primal.single() > BigFraction.ZERO)
+        assertEquals(BigFraction.ZERO, assertNotNull(closed.witness).primal.single())
+        assertTrue(closed.metrics.invalidated)
+    }
+
+    @Test
+    fun `strict interior witnesses retain original coordinate origins`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(),
+            listOf(ExactLpColumn(
+                ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))),
+                origin = ExactLpNumber.of(10L),
+            )),
+            emptyList(), ExactLpObjective(listOf(zero)),
+        )
+
+        val result = continueExactLp(
+            assertNotNull(LpExactState(source).toWorkingModel()), Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
+        )
+
+        val point = assertNotNull(result.witness).primal.single()
+        assertTrue(point > BigFraction.ofLong(10) && point < BigFraction.ofLong(11))
     }
 
     @Test

@@ -403,13 +403,21 @@ private fun captureContinuation(model: LpModel, basis: Basis, budget: Continuati
             }
         }
     }
-    repeat(model.numVars) { budget.fraction(model.exactCost(it)) }
+    var satisfaction = true
+    repeat(model.numVars) {
+        if (!budget.fraction(model.exactCost(it)).isZero) satisfaction = false
+    }
     budget.fraction(model.exactConstant())
     model.exactState?.model?.objective?.let {
         budget.fraction(it.scale.value)
         budget.fraction(it.externalConstant.value)
     }
     val bounds = List(model.numVars) { model.exactBounds(it) }
+    val strict = satisfaction && bounds.any {
+        budget.step()
+        it.lower?.strict == true || it.upper?.strict == true
+    }
+    if (strict) budget.step(2L * model.numVars, 32L * model.numVars)
     val input = ExactContinuationInput(
         columns,
         List(model.m) { budget.fraction(model.exactRhs(it)) },
@@ -425,6 +433,8 @@ private fun captureContinuation(model: LpModel, basis: Basis, budget: Continuati
                 VarStatus.FREE -> ContinuationStatus.FREE
             }
         },
+        lowerStrict = if (strict) bounds.map { it.lower?.strict == true } else emptyList(),
+        upperStrict = if (strict) bounds.map { it.upper?.strict == true } else emptyList(),
     )
     return ContinuationAuthority(input, List(model.n) { budget.fraction(model.exactShift(it)) })
 }

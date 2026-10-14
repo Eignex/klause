@@ -6,8 +6,133 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ExactContinuationTest {
+    @Test
+    fun `strict endpoints materialize interior coordinates in either direction`() {
+        for (upper in listOf(false, true)) {
+            val input = ExactContinuationInput(
+                listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(BigFraction.ONE),
+                emptyList(), listOf(if (upper) ContinuationStatus.UPPER else ContinuationStatus.LOWER),
+                lowerStrict = listOf(!upper), upperStrict = listOf(upper),
+            )
+
+            val result = ExactContinuation(input).resume()
+
+            val point = assertNotNull(result.values).single()
+            assertTrue(point > BigFraction.ZERO && point < BigFraction.ONE)
+            assertNull(result.headings)
+            assertNull(result.statuses)
+            assertNull(result.ray)
+        }
+    }
+
+    @Test
+    fun `strict coordinates preserve coupled equations and unused fixed values`() {
+        val two = BigFraction.ofLong(2)
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE), listOf(0 to BigFraction.ONE), emptyList()),
+            listOf(BigFraction.ONE),
+            listOf(BigFraction.ZERO, BigFraction.ZERO, two, BigFraction.ZERO),
+            listOf(BigFraction.ONE, BigFraction.ONE, two, BigFraction.ZERO),
+            listOf(1),
+            listOf(ContinuationStatus.LOWER, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED),
+            lowerStrict = listOf(true, true, false, false),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        val point = assertNotNull(result.values)
+        assertTrue(point[0] > BigFraction.ZERO && point[1] > BigFraction.ZERO)
+        assertEquals(BigFraction.ONE, point[0] + point[1])
+        assertEquals(two, point[2])
+        assertEquals(BigFraction.ZERO, point[3])
+    }
+
+    @Test
+    fun `copied strict flags survive caller mutation`() {
+        val lowerStrict = mutableListOf(true)
+        val input = ExactContinuationInput(
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(BigFraction.ONE),
+            emptyList(), listOf(ContinuationStatus.LOWER), lowerStrict = lowerStrict,
+        )
+        lowerStrict[0] = false
+
+        val result = ExactContinuation(input).resume()
+
+        assertTrue(assertNotNull(result.values).single() > BigFraction.ZERO)
+    }
+
+    @Test
+    fun `strict fixed endpoints decline without a source refutation`() {
+        val input = ExactContinuationInput(
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(BigFraction.ZERO),
+            emptyList(), listOf(ContinuationStatus.FIXED), lowerStrict = listOf(true),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        assertEquals(ContinuationDecline.CANDIDATE, result.metrics.decline)
+        assertNull(result.values)
+        assertNull(result.ray)
+    }
+
+    @Test
+    fun `strict materialization cannot replenish an exhausted allowance`() {
+        val input = ExactContinuationInput(
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(BigFraction.ONE),
+            emptyList(), listOf(ContinuationStatus.LOWER), lowerStrict = listOf(true),
+        )
+        val completed = ExactContinuation(input).resume()
+        val limits = ExactContinuationLimits(maxWork = completed.metrics.work - 1L)
+        val session = ExactContinuation(input)
+
+        val first = session.resume(limits)
+        val repeated = session.resume(limits)
+
+        assertNotNull(completed.values)
+        assertEquals(ContinuationDecline.WORK, first.metrics.decline)
+        assertEquals(ContinuationDecline.WORK, repeated.metrics.decline)
+        assertNull(first.values)
+        assertNull(repeated.values)
+        assertTrue(session.usedWork <= limits.maxWork)
+    }
+
+    @Test
+    fun `cancelled strict continuation cannot publish an interior point`() {
+        val input = ExactContinuationInput(
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(BigFraction.ONE),
+            emptyList(), listOf(ContinuationStatus.LOWER), lowerStrict = listOf(true),
+        )
+
+        val result = ExactContinuation(input).resume(cancellation = Cancellation { true })
+
+        assertEquals(ContinuationDecline.CANCELLED, result.metrics.decline)
+        assertNull(result.values)
+        assertNull(result.ray)
+    }
+
+    @Test
+    fun `strict feasibility retains exact equations across a precision restart`() {
+        val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to huge, 1 to BigFraction.ONE), listOf(0 to BigFraction.ONE, 1 to huge)),
+            List(2) { BigFraction.ONE }, List(4) { BigFraction.ZERO },
+            listOf(null, null, BigFraction.ZERO, BigFraction.ZERO), listOf(0, 1),
+            listOf(ContinuationStatus.BASIC, ContinuationStatus.BASIC, ContinuationStatus.FIXED, ContinuationStatus.FIXED),
+            lowerStrict = listOf(true, true, false, false),
+        )
+
+        val result = ExactContinuation(input).resume()
+
+        val point = assertNotNull(result.values)
+        assertTrue(point[0] > BigFraction.ZERO && point[1] > BigFraction.ZERO)
+        assertEquals(BigFraction.ONE, huge * point[0] + point[1])
+        assertEquals(BigFraction.ONE, point[0] + huge * point[1])
+        assertTrue(result.metrics.restarts > 0)
+    }
+
     @Test
     fun `higher effort resumes the same feasible tableau`() {
         val n = 4

@@ -61,6 +61,19 @@ Oversized authority starts wide, and fixed-width overflow restarts the whole
 operation from authority. Failed attempts and precision restarts are charged.
 An off-status feasible point cannot furnish the claimed warm basis.
 
+Zero-objective continuation imports the active strict lower and upper sides. Its
+rational tableau keeps one infinitesimal coefficient beside each nonbasic seat
+and computed coordinate: strict lower seats use `l + epsilon`, and strict upper
+seats use `u - epsilon`. Lexicographic feasibility preserves the matrix equations.
+A completed feasible state selects a positive rational epsilon below every
+slack crossing and verifies the finite point against the unchanged exact source.
+Such an interior point carries no warm-basis claim. Strict conflicts still require
+the existing exact ray and source-premise checks. Missing interiors and interrupted
+materialization decline; they cannot establish infeasibility. The additional
+arithmetic, scalar growth, storage and verification share the continuation's
+cumulative allowances, with unchanged dimension and pivot caps. Nonzero objectives
+retain closure continuation and their existing strict-refinement policy.
+
 Reconstruction converts signed single-word fractions directly between
 `BigFraction` and `Frac128`; wider values use both words. Both paths retain the
 same bit checks, work charges, allocation allowance and cancellation checks.
