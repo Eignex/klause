@@ -196,7 +196,7 @@ class ProblemTest {
     }
 
     @Test
-    fun `a bounded column with fractional linear coefficients is theory-owned`() {
+    fun `a bounded column retains finite ownership beside fractional theory rows`() {
         val spec = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
@@ -218,7 +218,7 @@ class ProblemTest {
 
         val plan = spec.componentPlan()
 
-        assertEquals(IntVariableOwner.THEORY, plan.intOwner(0))
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
         assertEquals(FactorOwner.THEORY, plan.factorOwner(0))
     }
 

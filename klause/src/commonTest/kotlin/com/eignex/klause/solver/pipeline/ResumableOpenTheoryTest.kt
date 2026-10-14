@@ -37,6 +37,7 @@ class ResumableOpenTheoryTest {
 
     private fun sliced(problem: Problem): Pair<OpenTheoryResult, Int> {
         val request = OpenTheoryRequest(problem, componentPlan = problem.componentPlan())
+            .withPresolve(com.eignex.klause.presolve.PresolveConfig.NONE)
         val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), TheoryParams())
         var slices = 0
         while (true) {
@@ -76,6 +77,7 @@ class ResumableOpenTheoryTest {
             factors = factors.toTypedArray(),
         )
         val request = OpenTheoryRequest(problem, componentPlan = problem.componentPlan())
+            .withPresolve(com.eignex.klause.presolve.PresolveConfig.NONE)
         val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), TheoryParams())
         var pausedGlue = 0.0
 

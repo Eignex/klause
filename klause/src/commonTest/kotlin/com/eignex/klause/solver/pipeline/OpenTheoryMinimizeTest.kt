@@ -225,12 +225,10 @@ class OpenTheoryMinimizeTest {
             val x = parsed.intVarNames.getValue("x")
             val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
 
-            // Folded into comparison clauses, the disjunctions put the first witness at the optimum, so the
-            // descent has no standing incumbent to stop beside; the reified form keeps its intermediate steps.
             val minimizer = OpenTheoryMinimizer(
                 parsed.model,
                 objective,
-                PresolveConfig.parse("default,-comparison-clause"),
+                PresolveConfig.NONE,
                 solutionSetSensitive = false,
                 presolveCancellation = Cancellation.Never,
                 presolveBudget = null,

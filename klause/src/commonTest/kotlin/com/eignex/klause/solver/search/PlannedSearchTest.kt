@@ -144,7 +144,8 @@ class PlannedSearchTest {
         val planned = plan.search(model, mapOf(0 to IntDomain(0, 1), 1 to IntDomain(0, 1)))
 
         assertEquals(FactorOwner.CP, plan.factorOwner(0))
-        assertEquals(FactorOwner.THEORY, plan.factorOwner(1))
+        assertEquals(FactorOwner.CP, plan.factorOwner(1))
+        assertEquals(true, plan.factorEncoded(1))
         assertEquals(FactorOwner.THEORY, plan.factorOwner(2))
 
         assertIs<ComponentResult.Consistent>(planned.session.initialize())

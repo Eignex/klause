@@ -37,6 +37,7 @@ import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchBoolValue
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
@@ -232,7 +233,10 @@ class EncoderTest {
         })
         val plan = assertNotNull(source.prepareExecutionPlan(providers).componentPlan)
 
-        val result = plan.search(source, plan.cpSourceDomains(source)).use { it.session.solve(source.numBoolVars) }
+        val result = plan.search(source, plan.cpSourceDomains(source)).use {
+            if (it.session.initialize() is ComponentResult.Conflict) SearchResult.Exhausted
+            else it.session.solve(source.numBoolVars)
+        }
 
         assertIs<SearchResult.Exhausted>(result)
         assertEquals(listOf(IntVariableOwner.CP, IntVariableOwner.CP), (0..1).map(plan::intOwner))
@@ -250,7 +254,10 @@ class EncoderTest {
         ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
         val plan = assertNotNull(source.prepareExecutionPlan().componentPlan)
 
-        val result = plan.search(source, plan.cpSourceDomains(source)).use { it.session.solve(source.numBoolVars) }
+        val result = plan.search(source, plan.cpSourceDomains(source)).use {
+            if (it.session.initialize() is ComponentResult.Conflict) SearchResult.Exhausted
+            else it.session.solve(source.numBoolVars)
+        }
 
         assertIs<SearchResult.Exhausted>(result)
         assertEquals(IntVariableOwner.CP, plan.intOwner(1))

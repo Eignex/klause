@@ -53,9 +53,20 @@ internal fun PreparedFactorProjections.installLinearFactor(
     val encoding = LinearTheoryEncoding(target, sourceIndex, integerPins, booleanPins, cancellation)
     if (encoder(index, target).install(source, encoding) != null) return null
     val form = encoding.form ?: return null
-    val booleans = source.boolVars.toSet()
-    val integers = source.intVars.toSet()
-    val reals = source.variables.reals.toSet()
+    val booleans = source.boolVars.toMutableSet()
+    val integers = source.intVars.toMutableSet()
+    val reals = source.variables.reals.toMutableSet()
+    source.linearForm?.rows?.forEach { row ->
+        if (row.activator != LinearRow.ALWAYS) booleans += row.activator
+        for (term in 0 until row.size) {
+            val ref = row.ref(term)
+            when {
+                Term.isInt(ref) -> integers += Term.intVar(ref)
+                Term.isReal(ref) -> reals += Term.realVar(ref)
+                else -> booleans += Term.lit(ref) ushr 1
+            }
+        }
+    }
     require(form.rows.all { row ->
         (row.activator == LinearRow.ALWAYS || row.activator in booleans) &&
             (0 until row.size).all { term ->
@@ -71,8 +82,8 @@ internal fun PreparedFactorProjections.installLinearFactor(
         integerPins.isEmpty() && booleanPins.isEmpty()
     ) return source
     return EncodedTheoryFactor(source, form, EncodingAttribution(sourceIndex,
-        source.boolVars.map(::SourceBoolId), source.intVars.map(::SourceIntId),
-        source.variables.reals.map(::SourceRealId), integerConditions = integerPins,
+        booleans.sorted().map(::SourceBoolId), integers.sorted().map(::SourceIntId),
+        reals.sorted().map(::SourceRealId), integerConditions = integerPins,
         booleanConditions = booleanPins))
 }
 
