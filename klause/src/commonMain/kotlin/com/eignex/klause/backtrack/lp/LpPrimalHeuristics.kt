@@ -2,8 +2,10 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
-import com.eignex.klause.lp.bounding.dualSimplex
+import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.rootDomainOf
@@ -41,16 +43,7 @@ internal fun LpEngine.lpRoundingProbe(
             return null
         }
         val result = try {
-            val simplex = dualSimplex(relaxation.model, cancellation)
-            try {
-                simplex.solve()
-            } finally {
-                try {
-                    observeRootSolve(simplex)
-                } finally {
-                    simplex.close()
-                }
-            }
+            solvePrimalRelaxation(relaxation.model, cancellation, primal = false)
         } catch (_: CheckedLongOverflowException) {
             return null
         } ?: return null
@@ -316,27 +309,46 @@ private fun LpEngine.solveRelaxation(
         val relaxation = CpToLpRelaxation(problem, obj).build(session)
         if (relaxation.model.n == 0) return null
         val result = try {
-            val simplex = dualSimplex(relaxation.model, cancellation)
-            try {
-                val primal = try {
-                    simplex.solvePrimal()
-                } finally {
-                    observeRootSolve(simplex)
-                }
-                primal ?: try {
-                    simplex.solve()
-                } finally {
-                    observeRootSolve(simplex)
-                }
-            } finally {
-                simplex.close()
-            }
+            solvePrimalRelaxation(relaxation.model, cancellation, primal = true)
+                ?: solvePrimalRelaxation(relaxation.model, cancellation, primal = false)
         } catch (_: CheckedLongOverflowException) {
             return null
         } ?: return null
         return relaxation to result.primal
     } finally {
         primalPropagationWork += session.work
+    }
+}
+
+private fun LpEngine.solvePrimalRelaxation(
+    model: LpModel,
+    cancellation: Cancellation,
+    primal: Boolean,
+): FloatLpResult? {
+    requireOpen()
+    if (cancellation()) return null
+    val started = TimeSource.Monotonic.markNow()
+    val simplex = newTableauCutSolver(model, cancellation,
+        workLimit = rootPrimalWorkBudget(), factory = solveContext.engineFactory, pricing = pricingOptions)
+    var outcome = "FAILED"
+    try {
+        val result = if (primal) simplex.solvePrimal() else simplex.solve()
+        outcome = if (result?.optimal == true) "OPTIMAL" else {
+            val reason = simplex.lastTermination?.name ?: "OTHER"
+            if (result == null) "NO_POINT_$reason" else "NON_OPTIMAL_$reason"
+        }
+        return result?.takeIf { it.optimal }
+    } finally {
+        try {
+            observeRootSolve(simplex)
+        } finally {
+            try {
+                simplex.close()
+            } finally {
+                val stage = if (primal) "PRIMAL_LP_PRIMAL" else "PRIMAL_LP_DUAL"
+                sink.lp.observePrimalPhase(stage, outcome, started.elapsedNow().inWholeNanoseconds)
+            }
+        }
     }
 }
 

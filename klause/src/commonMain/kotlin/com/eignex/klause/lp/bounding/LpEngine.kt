@@ -431,6 +431,18 @@ internal class LpEngine(
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
+    internal fun rootPrimalWorkBudget(): Long {
+        val root = params.lpPlan.rootMaxWork.takeIf {
+            it > 0L && params.lpPlan.rootBudgetFraction > 0.0
+        }?.let { (it - totalSolveOps).coerceAtLeast(1L) }
+        val remaining = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L)
+        return when {
+            root == null -> remaining ?: 0L
+            remaining == null -> root
+            else -> minOf(root, remaining)
+        }
+    }
+
     // Work the current node's LP has charged, across its base, cut-augmented and recovery solves.
     private var pendingSolveOps = 0L
 
