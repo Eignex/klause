@@ -848,9 +848,10 @@ remains the solver's proof claim, recorded separately as `reportedProven`.
 identity and the checked XCSP assignment when accepted, without solving again.
 
 `com.eignex.klause.bench.profile.XcspWitnessReplay` checks saved witnesses on a
-remote profile without invoking the solver. Its arguments concatenate to a base64 gzip
+remote profile without invoking the solver. Its single argument is a base64 gzip
 JSON array containing `sourceRevision`, original `source`, `sourceSha256`, original
-`witness`, `witnessSha256` and optional exact integer `objective`. Split long payloads across arguments to stay within operating-system argument limits.
+`witness`, `witnessSha256` and optional exact integer `objective`. Keep the encoded payload below 100 KiB for the lab shell; split larger collections
+into separate jobs.
 Hashes are verified before checking. It retains the original records, installed harness/runtime
 hashes, checker command, process exit, timeout, stdout/stderr and each check outcome.
 Each checker subprocess has one active processor, a 512 MiB heap and ten seconds.
