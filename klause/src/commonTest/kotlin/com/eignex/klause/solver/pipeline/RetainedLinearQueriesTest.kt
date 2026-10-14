@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentResult
@@ -13,11 +14,41 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class RetainedLinearQueriesTest {
+    @Test
+    fun `generated center preparation preserves cancellation and one root opening`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray())
+        var openings = 0
+        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("root",
+            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
+            openings++
+            listOf(object : SearchComponent {
+                override fun initialize(context: SearchContext): ComponentResult = context.publish(Lit.make(0, true))
+            })
+        }
+        val prepared = PreparedSearchRegistrations(source, listOf(registration))
+        val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
+            prepared.open(Long.MAX_VALUE, stop, SearchLearnedDbParams(), null, null)
+        }
+
+        queries.use {
+            assertFalse(it.prepareBooleanCenter(Cancellation { true }))
+            assertEquals(0, openings)
+            assertTrue(it.prepareBooleanCenter(Cancellation.Never))
+            assertTrue(it.prepareBooleanCenter(Cancellation.Never))
+
+            assertEquals(1, openings)
+            assertEquals(true, it.rootBooleanValue(0))
+            assertEquals(0L, it.work)
+        }
+    }
+
     @Test
     fun `failed root initialization preserves its failure and releases every peer`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())

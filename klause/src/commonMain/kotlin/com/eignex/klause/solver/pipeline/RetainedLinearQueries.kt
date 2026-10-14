@@ -66,6 +66,31 @@ internal class RetainedLinearQueries(
         return scope.withCondition(condition, cancellation) { action() }
     }
 
+    fun prepareBooleanCenter(cancellation: Cancellation): Boolean {
+        check(!closed) { "conditioned query owner is closed" }
+        check(!checking) { "a worker may execute one conditioned query at a time" }
+        val empty = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
+        return scope.withCondition(empty, cancellation) {
+            if (scope.stop() || exhausted) return@withCondition false
+            checking = true
+            try {
+                val search = prepared()
+                (search != null || sourceRefuted) && !scope.stop() && !exhausted
+            } catch (_: CancellationException) {
+                false
+            } finally {
+                checking = false
+            }
+        }
+    }
+
+    fun rootBooleanValue(variable: Int): Boolean? {
+        check(!closed && !checking) { "root values require an idle conditioned query owner" }
+        val session = planned?.session ?: return null
+        check(session.decisionLevel == 0) { "a generated center may only read the source root" }
+        return session.boolValue(variable)
+    }
+
     override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult {
         check(!closed) { "conditioned query owner is closed" }
         check(!checking) { "a worker may execute one conditioned query at a time" }

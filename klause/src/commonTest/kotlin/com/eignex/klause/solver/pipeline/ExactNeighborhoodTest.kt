@@ -10,10 +10,82 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ExactNeighborhoodTest {
+    @Test
+    fun `root Boolean copying resumes without checking a partial center`() {
+        val visited = ArrayList<Int>()
+        val conditions = ArrayList<ExactNeighborhoodCondition>()
+        val search = ExactNeighborhood(3, emptyList(), ExactNeighborhoodCompletion { condition, _ ->
+            conditions += condition
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1,
+            prepareBooleanCenter = { true }, rootBooleanValue = { variable ->
+                visited += variable
+                when (variable) { 0 -> true; 1 -> false; else -> null }
+            })
+
+        assertFalse(search.advance(Cancellation.Never, 1))
+        assertTrue(conditions.isEmpty())
+        assertTrue(search.advance(Cancellation.Never, 10))
+
+        assertEquals(listOf(0, 1, 2), visited)
+        assertEquals(mapOf(0 to true, 1 to false, 2 to false), conditions.single().bools)
+        assertEquals(4L, search.work)
+    }
+
+    @Test
+    fun `cancellation withholds a partially copied Boolean center`() {
+        var cancelled = false
+        var checks = 0
+        val search = ExactNeighborhood(2, emptyList(), ExactNeighborhoodCompletion { _, _ ->
+            checks++
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1,
+            prepareBooleanCenter = { true }, rootBooleanValue = { cancelled = true; true })
+
+        assertFalse(search.advance(Cancellation { cancelled }, 10))
+
+        assertEquals(0, checks)
+        assertEquals(1L, search.work)
+        assertEquals(0.0, search.stats.ls.completions.sum)
+    }
+
+    @Test
+    fun `Boolean center preparation cannot exceed the instruction allowance`() {
+        var checks = 0
+        val search = ExactNeighborhood(2, emptyList(), ExactNeighborhoodCompletion { _, _ ->
+            checks++
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumInstructions = 1,
+            prepareBooleanCenter = { true }, rootBooleanValue = { true })
+
+        assertTrue(search.advance(Cancellation.Never, 10))
+
+        assertEquals(0, checks)
+        assertEquals(1L, search.work)
+        assertIs<SolveResult.Unknown>(search.solveResult(TerminationReason.BudgetExhausted))
+    }
+
+    @Test
+    fun `declined root preparation retains incomplete move accounting`() {
+        var checks = 0
+        val search = ExactNeighborhood(1, emptyList(), ExactNeighborhoodCompletion { _, _ ->
+            checks++
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1,
+            prepareBooleanCenter = { false })
+
+        assertTrue(search.advance(Cancellation.Never, 10))
+
+        assertEquals(0, checks)
+        assertEquals(1.0, search.stats.ls.completionsUndecided.sum)
+        assertIs<SolveResult.Unknown>(search.solveResult(TerminationReason.BudgetExhausted))
+    }
+
     @Test
     fun `a refuted neighborhood does not refute the source`() {
         val search = ExactNeighborhood(0, listOf(BigFraction.ZERO),
