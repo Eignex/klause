@@ -231,6 +231,9 @@ the residual factor kinds and clause dependencies of proposed cardinality reduct
 For a reduction with remaining violations, a separate diagnostic state traces up to two
 ordinary clause repairs while protecting every NValue coordinate and the count. The
 trace does not change the measured state's assignment or random stream. Proposal
+diagnostics also invoke the internal scratch-completion component through its JVM
+constructor ABI on a separate state and record the resulting parts and full residuals.
+An ABI mismatch fails the probe instead of silently skipping that component.
 generation must leave the incumbent unchanged. Scoring and incumbent acquisition are
 outside proposal timing. This probes the neighborhood at a captured feasible point;
 it does not measure portfolio reachability, independent source validity or end-to-end gains.

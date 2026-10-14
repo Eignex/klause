@@ -26,6 +26,20 @@ import kotlin.random.Random
 
 /** Measures NValue proposals at a CP incumbent, separately from end-to-end solving. */
 object NValueNeighborhoodProfile {
+    private val completionType = Class.forName("com.eignex.klause.factor.global.NValueClauseCompletion")
+    private val completionConstructor = completionType.getConstructor(
+        LocalSearchState::class.java, MoveSink::class.java, IntArray::class.java,
+    )
+    private val completionMethod = completionType.getMethod("complete", Move::class.java)
+
+    @Serializable
+    private data class CompletionObservation(val cost: Long, val parts: List<String>, val residuals: Map<String, Int>)
+
+    @Serializable
+    private data class RepairObservation(
+        val cost: Long, val move: String, val residuals: Map<String, Int>, val clauses: Map<Int, List<String>>,
+    )
+
     @Serializable
     private data class Proposal(
         val distinct: Int,
@@ -35,7 +49,8 @@ object NValueNeighborhoodProfile {
         val residuals: Map<String, Int>,
         val parts: Int,
         val clauseDependencies: Map<Int, List<String>>,
-        val repairTrace: List<Map<Int, List<String>>> = emptyList(),
+        val repairTrace: List<RepairObservation> = emptyList(),
+        val scratchCompletion: CompletionObservation? = null,
     )
 
     @Serializable
@@ -153,7 +168,10 @@ object NValueNeighborhoodProfile {
                                 if (move is Move.Compound) move.parts.size else 1,
                                 clauseDependencies(state),
                             )
-                            reductions += proposal.copy(repairTrace = clauseRepairTrace(state, factor))
+                            reductions += proposal.copy(
+                                repairTrace = clauseRepairTrace(state, factor),
+                                scratchCompletion = scratchCompletion(state, factor, move, sample),
+                            )
                         }
                         restore(state, sample)
                     }
@@ -205,7 +223,7 @@ object NValueNeighborhoodProfile {
         }
     }
 
-    private fun clauseRepairTrace(state: LocalSearchState, factor: NValue): List<Map<Int, List<String>>> {
+    private fun clauseRepairTrace(state: LocalSearchState, factor: NValue): List<RepairObservation> {
         if (state.cost == 0L) return emptyList()
         val diagnostic = LocalSearchState(state.model, Random(0), state.assumptions, state.projection)
         diagnostic.invariants = state.invariants
@@ -216,7 +234,7 @@ object NValueNeighborhoodProfile {
             it.setInvariants(diagnostic.invariants)
             it.setOwners(state.seeding.ownerInt)
         }
-        val trace = ArrayList<Map<Int, List<String>>>()
+        val trace = ArrayList<RepairObservation>()
         repeat(2) { _ ->
             val fid = (0 until diagnostic.problem.numFactors).firstOrNull { id ->
                 diagnostic.problem.factors[id] is Clause && diagnostic.factors[id].isViolated(diagnostic, id)
@@ -225,10 +243,31 @@ object NValueNeighborhoodProfile {
             diagnostic.factors[fid].proposeRepairMoves(diagnostic, fid, repairs)
             val next = repairs.list.minByOrNull { diagnostic.netDelta(it) } ?: return trace
             diagnostic.apply(next)
-            trace += clauseDependencies(diagnostic)
+            trace += RepairObservation(diagnostic.cost, next.toString(), residuals(diagnostic),
+                clauseDependencies(diagnostic))
         }
         return trace
     }
+
+    private fun scratchCompletion(
+        state: LocalSearchState, factor: NValue, move: Move, incumbent: Sample,
+    ): CompletionObservation? {
+        if (state.invariants == null || state.cost == 0L) return null
+        val diagnostic = LocalSearchState(state.model, Random(0), state.assumptions, state.projection)
+        diagnostic.invariants = state.invariants
+        restore(diagnostic, incumbent)
+        val eligibility = MoveSink(diagnostic.assumptions).also { it.setInvariants(diagnostic.invariants) }
+        // The component stays internal to the library; the JVM probe follows its constructor ABI.
+        val helper = completionConstructor.newInstance(diagnostic, eligibility, factor.xs + intArrayOf(factor.n))
+        val completion = completionMethod.invoke(helper, move) as Move
+        diagnostic.apply(completion)
+        val parts = if (completion is Move.Compound) completion.parts else listOf(completion)
+        return CompletionObservation(diagnostic.cost, parts.map { it.toString() }, residuals(diagnostic))
+    }
+
+    private fun residuals(state: LocalSearchState): Map<String, Int> = (0 until state.problem.numFactors)
+        .filter { state.factors[it].isViolated(state, it) }
+        .groupingBy { state.problem.factors[it]::class.simpleName ?: "Factor" }.eachCount()
 
     private fun distinct(state: LocalSearchState, factor: NValue): Int = factor.xs.indices.filter {
         factor.presents.isEmpty() || Lit.evaluate(
