@@ -295,9 +295,13 @@ class LocalSearchStateCompoundProbeTest {
         val half = 1L shl 62
         val problem = Problem(0, 2, Array(2) { IntDomain(-half, half) },
             arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
-        val network = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(2, 0)
+        val definition = FunctionalObjective.Lin(
+            1, 1, longArrayOf(-1), arrayOf(FunctionalObjective.Operand.v(0)), 0,
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        state.invariants = network
+        state.invariants = InvariantNetwork(
+            listOf(DefinitionalSweep.SweepNode.IntDef(definition, intArrayOf(0))), 2, 0,
+        )
         state.assignment.setInt(0, -half)
         state.assignment.setInt(1, -half)
         state.recompute()
@@ -323,14 +327,17 @@ class LocalSearchStateCompoundProbeTest {
         val problem = Problem(0, 2, Array(2) { IntDomain(-half, half) },
             arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(2, 0)
+        val definition = FunctionalObjective.Lin(
+            1, 1, longArrayOf(-1), arrayOf(FunctionalObjective.Operand.v(0)), 0,
+        )
+        state.invariants = InvariantNetwork(
+            listOf(DefinitionalSweep.SweepNode.IntDef(definition, intArrayOf(0))), 2, 0,
+        )
         state.assignment.setInt(0, half)
         state.assignment.setInt(1, half)
         state.recompute()
         val before = state.assignment.snapshot()
-        val objective = FunctionalObjective(1, true,
-            listOf(FunctionalObjective.Lin(1, 1, longArrayOf(-1), arrayOf(FunctionalObjective.Operand.v(0)), 0)),
-            intArrayOf(0))
+        val objective = FunctionalObjective(1, true, listOf(definition), intArrayOf(0))
 
         val delta = state.objectiveDelta(objective, Move.IntSet(0, half - 1))
 
