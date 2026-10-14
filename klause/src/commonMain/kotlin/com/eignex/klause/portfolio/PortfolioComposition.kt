@@ -257,7 +257,11 @@ internal object PortfolioComposition {
             // A finite objective can seed through incumbent workers without reserving continuous descent.
             if (!facts.continuousObjective && arms.size > PortfolioScenario.DEFAULT_ARMS &&
                 arms.last().label == "lp-default"
-            ) arms.dropLast(1) else arms
+            ) {
+                arms.dropLast(1)
+            } else {
+                arms
+            }
         }
         val remaining = composed.toMutableList()
         val first = small.mapNotNull { arm ->
@@ -322,7 +326,9 @@ internal object PortfolioComposition {
         // Root cut harvesting spends a satisfaction arm's first slice before node refutation.
         val curatedEdit: ((BacktrackParams) -> BacktrackParams)? = if (scenario.kind == Kind.CSP) {
             { params ->
-                val rootParams = if (params.lpConfig == null) params else {
+                val rootParams = if (params.lpConfig == null) {
+                    params
+                } else {
                     params.copy(lpPlan = params.lpPlan.copy(rootCutHarvest = false))
                 }
                 edit?.invoke(rootParams) ?: rootParams
@@ -406,7 +412,9 @@ internal object PortfolioComposition {
             scenario.lsPool != null || scenario.btPool != null || scenario.btEdit != null ||
             scenario.annotationArm != null || arms.lastOrNull()?.label == "lp-default" ||
             arms.any { it.label == "lp-aggressive" }
-        ) return null
+        ) {
+            return null
+        }
         val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-aggressive" }
             ?: return null
         return BacktrackWorkerConfig(
@@ -424,7 +432,9 @@ internal object PortfolioComposition {
             facts.profile.problemClass != ProblemClass.FiniteCp ||
             scenario.btPool != null || scenario.lsPool != null || scenario.btEdit != null ||
             scenario.annotationArm != null || selected.take(2).any { it.label.startsWith("lp-") }
-        ) return selected
+        ) {
+            return selected
+        }
         val conflict = selected.indexOfFirst { it.label == "conflictDriven" }
         if (conflict < 0) return selected
         val selector = selected.indexOfFirst { it.label == "selector-switch" }
@@ -451,7 +461,9 @@ internal object PortfolioComposition {
         if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
             scenario.lsPool != null || scenario.btPool != null || !facts.profile.realColumns ||
             arms.any { it.label == "lp-default" }
-        ) return null
+        ) {
+            return null
+        }
         val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-default" }
             ?: return null
         return BacktrackWorkerConfig(
