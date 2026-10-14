@@ -4,6 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -225,6 +227,40 @@ class PreparedFactorProjectionsTest {
 
         assertEquals(0, relaxation.model.m)
         assertEquals(RelaxationCapability.NONE, selected.capabilities(0).relaxation)
+    }
+
+    @Test
+    fun `omitted scheduling and circuit projections do not reinstall default family rows`() {
+        val source = Problem(0, 5, arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(2, 6),
+            IntDomain(0, 1), IntDomain(0, 1)), arrayOf<Factor>(
+            Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.GE, 2),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.GE, 2),
+            Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), 1),
+            Circuit(intArrayOf(3, 4)),
+        ))
+        val selected = FactorProjectionProviders(relaxation = RelaxationProjectionProvider { null }).prepare(source)
+
+        val default = CpToLpRelaxation(source, null, cumulative = true, cumulativeTimeIndexed = true,
+            circuitArcs = true).build(RootDomains(source))
+        val omitted = CpToLpRelaxation(source, null, cumulative = true, cumulativeTimeIndexed = true,
+            circuitArcs = true, projections = selected).build(RootDomains(source))
+
+        assertTrue(default.model.m > 0)
+        assertEquals(0, omitted.model.m)
+    }
+
+    @Test
+    fun `omitted binary rows do not reinstall default Boolean RLT rows`() {
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)))
+        val selected = FactorProjectionProviders(relaxation = RelaxationProjectionProvider { null }).prepare(source)
+
+        val default = CpToLpRelaxation(source, null, booleanRlt = true).build(RootDomains(source))
+        val omitted = CpToLpRelaxation(source, null, booleanRlt = true, projections = selected)
+            .build(RootDomains(source))
+
+        assertTrue(default.model.m > 0)
+        assertEquals(0, omitted.model.m)
     }
 
     @Test

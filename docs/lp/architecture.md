@@ -261,3 +261,8 @@ rows, using the existing private LP owner and native allowances. Replacement rea
 projections require a source-coordinate check before publication; an unavailable
 or rejected completion stays indeterminate. Omitting a selected relaxation row
 cannot remove the original source constraint from the witness check.
+
+Circuit arcs and Boolean RLT rows use only factors retaining built-in relaxation
+descriptors. Scheduling family preparation reads the corresponding built-in factor
+subset, including its linking rows. Replacing or omitting those descriptors cannot
+reinstall their default family rows outside the selected emission loop.
