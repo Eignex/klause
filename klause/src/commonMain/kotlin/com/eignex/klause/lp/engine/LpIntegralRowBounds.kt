@@ -129,7 +129,7 @@ private fun integralProjectionTightens(
     meter: MixedCertificateMeter,
 ): Boolean? {
     val endpoint = previous.number.exactLong() ?: return null
-    meter.reserve(64L)
+    meter.reserve(96L)
     val contribution = Int128().apply { addProduct(coefficient, endpoint) }
     val difference = residual.copy().apply { subtract(contribution) }
     if (difference.overflow) return null
