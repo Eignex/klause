@@ -19,8 +19,22 @@ def read_model(path):
     import cpmpy as cp
     from cpmpy.tools.xcsp3.parser_callbacks import CallbacksCPMPy
     from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
+    from pycsp3.tools.utilities import _Star
 
-    class RowMajorCallbacks(CallbacksCPMPy):
+    class SourceCallbacks(CallbacksCPMPy):
+        def ctr_extension(self, scope, tuples, positive, flags):
+            if positive:
+                super().ctr_extension(scope, tuples, positive, flags)
+                return
+            variables = self.vars_from_node(scope)
+            # A conflict excludes only its matching tuple, including wildcard coordinates.
+            # Negated native tables can lose permitted pairs after source-domain exclusions.
+            for entry in tuples:
+                self.cpm_model += cp.any([
+                    variable != value for variable, value in zip(variables, entry)
+                    if not isinstance(value, _Star)
+                ])
+
         def ctr_element_matrix(self, matrix, i, j, condition):
             cells = cp.cpm_array([self.get_cpm_vars(row) for row in matrix])
             rows, columns = cells.shape
@@ -31,7 +45,7 @@ def read_model(path):
             selected = cp.Element(cells.flatten(), columns * row + column)
             self.cpm_model += self.eval_cpm_comp(selected, condition.operator, value)
 
-    callbacks = RowMajorCallbacks()
+    callbacks = SourceCallbacks()
     callbacks.force_exit = True
     CallbackerXCSP3(ParserXCSP3(path), callbacks).load_instance()
     callbacks.cpm_model.source_variables = callbacks.cpm_variables
@@ -49,8 +63,7 @@ def solve(path, time_limit, workers, seed=3):
     solver = CPM_ortools(model)
     solver.user_vars.update(model.source_variables.values())
     solver.solver_vars(list(model.source_variables.values()))
-    # Native presolve can refute models whose original-source witnesses satisfy the encoded constraints.
-    solver.solve(time_limit=time_limit, num_workers=workers, random_seed=seed, cp_model_presolve=False)
+    solver.solve(time_limit=time_limit, num_workers=workers, random_seed=seed, cp_model_presolve=True)
     status = solver.status()
     exitstatus = str(status.exitstatus).rsplit(".", 1)[-1]
     objective = None
@@ -69,7 +82,7 @@ def solve(path, time_limit, workers, seed=3):
         "witness": witness,
         "seed": seed,
         "workers": workers,
-        "cpModelPresolve": False,
+        "cpModelPresolve": True,
     }
 
 

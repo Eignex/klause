@@ -111,7 +111,8 @@ checker receipts bind remote regression controls to original bytes.
 The reference importer uses column-count strides for row-major matrix selection
 and enforces both source index bounds. Source-preserving reference records retain
 the installed image/importer identity, complete source assignment and exact integer
-objective; they disable native model presolve across the admitted input surface.
+objective. Negative extension tuples retain their complement semantics under
+source-domain exclusions through explicit conflict clauses.
 See the [benchmark reference workflow](../../klause-bench/README.md#klause-lab)
 for image preparation, replay and the distinction between source witnesses and
 native proof claims.

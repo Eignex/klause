@@ -175,7 +175,7 @@ internal object Xcsp3CpSatReference {
         val result = when {
             v == null -> undecided(cmd, stdout, "no JSON verdict ($error)")
             v.exit == "ERROR" -> undecided(cmd, stdout, v.error ?: "unknown")
-            v.exit in setOf("OPTIMAL", "FEASIBLE", "UNSATISFIABLE") && v.cpModelPresolve != false ->
+            v.exit in setOf("OPTIMAL", "FEASIBLE", "UNSATISFIABLE") && v.cpModelPresolve != true ->
                 undecided(cmd, stdout, "source-preserving native settings are missing")
             v.exit in setOf("OPTIMAL", "FEASIBLE") && Xcsp3SourceValidation.candidate(stdout) == null ->
                 undecided(cmd, stdout, "complete source witness is missing")

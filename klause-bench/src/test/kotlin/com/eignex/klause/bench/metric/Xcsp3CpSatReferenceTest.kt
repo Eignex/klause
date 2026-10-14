@@ -16,7 +16,7 @@ class Xcsp3CpSatReferenceTest {
     @Test
     fun `reference records retain their importer identity`() {
         val output = "v <instantiation><list>x</list><values>5</values></instantiation>\n" +
-            """{"exit":"OPTIMAL","version":"${Xcsp3CpSatReference.VERSION}","objective":5,"exactObjective":"5","maximize":true,"cpModelPresolve":false}"""
+            """{"exit":"OPTIMAL","version":"${Xcsp3CpSatReference.VERSION}","objective":5,"exactObjective":"5","maximize":true,"cpModelPresolve":true}"""
 
         val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image")
 
@@ -50,7 +50,7 @@ class Xcsp3CpSatReferenceTest {
 
     @Test
     fun `proofs with incompatible native settings are undecided`() {
-        val output = """{"exit":"UNSATISFIABLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":true}"""
+        val output = """{"exit":"UNSATISFIABLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":false}"""
 
         val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image")
 
@@ -60,7 +60,7 @@ class Xcsp3CpSatReferenceTest {
 
     @Test
     fun `feasible reference claims without source witnesses are undecided`() {
-        val output = """{"exit":"FEASIBLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":false}"""
+        val output = """{"exit":"FEASIBLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":true}"""
 
         val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image")
 
@@ -71,7 +71,7 @@ class Xcsp3CpSatReferenceTest {
     @Test
     fun `reference objectives retain integers beyond binary64 precision`() {
         val output = "o 9007199254740993\nv <instantiation><list>x</list><values>1</values></instantiation>\n" +
-            """{"exit":"OPTIMAL","version":"${Xcsp3CpSatReference.VERSION}","objective":9007199254740993,"exactObjective":"9007199254740993","maximize":true,"cpModelPresolve":false,"seed":7,"workers":1}"""
+            """{"exit":"OPTIMAL","version":"${Xcsp3CpSatReference.VERSION}","objective":9007199254740993,"exactObjective":"9007199254740993","maximize":true,"cpModelPresolve":true,"seed":7,"workers":1}"""
 
         val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image")
 
