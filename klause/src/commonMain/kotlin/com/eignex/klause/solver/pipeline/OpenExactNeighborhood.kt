@@ -18,6 +18,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
@@ -79,7 +80,7 @@ internal class OpenExactNeighborhood(
         if ((params.timeout or params.cancellation or cancellation)()) return ExactNeighborhoodResult.Undecided
         val sample = result.sample
         val checked = try {
-            if (sample.exactInts?.any { !it.fitsLong() } == true || model.factors.any { it is ExactSearchRow }) {
+            if (sample.exactInts?.any { !it.fitsLong() } == true || model.factors.any { it is ExactSearchRow || it is EncodedTheoryFactor }) {
                 verifyRealCoordinates(model, sample)
             } else {
                 verifyOpenWitness(model, sample)

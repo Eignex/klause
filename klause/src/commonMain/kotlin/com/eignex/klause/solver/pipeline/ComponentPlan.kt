@@ -83,7 +83,7 @@ class ComponentPlan internal constructor(
 
     /** Whether the composition needs a theory component. */
     val hasTheoryComponent: Boolean get() =
-        intOwners.any { it == IntVariableOwner.THEORY } || encodingFactors.any { it }
+        theoryPipeline != ProblemPipeline.FINITE_CP && theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN
 
     /** Verify that this plan can hand the whole canonical model to finite preparation. */
     internal fun requireFullFiniteProjection(spec: Problem) {
@@ -128,9 +128,7 @@ class ComponentPlan internal constructor(
         val cpToSource = cpIntVars
         for (local in cpToSource.indices) sourceToCp[cpToSource[local]] = local
         val domains = Array(cpToSource.size) { local ->
-            requireNotNull(cpDomains[cpToSource[local]]) {
-                "missing finite domain for CP integer column ${cpToSource[local]}"
-            }
+            cpDomains[cpToSource[local]] ?: spec.declaredIntDomains.finiteDomain(cpToSource[local])
         }
         val boolMap = IntArray(spec.numBoolVars) { it }
         val mapping = VarRemap(boolMap, sourceToCp)
@@ -387,7 +385,7 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
     val fragment = projections.linearTheoryModel(EncodingTarget.LINEAR, kept)
     val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE,
         kept.filter { factorOwners[it] != FactorOwner.SHARED })
-    val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
+    val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0 || completeTheory != null
     val route = when {
         unownedOpenColumn != null || unownedRealFactor -> ProblemPipeline.UNSUPPORTED_OPEN
         !needsArithmetic -> ProblemPipeline.FINITE_CP

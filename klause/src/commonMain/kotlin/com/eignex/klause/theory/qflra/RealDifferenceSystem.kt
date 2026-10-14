@@ -15,6 +15,7 @@ import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
@@ -87,7 +88,10 @@ internal class RealDifferenceSystem private constructor(
                 ) return null
             }
             for ((factorIndex, factor) in model.factors.withIndex()) {
-                if (factor is Clause || factor is Cardinality) continue
+                val source = (factor as? EncodedTheoryFactor)?.takeIf {
+                    it.linearForm === it.source.linearForm
+                }?.source ?: factor
+                if (source is Clause || source is Cardinality) continue
                 if (factor.linearForm is LinearForm.Disjunction) return null
                 for ((rowIndex, row) in factor.linearRows.withIndex()) {
                     if (stop()) return null

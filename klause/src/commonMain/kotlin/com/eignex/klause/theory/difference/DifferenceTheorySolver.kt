@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
@@ -44,27 +45,34 @@ class DifferenceTheorySolver(
             null -> return TheoryCheck.Cancelled
             true -> Unit
         }
-        val values = if (fragment == null) {
+        val active = activeFragment(context)
+        if (context.cancelled()) return TheoryCheck.Cancelled
+        val values = if (active == null) {
             unconstrainedValues()
         } else {
-            when (val outcome = fragment.potentialSample(model.numIntVars, bools, context::cancelled)) {
+            when (val outcome = active.potentialSample(model.numIntVars, bools, context::cancelled)) {
                 is Potentials.Found -> outcome.values
 
                 // A refutation is claimed only when the sweeps settled on one; a spent budget reports the
                 // budget, never infeasibility.
-                Potentials.Infeasible -> return TheoryCheck.Infeasible(negativeCycleExplanation(bools, context))
+                Potentials.Infeasible -> return TheoryCheck.Infeasible(negativeCycleExplanation(active, bools, context))
 
                 Potentials.Abandoned -> return TheoryCheck.Cancelled
             }
         }
-        if (values.indices.any { variable -> model.intDomainOrNull(variable)?.let {
-                values[variable] !in it
-            } == true }) return TheoryCheck.Cancelled
+        if (context.cancelled() || values.indices.any { variable ->
+                model.intDomainOrNull(variable)?.let { values[variable] !in it } == true ||
+                    context.intLowerBound(variable)?.let { values[variable] < it } == true ||
+                    context.intUpperBound(variable)?.let { values[variable] > it } == true
+            }) return TheoryCheck.Cancelled
         return TheoryCheck.Sat(Sample(bools.copyOf(), values))
     }
 
-    private fun negativeCycleExplanation(bools: BooleanArray, context: TheoryContext): SearchExplanation? {
-        val fragment = fragment ?: return null
+    private fun negativeCycleExplanation(
+        fragment: DifferenceFragment,
+        bools: BooleanArray,
+        context: TheoryContext,
+    ): SearchExplanation? {
         val active = BooleanArray(fragment.edges.size) { edge ->
             val guard = fragment.edges[edge].guard
             guard == DifferenceEdge.ALWAYS || bools[Lit.variable(guard)] == Lit.isPositive(guard)
@@ -73,6 +81,25 @@ class DifferenceTheorySolver(
         val guards = cycle.map { fragment.edges[it].guard }
         if (guards.any { it == DifferenceEdge.ALWAYS }) return null
         return SearchExplanation(guards.distinct().map(Lit::negate).toIntArray())
+    }
+
+    private fun activeFragment(context: TheoryContext): DifferenceFragment? {
+        val edges = ArrayList<DifferenceEdge>()
+        fragment?.let { edges.addAll(it.edges) }
+        for (variable in 0 until model.numIntVars) {
+            if (context.cancelled()) return null
+            if (model.intBounds.hasUpper(variable)) {
+                edges += DifferenceEdge(DifferenceFragment.ZERO, variable, model.intBounds.upper(variable))
+            }
+            if (model.intBounds.hasLower(variable) && model.intBounds.lower(variable) != Long.MIN_VALUE) {
+                edges += DifferenceEdge(variable, DifferenceFragment.ZERO, -model.intBounds.lower(variable))
+            }
+            context.intUpperBound(variable)?.let { edges += DifferenceEdge(DifferenceFragment.ZERO, variable, it) }
+            context.intLowerBound(variable)?.takeUnless { it == Long.MIN_VALUE }?.let {
+                edges += DifferenceEdge(variable, DifferenceFragment.ZERO, -it)
+            }
+        }
+        return if (edges.isEmpty()) null else DifferenceFragment(edges)
     }
 
     private fun unconstrainedValues(): LongArray = LongArray(model.numIntVars) { variable ->
