@@ -445,6 +445,13 @@ can use the current peer's discrete assignment as its first target. Continuous
 coordinates are completed independently; the peer target remains a proposal and
 must improve the available cutoff before publication.
 
+After a declined nearest rounding, mixed root probes try a peer discrete target
+and upward/downward roundings of the retained LP point before distance pumping.
+Each distinct proposal receives fresh propagation and real completion. Directed
+rounding reuses the root solve and retains its time/work allowance; it neither
+changes the relaxation nor installs a source bound. This permits a rounded
+capacity proposal to retain the continuous flow that nearest rounding can remove.
+
 Root primal diagnostics distinguish rounding and pump pinning from proposal
 completion and cutoff admission. `PRIMAL_ROUNDING_ROOT` and
 `PRIMAL_PUMP_ROUND_ROOT` record whether a discrete proposal was produced;
