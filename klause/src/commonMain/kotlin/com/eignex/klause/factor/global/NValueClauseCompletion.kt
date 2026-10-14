@@ -22,7 +22,7 @@ import com.eignex.klause.util.toLongExact
 internal class NValueClauseCompletion(
     private val state: LocalSearchState,
     private val sink: MoveSink,
-    protectedInts: IntArray,
+    private val protectedInts: IntArray,
 ) {
     private val network = checkNotNull(state.invariants)
     private val folds = MutableIntObjectMap<DefinitionalSweep.SweepNode.BoolFold>().also { index ->
@@ -41,6 +41,12 @@ internal class NValueClauseCompletion(
     private val predicates = HashMap<ReifiedLinear, Predicate?>()
 
     fun complete(move: Move): Move {
+        pinnedInts.clear()
+        protectedInts.forEach { pinnedInts.add(it) }
+        pinnedBools.clear()
+        pending.clear()
+        parts.clear()
+        foldVisits = 0
         state.assignment.copyInto(assignment)
         val initial = if (move is Move.Compound) move.parts else listOf(move)
         for (part in initial) {
@@ -73,7 +79,7 @@ internal class NValueClauseCompletion(
             propagate(writes)
             added += writes.size
         }
-        return if (parts.size == 1) parts[0] else Move.Compound(parts)
+        return if (parts.size == 1) parts[0] else Move.Compound(parts.toList())
     }
 
     private fun repair(literal: Int): Move? = repair(literal, 0)

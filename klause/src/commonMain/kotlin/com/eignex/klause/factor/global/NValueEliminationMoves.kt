@@ -36,6 +36,7 @@ internal class NValueEliminationMoves(
         var emitted = 0
         var completion: Move? = null
         var completionDelta = Long.MAX_VALUE
+        var coordinator: NValueClauseCompletion? = null
         val canComplete = state.cost == 0L || (state.violated.size == 1 && state.violated.contains(factorId))
         val attempted = HashSet<Pair<Long, Long>>()
         repeat(MAX_ATTEMPTS) {
@@ -53,9 +54,21 @@ internal class NValueEliminationMoves(
             emitted++
             if (canComplete) {
                 val delta = state.netDelta(move)
-                if (delta >= 0L && (state.cost > 0L || delta > 0L) && delta < completionDelta) {
-                    completion = move
-                    completionDelta = delta
+                if (delta >= 0L && (state.cost > 0L || delta > 0L)) {
+                    val candidate = if (state.invariants == null) move else {
+                        val clauses = coordinator ?: NValueClauseCompletion(state, sink, xs + intArrayOf(n))
+                            .also { created -> coordinator = created }
+                        clauses.complete(move)
+                    }
+                    val candidateParts = if (candidate is Move.Compound) candidate.parts else listOf(candidate)
+                    if (candidateParts.size > MAX_COMPLETED_PARTS ||
+                        !preservesCount(state, candidateParts, distinct - 1)
+                    ) return@repeat
+                    val reconciled = state.netDelta(candidate)
+                    if (reconciled < completionDelta) {
+                        completion = candidate
+                        completionDelta = reconciled
+                    }
                 }
             }
         }
@@ -173,19 +186,16 @@ internal class NValueEliminationMoves(
     }
 
     private fun completeMove(state: LocalSearchState, move: Move, sink: MoveSink, expectedDistinct: Int) {
-        val first = if (state.invariants == null) move else {
-            NValueClauseCompletion(state, sink, xs + intArrayOf(n)).complete(move)
-        }
-        val firstParts = if (first is Move.Compound) first.parts else listOf(first)
+        val firstParts = if (move is Move.Compound) move.parts else listOf(move)
         if (firstParts.size > MAX_COMPLETED_PARTS || !preservesCount(state, firstParts, expectedDistinct)) return
-        if (state.netDelta(first) == -state.cost) {
+        if (state.netDelta(move) == -state.cost) {
             sink.addCompound(firstParts)
             return
         }
         val repairs = MoveSink(state.assumptions.withInt(n, state.assignment.intValue(n)))
         repairs.setInvariants(state.invariants)
         repairs.setOwners(state.seeding.ownerInt)
-        val parts = state.buildRepairChain(first, MAX_REPAIR_DEPTH, repairs) ?: return
+        val parts = state.buildRepairChain(move, MAX_REPAIR_DEPTH, repairs) ?: return
         if (parts.size > MAX_COMPLETED_PARTS || !preservesCount(state, parts, expectedDistinct)) return
         val candidate = if (parts.size == 1) parts[0] else Move.Compound(parts)
         if (state.netDelta(candidate) == -state.cost) sink.addCompound(parts)

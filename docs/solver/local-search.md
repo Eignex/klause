@@ -313,9 +313,11 @@ indicators and binary channels. Proposals changing presence literals decline. Co
 model scoring and ordinary source publication checks remain required; NValue
 satisfaction alone establishes neither feasibility nor objective improvement.
 
-At a feasible assignment or when NValue is the sole violated factor, the sampled
-elimination with the least nonnegative whole-model cost delta after move-sink filtering
-may reconcile affected Boolean clauses on a scratch assignment before using the
+At a feasible assignment or when NValue is the sole violated factor,
+sampled eliminations with nonnegative whole-model cost delta after move-sink filtering
+may reconcile affected Boolean clauses on a scratch assignment. At most four sampled
+candidates use that bounded reconciliation, sharing root-predicate and fold indexes.
+The candidate with the least resulting model cost may use the
 existing directed repair-chain mechanism to reconcile regressed
 surrounding constraints. Zero-delta moves need completion only at an infeasible assignment.
 Clause, XOR and unary-channel reconciliation inspects at most 512 queued factor occurrences and appends at
