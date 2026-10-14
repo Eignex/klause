@@ -1299,6 +1299,25 @@ counters exclude native CP analysis; matching SAT reports are not source checks.
 
 ## Focused probes
 
+### Boolean objective descent
+
+`com.eignex.klause.bench.profile.BooleanObjectiveDescentProbe` compares the existing
+CBLS feasible-descent and objective-bound repair modes from one retained WCNF witness.
+It also compares native linear scoring with a functional Boolean objective view.
+The input must retain explicit unary penalty folds. Supply `suite`, `problem`, the original source
+`sha256`, a gzip/base64 original `v` bitstring in `witness64`, and counted `work`.
+Optional `prepareMs=500` and per-run `timeout=5000` bound preparation and execution.
+Run the committed main through an AWS lab profile at a trusted pinned revision.
+
+Each variant gets a fresh worker, seed 3, the same prepared model and initial point.
+The probe records exact source and search costs, final original witnesses, actual
+moves, strict improvements beyond the supplied point, materialization and run times,
+source bytes and build provenance. The initial point remains the retained best when
+an arm finds no improvement; `nativeWitnesses` distinguishes returned arm witnesses.
+Check `cases.json` with the independent original-source checker. Profile timings and
+explicit mode comparisons are diagnostic; use ordinary matched whole-CLI runs for
+default-route performance claims.
+
 ### Objective representation probe
 
 `com.eignex.klause.bench.profile.ObjectiveRepresentationProbe` measures the public
