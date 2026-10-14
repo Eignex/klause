@@ -64,7 +64,7 @@ internal object ReferenceSolve {
         // run side by side oversubscribe the machine and their times say more about the load than the instance.
         val settings = asked.copy(processors = asked.processors ?: 1)
         val cacheTag = when (ref.format) {
-            Format.XCSP3 -> "$id-xcsp3|${Xcsp3CpSatReference.identity()}|p${settings.processors}"
+            Format.XCSP3 -> "$id-xcsp3|${Xcsp3CpSatReference.identity()}|p${settings.processors}|seed${settings.seed}"
 
             Format.SMTLIB -> if (id == "z3") "$id|${Z3Reference.identity()}" else id
 
@@ -96,7 +96,7 @@ internal object ReferenceSolve {
             }
 
             Format.XCSP3 -> {
-                val r = cached ?: cache(Xcsp3CpSatReference.run(ref, budget, checkNotNull(settings.processors)))
+                val r = cached ?: cache(Xcsp3CpSatReference.run(ref, budget, checkNotNull(settings.processors), settings.seed))
                 Run(
                     id, r, optimize = r.exactObjective != null || r.objective != null,
                     maximize = r.stats["maximize"].toBoolean(),
