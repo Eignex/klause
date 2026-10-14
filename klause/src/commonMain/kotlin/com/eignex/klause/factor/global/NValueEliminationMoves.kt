@@ -149,13 +149,13 @@ internal class NValueEliminationMoves(
     }
 
     private fun completeMove(state: LocalSearchState, move: Move, sink: MoveSink, expectedDistinct: Int) {
-        val repairs = MoveSink(state.assumptions)
+        val repairs = MoveSink(state.assumptions.withInt(n, state.assignment.intValue(n)))
         repairs.setInvariants(state.invariants)
         repairs.setOwners(state.seeding.ownerInt)
         val parts = state.buildRepairChain(move, MAX_REPAIR_DEPTH, repairs) ?: return
         if (parts.size > MAX_COMPLETED_PARTS || !preservesCount(state, parts, expectedDistinct)) return
         val candidate = if (parts.size == 1) parts[0] else Move.Compound(parts)
-        if (state.netDelta(candidate) == 0L) sink.addCompound(parts)
+        if (state.netDelta(candidate) == -state.cost) sink.addCompound(parts)
     }
 
     private fun preservesCount(state: LocalSearchState, parts: List<Move>, expectedDistinct: Int): Boolean {
