@@ -7,6 +7,7 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.BoolFoldDefinition
@@ -18,6 +19,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
@@ -53,7 +55,7 @@ internal object BooleanObjectiveDescentProbe {
             require(parts.size == 2)
             parts[0] to parts[1]
         }
-        require(options.keys - setOf("prepareMs", "timeout", "conditional", "conditionalScope") ==
+        require(options.keys - setOf("prepareMs", "timeout", "conditional", "conditionalScope", "conditionalBound") ==
             setOf("suite", "problem", "sha256", "witness64", "work"))
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -63,8 +65,10 @@ internal object BooleanObjectiveDescentProbe {
         val conditional = options["conditional"]?.toInt() ?: 0
         require(options["conditionalScope"] in listOf(null, "true", "false"))
         val scoped = options["conditionalScope"] == "true"
+        require(options["conditionalBound"] in listOf(null, "true", "false"))
+        val bounded = options["conditionalBound"] == "true"
         require(conditional in 0..32)
-        require(!scoped || conditional > 0)
+        require(!(scoped || bounded) || conditional > 0)
         require(timeout in 1..60_000 && prepareMs in 1..5000)
         val ref = Catalog.uncapped(suite).problems.single { it.name == name }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(MAX_SOURCE_BYTES + 1) }
@@ -116,7 +120,7 @@ internal object BooleanObjectiveDescentProbe {
             val rows = conditionalRepairs(
                 problem, objective, sweep, initial, parsed.boolFolds, conditional, work, timeout,
                 suite, name, digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct,
-                scoped,
+                scoped, bounded,
             )
             out.resolve("cases.json").writeText(rows.toString() + "\n")
             return
@@ -222,6 +226,7 @@ internal object BooleanObjectiveDescentProbe {
         sourceObjective: LinearObjective,
         reconstruct: (Sample) -> Sample,
         scoped: Boolean,
+        bounded: Boolean,
     ) = buildJsonArray {
         val setupStarted = System.nanoTime()
         val pins = requireNotNull(LocalSearchModel.of(problem.bake()).pinsUnder(Assumptions.None))
@@ -232,6 +237,10 @@ internal object BooleanObjectiveDescentProbe {
         base.invariants = sweep.network(0, problem.numBoolVars)
         base.recompute()
         require(base.cost == 0L)
+        val repairModel = if (bounded) {
+            LocalSearchModel.open(strictObjectiveProblem(problem, objective, initial))
+        } else model
+        val repairBase = if (bounded) LocalSearchState(repairModel, Random(3), pins) else base
         val graph = if (scoped) supportGraph(problem, initial, pins, folds,
             Cancellation.after(timeout.milliseconds)) else null
         val roots = folds.map { Lit.variable(it.lits.single()) }.distinct()
@@ -249,20 +258,21 @@ internal object BooleanObjectiveDescentProbe {
                 (0 until problem.numBoolVars).filter { !region[it] && !pins.isFrozenBool(it) }
                     .associateWith(initial::boolValue))
             val assumptions = pins.mergedWith(scopePins).withBool(root, !initial.boolValue(root))
-            val state = LocalSearchState(model, Random(3), assumptions, base.projection)
+            val state = LocalSearchState(repairModel, Random(3), assumptions, repairBase.projection)
             for (v in 0 until problem.numBoolVars) state.assignment.setBool(v, initial.boolValue(v))
             assumptions.forEachBool { id, value -> state.assignment.setBool(id, value) }
             sweep.sweep(state.assignment, state.rootDomains, problem.factors, assumptions::isFrozenBool)
             state.invariants = sweep.network(0, problem.numBoolVars)
             state.recompute()
-            val initialCost = state.cost
+            val initialSearchCost = state.cost
+            val initialCost = state.cost - if (bounded) state.factorDegree[problem.numFactors] else 0
             val strategy = LocalSearchCatalog.byLabel("cbls/fixed").strategy
             val materializeNanos = System.nanoTime() - materializeStarted
             val cancellation = Cancellation.after(timeout.milliseconds)
             val started = System.nanoTime()
             var moves = 0L
             var stalled = false
-            var bestHardCost = state.cost
+            var bestSearchCost = state.cost
             while (state.cost != 0L && moves < work && !cancellation.isCancelled()) {
                 val move = strategy.pickMove(state)
                 if (move == null) {
@@ -271,16 +281,19 @@ internal object BooleanObjectiveDescentProbe {
                 }
                 state.apply(move)
                 moves++
-                bestHardCost = minOf(bestHardCost, state.cost)
+                bestSearchCost = minOf(bestSearchCost, state.cost)
             }
             val elapsedNanos = System.nanoTime() - started
             assumptions.forEachBool { id, value -> check(state.assignment.boolValue(id) == value) }
             val feasible = state.cost == 0L
             val sourceSample = if (feasible) reconstruct(state.assignment.snapshot()) else null
             val value = sourceSample?.let(sourceObjective::evaluateExact)
+            check(value == null || !bounded || value < sourceObjective.evaluateExact(initial))
+            val boundCost = if (bounded) state.factorDegree[problem.numFactors] else 0
+            val hardCost = state.cost - boundCost
             add(buildJsonObject {
                 put("index", index); put("status", "DONE")
-                put("arm", "conditional-${if (scoped) "support" else "full"}-cbls-$root")
+                put("arm", "conditional-${if (scoped) "support" else "full"}-${if (bounded) "bound" else "sat"}-$root")
                 put("seed", 3)
                 put("problem", buildJsonObject {
                     put("suite", suite); put("problem", name); put("format", "WCNF")
@@ -301,8 +314,10 @@ internal object BooleanObjectiveDescentProbe {
                     put("targetRoot", root); put("targetDelta", delta)
                     put("rootPins", pins.numBools); put("pinsSatisfied", true)
                     put("scoped", scoped); put("freeBools", problem.numBoolVars - assumptions.numBools)
-                    put("initialHardCost", initialCost); put("finalHardCost", state.cost)
-                    put("bestHardCost", bestHardCost)
+                    put("bounded", bounded); put("boundCost", boundCost)
+                    put("initialHardCost", initialCost); put("finalHardCost", hardCost)
+                    put("initialSearchCost", initialSearchCost); put("finalSearchCost", state.cost)
+                    put("bestSearchCost", bestSearchCost)
                     put("nativeWitnesses", if (feasible) 1 else 0)
                     put("sharedSetupNanos", sharedSetupNanos); put("materializeNanos", materializeNanos)
                     put("elapsedNanos", elapsedNanos); put("workLimit", work); put("timeoutMillis", timeout)
@@ -310,11 +325,34 @@ internal object BooleanObjectiveDescentProbe {
                     put("stats", buildJsonObject { put("lsMoves", moves); put("lsRestarts", 0) })
                 })
             })
-            println("conditional root=$root scoped=$scoped free=${problem.numBoolVars - assumptions.numBools} " +
-                "delta=$delta initialHard=$initialCost bestHard=$bestHardCost finalHard=${state.cost} " +
+            println("conditional root=$root scoped=$scoped bounded=$bounded " +
+                "free=${problem.numBoolVars - assumptions.numBools} delta=$delta initialHard=$initialCost " +
+                "bestSearch=$bestSearchCost finalSearch=${state.cost} finalHard=$hardCost boundCost=$boundCost " +
                 "sourceObjective=$value moves=$moves elapsedNanos=$elapsedNanos")
         }
         println("conditional targets=${targets.size} requested=$count sharedSetupNanos=$sharedSetupNanos")
+    }
+
+    private fun strictObjectiveProblem(problem: Problem, objective: LinearObjective, initial: Sample): Problem {
+        val coefficients = objective.boolWeights
+        val terms = coefficients.indices.filter { coefficients[it] != 0L }
+        var total = 0L
+        for (variable in terms) {
+            require(coefficients[variable] > 0L)
+            total = Math.addExact(total, coefficients[variable])
+        }
+        Math.addExact(total, objective.constant)
+        val limit = Math.subtractExact(Math.subtractExact(objective.evaluateLong(initial), objective.constant), 1L)
+        require(limit >= 0L)
+        val bound = PseudoBoolean(
+            LongArray(terms.size) { coefficients[terms[it]] },
+            IntArray(terms.size) { Lit.make(terms[it], true) }, PbOp.LE, limit,
+        )
+        return Problem(
+            problem.numBoolVars, 0, emptyArray(), problem.factors + bound,
+            impliedFactorMask = problem.impliedFactorMask?.copyOf(problem.numFactors + 1),
+            hasSymmetryBreaking = problem.hasSymmetryBreaking, settings = problem.settings,
+        )
     }
 
     private fun supportGraph(

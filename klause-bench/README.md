@@ -1460,6 +1460,12 @@ aliases link both ways. Coordinates outside the region stay pinned at their init
 values, alongside every effective root pin. Rows report the remaining free coordinates
 and the lowest observed hard cost. This heuristic restriction proves no infeasibility.
 
+`conditionalBound=true` adds a public pseudo-Boolean constraint requiring the full
+objective to beat the supplied point. It admits only positive Boolean coefficients
+whose sum and objective range fit signed 64-bit arithmetic. The repair model retains
+every prepared clause and root pin; it receives no further propagation. Search cost
+includes the bound's violation, reported separately from the original hard cost.
+
 ### Objective representation probe
 
 `com.eignex.klause.bench.profile.ObjectiveRepresentationProbe` measures the public
