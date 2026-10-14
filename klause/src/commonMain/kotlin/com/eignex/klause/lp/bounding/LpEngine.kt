@@ -102,7 +102,7 @@ internal class LpEngine(
     internal val sink: SolveStatsSink,
     internal val solveContext: LpSolveContext = LpSolveContext.Production,
     private val deferred: Boolean = false,
-    private val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
+    internal val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ) : AutoCloseable {
     init { projections?.requireSource(problem) }
 
