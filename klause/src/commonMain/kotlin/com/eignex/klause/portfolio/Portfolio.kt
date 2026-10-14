@@ -821,7 +821,10 @@ class Portfolio(
                 it in incumbentProbeArms && trialStarted[it] && !productive[it]
             } else emptyList()
             val ordinary = free.filter { it !in trials }
-            if (trials.isNotEmpty() && (auxiliaryContinuationAllowed || ordinary.isEmpty())) return trials.first()
+            if (trials.isNotEmpty() && (auxiliaryContinuationAllowed || ordinary.isEmpty())) {
+                auxiliaryContinuationAllowed = false
+                return trials.first()
+            }
             val preparing = continuingPreparation
             if (preparing >= 0 && !busy[preparing]) {
                 if (preparing in ordinary &&

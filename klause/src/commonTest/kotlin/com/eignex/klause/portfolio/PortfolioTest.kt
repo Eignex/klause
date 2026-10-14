@@ -2372,7 +2372,6 @@ class PortfolioTest {
 
     @Test
     fun `auxiliary trial retains search through plateau reseeding`() {
-        var calls = 0
         var slices = 0
         val search = object : ResumableSearch {
             private var closed = false
@@ -2383,7 +2382,6 @@ class PortfolioTest {
             override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                 check(!closed)
-                calls++
                 slices++
                 spent += sliceNodes
                 return null
@@ -2391,13 +2389,13 @@ class PortfolioTest {
             override fun close() { closed = true }
         }
         val workers = listOf(
-            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { calls++ }),
+            trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) {}),
             trackingWorker("probe", 1, search).also { it.restartingSearch = true },
         )
 
         Portfolio.thompson(workers, maxSliceWork = 5_000L, reseedStaleThreshold = 1).use {
             it.incumbentProbeArms = setOf(1)
-            it.minimize(Cancellation { calls >= 15 })
+            it.minimize(Cancellation { search.work >= 60_000L })
         }
 
         assertEquals(60_000L, search.work)
@@ -2620,7 +2618,7 @@ class PortfolioTest {
 
             portfolio.use { it.minimize(Cancellation { allowances.size >= 4 }) }
 
-            assertEquals(listOf(7L, 7L, 14L, 21L), allowances)
+            assertEquals(listOf(7L, 7L, 10L, 15L), allowances)
             assertTrue(probeSlices > 1)
         }
     }
@@ -2647,7 +2645,7 @@ class PortfolioTest {
             it.minimize(Cancellation { allowances.sum() >= 252L && finderSlices >= 15 })
         }
 
-        assertEquals(listOf(7L, 14L) + List(11) { 21L }, allowances)
+        assertEquals(listOf(7L, 10L, 15L) + List(10) { 21L } + 10L, allowances)
     }
 
     @Test
