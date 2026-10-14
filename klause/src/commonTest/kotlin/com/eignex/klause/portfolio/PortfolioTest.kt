@@ -219,7 +219,7 @@ class PortfolioTest {
     fun `proof continuation follows charged family work without waiting for every sibling`() {
         var ordinaryVisits = 0
         var proofVisits = 0
-        val progressing = ScriptedSearch({ true }) { ordinaryVisits++ }
+        val progressing = ScriptedSearch({ it == 0 || it >= 2 }) { ordinaryVisits++ }
         val quietBase = ScriptedSearch({ false }) { ordinaryVisits++ }
         val quiet = object : ResumableSearch by quietBase {
             override val work: Long get() = minOf(5_000L, quietBase.work)
@@ -310,12 +310,12 @@ class PortfolioTest {
     }
 
     @Test
-    fun `proof admission preserves charged sibling work across incumbent updates`() {
+    fun `supplemental proof waits for sibling work after the latest improvement`() {
         var completeVisits = 0
         var proofVisits = 0
         val complete = ScriptedSearch({ it < 3 }) { completeVisits++ }
         val proofBase = ScriptedSearch({ false }) {
-            assertEquals(2, completeVisits)
+            assertEquals(4, completeVisits)
             proofVisits++
         }
         val proof = object : ResumableSearch by proofBase {
@@ -336,7 +336,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `continued incumbent improvements allow supplemental proof turns`() {
+    fun `continued incumbent improvements keep supplemental proof deferred`() {
         var completeVisits = 0
         var proofVisits = 0
         val complete = ScriptedSearch({ true }) { completeVisits++ }
@@ -349,7 +349,7 @@ class PortfolioTest {
         }
 
         assertEquals(8, completeVisits)
-        assertTrue(proofVisits > 0)
+        assertEquals(0, proofVisits)
     }
 
     @Test

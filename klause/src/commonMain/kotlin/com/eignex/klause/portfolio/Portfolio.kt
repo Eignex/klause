@@ -873,7 +873,7 @@ class Portfolio(
             val account = ledgerFor(arm)
             siblingWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - siblingWork[arm])
             val proofWork = workers[arm].auxiliaryProof && work > 0L
-            if (claim.foundFirst || proofWork) siblingWork.fill(0L)
+            if ((!proofStarted && claim.improved) || proofWork) siblingWork.fill(0L)
             if (proofWork) proofStarted = true
             armWork[arm] += if (work > 0L) work else claim.sliceWork
             if (stats != null) {
