@@ -227,6 +227,9 @@ class SourceStrategy internal constructor(
             routePureRealToTheory = true, routeLinearToTheory = true, boundCancellation = scope.stop,
         )
         if (scope.stop()) return incomplete(scope.unknown().reason)
+        if (route is SourceProblemRoute.UnsupportedOpen &&
+            route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
+        ) return incomplete(TerminationReason.BudgetExhausted)
         return when (route) {
             is SourceProblemRoute.OpenTheory -> OpenTheoryPipeline.execute(route.request, scope.theory, engine)
             is SourceProblemRoute.UnsupportedOpen -> OpenTheoryPipeline.searchWithoutTheory(
