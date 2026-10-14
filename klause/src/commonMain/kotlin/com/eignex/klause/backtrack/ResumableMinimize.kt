@@ -804,7 +804,8 @@ internal class ResumableMinimize(
     private fun recordIfImproving(sample: Sample, o: Double): MinimizeResult.WithSample? {
         val exact = exactSourceObjective(objective, sample, params.toleranceCheck)
         if (rebindable && exact == null) return null
-        if (rebindable && exact != null && !beatsCutoff(exact, externalCutoff())) return null
+        val cutoff = externalCutoff()
+        if (cutoff.isNaN() || !(exact?.let { beatsCutoff(it, cutoff) } ?: (o < cutoff))) return null
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
         brancher.onSolution(sample)
