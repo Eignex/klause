@@ -6,6 +6,7 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.kumulant.stat.summary.CountStat
 import com.eignex.kumulant.stat.summary.MaxResult
@@ -635,6 +636,10 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                         mapOf(metrics.outcome to 1L),
                     )
                     phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+                    if (metrics.phase == LpSolvePhase.NODE_DEDUCTION) {
+                        val detail = "${key}_${metrics.outcome}"
+                        phases[detail] = (phases[detail] ?: LpPhaseStats()).mergedWith(delta)
+                    }
                 }
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                     val i = certifier.ordinal
