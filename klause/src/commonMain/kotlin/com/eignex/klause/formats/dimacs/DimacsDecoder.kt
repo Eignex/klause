@@ -38,8 +38,10 @@ fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.prob
     val unitCosts = LongArray(numOriginalBoolVars)
     val direct = BooleanArray(softClauses.size)
     var constant = fixedCost
+    val unitWeight = softClauses.firstOrNull()?.weight
+    val uniformCosts = softClauses.all { it.weight == unitWeight }
     for ((index, soft) in softClauses.withIndex()) {
-        if (soft.literals.size != 1) continue
+        if (!uniformCosts || soft.literals.size != 1) continue
         val literal = soft.literals[0]
         val variable = Lit.variable(literal)
         val weight = soft.weight

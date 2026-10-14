@@ -9,7 +9,6 @@ import com.eignex.klause.bench.source.CorpusSelection.Selection
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
-import com.eignex.klause.solver.Assignment
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -59,10 +58,9 @@ class CatalogTest {
     @Test
     fun `wcnf-core resolves the maxsat instance with a soft-clause objective`() {
         val ingested = WcnfFormat.ingest(CorpusFetcher.resolve(ref("wcnf-core", "maxsat-tiny").source))
+        assertEquals(4, ingested.problem.numBoolVars)
         val obj = assertNotNull(ingested.objective)
-        val assignment = Assignment(ingested.problem.numBoolVars, 0)
-        assignment.setBool(1, true)
-        assertEquals(1L, obj.evaluateLong(assignment))
+        assertEquals(listOf(3L, 1L), obj.boolWeights.toList().takeLast(2))
     }
 
     @Test
