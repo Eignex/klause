@@ -38,6 +38,8 @@ import java.util.Base64
 import java.util.zip.GZIPInputStream
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -269,7 +271,8 @@ internal object BooleanObjectiveDescentProbe {
                     put("suite", suite); put("problem", name); put("format", "WCNF")
                 })
                 put("record", buildJsonObject {
-                    put("feasible", feasible); put("proven", false); put("maximize", false)
+                    put("feasible", if (feasible) JsonPrimitive(true) else JsonNull)
+                    put("proven", false); put("maximize", false)
                     if (sourceSample != null) {
                         put("exactObjective", value.toString())
                         put("finalWitness", "v " + (0 until originalBools).joinToString("") {
