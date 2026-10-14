@@ -65,6 +65,7 @@ class DefinitionalSweep internal constructor(
         }
         var index = 0
         while (index < result.size) {
+            if (visits++ % INITIALIZATION_BATCH == 0 && cancellation()) return null
             val neighbors = unitBooleanLinks[result[index++]] ?: continue
             for (neighbor in neighbors) {
                 if (visits++ % INITIALIZATION_BATCH == 0 && cancellation()) return null
