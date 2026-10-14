@@ -49,8 +49,12 @@ can declare a target and implement the same installation scope. Selection contai
 no mutable solving state. Prepared relations are combined within one arithmetic
 owner before its checks, rather than checked as independent factor witnesses.
 
-Linear and difference ownership use the selected complete relations and retain
-existing exact coefficient, strictness and combined graph safety gates. Polynomial
+Linear and difference participation uses selected complete relations and retains
+existing exact coefficient, strictness and combined graph safety gates. Finite
+coordinate ownership stays independent of that participation. Propagation and encoding
+can reason over the same factor; authoritative finite choices retain their integrality,
+bounds and holes. Arithmetic completion waits for those choices before contributing
+its final point, under the same shared assertion/retraction lifecycle. Polynomial
 composition installs selected continuous relations alongside its finite projection.
 A conditioning pin must hold for the entire installed relation's scope; retraction
 invalidates its derived state and witness. Failed or interrupted installation

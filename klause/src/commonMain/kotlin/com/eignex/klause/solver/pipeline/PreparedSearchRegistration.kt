@@ -51,6 +51,9 @@ internal class PreparedSearchRegistrations(
         this.registrations.forEach { it.requireSource(source) }
         val descriptors = this.registrations.map { it.descriptor }
         requireOwnership(descriptors.flatMap { it.factorIndices }, source.factors.size, "factor")
+        require(descriptors.flatMap { it.participatingFactorIndices }.all { it in source.factors.indices }) {
+            "factor participation is outside the source model"
+        }
         requireOwnership(descriptors.flatMap { it.booleanCoordinates }, source.numBoolVars, "Boolean")
         requireOwnership(descriptors.flatMap { it.integerCoordinates }, source.numIntVars, "integer")
         requireOwnership(descriptors.flatMap { it.realCoordinates }, source.numRealVars, "real")

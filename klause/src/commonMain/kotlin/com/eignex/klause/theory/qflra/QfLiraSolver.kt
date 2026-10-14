@@ -83,6 +83,8 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
@@ -159,6 +161,7 @@ class ExactLiraAssignment(
 class ExactLiraSearchComponent private constructor(
     private val preparedSource: PreparedExactLiraSource,
     private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)?,
+    private val finiteIntVars: IntArray = intArrayOf(),
 ) : TheoryComponent,
     SearchBrancher,
     SearchBranchProposal,
@@ -176,9 +179,10 @@ class ExactLiraSearchComponent private constructor(
         model: Problem,
         projections: PreparedFactorProjections,
         modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
+        finiteIntegerVariables: IntArray = intArrayOf(),
     ) : this(legacyExactLiraSource(requireNotNull(projections.linearTheoryModel(EncodingTarget.LINEAR)) {
         "unsupported selected exact linear encoding"
-    }.also { projections.requireSource(model) }), modelContribution)
+    }.also { projections.requireSource(model) }), modelContribution, finiteIntegerVariables.copyOf())
 
     private val model = preparedSource.model
     private var smtStats: SmtStatsSink? = null
@@ -313,7 +317,10 @@ class ExactLiraSearchComponent private constructor(
         }
     }
     override fun propagate(context: SearchContext): ComponentResult = lp.propagate(context)
-    override fun check(context: SearchContext): ComponentCheck = lp.check(context)
+    override fun check(context: SearchContext): ComponentCheck = if (finiteIntVars.any { variable ->
+            context.intLowerBound(variable) == null ||
+                context.intLowerBound(variable) != context.intUpperBound(variable)
+        }) ComponentCheck.Indeterminate else lp.check(context)
     override fun shareSourcePredicates(context: SearchContext): ComponentResult {
         beginOperation()
         return try {
@@ -825,6 +832,10 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
+        if (finiteIntVars.any { variable ->
+                context.intLowerBound(variable) == null ||
+                    context.intLowerBound(variable) != context.intUpperBound(variable)
+            }) return null
         if (bools.any { it == UNASSIGNED } || outcome != null) return null
         if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
@@ -955,6 +966,11 @@ class ExactLiraSearchComponent private constructor(
         ) {
             return null
         }
+        for (variable in 0 until model.numIntVars) {
+            val domain = model.intDomainOrNull(variable) ?: continue
+            val value = point[model.numRealVars + variable].num
+            if (!value.fitsLong() || value.toLongExact() !in domain) return null
+        }
         val token = lpStop
         val rows = reduction.sourceRows(bools, node, token) ?: return null
         if (!point.satisfiesSourceRows(rows, token)) return null
@@ -991,8 +1007,8 @@ class ExactLiraSearchComponent private constructor(
     internal companion object {
         fun prepareSource(fragment: Problem, stop: Cancellation): PreparedExactLiraComponentFactory? {
             val source = sharedExactLiraSource(fragment, stop) ?: return null
-            val factory = PreparedExactLiraComponentFactory { contribution ->
-                ExactLiraSearchComponent(source, contribution)
+            val factory = PreparedExactLiraComponentFactory { contribution, finite ->
+                ExactLiraSearchComponent(source, contribution, finite)
             }
             return factory.takeUnless { stop() }
         }
@@ -1008,11 +1024,12 @@ class ExactLiraSearchComponent private constructor(
 }
 
 internal class PreparedExactLiraComponentFactory(
-    private val openComponent: (((ExactLiraAssignment, SearchModel) -> Unit)?) -> ExactLiraSearchComponent,
+    private val openComponent: (((ExactLiraAssignment, SearchModel) -> Unit)?, IntArray) -> ExactLiraSearchComponent,
 ) {
     fun open(
         modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
-    ): ExactLiraSearchComponent = openComponent(modelContribution)
+        finiteIntegerVariables: IntArray = intArrayOf(),
+    ): ExactLiraSearchComponent = openComponent(modelContribution, finiteIntegerVariables.copyOf())
 }
 
 internal fun prepareExactLiraSource(

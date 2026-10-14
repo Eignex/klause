@@ -135,7 +135,8 @@ arithmetic-owned and are not integer branch candidates.
 
 Finite/linear search preparation binds each component descriptor to its canonical
 source and opening factory. The registration collection checks source identity and
-unique factor and coordinate ownership before opening any factory. Factories retain
+unique primary factor and coordinate ownership before opening any factory.
+Additional factor participation can overlap those primary enforcing paths. Factories retain
 read-only source fragments and reusable projections; every opening creates separate
 mutable components and an atom registry. A registration can supply several peers,
 such as shared clauses and cardinalities. Installation preserves CP, Boolean and
@@ -218,8 +219,13 @@ for the identical model; a rewritten or remapped model selects against its own f
 Encoder selection names the consumer language separately from numerical execution.
 Direct and equivalent encoders enforce the whole factor; conditioned encoders require
 captured source pins. Relaxation-only and unsupported descriptors confer no source
-ownership. Finite/linear planning reads those selected relations for variable ownership,
-fragment admission and shared component installation. The prepared linear relations
+ownership. Finite/linear planning reads those selected relations for fragment admission and
+shared component installation. Variable ownership is separate: finite declarations
+and their choices remain in finite state, while open integers and reals remain
+arithmetic-owned. `factorOwner` names the primary enforcing path; `factorEncoded`
+records additional arithmetic participation, including factors with propagators.
+Only relations needed by the arithmetic component are installed. An exact coefficient
+or one continuous relation cannot promote unrelated finite factors or choices. The prepared linear relations
 retain original factor attribution and typed coordinates; component openings own their
 combined graph, assertion scopes, LP state and resources. Conditioned finite completion
 captures the fixed discrete point without changing source declarations. Its pins do

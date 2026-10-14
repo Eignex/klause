@@ -26,9 +26,9 @@ class VariablePartition(private val searchRequired: BooleanArray) {
 /**
  * Classify integer variables; see [VariablePartition].
  *
- * A column is search-required exactly when some factor no other lane can hold reads it. That is the same
- * question [componentPlan] answers when it assigns column ownership and when it checks a CP-owned
- * factor's columns, so the three read one rule rather than three that can drift.
+ * A column is search-required by a factor when no selected arithmetic encoder can hold that factor.
+ * Eligibility describes factor representation; it does not transfer a finite declaration's choices
+ * away from finite state. [componentPlan] selects coordinate ownership independently.
  *
  * One pass, not a fixpoint: the demand is a static per-factor declaration, so pulling a column into the
  * search set never changes what another factor declares, and one pass is already the closure.

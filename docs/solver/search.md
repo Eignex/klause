@@ -576,8 +576,11 @@ resumable lifecycle. See [the polynomial route](../theories/polynomial-real.md).
 ## Selected theory encoders
 
 Prepared factor encoders supply the full relations used by shared arithmetic
-components. Ownership, admission and component construction consume the same selected
-capture. Linear relations retain conjunction/disjunction structure, row activators,
+components. Admission and component construction consume the same selected capture. Variable
+ownership is independent of factor participation: finite declarations retain finite
+state and choices, while a propagator and encoder can consume one factor together.
+Component descriptors distinguish primary `factorIndices` from overlapping
+`participatingFactorIndices`, retaining one authoritative coordinate owner. Linear relations retain conjunction/disjunction structure, row activators,
 Boolean terms, strictness and original factor attribution. Integer difference admission
 checks complete selected relations and the safety of their combined graph. Polynomial
 installation conjoins factor relations and all private auxiliary definitions before
@@ -589,3 +592,10 @@ an unfixed interval remains a relaxation and supplies no witness authority. Cond
 linear products capture the same source integer pins as their completion scope. The
 original source checker remains required when numerical execution proposes a point.
 Relaxation selection cannot omit an encoder's enforcing relation or grant completeness.
+
+Exact linear components wait for finite-owned coordinates before proposing arithmetic
+splits or accepting their final completion. Finite publications supply scoped bounds
+and exact fixed values; the finite owner retains hole membership. Numeric contributions
+come only from the declared coordinate owner. An isolated arithmetic service with a
+point outside a source value set withholds that witness instead of treating its bound
+hull as the source. Retraction invalidates both peers' scoped outcomes.

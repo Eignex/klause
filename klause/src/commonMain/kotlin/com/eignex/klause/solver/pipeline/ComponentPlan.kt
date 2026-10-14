@@ -2,7 +2,6 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.Problem
@@ -12,6 +11,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
@@ -44,12 +44,15 @@ class ComponentPlan internal constructor(
     private val source: Problem,
     private val intOwners: Array<IntVariableOwner>,
     private val factorOwners: Array<FactorOwner>,
-    /** Theory route selected from the theory-owned source fragment. */
+    /** Theory route selected from its participating source relations. */
     val theoryPipeline: ProblemPipeline,
     /** What left the model without a route, or null when it has one. */
     val unplaceable: UnplaceableColumn? = null,
     internal val factorProjections: PreparedFactorProjections = (source as? BakedProblem)?.factorProjections
         ?: FactorProjectionProviders.Default.prepare(source),
+    private val encodingFactors: BooleanArray = BooleanArray(factorOwners.size) {
+        factorOwners[it] == FactorOwner.THEORY
+    },
 ) {
     init {
         factorProjections.requireSource(source)
@@ -58,8 +61,13 @@ class ComponentPlan internal constructor(
     /** Owner of integer column [v]. */
     fun intOwner(v: Int): IntVariableOwner = intOwners[v]
 
-    /** Owner of source factor [i]. */
+    /** Primary enforcing owner of source factor [i]; encoding participation is separate. */
     fun factorOwner(i: Int): FactorOwner = factorOwners[i]
+
+    /** Whether arithmetic installs this factor alongside its primary enforcing owner. */
+    fun factorEncoded(i: Int): Boolean = encodingFactors[i]
+
+    internal val encodedFactorIndices: List<Int> get() = factorOwners.indices.filter { encodingFactors[it] }
 
     /** Source integer ids requiring finite domains. */
     val cpIntVars: IntArray get() = intOwners.indices.filter { intOwners[it] == IntVariableOwner.CP }.toIntArray()
@@ -75,7 +83,7 @@ class ComponentPlan internal constructor(
 
     /** Whether the composition needs a theory component. */
     val hasTheoryComponent: Boolean get() =
-        intOwners.any { it == IntVariableOwner.THEORY } || factorOwners.any { it == FactorOwner.THEORY }
+        intOwners.any { it == IntVariableOwner.THEORY } || encodingFactors.any { it }
 
     /** Verify that this plan can hand the whole canonical model to finite preparation. */
     internal fun requireFullFiniteProjection(spec: Problem) {
@@ -109,6 +117,7 @@ class ComponentPlan internal constructor(
             theoryPipeline,
             unplaceable,
             factorProjections.projected(spec, IntArray(spec.numFactors) { it }),
+            encodingFactors.copyOfRange(0, spec.numFactors),
         )
     }
 
@@ -169,12 +178,21 @@ class ComponentPlan internal constructor(
     }
 
     /** Source view consumed by the selected theory component. */
-    fun theoryFragment(spec: Problem): Problem = fragment(spec) { it != FactorOwner.CP }
+    fun theoryFragment(spec: Problem): Problem {
+        requireBelongsTo(spec)
+        val kept = selectedTheoryFactorIndices()
+        return spec.withFactors(Array(kept.size) { spec.factors[kept[it]] },
+            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
+    }
+
+    private fun selectedTheoryFactorIndices(): List<Int> = factorOwners.indices.filter {
+        encodingFactors[it] || (theoryPipeline != ProblemPipeline.FINITE_CP && factorOwners[it] == FactorOwner.SHARED)
+    }
 
     private val encodedFragment: Problem? by lazy {
         val target = if (theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) EncodingTarget.DIFFERENCE
         else EncodingTarget.LINEAR
-        factorProjections.linearTheoryModel(target, factorOwners.indices.filter { factorOwners[it] != FactorOwner.CP })
+        factorProjections.linearTheoryModel(target, selectedTheoryFactorIndices())
     }
 
     internal fun encodedTheoryFragment(spec: Problem): Problem? {
@@ -183,15 +201,11 @@ class ComponentPlan internal constructor(
     }
 
     // Shared clauses stay out because the shared clause component enforces them in the same session.
-    internal fun theoryOwnedFragment(spec: Problem): Problem = fragment(spec) { it == FactorOwner.THEORY }
-
-    private fun fragment(spec: Problem, keep: (FactorOwner) -> Boolean): Problem {
+    internal fun theoryOwnedFragment(spec: Problem): Problem {
         requireBelongsTo(spec)
-        val kept = factorOwners.indices.filter { keep(factorOwners[it]) }
-        return spec.withFactors(
-            Array(kept.size) { spec.factors[kept[it]] },
-            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },
-        )
+        val kept = encodedFactorIndices
+        return spec.withFactors(Array(kept.size) { spec.factors[kept[it]] },
+            spec.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } })
     }
 
     internal fun forObjectiveRound(spec: Problem, appended: Boolean): ComponentPlan {
@@ -213,7 +227,7 @@ class ComponentPlan internal constructor(
         }
         return ComponentPlan(spec, intOwners, factorOwners, theoryPipeline, unplaceable,
             if (appended) factorProjections.replacedLast(spec)
-            else factorProjections.projected(spec, IntArray(spec.numFactors) { it }))
+            else factorProjections.projected(spec, IntArray(spec.numFactors) { it }), encodingFactors)
     }
 
     private fun requireSamePrefix(spec: Problem, count: Int) {
@@ -248,21 +262,17 @@ class ComponentPlan internal constructor(
         requireBelongsTo(spec)
         if (unplaceable != null) return null
         if (spec.numIntVars == 0 && spec.numRealVars == 0) return this
-        val owners = Array(factorOwners.size) { index ->
-            val factor = spec.factors[index]
-            if (factorOwners[index] == FactorOwner.CP && factor.variables.reals.isNotEmpty()) {
-                if (!factorProjections.encoder(index, EncodingTarget.LINEAR).enforcesSource) return null
-                FactorOwner.THEORY
-            } else factorOwners[index]
-        }
-        val kept = owners.indices.filter { owners[it] != FactorOwner.CP }
-        val fragment = factorProjections.linearTheoryModel(EncodingTarget.LINEAR, kept) ?: return null
+        val selected = spec.componentPlan(factorProjections)
+        if (selected.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN) return null
+        val fragment = factorProjections.linearTheoryModel(EncodingTarget.LINEAR,
+            selected.selectedTheoryFactorIndices()) ?: return null
         val route = when {
             fragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
             fragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
             else -> return null
         }
-        return ComponentPlan(spec, intOwners, owners, route, factorProjections = factorProjections)
+        return ComponentPlan(spec, intOwners, selected.factorOwners, route, factorProjections = factorProjections,
+            encodingFactors = selected.encodingFactors)
     }
 
     internal fun requireSource(spec: Problem) = requireBelongsTo(spec)
@@ -315,86 +325,78 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
             factorProjections = projections,
         )
     }
-    val partition = variablePartition(projections)
-    val linearModel = projections.linearTheoryModel(EncodingTarget.LINEAR)
-    val differenceModel = projections.linearTheoryModel(EncodingTarget.DIFFERENCE)
+    val intOwners = Array(numIntVars) { variable ->
+        if (intBounds.hasLower(variable) && intBounds.hasUpper(variable)) IntVariableOwner.CP
+        else IntVariableOwner.THEORY
+    }
+    val linear = projections.linearTheoryModel(EncodingTarget.LINEAR)
+    val difference = projections.linearTheoryModel(EncodingTarget.DIFFERENCE)
     val completeTheory = when {
-        linearModel?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
-
-        differenceModel != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
-            differenceModel.factors,
-            numIntVars,
-            intBounds,
-        ) -> ProblemPipeline.DIFFERENCE_THEORY
-
-        linearModel?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
-
+        linear?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
+        difference != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
+            difference.factors, numIntVars, intBounds) -> ProblemPipeline.DIFFERENCE_THEORY
+        linear?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
         else -> null
     }
-    // An open column some CP-only factor reads has no owner: CP cannot index it and no theory can hold
-    // the factor. The plan says so rather than asserting it away, so one model has one verdict however
-    // it was reached.
-    var unownedOpenColumn = -1
-    val intOwners = Array(numIntVars) { v ->
-        if (completeTheory != null) {
-            IntVariableOwner.THEORY
-        } else if (!intBounds.hasLower(v) || !intBounds.hasUpper(v)) {
-            if (partition.isSearchVariable(v) && unownedOpenColumn < 0) unownedOpenColumn = v
-            IntVariableOwner.THEORY
-        } else if (partition.isSearchVariable(v)) {
-            IntVariableOwner.CP
-        } else {
-            IntVariableOwner.THEORY
-        }
-    }
-    val factorOwners = Array(factors.size) { i ->
-        val factor = factors[i]
+    val target = if (completeTheory == ProblemPipeline.DIFFERENCE_THEORY) EncodingTarget.DIFFERENCE
+        else EncodingTarget.LINEAR
+    val factorOwners = Array(factors.size) { index ->
+        val factor = factors[index]
         when {
-            factor is Clause && projections.usesBuiltInPropagation(i) -> FactorOwner.SHARED
-            factor is Clause -> FactorOwner.CP
-            completeTheory == ProblemPipeline.DIFFERENCE_THEORY &&
-                projections.encoder(i, EncodingTarget.DIFFERENCE).enforcesSource -> FactorOwner.THEORY
-            completeTheory == ProblemPipeline.EXACT_LIRA &&
-                projections.encoder(i, EncodingTarget.LINEAR).enforcesSource -> FactorOwner.THEORY
-            projections.theoryOwnable(i, numRealVars != 0) -> FactorOwner.THEORY
+            factor is Clause && projections.usesBuiltInPropagation(index) -> FactorOwner.SHARED
+            factor.variables.reals.isEmpty() && factor.intVars.all { intOwners[it] == IntVariableOwner.CP } &&
+                projections.capabilities(index).propagation != PropagationCapability.UNSUPPORTED ->
+                FactorOwner.CP
+            projections.encoder(index, target).enforcesSource -> FactorOwner.THEORY
             else -> FactorOwner.CP
         }
     }
-    val theoryKept = factorOwners.indices.filter { factorOwners[it] != FactorOwner.CP }
-    val theoryFragment = projections.linearTheoryModel(EncodingTarget.LINEAR, theoryKept)
-    val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE, theoryKept)
-    val unownedRealFactor = factorOwners.indices.any { index ->
+    val relevantIntegers = BooleanArray(numIntVars) { intOwners[it] == IntVariableOwner.THEORY }
+    val relevantReals = BooleanArray(numRealVars) { true }
+    val encoded = BooleanArray(factors.size) { factorOwners[it] == FactorOwner.THEORY }
+    val jointFinite = numRealVars == 0 && relevantIntegers.none { it } && completeTheory != null
+    if (jointFinite) relevantIntegers.fill(true)
+    var changed = true
+    while (changed) {
+        changed = false
+        for ((index, factor) in factors.withIndex()) {
+            if (!projections.encoder(index, target).enforcesSource ||
+                (!encoded[index] && factor.intVars.none { relevantIntegers[it] } &&
+                    factor.variables.reals.none { relevantReals[it] })
+            ) continue
+            encoded[index] = true
+            for (variable in factor.intVars) if (!relevantIntegers[variable]) {
+                relevantIntegers[variable] = true
+                changed = true
+            }
+            for (variable in factor.variables.reals) if (!relevantReals[variable]) {
+                relevantReals[variable] = true
+                changed = true
+            }
+        }
+    }
+    val unownedOpenColumn = factors.indices.firstNotNullOfOrNull { index ->
+        if (factorOwners[index] != FactorOwner.CP) null
+        else factors[index].intVars.firstOrNull { intOwners[it] == IntVariableOwner.THEORY }
+    }
+    val unownedRealFactor = factors.indices.any { index ->
         factorOwners[index] == FactorOwner.CP && factors[index].variables.reals.isNotEmpty()
     }
+    val kept = factors.indices.filter { encoded[it] || factorOwners[it] == FactorOwner.SHARED }
+    val fragment = projections.linearTheoryModel(EncodingTarget.LINEAR, kept)
+    val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE, kept)
+    val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
     val route = when {
-        unownedOpenColumn >= 0 || unownedRealFactor -> ProblemPipeline.UNSUPPORTED_OPEN
-
-        theoryFragment?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
-
-        intOwners.any { it == IntVariableOwner.THEORY } || factorOwners.any { it == FactorOwner.THEORY } -> when {
-            differenceFragment != null && differenceFragment.numRealVars == 0 && supportsCompleteDifferenceTheory(
-                differenceFragment.factors,
-                differenceFragment.numIntVars,
-                differenceFragment.intBounds,
-            ) -> ProblemPipeline.DIFFERENCE_THEORY
-
-            theoryFragment?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
-
-            else -> ProblemPipeline.UNSUPPORTED_OPEN
-        }
-
-        else -> ProblemPipeline.FINITE_CP
+        unownedOpenColumn != null || unownedRealFactor -> ProblemPipeline.UNSUPPORTED_OPEN
+        !needsArithmetic -> ProblemPipeline.FINITE_CP
+        fragment?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
+        differenceFragment != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
+            differenceFragment.factors, numIntVars, intBounds) -> ProblemPipeline.DIFFERENCE_THEORY
+        fragment?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
+        else -> ProblemPipeline.UNSUPPORTED_OPEN
     }
-    return ComponentPlan(
-        this,
-        intOwners,
-        factorOwners,
-        route,
-        // Only searched on the refusal path, where the model is already declined and the scan is the
-        // difference between naming the constraint at fault and naming nothing.
-        if (unownedOpenColumn < 0) null else unplaceable(unownedOpenColumn, factors, numRealVars != 0),
-        projections,
-    )
+    return ComponentPlan(this, intOwners, factorOwners, route,
+        unownedOpenColumn?.let { unplaceable(it, projections, numRealVars != 0) }, projections, encoded)
 }
 
 /**
@@ -404,10 +406,15 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
  * and some factor no theory holds reads it. Which factor that is decides the remedy — bound the column,
  * or state a decomposition for that global the theories can take.
  */
-private fun unplaceable(column: Int, factors: Array<Factor>, hasRealColumns: Boolean): UnplaceableColumn {
-    val culprit = factors.indexOfFirst { f ->
-        !f.isTheoryOwnable(hasRealColumns) && f.variables.ints.any { it == column }
-    }
+private fun unplaceable(
+    column: Int,
+    projections: PreparedFactorProjections,
+    hasRealColumns: Boolean,
+): UnplaceableColumn {
+    val factors = projections.problem.factors
+    val culprit = factors.indices.firstOrNull { index ->
+        !projections.theoryOwnable(index, hasRealColumns) && factors[index].variables.ints.any { it == column }
+    } ?: -1
     return UnplaceableColumn(
         column,
         culprit.takeIf { it >= 0 },

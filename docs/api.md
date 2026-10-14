@@ -383,3 +383,9 @@ schema mapping while selecting mechanisms separately for each invocation. Open
 heuristic models can use `LocalSearchModel.open(problem, selection, domains)` to
 bind a prepared capture to their actual move domains without allocating finite CP
 state. Selected factories remain private to each live worker.
+
+`ComponentPlan.factorOwner` records the primary enforcing path and `factorEncoded`
+records arithmetic participation. A bounded linear relation can retain propagation
+and its encoder simultaneously. `ExecutionComponentDescriptor.participatingFactorIndices`
+records that overlap without duplicating factor or coordinate ownership. Source finite
+choices are not promoted because another relation needs arithmetic or exact coefficients.

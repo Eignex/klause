@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchExactIntValue
@@ -52,7 +53,9 @@ internal fun ComponentPlan.theoryComponentFactory(
         opening: SearchComponentOpening,
         contribution: (ExactLiraAssignment, SearchModel) -> Unit,
     ): List<SearchComponent> = listOf(
-        (preparedSource()?.open(contribution) ?: ExactLiraSearchComponent(fragment, contribution)).also { component ->
+        (preparedSource()?.open(contribution, cpIntVars) ?: ExactLiraSearchComponent(
+            fragment, fragment.selectedFactorProjections(), contribution, cpIntVars,
+        )).also { component ->
             opening.ownComponent(component)
             component.useSolveStop(opening.theorySolveStop)
             opening.smtStats?.let(component::observeWith)
