@@ -92,6 +92,9 @@ Node-deduction phase outcomes distinguish completed integer, rounded, reconstruc
 and objective-integrality checks from missing endpoints, scalar width, resource
 limits and cancellation. They time existing attempts without additional numerical
 queries; their counts do not add to certifier invocation or work totals.
+The combined node bound retains a downward projection of a complete rational
+certificate even without an integral objective lattice or a usable floating-dual
+bound. Withholding the certificate still withholds that projection.
 Objective scale and external constants map the rational bound and reduced costs
 to minimized source units. Rational cutoff and fixing arithmetic charges operand word-length
 squared to the containing node work ledger; fixed-width integer fixing keeps its
@@ -105,6 +108,13 @@ other endpoint contributions and every weighted scoped row. A continuous endpoin
 that differs from its declared bound withholds a reusable CP reason; the deduction
 remains local to the numerical scope. Bounds and certificates cannot survive a
 foreign exact state, rollback or objective change.
+For a single cost-bearing structural coordinate, a source-valid finite maximizing
+endpoint bounds every feasible objective value. Reduced-cost fixing can use this
+closed ceiling before an incumbent exists, or combine it with a tighter improving
+cutoff. A point equal to the declared ceiling remains feasible. Missing sides and
+probe boxes cannot supply the ceiling; source scale, constants and scoped bounds
+remain part of the deduction. Ceiling arithmetic has bounded scalar admission
+and charges the containing node ledger without an additional LP query.
 For a nonintegral objective, node pruning compares the exact certified bound in
 minimized source units with an enclosing rational incumbent cutoff. It uses the
 unrounded objective without an integer objective atom, so the prune has no
