@@ -79,4 +79,26 @@ class Xcsp3CpSatReferenceTest {
         assertEquals("7", result.stats["referenceSeed"])
         assertEquals("1", result.stats["referenceWorkers"])
     }
+
+    @Test
+    fun `failed reference processes cannot earn proof credit`() {
+        val output = """{"exit":"UNSATISFIABLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":true}"""
+
+        val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image", exit = 137)
+
+        assertNull(result.feasible)
+        assertEquals(false, result.proven)
+        assertEquals("137", result.stats["referenceExit"])
+    }
+
+    @Test
+    fun `watchdog termination cannot earn proof credit`() {
+        val output = """{"exit":"UNSATISFIABLE","version":"${Xcsp3CpSatReference.VERSION}","cpModelPresolve":true}"""
+
+        val result = Xcsp3CpSatReference.parse(emptyList(), output, "checked-image", timedOut = true)
+
+        assertNull(result.feasible)
+        assertEquals(false, result.proven)
+        assertEquals("true", result.stats["referenceTimeout"])
+    }
 }

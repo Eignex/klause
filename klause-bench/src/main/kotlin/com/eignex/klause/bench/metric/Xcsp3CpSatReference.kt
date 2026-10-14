@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
@@ -9,6 +10,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -90,6 +92,7 @@ internal object Xcsp3CpSatReference {
      *  staged copy, since the container reads a plain file. */
     fun run(ref: ProblemRef, budget: Budget, workers: Int, seed: Long): SolverInvocation.Result =
         CorpusFiles.withPlainFile(CorpusFetcher.resolve(ref.source)) { run(it, budget, workers, seed) }
+            .copy(buildProvenance = InstalledBuild.reference)
 
     private fun run(xml: File, budget: Budget, workers: Int, seed: Long): SolverInvocation.Result {
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
@@ -131,12 +134,14 @@ internal object Xcsp3CpSatReference {
     private fun solve(cmd: List<String>, name: String, budget: Budget, stderr: File): SolverInvocation.Result {
         val startNanos = System.nanoTime()
         val proc = ProcessBuilder(cmd).redirectError(stderr).start()
+        val timedOut = AtomicBoolean()
         // Watchdog: `docker kill` the CONTAINER (not just the client) if it blows the deadline — CPMpy's
         // parse phase is not time-bounded and can hang/balloon, and killing only the client leaves the
         // container running. Killing the container closes stdout, so the read below can't block forever.
         val watchdog = Thread {
             runCatching {
                 if (!proc.waitFor(budget.timeoutMillis * 2 + 20_000, TimeUnit.MILLISECONDS)) {
+                    timedOut.set(true)
                     ProcessBuilder("docker", "kill", name)
                         .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                         .redirectError(ProcessBuilder.Redirect.DISCARD)
@@ -158,7 +163,8 @@ internal object Xcsp3CpSatReference {
         check(exit !in DOCKER_RUN_FAILED) {
             "xcsp3 cp-sat: docker run exited $exit: ${stderr.readText().takeLast(ERROR_TAIL_CHARS)}"
         }
-        return parse(cmd, stdout, identity(), stderr.readText().takeLast(ERROR_TAIL_CHARS)).copy(elapsedMs = elapsedMs)
+        return parse(cmd, stdout, identity(), stderr.readText().takeLast(ERROR_TAIL_CHARS), exit, timedOut.get())
+            .copy(elapsedMs = elapsedMs)
     }
 
     internal fun parse(
@@ -166,25 +172,29 @@ internal object Xcsp3CpSatReference {
         stdout: String,
         identity: String,
         error: String = "",
+        exit: Int? = 0,
+        timedOut: Boolean = false,
     ): SolverInvocation.Result {
-        val v = stdout.lineSequence().lastOrNull { it.trimStart().startsWith("{") }
+        val v = stdout.lineSequence().lastOrNull { exit == 0 && !timedOut && it.trimStart().startsWith("{") }
             ?.let { Reports.json.decodeFromString<Verdict>(it) }
         check(v == null || v.version == VERSION) {
             "xcsp3 cp-sat: incompatible importer '${v?.version}'; rebuild $IMAGE from klause-bench/xcsp3-cpsat"
         }
         val result = when {
+            exit != 0 || timedOut -> undecided(cmd, stdout, "container exit=$exit, watchdog=$timedOut ($error)")
             v == null -> undecided(cmd, stdout, "no JSON verdict ($error)")
             v.exit == "ERROR" -> undecided(cmd, stdout, v.error ?: "unknown")
             v.exit in setOf("OPTIMAL", "FEASIBLE", "UNSATISFIABLE") && v.cpModelPresolve != true ->
                 undecided(cmd, stdout, "source-preserving native settings are missing")
-            v.exit in setOf("OPTIMAL", "FEASIBLE") && Xcsp3SourceValidation.candidate(stdout) == null ->
-                undecided(cmd, stdout, "complete source witness is missing")
+            v.exit in setOf("OPTIMAL", "FEASIBLE") && SolveEvidence.finalWitness(Format.XCSP3, stdout) == null ->
+                undecided(cmd, stdout, "complete source witness cannot be retained")
             v.exit in setOf("OPTIMAL", "FEASIBLE") && v.maximize != null &&
                 v.exactObjective?.toBigIntegerOrNull() == null ->
                 undecided(cmd, stdout, "exact integer objective is missing")
             else -> decided(cmd, stdout, v)
         }
-        return result.copy(stats = result.stats + ("referenceVersion" to identity))
+        return result.copy(stats = result.stats + mapOf("referenceVersion" to identity,
+            "referenceExit" to exit.toString(), "referenceTimeout" to timedOut.toString(), "referenceStderr" to error))
     }
 
     private fun decided(cmd: List<String>, stdout: String, v: Verdict): SolverInvocation.Result {
