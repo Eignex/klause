@@ -2,6 +2,8 @@ package com.eignex.klause.bench.profile
 
 import java.io.File
 import java.util.Base64
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 
 internal object NraSourceCheck {
     @JvmStatic
@@ -13,11 +15,22 @@ internal object NraSourceCheck {
             "input=<base64 original-source bundle> is required"
         }))
         val root = File(System.getProperty("klause.workspace.root", "."))
-        val checker = root.resolve("klause-bench/tools/verify_nra_source_results.py")
+        val checkerName = options["checker"] ?: "polynomial"
+        require(checkerName in setOf("polynomial", "transcendental"))
+        val checker = root.resolve("klause-bench/tools/verify_${
+            if (checkerName == "polynomial") "nra" else "transcendental"
+        }_source_results.py")
         val python = if (options["preparePython"] == "true") preparePython(root, out)
             else options["python"] ?: "python3"
-        val process = ProcessBuilder(python, checker.absolutePath,
+        val command = if (checkerName == "transcendental") {
+            val bundle = Json.parseToJsonElement(input.readText()).jsonObject
+            require(bundle.keys == setOf("sources", "results"))
+            val sources = out.resolve("sources.json").also { it.writeText(bundle.getValue("sources").toString()) }
+            val results = out.resolve("results.json").also { it.writeText(bundle.getValue("results").toString()) }
+            listOf(python, checker.absolutePath, sources.absolutePath, results.absolutePath)
+        } else listOf(python, checker.absolutePath,
             "--bundle", input.absolutePath, "--timeout-ms", options["timeoutMs"] ?: "5000")
+        val process = ProcessBuilder(command)
             .redirectOutput(out.resolve("source-checks.json"))
             .redirectError(out.resolve("source-checks.err")).start()
         check(process.waitFor() == 0) { "original-source check failed; see source-checks.err" }

@@ -707,6 +707,11 @@ dependency identities alongside the original inputs, producer revisions and repo
 `preparePython=true` explicitly provisions the pinned checker environment on an owned
 Ubuntu analysis instance; its installation and runtime identity log stays under `$OUT`.
 
+`checker=transcendental` checks a saved bundle with `sources` and `results` arrays in
+the `TranscendentalSourceProbe` schema. It uses the independent rational/symbolic
+ground checker, requires original source hashes, and reports unsupported witnesses
+separately. This mode needs only Python's standard library and checks no UNSAT proof.
+
 These entry points can run as committed-code lab profiles with explicit AWS host,
 one machine and one parallel command. Use the lab client with
 `LAB_URL=https://lab.eignex.com` for submission, status, remote access and retrieval.
