@@ -42,10 +42,15 @@ internal class NValueClauseCompletion(
         propagate(initial)
         var position = 0
         var added = 0
-        while (position < pending.size && position < MAX_CLAUSE_VISITS && added < MAX_WRITES) {
-            val clause = state.problem.factors[pending[position++]] as Clause
-            if (clause.literals.any { holds(it) }) continue
-            val choices = clause.literals.map(::repair).filterNotNull().distinct()
+        while (position < pending.size && position < MAX_FACTOR_VISITS && added < MAX_WRITES) {
+            val choices = when (val factor = state.problem.factors[pending[position++]]) {
+                is Clause -> {
+                    if (factor.literals.any { holds(it) }) continue
+                    factor.literals.map(::repair).filterNotNull().distinct()
+                }
+                is ReifiedLinear -> channelRepairs(factor)
+                else -> emptyList()
+            }
             if (choices.size != 1) continue
             val next = choices[0]
             val writes = if (next is Move.Compound) next.parts else listOf(next)
@@ -70,21 +75,7 @@ internal class NValueClauseCompletion(
         if (!network.isDefinedBool(b)) return if (sink.allowsBool(b)) Move.BoolFlip(b) else null
         for (fid in state.projection.boolOccurrences[b]) {
             val row = state.problem.factors[fid] as? ReifiedLinear ?: continue
-            if (row.auxBoolVar != b || row.vars.size != 1 ||
-                !((row.op == LinearOp.EQ && desired) || (row.op == LinearOp.NE && !desired))
-            ) continue
-            val constants = row.integerConstants ?: continue
-            val coefficient = constants.coeff(0)
-            val value = when {
-                coefficient == 1L -> constants.bound
-                coefficient == -1L && constants.bound != Long.MIN_VALUE -> -constants.bound
-                else -> continue
-            }
-            val variable = row.vars[0]
-            if (variable in pinnedInts || !sink.allowsInt(variable) || value !in state.rootDomains[variable] ||
-                value == assignment.intValue(variable)
-            ) continue
-            return Move.IntSet(variable, value)
+            if (row.auxBoolVar == b) predicateRepair(row, desired)?.let { return it }
         }
         if (depth >= MAX_FOLD_DEPTH || foldVisits >= MAX_FOLD_VISITS) return null
         val fold = folds[b] ?: return null
@@ -104,6 +95,39 @@ internal class NValueClauseCompletion(
         return if (distinct.size == 1) distinct[0] else Move.Compound(distinct)
     }
 
+    private fun channelRepairs(row: ReifiedLinear): List<Move> {
+        val value = predicateValue(row) ?: return emptyList()
+        val equal = assignment.intValue(row.vars[0]) == value
+        val actual = if (row.op == LinearOp.EQ) equal else !equal
+        val desired = assignment.boolValue(row.auxBoolVar)
+        if (actual == desired) return emptyList()
+        val integer = predicateRepair(row, desired)
+        val indicator = if (row.auxBoolVar !in pinnedBools && sink.allowsBool(row.auxBoolVar)) {
+            Move.BoolFlip(row.auxBoolVar)
+        } else null
+        return listOfNotNull(integer, indicator)
+    }
+
+    private fun predicateRepair(row: ReifiedLinear, desired: Boolean): Move.IntSet? {
+        if (!((row.op == LinearOp.EQ && desired) || (row.op == LinearOp.NE && !desired))) return null
+        val value = predicateValue(row) ?: return null
+        val variable = row.vars[0]
+        if (variable in pinnedInts || !sink.allowsInt(variable) || value !in state.rootDomains[variable] ||
+            value == assignment.intValue(variable)
+        ) return null
+        return Move.IntSet(variable, value)
+    }
+
+    private fun predicateValue(row: ReifiedLinear): Long? {
+        if (row.vars.size != 1 || (row.op != LinearOp.EQ && row.op != LinearOp.NE)) return null
+        val constants = row.integerConstants ?: return null
+        return when {
+            constants.coeff(0) == 1L -> constants.bound
+            constants.coeff(0) == -1L && constants.bound != Long.MIN_VALUE -> -constants.bound
+            else -> null
+        }
+    }
+
     private fun pin(move: Move) {
         when (move) {
             is Move.IntSet -> pinnedInts.add(move.varId)
@@ -114,7 +138,10 @@ internal class NValueClauseCompletion(
 
     private fun write(move: Move) {
         when (move) {
-            is Move.IntSet -> assignment.setInt(move.varId, move.newValue)
+            is Move.IntSet -> {
+                assignment.setInt(move.varId, move.newValue)
+                for (fid in state.projection.intOccurrences[move.varId]) enqueueFactor(fid)
+            }
             is Move.BoolFlip -> {
                 assignment.flipBool(move.varId)
                 enqueue(move.varId)
@@ -146,16 +173,19 @@ internal class NValueClauseCompletion(
     }
 
     private fun enqueue(boolVar: Int) {
-        for (fid in state.projection.boolOccurrences[boolVar]) {
-            if (pending.size >= MAX_CLAUSE_VISITS) return
-            if (state.problem.factors[fid] is Clause) pending += fid
-        }
+        for (fid in state.projection.boolOccurrences[boolVar]) enqueueFactor(fid)
+    }
+
+    private fun enqueueFactor(fid: Int) {
+        if (pending.size >= MAX_FACTOR_VISITS) return
+        val factor = state.problem.factors[fid]
+        if (factor is Clause || (factor is ReifiedLinear && predicateValue(factor) != null)) pending += fid
     }
 
     private fun holds(literal: Int): Boolean = Lit.evaluate(literal, assignment.boolValue(Lit.variable(literal)))
 
     private companion object {
-        const val MAX_CLAUSE_VISITS = 512
+        const val MAX_FACTOR_VISITS = 512
         const val MAX_WRITES = 32
         const val MAX_FOLD_DEPTH = 4
         const val MAX_FOLD_VISITS = 32
