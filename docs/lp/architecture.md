@@ -101,6 +101,10 @@ defines its scheduling and overrides. Candidate availability supplies no proof a
 Source mapping must discharge each rounding premise and retain inherited parent
 guards before root sharing. Root and node separation keep their existing round,
 depth, pool and work allowances.
+Ordinary-row root harvesting caps retained cut rows at the original relaxation's
+row count, trimming by activity before each augmented solve. This bounds matrix
+growth before cuts reach repeated node queries. Structural, circuit and explicit
+plan paths keep their existing pool policy.
 
 For unrounded Lagrangian bound `L`, reduced cost `d(j)` and cutoff `U`, a fixing
 allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoint.
