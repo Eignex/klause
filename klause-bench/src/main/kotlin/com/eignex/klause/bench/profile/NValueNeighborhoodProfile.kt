@@ -38,6 +38,7 @@ object NValueNeighborhoodProfile {
     private data class CompletionObservation(
         val cost: Long, val parts: List<String>, val residuals: Map<String, Int>, val clauses: Map<Int, List<String>>,
         val elements: Map<Int, List<String>>,
+        val reifiedRows: Map<Int, List<String>>,
     )
 
     @Serializable
@@ -273,7 +274,48 @@ object NValueNeighborhoodProfile {
         val residuals = residuals(diagnostic)
         val clauses = clauseDependencies(diagnostic)
         val elements = elementDependencies(diagnostic, parts)
-        return CompletionObservation(cost, parts.map { it.toString() }, residuals, clauses, elements)
+        val rows = reifiedDependencies(diagnostic, parts)
+        return CompletionObservation(cost, parts.map { it.toString() }, residuals, clauses, elements, rows)
+    }
+
+    private fun reifiedDependencies(state: LocalSearchState, parts: List<Move>): Map<Int, List<String>> = buildMap {
+        var pins = state.assumptions
+        for (part in parts) {
+            pins = when (part) {
+                is Move.IntSet -> pins.withInt(part.varId, state.assignment.intValue(part.varId))
+                is Move.BoolFlip -> pins.withBool(part.varId, state.assignment.boolValue(part.varId))
+                else -> pins
+            }
+        }
+        val repairs = MoveSink(pins).also {
+            it.setInvariants(state.invariants)
+            it.setOwners(state.seeding.ownerInt)
+        }
+        val before = state.assignment.snapshot()
+        for (fid in 0 until state.problem.numFactors) {
+            if (size >= 16) break
+            val row = state.problem.factors[fid] as? ReifiedLinear ?: continue
+            if (!state.factors[fid].isViolated(state, fid)) continue
+            val constants = row.integerConstants ?: continue
+            val descriptions = arrayListOf(
+                "b${row.auxBoolVar}=${state.assignment.boolValue(row.auxBoolVar)} ${row.op} " +
+                    "defined=${state.invariants?.isDefinedBool(row.auxBoolVar) == true} " +
+                    "pinned=${pins.isFrozenBool(row.auxBoolVar)}",
+                "vars=${row.vars.contentToString()} bound=${constants.bound} " +
+                    "coeffs=${row.vars.indices.map { constants.coeff(it) }}",
+                "values=${row.vars.map { state.assignment.intValue(it) }} " +
+                    "domains=${row.vars.map { state.rootDomains[it].toString() }}",
+            )
+            repairs.clear()
+            repairs.proposer = fid
+            state.factors[fid].proposeRepairMoves(state, fid, repairs)
+            for (repair in repairs.list.take(8)) {
+                state.apply(repair)
+                descriptions += "repair=$repair cost=${state.cost} residuals=${residuals(state)}"
+                restore(state, before)
+            }
+            put(fid, descriptions)
+        }
     }
 
     private fun elementDependencies(state: LocalSearchState, parts: List<Move>): Map<Int, List<String>> = buildMap {
