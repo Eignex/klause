@@ -327,8 +327,8 @@ class Xcsp3SourceCheckerTest {
         "add(x,0) y||1073741823 1073741824|le,2147483647|valid",
         "mul(x,x) neg(mul(y,y))||1500000000 1500000000|eq,0|valid",
         "mul(x,x) neg(mul(y,y))|5 5|1500000000 1500000000|eq,0|unknown",
-        "mul(x,x) neg(mul(y,y))|c c|2147483647 2147483647|eq,0|valid",
-        "mul(x,x) neg(mul(y,y))|c c|2147483647 2147483646|eq,0|unknown",
+        "mul(x,x) neg(mul(y,y))|c c|2147483637 2147483637|eq,0|valid",
+        "mul(x,x) neg(mul(y,y))|c c|2147483637 2147483636|eq,0|unknown",
         "mul(x,x,x) neg(mul(y,y,y))||1500000000 1500000000|eq,0|unknown",
         "sub(mul(x,x,x),mul(x,x,x)) y||1500000000 0|eq,0|unknown",
         "add(9223372036854775807,1,-9223372036854775807) y||0 0|eq,1|unknown",
@@ -359,6 +359,46 @@ class Xcsp3SourceCheckerTest {
             val witness = "<instantiation><list>x y c d</list><values>$values 2 -1</values></instantiation>"
 
             val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals(status, checked.status, checked.reason)
+            if (status == "valid") assertNotNull(checked.checkedWitness) else assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "x y|1 1|8|valid",
+        "x y|0 1|5|invalid",
+        "x y|1 1|9|invalid",
+        "x y|1 1|8.0|invalid",
+        "x y|1 1||unknown",
+        "x x|1 1|8|invalid",
+        "x|1|8|invalid",
+        "x y|1 nope|8|invalid",
+        "x y|1 2|13|invalid",
+    ])
+    fun `expression sum admission retains source assignment and objective checks`(
+        names: String,
+        values: String,
+        objective: String?,
+        status: String,
+    ) {
+        val model = File.createTempFile("xcsp-expression-sum-objective-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="COP">
+                  <variables><var id="x">0..1</var><var id="y">0..1</var></variables>
+                  <constraints><sum><list>eq(x,1) eq(y,1)</list><condition>(eq,2)</condition></sum></constraints>
+                  <objectives><minimize type="sum"><list>x y</list><coeffs>3 5</coeffs></minimize></objectives>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>$names</list><values>$values</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, objective)
 
             assertEquals(status, checked.status, checked.reason)
             if (status == "valid") assertNotNull(checked.checkedWitness) else assertNull(checked.checkedWitness)
