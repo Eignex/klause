@@ -324,7 +324,7 @@ internal class PolynomialArithmetic(
         require(rows >= 0 && columns >= 0)
         step()
         if (rows > Int.MAX_VALUE || columns > Int.MAX_VALUE ||
-            columns != 0L && rows > (limits.maxMatrixCells ?: Long.MAX_VALUE) / columns
+            (columns != 0L && rows > (limits.maxMatrixCells ?: Long.MAX_VALUE) / columns)
         ) {
             throw PolynomialResourceLimit(PolynomialResource.MATRIX_CELLS)
         }

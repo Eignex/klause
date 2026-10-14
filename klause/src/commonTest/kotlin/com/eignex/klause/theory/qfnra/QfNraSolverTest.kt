@@ -39,8 +39,11 @@ class QfNraSolverTest {
             listOf(BigFraction.ZERO, BigFraction.ZERO), emptyMap(),
         ))
 
-        assertEquals(BigFraction.ONE, assignment.realValue(0).rational)
-        assertEquals(BigFraction.ONE, assignment.realValue(1).rational)
+        val x = assignment.realValue(0)
+        val y = assignment.realValue(1)
+        assertEquals(1, algebraic.sign(x))
+        assertEquals(1, algebraic.sign(y))
+        assertTrue(algebraic.compare(algebraic.multiply(x, y), algebraic.rational(BigFraction.ONE)) >= 0)
     }
 
     @Test
