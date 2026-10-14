@@ -508,6 +508,27 @@ outside subprocess timing. Missing captures remain absent; included MiniZinc
 files are outside original model/data hashes. `compilerIdentity` records the compiler
 and library identity for Klause MiniZinc solves and compilation failures.
 
+Caught solve exceptions write `command=ERROR`, with nullable feasibility/objective
+and no proof credit. `stats.errorClass` and `errorMessage` retain the exception;
+`errorCause1Class`/`errorCause1Message` through `errorCause3Class`/`errorCause3Message`
+retain its first three causes. Class names are capped at 256 UTF-16 characters and
+messages at 1024 each; absent messages stay absent. A field exceeding its cap has
+a matching `ClassTruncated=true` or `MessageTruncated=true` key. Further causes
+set `errorCausesTruncated=depth`; repeated throwable identities set it to `cycle`.
+Stack traces and suppressed exceptions are not stored. Inspect these durable JSON
+fields even when stdout or job logs have been trimmed.
+
+ERROR records preserve original source hashes, installed-build provenance/fingerprint
+and MiniZinc compiler identity captured before the failing operation. `gitSha`
+identifies the harness checkout, separately from installed bytes. A failed identity
+capture leaves that identity unavailable and retains the capture exception; the catch
+path does not recapture changed inputs or installations. Reference failures retain
+the build identity only when the reference runner supplied it before failure.
+An undecided returned result keeps its ordinary command and statistics, without
+caught-exception fields. Legacy ERROR records with empty statistics remain readable;
+their missing exception text and installed-build/source identities cannot be recovered
+from the record. Added diagnostics use the existing string-valued `stats` map.
+
 | Field/channel | Contract |
 |---|---|
 | `elapsedMs` | Subprocess launch through output consumption; nullable for legacy/unlaunched runs |
