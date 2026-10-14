@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -608,5 +609,112 @@ class NValueInvariantTest {
         assertEquals(0L, state.cost)
         state.recompute()
         assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `class elimination reconciles searched usage flags and empty class attributes`() {
+        val p = Problem(
+            6,
+            7,
+            arrayOf(
+                IntDomain(1, 2), IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 1),
+                IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),
+            ),
+            arrayOf<Factor>(
+                NValue(0, intArrayOf(1, 2, 3, 4)),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(4), LinearOp.EQ, 1),
+                ReifiedLinear(3, intArrayOf(1), intArrayOf(5), LinearOp.EQ, 0),
+                ReifiedLinear(4, intArrayOf(1), intArrayOf(6), LinearOp.EQ, 0),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(5, false), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(5, false), Lit.make(4, true))),
+                Clause(intArrayOf(Lit.make(5, true), Lit.make(3, false), Lit.make(4, false))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(5, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(5, false))),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(p), Random(3))
+        state.invariants = InvariantNetwork(
+            listOf(
+                DefinitionalSweep.SweepNode.CmpReif(0, longArrayOf(1), intArrayOf(3), 1, LinearOp.EQ),
+                DefinitionalSweep.SweepNode.CmpReif(1, longArrayOf(1), intArrayOf(4), 1, LinearOp.EQ),
+                DefinitionalSweep.SweepNode.CmpReif(3, longArrayOf(1), intArrayOf(5), 0, LinearOp.EQ),
+                DefinitionalSweep.SweepNode.CmpReif(4, longArrayOf(1), intArrayOf(6), 0, LinearOp.EQ),
+            ),
+            7,
+            6,
+        )
+        state.assignment.setInt(0, 2)
+        for (variable in 3..6) state.assignment.setInt(variable, 1)
+        for (b in 0..2) state.assignment.setBool(b, true)
+        state.recompute()
+        val before = state.assignment.snapshot()
+        assertEquals(0L, state.cost)
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+        val completion = state.moveSink.list.firstOrNull { move ->
+            move is Move.Compound && Move.IntSet(0, 1) in move.parts && state.netDelta(move) == 0L
+        }
+
+        assertEquals(before, state.assignment.snapshot())
+        state.apply(assertNotNull(completion))
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(0L, state.assignment.intValue(5))
+        assertEquals(0L, state.assignment.intValue(6))
+        assertEquals(false, state.assignment.boolValue(2))
+        assertEquals(true, state.assignment.boolValue(5))
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `class clause completion respects protected auxiliary attributes`() {
+        for (protection in listOf("pin", "domain hole", "owner")) {
+            val p = Problem(
+                3,
+                6,
+                arrayOf(
+                    IntDomain(1, 2), IntDomain(0, 0), IntDomain(0, 0),
+                    IntDomain(0, 1), IntDomain(0, 1),
+                    if (protection == "domain hole") IntDomain(-1, 1).excludeValue(0) else IntDomain(0, 1),
+                ),
+                arrayOf<Factor>(
+                    NValue(0, intArrayOf(1, 2, 3, 4)),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(4), LinearOp.EQ, 1),
+                    ReifiedLinear(2, intArrayOf(1), intArrayOf(5), LinearOp.EQ, 0),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
+                ),
+            )
+            val assumptions = if (protection == "pin") Assumptions.None.withInt(5, 1) else Assumptions.None
+            val state = LocalSearchState(LocalSearchModel.open(p), Random(3), assumptions)
+            state.invariants = InvariantNetwork(
+                listOf(
+                    DefinitionalSweep.SweepNode.CmpReif(0, longArrayOf(1), intArrayOf(3), 1, LinearOp.EQ),
+                    DefinitionalSweep.SweepNode.CmpReif(1, longArrayOf(1), intArrayOf(4), 1, LinearOp.EQ),
+                    DefinitionalSweep.SweepNode.CmpReif(2, longArrayOf(1), intArrayOf(5), 0, LinearOp.EQ),
+                ),
+                6,
+                3,
+            )
+            if (protection == "owner") state.moveSink.setOwners(intArrayOf(-1, -1, -1, -1, -1, 7))
+            state.assignment.setInt(0, 2)
+            for (variable in 3..5) state.assignment.setInt(variable, 1)
+            state.assignment.setBool(0, true)
+            state.assignment.setBool(1, true)
+            state.recompute()
+            val before = state.assignment.snapshot()
+
+            state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+
+            assertEquals(before, state.assignment.snapshot())
+            assertTrue(state.moveSink.list.none { move ->
+                move is Move.Compound && Move.IntSet(0, 1) in move.parts && state.netDelta(move) == 0L
+            }, protection)
+        }
     }
 }

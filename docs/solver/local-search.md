@@ -315,8 +315,16 @@ satisfaction alone establishes neither feasibility nor objective improvement.
 
 At a feasible assignment or when NValue is the sole violated factor, the sampled
 elimination with the least nonnegative whole-model cost delta after move-sink filtering
-may also use the existing directed repair-chain mechanism to reconcile regressed
+may reconcile affected Boolean clauses on a scratch assignment before using the
+existing directed repair-chain mechanism to reconcile regressed
 surrounding constraints. Zero-delta moves need completion only at an infeasible assignment.
+Clause reconciliation inspects at most 512 queued clause occurrences and appends at
+most 32 primitive writes. A violated clause with one eligible repair can flip a searched
+flag or set a searched integer to satisfy a maintained unary equality (or falsify a
+unary disequality). All counted coordinates and the count remain protected; auxiliary
+writes respect pins, domains and ownership. Each scratch write reevaluates its affected
+definitions. This can reconcile searched usage flags and the coordinated attributes
+of a removed class without mutating the live assignment or extending generic repairs.
 At most one completion follows at
 most eight repair steps, protects the changed class and count coordinates, and offers
 only a complete zero-violation proposal with at most 128 primitive parts. Class
