@@ -661,6 +661,7 @@ class Portfolio(
         private val armNanos = LongArray(workers.size)
         private val armWork = DoubleArray(workers.size)
         private val siblingWork = LongArray(workers.size)
+        private var proofStarted = false
         private var totalNanos = 0L
         private var slice = baseSliceMillis
         private var sliceWork = baseSliceWork
@@ -865,7 +866,9 @@ class Portfolio(
             val arm = claim.arm
             val account = ledgerFor(arm)
             siblingWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - siblingWork[arm])
-            if (claim.improved || (workers[arm].auxiliaryProof && work > 0L)) siblingWork.fill(0L)
+            val proofWork = workers[arm].auxiliaryProof && work > 0L
+            if ((!proofStarted && claim.improved) || proofWork) siblingWork.fill(0L)
+            if (proofWork) proofStarted = true
             armWork[arm] += if (work > 0L) work else claim.sliceWork
             if (stats != null) {
                 if (cumulative) {

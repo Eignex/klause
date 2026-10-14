@@ -217,30 +217,32 @@ class PortfolioTest {
 
     @Test
     fun `supplemental proof continuations wait for fresh sibling work`() {
-        var completeVisits = 0
-        var lastCompleteVisit = 0
-        var proofVisits = 0
-        val complete = ScriptedSearch({ it == 0 }) { completeVisits++ }
-        val proofBase = ScriptedSearch({ false }) {
-            assertTrue(completeVisits > lastCompleteVisit)
-            lastCompleteVisit = completeVisits
-            proofVisits++
-        }
-        val proof = object : ResumableSearch by proofBase {
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
-                proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
-                return if (proofVisits == 3) MinimizeResult.Unknown(TerminationReason.BudgetExhausted) else null
+        for (improvesAfterAdmission in listOf(false, true)) {
+            var completeVisits = 0
+            var lastCompleteVisit = 0
+            var proofVisits = 0
+            val complete = ScriptedSearch({ it == 0 || (improvesAfterAdmission && it >= 2) }) { completeVisits++ }
+            val proofBase = ScriptedSearch({ false }) {
+                assertTrue(completeVisits > lastCompleteVisit)
+                lastCompleteVisit = completeVisits
+                proofVisits++
             }
-        }
-        val workers = listOf(trackingWorker("complete", 0, complete),
-            trackingWorker("proof", 1, proof).also { it.auxiliaryProof = true; it.improvementOnly = true })
+            val proof = object : ResumableSearch by proofBase {
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                    proofBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                    return if (proofVisits == 3) MinimizeResult.Unknown(TerminationReason.BudgetExhausted) else null
+                }
+            }
+            val workers = listOf(trackingWorker("complete", 0, complete),
+                trackingWorker("proof", 1, proof).also { it.auxiliaryProof = true; it.improvementOnly = true })
 
-        Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-            it.minimize(Cancellation { proofVisits >= 3 })
-        }
+            Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+                it.minimize(Cancellation { proofVisits >= 3 })
+            }
 
-        assertEquals(3, proofVisits)
+            assertEquals(3, proofVisits)
+        }
     }
 
     @Test
