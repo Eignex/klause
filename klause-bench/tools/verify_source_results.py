@@ -117,6 +117,8 @@ def mps(text, tolerance=False):
                 raise ValueError(f"unsupported MPS section {section}")
             if section != "NAME" and len(parts) != 1:
                 raise ValueError(f"unsupported inline MPS section {section}")
+            if section == "ENDATA":
+                break
             continue
         if section == "OBJSENSE":
             assert parts[0] in ("MIN", "MAX", "MINIMIZE", "MAXIMIZE")

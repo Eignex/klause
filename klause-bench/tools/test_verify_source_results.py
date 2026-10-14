@@ -448,6 +448,21 @@ class ProofCheckTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             proof_check.mps('NAME fixture\nQCMATRIX row\nENDATA\n')
 
+    def test_mps_records_after_endata_do_not_change_source_witnesses(self):
+        for trailer in ('IMPORTANCES\n x 1\n', 'BOUNDS\n FX b x 2\n'):
+            with self.subTest(trailer=trailer):
+                case = self.case(suite='mps-core', proven=False, objective='-1/10', finalWitness='v x=1')
+
+                result = self.check(case, self.mps_source + trailer)
+
+                self.assertEqual(result['witness'], 'exact source feasible')
+
+    def test_mps_importances_before_endata_are_rejected(self):
+        source = self.mps_source.replace('ENDATA\n', 'IMPORTANCES\n x 1\nENDATA\n')
+
+        with self.assertRaisesRegex(ValueError, 'unsupported MPS section IMPORTANCES'):
+            proof_check.mps(source)
+
     def test_inline_objective_orientation_cannot_be_ignored(self):
         with self.assertRaises(ValueError):
             proof_check.mps('NAME fixture\nOBJSENSE MAX\nENDATA\n')

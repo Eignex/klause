@@ -950,7 +950,9 @@ An explicit default-MPS `tolerance-optimum` retains its source point, objective
 and scaled-tolerance checks separately. It receives no exact-source optimality
 credit; native tolerance-certificate verification is unavailable from saved records.
 This marker cannot weaken exact-mode or SMT checking.
-Unsupported MPS sections/bounds, distinct RHS/range/bound vectors and SMT
+MPS `ENDATA` ends the source model; later records, including appended branching
+priorities, do not contribute constraints, bounds or objectives. Unsupported MPS
+sections before `ENDATA`, unsupported bounds, distinct RHS/range/bound vectors and SMT
 function/sort declarations are rejected rather than guessed. The verifier is
 independent of paired timing analysis and Klause's internal certificates.
 
