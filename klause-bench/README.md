@@ -1463,6 +1463,22 @@ and callbacks. Wrapper dispatch/digest creation are timed. Restoration checks co
 assignment, factor degrees, costs, break/make counts, tabu/configuration state and
 best-cost watermark. The probe measures prepared proposals, not full-solve quality.
 
+### Incremental move grading
+
+`com.eignex.klause.bench.profile.IncrementalMoveProfile` compares supplied integer moves
+and generated repairs with fresh whole-model grading. Its `sources` argument is a JSON
+array of `{name, format, text, ints, bools, moves}` objects. Formats are `flatzinc`,
+`smtlib` and `xcsp3`; assignments list every compiled coordinate, and each supplied move
+is `{id, value}`. `seed` pins initialization. Real coordinates and out-of-domain values
+are refused. The probe uses ordinary finite scoring without inferred definitions.
+
+Run the committed main through the lab client at an immutable revision. It retains
+source texts, hashes, installed-build/runtime/dependency identities and every predicted,
+committed and fresh grade under `$OUT`. A failed comparison exits unsuccessfully after
+saving its records. Agreement checks incremental state consistency; original-source
+witness validation remains a separate obligation. This profile measures no solve
+throughput and verifies no proof.
+
 ### Definition probe
 
 [scripts/definition-probes](scripts/definition-probes/) measures repeated complete

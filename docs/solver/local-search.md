@@ -29,7 +29,11 @@ Mixed-pool arms over the same model share it, including ALNS's inner local searc
 Objective-bound overlays keep their own projections. Each Boolean, integer and real
 variable's occurrence index contains each active factor once, in factor order. A move
 updates that invariant once; the invariant accounts for all positions reading the
-coordinate, including positions with different presence literals. Assignments, RNGs,
+coordinate, including positions with different presence literals. Product scoring substitutes
+new values into every matching operand and result position. Committed residual differences
+restore the old value in every matching position, and repair probes grade the same complete
+relation. Repeated operands in fixed-power chains and result aliases use this rule with
+saturated arithmetic and the state's shared violation compression. Assignments, RNGs,
 weights and invariant payloads belong to each live state. Immutable per-factor integer
 lookups store their arrays on one owner, shared with the projection. Compact key ranges
 use offset arrays; sparse ranges use primitive probing with storage bounded by entry

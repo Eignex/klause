@@ -52,7 +52,7 @@ class Product(
         Rewrite(listOf(Linear(longArrayOf(1L, -c), intArrayOf(result, other), LinearOp.EQ, 0L)))
     }
 
-    /** Multiplication is commutative, so the operands [a] and [b] are a set; [result] is positional. */
+    /** Multiplication is commutative, so the operands [a] and [b] are a multiset; [result] is positional. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PRODUCT, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.PRODUCT, mapping, ::buildKey)

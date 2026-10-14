@@ -29,13 +29,12 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
-        val nv = newValue
-        val after = when (intVar) {
-            a -> residual(nv, bv, rv)
-            b -> residual(av, nv, rv)
-            result -> residual(av, bv, nv)
-            else -> return 0
-        }
+        if (intVar != a && intVar != b && intVar != result) return 0
+        val after = residual(
+            if (intVar == a) newValue else av,
+            if (intVar == b) newValue else bv,
+            if (intVar == result) newValue else rv,
+        )
         return compressViolation(after, state.violationSoftCap) -
             compressViolation(residual(av, bv, rv), state.violationSoftCap)
     }
@@ -44,13 +43,12 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
-        val ov = oldValue
-        val before = when (intVar) {
-            a -> residual(ov, bv, rv)
-            b -> residual(av, ov, rv)
-            result -> residual(av, bv, ov)
-            else -> return 0
-        }
+        if (intVar != a && intVar != b && intVar != result) return 0
+        val before = residual(
+            if (intVar == a) oldValue else av,
+            if (intVar == b) oldValue else bv,
+            if (intVar == result) oldValue else rv,
+        )
         return compressViolation(residual(av, bv, rv), state.violationSoftCap) -
             compressViolation(before, state.violationSoftCap)
     }
@@ -63,18 +61,18 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val rTarget = saturatedMul(av, bv)
         val rDomain = state.rootDomains[result]
         val rClamped = rDomain.clamp(rTarget)
-        if (rClamped == rTarget && rClamped != rv) sink.addChannelingIntSet(state, result, rClamped)
+        if (rClamped == rTarget && rClamped != rv) proposeIfImproving(state, result, rClamped, sink)
         if (bv != 0L && rv % bv == 0L) {
             val aTarget = rv / bv
             val aClamped = state.rootDomains[a].clamp(aTarget)
-            if (aClamped == aTarget && aClamped != av) sink.addChannelingIntSet(state, a, aClamped)
+            if (aClamped == aTarget && aClamped != av) proposeIfImproving(state, a, aClamped, sink)
         } else if (bv != 0L) {
             proposeClosestOperand(state, operandVar = a, otherValue = bv, currentValue = av, sink)
         }
         if (av != 0L && rv % av == 0L) {
             val bTarget = rv / av
             val bClamped = state.rootDomains[b].clamp(bTarget)
-            if (bClamped == bTarget && bClamped != bv) sink.addChannelingIntSet(state, b, bClamped)
+            if (bClamped == bTarget && bClamped != bv) proposeIfImproving(state, b, bClamped, sink)
         } else if (av != 0L) {
             proposeClosestOperand(state, operandVar = b, otherValue = av, currentValue = bv, sink)
         }
@@ -85,11 +83,11 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
             val d = state.rootDomains[v]
             for (cand in longArrayOf(saturatedAdd(cur, 1L), saturatedSub(cur, 1L))) {
                 if (cand !in d) continue
-                val res = when (v) {
-                    a -> residual(cand, bv, rvL)
-                    b -> residual(av, cand, rvL)
-                    else -> residual(av, bv, cand)
-                }
+                val res = residual(
+                    if (v == a) cand else av,
+                    if (v == b) cand else bv,
+                    if (v == result) cand else rvL,
+                )
                 if (res <= curResidual) sink.addChannelingIntSet(state, v, cand)
             }
         }
@@ -97,6 +95,18 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
 
     // |x·y − r| without wrapping, so a product past the Long range still reads as violated.
     private fun residual(x: Long, y: Long, r: Long): Long = distance(saturatedMul(x, y), r)
+
+    private fun residualAfterSet(state: LocalSearchState, intVar: Int, value: Long): Long = residual(
+        if (intVar == a) value else state.assignment.intValue(a),
+        if (intVar == b) value else state.assignment.intValue(b),
+        if (intVar == result) value else state.assignment.intValue(result),
+    )
+
+    private fun proposeIfImproving(state: LocalSearchState, intVar: Int, value: Long, sink: MoveSink) {
+        if (residualAfterSet(state, intVar, value) <=
+            residual(state.assignment.intValue(a), state.assignment.intValue(b), state.assignment.intValue(result))
+        ) sink.addChannelingIntSet(state, intVar, value)
+    }
 
     private fun proposeClosestOperand(
         state: LocalSearchState,
@@ -110,11 +120,11 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val center = rv / otherValue
         val domain = state.rootDomains[operandVar]
         var bestCandidate = currentValue
-        var bestError = residual(currentValue, otherValue, rv)
+        var bestError = residualAfterSet(state, operandVar, currentValue)
         for (delta in -2..2) {
             val cand = saturatedAdd(center, delta.toLong())
             if (cand !in domain) continue
-            val error = residual(cand, otherValue, rv)
+            val error = residualAfterSet(state, operandVar, cand)
             if (error < bestError) {
                 bestError = error
                 bestCandidate = cand
