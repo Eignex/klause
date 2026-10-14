@@ -791,7 +791,8 @@ unweighted terms and constant or variable coefficients. Every expression node,
 intermediate addition/product and weighted term must fit a signed long and agree
 with the pinned evaluator; the exact sum must fit a signed integer. This guards
 the checker's long multiplication before its exact accumulation, including
-cancellation between large terms. Indexed vector elements admit only `rank="any"`,
+cancellation between large terms. Embedded expression parameters in group/slide
+templates remain unknown when the pinned parser cannot expand them. Indexed vector elements admit only `rank="any"`,
 constant or variable entries, and an in-range index whose exact offset fits a signed
 integer. Ranked, matrix and unindexed elements remain unchecked.
 

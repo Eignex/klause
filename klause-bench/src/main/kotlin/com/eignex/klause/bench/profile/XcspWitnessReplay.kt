@@ -17,7 +17,8 @@ internal object XcspWitnessReplay {
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.isNotEmpty()) { "Supply a base64 gzip JSON array of captured XCSP witnesses" }
-        val bytes = GZIPInputStream(Base64.getDecoder().decode(args.joinToString("")).inputStream()).use { it.readBytes() }
+        val compressed = Base64.getDecoder().decode(args.joinToString(""))
+        val bytes = GZIPInputStream(compressed.inputStream()).use { it.readBytes() }
         val records = Reports.json.decodeFromString<List<XcspWitnessRecord>>(bytes.toString(Charsets.UTF_8))
         require(records.isNotEmpty())
         val output = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
