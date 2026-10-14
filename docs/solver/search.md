@@ -437,7 +437,10 @@ witness reaches incumbent admission; an incomplete or unbounded completion does 
 publish a heuristic result. The pump can continue after a declined completion under
 its existing root allowance. Root primal proposals must improve the available local
 or external incumbent cutoff before admission; a completed candidate that misses
-that cutoff permits further pumping without renewing its budget.
+that cutoff permits further pumping without renewing its budget. An integral distance
+optimum with no fractional support uses seeded perturbations of live discrete
+coordinates to escape a declined rounding. Fixed coordinates remain fixed, and
+source completion and admission check every proposed assignment.
 
 [Theory contracts](../theories.md) define the fragment-specific checks and evidence.
 Difference graphs, exact linear systems and polynomial completion keep their own

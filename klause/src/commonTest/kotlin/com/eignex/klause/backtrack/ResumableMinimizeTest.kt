@@ -697,6 +697,40 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `mixed pumping improves an integral rounding before tree branching`() {
+        val problem = Problem(
+            0, 3, Array(3) { IntDomain(0, 1) },
+            arrayOf<Factor>(
+                Linear(intArrayOf(0, 1), doubleArrayOf(1.0, 1.0),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                Linear(intArrayOf(1, 2), doubleArrayOf(1.0, 1.0),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                Linear(intArrayOf(0, 2), doubleArrayOf(1.0, 1.0),
+                    intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(10.0))
+        val offered = ArrayList<Sample>()
+        val nodesAtPublication = ArrayList<Double>()
+        val params = BacktrackParams(randomSeed = 0L, maxDecisions = 0L, objectiveBoundSupplier = { 5.0 },
+            lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false))
+
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation.Never, 1000L, 100_000L) {
+                offered += it.sample
+                nodesAtPublication += search.stats.search.nodes.sum
+            }
+        }
+
+        val sample = offered.single()
+        assertEquals(3.0, objective.evaluate(sample))
+        assertEquals(listOf(0.0), nodesAtPublication)
+        assertEquals(BigFraction.ZERO, sample.exactReals?.single())
+        assertTrue((0 until 3).all { sample.ints[it] == 1L })
+    }
+
+    @Test
     fun `mixed rounding cannot publish an uncertified completion`() {
         val fixture = UnresolvedRealLeafFixture(true)
         fixture.acceptProof = { _, _ -> false }

@@ -13,6 +13,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -66,19 +67,22 @@ class LpPrimalHeuristicsFeasibilityPumpTest {
     }
 
     @Test
-    fun `the pump continues after the consumer declines a rounding`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-        val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val sink = SolveStatsSink(backend = "pump-test")
-        var proposals = 0
+    fun `the pump changes an integral rounding the consumer declines`() {
+        for (coefficient in listOf(1L, -1L)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val objective = LinearObjective(intCoefficients = longArrayOf(coefficient))
+            val sink = SolveStatsSink(backend = "pump-test")
+            var declined: Long? = null
 
-        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
-            assertNotNull(engine.lpFeasibilityPump(objective, Cancellation.Never) { sample ->
-                if (++proposals == 1) null else sample
-            })
+            val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                assertNotNull(engine.lpFeasibilityPump(objective, Cancellation.Never) { sample ->
+                    if (declined == null) declined = sample.ints.single()
+                    sample.takeIf { it.ints.single() != declined }
+                })
+            }
+
+            assertNotEquals(declined, sample.ints.single())
         }
-
-        assertTrue(proposals > 1)
     }
 
     @Test

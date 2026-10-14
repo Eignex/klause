@@ -145,7 +145,7 @@ internal fun LpEngine.lpFeasibilityPump(
             // than giving up. Steering only — a returned [Sample] is still re-checked downstream.
             if (++restarts > PUMP_MAX_RESTARTS) return null
             val flips = PUMP_MIN_FLIP + rng.nextInt(PUMP_MIN_FLIP + 1)
-            perturbRounding(relaxation, primal, intTarget, boolTarget, flips)
+            perturbRounding(relaxation, primal, intTarget, boolTarget, flips, rng)
             seen.add(pumpKey(intTarget, boolTarget))
         }
         val session = PropagationSession(problem, cancellation)
@@ -174,7 +174,8 @@ private fun pumpKey(intTarget: LongArray, boolTarget: BooleanArray): String =
 /**
  * Fischetti–Glover–Lodi perturbation: flip the [count] most-fractional structural coordinates of a
  * pump rounding **in place** — a Boolean flips its bit, an integer rounds the other way (toward the LP
- * value, clamped to its domain) — so a cycled pump escapes to a fresh rounding. Pure steering: the pump
+ * value, clamped to its domain) — so a cycled pump escapes to a fresh rounding. An integral
+ * distance optimum uses seeded live coordinates when fractional support is empty. Pure steering: the pump
  * only proposes roundings that [pinToward] re-realizes and the caller re-evaluates, so this never
  * affects soundness.
  */
@@ -184,12 +185,17 @@ private fun LpEngine.perturbRounding(
     intTarget: LongArray,
     boolTarget: BooleanArray,
     count: Int,
+    rng: Random,
 ) {
     // Live structural columns by fractionality |primal − target|, descending.
     val cols = IntArrayList()
+    val live = IntArrayList()
     val fracs = ArrayList<Double>()
     for (col in relaxation.colVarId.indices) {
-        if (col >= primal.size || relaxation.colVarId[col] < 0) continue
+        if (col >= primal.size || relaxation.colVarId[col] < 0 || relaxation.model.upperIsZero(col)) continue
+        val variable = relaxation.colVarId[col]
+        if (!relaxation.colIsBool[col] && problem.rootDomainOf(variable).valueCount <= 1L) continue
+        live.add(col)
         val t = targetOfCol(relaxation, intTarget, boolTarget, col) ?: continue
         val f = abs(primal[col] - t)
         if (f > PUMP_FRAC_TOL) {
@@ -197,16 +203,24 @@ private fun LpEngine.perturbRounding(
             fracs.add(f)
         }
     }
-    val order = (0 until cols.size).sortedByDescending { fracs[it] }
+    // An integral distance optimum can repeat a feasible point the consumer declined.
+    val order = if (cols.size == 0) {
+        (0 until live.size).shuffled(rng).map { live[it] }
+    } else (0 until cols.size).sortedByDescending { fracs[it] }.map { cols[it] }
     for (rank in 0 until minOf(count, order.size)) {
-        val col = cols[order[rank]]
+        val col = order[rank]
         val v = relaxation.colVarId[col]
         if (relaxation.colIsBool[col]) {
             boolTarget[v] = !boolTarget[v]
         } else {
             val d = problem.rootDomainOf(v)
             val cur = intTarget[v]
-            intTarget[v] = if (primal[col] >= cur) (cur + 1).coerceAtMost(d.max) else (cur - 1).coerceAtLeast(d.min)
+            intTarget[v] = when {
+                primal[col] >= cur && cur < d.max -> cur + 1L
+                cur > d.min -> cur - 1L
+                cur < d.max -> cur + 1L
+                else -> cur
+            }
         }
     }
 }
@@ -218,29 +232,33 @@ private fun LpEngine.solveRelaxation(
     cancellation: Cancellation,
 ): Pair<LpRelaxation, DoubleArray>? {
     val session = PropagationSession(problem, cancellation)
-    if (session.isUnsatAtRoot) return null
-    val relaxation = CpToLpRelaxation(problem, obj).build(session)
-    if (relaxation.model.n == 0) return null
-    val result = try {
-        val simplex = dualSimplex(relaxation.model, cancellation)
-        try {
-            val primal = try {
-                simplex.solvePrimal()
+    try {
+        if (session.isUnsatAtRoot) return null
+        val relaxation = CpToLpRelaxation(problem, obj).build(session)
+        if (relaxation.model.n == 0) return null
+        val result = try {
+            val simplex = dualSimplex(relaxation.model, cancellation)
+            try {
+                val primal = try {
+                    simplex.solvePrimal()
+                } finally {
+                    observeRootSolve(simplex)
+                }
+                primal ?: try {
+                    simplex.solve()
+                } finally {
+                    observeRootSolve(simplex)
+                }
             } finally {
-                observeRootSolve(simplex)
+                simplex.close()
             }
-            primal ?: try {
-                simplex.solve()
-            } finally {
-                observeRootSolve(simplex)
-            }
-        } finally {
-            simplex.close()
-        }
-    } catch (_: CheckedLongOverflowException) {
-        return null
-    } ?: return null
-    return relaxation to result.primal
+        } catch (_: CheckedLongOverflowException) {
+            return null
+        } ?: return null
+        return relaxation to result.primal
+    } finally {
+        primalPropagationWork += session.work
+    }
 }
 
 /** The rounded target of structural column [col] as a double, or null when it backs no live variable. */
