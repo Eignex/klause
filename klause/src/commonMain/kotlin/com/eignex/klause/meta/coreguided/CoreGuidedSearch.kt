@@ -58,6 +58,7 @@ internal class CoreGuidedSearch(
         }
     }
     private val weights = LinkedHashMap<Int, BigInt>()
+    private val tails = HashMap<Int, ThresholdTail>()
     private var nextBool = base.numBoolVars
     private var initialIndex = 0
     private var lower = objective.boolWeightValues.fold(bigIntOf(objective.constant)) { value, weight ->
@@ -76,9 +77,13 @@ internal class CoreGuidedSearch(
     private var closed = false
     private var core: IntArray? = null
     private var coreWeight = BIG_ZERO
-    private var coreThreshold = 2
+    private var coreCursor = 0
+    private var coreLiterals = IntArray(0)
+    private var coreEncoded = false
     private var completedCores = 0L
     private var largestCore = 0
+
+    private class ThresholdTail(val literals: IntArray, val minimum: Int, val weight: BigInt)
 
     init {
         require(eligible(base, objective)) { "core-guided search needs a finite Boolean objective" }
@@ -185,10 +190,10 @@ internal class CoreGuidedSearch(
                     if (selected.isEmpty()) return finish(MinimizeResult.Infeasible(stats = stats))
                     coreWeight = selected.map { requireNotNull(weights[it]) }.reduce { a, b -> if (a < b) a else b }
                     core = selected
-                    coreThreshold = 2
-                    // A refuted core implies at least one violation. Its remaining count is represented
-                    // exactly by the higher threshold bits, including when a prior threshold is re-cored.
-                    factors.add(Clause(IntArray(selected.size) { Lit.make(selected[it], true) }))
+                    coreCursor = 0
+                    coreEncoded = false
+                    coreLiterals = IntArray(selected.size) { Lit.make(selected[it], true) }
+                    factors.add(Clause(coreLiterals))
                 }
             }
         }
@@ -212,18 +217,23 @@ internal class CoreGuidedSearch(
 
     private fun extendCore() {
         val selected = requireNotNull(core)
-        val literals = IntArray(selected.size) { Lit.make(selected[it], true) }
-        // One threshold per checkpoint keeps a large core's encoding resumable.
-        if (coreThreshold <= selected.size) {
-            val aux = nextBool++
-            factors.add(ReifiedCardinality(aux, literals, min = coreThreshold++, max = selected.size))
-            weights[aux] = coreWeight
+        if (!coreEncoded) {
+            coreEncoded = true
+            if (selected.size > 1) appendThreshold(coreLiterals, 2, coreWeight)
             return
         }
-        for (id in selected) {
+        val end = minOf(selected.size, coreCursor + 256)
+        while (coreCursor < end) {
+            val id = selected[coreCursor++]
             val residual = requireNotNull(weights[id]) - coreWeight
-            if (residual == BIG_ZERO) weights.remove(id) else weights[id] = residual
+            if (residual == BIG_ZERO) {
+                weights.remove(id)
+                tails.remove(id)?.let { appendThreshold(it.literals, it.minimum, it.weight) }
+            } else {
+                weights[id] = residual
+            }
         }
+        if (coreCursor < selected.size) return
         lower += coreWeight
         completedCores++
         largestCore = maxOf(largestCore, selected.size)
@@ -231,6 +241,15 @@ internal class CoreGuidedSearch(
         val maximum = maximumWeight() ?: coreWeight
         threshold = if (current < maximum) current else maximum
         core = null
+    }
+
+    private fun appendThreshold(literals: IntArray, minimum: Int, weight: BigInt) {
+        val aux = nextBool++
+        factors.add(ReifiedCardinality(aux, literals, min = minimum, max = literals.size))
+        weights[aux] = weight
+        // Every latent higher threshold implies this frontier. It stays false in a completed
+        // all-residual query; spending the frontier exposes its successor at the original weight.
+        if (minimum < literals.size) tails[aux] = ThresholdTail(literals, minimum + 1, weight)
     }
 
     private fun maximumWeight(below: BigInt? = null): BigInt? {
