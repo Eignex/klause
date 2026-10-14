@@ -198,8 +198,9 @@ arrives. Every initial sibling admission precedes its continuation. The unproduc
 trial uses its selected family's current allowance, clipped to its remaining work
 and time budget, and preserves the other arms'
 policy evidence. Fresh trial work competes through the ordinary family selector;
-zero-work continuations resume directly. Paid family selections advance the ordinary
-allowance ladder; initial probes and zero-work continuation do not. Search work after
+zero-work continuations resume directly. Ordinary retained-worker segments advance
+the shared allowance ladder; an unproductive trial preserves it even when charging
+fresh work. Search work after
 preparation is capped at twelve base work allowances and four base time allowances;
 atomic overspend consumes the trial instead of buying additional fresh segments.
 The separate time cap bounds a handle that reports no charged work. Charged debt
