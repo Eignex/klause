@@ -214,6 +214,8 @@ Boolean/finite/arithmetic category priorities on an original satisfaction SMT so
 Pass `source64=<base64 source>` and `finite=<bounded integer name>`; optional
 `repeats=3 warmups=1` control alternating policy rounds. An independent finite
 proposal splits that source column while exact linear arithmetic owns source checks.
+The source must have a complete linear plan without CP-owned factors; shared
+Boolean clause and cardinality participants retain their checks and propagation.
 Each opening uses a ten-second token. Original bytes, decision traces, timing,
 runtime/artifact hashes and raw exact models remain in `$OUT`. The existing pinned
 SMT stream checker validates every complete witness outside the measured span.

@@ -2,14 +2,21 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibProblem
+import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.search.CardinalitySearchComponent
+import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
 import com.eignex.klause.solver.search.SearchBranchSelection
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModelKey
@@ -40,6 +47,12 @@ internal object SearchSelectionProfile {
         val source = Base64.getDecoder().decode(requireNotNull(options["source64"]))
         val parsed = SmtLib.parse(source.toString(Charsets.UTF_8))
         require(parsed.objective == null) { "selection profile accepts satisfaction sources" }
+        val plan = parsed.model.componentPlan()
+        require(!plan.hasCpComponent && plan.theoryPipeline in setOf(
+            ProblemPipeline.EXACT_LRA, ProblemPipeline.EXACT_LIRA, ProblemPipeline.DIFFERENCE_THEORY,
+        )) { "selection profile requires a complete linear source plan without CP-owned factors" }
+        val clauses = parsed.model.factors.filterIsInstance<Clause>()
+        val cardinalities = parsed.model.factors.filterIsInstance<Cardinality>()
         val finite = parsed.intVarNames.getValue(requireNotNull(options["finite"]))
         require(parsed.model.intBounds.hasLower(finite) && parsed.model.intBounds.hasUpper(finite))
         val sourceLower = parsed.model.intBounds.lower(finite)
@@ -99,7 +112,12 @@ internal object SearchSelectionProfile {
                                 SearchDecision.IntAtLeast(finite, middle + 1))
                         }
                     }
-                    val session = SearchComponentSet(listOf(arithmetic), proposals = listOf(proposal))
+                    val components = buildList<SearchComponent> {
+                        add(ClauseSearchComponent(clauses))
+                        if (cardinalities.isNotEmpty()) add(CardinalitySearchComponent(cardinalities))
+                        add(arithmetic)
+                    }
+                    val session = SearchComponentSet(components, proposals = listOf(proposal))
                         .session(cancellation = stop, atoms = SearchAtomRegistry(parsed.model.numBoolVars))
                     val initialized = session.initialize()
                     val run = session.openRun(parsed.model.numBoolVars, branchSelection = selection,
