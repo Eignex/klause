@@ -7,7 +7,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -47,7 +46,6 @@ import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import java.io.File
@@ -312,9 +310,10 @@ object ProjectionProviderProfile {
 
     private fun mappedControl(seed: Long): JsonObject {
         val table = Table(intArrayOf(2), longArrayOf(1, 2))
-        val open = Bits(3).also { it.set(0); it.set(1) }
-        val bounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(0, 0, 2), open, open)
-        val source = Problem(0, intBounds = bounds, factors = arrayOf<Factor>(table))
+        val source = Problem(0, 3, arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 2)),
+            arrayOf<Factor>(table), openIntLo = booleanArrayOf(true, true, false),
+            openIntHi = booleanArrayOf(true, true, false))
+        val bounds = source.intBounds
         var emissions = 0
         val providers = FactorProjectionProviders(
             propagation = PropagationProjectionProvider { factor ->
