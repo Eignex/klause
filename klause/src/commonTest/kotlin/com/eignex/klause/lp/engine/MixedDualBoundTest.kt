@@ -11,6 +11,41 @@ import kotlin.test.assertTrue
 
 class MixedDualBoundTest {
     @Test
+    fun `scoped logical sides cannot silently supply an objective lattice`() {
+        val source = assertNotNull(LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            val r = addRealVar(0.0, 10.0, cost = 1.0)
+            addRealRow(intArrayOf(x, r), doubleArrayOf(-1.0, 1.0), Relation.EQ, 0.0)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val slack = source.column(source.n)
+        val premises = ExactLpPremises(emptyList(), listOf(0))
+        val bounds = ExactLpBounds(
+            slack.bounds.lower?.copy(premises = premises), slack.bounds.upper?.copy(premises = premises),
+        )
+        val model = assertNotNull(LpExactState(source.withBoundColumns(
+            List(source.numVars) { if (it == source.n) slack.copy(bounds = bounds) else source.column(it) },
+        )).toWorkingModel())
+
+        val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf(0.0)))
+
+        assertNull(certificate.integralObjectiveRows())
+    }
+
+    @Test
+    fun `oversized authoritative arithmetic withholds mixed deductions`() {
+        val source = assertNotNull(LpBuilder().apply {
+            addRealVar(0.0, 1.0, cost = 1.0)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val wide = BigFraction.ofLong(Long.MAX_VALUE) * BigFraction.ofLong(Long.MAX_VALUE) * BigFraction.ofLong(8L)
+        val objective = ExactLpObjective(listOf(ExactLpNumber.of(wide)))
+        val model = assertNotNull(LpExactState(source.withObjective(objective)).toWorkingModel())
+
+        val certificate = nodeDualCertificate(model, doubleArrayOf())
+
+        assertNull(certificate)
+    }
+
+    @Test
     fun `bounded continuous objective definitions retain their integral equality support`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 10L)
