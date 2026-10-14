@@ -140,7 +140,7 @@ counter-proofs and component OBBT remain scoped mechanisms. Triangular crash
 initialization belongs to the optional LP tree-search route. Root rounding and pumping can propose discrete assignments for mixed models;
 declined nearest rounding permits fresh peer-target and directed-rounding attempts
 using the retained LP point under the same root allowance.
-search validates and completes them with the retained real-leaf owner before
+Search validates and completes them with the retained real-leaf owner before
 publication. A relaxation point supplies only a target, never witness authority.
 Production primal
 pricing recomputes scores; there is no optional exact-row propagation or

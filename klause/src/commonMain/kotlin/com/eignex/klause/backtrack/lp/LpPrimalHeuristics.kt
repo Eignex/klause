@@ -90,7 +90,10 @@ internal fun LpEngine.lpRoundingProbe(
         outcome = "PINNING_DECLINED"
         propose(LpRounding.NEAREST)?.let { return it }
         if (problem.numRealVars > 0) {
-            initial?.takeIf { it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars }?.let { seed ->
+            val seed = initial?.takeIf {
+                it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars
+            }
+            if (seed != null) {
                 propose(LpRounding.NEAREST, seed)?.let { return it }
             }
             propose(LpRounding.UP)?.let { return it }
