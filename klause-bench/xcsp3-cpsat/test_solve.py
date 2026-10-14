@@ -69,7 +69,7 @@ class SolveTest(unittest.TestCase):
             <extension><list>x</list><conflicts>1 3 4</conflicts></extension>
             <extension><list>y</list><conflicts>0 2 3</conflicts></extension>
             <extension><list>x y</list><conflicts>(0,0)(0,2)(1,1)(2,4)(3,3)(4,4)</conflicts></extension>
-          </constraints><objectives><maximize type="sum"><list>x y</list></maximize></objectives>
+          </constraints><objectives><maximize type="sum"><list>x y</list><coeffs>1 1</coeffs></maximize></objectives>
         </instance>"""
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "domain-conflicts.xml"
@@ -168,6 +168,21 @@ class SolveTest(unittest.TestCase):
             result = solve(path, 1, 1)
         self.assertEqual("OPTIMAL", result["exit"])
         self.assertEqual("9007199254740993", result["exactObjective"])
+
+    def test_unweighted_objectives_preserve_integer_precision(self):
+        for direction, expected in [("minimize", 9007199254740992), ("maximize", 9007199254740993)]:
+            with self.subTest(direction=direction):
+                xml = f"""<instance format="XCSP3" type="COP">
+                  <variables><var id="x">9007199254740992..9007199254740993</var><var id="y">0</var></variables>
+                  <objectives><{direction} type="sum">x y</{direction}></objectives>
+                </instance>"""
+                with tempfile.TemporaryDirectory() as directory:
+                    path = Path(directory) / "unweighted-wide.xml"
+                    path.write_text(xml)
+                    result = solve(path, 1, 1)
+                self.assertEqual("OPTIMAL", result["exit"])
+                self.assertEqual(expected, result["witness"]["x"])
+                self.assertEqual(str(expected), result["exactObjective"])
 
 
 if __name__ == "__main__":

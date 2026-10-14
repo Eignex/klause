@@ -341,7 +341,8 @@ The `xcsp3-source-preserving-v2` policy uses the pinned packages in
 coordinate disequalities; wildcard coordinates contribute no comparison. This
 preserves every permitted source pair after unary exclusions and avoids the
 native negated-table conversion. Positive extension tables keep their native
-encoding. Native model presolve and search remain enabled.
+encoding. Implicit objective coefficients remain integer ones. Native model
+presolve and search remain enabled.
 The image digest, importer policy, worker count and solver seed distinguish cache
 entries. Records retain effective `referenceSeed`, `referenceWorkers` and
 `cpModelPresolve` settings, complete original-variable `finalWitness`, raw output

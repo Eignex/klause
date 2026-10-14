@@ -22,6 +22,14 @@ def read_model(path):
     from pycsp3.tools.utilities import _Star
 
     class SourceCallbacks(CallbacksCPMPy):
+        def obj_minimize_special(self, obj_type, terms, coefficients):
+            weights = [1] * len(terms) if coefficients is None else coefficients
+            super().obj_minimize_special(obj_type, terms, weights)
+
+        def obj_maximize_special(self, obj_type, terms, coefficients):
+            weights = [1] * len(terms) if coefficients is None else coefficients
+            super().obj_maximize_special(obj_type, terms, weights)
+
         def ctr_extension(self, scope, tuples, positive, flags):
             if positive:
                 super().ctr_extension(scope, tuples, positive, flags)
