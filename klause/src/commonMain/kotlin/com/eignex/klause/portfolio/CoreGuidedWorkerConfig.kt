@@ -24,8 +24,8 @@ internal class CoreGuidedWorkerConfig(
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, edit)
 
-    internal fun withWorkLimit(work: Long): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, work, 2_000L, edit)
+    internal fun withActiveTimeLimit(): CoreGuidedWorkerConfig =
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, edit)
 
     override fun materialize(
         problem: BakedProblem,
@@ -65,7 +65,7 @@ internal class CoreGuidedWorkerConfig(
             params,
             sourceObjective,
         ).bindEvidence(identity, provesResults = CoreGuidedSearch.scalarProofs(sourceObjective)).also {
-            it.auxiliaryProof = maximumWork != null
+            it.auxiliaryProof = maximumWork != null || maximumMillis != null
             it.sharedPools = matched
             it.sharingMeter = meter
             it.sharing = if (matched?.bounds != null) setOf(Contribution.Floor) else emptySet()

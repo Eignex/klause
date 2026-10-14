@@ -207,7 +207,8 @@ internal class CoreGuidedSearch(
             }
             val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
-            val result = handle.runSlice(preparation.withLifetime(lifetime), millis, remaining)
+            val traversalToken = token or Cancellation.until(deadline) or Cancellation { allowanceExhausted }
+            val result = handle.runSlice(traversalToken.withLifetime(lifetime), millis, remaining)
             if (result == null) {
                 return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
