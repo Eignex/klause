@@ -350,7 +350,9 @@ and at most 256 counted positions for 32 distinct destination values. Maintained
 searched, frozen or foreign-owned results retain their values. Source coordinates and
 the count cannot be rewritten, and final cardinality scoring still applies.
 Auxiliary and recipient writes respect pins, domains and ownership. Each scratch write reevaluates its affected
-definitions. This can reconcile searched usage flags and the coordinated attributes
+definitions. Changed integer definition outputs queue their incident readers for the same bounded
+reconciliation, including searched predicates reading maintained attributes.
+This can reconcile searched usage flags and the coordinated attributes
 of a removed class without mutating the live assignment or extending generic repairs.
 At most one completion follows at
 most eight repair steps, protects the changed class and count coordinates, and offers
