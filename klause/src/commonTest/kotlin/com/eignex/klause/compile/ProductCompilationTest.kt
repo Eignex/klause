@@ -1,0 +1,114 @@
+package com.eignex.klause.compile
+
+import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.model.IntSpec
+import com.eignex.klause.model.NamedConstraint
+import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.schema.IntHandle
+import com.eignex.klause.schema.eq
+import com.eignex.klause.schema.times
+import com.eignex.skema.SchemaDef
+import kotlin.random.Random
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+
+class ProductCompilationTest {
+    @Test
+    fun `compiled squares grade moves against the original source equation`() {
+        val x = IntHandle("x", 1, 3)
+        val models = listOf(
+            "schema" to SchemaDef<SchemaEntry>(mapOf(
+                "x" to IntSpec(1, 3), "square" to NamedConstraint((x * x) eq 4),
+            )).compile().problem,
+            "FlatZinc" to parseFlatZinc(
+                "var 1..3: x; constraint int_times(x, x, 4); solve satisfy;",
+            ).problem,
+            "SMT product" to SmtLib.parse(
+                "(declare-const x Int) (assert (and (<= 1 x 3) (= (* x x) 4)))",
+            ).model,
+            "SMT power" to SmtLib.parse(
+                "(declare-const x Int) (assert (and (<= 1 x 3) (= (^ x 2) 4)))",
+            ).model,
+            "XCSP3" to Xcsp3.parse(
+                """<instance><variables><var id="x">1..3</var></variables>
+                    <constraints><intension>eq(mul(x,x),4)</intension></constraints></instance>""",
+            ).problem,
+        )
+        for ((format, problem) in models) {
+            val product = problem.factors.filterIsInstance<Product>().single()
+            assertEquals(product.a, product.b, format)
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
+            for (id in 0 until problem.numIntVars) state.assignment.setInt(id, state.rootDomains[id].min)
+            for (id in 0 until problem.numBoolVars) state.assignment.setBool(id, true)
+            state.assignment.setInt(product.a, 2)
+            state.assignment.setInt(product.result, 4)
+            state.recompute()
+            assertEquals(0L, state.cost, format)
+            val move = Move.IntSet(product.a, 3)
+            val predicted = state.netDelta(move)
+
+            state.apply(move)
+            val committed = state.cost
+            state.recompute()
+
+            val sourceResidual = 3L * 3L - 4L
+            assertEquals(sourceResidual, predicted, format)
+            assertEquals(sourceResidual, committed, format)
+            assertEquals(committed, state.cost, format)
+            assertTrue(state.factors[problem.factors.indexOf(product)].isViolated(state, problem.factors.indexOf(product)))
+            assertFalse(state.assignment.intValue(product.a).let { it * it == 4L }, format)
+        }
+    }
+    @Test
+    fun `fixed power chains preserve source grading with pinned outputs`() {
+        for ((exponent, expected) in listOf(2 to 4L, 3 to 8L, 4 to 16L)) {
+            val parsed = SmtLib.parse(
+                "(declare-const x Int) (assert (and (<= 1 x 3) (= (^ x $exponent) $expected)))",
+            )
+            val problem = parsed.model
+            val products = problem.factors.filterIsInstance<Product>()
+            val output = products.last().result
+            val input = parsed.intVarNames.getValue("x")
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(1),
+                Assumptions.None.withInt(output, expected))
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem)).network(
+                problem.numIntVars, problem.numBoolVars,
+            )
+            for (id in 0 until problem.numIntVars) state.assignment.setInt(id, state.rootDomains[id].min)
+            for (id in 0 until problem.numBoolVars) state.assignment.setBool(id, true)
+            state.assignment.setInt(input, 2)
+            for (product in products) {
+                state.assignment.setInt(product.result,
+                    state.assignment.intValue(product.a) * state.assignment.intValue(product.b))
+            }
+            state.recompute()
+            assertEquals(0L, state.cost)
+            val move = Move.IntSet(input, 3)
+            val predicted = state.netDelta(move)
+
+            state.apply(move)
+            val committed = state.cost
+            state.recompute()
+
+            val sourceValue = when (exponent) { 2 -> 9L; 3 -> 27L; else -> 81L }
+            val sourceDegree = compressViolation(sourceValue - expected, state.violationSoftCap).toLong()
+            assertEquals(expected, state.assignment.intValue(output))
+            assertEquals(sourceDegree, predicted, "exponent $exponent")
+            assertEquals(sourceDegree, committed, "exponent $exponent")
+            assertEquals(committed, state.cost)
+        }
+    }
+
+}
