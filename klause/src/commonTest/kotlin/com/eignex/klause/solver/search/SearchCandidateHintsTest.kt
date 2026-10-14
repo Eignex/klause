@@ -1,15 +1,99 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.solver.pipeline.SourceConjunctionHints
 import com.eignex.klause.solver.pipeline.bindOpenTheoryWork
+import com.eignex.klause.solver.pipeline.observedCandidateHints
+import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class SearchCandidateHintsTest {
+
+    @Test
+    fun `usage observes caller precedence once and retains the complementary traversal`() {
+        val usage = OpenHintUsageSink()
+        var callerCalls = 0
+        var componentCalls = 0
+        val caller = SearchCandidateHints { callerCalls++; false }
+        val component = SearchCandidateHints { componentCalls++; true }
+        val commits = CommitRecorder()
+        val run = SearchSession(emptyList()).openRun(1, observer = commits,
+            candidateHints = observedCandidateHints(caller, component, usage))
+
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+
+        assertEquals(listOf(literal(0, false), literal(0, true)), commits.literals)
+        assertEquals(1, callerCalls)
+        assertEquals(0, componentCalls)
+        assertEquals(1L, usage.snapshot().callerConsultations)
+        assertEquals(1L, usage.snapshot().callerSelections)
+        assertEquals(0L, usage.snapshot().componentConsultations)
+    }
+
+    @Test
+    fun `a failing hint retains its consultation without inventing a selected polarity`() {
+        val usage = OpenHintUsageSink()
+        val failure = IllegalStateException("hint failed")
+        val hints = observedCandidateHints(SearchCandidateHints.None, SearchCandidateHints { throw failure }, usage)
+
+        val thrown = kotlin.test.assertFailsWith<IllegalStateException> { hints.preferredBool(0) }
+
+        kotlin.test.assertSame(failure, thrown)
+        assertEquals(1L, usage.snapshot().componentConsultations)
+        assertEquals(0L, usage.snapshot().componentSelections)
+    }
+
+    @Test
+    fun `caller hints precede nested gate preferences and preserve both sides`() {
+        val clauses = listOf(
+            Clause(intArrayOf(3, 4)), Clause(intArrayOf(3, 6)), Clause(intArrayOf(2, 5, 7)),
+            Clause(intArrayOf(1, 2)), Clause(intArrayOf(1, 8)), Clause(intArrayOf(0, 3, 9)),
+        )
+        val component = assertNotNull(SourceConjunctionHints.create(
+            clauses, 5, intArrayOf(2, 3, 4), SearchCandidateHints { variable ->
+                if (variable in 2..4) true else null
+            }, Cancellation.Never,
+        ))
+        val caller = SearchCandidateHints.ofLiterals(intArrayOf(literal(0, false)))
+        val commits = CommitRecorder()
+        val session = SearchSession(emptyList())
+        val run = session.openRun(1, observer = commits, candidateHints = caller.followedBy(component))
+
+        assertEquals(true, component.preferredBool(0))
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+        assertEquals(listOf(literal(0, false), literal(0, true)), commits.literals)
+    }
+
+    @Test
+    fun `caller preferences precede component fallback and keep the complement`() {
+        for (preferred in listOf(false, true)) {
+            val caller = SearchCandidateHints.ofLiterals(intArrayOf(literal(0, preferred)))
+            val component = SearchCandidateHints.ofLiterals(
+                intArrayOf(literal(0, !preferred), literal(1, true)),
+            )
+            val hints = caller.followedBy(component)
+            val commits = CommitRecorder()
+            val session = SearchSession(emptyList())
+            val run = session.openRun(1, observer = commits, candidateHints = hints)
+
+            assertIs<SearchRunEvent.Satisfied>(run.next())
+            assertIs<SearchRunEvent.Satisfied>(run.next())
+            assertIs<SearchRunEvent.Exhausted>(run.next())
+
+            assertEquals(listOf(literal(0, preferred), literal(0, !preferred)), commits.literals)
+            assertEquals(true, hints.preferredBool(1))
+        }
+    }
 
     @Test
     fun `a hint decides which polarity of a split is tried first`() {

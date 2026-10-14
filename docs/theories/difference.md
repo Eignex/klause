@@ -15,6 +15,14 @@ integer factor, including declared bounds and both meanings of reified rows.
 Numerical safety is part of admission. An implied difference relaxation alone does
 not establish that a whole factor belongs to the fragment.
 
+SMT-LIB lowering represents reified unit-coefficient pairwise integer
+differences with equality as a conjunction of their lower and upper
+comparisons. Disequality is the negation of that conjunction. Each comparison
+retains both signed guarded meanings, allowing complete difference coverage
+without dropping the equality's false branch. General linear and wide integer
+equalities and unary bounds retain their direct reified factors; graph numerical admission still
+applies to the emitted bounds.
+
 Pure-real difference rows are handled inside the linear-real component when they
 meet its graph admission conditions. Other linear rows retain the applicable
 [linear integer](linear-integer.md), [linear real](linear-real.md) or
@@ -27,6 +35,64 @@ Shared search selects Boolean alternatives and passes their active guarded edges
 and integer bound facts to the component. Graph checks can detect conflicts before
 a complete Boolean assignment. Complete checks require settled guards and supply
 coordinates for the variables this theory owns.
+
+The open integer component also refutes unassigned comparison guards from active
+source paths. A guarded edge is impossible when an existing path closes a checked
+negative cycle through it. Its clause-form reason includes the negated guard and
+every active path guard; immutable source rows and declared bounds need no Boolean
+premise. A contradictory member refutes its entire signed row group, whereas
+satisfying one member supplies no entailment. Shared source clauses propagate these
+primitive facts through equality and disequality gates.
+
+This optional closure uses only immutable base edges. Transient published integer
+bounds remain in ordinary feasibility checks but are excluded from proof paths.
+The existing completed cycle sweep supplies a feasible numerical reweighting;
+a point influenced by transient bounds gives those bounds no explanation authority.
+Sparse shortest-path queries charge the containing token and validate original path
+edges and overflow-free sums before publishing. A sweep processes at most 64 open
+heads. Deferred heads remain searchable, and representation decline retains complete
+checks. Guard activity changes and retraction invalidate completed query coverage;
+no reduced distance is interpreted using a different potential. A published guard
+ends the sweep until the shared fixpoint reconciles its new activity.
+
+The stateless path operation lives in `arithmetic.difference`, with caller-owned
+activity, potentials and scratch. Finite incremental repair, trail reconciliation
+and cached zero routes remain owned by propagation. Open component state remains
+private to its search opening. Abandonment exports no path or implication and
+renews neither an allowance nor a deadline.
+
+The default integer pipeline retains its ordinary Boolean polarity selection and
+installs no difference-point hint provider. An explicitly requested internal provider
+can retain a feasible potential from the same completed partial cycle sweep.
+It uses that point only to prefer a Boolean comparison's first polarity; every
+edge belonging to that signed guard must agree. Checked arithmetic
+overflow, interruption or missing signed coverage supplies no preference. The point
+is private to the current completed fixpoint and is invalidated by initialization,
+propagation and retraction. A changed decision level or stopped invocation also
+withholds it.
+
+A separate numerical seed retains the last completed partial potential and its
+exact sorted source-node identities. A following feasibility sweep may repair
+that seed against every current active edge, including transient bounds. Retraction
+can retain this arithmetic start while withholding hints and cached proof paths
+until a fresh completed fixpoint. Changed node identities or overflowing repair
+discard the seed and retain the zero-start check under the same live owner. A
+containing stop supplies no fallback, point or conflict. Root initialization and
+opening cleanup discard the seed. It carries no assignment or explanation
+authority, and complete source witness checking remains independent.
+
+An explicitly composed internal adapter recognizes complete conjunction definitions
+with two or more inputs through every implication pair and the full reverse clause. Nested
+signed definitions extend primitive comparison preferences through conjunctions
+and De Morgan disjunctions. Missing leaves, ambiguous or cyclic definitions supply
+no compound preference. Sparse dependency values are private to one charged
+consultation. Earlier source gates can therefore use the same potential as their
+comparison leaves. Caller and deferred hints retain precedence. Source variable
+order and both complementary alternatives remain intact; a potential or derived
+gate preference never supplies a fact, explanation, model or verdict.
+An available direct comparison retains its primitive preference. Remaining declared
+Boolean and compound choices can use the semantic-clause guidance in
+[shared search](../solver/search.md).
 
 The pipeline can compose theory-owned columns with a finite projection where the
 ownership plan admits that decomposition. Source variables keep their identities;
@@ -51,8 +117,21 @@ Immutable edges and fragment descriptions belong to
 [arithmetic.difference](../../klause/src/commonMain/kotlin/com/eignex/klause/arithmetic/difference).
 Each search component owns its active facts and captured assignment; retraction
 invalidates the assignment. Graph operations poll the caller's cancellation.
+Optional guard propagation batches unmetered external polls within one operation,
+checks native exhaustion on every primitive charge, and forces live polls before
+allocation and proof publication. Metered tokens keep eager polling. A stop discards
+query scratch and resets the origin cursor without retaining cancellation across
+later calls; [resource allowances](../solver/resources.md) defines the boundaries.
 Representation or safety declines retain another admitted route or an undecided
 result, rather than an invented bounded model.
+
+Explicitly requested hint storage admits at most 65,536 edge incidences and source
+factor/index entries. These are private index representation bounds; declining an index retains
+ordinary graph initialization and complete coverage. Index and preference visits
+poll the invocation and charge its attached work meter. Capturing a point performs
+no second graph solve, creates no allowance and does not change the open-policy
+decision/check currency. The caller owns an explicitly composed adapter; closing the
+planned search releases its borrowed component point and private arithmetic seed.
 
 ## Implementation
 

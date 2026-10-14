@@ -95,6 +95,29 @@ internal fun CnfLowering.reifyLinear(coeffs: Array<BigInt>, vars: IntArray, op: 
     return Lit.make(aux, true)
 }
 
+internal fun CnfLowering.reifyDifferenceLinear(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long): Int {
+    val factor = ReifiedLinear(newBool(), coeffs, vars, op, bound)
+    val literal = Lit.make(factor.auxBoolVar, true)
+    val constants = factor.integerConstants
+    val difference = constants != null && factor.vars.size == 2 &&
+        (constants.coeff(0) == 1L || constants.coeff(0) == -1L) &&
+        constants.coeff(1) == -constants.coeff(0)
+    if (!difference || (factor.op != LinearOp.EQ && factor.op != LinearOp.NE)) {
+        factors.add(factor)
+        return literal
+    }
+    val rowConstants = requireNotNull(constants)
+    // Splitting both meanings keeps guarded disequalities within signed difference coverage.
+    tseitinAnd(
+        listOf(
+            reifyLinear(rowConstants.coeffs, factor.vars, LinearOp.LE, rowConstants.bound),
+            reifyLinear(rowConstants.coeffs, factor.vars, LinearOp.GE, rowConstants.bound),
+        ),
+        if (factor.op == LinearOp.EQ) literal else Lit.negate(literal),
+    )
+    return literal
+}
+
 /**
  * Channel [auxBoolVar] onto the 0/1 integer [intVar] using [ReifiedLinear]: it holds iff the
  * integer is 1 ([whenTrue]) or 0. The caller allocates [intVar] with domain `{0, 1}`.

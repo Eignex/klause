@@ -1,5 +1,10 @@
 package com.eignex.klause.propagation.difference
 
+import com.eignex.klause.arithmetic.difference.DifferenceLongHeap
+import com.eignex.klause.arithmetic.difference.DifferencePathCompletion
+import com.eignex.klause.arithmetic.difference.DifferencePathEdges
+import com.eignex.klause.arithmetic.difference.DifferencePathScratch
+import com.eignex.klause.arithmetic.difference.differenceShortestPaths
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
@@ -56,16 +61,10 @@ internal class IncrementalDifferenceGraph(
     private val touched = IntArrayList()
     private val touchedPotential = LongArrayList()
     private val queued = IntArrayList()
-    private val heap = LongMinHeap(numNodes)
+    private val heap = DifferenceLongHeap(numNodes)
 
-    // Query scratch, stamped so a new search need not clear the arrays.
-    private val dist = LongArray(numNodes)
-    private val distPred = IntArray(numNodes)
-    private val reachedStamp = IntArray(numNodes)
-    private val settledStamp = IntArray(numNodes)
-    private val neededStamp = IntArray(numNodes)
-    private var stamp = 0
-    private var queryOrigin = -1
+    private val query = DifferencePathScratch(numNodes)
+    private val queryEdges = DifferencePathEdges(source, target, weight, adjStart, adjEdge)
 
     // Reverse adjacency, for the search that measures distances *to* the constant node.
     private val radjStart = IntArray(numNodes + 1)
@@ -208,42 +207,7 @@ internal class IncrementalDifferenceGraph(
      * [needed]. Read back with [distanceTo] and [pathTo]; a later call invalidates both.
      */
     fun shortestPathsFrom(origin: Int, needed: IntArray) {
-        stamp++
-        queryOrigin = origin
-        var pending = 0
-        for (n in needed) {
-            if (neededStamp[n] == stamp) continue
-            neededStamp[n] = stamp
-            pending++
-        }
-        heap.clear()
-        dist[origin] = 0L
-        distPred[origin] = -1
-        reachedStamp[origin] = stamp
-        heap.push(origin, 0L)
-        while (!heap.isEmpty() && pending > 0) {
-            val s = heap.pop()
-            settledStamp[s] = stamp
-            if (neededStamp[s] == stamp) pending--
-            relaxFrom(s)
-        }
-    }
-
-    private fun relaxFrom(s: Int) {
-        for (i in adjStart[s] until adjStart[s + 1]) {
-            val e = adjEdge[i]
-            if (!active[e] || hub[e]) continue
-            val t = target[e]
-            if (settledStamp[t] == stamp) continue
-            // Johnson's reduced weight: non-negative because the potential is feasible.
-            val reduced = potential[s] + weight[e] - potential[t]
-            val candidate = dist[s] + reduced
-            if (reachedStamp[t] == stamp && candidate >= dist[t]) continue
-            reachedStamp[t] = stamp
-            dist[t] = candidate
-            distPred[t] = e
-            heap.push(t, candidate)
-        }
+        differenceShortestPaths(queryEdges, active, potential, origin, needed, query, skipped = hub)
     }
 
     /**
@@ -346,22 +310,12 @@ internal class IncrementalDifferenceGraph(
 
     /** Weight of the shortest path from the last [shortestPathsFrom] origin to [node], or [UNREACHABLE]. */
     fun distanceTo(node: Int): Long {
-        if (settledStamp[node] != stamp) return UNREACHABLE
-        return dist[node] - potential[queryOrigin] + potential[node]
+        if (query.completion != DifferencePathCompletion.Completed || !query.settled(node)) return UNREACHABLE
+        return query.distance[node] - potential[query.origin] + potential[node]
     }
 
     /** Edge indices of that shortest path, tail first. Empty when [node] is the origin itself. */
-    fun pathTo(node: Int): IntArray {
-        val edges = IntArrayList()
-        var cur = node
-        while (cur != queryOrigin) {
-            val e = distPred[cur]
-            if (e < 0) break
-            edges.add(e)
-            cur = source[e]
-        }
-        return edges.toIntArray()
-    }
+    fun pathTo(node: Int): IntArray = query.pathTo(node, source) ?: intArrayOf()
 
     internal companion object {
         /** [distanceTo] for a vertex no asserted path reaches. */
@@ -375,79 +329,5 @@ internal class IncrementalDifferenceGraph(
          * the decision to post the factor at all can be made against the same rule the structure applies.
          */
         fun weightRoom(numNodes: Int): Long = Long.MAX_VALUE / (8L * (numNodes + 1).toLong())
-    }
-}
-
-/** Indexed binary min-heap over [Long] keys; `decrease-key` in place so a vertex is queued once. */
-private class LongMinHeap(capacity: Int) {
-    private val heap = IntArray(capacity)
-    private val pos = IntArray(capacity) { -1 }
-    private val keys = LongArray(capacity)
-    private var size = 0
-
-    fun isEmpty(): Boolean = size == 0
-
-    fun clear() {
-        for (i in 0 until size) pos[heap[i]] = -1
-        size = 0
-    }
-
-    fun push(id: Int, key: Long) {
-        val p = pos[id]
-        if (p >= 0) {
-            if (key >= keys[id]) return
-            keys[id] = key
-            siftUp(p)
-            return
-        }
-        keys[id] = key
-        heap[size] = id
-        pos[id] = size
-        size++
-        siftUp(size - 1)
-    }
-
-    fun pop(): Int {
-        val top = heap[0]
-        pos[top] = -1
-        size--
-        if (size > 0) {
-            heap[0] = heap[size]
-            pos[heap[0]] = 0
-            siftDown(0)
-        }
-        return top
-    }
-
-    private fun siftUp(start: Int) {
-        var i = start
-        while (i > 0) {
-            val parent = (i - 1) / 2
-            if (keys[heap[parent]] <= keys[heap[i]]) break
-            swap(i, parent)
-            i = parent
-        }
-    }
-
-    private fun siftDown(start: Int) {
-        var i = start
-        while (true) {
-            val left = 2 * i + 1
-            if (left >= size) break
-            val right = left + 1
-            val child = if (right < size && keys[heap[right]] < keys[heap[left]]) right else left
-            if (keys[heap[i]] <= keys[heap[child]]) break
-            swap(i, child)
-            i = child
-        }
-    }
-
-    private fun swap(a: Int, b: Int) {
-        val x = heap[a]
-        val y = heap[b]
-        heap[a] = y
-        heap[b] = x
-        pos[y] = a
-        pos[x] = b
     }
 }

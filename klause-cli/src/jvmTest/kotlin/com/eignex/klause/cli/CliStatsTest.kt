@@ -21,6 +21,7 @@ import com.eignex.klause.solver.result.LpPhaseStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
+import com.eignex.klause.solver.result.OpenHintUsageStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
 import com.eignex.klause.solver.result.PortfolioStats
@@ -40,6 +41,27 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class CliStatsTest {
+
+    @Test
+    fun `component hint usage is emitted when no Boolean proposal was drawn`() {
+        val stats = SolveStats(openHints = OpenHintStats(usage = OpenHintUsageStats(
+            indexesAdmitted = 1, componentConsultations = 3, componentSelections = 2, gateSelections = 2,
+            clauseIndexesAdmitted = 1, clauseConsultations = 3, clauseSelections = 1, clauseDeclines = 2,
+        )))
+
+        val pairs = openTheoryStatPairs(stats, 1L).toMap()
+
+        assertEquals("1", pairs["openHintIndexAdmitted"])
+        assertEquals("3", pairs["openHintComponentConsulted"])
+        assertEquals("2", pairs["openHintComponentSelected"])
+        assertEquals("2", pairs["openHintGateSelected"])
+        assertEquals("1", pairs["openHintClauseIndexAdmitted"])
+        assertEquals("3", pairs["openHintClauseConsulted"])
+        assertEquals("1", pairs["openHintClauseSelected"])
+        assertEquals("2", pairs["openHintClauseDeclined"])
+        assertEquals(null, pairs["openHintDraws"])
+        assertTrue(openHintUsageStatPairs(SolveStats.EMPTY).isEmpty())
+    }
 
     @Test
     fun `core bounds preserve exact integers when worker snapshots combine`() {

@@ -3,10 +3,10 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.util.MutableIntIntMap
 
 /**
- * Unverified branch-order steering produced outside the shared search.
+ * Unverified branch-order steering from candidate producers and live component-owned partial points.
  *
- * A hint is a guess — a local-search assignment, a cached solution, a caller annotation — and carries
- * no proof, so it is never an assumption, a sample, or a model value. Its only effect is which side of
+ * A hint is a guess — a local-search assignment, a partial theory point, a cached solution or a caller annotation.
+ * It carries no proof, so it is never an assumption, a sample, or a model value. Its only effect is which side of
  * a split is tried first. The complement stays on the frame, propagation may fix the variable the other
  * way before the split is reached, and a hint that is missing, contradictory, or inapplicable leaves the
  * default order alone. Completeness therefore never depends on the producer being right, and only the
@@ -85,3 +85,9 @@ class HintedBooleanBranching(private val delegate: BooleanBranching, private val
 /** Steer this branching with [hints], or keep it as it is when the producer supplied none. */
 internal fun BooleanBranching.preferring(hints: SearchCandidateHints): BooleanBranching =
     if (hints === SearchCandidateHints.None) this else HintedBooleanBranching(this, hints)
+
+internal fun SearchCandidateHints.followedBy(fallback: SearchCandidateHints): SearchCandidateHints = when {
+    this === SearchCandidateHints.None -> fallback
+    fallback === SearchCandidateHints.None -> this
+    else -> SearchCandidateHints { variable -> preferredBool(variable) ?: fallback.preferredBool(variable) }
+}

@@ -1078,9 +1078,12 @@ class CliModeTest {
         }
 
         assertTrue(plain.lines().firstOrNull() == "sat", plain)
-        assertTrue("openHint" !in plain, plain)
+        assertTrue("; openHintDraws=" !in plain, plain)
+        assertTrue("; openHintNoProvider=1" in plain, plain)
+        assertTrue("; openHintIndexAdmitted=0" in plain, plain)
+        assertTrue("; openHintComponentSelected=0" in plain, plain)
         assertTrue(deferred.lines().firstOrNull() == "sat", deferred)
-        assertTrue("openHint" !in deferred, deferred)
+        assertTrue("; openHintDraws=" !in deferred, deferred)
         assertTrue(hinted.lines().firstOrNull() == "sat", hinted)
         assertTrue("; openHintDraws=1" in hinted, hinted)
         assertTrue("; openHintProduced=1" in hinted, hinted)

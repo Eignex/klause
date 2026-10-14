@@ -134,7 +134,9 @@ internal class RetainedLinearQueries(
             val run = session.openConditionedRun(model.numBoolVars,
                 SearchSolveParams(maxDecisions = state.remainingDecisions().coerceAtLeast(0),
                     restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never),
-                nodePolicy = policy, booleanBranching = branching, candidateHints = hints(scope.stop, state),
+                nodePolicy = policy, booleanBranching = branching,
+                candidateHints = observedCandidateHints(hints(scope.stop, state), SearchCandidateHints.None,
+                    state.smt.hintUsage),
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None)
             when (val event = run.next()) {
                 is SearchRunEvent.Satisfied -> {

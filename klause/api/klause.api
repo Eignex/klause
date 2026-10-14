@@ -12517,21 +12517,77 @@ public final class com/eignex/klause/solver/result/OpenHintStats {
 	public fun <init> ()V
 	public fun <init> (JJJJJ)V
 	public synthetic fun <init> (JJJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (JJJJJLcom/eignex/klause/solver/result/OpenHintUsageStats;)V
+	public synthetic fun <init> (JJJJJLcom/eignex/klause/solver/result/OpenHintUsageStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()J
 	public final fun component2 ()J
 	public final fun component3 ()J
 	public final fun component4 ()J
 	public final fun component5 ()J
+	public final fun component6 ()Lcom/eignex/klause/solver/result/OpenHintUsageStats;
 	public final fun copy (JJJJJ)Lcom/eignex/klause/solver/result/OpenHintStats;
+	public final fun copy (JJJJJLcom/eignex/klause/solver/result/OpenHintUsageStats;)Lcom/eignex/klause/solver/result/OpenHintStats;
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/OpenHintStats;JJJJJILjava/lang/Object;)Lcom/eignex/klause/solver/result/OpenHintStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/OpenHintStats;JJJJJLcom/eignex/klause/solver/result/OpenHintUsageStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/OpenHintStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDraws ()J
 	public final fun getHintedVars ()J
 	public final fun getMoves ()J
 	public final fun getProduced ()J
 	public final fun getSteeredSplits ()J
+	public final fun getUsage ()Lcom/eignex/klause/solver/result/OpenHintUsageStats;
 	public fun hashCode ()I
 	public final fun mergedWith (Lcom/eignex/klause/solver/result/OpenHintStats;)Lcom/eignex/klause/solver/result/OpenHintStats;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/result/OpenHintUsageStats {
+	public fun <init> ()V
+	public fun <init> (JJJJJJJJJJJJJJJJJJJ)V
+	public synthetic fun <init> (JJJJJJJJJJJJJJJJJJJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component10 ()J
+	public final fun component11 ()J
+	public final fun component12 ()J
+	public final fun component13 ()J
+	public final fun component14 ()J
+	public final fun component15 ()J
+	public final fun component16 ()J
+	public final fun component17 ()J
+	public final fun component18 ()J
+	public final fun component19 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun component6 ()J
+	public final fun component7 ()J
+	public final fun component8 ()J
+	public final fun component9 ()J
+	public final fun copy (JJJJJJJJJJJJJJJJJJJ)Lcom/eignex/klause/solver/result/OpenHintUsageStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/OpenHintUsageStats;JJJJJJJJJJJJJJJJJJJILjava/lang/Object;)Lcom/eignex/klause/solver/result/OpenHintUsageStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAbortedIndexes ()J
+	public final fun getCallerConsultations ()J
+	public final fun getCallerSelections ()J
+	public final fun getClauseConsultations ()J
+	public final fun getClauseDeclines ()J
+	public final fun getClauseIndexesAdmitted ()J
+	public final fun getClauseIndexesDeclined ()J
+	public final fun getClauseSelections ()J
+	public final fun getComponentConsultations ()J
+	public final fun getComponentSelections ()J
+	public final fun getGateSelections ()J
+	public final fun getIndexesAdmitted ()J
+	public final fun getInvalidPrimitiveDeclines ()J
+	public final fun getNoProvider ()J
+	public final fun getPrimitiveSelections ()J
+	public final fun getSourceLimitDeclines ()J
+	public final fun getStoppedIndexes ()J
+	public final fun getStorageDeclines ()J
+	public final fun getVisitDeclines ()J
+	public fun hashCode ()I
+	public final fun mergedWith (Lcom/eignex/klause/solver/result/OpenHintUsageStats;)Lcom/eignex/klause/solver/result/OpenHintUsageStats;
 	public fun toString ()Ljava/lang/String;
 }
 

@@ -420,7 +420,7 @@ class OpenTheoryEngine internal constructor(
                 booleanBranching = branching,
                 observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
                 nodePolicy = nodePolicy,
-                candidateHints = hints,
+                candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
             )
             handedOff = true
             return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
@@ -551,7 +551,9 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     private var capturedRootFixed = 0
 
     /** What the request's hint draw produced, cost, and has steered so far. */
-    val hints: OpenHintStats get() = drawStats.copy(steeredSplits = steering?.steeredSplits ?: 0L)
+    val hints: OpenHintStats get() = drawStats.copy(
+        steeredSplits = steering?.steeredSplits ?: 0L, usage = smt.hintUsage.snapshot(),
+    )
 
     private var drawStats = OpenHintStats()
     private var steering: CountingCandidateHints? = null

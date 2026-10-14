@@ -135,6 +135,14 @@ in those packages are implementation APIs. Existing descriptors remain available
 when a supported replacement is introduced, with warning-level deprecations for
 migration rather than an immediate visibility or signature break.
 
+`OpenHintStats` retains its no-argument and five-counter constructors, default
+argument descriptors and five-counter copy surface. Its immutable usage observation
+is optional through the retained constructor; copying draw counters preserves that
+observation. The extended value copy can replace usage, and value equality and
+independent-slice merging include it. The first five destructured values remain the
+draw counters. Usage includes the source index, component consultations and optional
+semantic-clause comparisons, independently of the optional Boolean draw allowance.
+
 Experimental composition includes `PreparedSourcePlan` and its inspectable component,
 operation and strategy admission contracts, `ComponentPlan`, CP projection planning, shared
 search session/runner construction, direct pipeline engines and concrete theory

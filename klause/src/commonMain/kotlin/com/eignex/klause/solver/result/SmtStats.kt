@@ -98,6 +98,8 @@ data class SmtStats(
 
 /** Mutable exact-SMT telemetry for one top-level open-theory request. */
 internal class SmtStatsSink {
+    val hintUsage = OpenHintUsageSink()
+
     private var sourceLp = SourceLpWorkStats()
 
     fun observeSourceLp(delta: SourceLpWorkStats) {

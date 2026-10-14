@@ -10,6 +10,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.CardinalitySearchComponent
 import com.eignex.klause.solver.search.ClauseSearchComponent
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
@@ -28,6 +29,7 @@ class PlannedSearch internal constructor(
     /** Theory participant, if selected. */
     val theory: TheoryComponent?,
     private val resources: SearchInvocationResources,
+    internal val candidateHints: SearchCandidateHints = SearchCandidateHints.None,
 ) : AutoCloseable {
     override fun close() = resources.close()
 

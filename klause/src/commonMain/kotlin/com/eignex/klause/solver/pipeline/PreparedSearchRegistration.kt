@@ -1,9 +1,12 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchCoordinateOwnership
@@ -21,6 +24,67 @@ internal class SearchComponentOpening(
     val theorySolveStop: Cancellation?,
     private val resources: SearchInvocationResources,
 ) {
+    private var primitiveHints: Pair<IntArray, SearchCandidateHints>? = null
+    private var releaseHints: (() -> Unit)? = null
+    private var pointAvailable: (() -> Boolean)? = null
+    private var knownBool: (Int) -> Boolean? = { null }
+
+    fun registerCandidateHints(
+        variables: IntArray,
+        hints: SearchCandidateHints,
+        release: () -> Unit,
+        available: (() -> Boolean)? = null,
+        knownBool: (Int) -> Boolean? = { null },
+    ) {
+        check(primitiveHints == null) { "candidate hints already have an owner" }
+        primitiveHints = variables to hints
+        releaseHints = release
+        pointAvailable = available
+        this.knownBool = knownBool
+        own(AutoCloseable { release() })
+    }
+
+    fun candidateHints(source: Problem): SearchCandidateHints {
+        var accounted = false
+        fun outcome(value: HintIndexOutcome) {
+            accounted = true
+            smtStats?.hintUsage?.index(value)
+        }
+        try {
+            val (variables, hints) = primitiveHints ?: return SearchCandidateHints.None.also {
+                outcome(HintIndexOutcome.NO_PROVIDER)
+            }
+            if (source.factors.size > SourceConjunctionHints.MAX_INDEX_ENTRIES) {
+                outcome(HintIndexOutcome.SOURCE_LIMIT)
+                releaseHints?.invoke()
+                return SearchCandidateHints.None
+            }
+            if (cancellation()) {
+                outcome(HintIndexOutcome.STOPPED)
+                releaseHints?.invoke()
+                return SearchCandidateHints.None
+            }
+            val clauses = ArrayList<Clause>()
+            for (factor in source.factors) {
+                cancellation.charge(1)
+                if (cancellation()) {
+                    outcome(HintIndexOutcome.STOPPED)
+                    releaseHints?.invoke()
+                    return SearchCandidateHints.None
+                }
+                if (factor is Clause) clauses += factor
+            }
+            accounted = true
+            val compiled = SourceConjunctionHints.create(clauses, source.numBoolVars, variables, hints, cancellation,
+                usage = smtStats?.hintUsage, available = pointAvailable, knownBool = knownBool)
+            if (compiled != null) return own(compiled)
+            releaseHints?.invoke()
+            return SearchCandidateHints.None
+        } finally {
+            if (!accounted) smtStats?.hintUsage?.index(HintIndexOutcome.ABORTED)
+        }
+    }
+
     fun <T : AutoCloseable> own(resource: T): T = resources.own(resource)
 
     fun ownComponent(component: SearchComponent) = resources.ownComponent(component)
@@ -41,7 +105,7 @@ internal class PreparedSearchRegistration(
 }
 
 internal class PreparedSearchRegistrations(
-    source: Problem,
+    private val source: Problem,
     registrations: List<PreparedSearchRegistration>,
 ) {
     private val registrations = registrations.toList()
@@ -99,6 +163,7 @@ internal class PreparedSearchRegistrations(
                 components.filterIsInstance<CpSearchComponent>().firstOrNull(),
                 components.filterIsInstance<TheoryComponent>().firstOrNull(),
                 resources,
+                opening.candidateHints(source),
             )
         } catch (failure: Throwable) {
             resources.closeAfter(failure)

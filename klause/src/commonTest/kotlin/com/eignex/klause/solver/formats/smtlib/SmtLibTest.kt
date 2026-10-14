@@ -104,6 +104,38 @@ class SmtLibTest {
     private fun SmtLibProblem.bounded(): Problem = model.bake()
 
     @Test
+    fun `machine equality conditions retain difference scheduling coverage`() {
+        for (sameMachine in listOf(true, false)) {
+            val parsed = SmtLib.parse(
+                """
+                    (set-logic QF_IDL)
+                    (declare-const m0 Int) (declare-const m1 Int)
+                    (declare-const t0 Int) (declare-const t1 Int)
+                    (assert (= m0 0)) (assert (= m1 ${if (sameMachine) 0 else 1}))
+                    (assert (>= t0 0)) (assert (>= t1 0))
+                    ${if (sameMachine) "" else "(assert (= t0 0)) (assert (= t1 0))"}
+                    (assert (or (not (= (- m0 m1) 0))
+                        (or (<= (+ t0 3) t1) (<= (+ t1 3) t0))))
+                    (check-sat)
+                """.trimIndent(),
+            )
+
+            val assignment = differenceSat(parsed.model)
+
+            assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.model.componentPlan().theoryPipeline)
+            val t0 = assignment.ints[parsed.intVarNames.getValue("t0")]
+            val t1 = assignment.ints[parsed.intVarNames.getValue("t1")]
+            assertTrue(t0 >= 0L && t1 >= 0L)
+            if (sameMachine) {
+                assertTrue(t0 + 3L <= t1 || t1 + 3L <= t0)
+            } else {
+                assertEquals(0L, t0)
+                assertEquals(0L, t1)
+            }
+        }
+    }
+
+    @Test
     fun `open QF LIRA returns an exact mixed witness`() {
         val parsed = SmtLib.parse(
             """

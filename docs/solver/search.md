@@ -93,6 +93,51 @@ to that level, and learned backjumps below it fall back to chronological travers
 Exhaustion is then conditional. The query owner retracts the condition after the
 run; the source root and its immutable atom meanings stay with the session.
 
+Component-owned candidate hints reach ordinary Boolean traversal through the
+internal planned opening and the existing `SearchCandidateHints` surface. Caller
+and deferred hints retain precedence. A component preference only reorders the
+two sides of an already selected Boolean split; propagation and complete component
+checks retain authority. The provider belongs to its opening and completed partial
+fixpoint, including retraction and close lifetime. A source-clause adapter recognizes
+complete signed conjunction definitions of two or more inputs, including nested gates
+and disjunctions expressed by signed De Morgan inputs. Primitive preferences remain
+the leaves. Each consultation evaluates a bounded dependency closure with sparse
+private storage charged to the opening token; no values survive the consultation.
+Every definition retains its full reverse clause and every implication pair.
+Recognition checks its first required implication pair before allocating or charging
+the complete operand buffer. A missing first pair skips that candidate; admission
+still requires every pair, canonical operands and an unambiguous definition.
+Missing leaves, incomplete or ambiguous definitions, cycles and cancellation supply
+no derived gate preference. The adapter performs no second Boolean or arithmetic search.
+
+The default integer difference opening installs no point hint provider; its ordinary
+Boolean polarity selection is independent of optional internal adapter composition.
+
+An opt-in internal point provider can also compare both values of the selected Boolean
+against the original shared clauses. Index construction records hook presence before
+initialization; consultation requires a live point before and after its charged work.
+An available direct primitive preference retains its polarity without semantic scoring.
+Declared Boolean choices and compound gates can use the semantic comparison.
+Live pins come from the search context, including publications awaiting delivery to a
+component. Complete unambiguous acyclic definitions supply only structure and are
+excluded from scoring by their stable source clause identities. Their clauses remain
+fully enforced by search. Unknown partners stay unknown: a clause is satisfied by a
+known true literal, broken only when all literals are known false, and otherwise
+unresolved. Comparisons require the same usable primitive point support on both sides,
+prefer fewer broken clauses, then more definitely satisfied clauses. Ties and optional
+representation declines retain the forward preference. A hypothetical compound output
+can differ from its point-derived value; it supplies no arithmetic fact or feasibility
+claim. Ordinary fixpoint and complete source checks still validate either branch.
+
+Source-index outcomes and eligible Boolean split consultations are separate from
+the optional Boolean proposal's draw counters. The invocation retains one outcome
+for each index opening, including declines and stops before initialization or close.
+Caller providers keep precedence; a component is consulted only when the caller
+supplies no preference. A non-null preference counts a selected first polarity even
+when it agrees with the delegate, and preserves the complementary alternative.
+Primitive and compound gate selections describe the outer consultation, not recursive
+leaf reads. These observations do not certify a committed decision or source witness.
+
 Fractional source integers split at exact floor/ceiling thresholds. CP decisions use
 Long values; open theories use arbitrary-precision thresholds. Stable complementary
 atoms must exist before first-UIP learning. Boolean atom names belong to one immutable
@@ -152,6 +197,13 @@ concrete arithmetic routes. Factories create fresh component instances and retai
 their optional branching, model-blocking and conflict-resolution capabilities.
 Repeated opening shares read-only source data and completed projections, preserving
 the default component and branch order.
+
+Difference components can also imply comparison guards from checked active source
+paths. These facts carry clause-form reasons and enter the ordinary shared Boolean
+fixpoint, unlike candidate preferences. Immutable source edges may appear without
+Boolean antecedents; transient bounds are excluded unless their complete source
+premises are represented. The producing component stops after a new implication
+until the fixpoint reconciles activity. See [difference proofs](../theories/difference.md).
 
 ## Arithmetic coordinate agreement
 
