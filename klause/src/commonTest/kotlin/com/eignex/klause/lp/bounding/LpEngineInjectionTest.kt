@@ -196,6 +196,7 @@ class LpEngineInjectionTest {
             ),
             SolveStatsSink(backend = "root"),
             LpSolveContext(factory, decline),
+            nodeWorkAllowance = { 1L },
         )
 
         val bound = engine.rootLpRelaxationBound(checkNotNull(engine.lpRelaxer), emptyList())
@@ -205,6 +206,7 @@ class LpEngineInjectionTest {
         val construction = factory.calls.single { it.kind == EngineConstruction.TABLEAU }
         assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
         assertEquals(37L, construction.tieSeed)
+        assertEquals(0L, construction.workLimit)
     }
 
     @Test

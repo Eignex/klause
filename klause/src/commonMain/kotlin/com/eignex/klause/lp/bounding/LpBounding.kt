@@ -119,13 +119,17 @@ internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).
 /** A budgeted [TableauCutSolver] over [model]. The simplex always uses Devex pricing, the Harris
  *  two-pass ratio test, the bound-flipping long step and basis equilibration — all correctness-neutral
  *  (they change only the pivot path / conditioning, never the certified optimum). */
-internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver {
+internal fun LpEngine.dualSimplex(
+    model: LpModel,
+    cancellation: Cancellation,
+    workLimit: Long = nodeWorkBudget(),
+): TableauCutSolver {
     requireOpen()
     return newTableauCutSolver(
         model,
         cancellation,
         iterationLimit = nodePivotBudget(),
-        workLimit = nodeQueryWorkBudget() ?: nodeWorkBudget(),
+        workLimit = workLimit,
         trackDegeneracy = adaptiveWork,
         pricing = pricingOptions,
         factory = solveContext.engineFactory,
@@ -937,7 +941,9 @@ internal fun LpEngine.sparseCertifiedPrune(
     if (relaxation.model.n == 0 && relaxation.model.m == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
     noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.SETUP)
-    val recoverySimplex = dualSimplex(relaxation.model, cancellation)
+    val recoverySimplex = dualSimplex(
+        relaxation.model, cancellation, workLimit = nodeQueryWorkBudget() ?: nodeWorkBudget(),
+    )
     val result = try {
         recoverySimplex.solve()
     } finally {
