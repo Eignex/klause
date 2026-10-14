@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -11,6 +12,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.fitsLong
@@ -22,8 +24,10 @@ import com.eignex.klause.util.toLongExact
 internal class NValueClauseCompletion(
     private val state: LocalSearchState,
     private val sink: MoveSink,
-    private val protectedInts: IntArray,
+    private val countedInts: IntArray,
+    private val count: Int,
 ) {
+    private val protectedInts = countedInts + intArrayOf(count)
     private val network = checkNotNull(state.invariants)
     private val folds = MutableIntObjectMap<DefinitionalSweep.SweepNode.BoolFold>().also { index ->
         for (i in 0 until network.size) {
@@ -34,6 +38,8 @@ internal class NValueClauseCompletion(
     private val assignment = Assignment(state.problem.numBoolVars, state.problem.numIntVars, state.problem.numRealVars)
     private val pinnedInts = IntHashSet().also { pins -> protectedInts.forEach { pins.add(it) } }
     private val pinnedBools = IntHashSet()
+    private val writtenInts = IntHashSet()
+    private val receivingClasses = LongHashSet()
     private val pending = ArrayList<Int>()
     private val parts = ArrayList<Move>()
     private var foldVisits = 0
@@ -44,12 +50,17 @@ internal class NValueClauseCompletion(
         pinnedInts.clear()
         protectedInts.forEach { pinnedInts.add(it) }
         pinnedBools.clear()
+        writtenInts.clear()
+        receivingClasses.clear()
         pending.clear()
         parts.clear()
         foldVisits = 0
         state.assignment.copyInto(assignment)
         val initial = if (move is Move.Compound) move.parts else listOf(move)
         for (part in initial) {
+            if (part is Move.IntSet && part.varId != count && part.varId in countedInts) {
+                receivingClasses.add(part.newValue)
+            }
             parts += part
             pin(part)
             write(part)
@@ -63,8 +74,13 @@ internal class NValueClauseCompletion(
                     if (factor.literals.any { holds(it) }) continue
                     factor.literals.map(::repair).filterNotNull().distinct()
                 }
+
                 is ReifiedLinear -> channelRepairs(factor)
+
                 is Xor -> xorRepairs(factor)
+
+                is Element -> elementRepairs(factor)
+
                 else -> emptyList()
             }
             if (choices.size != 1) continue
@@ -120,7 +136,9 @@ internal class NValueClauseCompletion(
         val integer = predicateRepair(row, desired)
         val indicator = if (row.auxBoolVar !in pinnedBools && sink.allowsBool(row.auxBoolVar)) {
             Move.BoolFlip(row.auxBoolVar)
-        } else null
+        } else {
+            null
+        }
         return listOfNotNull(integer, indicator)
     }
 
@@ -138,6 +156,67 @@ internal class NValueClauseCompletion(
         }.filterNotNull().distinct()
     }
 
+    private fun elementRepairs(element: Element): List<Move> {
+        val position = assignment.intValue(element.idx) - element.indexOffset
+        if (position < 0 || position >= element.arr.size) return emptyList()
+        val entry = element.arr[position.toInt()]
+        val value = if (element.arrIsVars) assignment.intValue(entry.toInt()) else entry
+        val result = assignment.intValue(element.result)
+        if (value == result) return emptyList()
+        val repairs = ArrayList<Move>()
+        if (element.arrIsVars) {
+            val cell = entry.toInt()
+            if (cell !in pinnedInts && sink.allowsInt(cell) && result in state.rootDomains[cell]) {
+                repairs += Move.IntSet(cell, result)
+            }
+        }
+        if (element.result !in pinnedInts && sink.allowsInt(element.result) &&
+            value in state.rootDomains[element.result]
+        ) {
+            repairs += Move.IntSet(element.result, value)
+        }
+        val index = element.idx
+        if (index != count && index in countedInts && index !in writtenInts &&
+            assignment.intValue(index) in receivingClasses && sink.allowsInt(index)
+        ) {
+            retargetIndex(index)?.let { repairs += Move.IntSet(index, it) }
+        }
+        return repairs
+    }
+
+    private fun retargetIndex(index: Int): Long? {
+        val occurrences = state.projection.intOccurrences[index]
+        if (occurrences.size > MAX_INDEX_OCCURRENCES) return null
+        val elements = ArrayList<Element>()
+        for (fid in occurrences) {
+            val element = state.problem.factors[fid] as? Element ?: continue
+            if (element.idx == index) elements += element
+        }
+        val seen = LongHashSet()
+        var target: Long? = null
+        for (i in 0 until minOf(countedInts.size, MAX_INDEX_POSITIONS)) {
+            val variable = countedInts[i]
+            if (variable == count) continue
+            val candidate = assignment.intValue(variable)
+            if (candidate == assignment.intValue(index) || !seen.add(candidate)) continue
+            if (seen.size > MAX_TARGET_CLASSES) break
+            if (candidate !in state.rootDomains[index] || elements.any { !admitsIndex(it, candidate) }) continue
+            if (target == null || candidate < target) target = candidate
+        }
+        return target
+    }
+
+    private fun admitsIndex(element: Element, index: Long): Boolean {
+        val position = index - element.indexOffset
+        if (position < 0 || position >= element.arr.size) return false
+        val entry = element.arr[position.toInt()]
+        val value = if (element.arrIsVars) assignment.intValue(entry.toInt()) else entry
+        if (value !in state.rootDomains[element.result]) return false
+        val maintained = network.elementResultDefinition(element.result)?.factor === element &&
+            state.moveSink.allowsDefinedInt(element.result) && sink.allowsDefinedInt(element.result)
+        return maintained || value == assignment.intValue(element.result)
+    }
+
     private fun predicateRepair(row: ReifiedLinear, desired: Boolean): Move.IntSet? {
         if (!((row.op == LinearOp.EQ && desired) || (row.op == LinearOp.NE && !desired))) return null
         val predicate = predicate(row) ?: return null
@@ -145,7 +224,9 @@ internal class NValueClauseCompletion(
         val variable = predicate.variable
         if (variable in pinnedInts || !sink.allowsInt(variable) || value !in state.rootDomains[variable] ||
             value == assignment.intValue(variable)
-        ) return null
+        ) {
+            return null
+        }
         return Move.IntSet(variable, value)
     }
 
@@ -177,8 +258,13 @@ internal class NValueClauseCompletion(
 
     private fun pin(move: Move) {
         when (move) {
-            is Move.IntSet -> pinnedInts.add(move.varId)
+            is Move.IntSet -> {
+                pinnedInts.add(move.varId)
+                writtenInts.add(move.varId)
+            }
+
             is Move.BoolFlip -> pinnedBools.add(move.varId)
+
             else -> Unit
         }
     }
@@ -189,11 +275,14 @@ internal class NValueClauseCompletion(
                 assignment.setInt(move.varId, move.newValue)
                 for (fid in state.projection.intOccurrences[move.varId]) enqueueFactor(fid)
             }
+
             is Move.BoolFlip -> {
                 assignment.flipBool(move.varId)
                 enqueue(move.varId)
             }
+
             is Move.RealSet -> assignment.setReal(move.varId, move.newValue)
+
             is Move.Compound -> error("Completion parts must be primitive")
         }
     }
@@ -203,9 +292,12 @@ internal class NValueClauseCompletion(
         val bools = moves.filterIsInstance<Move.BoolFlip>().map { it.varId }.toIntArray()
         for (index in network.affectedNodes(ints, bools, assignment)) {
             val node = network.node(index)
-            if (if (node.outIsBool) state.assumptions.isFrozenBool(node.out)
-                else !state.moveSink.allowsDefinedInt(node.out)
-            ) continue
+            val frozen = if (node.outIsBool) {
+                state.assumptions.isFrozenBool(node.out)
+            } else {
+                !state.moveSink.allowsDefinedInt(node.out)
+            }
+            if (frozen) continue
             val value = node.eval(assignment, state.rootDomains)
             if (value == DefinitionalSweep.SweepNode.NO_WRITE) continue
             if (node.outIsBool) {
@@ -226,9 +318,11 @@ internal class NValueClauseCompletion(
     private fun enqueueFactor(fid: Int) {
         if (pending.size >= MAX_FACTOR_VISITS) return
         val factor = state.problem.factors[fid]
-        if (factor is Clause || factor is Xor ||
+        if (factor is Clause || factor is Xor || factor is Element ||
             (factor is ReifiedLinear && predicate(factor) != null)
-        ) pending += fid
+        ) {
+            pending += fid
+        }
     }
 
     private fun holds(literal: Int): Boolean = Lit.evaluate(literal, assignment.boolValue(Lit.variable(literal)))
@@ -239,5 +333,8 @@ internal class NValueClauseCompletion(
         const val MAX_FOLD_DEPTH = 4
         const val MAX_FOLD_VISITS = 32
         const val MAX_PREDICATE_TERMS = 32
+        const val MAX_INDEX_OCCURRENCES = 256
+        const val MAX_TARGET_CLASSES = 32
+        const val MAX_INDEX_POSITIONS = 256
     }
 }

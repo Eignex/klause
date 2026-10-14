@@ -30,6 +30,7 @@ object NValueNeighborhoodProfile {
     private val completionType = Class.forName("com.eignex.klause.factor.global.NValueClauseCompletion")
     private val completionConstructor = completionType.getConstructor(
         LocalSearchState::class.java, MoveSink::class.java, IntArray::class.java,
+        checkNotNull(Int::class.javaPrimitiveType),
     )
     private val completionMethod = completionType.getMethod("complete", Move::class.java)
 
@@ -264,7 +265,7 @@ object NValueNeighborhoodProfile {
         restore(diagnostic, incumbent)
         val eligibility = MoveSink(diagnostic.assumptions).also { it.setInvariants(diagnostic.invariants) }
         // The component stays internal to the library; the JVM probe follows its constructor ABI.
-        val helper = completionConstructor.newInstance(diagnostic, eligibility, factor.xs + intArrayOf(factor.n))
+        val helper = completionConstructor.newInstance(diagnostic, eligibility, factor.xs, factor.n)
         val completion = completionMethod.invoke(helper, move) as Move
         diagnostic.apply(completion)
         val parts = if (completion is Move.Compound) completion.parts else listOf(completion)

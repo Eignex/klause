@@ -326,7 +326,7 @@ existing directed repair-chain mechanism to reconcile regressed
 surrounding constraints during structured generation. Repair generation supplies class
 seeds and zero-cost scratch reconciliations to its caller's walk and never starts another walk;
 this preserves the caller's live degree baseline. Zero-delta moves need completion only at an infeasible assignment.
-Clause, XOR and unary-channel reconciliation inspects at most 512 queued factor occurrences and appends at
+Clause, XOR, Element and unary-channel reconciliation inspects at most 512 queued factor occurrences and appends at
 most 32 primitive writes. A violated clause with one eligible repair can flip a searched
 flag or set a searched integer to satisfy a maintained unary equality (or falsify a
 unary disequality). Reconciliation can also force a maintained conjunction true or a maintained disjunction false,
@@ -341,8 +341,15 @@ Effective unary predicates fold singleton root-domain columns in rows of at most
 is exact, and a target outside the signed 64-bit range declines the repair.
 XOR repairs consider only variables with an odd number of literal occurrences and
 require one eligible repair, including an inverse repair through a maintained fold.
-All counted coordinates and the count remain protected. Auxiliary writes respect pins,
-domains and ownership. Each scratch write reevaluates its affected
+Clause and predicate repairs protect every counted coordinate and the count.
+Element reconciliation can set an admissible searched cell or result. A changed cell may
+make existing members of a receiving class incompatible with their maintained result
+domains. Unwritten members of those receiving classes can move to another surviving
+value admitted by all incident Element readers, inspecting at most 256 incident factors
+and at most 256 counted positions for 32 distinct destination values. Maintained results admit their root domains;
+searched, frozen or foreign-owned results retain their values. Source coordinates and
+the count cannot be rewritten, and final cardinality scoring still applies.
+Auxiliary and recipient writes respect pins, domains and ownership. Each scratch write reevaluates its affected
 definitions. This can reconcile searched usage flags and the coordinated attributes
 of a removed class without mutating the live assignment or extending generic repairs.
 At most one completion follows at
