@@ -198,9 +198,10 @@ arrives. Every initial sibling admission precedes its continuation. The unproduc
 trial uses base slices and preserves the other arms' policy evidence. Search work after
 preparation is capped at twelve base work allowances and four base time allowances;
 atomic overspend consumes the trial instead of buying additional fresh segments.
-The separate time cap bounds a handle that reports no charged work. Charged debt repayment grants no fresh
-work and does not consume that allowance. Preparation has at most twelve
-segments. Productive arms return to the ordinary policy; unproductive arms retire
+The separate time cap bounds a handle that reports no charged work. Charged debt
+repayment grants no fresh work and does not consume that work allowance. Preparation
+has twelve base time allowances; cheap debt-repayment visits do not consume an extra
+preparation slice. Productive arms return to the ordinary policy; unproductive arms retire
 without plateau reseeding. This budget belongs to the invocation and never renews
 native arithmetic quotas.
 
