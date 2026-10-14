@@ -659,7 +659,7 @@ class Portfolio(
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
         private val productive = BooleanArray(workers.size)
-        private val trialSegments = IntArray(workers.size)
+        private val trialPreparationSegments = IntArray(workers.size)
         private val trialSearchWork = LongArray(workers.size)
         private val trialWorkLimit = baseSliceWork.coerceAtMost(Long.MAX_VALUE / AUXILIARY_SEARCH_SEGMENTS) *
             AUXILIARY_SEARCH_SEGMENTS
@@ -911,7 +911,7 @@ class Portfolio(
             val unproductiveTrial = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
                 !failed && claim.fault == null
             if (unproductiveTrial) {
-                if (claim.preparing || work > 0L) trialSegments[arm]++
+                if (claim.preparing) trialPreparationSegments[arm]++
                 if (!claim.preparing && work > 0L) {
                     trialSearchWork[arm] += minOf(work, trialWorkLimit - trialSearchWork[arm])
                 }
@@ -938,7 +938,7 @@ class Portfolio(
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
             if (unproductiveTrial && (trialSearchWork[arm] >= trialWorkLimit ||
-                    trialSegments[arm] >= AUXILIARY_TRIAL_SEGMENTS)
+                    trialPreparationSegments[arm] >= AUXILIARY_TRIAL_SEGMENTS)
             ) retire(arm)
         }
 
