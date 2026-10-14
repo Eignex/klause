@@ -75,7 +75,7 @@ for index, row in enumerate(json.loads((out / "request.json").read_text())):
         (out / "reduction.json").write_text(json.dumps(receipt, indent=2))
         print(json.dumps(receipt), flush=True)
         continue
-    for mode in ["default", "source-pins", "no-model-presolve", "keep-all", "no-probing", "no-substitution"]:
+    for mode in ["default", "source-pins", "no-model-presolve", "expanded-conflicts"]:
         callbacks = namespace["read_model"](str(source))
         model = callbacks.cpm_model
         assert {var.id for var in callbacks.cpm_variables} == set(assignment)
@@ -85,11 +85,11 @@ for index, row in enumerate(json.loads((out / "request.json").read_text())):
         objective = None if model.objective_ is None else int(model.objective_.value())
         if mode == "source-pins":
             model += [cpm == assignment[var.id] for var, cpm in callbacks.cpm_variables.items()]
-        if mode == "expanded-negative-tables":
+        if mode == "expanded-conflicts":
             constraints = []
             for constraint in model.constraints:
-                if constraint.name == "negative_table":
-                    variables, tuples = constraint.args
+                if constraint.name == "not" and constraint.args[0].name == "table":
+                    variables, tuples = constraint.args[0].args
                     constraints += [cp.any([var != value for var, value in zip(variables, entry)]) for entry in tuples]
                 else:
                     constraints.append(constraint)
