@@ -5,13 +5,16 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.FunctionalObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,6 +22,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class DefinitionalSweepInferTest {
+
+    @Test
+    fun `cancelled literal scope expansion does not affect a later scope`() {
+        val problem = Problem(301, 0, emptyArray(), emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = (0 until 300).map {
+            BoolFoldDefinition(it + 1, intArrayOf(Lit.make(it, true)), true)
+        }))
+        var polls = 0
+
+        assertNull(sweep.expandUnitBooleanScope(intArrayOf(0), Cancellation { ++polls == 2 }))
+        val expanded = assertNotNull(sweep.expandUnitBooleanScope(intArrayOf(0), Cancellation.Never))
+
+        assertEquals((0..300).toList(), expanded.toList())
+    }
 
     // Vars: x0=0, x1=1 (decisions); y=2 (=x0·x1); c=3 (=Σy, hinted); p=4 (=c·c, objective term).
     private fun labsShapedFactors(): Array<Factor> = arrayOf(

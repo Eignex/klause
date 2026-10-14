@@ -4,10 +4,13 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.Assumptions
@@ -42,6 +45,92 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AlnsTest {
+
+    @Test
+    fun `unit literal neighborhoods release source and nested output aliases together`() {
+        val problem = Problem(3, 0, emptyArray(), listOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+        )).bake()
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+            BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), false),
+        )))
+        val initial = Sample(booleanArrayOf(false, true, false), LongArray(0))
+        val objective = LinearObjective(boolWeights = longArrayOf(0, 3, 0))
+        for (destroyed in 0..2) {
+            val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+                override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
+                    MinimizeResult.BestFound(initial, objective.evaluate(initial), TerminationReason.BudgetExhausted)
+            }
+            val alns = Alns(
+                inner = inner,
+                destroyOperators = listOf(DestroyOperator { _, _, _, _, _ ->
+                    FreedVars(intArrayOf(destroyed), intArrayOf())
+                }),
+                repairOperators = listOf(RepairOperator { context ->
+                    BacktrackRepair(maxDecisions = 8).repair(context.copy(
+                        backtrack = BacktrackSolver(problem), backtrackParams = BacktrackParams(randomSeed = 3L),
+                    ))
+                }),
+                maxIterations = 1,
+                literalSweep = sweep,
+            )
+
+            val result = alns.minimize(objective, LocalSearchParams(randomSeed = 3L))
+
+            assertEquals(0.0, objective.evaluate(assertNotNull(result.assignment)), "destroyed=$destroyed")
+        }
+    }
+
+    @Test
+    fun `unit literal neighborhoods preserve caller pins`() {
+        val problem = Problem(3, 0, emptyArray(), listOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+        )).bake()
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+            BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), false),
+        )))
+        val initial = Sample(booleanArrayOf(false, true, false), LongArray(0))
+        val objective = LinearObjective(boolWeights = longArrayOf(0, 3, 0))
+        for (pinned in 0..2) {
+            var repairs = 0
+            val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+                override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
+                    MinimizeResult.BestFound(initial, objective.evaluate(initial), TerminationReason.BudgetExhausted)
+            }
+            val alns = Alns(
+                inner = inner,
+                destroyOperators = listOf(DestroyOperator { _, _, _, _, _ ->
+                    FreedVars(intArrayOf((pinned + 1) % 3), intArrayOf())
+                }),
+                repairOperators = listOf(RepairOperator { context ->
+                    repairs++
+                    assertFalse(pinned in context.freed.bools)
+                    assertEquals(initial.boolValue(pinned), context.pinAssumptions.boolValueOrNull(pinned))
+                    BacktrackRepair(maxDecisions = 8).repair(context.copy(
+                        backtrack = BacktrackSolver(problem), backtrackParams = BacktrackParams(randomSeed = 3L),
+                    ))
+                }),
+                maxIterations = 1,
+                literalSweep = sweep,
+            )
+            val params = LocalSearchParams(
+                randomSeed = 3L, assumptions = Assumptions(bools = mapOf(pinned to initial.boolValue(pinned))),
+            )
+
+            val result = alns.minimize(objective, params)
+
+            assertEquals(3.0, objective.evaluate(assertNotNull(result.assignment)), "pinned=$pinned")
+            assertEquals(1, repairs)
+        }
+    }
 
     @Test
     fun `default destroy operators preserve an empty finite projection`() {

@@ -115,6 +115,12 @@ factor expands once. Frontier storage is bounded by the finite variable count, w
 variable and factor visit masks owned by the destruction call. Overlapping factors retain
 the same selected neighborhood and disconnected components retain random reseeding.
 
+ALNS repair scopes release both ends of unit Boolean definitions, including connected
+source and output aliases. The sweep owns their immutable adjacency index. Scope expansion
+polls cancellation every 256 coordinate or link visits and discards interrupted scopes.
+Caller pins are filtered after expansion and remain in the repair assumptions. The
+declared destroy draw, repair allowance and outer iteration charge remain unchanged.
+
 ## Definitions and repairs
 
 Hinted min/max expression outputs, their materialized affine operands and output aliases

@@ -14,6 +14,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayDeque
@@ -40,6 +41,37 @@ class DefinitionalSweep internal constructor(
 ) {
     private val maintainedBools = IntHashSet().also { defined ->
         for (node in nodes) if (node.outIsBool) defined.add(node.out)
+    }
+
+    private val unitBooleanLinks: Map<Int, IntArray> = run {
+        val links = HashMap<Int, MutableList<Int>>()
+        for (node in nodes) {
+            if (node !is SweepNode.BoolFold || node.ins.size != 1) continue
+            val source = Lit.variable(node.ins[0])
+            links.getOrPut(node.out) { ArrayList() }.add(source)
+            links.getOrPut(source) { ArrayList() }.add(node.out)
+        }
+        links.mapValues { (_, neighbors) -> neighbors.toIntArray() }
+    }
+
+    internal fun expandUnitBooleanScope(variables: IntArray, cancellation: Cancellation): IntArray? {
+        if (variables.isEmpty() || unitBooleanLinks.isEmpty()) return variables
+        val seen = IntHashSet()
+        val result = IntArrayList()
+        var visits = 0
+        for (variable in variables) {
+            if (visits++ % INITIALIZATION_BATCH == 0 && cancellation()) return null
+            if (seen.add(variable)) result.add(variable)
+        }
+        var index = 0
+        while (index < result.size) {
+            val neighbors = unitBooleanLinks[result[index++]] ?: continue
+            for (neighbor in neighbors) {
+                if (visits++ % INITIALIZATION_BATCH == 0 && cancellation()) return null
+                if (seen.add(neighbor)) result.add(neighbor)
+            }
+        }
+        return result.toIntArray()
     }
 
     /** Factory for sweeps inferred from the factor IR (as opposed to front-end annotations). */
