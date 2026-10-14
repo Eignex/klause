@@ -88,7 +88,10 @@ premises. Absent supporting sides decline that projection; a missing target side
 does not. Origins reconstruct source coordinates before integer rounding. A strict
 supporting endpoint excludes equality when the projected bound is integral.
 The pass builds a bounded sparse row view once per root query and retains only
-completed coordinate certificates. It shares the 128-bit scalar admission,
+completed coordinate certificates. An exact comparison of the existing endpoint's
+row contribution with the residual skips division and source-coordinate reconstruction
+when the projection cannot tighten that endpoint. Strict equality retains the same
+admission rule. It shares the 128-bit scalar admission,
 250,000 work and 16 MiB allocation allowance with subsequent objective candidates.
 Cancellation discards unpublished projections; resource decline can retain completed
 ones. The consumer charges row work and rounding to the containing LP ledger.

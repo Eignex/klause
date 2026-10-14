@@ -126,20 +126,20 @@ private fun projectRowBound(
     val ownValue = ownSide?.let { meter.read(term.coefficient * meter.read(it.number.value)) } ?: BigFraction.ZERO
     val others = meter.read(sum.value - ownValue)
     val residual = meter.read(meter.read(state.model.rhs(row).value) - others)
-    val normalized = meter.read(residual * meter.read(term.coefficient.reciprocal()))
-    val origin = meter.read(state.model.column(term.column).origin.value)
-    val value = meter.read(normalized + origin)
     val upper = minimum == (term.coefficient.signum() > 0)
     val strict = sum.strict > if (ownSide?.strict == true) 1 else 0
     val bounds = state.model.column(term.column).bounds
     val previous = if (upper) bounds.upper else bounds.lower
     if (previous != null) {
-        val current = meter.read(previous.number.value + origin)
-        val weaker = if (upper) meter.less(current, value) else meter.less(value, current)
+        val contribution = meter.read(term.coefficient * meter.read(previous.number.value))
+        val weaker = if (minimum) meter.less(contribution, residual) else meter.less(residual, contribution)
         if (weaker ||
-            (value == current && (!strict || previous.strict))
+            (contribution == residual && (!strict || previous.strict))
         ) return null
     }
+    val normalized = meter.read(residual * meter.read(term.coefficient.reciprocal()))
+    val origin = meter.read(state.model.column(term.column).origin.value)
+    val value = meter.read(normalized + origin)
     meter.reserve(80L)
     return LpRowBound(state, row, term.column, upper, value, strict, minimum, terms)
 }
