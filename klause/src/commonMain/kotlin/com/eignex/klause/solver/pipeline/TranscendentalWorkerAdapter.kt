@@ -127,14 +127,20 @@ internal class TranscendentalWorkerAdapter(
             PortfolioWorker.ofSolve("bt+exact-transcendental", arm, resumable = { completeHandle() }) { global, _ ->
                 completeHandle().use { requireNotNull(it.runSlice(global, Long.MAX_VALUE, -1)) }
             }
-        } else exactNeighborhoodWorker(
+        } else PortfolioWorker.ofSolve(
+            if (arm == 2) "alns+exact-transcendental" else "ls+exact-transcendental", arm,
+            countsInstructions = true,
+            resumable = { requireNotNull(neighborhoodWorker(arm).newResumableSolve()) },
+        ) { global, budget -> neighborhoodWorker(arm).solve(global, budget) }
+        return worker.bindEvidence(identity, provesResults = arm == 0).bindInvocation(requireNotNull(binding))
+    }
+
+    private fun neighborhoodWorker(arm: Int): PortfolioWorker = exactNeighborhoodWorker(
             if (arm == 2) "alns+exact-transcendental" else "ls+exact-transcendental", arm,
             objective = null, lifetime = external or params.strategy.localSearch.cancellation,
             timeout = params.timeout, exhausted = { service.exhausted || nodeBudget?.exhausted() == true },
             open = { neighborhood(arm == 2) },
         )
-        return worker.bindEvidence(identity, provesResults = arm == 0).bindInvocation(requireNotNull(binding))
-    }
 
     internal fun completeHandle(): ResumableSolve = object : ResumableSolve, ReseedGuard {
         override val canReseed: Boolean get() = false
