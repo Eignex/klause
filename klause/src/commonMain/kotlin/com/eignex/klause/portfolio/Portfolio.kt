@@ -592,6 +592,7 @@ class Portfolio(
         val whole: Boolean = false,
         val probeCount: Int = 1,
         val preparationRevisit: Boolean = false,
+        val initialProbe: Boolean = false,
     ) {
         /** The work a resumable handle's slice may spend; a negative allowance leaves it to the run's token. */
         val handleNodes: Long get() = if (whole) -1L else sliceWork
@@ -785,6 +786,7 @@ class Portfolio(
                 whole = dedicated,
                 probeCount = eligible.count { !workers[it].auxiliaryProof }.coerceAtLeast(1),
                 preparationRevisit = revisit != null,
+                initialProbe = probe != null,
             )
         }
 
@@ -947,7 +949,10 @@ class Portfolio(
             log.record(arm, work, claim.started.elapsedNow().inWholeMilliseconds, reward, failed)
             if (failed && failure != null && failure !is UnsoundnessException) log.failure(arm, failure, phase)
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
-            if (!claim.probing && !claim.preparationRevisit && !workers[arm].auxiliaryProof) {
+            val freshTrialAllocation = unproductiveTrial && !claim.initialProbe && work > 0L
+            if (((!claim.probing && !claim.preparationRevisit) || freshTrialAllocation) &&
+                !workers[arm].auxiliaryProof
+            ) {
                 slice = grow(slice, maxSliceMillis)
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
