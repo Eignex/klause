@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -53,11 +54,18 @@ class SourceStrategy internal constructor(
     val engine: FiniteEngine,
     /** Captured schema names and typed source locations, when constructed from a schema or compilation. */
     val compiledSchema: CompiledSchema? = null,
+    /** Factor mechanisms selected afresh for each operation's canonical source preparation. */
+    val projectionProviders: FactorProjectionProviders = (source as? BakedProblem)?.projectionProviders
+        ?: FactorProjectionProviders.Default,
 ) {
     init {
         require(engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.LOCAL_SEARCH)
         require(compiledSchema == null || compiledSchema.problem === source)
     }
+
+    /** Use this provider bundle for subsequent invocations over the same immutable source. */
+    fun withProjectionProviders(providers: FactorProjectionProviders): SourceStrategy =
+        SourceStrategy(source, engine, compiledSchema, providers)
 
     /**
      * Solve through the shared source route. [polynomial] retains finite strategy controls and arithmetic limits;
@@ -73,7 +81,7 @@ class SourceStrategy internal constructor(
         if (scope.stop()) return scope.unknown()
         if (!scope.supportsSource()) return scope.unsupported()
         val route = source.pipelineRoute(
-            routePureRealToTheory = true,
+            projectionProviders, routePureRealToTheory = true,
             boundCancellation = scope.stop,
         )
         if (scope.stop()) return scope.unknown()
@@ -94,7 +102,7 @@ class SourceStrategy internal constructor(
                     return scope.unsupported()
                 }
                 (OpenTheoryPipeline.searchWithoutTheory(
-                    route.problem, scope.theory, null, engine,
+                    route.preparedPlan, scope.theory, null, engine,
                 ) as OpenTheoryExecution.Satisfy).result
             }
             SourceProblemRoute.Refuted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
@@ -135,7 +143,7 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = source.preparePolynomialExecutionPlan()
+        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders)
             .withObjective(objective, maximize = sense == ObjectiveSense.MAXIMIZE)
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
@@ -174,7 +182,8 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
-        val plan = source.preparePolynomialExecutionPlan().withObjective(objective, sense)
+        val plan = source.preparePolynomialExecutionPlan(providers = projectionProviders)
+            .withObjective(objective, sense)
         if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
         ) return unsupportedQuadratic(sense)
@@ -199,15 +208,16 @@ class SourceStrategy internal constructor(
         if (scope.stop()) return incomplete(scope.unknown().reason)
         if (!scope.supportsOpen(engine)) return incomplete(TerminationReason.Unsupported)
         val route = source.pipelineRoute(
-            objective, maximize = sense == ObjectiveSense.MAXIMIZE,
+            projectionProviders, objective, maximize = sense == ObjectiveSense.MAXIMIZE,
             routePureRealToTheory = true, routeLinearToTheory = true, boundCancellation = scope.stop,
         )
         if (scope.stop()) return incomplete(scope.unknown().reason)
         return when (route) {
             is SourceProblemRoute.OpenTheory -> OpenTheoryPipeline.execute(route.request, scope.theory, engine)
             is SourceProblemRoute.UnsupportedOpen -> OpenTheoryPipeline.searchWithoutTheory(
-                route.problem, scope.theory,
+                route.preparedPlan, scope.theory,
                 if (sense == ObjectiveSense.MAXIMIZE) objective.negated() else objective, engine,
+                maximize = sense == ObjectiveSense.MAXIMIZE,
             )
             SourceProblemRoute.Refuted -> OpenTheoryExecution.Optimize(OpenTheoryOptimum.Infeasible(SolveStats.EMPTY))
             else -> incomplete(TerminationReason.Unsupported)

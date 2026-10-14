@@ -194,3 +194,48 @@ against its retained source mapping, preserving arbitrary-width integers, ration
 algebraic and symbolic reals. Missing or multiply represented coordinates withhold
 publication. [Typed contributions](api.md#typed-contributions-and-migration) define
 the decoding and ownership boundary; assembly adds no independent proof authority.
+
+## Factor projection selection
+
+`FactorProjectionProviders.prepare(problem)` captures immutable selected propagation,
+scoring and relaxation descriptors against one canonical `Problem`. The descriptors
+couple declared capabilities to their factories or emitters; null selects an unsupported
+role, while an explicit inert descriptor records deliberate absence. Source factors
+remain engine-neutral and borrowed read-only. `forProblem` retains the capture only
+for the identical model; a rewritten or remapped model selects against its own factors.
+
+`PropagationProblem(problem, selection)` and `LocalSearchProblem(problem, selection,
+domains)` open mechanisms from that capture. Factories allocate private mutable
+mechanisms or stateless projections whose payloads belong to engine states. Scoring
+uses the actual move domains when choosing exact wide-linear sums. Built-in selectors
+retain their existing algorithms, relation indexes and linear-row caches.
+
+`problem.bake(providers)` binds these selectors to the finite engine projection for
+one invocation. Root propagation, later assumption checks, appended objective
+overlays, conditioned roots, local scoring and model-facing LP emission retain that
+selection. The neutral `Problem` has no engine provider field. Custom scoring
+mechanisms are prepared separately for portfolio workers; only built-in stateless
+scoring projections enter the shared preparation pool.
+
+Absent or partial selected deduction does not authorize arbitrary assignments.
+Original finite factors are checked at complete points when a built-in complete
+check exists; otherwise execution remains unknown. Real completion uses original
+source rows independently of a selected bounding relaxation, and published exact
+coordinates must satisfy their source relation. These checks create private state
+and retain the invocation's existing work currencies and cancellation lifetime.
+
+Coordinate projection retains the selected descriptors and binds their factories
+to remapped immutable factor data. Each factory or emitter receives that engine-view
+factor, so source variable ids cannot leak into compact CP storage. Source rewrites
+select fresh descriptors; objective overlays retain prior selections and select only
+the appended factor. `bake(selection)` keeps the captured choice through finite
+root construction instead of invoking selectors again.
+
+`prepareExecutionPlan(providers, ...)` captures immutable projection descriptors on
+its canonical model. Component ownership and admission read that capture, including
+shared clauses whose heuristic score belongs to the finite invocation. Complete
+traversal requires an exact propagation or installed source check; scoring availability
+is a separate heuristic requirement. Inert finite deduction can use the original exact
+point checker, while missing checks remain declined. Objective and conditioned plans
+retain the capture. Compact CP and polynomial finite views bind those descriptors to
+their own factor coordinates; source factor rewrites select against rewritten data.

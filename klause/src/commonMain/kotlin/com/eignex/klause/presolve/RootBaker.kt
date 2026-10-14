@@ -55,6 +55,10 @@ object RootBaker {
             // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
             packedOpenIntLo = problem.intBounds.openLowerBits,
             packedOpenIntHi = problem.intBounds.openUpperBits,
+            projectionProviders = problem.projectionProviders,
+            projectionSelection = problem.factorProjections?.let { captured ->
+                { view -> captured.forEngineView(view) }
+            },
         )
     }
 
@@ -352,6 +356,10 @@ object RootBaker {
                 numIntVars = problem.numIntVars,
                 intDomains = problem.rootIntDomains(),
                 factors = factors,
+                // The explicit contradiction is independent of the selected filtering strength.
+                seedDeductions = if (problem.factorProjections?.nativePropagation == false) {
+                    PropagationResult.Unsat()
+                } else PropagationResult.Implied.EMPTY,
                 impliedFactorMask = problem.impliedFactorMask?.let { mask ->
                     BooleanArray(factors.size) { it < mask.size && mask[it] }
                 },
@@ -361,6 +369,10 @@ object RootBaker {
                 realUpper = problem.realUpper,
                 packedOpenIntLo = problem.intBounds.openLowerBits,
                 packedOpenIntHi = problem.intBounds.openUpperBits,
+                projectionProviders = problem.projectionProviders,
+                projectionSelection = problem.factorProjections?.let { captured ->
+                    { view -> captured.forEngineView(view) }
+                },
             ),
             config,
         )

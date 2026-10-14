@@ -116,7 +116,7 @@ class BacktrackSolver internal constructor(
      *  [BacktrackParams.objectiveBoundSupplier] for external bound sharing (its [BacktrackParams.cancellation]
      *  bounds construction, while a separately bound lifetime token persists). */
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
-        if ((params.nativeSat ?: true) && problem.isClausal()) {
+        if ((params.nativeSat ?: true) && PropagationProblem(problem).isNativeSatEligible) {
             ResumableMinimize(this, objective, params)
         } else {
             PreparingMinimize(this, objective, params)

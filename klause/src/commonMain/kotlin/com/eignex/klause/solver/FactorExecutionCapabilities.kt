@@ -15,30 +15,49 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.difference.DifferenceSystem
 
-internal enum class PropagationCapability {
+/** Deductive participation declared by a selected propagation projection. */
+enum class PropagationCapability {
+    /** No finite deduction implementation is available. */
     UNSUPPORTED,
+    /** Deduction is deliberately absent; another source check must enforce the factor. */
     INERT,
+    /** Deductions preserve every source solution. */
     SOUND_FILTERING,
+    /** Deductions filter finite interval bounds. */
     BOUNDS_FILTERING,
+    /** Deductions can remove interior finite-domain values. */
     DOMAIN_FILTERING,
 }
 
-internal enum class AssignmentCheckCapability {
+/** Authority of an assignment check supplied by a projection. */
+enum class AssignmentCheckCapability {
+    /** No assignment check is supplied by this role. */
     UNSUPPORTED,
+    /** The role checks the exact source relation at a pinned assignment. */
     EXACT,
+    /** A separate exact source completion must certify the assignment. */
     SOURCE_CERTIFICATION,
+    /** Other installed source rows enforce this redundant role. */
     REDUNDANT,
 }
 
-internal enum class ScoringCapability {
+/** Local-search participation declared by a selected scoring projection. */
+enum class ScoringCapability {
+    /** No scoring implementation is available. */
     UNSUPPORTED,
+    /** This role contributes no score and requires another source check. */
     INERT,
+    /** Scores and move deltas agree on discrete violation degree. */
     GRADED,
+    /** Scores guide search but require exact source certification. */
     HEURISTIC,
 }
 
-internal enum class RelaxationCapability {
+/** Linear relaxation authority declared by a selected provider. */
+enum class RelaxationCapability {
+    /** This role emits no relaxation rows. */
     NONE,
+    /** Emitted rows contain every source solution under their stated premises. */
     SOUND,
 }
 
@@ -119,7 +138,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     else -> null
 }
 
-internal fun Factor.executionCapabilities(): FactorExecutionCapabilities = builtInExecutionCapabilities()
+internal fun Factor.defaultExecutionCapabilities(): FactorExecutionCapabilities = builtInExecutionCapabilities()
     ?: FactorExecutionCapabilities(
         propagation = if (this is Propagator) {
             PropagationCapability.SOUND_FILTERING
@@ -140,3 +159,7 @@ internal fun Factor.executionCapabilities(): FactorExecutionCapabilities = built
         relaxation = if (impliedLinearRows.isNotEmpty()) RelaxationCapability.SOUND else RelaxationCapability.NONE,
         inertReason = if (this is Propagator && this !is Invariant) "Custom propagation-only factor." else null,
     )
+
+internal fun Factor.executionCapabilities(
+    providers: FactorProjectionProviders = FactorProjectionProviders.Default,
+): FactorExecutionCapabilities = providers.capabilities(this)

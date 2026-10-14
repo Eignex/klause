@@ -309,3 +309,47 @@ invocation cleanup. Affine mixed results retain typed optimality, limits and int
 rays in `OpenTheoryOptimum.linearResult`; incomplete execution retains independently
 checked global root bounds and the accepted source point. These fields remain separate
 from scalar telemetry and from a ray's private base.
+
+## Projection provider extensions
+
+`FactorProjectionProviders` groups engine-owned `PropagationProjectionProvider`,
+`ScoringProjectionProvider` and `RelaxationProjectionProvider` selectors. Their
+selected descriptors pair declared participation and check authority with the
+implementation factory or emitter. Providers may delegate unmatched factors to
+the built-in selector without editing central dispatch. Null refuses propagation
+or scoring and contributes no relaxation. Explicit inert roles keep their source
+check obligation.
+
+Prepare once with `providers.prepare(problem)` and pass the source-associated
+`PreparedFactorProjections` to the engine projection constructors. A descriptor
+contains no mutable workspace; its factory must return a private mechanism or a
+stateless projection using state-owned payloads. Source membership, soundness,
+exact checks and scoring delta consistency remain extension obligations.
+
+Finite facades accept `problem.bake(providers)` for invocation-specific selection.
+The baked projection carries immutable factories, and each live search allocates its
+own state. Ordinary `bake()` and existing solver constructors retain built-in defaults.
+
+An inert descriptor requires an explicit reason and cannot claim an exact check:
+its absent mechanism needs an enforcing peer or separate source certification.
+
+Factories and emitters receive the immutable factor in the engine's coordinate
+namespace; use that argument for variable ids rather than a captured source factor.
+Scoring also receives actual move domains. `problem.bake(selection)` retains the
+source-prepared choice through finite root construction. Coordinate projections
+bind captured choices to mapped factor data, while a source rewrite selects anew.
+
+`Problem.prepareExecutionPlan(providers, ...)` selects mechanisms for one source
+preparation. Its `factorProjections` snapshot survives objective rebinding and
+conditioned preparation. A `FinitePipelineRequest` carrying that plan applies the
+selection during deferred baking and subsequent finite engine construction. A
+complete strategy can remain admitted with exact deduction and unavailable scoring;
+a heuristic strategy that scores factors needs its own supplied score and
+candidate-check authority. Exact conditioned neighborhoods use their complete
+component checks.
+
+`SourceStrategy.withProjectionProviders(providers)` retains the original model and
+schema mapping while selecting mechanisms separately for each invocation. Open
+heuristic models can use `LocalSearchModel.open(problem, selection, domains)` to
+bind a prepared capture to their actual move domains without allocating finite CP
+state. Selected factories remain private to each live worker.

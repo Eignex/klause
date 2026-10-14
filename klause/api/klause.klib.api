@@ -768,6 +768,19 @@ final enum class com.eignex.klause.solver.search/SearchStopCause : kotlin/Enum<c
     final fun values(): kotlin/Array<com.eignex.klause.solver.search/SearchStopCause> // com.eignex.klause.solver.search/SearchStopCause.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.solver/AssignmentCheckCapability : kotlin/Enum<com.eignex.klause.solver/AssignmentCheckCapability> { // com.eignex.klause.solver/AssignmentCheckCapability|null[0]
+    enum entry EXACT // com.eignex.klause.solver/AssignmentCheckCapability.EXACT|null[0]
+    enum entry REDUNDANT // com.eignex.klause.solver/AssignmentCheckCapability.REDUNDANT|null[0]
+    enum entry SOURCE_CERTIFICATION // com.eignex.klause.solver/AssignmentCheckCapability.SOURCE_CERTIFICATION|null[0]
+    enum entry UNSUPPORTED // com.eignex.klause.solver/AssignmentCheckCapability.UNSUPPORTED|null[0]
+
+    final val entries // com.eignex.klause.solver/AssignmentCheckCapability.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver/AssignmentCheckCapability> // com.eignex.klause.solver/AssignmentCheckCapability.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver/AssignmentCheckCapability // com.eignex.klause.solver/AssignmentCheckCapability.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver/AssignmentCheckCapability> // com.eignex.klause.solver/AssignmentCheckCapability.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.solver/ProblemClass : kotlin/Enum<com.eignex.klause.solver/ProblemClass> { // com.eignex.klause.solver/ProblemClass|null[0]
     enum entry Continuous // com.eignex.klause.solver/ProblemClass.Continuous|null[0]
     enum entry FiniteCp // com.eignex.klause.solver/ProblemClass.FiniteCp|null[0]
@@ -781,6 +794,44 @@ final enum class com.eignex.klause.solver/ProblemClass : kotlin/Enum<com.eignex.
 
     final fun valueOf(kotlin/String): com.eignex.klause.solver/ProblemClass // com.eignex.klause.solver/ProblemClass.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.eignex.klause.solver/ProblemClass> // com.eignex.klause.solver/ProblemClass.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.solver/PropagationCapability : kotlin/Enum<com.eignex.klause.solver/PropagationCapability> { // com.eignex.klause.solver/PropagationCapability|null[0]
+    enum entry BOUNDS_FILTERING // com.eignex.klause.solver/PropagationCapability.BOUNDS_FILTERING|null[0]
+    enum entry DOMAIN_FILTERING // com.eignex.klause.solver/PropagationCapability.DOMAIN_FILTERING|null[0]
+    enum entry INERT // com.eignex.klause.solver/PropagationCapability.INERT|null[0]
+    enum entry SOUND_FILTERING // com.eignex.klause.solver/PropagationCapability.SOUND_FILTERING|null[0]
+    enum entry UNSUPPORTED // com.eignex.klause.solver/PropagationCapability.UNSUPPORTED|null[0]
+
+    final val entries // com.eignex.klause.solver/PropagationCapability.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver/PropagationCapability> // com.eignex.klause.solver/PropagationCapability.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver/PropagationCapability // com.eignex.klause.solver/PropagationCapability.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver/PropagationCapability> // com.eignex.klause.solver/PropagationCapability.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.solver/RelaxationCapability : kotlin/Enum<com.eignex.klause.solver/RelaxationCapability> { // com.eignex.klause.solver/RelaxationCapability|null[0]
+    enum entry NONE // com.eignex.klause.solver/RelaxationCapability.NONE|null[0]
+    enum entry SOUND // com.eignex.klause.solver/RelaxationCapability.SOUND|null[0]
+
+    final val entries // com.eignex.klause.solver/RelaxationCapability.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver/RelaxationCapability> // com.eignex.klause.solver/RelaxationCapability.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver/RelaxationCapability // com.eignex.klause.solver/RelaxationCapability.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver/RelaxationCapability> // com.eignex.klause.solver/RelaxationCapability.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.solver/ScoringCapability : kotlin/Enum<com.eignex.klause.solver/ScoringCapability> { // com.eignex.klause.solver/ScoringCapability|null[0]
+    enum entry GRADED // com.eignex.klause.solver/ScoringCapability.GRADED|null[0]
+    enum entry HEURISTIC // com.eignex.klause.solver/ScoringCapability.HEURISTIC|null[0]
+    enum entry INERT // com.eignex.klause.solver/ScoringCapability.INERT|null[0]
+    enum entry UNSUPPORTED // com.eignex.klause.solver/ScoringCapability.UNSUPPORTED|null[0]
+
+    final val entries // com.eignex.klause.solver/ScoringCapability.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver/ScoringCapability> // com.eignex.klause.solver/ScoringCapability.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver/ScoringCapability // com.eignex.klause.solver/ScoringCapability.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver/ScoringCapability> // com.eignex.klause.solver/ScoringCapability.values|values#static(){}[0]
 }
 
 open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex.klause.presolve/PresolvePass> { // com.eignex.klause.presolve/PresolvePass|null[0]
@@ -870,6 +921,14 @@ abstract fun interface com.eignex.klause.localsearch/CandidateCompletion { // co
     abstract fun complete(com.eignex.klause.solver/Sample, com.eignex.klause.util/Cancellation): com.eignex.klause.localsearch/Completion // com.eignex.klause.localsearch/CandidateCompletion.complete|complete(com.eignex.klause.solver.Sample;com.eignex.klause.util.Cancellation){}[0]
 }
 
+abstract fun interface com.eignex.klause.localsearch/ScoringProjectionProvider { // com.eignex.klause.localsearch/ScoringProjectionProvider|null[0]
+    abstract fun select(com.eignex.klause.ir/Factor): com.eignex.klause.localsearch/ScoringProjection? // com.eignex.klause.localsearch/ScoringProjectionProvider.select|select(com.eignex.klause.ir.Factor){}[0]
+}
+
+abstract fun interface com.eignex.klause.lp/RelaxationProjectionProvider { // com.eignex.klause.lp/RelaxationProjectionProvider|null[0]
+    abstract fun select(com.eignex.klause.ir/Factor): com.eignex.klause.lp/RelaxationProjection? // com.eignex.klause.lp/RelaxationProjectionProvider.select|select(com.eignex.klause.ir.Factor){}[0]
+}
+
 abstract fun interface com.eignex.klause.portfolio/WitnessCheck { // com.eignex.klause.portfolio/WitnessCheck|null[0]
     abstract fun refute(com.eignex.klause.solver/Sample, kotlin/Double?): kotlin/String? // com.eignex.klause.portfolio/WitnessCheck.refute|refute(com.eignex.klause.solver.Sample;kotlin.Double?){}[0]
 }
@@ -890,6 +949,10 @@ abstract fun interface com.eignex.klause.propagation/CpBranching { // com.eignex
         final fun hashCode(): kotlin/Int // com.eignex.klause.propagation/CpBranching.None.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.propagation/CpBranching.None.toString|toString(){}[0]
     }
+}
+
+abstract fun interface com.eignex.klause.propagation/PropagationProjectionProvider { // com.eignex.klause.propagation/PropagationProjectionProvider|null[0]
+    abstract fun select(com.eignex.klause.ir/Factor): com.eignex.klause.propagation/PropagationProjection? // com.eignex.klause.propagation/PropagationProjectionProvider.select|select(com.eignex.klause.ir.Factor){}[0]
 }
 
 abstract fun interface com.eignex.klause.solver.pipeline/ExactTheorySatisfactionRequest { // com.eignex.klause.solver.pipeline/ExactTheorySatisfactionRequest|null[0]
@@ -8017,6 +8080,7 @@ final class com.eignex.klause.localsearch/LocalSearchModel { // com.eignex.klaus
     final object Companion { // com.eignex.klause.localsearch/LocalSearchModel.Companion|null[0]
         final fun of(com.eignex.klause.propagation/BakedProblem): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchModel.Companion.of|of(com.eignex.klause.propagation.BakedProblem){}[0]
         final fun open(com.eignex.klause.ir/Problem): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchModel.Companion.open|open(com.eignex.klause.ir.Problem){}[0]
+        final fun open(com.eignex.klause.ir/Problem, com.eignex.klause.solver/PreparedFactorProjections, kotlin/Array<com.eignex.klause.ir/IntDomain> = ...): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchModel.Companion.open|open(com.eignex.klause.ir.Problem;com.eignex.klause.solver.PreparedFactorProjections;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
         final fun open(com.eignex.klause.ir/Problem, kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.localsearch/LocalSearchModel // com.eignex.klause.localsearch/LocalSearchModel.Companion.open|open(com.eignex.klause.ir.Problem;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     }
 }
@@ -8080,6 +8144,7 @@ final class com.eignex.klause.localsearch/LocalSearchParams : com.eignex.klause.
 }
 
 final class com.eignex.klause.localsearch/LocalSearchProblem { // com.eignex.klause.localsearch/LocalSearchProblem|null[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver/PreparedFactorProjections, kotlin/Array<com.eignex.klause.ir/IntDomain>? = ...) // com.eignex.klause.localsearch/LocalSearchProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.PreparedFactorProjections;kotlin.Array<com.eignex.klause.ir.IntDomain>?){}[0]
     constructor <init>(com.eignex.klause.ir/Problem, kotlin/Array<com.eignex.klause.ir/IntDomain>? = ...) // com.eignex.klause.localsearch/LocalSearchProblem.<init>|<init>(com.eignex.klause.ir.Problem;kotlin.Array<com.eignex.klause.ir.IntDomain>?){}[0]
 
     final val boolOccurrences // com.eignex.klause.localsearch/LocalSearchProblem.boolOccurrences|{}boolOccurrences[0]
@@ -8297,6 +8362,17 @@ final class com.eignex.klause.localsearch/ObjectiveShaping { // com.eignex.klaus
         final fun <get-shapingLambda>(): kotlin/Double // com.eignex.klause.localsearch/ObjectiveShaping.shapingLambda.<get-shapingLambda>|<get-shapingLambda>(){}[0]
 
     final fun objectiveHotSpotIntVar(kotlin.random/Random): kotlin/Int // com.eignex.klause.localsearch/ObjectiveShaping.objectiveHotSpotIntVar|objectiveHotSpotIntVar(kotlin.random.Random){}[0]
+}
+
+final class com.eignex.klause.localsearch/ScoringProjection { // com.eignex.klause.localsearch/ScoringProjection|null[0]
+    constructor <init>(com.eignex.klause.solver/ScoringCapability, com.eignex.klause.solver/AssignmentCheckCapability, kotlin/String? = ..., kotlin/Function2<com.eignex.klause.ir/Factor, kotlin/Array<com.eignex.klause.ir/IntDomain>?, com.eignex.klause.localsearch/Invariant>) // com.eignex.klause.localsearch/ScoringProjection.<init>|<init>(com.eignex.klause.solver.ScoringCapability;com.eignex.klause.solver.AssignmentCheckCapability;kotlin.String?;kotlin.Function2<com.eignex.klause.ir.Factor,kotlin.Array<com.eignex.klause.ir.IntDomain>?,com.eignex.klause.localsearch.Invariant>){}[0]
+
+    final val assignmentCheck // com.eignex.klause.localsearch/ScoringProjection.assignmentCheck|{}assignmentCheck[0]
+        final fun <get-assignmentCheck>(): com.eignex.klause.solver/AssignmentCheckCapability // com.eignex.klause.localsearch/ScoringProjection.assignmentCheck.<get-assignmentCheck>|<get-assignmentCheck>(){}[0]
+    final val capability // com.eignex.klause.localsearch/ScoringProjection.capability|{}capability[0]
+        final fun <get-capability>(): com.eignex.klause.solver/ScoringCapability // com.eignex.klause.localsearch/ScoringProjection.capability.<get-capability>|<get-capability>(){}[0]
+    final val inertReason // com.eignex.klause.localsearch/ScoringProjection.inertReason|{}inertReason[0]
+        final fun <get-inertReason>(): kotlin/String? // com.eignex.klause.localsearch/ScoringProjection.inertReason.<get-inertReason>|<get-inertReason>(){}[0]
 }
 
 final class com.eignex.klause.localsearch/StagnationRestart : com.eignex.klause.localsearch.schedule/AdaptivePolicy, com.eignex.klause.localsearch/RestartPolicy { // com.eignex.klause.localsearch/StagnationRestart|null[0]
@@ -8681,6 +8757,13 @@ final class com.eignex.klause.lp/LpSizeEstimate { // com.eignex.klause.lp/LpSize
         final fun <get-cols>(): kotlin/Long // com.eignex.klause.lp/LpSizeEstimate.cols.<get-cols>|<get-cols>(){}[0]
     final val rows // com.eignex.klause.lp/LpSizeEstimate.rows|{}rows[0]
         final fun <get-rows>(): kotlin/Long // com.eignex.klause.lp/LpSizeEstimate.rows.<get-rows>|<get-rows>(){}[0]
+}
+
+final class com.eignex.klause.lp/RelaxationProjection { // com.eignex.klause.lp/RelaxationProjection|null[0]
+    constructor <init>(com.eignex.klause.solver/RelaxationCapability, kotlin/Function2<com.eignex.klause.ir/Factor, com.eignex.klause.lp/RelaxationBuilder, kotlin/Unit>) // com.eignex.klause.lp/RelaxationProjection.<init>|<init>(com.eignex.klause.solver.RelaxationCapability;kotlin.Function2<com.eignex.klause.ir.Factor,com.eignex.klause.lp.RelaxationBuilder,kotlin.Unit>){}[0]
+
+    final val capability // com.eignex.klause.lp/RelaxationProjection.capability|{}capability[0]
+        final fun <get-capability>(): com.eignex.klause.solver/RelaxationCapability // com.eignex.klause.lp/RelaxationProjection.capability.<get-capability>|<get-capability>(){}[0]
 }
 
 final class com.eignex.klause.model/AllDifferent : com.eignex.klause.model/BoolExpr { // com.eignex.klause.model/AllDifferent|null[0]
@@ -11332,6 +11415,7 @@ final class com.eignex.klause.propagation/DeducedRestrictions { // com.eignex.kl
 
 final class com.eignex.klause.propagation/PropagationProblem { // com.eignex.klause.propagation/PropagationProblem|null[0]
     constructor <init>(com.eignex.klause.ir/Problem) // com.eignex.klause.propagation/PropagationProblem.<init>|<init>(com.eignex.klause.ir.Problem){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver/PreparedFactorProjections) // com.eignex.klause.propagation/PropagationProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.PreparedFactorProjections){}[0]
 
     final val boolOccurrences // com.eignex.klause.propagation/PropagationProblem.boolOccurrences|{}boolOccurrences[0]
         final fun <get-boolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.propagation/PropagationProblem.boolOccurrences.<get-boolOccurrences>|<get-boolOccurrences>(){}[0]
@@ -11351,6 +11435,17 @@ final class com.eignex.klause.propagation/PropagationProblem { // com.eignex.kla
         final fun <get-usesIntEventDeltaConsumers>(): kotlin/Boolean // com.eignex.klause.propagation/PropagationProblem.usesIntEventDeltaConsumers.<get-usesIntEventDeltaConsumers>|<get-usesIntEventDeltaConsumers>(){}[0]
     final val usesIntEventWatchers // com.eignex.klause.propagation/PropagationProblem.usesIntEventWatchers|{}usesIntEventWatchers[0]
         final fun <get-usesIntEventWatchers>(): kotlin/Boolean // com.eignex.klause.propagation/PropagationProblem.usesIntEventWatchers.<get-usesIntEventWatchers>|<get-usesIntEventWatchers>(){}[0]
+}
+
+final class com.eignex.klause.propagation/PropagationProjection { // com.eignex.klause.propagation/PropagationProjection|null[0]
+    constructor <init>(com.eignex.klause.solver/PropagationCapability, com.eignex.klause.solver/AssignmentCheckCapability, kotlin/String? = ..., kotlin/Function1<com.eignex.klause.ir/Factor, com.eignex.klause.propagation/Propagator>) // com.eignex.klause.propagation/PropagationProjection.<init>|<init>(com.eignex.klause.solver.PropagationCapability;com.eignex.klause.solver.AssignmentCheckCapability;kotlin.String?;kotlin.Function1<com.eignex.klause.ir.Factor,com.eignex.klause.propagation.Propagator>){}[0]
+
+    final val assignmentCheck // com.eignex.klause.propagation/PropagationProjection.assignmentCheck|{}assignmentCheck[0]
+        final fun <get-assignmentCheck>(): com.eignex.klause.solver/AssignmentCheckCapability // com.eignex.klause.propagation/PropagationProjection.assignmentCheck.<get-assignmentCheck>|<get-assignmentCheck>(){}[0]
+    final val capability // com.eignex.klause.propagation/PropagationProjection.capability|{}capability[0]
+        final fun <get-capability>(): com.eignex.klause.solver/PropagationCapability // com.eignex.klause.propagation/PropagationProjection.capability.<get-capability>|<get-capability>(){}[0]
+    final val inertReason // com.eignex.klause.propagation/PropagationProjection.inertReason|{}inertReason[0]
+        final fun <get-inertReason>(): kotlin/String? // com.eignex.klause.propagation/PropagationProjection.inertReason.<get-inertReason>|<get-inertReason>(){}[0]
 }
 
 final class com.eignex.klause.propagation/PropagationSession { // com.eignex.klause.propagation/PropagationSession|null[0]
@@ -12563,6 +12658,8 @@ final class com.eignex.klause.solver.pipeline/PreparedSourcePlan { // com.eignex
         final fun <get-components>(): kotlin.collections/List<com.eignex.klause.solver.pipeline/ExecutionComponentDescriptor> // com.eignex.klause.solver.pipeline/PreparedSourcePlan.components.<get-components>|<get-components>(){}[0]
     final val decline // com.eignex.klause.solver.pipeline/PreparedSourcePlan.decline|{}decline[0]
         final fun <get-decline>(): com.eignex.klause.solver.pipeline/PreparedPlanDecline? // com.eignex.klause.solver.pipeline/PreparedSourcePlan.decline.<get-decline>|<get-decline>(){}[0]
+    final val factorProjections // com.eignex.klause.solver.pipeline/PreparedSourcePlan.factorProjections|{}factorProjections[0]
+        final fun <get-factorProjections>(): com.eignex.klause.solver/PreparedFactorProjections? // com.eignex.klause.solver.pipeline/PreparedSourcePlan.factorProjections.<get-factorProjections>|<get-factorProjections>(){}[0]
     final val kind // com.eignex.klause.solver.pipeline/PreparedSourcePlan.kind|{}kind[0]
         final fun <get-kind>(): com.eignex.klause.solver.pipeline/PreparedExecutionKind // com.eignex.klause.solver.pipeline/PreparedSourcePlan.kind.<get-kind>|<get-kind>(){}[0]
     final val maximize // com.eignex.klause.solver.pipeline/PreparedSourcePlan.maximize|{}maximize[0]
@@ -14624,6 +14721,33 @@ final class com.eignex.klause.solver/Assignment { // com.eignex.klause.solver/As
     final fun snapshot(): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Assignment.snapshot|snapshot(){}[0]
 }
 
+final class com.eignex.klause.solver/FactorProjectionProviders { // com.eignex.klause.solver/FactorProjectionProviders|null[0]
+    constructor <init>(com.eignex.klause.propagation/PropagationProjectionProvider = ..., com.eignex.klause.localsearch/ScoringProjectionProvider = ..., com.eignex.klause.lp/RelaxationProjectionProvider = ...) // com.eignex.klause.solver/FactorProjectionProviders.<init>|<init>(com.eignex.klause.propagation.PropagationProjectionProvider;com.eignex.klause.localsearch.ScoringProjectionProvider;com.eignex.klause.lp.RelaxationProjectionProvider){}[0]
+
+    final val propagation // com.eignex.klause.solver/FactorProjectionProviders.propagation|{}propagation[0]
+        final fun <get-propagation>(): com.eignex.klause.propagation/PropagationProjectionProvider // com.eignex.klause.solver/FactorProjectionProviders.propagation.<get-propagation>|<get-propagation>(){}[0]
+    final val relaxation // com.eignex.klause.solver/FactorProjectionProviders.relaxation|{}relaxation[0]
+        final fun <get-relaxation>(): com.eignex.klause.lp/RelaxationProjectionProvider // com.eignex.klause.solver/FactorProjectionProviders.relaxation.<get-relaxation>|<get-relaxation>(){}[0]
+    final val scoring // com.eignex.klause.solver/FactorProjectionProviders.scoring|{}scoring[0]
+        final fun <get-scoring>(): com.eignex.klause.localsearch/ScoringProjectionProvider // com.eignex.klause.solver/FactorProjectionProviders.scoring.<get-scoring>|<get-scoring>(){}[0]
+
+    final fun prepare(com.eignex.klause.ir/Problem): com.eignex.klause.solver/PreparedFactorProjections // com.eignex.klause.solver/FactorProjectionProviders.prepare|prepare(com.eignex.klause.ir.Problem){}[0]
+
+    final object Companion { // com.eignex.klause.solver/FactorProjectionProviders.Companion|null[0]
+        final val Default // com.eignex.klause.solver/FactorProjectionProviders.Companion.Default|{}Default[0]
+            final fun <get-Default>(): com.eignex.klause.solver/FactorProjectionProviders // com.eignex.klause.solver/FactorProjectionProviders.Companion.Default.<get-Default>|<get-Default>(){}[0]
+    }
+}
+
+final class com.eignex.klause.solver/PreparedFactorProjections { // com.eignex.klause.solver/PreparedFactorProjections|null[0]
+    final val problem // com.eignex.klause.solver/PreparedFactorProjections.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver/PreparedFactorProjections.problem.<get-problem>|<get-problem>(){}[0]
+    final val providers // com.eignex.klause.solver/PreparedFactorProjections.providers|{}providers[0]
+        final fun <get-providers>(): com.eignex.klause.solver/FactorProjectionProviders // com.eignex.klause.solver/PreparedFactorProjections.providers.<get-providers>|<get-providers>(){}[0]
+
+    final fun forProblem(com.eignex.klause.ir/Problem): com.eignex.klause.solver/PreparedFactorProjections // com.eignex.klause.solver/PreparedFactorProjections.forProblem|forProblem(com.eignex.klause.ir.Problem){}[0]
+}
+
 final class com.eignex.klause.solver/ProblemProfile { // com.eignex.klause.solver/ProblemProfile|null[0]
     constructor <init>(com.eignex.klause.solver/ProblemClass, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean) // com.eignex.klause.solver/ProblemProfile.<init>|<init>(com.eignex.klause.solver.ProblemClass;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
 
@@ -14692,6 +14816,8 @@ final class com.eignex.klause.solver/SourceStrategy { // com.eignex.klause.solve
         final fun <get-compiledSchema>(): com.eignex.klause.compile/CompiledSchema? // com.eignex.klause.solver/SourceStrategy.compiledSchema.<get-compiledSchema>|<get-compiledSchema>(){}[0]
     final val engine // com.eignex.klause.solver/SourceStrategy.engine|{}engine[0]
         final fun <get-engine>(): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver/SourceStrategy.engine.<get-engine>|<get-engine>(){}[0]
+    final val projectionProviders // com.eignex.klause.solver/SourceStrategy.projectionProviders|{}projectionProviders[0]
+        final fun <get-projectionProviders>(): com.eignex.klause.solver/FactorProjectionProviders // com.eignex.klause.solver/SourceStrategy.projectionProviders.<get-projectionProviders>|<get-projectionProviders>(){}[0]
     final val source // com.eignex.klause.solver/SourceStrategy.source|{}source[0]
         final fun <get-source>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver/SourceStrategy.source.<get-source>|<get-source>(){}[0]
 
@@ -14703,6 +14829,7 @@ final class com.eignex.klause.solver/SourceStrategy { // com.eignex.klause.solve
     final fun solve(com.eignex.klause.backtrack/BacktrackParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver/SourceStrategy.solve|solve(com.eignex.klause.backtrack.BacktrackParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
     final fun solve(com.eignex.klause.localsearch/LocalSearchParams, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver/SourceStrategy.solve|solve(com.eignex.klause.localsearch.LocalSearchParams;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
     final fun solve(com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver/SourceStrategy.solve|solve(com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
+    final fun withProjectionProviders(com.eignex.klause.solver/FactorProjectionProviders): com.eignex.klause.solver/SourceStrategy // com.eignex.klause.solver/SourceStrategy.withProjectionProviders|withProjectionProviders(com.eignex.klause.solver.FactorProjectionProviders){}[0]
 }
 
 final class com.eignex.klause.theory.difference/DifferenceSearchComponent : com.eignex.klause.solver.search/TheoryComponent { // com.eignex.klause.theory.difference/DifferenceSearchComponent|null[0]
@@ -15393,6 +15520,10 @@ final object com.eignex.klause.localsearch.strategy/WalkSat { // com.eignex.klau
     final fun invoke(kotlin/Double = ..., com.eignex.klause.localsearch/TabuFilter = ..., kotlin/Boolean = ...): com.eignex.klause.localsearch.strategy/SourceDrivenStrategy // com.eignex.klause.localsearch.strategy/WalkSat.invoke|invoke(kotlin.Double;com.eignex.klause.localsearch.TabuFilter;kotlin.Boolean){}[0]
 }
 
+final object com.eignex.klause.localsearch/BuiltInScoringProjectionProvider : com.eignex.klause.localsearch/ScoringProjectionProvider { // com.eignex.klause.localsearch/BuiltInScoringProjectionProvider|null[0]
+    final fun select(com.eignex.klause.ir/Factor): com.eignex.klause.localsearch/ScoringProjection? // com.eignex.klause.localsearch/BuiltInScoringProjectionProvider.select|select(com.eignex.klause.ir.Factor){}[0]
+}
+
 final object com.eignex.klause.localsearch/NoInvariant : com.eignex.klause.localsearch/Invariant // com.eignex.klause.localsearch/NoInvariant|null[0]
 
 final object com.eignex.klause.lp.bounding/LpAutoConfig { // com.eignex.klause.lp.bounding/LpAutoConfig|null[0]
@@ -15403,6 +15534,10 @@ final object com.eignex.klause.lp.bounding/LpAutoConfig { // com.eignex.klause.l
 
     final fun recommend(com.eignex.klause.ir/Problem, com.eignex.klause.lp.bounding/LpPlan = ...): com.eignex.klause.lp.bounding/LpPlan // com.eignex.klause.lp.bounding/LpAutoConfig.recommend|recommend(com.eignex.klause.ir.Problem;com.eignex.klause.lp.bounding.LpPlan){}[0]
     final fun resolve(com.eignex.klause.ir/Problem, com.eignex.klause.lp.bounding/LpConfig, com.eignex.klause.lp.bounding/LpPlan = ...): com.eignex.klause.lp.bounding/LpPlan // com.eignex.klause.lp.bounding/LpAutoConfig.resolve|resolve(com.eignex.klause.ir.Problem;com.eignex.klause.lp.bounding.LpConfig;com.eignex.klause.lp.bounding.LpPlan){}[0]
+}
+
+final object com.eignex.klause.lp/BuiltInRelaxationProjectionProvider : com.eignex.klause.lp/RelaxationProjectionProvider { // com.eignex.klause.lp/BuiltInRelaxationProjectionProvider|null[0]
+    final fun select(com.eignex.klause.ir/Factor): com.eignex.klause.lp/RelaxationProjection? // com.eignex.klause.lp/BuiltInRelaxationProjectionProvider.select|select(com.eignex.klause.ir.Factor){}[0]
 }
 
 final object com.eignex.klause.model/BoolSpec : com.eignex.klause.model/VarSpec, kotlinx.serialization.internal/SerializerFactory { // com.eignex.klause.model/BoolSpec|null[0]
@@ -15472,6 +15607,10 @@ final object com.eignex.klause.presolve/RootBaker { // com.eignex.klause.presolv
     final fun bake(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.presolve/BakeConfig): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.presolve/RootBaker.bake|bake(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.presolve.BakeConfig){}[0]
     final fun provenInfeasible(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.presolve/BakeConfig): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.presolve/RootBaker.provenInfeasible|provenInfeasible(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.presolve.BakeConfig){}[0]
     final fun reseed(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.presolve/BakeConfig): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.presolve/RootBaker.reseed|reseed(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.presolve.BakeConfig){}[0]
+}
+
+final object com.eignex.klause.propagation/BuiltInPropagationProjectionProvider : com.eignex.klause.propagation/PropagationProjectionProvider { // com.eignex.klause.propagation/BuiltInPropagationProjectionProvider|null[0]
+    final fun select(com.eignex.klause.ir/Factor): com.eignex.klause.propagation/PropagationProjection? // com.eignex.klause.propagation/BuiltInPropagationProjectionProvider.select|select(com.eignex.klause.ir.Factor){}[0]
 }
 
 final object com.eignex.klause.propagation/NoPropagator : com.eignex.klause.propagation/Propagator // com.eignex.klause.propagation/NoPropagator|null[0]
@@ -15577,6 +15716,8 @@ final fun (com.eignex.klause.ir/NonlinearIntegerProblem).com.eignex.klause.solve
 final fun (com.eignex.klause.ir/PolynomialRealProblem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.PolynomialRealProblem(){}[0]
 final fun (com.eignex.klause.ir/PolynomialRealProblem).com.eignex.klause.solver.pipeline/prepareExecutionPlan(): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/prepareExecutionPlan|prepareExecutionPlan@com.eignex.klause.ir.PolynomialRealProblem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.presolve/presolveOpen(com.eignex.klause.presolve/PresolveConfig = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget? = ...): com.eignex.klause.presolve/OpenPresolveResult // com.eignex.klause.presolve/presolveOpen|presolveOpen@com.eignex.klause.ir.Problem(com.eignex.klause.presolve.PresolveConfig;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/bake(com.eignex.klause.solver/FactorProjectionProviders, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.propagation/bake|bake@com.eignex.klause.ir.Problem(com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.util.Cancellation){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/bake(com.eignex.klause.solver/PreparedFactorProjections, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.propagation/bake|bake@com.eignex.klause.ir.Problem(com.eignex.klause.solver.PreparedFactorProjections;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.propagation/bake|bake@com.eignex.klause.ir.Problem(com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/propagate(com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/propagate|propagate@com.eignex.klause.ir.Problem(com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.evidence/quadraticSourceProofContext(com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.ir/QuadraticObjectiveSpec, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceProofContext? // com.eignex.klause.solver.evidence/quadraticSourceProofContext|quadraticSourceProofContext@com.eignex.klause.ir.Problem(com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.ir.QuadraticObjectiveSpec;com.eignex.klause.util.Cancellation){}[0]
@@ -15584,11 +15725,14 @@ final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.evidence/quadr
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.evidence/sourceProofContext(com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.solver.objective/LinearObjective? = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.evidence/SourceProofContext? // com.eignex.klause.solver.evidence/sourceProofContext|sourceProofContext@com.eignex.klause.ir.Problem(com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/componentPlan(com.eignex.klause.solver/PreparedFactorProjections, kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/componentPlan|componentPlan@com.eignex.klause.ir.Problem(com.eignex.klause.solver.PreparedFactorProjections;kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/componentPlan(kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/componentPlan|componentPlan@com.eignex.klause.ir.Problem(kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/pipelineRoute(com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute // com.eignex.klause.solver.pipeline/pipelineRoute|pipelineRoute@com.eignex.klause.ir.Problem(com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/pipelineRoute(com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ..., kotlin/Function1<com.eignex.klause.solver.result/LpStats, kotlin/Unit>): com.eignex.klause.solver.pipeline/SourceProblemRoute // com.eignex.klause.solver.pipeline/pipelineRoute|pipelineRoute@com.eignex.klause.ir.Problem(com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;kotlin.Boolean;kotlin.Function1<com.eignex.klause.solver.result.LpStats,kotlin.Unit>){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/pipelineRoute(com.eignex.klause.solver/FactorProjectionProviders, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ..., kotlin/Function1<com.eignex.klause.solver.result/LpStats, kotlin/Unit>? = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute // com.eignex.klause.solver.pipeline/pipelineRoute|pipelineRoute@com.eignex.klause.ir.Problem(com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;kotlin.Boolean;kotlin.Function1<com.eignex.klause.solver.result.LpStats,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/prepareExecutionPlan(com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/prepareExecutionPlan|prepareExecutionPlan@com.eignex.klause.ir.Problem(com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/prepareExecutionPlan(com.eignex.klause.solver/FactorProjectionProviders, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/prepareExecutionPlan|prepareExecutionPlan@com.eignex.klause.ir.Problem(com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/sourceRoute(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/sourceRoute|sourceRoute@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/variablePartition(): com.eignex.klause.solver.pipeline/VariablePartition // com.eignex.klause.solver.pipeline/variablePartition|variablePartition@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver/hasFiniteIntegerRanges(): kotlin/Boolean // com.eignex.klause.solver/hasFiniteIntegerRanges|hasFiniteIntegerRanges@com.eignex.klause.ir.Problem(){}[0]

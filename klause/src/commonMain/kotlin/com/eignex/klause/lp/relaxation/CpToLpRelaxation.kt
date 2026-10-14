@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
-import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -18,7 +18,6 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.Contribution
@@ -52,13 +51,16 @@ import com.eignex.klause.lp.statesBinary
 import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -637,11 +639,17 @@ internal class CpToLpRelaxation(
     private val suppressedHullFactors: Set<Int> = emptySet(),
     internal val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
     deferred: Boolean = false,
+    private val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ) {
     private val linearProjection = LinearLpProjection()
 
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private var cumulativeRelaxation: CumulativeRelaxation? = null
+    private val builtInFamilySource: Problem by lazy {
+        if (projections?.builtInRelaxation != false) problem else problem.withFactors(
+            problem.factors.filterIndexed { id, _ -> projections.usesBuiltInRelaxation(id) }.toTypedArray(),
+        )
+    }
 
     /**
      * Whether this relaxer emits no row whose coefficients depend on the live domains, the
@@ -657,18 +665,19 @@ internal class CpToLpRelaxation(
     private var structurallyPersistent: Boolean = false
 
     init {
+        projections?.requireSource(problem)
         if (!deferred) preparation().forEach { }
     }
 
     fun preparation(): Iterator<Unit> = sequence {
         if (cumulative || diffn) {
             val owner = CumulativeRelaxation(
-                problem, includeCumulative = cumulative, includeDiffn = diffn, deferred = true,
+                builtInFamilySource, includeCumulative = cumulative, includeDiffn = diffn, deferred = true,
             )
             owner.preparation().forEach { yield(Unit) }
             cumulativeRelaxation = owner.takeIf { it.applicable }
         }
-        structurallyPersistent = !objectiveCone && !cumulative && !diffn
+        structurallyPersistent = !objectiveCone && !cumulative && !diffn && projections?.builtInRelaxation != false
         if (structurallyPersistent) for (fid in problem.factors.indices) {
             val factor = problem.factors[fid]
             if (factor is ReifiedLinear || factor is ReifiedPseudoBoolean || factor is ReifiedCardinality ||
@@ -774,7 +783,7 @@ internal class CpToLpRelaxation(
     ): LpRelaxation = Assembler(domains, cancellation = cancellation).assemble(extraCuts)
 
     private val timeIndexedViews by lazy {
-        if (cumulativeTimeIndexed && !objectiveCone) schedulingViews(problem) else emptyList()
+        if (cumulativeTimeIndexed && !objectiveCone) schedulingViews(builtInFamilySource) else emptyList()
     }
 
     val emissionRegions: List<LpEmissionRegion> by lazy {
@@ -783,7 +792,9 @@ internal class CpToLpRelaxation(
             if (!objectiveCone) {
                 if (circuitArcs) {
                     for (id in problem.factors.indices) {
-                        if (problem.factors[id] is Circuit) add(LpEmissionRegion(LpEmissionKind.CIRCUIT, id))
+                        if (problem.factors[id] is Circuit && projections?.usesBuiltInRelaxation(id) != false) {
+                            add(LpEmissionRegion(LpEmissionKind.CIRCUIT, id))
+                        }
                     }
                 }
                 cumulativeRelaxation?.plans?.indices?.forEach {
@@ -1225,7 +1236,7 @@ internal class CpToLpRelaxation(
                         checkCancellation()
                         currentFactorId = factorId
                         currentEmissionRoute = 1L
-                        if (factor is Circuit) {
+                        if (factor is Circuit && projections?.usesBuiltInRelaxation(factorId) != false) {
                             if (factor.subcircuit) buildSubcircuitArcs(factor) else buildCircuitArcs(factor)
                         }
                         attributeRows(factorId)
@@ -1253,7 +1264,7 @@ internal class CpToLpRelaxation(
                 if (realResidual && !touchesReals(factor)) continue
                 currentFactorId = factorId
                 currentEmissionRoute = 0L
-                if (gated && factor is ReifiedRealLinear) {
+                if (gated && factor is ReifiedRealLinear && projections?.usesBuiltInRelaxation(factorId) != false) {
                     emitGatedReified(factor)
                     attributeRows(factorId)
                     continue
@@ -1263,7 +1274,11 @@ internal class CpToLpRelaxation(
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags)
-                factor.emitLpRelaxation(this, linearProjection)
+                if (projections == null) {
+                    factor.emitLpRelaxation(this, linearProjection)
+                } else {
+                    projections.emitRelaxation(factorId, this, linearProjection)
+                }
                 attributeRows(factorId)
             }
 
@@ -1411,6 +1426,7 @@ internal class CpToLpRelaxation(
         private fun buildBooleanRlt() {
             var rltColumns = 0
             for ((factorId, f) in problem.factors.withIndex()) {
+                if (projections?.usesBuiltInRelaxation(factorId) == false) continue
                 currentFactorId = factorId
                 currentEmissionRoute = 2L
                 if (rltColumns >= MAX_RLT_COLUMNS) break

@@ -352,6 +352,10 @@ internal class PresolveSession(
             // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
             packedOpenIntLo = base.intBounds.openLowerBits,
             packedOpenIntHi = base.intBounds.openUpperBits,
+            projectionProviders = base.projectionProviders,
+            projectionSelection = base.factorProjections?.let { captured ->
+                { view -> captured.forEngineView(view) }
+            },
         )
         cachedInput = input
         inputDirty = false
@@ -525,6 +529,10 @@ internal class PresolveSession(
             // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
             packedOpenIntLo = base.intBounds.openLowerBits,
             packedOpenIntHi = base.intBounds.openUpperBits,
+            projectionProviders = base.projectionProviders,
+            projectionSelection = base.factorProjections?.let { captured ->
+                { view -> captured.forEngineView(view) }
+            },
         )
     }
 }

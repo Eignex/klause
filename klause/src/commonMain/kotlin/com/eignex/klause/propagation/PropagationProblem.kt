@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
@@ -15,18 +16,26 @@ class PropagationProblem private constructor(
     val problem: Problem,
     preparedPropagators: Array<out Propagator>?,
     private val preparedIndexes: PropagationIndexes? = null,
+    internal val selection: PreparedFactorProjections? = null,
 ) {
     /** Construct a private propagation projection over [problem]. */
-    constructor(problem: Problem) : this(problem, null)
+    constructor(problem: Problem) : this(problem, null, null, (problem as? BakedProblem)?.factorProjections)
+
+    /** Open private mechanisms selected for [problem] during preparation. */
+    constructor(problem: Problem, selection: PreparedFactorProjections) : this(problem, null, null, selection) {
+        selection.requireSource(problem)
+    }
 
     /** Whether this projection can use the packed native-SAT propagation lane. */
-    val isNativeSatEligible: Boolean = preparedIndexes?.nativeEligible ?: problem.isClausal()
+    val isNativeSatEligible: Boolean = (selection?.nativePropagation != false) &&
+        (preparedIndexes?.nativeEligible ?: problem.isClausal())
 
     /** One propagator per model factor, materialized only by consumers of the general CP lane. */
     val propagators: Array<out Propagator> by lazy {
         preparedPropagators ?: run {
             val preparation = FactorProjectionPreparation()
-            Array(problem.numFactors) { problem.factors[it].propagatorProjection(preparation) }
+            Array(problem.numFactors) { selection?.propagator(it, preparation)
+                ?: problem.factors[it].propagatorProjection(preparation) }
         }
     }
 
@@ -106,12 +115,17 @@ class PropagationProblem private constructor(
     internal val clauseArena: ClauseArena by lazy { ClauseArena.of(problem) }
 
     internal companion object {
-        fun preparation(problem: Problem): Iterator<PropagationProblem?> = sequence {
+        fun preparation(
+            problem: Problem,
+            selection: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
+        ): Iterator<PropagationProblem?> = sequence {
+            selection?.requireSource(problem)
             val preparation = FactorProjectionPreparation()
             val propagators = arrayOfNulls<Propagator>(problem.numFactors)
             yield(null)
             for (fid in propagators.indices) {
-                propagators[fid] = problem.factors[fid].propagatorProjection(preparation)
+                propagators[fid] = selection?.propagator(fid, preparation)
+                    ?: problem.factors[fid].propagatorProjection(preparation)
                 if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
             @Suppress("UNCHECKED_CAST")
@@ -121,7 +135,7 @@ class PropagationProblem private constructor(
                 if (next != null) indexes = next
                 yield(null)
             }
-            yield(PropagationProblem(problem, ready, checkNotNull(indexes)))
+            yield(PropagationProblem(problem, ready, checkNotNull(indexes), selection))
         }.iterator()
     }
 

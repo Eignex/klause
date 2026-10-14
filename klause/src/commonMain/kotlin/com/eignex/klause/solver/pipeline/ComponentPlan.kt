@@ -10,6 +10,8 @@ import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpIntId
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import com.eignex.klause.theory.qflra.supportsExactLira
@@ -45,7 +47,13 @@ class ComponentPlan internal constructor(
     val theoryPipeline: ProblemPipeline,
     /** What left the model without a route, or null when it has one. */
     val unplaceable: UnplaceableColumn? = null,
+    internal val factorProjections: PreparedFactorProjections = (source as? BakedProblem)?.factorProjections
+        ?: FactorProjectionProviders.Default.prepare(source),
 ) {
+    init {
+        factorProjections.requireSource(source)
+    }
+
     /** Owner of integer column [v]. */
     fun intOwner(v: Int): IntVariableOwner = intOwners[v]
 
@@ -99,6 +107,7 @@ class ComponentPlan internal constructor(
             factorOwners.copyOfRange(0, factorOwners.size - 1),
             theoryPipeline,
             unplaceable,
+            factorProjections.projected(spec, IntArray(spec.numFactors) { it }),
         )
     }
 
@@ -138,6 +147,8 @@ class ComponentPlan internal constructor(
                 numRealVars = 0,
                 realLower = doubleArrayOf(),
                 realUpper = doubleArrayOf(),
+                projectionProviders = factorProjections.providers,
+                projectionSelection = { view -> factorProjections.projected(view, factorIds.toIntArray()) },
             ),
             sourceToCp,
             cpToSource,
@@ -188,7 +199,9 @@ class ComponentPlan internal constructor(
                 }
             ) { "objective round must retain the planned row's columns and coefficients" }
         }
-        return ComponentPlan(spec, intOwners, factorOwners, theoryPipeline, unplaceable)
+        return ComponentPlan(spec, intOwners, factorOwners, theoryPipeline, unplaceable,
+            if (appended) factorProjections.replacedLast(spec)
+            else factorProjections.projected(spec, IntArray(spec.numFactors) { it }))
     }
 
     private fun requireSamePrefix(spec: Problem, count: Int) {
@@ -238,7 +251,7 @@ class ComponentPlan internal constructor(
             fragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
             else -> return null
         }
-        return ComponentPlan(spec, intOwners, owners, route)
+        return ComponentPlan(spec, intOwners, owners, route, factorProjections = factorProjections)
     }
 
     internal fun requireSource(spec: Problem) = requireBelongsTo(spec)
@@ -272,15 +285,23 @@ class CpProblemProjection internal constructor(
 }
 
 /** Select component ownership from the source model. */
-fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
+fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan = componentPlan(
+    (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this), preferFinite,
+)
+
+/** Select component ownership using the descriptors captured for this canonical source. */
+fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: Boolean = false): ComponentPlan {
+    projections.requireSource(this)
     if (preferFinite) {
         return ComponentPlan(
             source = this,
             intOwners = Array(numIntVars) { IntVariableOwner.CP },
             factorOwners = Array(factors.size) { factor ->
-                if (factors[factor] is Clause) FactorOwner.SHARED else FactorOwner.CP
+                if (factors[factor] is Clause && projections.usesBuiltInPropagation(factor)) FactorOwner.SHARED
+                else FactorOwner.CP
             },
             theoryPipeline = ProblemPipeline.FINITE_CP,
+            factorProjections = projections,
         )
     }
     val partition = variablePartition()
@@ -316,7 +337,8 @@ fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
     val factorOwners = Array(factors.size) { i ->
         val factor = factors[i]
         when {
-            factor is Clause -> FactorOwner.SHARED
+            factor is Clause && projections.usesBuiltInPropagation(i) -> FactorOwner.SHARED
+            factor is Clause -> FactorOwner.CP
             completeTheory == ProblemPipeline.EXACT_LIRA && factor.exactTheoryOwnable -> FactorOwner.THEORY
             factor.isTheoryOwnable(numRealVars != 0) -> FactorOwner.THEORY
             else -> FactorOwner.CP
@@ -354,6 +376,7 @@ fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
         // Only searched on the refusal path, where the model is already declined and the scan is the
         // difference between naming the constraint at fault and naming nothing.
         if (unownedOpenColumn < 0) null else unplaceable(unownedOpenColumn, factors, numRealVars != 0),
+        projections,
     )
 }
 

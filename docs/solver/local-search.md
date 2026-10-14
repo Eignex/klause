@@ -555,3 +555,26 @@ CLI pairs use `lsBestResidualFactorDetails.<factor-id>.<key>`; existing coordina
 pairs retain their format. Captures own detached metadata and never grade or mutate
 the assignment. Coordinate-only construction and the legacy constructor/copy
 compatibility descriptors remain available; copies retain captured details.
+
+## Selected scoring projections
+
+`ScoringProjectionProvider` selects an invariant factory, scoring participation and
+assignment-check authority from immutable factor data. The factory receives the
+worker's move domains; built-in linear rows retain exact sums when those domains
+can exceed the machine-integer range. A custom factory must preserve the source
+relation at zero violation and consistent move deltas for its advertised role.
+
+An explicit inert score contributes no occurrences and keeps its separate source
+check obligation. Unsupported scoring refuses construction. Returning `NoInvariant`
+for a declared active role is rejected. Captured factories open private mutable
+mechanisms for sibling engines; projection selection contains no assignment payloads.
+
+An inert descriptor requires an explicit reason and cannot claim an exact check:
+its absent mechanism needs an enforcing peer or separate source certification.
+
+Open heuristic models retain their prepared scoring capture separately from the
+neutral source. Scoring preparation and candidate checks consume that capture;
+private pinned-point checks retain the selected descriptors after factor selection.
+Scheduling windows and dense-timeline admission restrictions apply to built-in
+scorers. A selected alternate scorer receives the actual move domains and owns its
+own numeric and resource limits.

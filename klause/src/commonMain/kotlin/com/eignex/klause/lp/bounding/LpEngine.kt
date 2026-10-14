@@ -8,11 +8,8 @@ import com.eignex.klause.bound.LagrangianDualBound
 import com.eignex.klause.bound.SchedulingFeasibilityBound
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.constructionLongArray
-import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.AggregationMirSeparator
 import com.eignex.klause.lp.cut.AllDifferentSeparator
@@ -49,20 +46,25 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.exactLeafResult
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
+import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.constructionLongArray
 import kotlin.math.abs
 
 /** The persistent gated-residual float filter: the node-invariant [relaxation], the ONE [simplex]
@@ -100,8 +102,16 @@ internal class LpEngine(
     internal val sink: SolveStatsSink,
     internal val solveContext: LpSolveContext = LpSolveContext.Production,
     private val deferred: Boolean = false,
+    internal val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ) : AutoCloseable {
+    init { projections?.requireSource(problem) }
+
     private var closed = false
+    private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
+        if (projections?.builtInRelaxation == false) {
+            CpToLpRelaxation(problem, objective, realResidual = true, projections = null)
+        } else null
+    }
 
     // Retain the model and discrete warm-start caches; only native factor-owning solvers are released.
     @Suppress("TooGenericExceptionCaught") // cleanup must preserve arbitrary failures from owned solvers
@@ -157,6 +167,7 @@ internal class LpEngine(
             ),
             sink,
             solveContext,
+            projections = projections,
         )
     }
 
@@ -223,6 +234,7 @@ internal class LpEngine(
                 suppressedHullFactors = suppressedHullFactors,
                 auxiliarySources = auxiliarySources,
                 deferred = deferred,
+                projections = projections,
             )
         } else {
             null
@@ -595,7 +607,8 @@ internal class LpEngine(
         requireOpen()
         lpBackjump = null
         if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-        val relaxer = lpRelaxer ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        val relaxer = selectedSourceRelaxation ?: lpRelaxer
+            ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxation = nodeRelaxation(relaxer, session)
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val model = relaxation.model

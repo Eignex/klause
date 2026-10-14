@@ -6,6 +6,14 @@ import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -24,6 +32,28 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PolynomialStrategyAdaptersTest {
+    @Test
+    fun `polynomial finite preparation opens the selected source deduction`() {
+        val clause = Clause(intArrayOf(0))
+        val source = Problem(1, 1, arrayOf(IntDomain(1, 1)), arrayOf(clause, RealProduct(0, 0, 0, 1.0, 1.0)),
+            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+        var opened = 0
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            if (factor !== clause) BuiltInPropagationProjectionProvider.select(factor)
+            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                "The original clause is checked at complete points.") {
+                opened++
+                NoPropagator
+            }
+        })
+        val request = source.prepareExecutionPlan(providers).polynomialRequest()
+
+        val result = OpenTheoryPipeline.execute(request, engine = FiniteEngine.BACKTRACK).result
+
+        assertEquals(true, assertIs<OpenTheoryResult.Sat>(result).assignment.boolValue(0))
+        assertTrue(opened > 0)
+    }
+
     @Test
     fun `shared finite objective keeps exact completion across optimization strategies`() {
         val source = Problem(
