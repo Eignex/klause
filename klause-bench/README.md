@@ -1241,6 +1241,24 @@ reads no compiler-task instance, attaches no probes and changes no settings.
 Layout metadata alone supplies no compilation-root attribution, clock/loss proof,
 elapsed time, code-size reconstruction or compiler saving.
 
+### Native VM symbol availability
+
+`com.eignex.klause.bench.profile.NativeVmSymbolVerification` reads the pinned
+Linux x86-64 library's ELF symbol tables in an unprivileged Python child process.
+It verifies the open file and path identity and hashes before and after inspection.
+Section, linked string and symbol table reads have explicit file and size bounds;
+unsupported extended indexes, compressed tables and malformed names are refused.
+
+The diagnostic retains every raw symbol record whose name contains
+`invoke_compiler_on_method`, `post_compiled_method` or `total_size`, including
+local, duplicate, undefined and non-function entries. Missing names are reported
+only as absent from the available tables, with full versus dynamic table coverage
+recorded separately. Source-name matches establish no exact C++ signature or ABI.
+
+The capture includes original record bytes, section/table hashes, scan completion,
+partial records, errors and exits. The reader neither loads nor invokes the library,
+attaches no probes and supplies no task/root, code-size, timing or savings proof.
+
 ### Table profiling
 
 ```sh
