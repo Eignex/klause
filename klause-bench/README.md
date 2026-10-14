@@ -901,11 +901,11 @@ points/objectives require exact equality. Rounded default points can be nonexact
 while the original source remains feasible.
 
 Claimed SAT/UNSAT require matching exact source verdicts. A proven finite optimum
-needs a feasible source objective and exclusion of every strictly better objective;
-an exactly checked complete MPS point with that exact objective establishes attainment
+needs a feasible source objective and exclusion of every strictly better objective.
+An exactly checked complete MPS point with that exact objective establishes attainment
 without rediscovering it through a satisfiability search. Strict improvement exclusion
 still requires its independent source query.
-tolerance acceptance cannot justify either optimum or infeasibility. Unknown
+Tolerance acceptance cannot justify either optimum or infeasibility. Unknown
 records make no proof claim. Unbounded claims and unsupported constructs decline.
 An explicit default-MPS `tolerance-optimum` retains its source point, objective
 and scaled-tolerance checks separately. It receives no exact-source optimality
