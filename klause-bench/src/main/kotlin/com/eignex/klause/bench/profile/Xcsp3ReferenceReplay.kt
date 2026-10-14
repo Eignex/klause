@@ -36,8 +36,11 @@ internal object Xcsp3ReferenceReplay {
             require(row.getValue("suite").jsonPrimitive.content.startsWith("xcsp3-"))
             val ref = Catalog.uncapped(row.getValue("suite").jsonPrimitive.content).problems
                 .single { it.name == row.getValue("problem").jsonPrimitive.content }
-            val original = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use { it.readNBytes(32 * 1024 * 1024 + 1) }
-            require(original.size <= 32 * 1024 * 1024 && sha256(original) == row.getValue("sourceSha256").jsonPrimitive.content)
+            val original = CorpusFiles.open(CorpusFetcher.resolve(ref.source)).use {
+                it.readNBytes(32 * 1024 * 1024 + 1)
+            }
+            require(original.size <= 32 * 1024 * 1024 &&
+                sha256(original) == row.getValue("sourceSha256").jsonPrimitive.content)
             out.resolve("$index.xml").writeBytes(original)
         }
         val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
@@ -45,7 +48,8 @@ internal object Xcsp3ReferenceReplay {
         val name = "xcsp3-reference-replay-${ProcessHandle.current().pid()}"
         val command = listOf("docker", "run", "--rm", "--name", name, "--network", "none", "--memory", "6g",
             "--memory-swap", "6g", "--cpus", "1", "--entrypoint", "python", "-v", "${out.absolutePath}:/out",
-            image, "/out/diagnose.py", "/out") + if (args.getOrNull(1) == "mode=reduce") listOf("reduce") else emptyList()
+            image, "/out/diagnose.py", "/out") +
+            if (args.getOrNull(1) == "mode=reduce") listOf("reduce") else emptyList()
         out.resolve("command.json").writeText(Reports.json.encodeToString(command))
         val process = ProcessBuilder(command).redirectOutput(out.resolve("stdout"))
             .redirectError(out.resolve("stderr")).start()

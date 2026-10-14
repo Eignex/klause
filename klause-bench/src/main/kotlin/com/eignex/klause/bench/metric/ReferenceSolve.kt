@@ -96,7 +96,9 @@ internal object ReferenceSolve {
             }
 
             Format.XCSP3 -> {
-                val r = cached ?: cache(Xcsp3CpSatReference.run(ref, budget, checkNotNull(settings.processors), settings.seed))
+                val r = cached ?: cache(
+                    Xcsp3CpSatReference.run(ref, budget, checkNotNull(settings.processors), settings.seed),
+                )
                 Run(
                     id, r, optimize = r.exactObjective != null || r.objective != null,
                     maximize = r.stats["maximize"].toBoolean(),
