@@ -778,7 +778,7 @@ class Portfolio(
             val baseAllowance = probing || revisit != null || workers[arm].auxiliaryProof
             val allowance = if (baseAllowance) baseSliceWork else sliceWork
             val time = if (baseAllowance) baseSliceMillis else slice
-            val remainingTime = if (handles[arm]?.preparationPending != false) {
+            val remainingTime = if ((handles[arm] as? ResumableSearch)?.preparationPending != false) {
                 preparationTimeLimit - trialPreparationTime[arm]
             } else trialTimeLimit - trialSearchTime[arm]
             busy[arm] = true
