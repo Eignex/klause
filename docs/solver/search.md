@@ -431,8 +431,12 @@ complete source assignment. Every participating owner must finish its required
 check before publication. Extra theory components also constrain finite LP primal
 proposals and transferred initial candidates; ordinary traversal remains available
 when a proposal cannot be completed. Mixed root rounding and feasibility-pump
-proposals first satisfy the discrete fixpoint under caller assumptions, then obtain
-continuous coordinates from the retained real-leaf owner. Only a complete checked
+proposals satisfy the discrete fixpoint under caller assumptions. When the caller
+supplies an original-source tolerance check, rounding first offers the LP point's
+continuous coordinates with each discrete target to that same composed verifier.
+Unaccepted float-coordinate proposals retain discrete completion through the
+real-leaf owner. Exact invocations require that owner's certified coordinates.
+Only a complete checked
 witness reaches incumbent admission; an incomplete or unbounded completion does not
 publish a heuristic result. The pump can continue after a declined completion under
 its existing root allowance. Root primal proposals must improve the available local
@@ -447,7 +451,7 @@ must improve the available cutoff before publication.
 
 After a declined nearest rounding, mixed root probes try a peer discrete target
 and upward/downward roundings of the retained LP point before distance pumping.
-Each distinct proposal receives fresh propagation and real completion. Directed
+Each distinct proposal receives propagation and full source verification or real completion. Directed
 rounding reuses the root solve and retains its time/work allowance; it neither
 changes the relaxation nor installs a source bound. This permits a rounded
 capacity proposal to retain the continuous flow that nearest rounding can remove.

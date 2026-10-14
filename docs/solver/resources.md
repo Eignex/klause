@@ -105,7 +105,8 @@ visits one per 18000. Fractional LP and propagation marks survive slices and the
 preparation-to-search transition. Overspend debt is settled once and repaid by later
 slices. A nested private search leaves debt ownership with its containing budget.
 Private LP rounding, pump and proposal-verification propagation charge the same
-slice currency, including rejected proposals. Mixed proposal completion uses the
+slice currency, including rejected proposals. Complete LP float proposals use the
+caller's source tolerance verifier before discrete completion. Mixed proposal completion uses the
 containing root cancellation and real-leaf native ledger; composed verification
 adds its own short deadline without renewing the root allowance.
 Root primal queries retain the remaining cumulative root/native LP allowance;

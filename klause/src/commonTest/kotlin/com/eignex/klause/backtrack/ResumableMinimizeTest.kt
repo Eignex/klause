@@ -804,6 +804,67 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `mixed root rounding admits source checked float coordinates without native completion`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+        val params = fixture.params.copy(maxDecisions = 0L, objectiveBoundSupplier = { 1.0 },
+            toleranceCheck = { sample ->
+                sample.numRealVars == 1 && sample.reals.single() in 0.0..1.0 &&
+                    sample.ints.single() + 2.0 * sample.reals.single() == 2.0
+            },
+            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false))
+        val offered = ArrayList<Sample>()
+        val nodesAtPublication = ArrayList<Double>()
+
+        fixture.solver.resumable(fixture.objective, params).use { search ->
+            search.runSlice(Cancellation.Never, 1000L, 100_000L) {
+                offered += it.sample
+                nodesAtPublication += search.stats.search.nodes.sum
+            }
+        }
+
+        val sample = offered.single()
+        assertEquals(0.5, fixture.objective.evaluate(sample))
+        assertEquals(2.0, sample.ints.single() + 2.0 * sample.reals.single())
+        assertNull(sample.exactReals)
+        assertEquals(0, fixture.visited)
+        assertEquals(listOf(0.0), nodesAtPublication)
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `declined float coordinates retain discrete real completion fallback`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf<Factor>(Linear(intArrayOf(0), doubleArrayOf(1.0),
+                intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.3)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.5),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val params = BacktrackParams(maxDecisions = 0L, objectiveBoundSupplier = { 2.0 },
+            toleranceCheck = { sample ->
+                sample.numRealVars == 1 && sample.reals.single() in 0.0..0.5 &&
+                    kotlin.math.abs(sample.ints.single() + sample.reals.single() - 1.3) < 1e-8
+            },
+            lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false))
+        val offered = ArrayList<Sample>()
+        val nodesAtPublication = ArrayList<Double>()
+
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation.Never, 1000L, 100_000L) {
+                offered += it.sample
+                nodesAtPublication += search.stats.search.nodes.sum
+            }
+        }
+
+        val sample = offered.single()
+        assertEquals(1.0, objective.evaluate(sample))
+        assertTrue(kotlin.math.abs(sample.reals.single() - 0.3) < 1e-8)
+        assertTrue(assertNotNull(params.toleranceCheck)(sample))
+        assertEquals(listOf(0.0), nodesAtPublication)
+    }
+
+    @Test
     fun `mixed rounding cannot publish an uncertified completion`() {
         val fixture = UnresolvedRealLeafFixture(true)
         fixture.acceptProof = { _, _ -> false }

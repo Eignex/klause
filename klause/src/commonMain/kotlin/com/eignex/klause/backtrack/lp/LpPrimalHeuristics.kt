@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -27,6 +28,7 @@ internal fun LpEngine.lpRoundingProbe(
     objective: LinearObjective,
     cancellation: Cancellation,
     initial: Sample? = null,
+    toleranceReals: Boolean = false,
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
     val started = TimeSource.Monotonic.markNow()
@@ -48,8 +50,12 @@ internal fun LpEngine.lpRoundingProbe(
             return null
         } ?: return null
         val primal = result.primal
+        val reals = if (toleranceReals && problem.numRealVars > 0) relaxation.floatReals(primal, problem) else null
+        val seed = initial?.takeIf {
+            it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars
+        }
         val seen = HashSet<String>()
-        fun propose(rounding: LpRounding, seed: Sample? = null): Sample? {
+        fun propose(rounding: LpRounding, seed: Sample? = null, reals: DoubleArray? = null): Sample? {
             if (cancellation()) return null
             val attempt = if (rounding == LpRounding.NEAREST && seed == null) session else {
                 PropagationSession(problem, cancellation)
@@ -75,24 +81,28 @@ internal fun LpEngine.lpRoundingProbe(
                 if (sample == null) return null
                 outcome = "PROPOSED"
                 if (!seen.add(pumpKey(sample.ints, sample.bools))) return null
-                return accept(sample)
+                return accept(if (reals == null) sample else sample.copy(reals = reals))
             } finally {
                 if (attempt !== session) primalPropagationWork += attempt.work
             }
         }
         outcome = "PINNING_DECLINED"
-        propose(LpRounding.NEAREST)?.let { return it }
-        if (problem.numRealVars > 0) {
-            val seed = initial?.takeIf {
-                it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars
+        fun roundings(reals: DoubleArray?): Sample? {
+            propose(LpRounding.NEAREST, reals = reals)?.let { return it }
+            if (problem.numRealVars > 0) {
+                if (seed != null) {
+                    propose(LpRounding.NEAREST, seed, reals)?.let { return it }
+                }
+                propose(LpRounding.UP, reals = reals)?.let { return it }
+                propose(LpRounding.DOWN, reals = reals)?.let { return it }
             }
-            if (seed != null) {
-                propose(LpRounding.NEAREST, seed)?.let { return it }
-            }
-            propose(LpRounding.UP)?.let { return it }
-            propose(LpRounding.DOWN)?.let { return it }
+            return null
         }
-        return null
+        if (reals != null) {
+            roundings(reals)?.let { return it }
+            seen.clear()
+        }
+        return roundings(null)
     } finally {
         primalPropagationWork += session.work
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)
