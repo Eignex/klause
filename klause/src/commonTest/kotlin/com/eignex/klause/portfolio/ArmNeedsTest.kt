@@ -26,13 +26,22 @@ class ArmNeedsTest {
 
     @Test
     fun `continuous majority counts real coordinates against all discrete coordinates`() {
-        for ((counts, expected) in listOf(Triple(0, 1, 1) to false, Triple(0, 1, 2) to true,
-            Triple(2, 1, 2) to false)
+        for (
+            (counts, expected) in listOf(
+            Triple(0, 1, 1) to false,
+            Triple(0, 1, 2) to true,
+            Triple(2, 1, 2) to false,
+        )
         ) {
             val (bools, ints, reals) = counts
             val model = Problem(
-                bools, ints, Array(ints) { IntDomain(0, 1) }, emptyArray(),
-                numRealVars = reals, realLower = DoubleArray(reals), realUpper = DoubleArray(reals) { 1.0 },
+                bools,
+                ints,
+                Array(ints) { IntDomain(0, 1) },
+                emptyArray(),
+                numRealVars = reals,
+                realLower = DoubleArray(reals),
+                realUpper = DoubleArray(reals) { 1.0 },
             ).bake()
 
             val majority = model.continuousMajority
@@ -63,9 +72,13 @@ class ArmNeedsTest {
     @Test
     fun `unused real declarations preserve the integer linear model fact`() {
         val model = Problem(
-            0, 2, arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
             arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         ).bake()
 
         val facts = ProblemFacts.of(model, ProblemProfile.of(model, optimizing = true), LpConfig.AGGRESSIVE)
@@ -79,7 +92,8 @@ class ArmNeedsTest {
         val facts = ProblemFacts.of(model, ProblemProfile.of(model, optimizing = true), LpConfig.OFF)
 
         val composed = PortfolioComposition.compose(
-            PortfolioScenario.sequential(Kind.COP).copy(lpCeiling = LpConfig.OFF), facts,
+            PortfolioScenario.sequential(Kind.COP).copy(lpCeiling = LpConfig.OFF),
+            facts,
         )
 
         assertFalse(composed.any { it.label == "lp-aggressive" })

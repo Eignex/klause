@@ -20,7 +20,8 @@ class PortfolioCompositionTest {
         val baseline = PortfolioComposition.compose(scenario, ProblemFacts(profile, binaryIntegers = true) { true })
 
         val composed = PortfolioComposition.compose(
-            scenario, ProblemFacts(profile, binaryIntegers = true, integerLinear = true) { true },
+            scenario,
+            ProblemFacts(profile, binaryIntegers = true, integerLinear = true) { true },
         )
 
         assertEquals(baseline.map { it.label } + "lp-aggressive", composed.map { it.label })
@@ -46,14 +47,19 @@ class PortfolioCompositionTest {
         val baseline = ProblemFacts(profile) { true }
         val integer = ProblemFacts(profile, integerLinear = true) { true }
         for (control in listOf(
-            scenario.copy(cores = 2), scenario.copy(engine = EngineMix.BACKTRACK),
-            scenario.copy(kind = Kind.CSP), scenario.copy(arms = 5), scenario.copy(btEdit = { it }),
+            scenario.copy(cores = 2),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(kind = Kind.CSP),
+            scenario.copy(arms = 5),
+            scenario.copy(btEdit = { it }),
             scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
             scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
             scenario.copy(annotationArm = BacktrackParams()),
         )) {
-            assertEquals(PortfolioComposition.compose(control, baseline).map { it.label },
-                PortfolioComposition.compose(control, integer).map { it.label })
+            assertEquals(
+                PortfolioComposition.compose(control, baseline).map { it.label },
+                PortfolioComposition.compose(control, integer).map { it.label },
+            )
         }
     }
 
@@ -65,8 +71,10 @@ class PortfolioCompositionTest {
 
         val plan = PortfolioComposition.plan(scenario, facts)
 
-        assertEquals(listOf("satOptimized", "selector-switch"),
-            plan.arms.filterIsInstance<BacktrackWorkerConfig>().map { it.label })
+        assertEquals(
+            listOf("satOptimized", "selector-switch"),
+            plan.arms.filterIsInstance<BacktrackWorkerConfig>().map { it.label },
+        )
         assertEquals(4, plan.arms.count { it is LocalSearchWorkerConfig })
     }
 
@@ -87,17 +95,23 @@ class PortfolioCompositionTest {
         )
 
         for (control in controls) {
-            assertTrue(PortfolioComposition.compose(control, finite).filterIsInstance<BacktrackWorkerConfig>()
-                .take(2).none { it.label == "selector-switch" })
+            assertTrue(
+                PortfolioComposition.compose(control, finite).filterIsInstance<BacktrackWorkerConfig>()
+                .take(2).none { it.label == "selector-switch" }
+            )
         }
         for (problemClass in listOf(ProblemClass.MixedInteger, ProblemClass.Sat, ProblemClass.PseudoBoolean)) {
             val facts = ProblemFacts(profile.copy(problemClass = problemClass)) { false }
-            assertTrue(PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
-                .take(2).none { it.label == "selector-switch" })
+            assertTrue(
+                PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+                .take(2).none { it.label == "selector-switch" }
+            )
         }
         val relaxation = ProblemFacts(profile) { true }
-        assertEquals(listOf("satOptimized", "lp-default"),
-            PortfolioComposition.compose(scenario, relaxation).take(2).map { it.label })
+        assertEquals(
+            listOf("satOptimized", "lp-default"),
+            PortfolioComposition.compose(scenario, relaxation).take(2).map { it.label },
+        )
     }
 
     @Test
