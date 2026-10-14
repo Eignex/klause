@@ -51,6 +51,7 @@ class LpExplanationTest {
                 LinearOp.EQ, 5.0)),
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val session = PropagationSession(problem)
+        session.implyIntAtMost(0, 1L)
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L))
         val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))
         val trail = LpBoundTrail(assertNotNull(relaxation.model.authoritativeModel()))
