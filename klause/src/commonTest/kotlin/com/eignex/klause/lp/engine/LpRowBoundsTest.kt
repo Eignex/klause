@@ -30,12 +30,19 @@ class LpRowBoundsTest {
 
     @Test
     fun `integral row products beyond Long retain exact coordinate bounds`() {
-        val source = LpBuilder().apply {
-            val x = addVar(0L, 3L)
-            val r = addRealVar(0.0, 1.0)
-            addRow(intArrayOf(x, r), longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE), Relation.LE, Long.MAX_VALUE)
-        }.build(Sense.MINIMIZE)
-        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val zero = ExactLpNumber.of(0L)
+        val wide = ExactLpNumber.of(Long.MAX_VALUE)
+        val source = ExactLpModel(
+            List(2) { listOf(ExactLpEntry(0, wide)) },
+            listOf(wide),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(3L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(1L))), integral = false),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()), ExactLpObjective(List(3) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
 
         val bound = mixedRowBounds(model).single()
 
@@ -45,21 +52,18 @@ class LpRowBoundsTest {
 
     @Test
     fun `signed row accumulator overflow retains exact rational projection`() {
-        val source = assertNotNull(LpBuilder().apply {
-            val x = addVar(0L, 2L)
-            val r = addRealVar(0.0, 1.0)
-            val s = addRealVar(0.0, 1.0)
-            val t = addRealVar(0.0, 1.0)
-            addRow(intArrayOf(x, r, s, t), longArrayOf(1L, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE),
-                Relation.LE, 1L)
-        }.build(Sense.MINIMIZE).authoritativeModel())
-        val columns = List(source.numVars) { column ->
-            val original = source.column(column)
-            if (column in 1..3) original.copy(bounds = original.bounds.copy(
-                upper = ExactLpSide(ExactLpNumber.of(Long.MAX_VALUE)),
-            )) else original
-        }
-        val model = assertNotNull(LpExactState(source.withBoundColumns(columns)).toWorkingModel())
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val wide = ExactLpNumber.of(Long.MAX_VALUE)
+        val source = ExactLpModel(
+            List(4) { column -> listOf(ExactLpEntry(0, if (column == 0) one else wide)) },
+            listOf(one),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L))))) +
+                List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(wide)), integral = false) } +
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            listOf(ExactLpRow()), ExactLpObjective(List(5) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
 
         val bound = mixedRowBounds(model).single()
 
