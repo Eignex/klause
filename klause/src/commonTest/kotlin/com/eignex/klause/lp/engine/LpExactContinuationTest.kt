@@ -195,7 +195,9 @@ class LpExactContinuationTest {
         for (upper in listOf(false, true)) {
             val source = ExactLpModel(
                 listOf(emptyList()), emptyList(),
-                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = !upper), ExactLpSide(one, strict = upper)))),
+                listOf(ExactLpColumn(ExactLpBounds(
+                    ExactLpSide(zero, strict = !upper), ExactLpSide(one, strict = upper),
+                ))),
                 emptyList(), ExactLpObjective(listOf(zero)),
             )
             val model = assertNotNull(LpExactState(source).toWorkingModel())

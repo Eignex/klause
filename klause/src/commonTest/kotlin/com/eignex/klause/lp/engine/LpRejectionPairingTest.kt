@@ -301,7 +301,7 @@ class LpRejectionPairingTest {
         return LpExactState(ExactLpModel(
             listOf(emptyList()), emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(one)))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(), ExactLpObjective(listOf(one)),
         ))
     }
 
