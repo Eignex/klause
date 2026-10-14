@@ -88,6 +88,10 @@ When rounded multipliers decline, one continued-fraction reconstruction candidat
 uses the same allowance and cancellation stride. Its recurrence steps are charged.
 Approximation only proposes the multipliers: every reduced cost and endpoint
 contribution is checked exactly, including zero reduced cost on a free column.
+Node-deduction phase outcomes distinguish completed integer, rounded, reconstructed
+and objective-integrality checks from missing endpoints, scalar width, resource
+limits and cancellation. They time existing attempts without additional numerical
+queries; their counts do not add to certifier invocation or work totals.
 Objective scale and external constants map the rational bound and reduced costs
 to minimized source units. Rational cutoff and fixing arithmetic charges operand word-length
 squared to the containing node work ledger; fixed-width integer fixing keeps its

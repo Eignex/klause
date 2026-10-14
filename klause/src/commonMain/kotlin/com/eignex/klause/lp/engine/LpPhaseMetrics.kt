@@ -9,6 +9,7 @@ internal enum class LpSolvePhase {
     EXACT_DUALS,
     CLEANUP,
     EXACT_LADDER,
+    NODE_DEDUCTION,
 }
 
 internal data class LpPhaseMetrics(
