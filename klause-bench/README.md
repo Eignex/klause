@@ -345,7 +345,9 @@ encoding. Native model presolve and search remain enabled.
 The image digest, importer policy, worker count and solver seed distinguish cache
 entries. Records retain effective `referenceSeed`, `referenceWorkers` and
 `cpModelPresolve` settings, complete original-variable `finalWitness`, raw output
-identity and `exactObjective`. Emitted `o` and `v` lines precede the final JSON
+identity, installed harness/runtime provenance, container exit/watchdog diagnostics
+and `exactObjective`. Failed or interrupted container processes remain undecided.
+Emitted `o` and `v` lines precede the final JSON
 verdict. Feasible claims without a complete witness and proofs with incompatible
 native settings are undecided. Native optimum/refutation statuses remain reference
 claims; a source-checked witness certifies feasibility and its objective only.
