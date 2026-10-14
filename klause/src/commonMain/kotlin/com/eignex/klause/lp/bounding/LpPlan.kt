@@ -78,7 +78,7 @@ data class LpPlan(
     val boundMaxOpsPerNode: Long = 20_000L,
     /**
      * Work — [com.eignex.klause.lp.engine.LpWork] operations — the one-shot pre-search root LP may
-     * spend on cut harvesting and the root bound, or `0` to bound it by the clock alone.
+     * spend on cut harvesting, the root bound and primal probes, or `0` to bound it by the clock alone.
      *
      * The root harvest decides which cuts every later node inherits, so time-boxing it makes the whole
      * search a function of machine speed — the single largest remaining source of run-to-run drift once

@@ -108,6 +108,9 @@ Private LP rounding, pump and proposal-verification propagation charge the same
 slice currency, including rejected proposals. Mixed proposal completion uses the
 containing root cancellation and real-leaf native ledger; composed verification
 adds its own short deadline without renewing the root allowance.
+Root primal queries retain the remaining cumulative root/native LP allowance;
+adaptive node limits do not select their primal points. Each completed attempt
+charges that allowance before a fallback can open another solver.
 Relative counters and saturating additions prevent a large allowance from wrapping.
 Retained finite optimization behind a finite external cutoff converts the slice's remaining work to an optional
 node-LP operation cap, subtracting fractional LP work already charged. The adapter

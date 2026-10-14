@@ -8,6 +8,16 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatTermination
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -17,6 +27,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsFeasibilityPumpTest {
@@ -104,6 +115,85 @@ class LpPrimalHeuristicsFeasibilityPumpTest {
 
         assertEquals(initial.ints.toList(), proposed.first())
         assertNotEquals(initial.ints.toList(), sample.ints.toList())
+    }
+
+    @Test
+    fun `LP primal probes do not offer a stopped relaxation iterate`() {
+        for (pump in listOf(false, true)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val objective = LinearObjective(intCoefficients = longArrayOf(1))
+            val sink = SolveStatsSink(backend = "stopped-primal")
+            var offered = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newTableauSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): TableauCutSolver {
+                    val delegate = ProductionLpEngineFactory.newTableauSolver(model, cancellation,
+                        iterationLimit, workLimit, trackDegeneracy, pricing)
+                    return object : TableauCutSolver by delegate {
+                        override val lastTermination = LpFloatTermination.WORK
+                        override fun solve(warm: Basis?): FloatLpResult? = delegate.solve(warm)?.let { result ->
+                            FloatLpResult(result.basis, result.objective, result.duals, result.primal, optimal = false)
+                        }
+                        override fun solvePrimal(warm: Basis?): FloatLpResult? = solve(warm)
+                    }
+                }
+            }
+
+            val proposal = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+                LpSolveContext(factory)).use { engine ->
+                if (pump) engine.lpFeasibilityPump(objective, Cancellation.Never) { offered++; it } else {
+                    engine.lpRoundingProbe(objective, Cancellation.Never) { offered++; it }
+                }
+            }
+
+            assertNull(proposal)
+            assertEquals(0, offered)
+            assertTrue(sink.snapshot().lp.rootPasses.sum > 0.0)
+        }
+    }
+
+    @Test
+    fun `primal fallback opens its dual solve with the remaining root allowance`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val limits = ArrayList<Long>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newTableauSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): TableauCutSolver {
+                limits += workLimit
+                val delegate = ProductionLpEngineFactory.newTableauSolver(model, cancellation,
+                    iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : TableauCutSolver by delegate {
+                    private var spent = 0L
+                    override val lastMetrics get() = LpSolveMetrics(workOps = spent)
+                    override fun solvePrimal(warm: Basis?): FloatLpResult? {
+                        spent = 5_000L
+                        return null
+                    }
+                }
+            }
+        }
+        val plan = LpPlan(bounding = true, rootMaxWork = 12_000L)
+        val sink = SolveStatsSink(backend = "primal-fallback")
+
+        LpEngine(problem, objective, LpParams(lpPlan = plan, solveBudgetMillis = 4L), sink,
+            LpSolveContext(factory)).use { engine ->
+            assertNotNull(engine.lpFeasibilityPump(objective, Cancellation.Never))
+        }
+
+        assertEquals(listOf(12_000L, 7_000L), limits)
     }
 
     @Test

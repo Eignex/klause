@@ -451,6 +451,10 @@ Each distinct proposal receives fresh propagation and real completion. Directed
 rounding reuses the root solve and retains its time/work allowance; it neither
 changes the relaxation nor installs a source bound. This permits a rounded
 capacity proposal to retain the continuous flow that nearest rounding can remove.
+Root primal solves use the remaining cumulative root and LP work allowances rather
+than the adaptive node-query allowance. A stopped dual iterate supplies only a
+bounding candidate and cannot supply a primal target. Primal/dual fallback opens
+a fresh solve with the remaining allowance; it does not renew the root budget.
 
 Root primal diagnostics distinguish rounding and pump pinning from proposal
 completion and cutoff admission. `PRIMAL_ROUNDING_ROOT` and
@@ -459,6 +463,8 @@ completion and cutoff admission. `PRIMAL_ROUNDING_ROOT` and
 final verification, cancellation and non-improving outcomes. Their phase times
 are inclusive and overlap native solve and verification phases. These observations
 carry no witness or proof authority.
+`PRIMAL_LP_PRIMAL_ROOT` and `PRIMAL_LP_DUAL_ROOT` distinguish completed optimal
+candidates from stopped or unavailable points before rounding.
 
 [Theory contracts](../theories.md) define the fragment-specific checks and evidence.
 Difference graphs, exact linear systems and polynomial completion keep their own

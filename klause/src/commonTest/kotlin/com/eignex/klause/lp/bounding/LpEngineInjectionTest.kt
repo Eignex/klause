@@ -104,6 +104,37 @@ class LpEngineInjectionTest {
     }
 
     @Test
+    fun `root primal queries retain the smaller remaining root and LP allowance`() {
+        for ((rootLimit, spent, expected) in listOf(
+                Triple(12_000L, 5_000L, 7_000L),
+                Triple(50_000L, 5_000L, 15_000L),
+                Triple(0L, 5_000L, 15_000L),
+                Triple(12_000L, 20_000L, 1L),
+            )
+        ) {
+            val plan = LpPlan(bounding = true, rootMaxWork = rootLimit)
+            budgetedEngine(SolveStatsSink(backend = "primal-root-cap"), plan).use { engine ->
+                engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = spent))
+
+                assertEquals(expected, engine.rootPrimalWorkBudget())
+            }
+        }
+    }
+
+    @Test
+    fun `root primal work is independent of the adaptive node allowance`() {
+        val problem = boundedProblem()
+        val plan = LpPlan(bounding = true, rootMaxWork = 50_000_000L)
+        val engine = LpEngine(problem, LinearObjective(), LpParams(lpPlan = plan),
+            SolveStatsSink(backend = "primal-root-allowance"))
+
+        engine.use {
+            assertEquals(50_000_000L, it.rootPrimalWorkBudget())
+            assertTrue(it.nodeWorkBudget() < it.rootPrimalWorkBudget())
+        }
+    }
+
+    @Test
     fun `node queries use the smaller containing and offered native allowances`() {
         val problem = boundedProblem()
         var allowance: Long? = null
