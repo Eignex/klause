@@ -212,7 +212,7 @@ private class MixedCertificateMeter(private val cancellation: Cancellation) {
     val work: Long get() = meter.work
     fun poll() { if (cancellation()) throw LpProjectionStop() }
     fun step() = charge(1L, 0L, matrix = true)
-    fun reconstructionStep() = charge(8L, 32L, matrix = false)
+    fun reconstructionStep() = charge(8L, 96L, matrix = false)
     fun reserve(bytes: Long) = charge(bytes / 8L + 1L, bytes, matrix = false)
 
     private fun charge(work: Long, bytes: Long, matrix: Boolean) {
