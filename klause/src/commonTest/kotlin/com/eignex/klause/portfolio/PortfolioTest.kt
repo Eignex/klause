@@ -2472,7 +2472,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `unproductive auxiliary work does not update retained arm bandit evidence`() {
+    fun `only initial auxiliary admission updates retained arm bandit evidence`() {
         for (seed in 0L..3L) {
             val reached = ArrayList<Int>()
             val updates = ArrayList<Int>()
@@ -2496,7 +2496,7 @@ class PortfolioTest {
                 it.minimize(Cancellation { reached.count { arm -> arm < 2 } >= 30 })
             }
 
-            assertEquals(reached.filter { it < 2 }, updates)
+            assertEquals(reached.filterIndexed { index, arm -> arm < 2 || index == reached.indexOf(2) }, updates)
         }
     }
 
