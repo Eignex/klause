@@ -5,7 +5,6 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
 import com.eignex.klause.backtrack.ResumableSatisfaction
 import com.eignex.klause.backtrack.composedFixpoint
-import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -88,10 +87,11 @@ internal class CoreGuidedSearch(
     private var coreCursor = 0
     private var coreLiterals = IntArray(0)
     private var coreEncoded = false
+    private var pendingThreshold: ThresholdTail? = null
     private var completedCores = 0L
     private var largestCore = 0
 
-    private class ThresholdTail(val literals: IntArray, val minimum: Int, val weight: BigInt)
+    private class ThresholdTail(val counter: CoreGuidedThreshold, val minimum: Int, val weight: BigInt)
 
     init {
         require(maximumWork == null || maximumWork >= 0L) { "core work limit must be nonnegative" }
@@ -269,9 +269,27 @@ internal class CoreGuidedSearch(
 
     private fun extendCore() {
         val selected = requireNotNull(core)
+        val pending = pendingThreshold
+        if (pending != null) {
+            val literal = pending.counter.advance(pending.minimum, allocate = {
+                recordPreparation(1L)
+                Lit.make(nextBool++, true)
+            }, clause = {
+                recordPreparation(1L + it.size)
+                factors.add(Clause(it))
+            }, charge = ::recordPreparation) ?: return
+            val id = Lit.variable(literal)
+            weights[id] = pending.weight
+            if (pending.minimum < pending.counter.literals.size) {
+                tails[id] = ThresholdTail(pending.counter, pending.minimum + 1, pending.weight)
+            }
+            pendingThreshold = null
+        }
         if (!coreEncoded) {
             coreEncoded = true
-            if (selected.size > 1) appendThreshold(coreLiterals, 2, coreWeight)
+            if (selected.size > 1) {
+                pendingThreshold = ThresholdTail(CoreGuidedThreshold(coreLiterals), 2, coreWeight)
+            }
             return
         }
         val end = minOf(selected.size, coreCursor + 256)
@@ -281,7 +299,10 @@ internal class CoreGuidedSearch(
             val residual = requireNotNull(weights[id]) - coreWeight
             if (residual == BIG_ZERO) {
                 weights.remove(id)
-                tails.remove(id)?.let { appendThreshold(it.literals, it.minimum, it.weight) }
+                tails.remove(id)?.let {
+                    pendingThreshold = it
+                    return
+                }
             } else {
                 weights[id] = residual
             }
@@ -294,16 +315,6 @@ internal class CoreGuidedSearch(
         val maximum = maximumWeight() ?: coreWeight
         threshold = if (current < maximum) current else maximum
         core = null
-    }
-
-    private fun appendThreshold(literals: IntArray, minimum: Int, weight: BigInt) {
-        val aux = nextBool++
-        factors.add(ReifiedCardinality(aux, literals, min = minimum, max = literals.size))
-        weights[aux] = weight
-        recordPreparation(1L + literals.size)
-        // Every latent higher threshold implies this frontier. It stays false in a completed
-        // all-residual query; spending the frontier exposes its successor at the original weight.
-        if (minimum < literals.size) tails[aux] = ThresholdTail(literals, minimum + 1, weight)
     }
 
     private fun maximumWeight(below: BigInt? = null): BigInt? {
@@ -402,6 +413,12 @@ internal class CoreGuidedSearch(
         if (closed) return
         finishQuery()
         queryModel = null
+        pendingThreshold = null
+        tails.clear()
+        weights.clear()
+        factors.clear()
+        core = null
+        coreLiterals = IntArray(0)
         closed = true
     }
 

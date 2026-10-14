@@ -304,12 +304,17 @@ backtrack solver without transferring optimization-session ownership to it.
 
 Weights, negative-coefficient offsets and the accumulated lower bound use arbitrary-precision
 integers. A refuted core charges its minimum residual weight. Its violation count `s`
-is replaced by `1 + sum(k = 2..n, s >= k)` using exact reified cardinality thresholds;
+is replaced by `1 + sum(k = 2..n, s >= k)` using exact Boolean threshold frontiers;
 only the first unspent threshold of each count is materialized. Higher thresholds
 remain latent at the count's original weight and imply its active frontier. A partial
 weight split keeps that frontier; spending its final residual exposes the successor.
 An all-residual SAT query makes every frontier and therefore every latent tail false.
-Core weight updates checkpoint in batches and publish their floor only after completion.
+Each count retains the last complete prefix layer and a private next-layer cursor.
+The prefix recurrence `p(i, k) = p(i-1, k) or (p(i-1, k-1) and literal(i))` uses
+clauses in both directions, so a frontier equals the source count predicate. Prefix
+entries checkpoint in batches of 256; completed clauses remain private until the
+whole core update finishes. Clausal source models retain native SAT propagation
+through these private frontiers. Core weight updates publish their floor only after completion.
 Uncancelled residual weights stay active. This identity covers overlapping cores and
 cores containing thresholds from earlier rounds. Production core searches assume
 all positive residual terms together, so unavoidable violations can establish a
