@@ -335,7 +335,9 @@ exact checks and scoring delta consistency remain extension obligations.
 `encoder.select(factor, target)` returns a prepared `Encoder`. Direct/equivalent
 support authorizes the complete relation; conditioned support also declares required
 integer fixings or Boolean pins. The receiving `TheoryEncoding` captures those source
-conditions, installs the full relation and owns private coordinate allocation.
+conditions, stages the full relation and owns private coordinate allocation. The
+consumer commits that scope only after a successful installation; a decline discards
+all staged constraints and auxiliaries.
 Relaxation-only and unsupported support decline enforcing installation. Resource
 and missing-condition declines remain explicit `EncoderDecline` outcomes. Extensions
 keep installers deterministic over immutable factor data and must preserve every
@@ -387,5 +389,7 @@ state. Selected factories remain private to each live worker.
 `ComponentPlan.factorOwner` records the primary enforcing path and `factorEncoded`
 records arithmetic participation. A bounded linear relation can retain propagation
 and its encoder simultaneously. `ExecutionComponentDescriptor.participatingFactorIndices`
-records that overlap without duplicating factor or coordinate ownership. Source finite
+records that overlap without duplicating factor or coordinate ownership. Complete
+admission can use an enforcing arithmetic peer when finite deduction requires source
+certification. Source finite
 choices are not promoted because another relation needs arithmetic or exact coefficients.

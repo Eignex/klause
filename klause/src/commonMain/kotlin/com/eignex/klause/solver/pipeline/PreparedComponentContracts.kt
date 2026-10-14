@@ -78,6 +78,7 @@ internal fun Problem.finiteComponentContract(
         val factor = this.factors[index]
         val selected = capabilities(index)
         if (selected.propagationCheck == AssignmentCheckCapability.EXACT) return true
+        if (sourceCompletion && ownership?.factorEncoded(index) == true) return true
         if (factor.variables.reals.isNotEmpty()) {
             return selected.propagationCheck == AssignmentCheckCapability.SOURCE_CERTIFICATION && sourceCompletion
         }

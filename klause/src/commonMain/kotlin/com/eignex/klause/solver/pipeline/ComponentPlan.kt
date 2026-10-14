@@ -257,10 +257,10 @@ class ComponentPlan internal constructor(
         }
     }
 
-    internal fun forLinearConditions(spec: Problem): ComponentPlan? {
+    internal fun forLinearConditions(spec: Problem, retainEmptyTheory: Boolean = false): ComponentPlan? {
         requireBelongsTo(spec)
         if (unplaceable != null) return null
-        if (spec.numIntVars == 0 && spec.numRealVars == 0) return this
+        if (spec.numIntVars == 0 && spec.numRealVars == 0 && !retainEmptyTheory) return this
         val selected = spec.componentPlan(factorProjections)
         if (selected.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN) return null
         val fragment = factorProjections.linearTheoryModel(EncodingTarget.LINEAR,
@@ -337,8 +337,14 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
         linear?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
         else -> null
     }
-    val target = if (completeTheory == ProblemPipeline.DIFFERENCE_THEORY) EncodingTarget.DIFFERENCE
-        else EncodingTarget.LINEAR
+    val requiresDifference = numRealVars == 0 && factors.indices.any { index ->
+        factors[index].intVars.any { intOwners[it] == IntVariableOwner.THEORY } &&
+            !projections.encoder(index, EncodingTarget.LINEAR).enforcesSource &&
+            projections.encoder(index, EncodingTarget.DIFFERENCE).enforcesSource
+    }
+    val target = if (completeTheory == ProblemPipeline.DIFFERENCE_THEORY || requiresDifference) {
+        EncodingTarget.DIFFERENCE
+    } else EncodingTarget.LINEAR
     val factorOwners = Array(factors.size) { index ->
         val factor = factors[index]
         when {
@@ -385,7 +391,7 @@ fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: 
     val fragment = projections.linearTheoryModel(EncodingTarget.LINEAR, kept)
     val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE,
         kept.filter { factorOwners[it] != FactorOwner.SHARED })
-    val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0 || completeTheory != null
+    val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
     val route = when {
         unownedOpenColumn != null || unownedRealFactor -> ProblemPipeline.UNSUPPORTED_OPEN
         !needsArithmetic -> ProblemPipeline.FINITE_CP

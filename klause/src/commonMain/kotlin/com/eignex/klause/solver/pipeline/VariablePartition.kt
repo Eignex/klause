@@ -7,10 +7,10 @@ import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.ir.IntegralConstants
 
-/** Partition integer variables by whether finite-domain search must branch on them. */
+/** Factor representation eligibility; [ComponentPlan] independently owns finite choices. */
 class VariablePartition(private val searchRequired: BooleanArray) {
 
-    /** Whether finite-domain search must branch on [v]. */
+    /** Whether some factor needs a finite enforcement path for [v]. */
     fun isSearchVariable(v: Int): Boolean = searchRequired[v]
 
     /** Whether [v] can be decided by a theory. */

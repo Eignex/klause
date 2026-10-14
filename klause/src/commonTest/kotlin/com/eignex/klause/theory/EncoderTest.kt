@@ -10,6 +10,7 @@ import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.IntegralConstants
@@ -49,6 +50,7 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.polynomialRequest
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.skema.SchemaDef
@@ -215,10 +217,41 @@ class EncoderTest {
         val plan = source.prepareExecutionPlan(providers)
         val ownership = assertNotNull(plan.componentPlan)
 
-        val result = ownership.search(source, emptyMap()).use { it.session.solve(source.numBoolVars) }
+        val result = ownership.search(source, emptyMap()).use {
+            if (it.session.initialize() is ComponentResult.Conflict) SearchResult.Exhausted
+            else it.session.solve(source.numBoolVars)
+        }
 
         assertEquals(ProblemPipeline.DIFFERENCE_THEORY, ownership.theoryPipeline)
         assertIs<SearchResult.Exhausted>(result)
+    }
+
+    @Test
+    fun `selected difference relations compose beside an unencoded finite global`() {
+        val open = Bits(3).also { it.set(2) }
+        val source = Problem(0, IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(1, 1, 0),
+            null, open), arrayOf<Factor>(
+            AllDifferent(intArrayOf(0, 1), 0, 2),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.EQ, 1),
+        ))
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            if (target == EncodingTarget.DIFFERENCE) BuiltInEncoderProvider.select(factor, target)
+            else Encoder(EncoderSupport.UNSUPPORTED)
+        })
+        val prepared = source.prepareExecutionPlan(providers)
+        val plan = assertNotNull(prepared.componentPlan)
+
+        val result = plan.search(source, plan.cpSourceDomains(source)).use {
+            assertIs<ComponentResult.Consistent>(it.session.initialize())
+            it.session.solve(source.numBoolVars)
+        }
+
+        assertTrue(prepared.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+        assertEquals(FactorOwner.CP, plan.factorOwner(0))
+        assertFalse(plan.factorEncoded(0))
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
+        assertIs<SearchResult.Satisfied>(result)
     }
 
     @Test
@@ -242,6 +275,27 @@ class EncoderTest {
         assertEquals(listOf(IntVariableOwner.CP, IntVariableOwner.CP), (0..1).map(plan::intOwner))
         assertEquals(listOf(FactorOwner.CP, FactorOwner.CP), (0..1).map(plan::factorOwner))
         assertTrue((0..1).all(plan::factorEncoded))
+    }
+
+    @Test
+    fun `bounded fractional rows admit their retained finite and arithmetic peers`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(
+            Linear(intArrayOf(0), doubleArrayOf(0.5), intArrayOf(), doubleArrayOf(), LinearOp.EQ, 0.5),
+        ))
+        val prepared = source.prepareExecutionPlan()
+        val plan = assertNotNull(prepared.componentPlan)
+
+        val result = plan.search(source, plan.cpSourceDomains(source)).use {
+            assertIs<ComponentResult.Consistent>(it.session.initialize())
+            it.session.solve(source.numBoolVars)
+        }
+
+        assertTrue(prepared.capabilities.admission(ExecutionStrategy.COMPLETE).runnable)
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
+        assertEquals(FactorOwner.CP, plan.factorOwner(0))
+        assertTrue(plan.factorEncoded(0))
+        val model = assertIs<SearchResult.Satisfied>(result).model
+        assertEquals(1L, model.valueOf<Long>(com.eignex.klause.solver.search.SearchIntValue(0)))
     }
 
     @Test
@@ -294,7 +348,10 @@ class EncoderTest {
         val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { null })
         val plan = assertNotNull(source.prepareExecutionPlan(providers).componentPlan)
 
-        val result = plan.search(source, emptyMap()).use { it.session.solve(source.numBoolVars) }
+        val result = plan.search(source, emptyMap()).use {
+            assertIs<ComponentResult.Consistent>(it.session.initialize())
+            it.session.solve(source.numBoolVars)
+        }
 
         val model = assertIs<SearchResult.Satisfied>(result).model
         assertEquals(true, model.valueOf<Boolean>(SearchBoolValue(0)))

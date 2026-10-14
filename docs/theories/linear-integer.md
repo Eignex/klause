@@ -18,16 +18,19 @@ remain in their admitted finite projection; an open integer used by a CP-only
 factor requires a valid owner or the route declines.
 
 An entirely admitted difference fragment can use [difference logic](difference.md).
-A bounded source can use finite search according to pipeline policy; finite bounds
-do not change the source arithmetic fragment. SMT admission remains defined by
+Finite declarations retain their finite domain state and choices under either
+pipeline policy. A bounded linear factor can contribute both propagation and an
+encoder to joint reasoning; the theory waits for authoritative finite assignments
+before publishing a completed point. SMT admission remains defined by
 [SMT-LIB semantics](../formats/smtlib.md).
 
 ## Solving and composition
 
 The linear component asserts active source rows under shared Boolean choices.
 Exact integer reductions and bound reasoning can simplify the remaining system.
-A fractional candidate causes complementary integer branches at exact floor and
-ceiling thresholds. Shared search owns decision levels, retraction and conflict
+A fractional open-integer candidate causes complementary branches at exact floor
+and ceiling thresholds. Finite variables receive scoped fixings from their finite
+owner, preserving bounds and holes. Shared search owns decision levels, retraction and conflict
 learning; the arithmetic component owns row assertions and numerical checks.
 
 [Open portfolios](../solver/portfolio.md) can pair the proof-producing route with

@@ -71,7 +71,12 @@ internal fun PreparedSource.planned(
     model: Problem,
     projections: PreparedFactorProjections? = null,
 ): OpenSourcePreparation.Planned {
-    val plan = projections?.forEngineView(model)?.let { model.componentPlan(it) } ?: model.componentPlan()
+    val selected = projections?.forEngineView(model)?.let { model.componentPlan(it) } ?: model.componentPlan()
+    val plan = if (selected.theoryPipeline == ProblemPipeline.FINITE_CP) {
+        requireNotNull(selected.forLinearConditions(model, retainEmptyTheory = true)) {
+            "source preparation lost the selected arithmetic completion"
+        }
+    } else selected
     require(
         plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
             plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN,
