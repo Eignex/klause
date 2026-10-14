@@ -38,9 +38,12 @@ import kotlin.test.assertTrue
 
 class CoreGuidedSearchTest {
     @Test
-    fun `rebuilt core queries retain selected source propagation`() {
-        val hard = Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))
-        val source = Problem(2, 0, emptyArray(), arrayOf(hard))
+    fun `rebuilt core queries retain captured propagation in engine views`() {
+        val hard = Clause(intArrayOf(Lit.make(3, false), Lit.make(5, false)))
+        val source = Problem(6, 0, emptyArray(), arrayOf(hard))
+        val engineView = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+        ))
         var augmentedChecks = 0
         val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
             if (factor != hard) BuiltInPropagationProjectionProvider.select(factor)
@@ -48,7 +51,7 @@ class CoreGuidedSearchTest {
                 val delegate = BuiltInPropagationProjectionProvider.create(view, null)
                 object : Propagator by delegate {
                     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-                        if (state.problem.numBoolVars > source.numBoolVars) augmentedChecks++
+                        if (state.problem.numBoolVars > engineView.numBoolVars) augmentedChecks++
                         return delegate.propagate(state, factorId)
                     }
                 }
@@ -56,7 +59,9 @@ class CoreGuidedSearchTest {
         })
         val objective = LinearObjective(longArrayOf(-5, -3), constant = 8)
 
-        val result = CoreGuidedSolver(source.bake(providers)).minimize(objective, BacktrackParams())
+        val selection = providers.prepare(source).projected(engineView, intArrayOf(0))
+
+        val result = CoreGuidedSolver(engineView.bake(selection)).minimize(objective, BacktrackParams())
 
         val optimal = assertIs<MinimizeResult.Optimal>(result)
         assertEquals(3L, objective.evaluateLong(optimal.sample))
