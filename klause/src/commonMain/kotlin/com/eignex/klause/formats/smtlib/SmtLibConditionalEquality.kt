@@ -54,7 +54,12 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private val booleanDefinitions = HashMap<Int, List<Factor>>()
     private val equalities = HashMap<Key, Int>()
     private val pendingEqualities = LinkedHashMap<Key, PendingEquality>()
+    private var hasElidedConditional = false
     private var work = 0
+
+    fun noteElidedConditional() {
+        hasElidedConditional = true
+    }
 
     fun define(
         variable: Int,
@@ -132,7 +137,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         sourceBooleans: Collection<Int>,
         objective: LinearObjectiveSpec?,
     ): UnusedColumns {
-        if (definitions.isEmpty()) return UnusedColumns(emptySet(), emptySet())
+        if (definitions.isEmpty() && !hasElidedConditional) return UnusedColumns(emptySet(), emptySet())
         val owners = HashMap<Factor, Owner>()
         val integerOwners = definitions.keys.associateWith { Owner(it, integer = true) }
         val booleanOwners = HashMap<Int, Owner>()

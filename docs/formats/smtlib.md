@@ -86,6 +86,7 @@ An integer conditional with a constant guard returns its selected branch directl
 A directly nested single-guard integer conditional can be restricted by the enclosing
 branch's compiled literal or complement. This reads its definition without changing
 shared uses. Equal surviving narrow branch terms reuse that term without a selection.
+Definition dependency pruning still runs when this removes the last integer selection.
 Unmatched and multiple-guard definitions are not restricted; wide terms retain their exact lowering.
 Conditional definitions retain immutable equality meanings for their guards.
 When a branch compares a simple integer variable with a constant, these meanings
