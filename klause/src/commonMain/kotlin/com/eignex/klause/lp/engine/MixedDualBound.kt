@@ -13,6 +13,7 @@ internal fun nodeDualCertificate(
     eliminateContinuousObjective: Boolean = false,
     onAdditionalCertificate: ((LpDeductionCertificate) -> Unit)? = null,
     sharedMeter: MixedCertificateMeter? = null,
+    preferredColumns: IntArray? = null,
 ): LpDeductionCertificate? {
     if (!model.hasContinuous) return integerCertify(model, duals, observer = observer)
     val meter = sharedMeter ?: MixedCertificateMeter(cancellation)
@@ -89,7 +90,7 @@ internal fun nodeDualCertificate(
     } else if (primary != null && onAdditionalCertificate != null) {
         try {
             meter.attempt(observer, "FINITE_ENDPOINT_CANCEL") {
-                finiteEndpointCancellation(model, primary, meter)
+                finiteEndpointCancellation(model, primary, meter, preferredColumns)
             } ?: objectiveCertificate?.let {
                 meter.attempt(observer, "BLENDED") { blendedCertificate(model, primary, it, meter) }
             }
@@ -333,6 +334,7 @@ private fun finiteEndpointCancellation(
     model: LpModel,
     certificate: LpDeductionCertificate,
     meter: MixedCertificateMeter,
+    preferredColumns: IntArray?,
 ): LpDeductionCertificate? {
     val state = model.exactState ?: return null
     var first = -1
@@ -347,7 +349,7 @@ private fun finiteEndpointCancellation(
         }
     }
     if (first < 0) return null
-    val changedRows = changedIntegralRows(state, meter)
+    val changedRows = changedIntegralRows(state, meter, preferredColumns)
     meter.reserve(model.m * 8L + 128L)
     val y = MutableList(model.m) { meter.multiplier(certificate, it) }
     val counts = continuousRowCounts(model, state, meter)
@@ -398,17 +400,23 @@ private fun finiteEndpointCancellation(
     return null
 }
 
-private fun changedIntegralRows(state: LpExactState, meter: MixedCertificateMeter): BooleanArray? {
+private fun changedIntegralRows(
+    state: LpExactState,
+    meter: MixedCertificateMeter,
+    preferredColumns: IntArray?,
+): BooleanArray? {
     val source = state.model
-    meter.reserve(source.numVars.toLong() * 8L + 64L)
-    val columns = state.changedColumns
-    if (columns.isEmpty()) return null
+    val columns = if (preferredColumns != null) preferredColumns.asIterable() else {
+        meter.reserve(source.numVars.toLong() * 8L + 64L)
+        state.changedColumns
+    }
+    if (!columns.iterator().hasNext()) return null
     meter.reserve(source.m.toLong() + 32L)
     val selected = BooleanArray(source.m)
     var any = false
     for (column in columns) {
         meter.step()
-        if (column >= source.n || !source.column(column).integral) continue
+        if (column !in 0 until source.n || !source.column(column).integral) continue
         for (entry in source.columnEntries(column)) {
             meter.step()
             if (entry.number.value.isZero || !state.rows.row(entry.row).active) continue
