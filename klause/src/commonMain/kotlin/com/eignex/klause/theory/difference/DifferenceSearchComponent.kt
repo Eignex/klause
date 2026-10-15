@@ -149,7 +149,7 @@ class DifferenceSearchComponent private constructor(
         }
         if (stopped()) return abandon()
         cycle?.let {
-            val explanation = cycleExplanation(fragment, it)
+            val explanation = cycleExplanation(it)
             if (stopped()) return abandon()
             return ComponentResult.Conflict(explanation)
         }
@@ -357,9 +357,11 @@ class DifferenceSearchComponent private constructor(
         ShortestPaths.Abandoned -> ComponentResult.Consistent
     }
 
-    private fun cycleExplanation(fragment: DifferenceFragment, cycle: IntArray): SearchExplanation? {
-        val guards = cycle.map { fragment.edges[it].guard }
-        if (guards.any { it == DifferenceEdge.ALWAYS }) return null
+    private fun cycleExplanation(cycle: IntArray): SearchExplanation? {
+        val original = base ?: return null
+        // Appended bounds have no Boolean premises; only immutable source edges may be discharged.
+        if (cycle.any { it !in original.edges.indices }) return null
+        val guards = cycle.map { original.edges[it].guard }.filter { it != DifferenceEdge.ALWAYS }
         return SearchExplanation(guards.distinct().map(Lit::negate).toIntArray())
     }
 
