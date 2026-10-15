@@ -392,7 +392,7 @@ class OpenTheoryEngine internal constructor(
         try {
             (planned.theory as? ExactLiraSearchComponent)?.let {
                 it.observeCompleteTraversal()
-                it.useMixedDifferenceCompletion()
+                it.useMixedPointCompletion()
             }
             planned.session.bindOpenTheoryWork(work)
             when (planned.session.initialize()) {
