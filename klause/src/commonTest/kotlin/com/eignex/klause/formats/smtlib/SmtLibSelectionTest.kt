@@ -69,19 +69,23 @@ class SmtLibSelectionTest {
 
     @Test
     fun `wide conditional digits share one source condition`() {
-        val magnitude = "18446744073709551616"
-        val parsed = SmtLib.parse("""
-            (declare-const b Bool) (declare-const y Int)
-            (assert b) (assert (= y (ite b $magnitude (- $magnitude))))
-            (assert (>= y $magnitude))
-        """.trimIndent())
+        val magnitude = "18446744073709551623"
+        for (branch in listOf(true, false)) {
+            val parsed = SmtLib.parse("""
+                (declare-const b Bool) (declare-const y Int)
+                (assert ${if (branch) "b" else "(not b)"})
+                (assert (= y (ite b $magnitude (- $magnitude))))
+                (assert (${if (branch) ">=" else "<="} y ${if (branch) magnitude else "(- $magnitude)"}))
+            """.trimIndent())
 
-        val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+            val result = BacktrackSolver.source(parsed.model).solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
 
-        val selections = parsed.model.factors.filterIsInstance<Element>()
-        assertTrue(selections.isNotEmpty())
-        assertEquals(1, selections.map { it.idx }.distinct().size)
-        assertEquals(magnitude, assertIs<OpenTheoryResult.Sat>(result).assignment
-            .intValue(parsed.intVarNames.getValue("y")))
+            val selections = parsed.model.factors.filterIsInstance<Element>()
+            assertTrue(selections.isNotEmpty())
+            assertEquals(1, selections.map { it.idx }.distinct().size)
+            assertEquals(if (branch) magnitude else "-$magnitude",
+                assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+                    .intValue(parsed.intVarNames.getValue("y")))
+        }
     }
 }

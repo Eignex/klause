@@ -10,7 +10,9 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SmtLibIteChainTest {
 
@@ -68,14 +70,21 @@ class SmtLibIteChainTest {
     }
 
     @Test
-    fun `a chain on an unbounded selector should stay a decision list`() {
+    fun `a chain on an unbounded selector keeps source bounds open`() {
         val text = """
             (declare-const s Int) (declare-const r Int)
             (assert (= r ${chain("s") { "${it * 10}" }}))
             (check-sat)
         """.trimIndent()
 
-        assertEquals(0, elementCount(text))
+        val parsed = SmtLib.parse(text)
+        val selector = parsed.intVarNames.getValue("s")
+        val selections = parsed.model.factors.filterIsInstance<Element>()
+
+        assertFalse(parsed.model.intBounds.hasLower(selector))
+        assertFalse(parsed.model.intBounds.hasUpper(selector))
+        assertTrue(selections.isNotEmpty())
+        assertTrue(selections.all { it.idx != selector })
     }
 
     @Test
