@@ -88,6 +88,13 @@ candidate intervals as needed. No fixed precision determines equality or order.
 Rational sector samples are chosen strictly between ordered algebraic boundaries,
 or beyond the finite bound of an unbounded sector.
 
+Each arithmetic context retains up to two completed real-root cardinalities for
+immutable defining polynomials. Isolation produces those facts; negative affine
+transforms reuse them when reversing root order. Missing counts use the same exact
+isolation primitive. Capture and coefficient comparisons debit the current token;
+no caller supplies a cached count. This bounded context cache retains no intervals
+or source verdicts, and published scalars retain no cache or control owner.
+
 A point evaluation captures its own exact coordinate map and retains completed
 coordinate powers by ID and exponent. Each point owns a separate cache. Capture,
 lookups and completed inserts debit the same arithmetic token; an interrupted

@@ -13,6 +13,35 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `completed root counts fit negative affine transforms in remaining caller work`() {
+        var spent = 0L
+        var limit = Long.MAX_VALUE
+        val meter = WorkMeter { spent += it }
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= limit
+            override fun workMeter(): WorkMeter = meter
+        }
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
+        val root = counted.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        limit = spent + 64
+
+        val negative = counted.negate(root)
+
+        assertEquals(1, negative.rootIndex)
+        assertEquals(-1, arithmetic.sign(negative))
+    }
+
+    @Test
+    fun `negative affine images retain root order for distinct defining polynomials`() {
+        val first = arithmetic.roots(RationalPolynomial.of(-2, 0, -1, 0, 1)).last()
+        val second = arithmetic.roots(RationalPolynomial.of(6, 0, -5, 0, 1)).last()
+
+        val negatives = listOf(first, second).map(arithmetic::negate)
+
+        for (negative in negatives) assertEquals(1, negative.rootIndex)
+    }
+
+    @Test
     fun `rational coefficient lifting returns only actual real roots`() {
         val source = RationalPolynomial.of(-2, 0, -1, 0, 1)
         val lifted = arithmetic.polynomial(source.coefficients.map(arithmetic::rational))
