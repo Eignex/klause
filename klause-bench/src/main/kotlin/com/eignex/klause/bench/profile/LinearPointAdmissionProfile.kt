@@ -15,6 +15,7 @@ import com.eignex.klause.solver.pipeline.PlannedSearch
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.security.MessageDigest
@@ -119,7 +120,7 @@ internal object LinearPointAdmissionProfile {
                         put("disjunctionGroups", (field(component, "disjunctionAtoms") as Map<*, *>).size)
                         put("firstUnfixedFiniteVariable", firstFinite)
                         put("firstUnfixedFinitePoint", finiteValue?.toString())
-                        put("firstUnfixedFinitePointIntegral", finiteValue?.isInteger())
+                        put("firstUnfixedFinitePointIntegral", finiteValue?.let { it.den == BIG_ONE })
                         put("dirty", field(component, "dirty") as Boolean)
                         put("pendingPointForward", field(component, "pendingPointForward") as Boolean)
                         put("decisionLevel", planned.session.decisionLevel)
