@@ -19,6 +19,41 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `bounded mixed decimal loading retains finite execution under default and exact settings`() {
+        val source = File.createTempFile("mps-finite-decimal", ".mps").apply {
+            writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
+                " M1 'MARKER' 'INTEND'\n X COST 0.1 R 1\nRHS\n RHS R 0.2\n" +
+                "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0.1\nENDATA\n")
+            deleteOnExit()
+        }
+
+        for (exact in listOf(false, true)) {
+            val solvable = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
+
+            assertIs<SolvablePipeline.FiniteCp>(solvable.pipeline)
+            assertEquals(1, assertNotNull(solvable.problem).numIntVars)
+            assertEquals(!exact, solvable.toleranceCheck != null)
+        }
+    }
+
+    @Test
+    fun `joint decimal indicators refute their enabled original source`() {
+        val source = File.createTempFile("mps-joint-indicators", ".mps").apply {
+            writeText("ROWS\n N COST\n G A\n L B\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 0\n" +
+                " M1 'MARKER' 'INTEND'\n X A 1 B 1\nRHS\n RHS A 0.2 B 0.1\n" +
+                "BOUNDS\n FX BN I 1\n LO BN X 0\n UP BN X 1\n" +
+                "INDICATORS\n IF A I 1\n IF B I 1\nENDATA\n")
+            deleteOnExit()
+        }
+
+        for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
+            val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1") + flags + source.absolutePath)) }
+
+            assertTrue("s UNSATISFIABLE" in text.lines(), text)
+        }
+    }
+
+    @Test
     fun `float rendering checks zero reconstruction against original source rows`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R -1\n" +

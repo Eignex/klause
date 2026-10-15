@@ -76,7 +76,9 @@ Source routing attempts bound closing before rejecting a polynomial composition
 on open integer declarations. Proved bounds retain declared domain holes and
 original factor identities; unrelated finite globals keep their finite owner.
 A surviving open side remains arithmetic-owned and can still decline polynomial
-admission.
+admission. Native exact indicator rows participate in bound closure only
+when the source declaration fixes their integer trigger to the enabling value.
+Invocation-local fixings are not permanent source bounds.
 
 Open satisfaction separates optional source passes and bound closing from required
 component installation. The passes and bound closing retain the presolve phase token

@@ -4,6 +4,8 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.table.RealElement
@@ -12,9 +14,12 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConsts
+import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 
 /**
  * Whether [point] and [direction] prove [objective] unbounded below over this problem.
@@ -56,6 +61,9 @@ private fun within(value: BigFraction, lower: Double, upper: Double): Boolean {
 private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): Boolean {
     val reals = checkNotNull(point.exactReals)
     return when (factor) {
+        is ExactLinear -> factor.keeps(point, direction)
+        is LinearIndicator -> point.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) ||
+            factor.row.keeps(point, direction)
         is Linear -> {
             val constants = factor.realConstants ?: return false
             rowKeeps(
@@ -168,5 +176,29 @@ private fun rowKeeps(
         LinearOp.GE -> (if (strict) side > 0 else side >= 0) && slope.signum() >= 0
         LinearOp.EQ -> side == 0 && slope.isZero
         LinearOp.NE -> side != 0 && slope.isZero
+    }
+}
+
+private fun ExactLinear.keeps(point: Sample, direction: List<BigFraction>): Boolean {
+    var activity = BigFraction.ZERO
+    var movement = BigFraction.ZERO
+    val reals = point.exactReals ?: return false
+    for (index in 0 until size) {
+        val coefficient = BigFraction.of(constants.exactCoeff(index), BIG_ONE)
+        val reference = ref(index)
+        if (Term.isInt(reference)) {
+            activity += coefficient * BigFraction.of(point.exactIntValue(Term.intVar(reference)), BIG_ONE)
+        } else {
+            val id = Term.realVar(reference)
+            activity += coefficient * reals[id]
+            movement += coefficient * direction[id]
+        }
+    }
+    val bound = BigFraction.of(constants.exactBound, BIG_ONE)
+    return when (relation) {
+        LinearOp.LE -> activity <= bound && movement <= BigFraction.ZERO
+        LinearOp.GE -> activity >= bound && movement >= BigFraction.ZERO
+        LinearOp.EQ -> activity == bound && movement.isZero
+        LinearOp.NE -> activity != bound && movement.isZero
     }
 }

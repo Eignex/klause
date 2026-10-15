@@ -47,9 +47,7 @@ internal object MpsMode : CliMode {
             val source = Mps.parse(openFileSource(path))
             val settings = common.config.problemSettings()
             val lowered = source.toProblem(settings)
-            val hasConstantObjective = lowered.objective == null && source.objective.name.isNotEmpty()
-            val usesExactSource = hasConstantObjective ||
-                (!lowered.sourceExact && (common.exact || lowered.model.numIntVars > 0))
+            val usesExactSource = common.exact && !lowered.sourceExact
             val compiled = if (usesExactSource) source.toExactSourceProblem(settings) else lowered
             if (common.exact) requireExactMpsSource(compiled)
             val state = MpsOutputState(compiled.objectiveScale, compiled.toleranceDifference,
@@ -99,7 +97,7 @@ internal object MpsMode : CliMode {
                 compiled.maximize,
                 routePureRealToTheory = usesExactSource,
                 boundCancellation = common.routingCancellation(),
-                routeLinearToTheory = usesExactSource,
+                routeLinearToTheory = false,
                 onLpStats = { routingLpStats = it },
             )
             val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds

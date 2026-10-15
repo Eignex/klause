@@ -1,6 +1,8 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.GridAbs
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Power
@@ -33,6 +35,14 @@ internal fun Factor.emitLpRelaxation(
 }
 
 internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjection: LinearLpProjection?) {
+    if (this is ExactLinear) {
+        emitExactLpRelaxation(builder)
+        return
+    }
+    if (this is LinearIndicator) {
+        emitExactLpRelaxation(builder)
+        return
+    }
     if (impliedLinearRows.isNotEmpty()) {
         for (row in impliedLinearRows) row.emitLpRelaxation(builder, linearProjection)
         return

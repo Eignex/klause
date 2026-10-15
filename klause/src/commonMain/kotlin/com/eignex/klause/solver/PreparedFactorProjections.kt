@@ -2,6 +2,8 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -66,6 +68,7 @@ class PreparedFactorProjections internal constructor(
     internal val requiresRealSourceCheck: Boolean = problem.factors.indices.any { id ->
         problem.factors[id].variables.reals.isNotEmpty() &&
             (problem.factors[id] is RealAbs || problem.factors[id] is ContinuousProduct ||
+                problem.factors[id] is ExactLinear || problem.factors[id] is LinearIndicator ||
                 propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id))
     }
 

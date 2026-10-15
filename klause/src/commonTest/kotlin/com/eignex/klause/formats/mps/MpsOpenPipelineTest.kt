@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.mps
 
-import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.sourceRoute
@@ -58,7 +58,7 @@ class MpsOpenPipelineTest {
     }
 
     @Test
-    fun `lowers a finite continuous indicated row to a reified real atom`() {
+    fun `retains a finite continuous indicated source row`() {
         val compiled = MpsModel(
             "m",
             ObjectiveSense.MINIMIZE,
@@ -79,6 +79,7 @@ class MpsOpenPipelineTest {
             ),
         ).toProblem()
 
-        assertEquals(1, compiled.model.factors.count { it is ReifiedRealLinear })
+        assertEquals(1, compiled.model.factors.count { it is LinearIndicator })
+        assertEquals(0, compiled.model.numBoolVars)
     }
 }

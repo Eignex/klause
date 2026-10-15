@@ -3,6 +3,9 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.LinearIndicator
+import com.eignex.klause.lp.finiteRelaxationSupported
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.RealElement
@@ -67,6 +70,8 @@ internal fun Problem.finiteRealFactorSupported(index: Int, projections: Prepared
     val encoder = projections.encoder(index, EncodingTarget.LINEAR)
     if (projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED) return false
     if (factor.variables.reals.isEmpty()) return true
+    if (factor is ExactLinear) return encoder.enforcesSource && factor.finiteRelaxationSupported()
+    if (factor is LinearIndicator) return encoder.enforcesSource && factor.row.finiteRelaxationSupported()
     if (!encoder.enforcesSource && encoder.support != EncoderSupport.CONDITIONED) return false
     return factor is RealProduct || factor is RealAbs || factor is RealElement ||
         (factor is ContinuousProduct && factor.hasCompleteGuardedLpCompletion()) ||
