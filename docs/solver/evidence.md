@@ -71,7 +71,9 @@ source coordinates and checks every accompanying complete linear conjunction or
 disjunction, including reified comparisons and Boolean clauses. Declared integer
 sets and invocation restrictions remain required. Implied magnitude inequalities
 alone supply no complete source check, and this point checker supplies no recession
-authority for Abs relations.
+authority for Abs relations. Wide-coordinate heuristic witness publication selects
+this exact source checker before admission; the affine-only checker does not stand
+in for the nonlinear source relation.
 
 `PreparedSourcePlan.sourceResultCapture` uses the plan's retained original exact IR,
 explicit invocation pins and source objective direction. Narrowed execution bounds

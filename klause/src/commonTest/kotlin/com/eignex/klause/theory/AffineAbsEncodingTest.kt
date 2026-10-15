@@ -12,8 +12,10 @@ import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.absSourceWitnessContext
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
@@ -52,6 +54,8 @@ class AffineAbsEncodingTest {
         val source = input.model
         val prepared = source.prepareExecutionPlan()
         val binding = EngineInvocation(prepared, ModelIdentity.of(source))
+        val context = assertNotNull(source.absSourceWitnessContext(LinearObjective(), Cancellation.Never))
+        val sourceChecker = assertNotNull(context.semanticsChecker)
         val queries = OpenExactNeighborhood(source, TheoryParams(), preparedSource = prepared, invocation = { binding })
         queries.use {
             val refuted = ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap())
@@ -66,7 +70,10 @@ class AffineAbsEncodingTest {
             assertTrue(source.factors.filterIsInstance<AffineAbs>().single().isSatisfied(sample::exactIntValue))
             assertEquals(SourceEvidenceCheck.Checked, binding.checkWitness(sample, Cancellation.Never))
             val rejected = sample.copy(bools = sample.bools.also { values -> values[0] = false })
-            assertIs<SourceEvidenceCheck.Rejected>(binding.checkWitness(rejected, Cancellation.Never))
+            assertEquals(SourceEvidenceCheck.Checked,
+                sourceChecker.witness(sample, context.scope, Cancellation.Never))
+            assertIs<SourceEvidenceCheck.Rejected>(
+                sourceChecker.witness(rejected, context.scope, Cancellation.Never))
         }
     }
 

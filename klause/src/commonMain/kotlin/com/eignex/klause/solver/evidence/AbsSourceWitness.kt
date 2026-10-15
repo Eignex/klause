@@ -4,14 +4,17 @@ import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.ExactWitness
 import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
+import kotlin.uuid.Uuid
 
 internal fun Problem.hasCompleteAbsSource(): Boolean = factors.any { it is Abs || it is AffineAbs } &&
     factors.all { factor ->
@@ -20,6 +23,17 @@ internal fun Problem.hasCompleteAbsSource(): Boolean = factors.any { it is Abs |
             is LinearForm.Relaxation, null -> false
         }
     }
+
+internal fun Problem.absSourceWitnessContext(
+    objective: LinearObjective,
+    cancellation: Cancellation,
+): SourceProofContext? {
+    if (cancellation() || !hasCompleteAbsSource()) return null
+    val identity = Uuid.random().toString()
+    val scope = SourceScope(SourceRevision(identity, "klause-ir-exact-v1"),
+        objective = SourceObjective("$identity/objective", ObjectiveSense.MINIMIZE))
+    return sourceProofContext(scope, objective, cancellation)
+}
 
 internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: Cancellation): SourceEvidenceCheck {
     if (numRealVars > 0 && sample.exactReals == null) {
