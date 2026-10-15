@@ -97,6 +97,16 @@ val checkNativeVmEntries = tasks.register<Exec>("checkNativeVmEntries") {
         "tools/test_read_native_vm_entries.py", "tools/read_native_vm_symbols.py")
 }
 
+val checkNativeVmBoundaryEntries = tasks.register<Exec>("checkNativeVmBoundaryEntries") {
+    group = "verification"
+    description = "Test retained source signature and executable entry associations."
+    workingDir(projectDir)
+    commandLine("python3", "tools/test_bind_native_vm_boundary_entries.py")
+    inputs.files("tools/bind_native_vm_boundary_entries.py", "tools/test_bind_native_vm_boundary_entries.py",
+        "tools/read_native_vm_entries.py", "tools/read_native_vm_symbols.py", "tools/read_native_vm_signatures.py",
+        "tools/native_vm_demangler.py", "tools/native_vm_loaded_module.py", "tools/read_native_vm_metadata.py")
+}
+
 val checkNativeCompilerObserver = tasks.register<Exec>("checkNativeCompilerObserver") {
     group = "verification"
     description = "Test observer extraction, process scope and identity byte capture."
@@ -155,7 +165,8 @@ tasks.named("check") {
     dependsOn(checkNativeVmMetadata, checkNativeVmLoadedModule, checkNativeVmSymbols,
         checkNativeVmDemangler, checkNativeVmSignatures, checkNativeVmSymbolQueries, checkNativeVmEntries,
         checkNativeCompilerObserver, checkNativeVmLiveArguments, checkNativeCompilerObserverSetup,
-        checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview)
+        checkNativeVmLiveArgumentReview, checkNativeVmEventLoss, checkNativeVmEventLossReview,
+        checkNativeVmBoundaryEntries)
 }
 
 // Ground witness validation uses the maintained checker bytes from the installed bench artifact.
