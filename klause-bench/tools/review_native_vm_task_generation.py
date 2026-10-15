@@ -120,13 +120,29 @@ def parse_records(text, root_pid, selected):
     return {'threads': list(threads.values()), 'otherLines': other, 'errors': errors}
 
 
-def compiler_diagnostics(text, script, launch):
+def compiler_source_context(source, first, last, columns):
+    if not 1 <= first <= last <= len(source):
+        raise ValueError('Compiler diagnostic source span is invalid')
+    if first != last:
+        if columns is not None:
+            raise ValueError('Multiline diagnostic has column bounds')
+        return source[first - 1:last]
+    line = source[first - 1]
+    if not line.isascii() or columns is None or not 1 <= columns[0] < columns[1] <= len(line) + 1:
+        raise ValueError('Single-line diagnostic column bounds are invalid')
+    start, end = columns
+    underline = ''.join((' ' if index < start - 1 else '~') * (4 if char == '\t' else 1)
+                        for index, char in enumerate(line[:end - 1]))
+    return [line.replace('\t', '    '), underline]
+
+
+def compiler_diagnostics(text, stderr, script, launch):
     result = {'renderingProven': False, 'prefixLines': 0, 'warnings': [], 'errors': [],
-              'compilerWarningSafetyProven': False,
+              'compilerWarningSafetyProven': False, 'crossStreamOrderProven': False,
               'scope': 'Pinned pre-execution compiler diagnostic rendering only; no warning safety, '
                        'probe coverage, calling convention, task lifetime or compiler-cost proof.'}
-    lines, source = text.splitlines(), script.splitlines()
-    if len(lines) > MAX_RECORDS * 5 or len(source) > MAX_DIAGNOSTIC_LINES:
+    lines, error_lines, source = text.splitlines(), stderr.splitlines(), script.splitlines()
+    if max(len(lines), len(error_lines)) > MAX_RECORDS * 5 or len(source) > MAX_DIAGNOSTIC_LINES:
         raise ValueError('Compiler diagnostic line inventory exceeds bounds')
     try:
         command = launch['observerCommand']
@@ -145,37 +161,59 @@ def compiler_diagnostics(text, script, launch):
                     'observer', str(path.with_name('observer.pid')), name, launch['observerBinary']]
         if command != expected:
             raise ValueError('Original observer invocation differs from its pinned source')
-        attached = [index for index, line in enumerate(lines) if re.fullmatch(r'Attaching [1-9][0-9]* probes\.\.\.', line)]
+        attached = [re.fullmatch(r'Attached ([1-9][0-9]*) (probe|probes)', line)
+                    for line in error_lines if line.startswith('Attached ')]
         ready = [index for index, line in enumerate(lines) if line == capture.observer.ATTACHED]
-        if len(attached) != 1 or ready != [attached[0] + 1]:
+        if len(attached) != 1 or attached[0] is None or len(ready) != 1 or \
+                capture.observer.ATTACHED in error_lines:
             raise ValueError('Observer attachment and readiness boundary is absent or ambiguous')
-        prefix = lines[:attached[0]]
+        count = int(attached[0][1])
+        if count > MAX_RECORDS or attached[0][2] != ('probe' if count == 1 else 'probes'):
+            raise ValueError('Observer attachment status differs from the pinned rendering')
+        result.update(stderrAttachmentStatus=attached[0][0], stdoutReadinessLine=ready[0])
+        prefix = lines[:ready[0]]
         if len(prefix) > MAX_DIAGNOSTIC_LINES or len('\n'.join(prefix).encode()) > MAX_DIAGNOSTIC_BYTES:
             raise ValueError('Compiler diagnostic prefix exceeds bounds')
+        if any(line.startswith(('Attached ', 'Attaching ')) for line in prefix):
+            raise ValueError('Observer attachment status is not on its source-bound stderr stream')
         if any(line.split('\t')[0] in ('TASK_ENTRY', 'USDT', 'IDENTITY', 'LIFECYCLE',
                                        'VALIDATION_FAULT_EXPECTED', 'FINAL_SEQUENCE',
                                        'FINAL_SEQUENCE_TOTAL', 'DRAIN_MARKER') for line in prefix):
             raise ValueError('Protocol records precede the observer attachment boundary')
-        start = 0
-        while start < len(prefix) and not prefix[start]:
-            start += 1
-        if start < len(prefix):
-            header = re.fullmatch(re.escape(name) + r':([1-9][0-9]*)(?:-([1-9][0-9]*))?: WARNING: found external warnings',
-                                  prefix[start])
-            if header is None:
+        header_pattern = re.compile(re.escape(name) +
+            r':([1-9][0-9]*)(?:-([1-9][0-9]*)|:([1-9][0-9]*)-([1-9][0-9]*)): WARNING: (.+)')
+        cursor, seen = 0, set()
+        while cursor < len(prefix):
+            if not prefix[cursor]:
+                cursor += 1
+                continue
+            start = cursor
+            header = header_pattern.fullmatch(prefix[start])
+            if header is None or header[5] not in ('found external warnings',
+                    'Unnecessary cast: expression is already of type uint64'):
                 raise ValueError('Unrecognized pre-execution diagnostic header')
             first, last = int(header[1]), int(header[2] or header[1])
-            if not 1 <= first <= last <= len(source):
-                raise ValueError('Compiler diagnostic source span is invalid')
-            end = start + 1 + last - first + 1
-            if prefix[start + 1:end] != source[first - 1:last]:
+            columns = [int(header[3]), int(header[4])] if header[3] else None
+            key = (first, last, tuple(columns or []), header[5])
+            if key in seen:
+                raise ValueError('Duplicated compiler diagnostic source span')
+            seen.add(key)
+            context = compiler_source_context(source, first, last, columns)
+            end = start + 1 + len(context)
+            if prefix[start + 1:end] != context:
                 raise ValueError('Compiler diagnostic context differs from original source')
-            hint = end
-            while hint < len(prefix) and not prefix[hint]:
-                hint += 1
-            if hint == len(prefix) or not prefix[hint].startswith('HINT: ') or not prefix[hint][6:].strip():
-                raise ValueError('Compiler diagnostic hint is absent or truncated')
-            payload = prefix[hint:]
+            cursor, payload = end, []
+            if header[5] == 'found external warnings':
+                while cursor < len(prefix) and not prefix[cursor]:
+                    cursor += 1
+                if cursor == len(prefix) or not prefix[cursor].startswith('HINT: ') or not prefix[cursor][6:].strip():
+                    raise ValueError('Compiler diagnostic hint is absent or truncated')
+                hint = cursor
+                cursor += 1
+                while cursor < len(prefix) and not re.search(r'\.bt:[0-9].*: (WARNING|ERROR|BUG):', prefix[cursor]) and \
+                        not prefix[cursor].startswith(('WARNING:', 'ERROR:', 'BUG:')):
+                    cursor += 1
+                payload = prefix[hint:cursor]
             if any(re.search(r'\b(?:error|bug):|\b(?:lost|dropped)\b|WARNING: Bad address|retcode:', line,
                              re.IGNORECASE) or '\x1b' in line or
                    line.split('\t')[0] in ('TASK_ENTRY', 'USDT', 'IDENTITY', 'LIFECYCLE',
@@ -185,9 +223,8 @@ def compiler_diagnostics(text, script, launch):
                    (index > 0 and line.startswith('HINT: '))
                    for index, line in enumerate(payload)):
                 raise ValueError('Compiler diagnostic hint contains an error, control or another diagnostic')
-            result['warnings'].append({'header': prefix[start], 'sourceLines': [first, last],
-                                       'sourceContext': prefix[start + 1:end], 'hintLines': payload,
-                                       'rawLines': prefix[start:]})
+            result['warnings'].append({'header': prefix[start], 'sourceLines': [first, last], 'sourceColumns': columns,
+                                       'sourceContext': context, 'hintLines': payload, 'rawLines': prefix[start:cursor]})
         result.update(renderingProven=True, prefixLines=len(prefix))
     except (ValueError, KeyError, TypeError, IndexError) as error:
         result['errors'].append(str(error))
@@ -195,7 +232,7 @@ def compiler_diagnostics(text, script, launch):
 
 
 def task_diagnostics(text, stderr, script, launch, native):
-    compiler = compiler_diagnostics(text, script, launch)
+    compiler = compiler_diagnostics(text, stderr, script, launch)
     prefix = compiler['prefixLines'] if compiler['renderingProven'] else 0
     if native['otherLines'][:prefix] != text.splitlines()[:prefix]:
         compiler['renderingProven'] = False
@@ -209,7 +246,7 @@ def task_diagnostics(text, stderr, script, launch, native):
     diagnostics['unrecognizedLines'] = [line for line in other if line and
         not line.startswith(('VALIDATION_FAULT_EXPECTED\t', 'FINAL_SEQUENCE\t',
                              'FINAL_SEQUENCE_TOTAL\t', 'DRAIN_MARKER\t')) and
-        line != capture.observer.ATTACHED and not re.fullmatch(r'Attaching [1-9][0-9]* probes\.\.\.', line)]
+        line != capture.observer.ATTACHED]
     diagnostics['readWarningGuardPassed'] = diagnostics['readWarningGuardPassed'] and \
         compiler['renderingProven'] and len(controls) == 1 and len(controls[0]) == 3 and \
         controls[0][1].isdecimal() and not diagnostics['unrecognizedLines']
