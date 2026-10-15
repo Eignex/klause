@@ -111,6 +111,8 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is ObjectiveBoundFactor -> NoPropagator
 
+    is WideDivMod -> WideDivModPropagator(this)
+
     is DivMod -> DivModPropagator(this)
 
     is Product -> ProductPropagator(a, b, result, boolVars, intVars)

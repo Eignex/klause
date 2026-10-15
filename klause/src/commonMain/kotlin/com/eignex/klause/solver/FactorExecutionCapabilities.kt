@@ -118,6 +118,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
         domainRelaxation
     }
     is Abs -> domainRelaxation
+    is WideDivMod -> finiteBounds
     is DivMod -> finiteDomains
     is Inverse, is ValuePrecede -> finiteDomains
     is Power -> if (base is Power.Coordinate.Integer) finiteDomains else FactorExecutionCapabilities(

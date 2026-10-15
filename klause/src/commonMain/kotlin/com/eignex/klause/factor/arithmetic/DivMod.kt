@@ -95,14 +95,16 @@ class DivMod private constructor(
         return quotient to remainder
     }
 
-    internal fun outputs(a: BigInt, b: BigInt): Pair<BigInt, BigInt>? {
-        if (b.isZero()) return null
-        var q = a / b
-        var r = a - b * q
-        if (convention == DivisionConvention.EUCLIDEAN && r < BIG_ZERO) {
-            q -= bigIntOf(b.signum())
-            r += b.abs()
-        }
-        return q to r
+    internal fun outputs(a: BigInt, b: BigInt): Pair<BigInt, BigInt>? = integerDivMod(a, b, convention)
+}
+
+internal fun integerDivMod(a: BigInt, b: BigInt, convention: DivisionConvention): Pair<BigInt, BigInt>? {
+    if (b.isZero()) return null
+    var q = a / b
+    var r = a - b * q
+    if (convention == DivisionConvention.EUCLIDEAN && r < BIG_ZERO) {
+        q -= bigIntOf(b.signum())
+        r += b.abs()
     }
+    return q to r
 }

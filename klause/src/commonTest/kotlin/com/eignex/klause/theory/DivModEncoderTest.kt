@@ -2,6 +2,7 @@ package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.DivisionConvention
+import com.eignex.klause.factor.arithmetic.WideDivMod
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -84,14 +85,14 @@ class DivModEncoderTest {
             (assert (= (mod (+ 1000000000000000000000000000000 a) 1000000000000000000000000000000) 2))
         """.trimIndent())
         val source = parsed.model
-        val factor = source.factors.filterIsInstance<DivMod>().single()
+        val factor = source.factors.filterIsInstance<WideDivMod>().single()
         val queries = OpenExactNeighborhood(source, TheoryParams(), preparedSource = source.prepareExecutionPlan())
 
         val sample = queries.use { assertIs<ExactNeighborhoodResult.Witness>(it.check(
             ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)).sample }
 
         assertEquals(DivisionConvention.EUCLIDEAN, factor.convention)
-        assertEquals(2L, sample.intValue(parsed.intVarNames.getValue("a")))
+        assertEquals(bigIntOf(2), sample.exactIntValue(parsed.intVarNames.getValue("a")))
     }
 
     @Test

@@ -42,6 +42,12 @@ integer outputs. `DivisionConvention.TRUNCATING` rounds the quotient toward zero
 divisor magnitude. Exact arithmetic does not wrap at the signed-word boundary.
 Finite output domains can therefore make minimum-word division by minus one infeasible.
 
+The internal Euclidean `WideDivMod` form retains exact affine digit views for the
+dividend and outputs. Its selected finite projections and encoders install the
+complete affine relation; source factors retain those views without allocating open
+scalar coordinates for finite wide values. Native scoring evaluates the exact
+quotient/remainder and offers bounded repairs through the equivalent identity.
+
 Role fields and structural keys preserve aliases and convention through remapping.
 Frontends share quotient/remainder auxiliaries only for identical operands and
 convention, retaining equality rows for distinct declared outputs. Source factors
