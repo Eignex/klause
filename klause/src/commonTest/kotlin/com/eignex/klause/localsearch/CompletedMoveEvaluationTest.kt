@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -56,6 +57,39 @@ class CompletedMoveEvaluationTest {
         assertEquals(initial, state.assignment.snapshot())
         assertEquals(0L, state.step)
         assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `ordinary productive picks preserve the recipe without numerical probing`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 1) }, emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val baseline = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        val evaluated = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1), realCoefficients = doubleArrayOf(10.0))
+        for (state in listOf(baseline, evaluated)) {
+            state.assignment.setInt(0, 1)
+            state.assignment.setInt(1, 1)
+            state.assignment.setReal(0, 1.0)
+            state.shaping.objective = objective
+            state.recompute()
+        }
+        val initial = evaluated.assignment.snapshot()
+        var calls = 0
+        val evaluation = CompletedMoveEvaluation(
+            evaluated, objective, Cancellation.Never, mayAttempt = { true },
+            complete = { candidate -> calls++; Completion.Witness(candidate) }, current = { initial },
+        )
+        val expected = Cbls(pairSwapCap = 0, satisfiedSampleCount = 0).pickMove(baseline)
+
+        val actual = Cbls(pairSwapCap = 0, satisfiedSampleCount = 0)
+            .pickMove(evaluated, Cancellation.Never, evaluation)
+
+        assertEquals(expected, actual)
+        assertEquals(baseline.rng.nextInt(), evaluated.rng.nextInt())
+        assertEquals(0, calls)
+        assertEquals(actual, evaluation.ordinaryMove)
     }
 
     @Test
