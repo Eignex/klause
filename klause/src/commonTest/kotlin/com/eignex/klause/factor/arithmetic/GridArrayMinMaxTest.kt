@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -46,6 +47,21 @@ class GridArrayMinMaxTest {
         val assignments = BacktrackSolver(source.bake()).enumerate().map { it.ints.toList() }.toSet()
 
         assertEquals(setOf(listOf(0L, 0L, 2L), listOf(0L, 0L, 3L)), assignments)
+    }
+
+    @Test
+    fun `selected grid equality reasons retain excluded operands`() {
+        for (maximum in listOf(false, true)) {
+            val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(
+                GridArrayMinMax(intArrayOf(0, 1, 2), DoubleArray(3) { 1.0 }, DoubleArray(3),
+                    BooleanArray(3), 1000L, max = maximum),
+            ))
+
+            PropagationReasonOracle.assertReasonsImply(source, "selected grid equality max=$maximum") { state ->
+                if (maximum) state.tightenIntMax(2, 0L) && state.tightenIntMin(0, 1L)
+                else state.tightenIntMin(2, 2L) && state.tightenIntMax(0, 1L)
+            }
+        }
     }
 
     @Test
