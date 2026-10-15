@@ -66,6 +66,34 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `default mixed disjunction choices prefer a completed point while explicit allowances retain source order`() {
+        val model = Problem(
+            numBoolVars = 1, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 1.0),
+                ComparisonClause(intArrayOf(0, 0), arrayOf(LinearOp.GE, LinearOp.LE), longArrayOf(1, 0)),
+            ),
+        )
+        for ((flips, expected) in listOf(null to 0L, 0L to 1L, 4L to 1L)) {
+            model.componentPlan().search(model, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+                SearchLearnedDbParams(), null, openHintFlips = flips).use { planned ->
+                val component = assertIs<ExactLiraSearchComponent>(planned.theory)
+                component.useMixedPointCompletion()
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+
+                val result = planned.session.solve(0)
+
+                val witness = assertNotNull(assertIs<SearchResult.Satisfied>(result).model
+                    .valueOf<ExactLiraAssignment>(component))
+                assertEquals(bigIntOf(expected), witness.intValue(0))
+            }
+        }
+    }
+
+    @Test
     fun `complete traversal observations exclude private query openings`() {
         for (complete in listOf(false, true)) {
             val stats = SmtStatsSink()
