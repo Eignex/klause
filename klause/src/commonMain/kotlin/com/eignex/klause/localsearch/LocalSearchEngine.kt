@@ -964,6 +964,7 @@ internal class LocalSearchEngine(
                                     }
                                     liveCompletion = Completion.Witness(solution)
                                     pendingCompletedMove = true
+                                    if ((completedMoves.score(m) ?: 0.0) < 0.0) nextMoveCompletion = totalFlips
                                 }
                             } else {
                                 val savedSnap = state.assignment.snapshot()
