@@ -13,6 +13,97 @@ class AlgebraicArithmeticTest {
     private val arithmetic = AlgebraicArithmetic(polynomial)
 
     @Test
+    fun `completed root counts fit negative affine transforms in remaining caller work`() {
+        var spent = 0L
+        var limit = Long.MAX_VALUE
+        val meter = WorkMeter { spent += it }
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = spent >= limit
+            override fun workMeter(): WorkMeter = meter
+        }
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
+        val root = counted.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        limit = spent + 64
+
+        val negative = counted.negate(root)
+
+        assertEquals(1, negative.rootIndex)
+        assertEquals(-1, arithmetic.sign(negative))
+    }
+
+    @Test
+    fun `negative affine images retain root order for distinct defining polynomials`() {
+        val first = arithmetic.roots(RationalPolynomial.of(-2, 0, -1, 0, 1)).last()
+        val second = arithmetic.roots(RationalPolynomial.of(6, 0, -5, 0, 1)).last()
+
+        val negatives = listOf(first, second).map(arithmetic::negate)
+
+        for (negative in negatives) assertEquals(1, negative.rootIndex)
+    }
+
+    @Test
+    fun `rational coefficient lifting returns only actual real roots`() {
+        val source = RationalPolynomial.of(-2, 0, -1, 0, 1)
+        val lifted = arithmetic.polynomial(source.coefficients.map(arithmetic::rational))
+
+        val roots = arithmetic.roots(lifted)
+
+        assertEquals(2, roots.size)
+        assertEquals(-1, arithmetic.sign(roots[0]))
+        assertEquals(1, arithmetic.sign(roots[1]))
+        for (root in roots) assertEquals(0, arithmetic.signAt(RationalPolynomial.of(-2, 0, 1), root))
+    }
+
+    @Test
+    fun `rational coefficient lifting retains the caller dense limit`() {
+        val source = arithmetic.polynomial(RationalPolynomial.of(-2, 0, 1).coefficients.map(arithmetic::rational))
+        val counted = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 2)))
+
+        val failure = assertFailsWith<PolynomialResourceLimit> { counted.roots(source) }
+
+        assertEquals(PolynomialResource.DENSE_COEFFICIENTS, failure.resource)
+    }
+
+    @Test
+    fun `known rational point images evaluate mixed source monomials exactly`() {
+        val source = polynomial.add(
+            polynomial.multiply(Polynomial.variable(0), Polynomial.variable(1)),
+            polynomial.power(Polynomial.variable(0), 2),
+        )
+        val point = arithmetic.pointEvaluation(mapOf(
+            0 to arithmetic.rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+            1 to arithmetic.rational(BigFraction.ofLong(5) * BigFraction.ofLong(3).reciprocal()),
+        ))
+
+        val value = point.evaluate(source)
+
+        assertEquals(BigFraction.ofLong(19) * BigFraction.ofLong(4).reciprocal(), value.rational)
+    }
+
+    @Test
+    fun `rational point images use captured values after caller mutation`() {
+        val coordinates = mutableMapOf(0 to arithmetic.rational(BigFraction.ofLong(2)))
+        val point = arithmetic.pointEvaluation(coordinates)
+        coordinates[0] = arithmetic.rational(BigFraction.ofLong(3))
+
+        val value = point.evaluate(polynomial.power(Polynomial.variable(0), 2))
+
+        assertEquals(BigFraction.ofLong(4), value.rational)
+    }
+
+    @Test
+    fun `rational point images reject unrepresentable constant powers before expansion`() {
+        val point = arithmetic.pointEvaluation(mapOf(0 to arithmetic.rational(BigFraction.ofLong(4))))
+        val source = Polynomial.of(listOf(
+            PolynomialTerm(Monomial.of(mapOf(0 to Int.MAX_VALUE)), BigFraction.ONE),
+        ))
+
+        val failure = assertFailsWith<PolynomialResourceLimit> { point.evaluate(source) }
+
+        assertEquals(PolynomialResource.DEGREE_OVERFLOW, failure.resource)
+    }
+
+    @Test
     fun `completed point powers fit the remaining caller work`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val source = polynomial.add(
@@ -69,14 +160,16 @@ class AlgebraicArithmeticTest {
     @Test
     fun `completed point powers still obey caller cancellation`() {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        var cancelled = false
-        val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
-        val point = counted.pointEvaluation(mapOf(0 to root))
-        val source = polynomial.power(Polynomial.variable(0), 2)
-        point.evaluate(source)
-        cancelled = true
+        for (coordinate in listOf(root, arithmetic.rational(BigFraction.ofLong(2)))) {
+            var cancelled = false
+            val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+            val point = counted.pointEvaluation(mapOf(0 to coordinate))
+            val source = polynomial.power(Polynomial.variable(0), 2)
+            point.evaluate(source)
+            cancelled = true
 
-        assertFailsWith<PolynomialInterrupted> { point.evaluate(source) }
+            assertFailsWith<PolynomialInterrupted> { point.evaluate(source) }
+        }
     }
 
     @Test
@@ -210,13 +303,15 @@ class AlgebraicArithmeticTest {
 
     @Test
     fun `repeated specialized roots appear once`() {
-        val x = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        val linear = polynomial.subtract(Polynomial.variable(1), Polynomial.variable(0))
+        val irrational = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
+        for (x in listOf(irrational, arithmetic.rational(BigFraction.ofLong(2)))) {
+            val linear = polynomial.subtract(Polynomial.variable(1), Polynomial.variable(0))
 
-        val roots = arithmetic.roots(arithmetic.specialize(polynomial.power(linear, 2), 1, mapOf(0 to x)))
+            val roots = arithmetic.roots(arithmetic.specialize(polynomial.power(linear, 2), 1, mapOf(0 to x)))
 
-        assertEquals(1, roots.size)
-        assertEquals(0, arithmetic.compare(roots.single(), x))
+            assertEquals(1, roots.size)
+            assertEquals(0, arithmetic.compare(roots.single(), x))
+        }
     }
 
     @Test

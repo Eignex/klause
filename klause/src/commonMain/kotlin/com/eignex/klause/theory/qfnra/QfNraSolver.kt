@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.AffineLineEvaluation
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.Monomial
@@ -420,17 +421,13 @@ internal class WitnessProbe(
                                 repeat(realCount + 1) { arithmetic.step() }
                                 val proposed = LinkedHashMap(point)
                                 proposed[variable] = root
-                                candidate(proposed)?.let { return it }
                                 var score = 0
-                                for (comparison in formula.atoms) {
-                                    arithmetic.step()
-                                    if (comparison.holds(
-                                            algebraic.sign(algebraic.evaluate(comparison.polynomial, proposed)),
-                                        )
-                                    ) {
-                                        score++
+                                candidate(proposed) { signs ->
+                                    for ((index, comparison) in formula.atoms.withIndex()) {
+                                        arithmetic.step()
+                                        if (comparison.holds(signs[index])) score++
                                     }
-                                }
+                                }?.let { return it }
                                 if (score > bestScore) {
                                     best = proposed
                                     bestScore = score
@@ -458,15 +455,31 @@ internal class WitnessProbe(
         }
     }
 
-    fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? {
+    fun candidate(point: Map<Int, AlgebraicReal>): QfNraAssignment? = candidate(point, null)
+
+    private fun candidate(point: Map<Int, AlgebraicReal>, rank: ((IntArray) -> Unit)?): QfNraAssignment? {
         if (exhausted) return null
         arithmetic.step()
         proposals++
         val context = retentionGuides
         return checkSample(
             formula, point, boolCount, arithmetic, algebraic,
-            if (context == null) null else { captured, signs -> retainRejectedPoint(captured, signs, context) },
+            if (context == null && rank == null) null else { captured, signs ->
+                if (context != null) retainRejectedPoint(captured, signs, context)
+                rank?.invoke(signs)
+            },
             reusePowers = true,
+        )
+    }
+
+    private fun candidate(point: AffineLineEvaluation.Point): QfNraAssignment? {
+        if (exhausted) return null
+        arithmetic.step()
+        proposals++
+        val context = retentionGuides
+        return checkLineSample(
+            formula, point, boolCount, arithmetic, algebraic,
+            if (context == null) null else { captured, signs -> retainRejectedPoint(captured, signs, context) },
         )
     }
 
@@ -1173,19 +1186,14 @@ internal class WitnessProbe(
             }
         }
         val roots = distinctRoots(boundaries)
+        val line = AffineLineEvaluation(base, direction, algebraic)
         for (cell in coupledCells(roots)) {
             if (proposals >= proposalEnd) return null
             val root = cell / 2
             val sample = if (cell and 1 != 0) roots[root] else algebraic.rational(
                 algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)),
             )
-            val point = base.indices.associateWith { id ->
-                arithmetic.step()
-                if (direction[id].isZero) algebraic.rational(base[id]) else algebraic.add(
-                    algebraic.rational(base[id]), algebraic.multiply(algebraic.rational(direction[id]), sample),
-                )
-            }
-            candidate(point)?.let { return it }
+            candidate(line.at(sample))?.let { return it }
         }
         return null
     }
@@ -1376,23 +1384,74 @@ private fun checkSample(
             PolynomialFormula.TRUE
         } else PolynomialFormula.FALSE
     }
-    val bools = solveBooleans(formula, boolCount, atomValues, arithmetic) ?: run {
+    val bools = checkedBooleans(formula, boolCount, atomValues, arithmetic) ?: run {
         if (signs != null) {
             arithmetic.step()
             rejected?.invoke(requireNotNull(evaluation), signs)
         }
         return null
     }
-    val complete = IntArray(bools.size) {
-        arithmetic.step()
-        if (bools[it]) PolynomialFormula.TRUE else PolynomialFormula.FALSE
-    }
-    check(formula.truth(complete, atomValues, arithmetic) == PolynomialFormula.TRUE)
     arithmetic.step()
     return QfNraAssignment(bools, List(evaluation?.coordinateCount ?: coordinates.size) {
         arithmetic.step()
         evaluation?.coordinate(it) ?: coordinates.getValue(it)
     })
+}
+
+private fun checkLineSample(
+    formula: PolynomialFormula,
+    point: AffineLineEvaluation.Point,
+    boolCount: Int,
+    arithmetic: PolynomialArithmetic,
+    algebraic: AlgebraicArithmetic,
+    rejected: ((AlgebraicArithmetic.PointEvaluation, IntArray) -> Unit)? = null,
+): QfNraAssignment? {
+    val signs = if (rejected == null) null else {
+        repeat(formula.atoms.size + 1) { arithmetic.step() }
+        IntArray(formula.atoms.size)
+    }
+    val atomValues = IntArray(formula.atoms.size) { index ->
+        arithmetic.step()
+        val atom = formula.atoms[index]
+        val sign = point.sign(atom.polynomial)
+        if (signs != null) {
+            arithmetic.step()
+            signs[index] = sign
+        }
+        if (atom.holds(sign)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
+    }
+    val bools = checkedBooleans(formula, boolCount, atomValues, arithmetic) ?: run {
+        if (signs != null) {
+            val coordinates = (0 until point.coordinateCount).associateWith { id ->
+                arithmetic.step()
+                point.coordinate(id)
+            }
+            val captured = algebraic.pointEvaluation(coordinates)
+            arithmetic.step()
+            rejected?.invoke(captured, signs)
+        }
+        return null
+    }
+    arithmetic.step()
+    return QfNraAssignment(bools, List(point.coordinateCount) { id ->
+        arithmetic.step()
+        point.coordinate(id)
+    })
+}
+
+private fun checkedBooleans(
+    formula: PolynomialFormula,
+    boolCount: Int,
+    atomValues: IntArray,
+    arithmetic: PolynomialArithmetic,
+): BooleanArray? {
+    val bools = solveBooleans(formula, boolCount, atomValues, arithmetic) ?: return null
+    val complete = IntArray(bools.size) {
+        arithmetic.step()
+        if (bools[it]) PolynomialFormula.TRUE else PolynomialFormula.FALSE
+    }
+    check(formula.truth(complete, atomValues, arithmetic) == PolynomialFormula.TRUE)
+    return bools
 }
 
 private fun solveBooleans(

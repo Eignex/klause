@@ -4,6 +4,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 
 internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = PolynomialArithmetic()) {
     private val univariate = RationalPolynomialArithmetic(arithmetic)
+    private data class RootCount(val polynomial: RationalPolynomial, val count: Int)
+    private var currentRootCount: RootCount? = null
+    private var previousRootCount: RootCount? = null
 
     fun rational(value: BigFraction): AlgebraicReal {
         arithmetic.step()
@@ -16,10 +19,43 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
     fun roots(polynomial: RationalPolynomial): List<AlgebraicReal> {
         val defining = univariate.squareFree(polynomial)
-        return univariate.isolate(defining).mapIndexed { index, interval ->
+        val intervals = univariate.isolate(defining)
+        if (intervals.any { arithmetic.step(); !it.isPoint }) rememberRootCount(defining, intervals.size)
+        return intervals.mapIndexed { index, interval ->
             AlgebraicReal(defining, index + 1, interval)
         }
     }
+
+    private fun knownRootCount(polynomial: RationalPolynomial): Int? {
+        arithmetic.step()
+        for (entry in arrayOf(currentRootCount, previousRootCount)) {
+            arithmetic.step()
+            if (entry == null) continue
+            if (entry.polynomial === polynomial) return entry.count
+            if (entry.polynomial.degree != polynomial.degree) continue
+            var same = true
+            for (index in 0..polynomial.degree) {
+                arithmetic.step()
+                if (entry.polynomial[index] != polynomial[index]) {
+                    same = false
+                    break
+                }
+            }
+            if (same) return entry.count
+        }
+        return null
+    }
+
+    private fun rememberRootCount(polynomial: RationalPolynomial, count: Int) {
+        if (knownRootCount(polynomial) != null) return
+        arithmetic.step()
+        val completed = RootCount(polynomial, count)
+        previousRootCount = currentRootCount
+        currentRootCount = completed
+    }
+
+    private fun realRootCount(polynomial: RationalPolynomial): Int = knownRootCount(polynomial)
+        ?: univariate.isolate(polynomial).size.also { rememberRootCount(polynomial, it) }
 
     fun refine(value: AlgebraicReal): AlgebraicReal = AlgebraicReal(
         value.definingPolynomial, value.rootIndex, univariate.refine(value.definingPolynomial, value.interval),
@@ -134,7 +170,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val b = value.upperBound * scale + offset
         val interval = if (scale.signum() > 0) RationalInterval(a, b) else RationalInterval(b, a)
         val index = if (scale.signum() > 0) value.rootIndex else {
-            univariate.isolate(value.definingPolynomial).size + 1 - value.rootIndex
+            realRootCount(value.definingPolynomial) - value.rootIndex + 1
         }
         return AlgebraicReal(univariate.monic(defining), index, interval)
     }
@@ -232,11 +268,37 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             }
         }
         private val powers = HashMap<Pair<Int, Int>, AlgebraicReal>()
+        private var constantPoint: AffineLineEvaluation.Point? = null
+        private var classified = false
         val coordinateCount: Int get() = point.size
 
         fun coordinate(variable: Int): AlgebraicReal = point.getValue(variable)
 
-        fun evaluate(polynomial: Polynomial): AlgebraicReal = evaluateAt(polynomial, ::power)
+        fun evaluate(polynomial: Polynomial): AlgebraicReal =
+            capturedConstantPoint()?.evaluate(polynomial) ?: evaluateAt(polynomial, ::power)
+
+        private fun capturedConstantPoint(): AffineLineEvaluation.Point? {
+            arithmetic.step()
+            if (classified) return constantPoint
+            val base = ArrayList<BigFraction>()
+            for (id in 0 until point.size) {
+                arithmetic.step()
+                val value = point[id]?.rational
+                if (value == null) {
+                    arithmetic.step()
+                    classified = true
+                    return null
+                }
+                base.add(value)
+            }
+            val direction = List(base.size) { arithmetic.step(); BigFraction.ZERO }
+            val completed = AffineLineEvaluation(base, direction, this@AlgebraicArithmetic)
+                .at(rational(BigFraction.ZERO))
+            arithmetic.step()
+            constantPoint = completed
+            classified = true
+            return completed
+        }
 
         private fun power(variable: Int, exponent: Int): AlgebraicReal {
             arithmetic.step()
@@ -288,6 +350,16 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         // Independent coefficient conjugates give a superset of roots. The leading coefficient's
         // annihilator excludes zero, ensuring every conjugate polynomial retains positive degree.
         val coefficients = polynomial.coefficients
+        val rational = ArrayList<BigFraction>()
+        for (coefficient in coefficients) {
+            arithmetic.step()
+            val value = coefficient.rational ?: break
+            rational.add(value)
+        }
+        if (rational.size == coefficients.size) {
+            arithmetic.denseSize(polynomial.degree)
+            return roots(RationalPolynomial(rational))
+        }
         val variable = coefficients.size
         var relation = Polynomial.ZERO
         for ((index, coefficient) in coefficients.withIndex()) {

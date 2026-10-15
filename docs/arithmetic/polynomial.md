@@ -88,23 +88,48 @@ candidate intervals as needed. No fixed precision determines equality or order.
 Rational sector samples are chosen strictly between ordered algebraic boundaries,
 or beyond the finite bound of an unbounded sector.
 
+Each arithmetic context retains up to two completed real-root cardinalities for
+immutable defining polynomials. Isolation produces those facts; negative affine
+transforms reuse them when reversing root order. Missing counts use the same exact
+isolation primitive. Capture and coefficient comparisons debit the current token;
+no caller supplies a cached count. This bounded context cache retains no intervals
+or source verdicts, and published scalars retain no cache or control owner.
+
 A point evaluation captures its own exact coordinate map and retains completed
 coordinate powers by ID and exponent. Each point owns a separate cache. Capture,
 lookups and completed inserts debit the same arithmetic token; an interrupted
 power installs no value. The ordinary evaluator keeps no retained powers. Both
 paths preserve coefficient-first multiplication order and exact scalar metadata.
 The point owner exposes its captured coordinates separately from arithmetic work,
-so callers can publish the same immutable values they evaluated.
+so callers can publish the same immutable values they evaluated. A completed scan of
+known rational coordinates creates a private constant-line image owner; exact
+fraction arithmetic replaces repeated algebraic scalar wrappers. Classification,
+construction and consultations charge the same token. Missing or nonrational
+coordinates retain the ordinary captured-point evaluator, and interrupted
+classification installs no completed owner. Published coordinates still come from
+the original capture.
+
+An affine-line evaluation captures rational offsets and directions by original
+coordinate ID. It retains only completed rational univariate images and coordinate
+powers for that line. A point binds one exact algebraic parameter to the captured
+line; polynomial signs use the image at that same parameter, and coordinate access
+constructs the corresponding exact scalar. Another line starts with separate state.
+Capture, cache consultations, image arithmetic, sign checking and coordinate
+construction debit the same token and retain its dense and checked-degree limits.
+Interrupted images install no entry. The kernel supplies arithmetic signs and values;
+callers retain full source-formula and publication obligations.
 
 Specialization evaluates coefficients at exact earlier coordinates and trims
 vanished leading coefficients by exact sign. `AlgebraicPolynomial.isZero` retains
-nullification as a separate state. Lifting forms a rational annihilator by
-eliminating algebraic coefficient variables against their defining polynomials.
-Independent coefficient conjugates produce a superset of the specialized roots.
-The nonzero leading coefficient's annihilator excludes a zero conjugate, ensuring
-the elimination cannot become identically zero through a conjugate degree drop.
-Every candidate root is then checked against the actual specialized polynomial
-with exact algebraic arithmetic. The retained ordered roots are all and only its
+nullification as a separate state. When every captured coefficient is known rational,
+lifting copies those exact values under the current token, checks the same dense
+limit and isolates the actual rational polynomial directly. Otherwise lifting forms
+a rational annihilator by eliminating algebraic coefficient variables against their
+defining polynomials. Independent coefficient conjugates produce a superset of the
+specialized roots. The nonzero leading coefficient's annihilator excludes a zero
+conjugate, ensuring the elimination cannot become identically zero through a
+conjugate degree drop. Every conjugate candidate root is then checked against the
+actual specialized polynomial with exact algebraic arithmetic. The retained ordered roots are all and only its
 distinct real roots, including repeated/common roots and nested irrational
 coordinates. Cross-coordinate polynomial evaluation retains exact equality and
 sign authority even for correlated coordinates.

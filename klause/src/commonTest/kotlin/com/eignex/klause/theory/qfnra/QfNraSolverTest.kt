@@ -24,6 +24,56 @@ class QfNraSolverTest {
     private val algebraic = AlgebraicArithmetic()
 
     @Test
+    fun `successive scalar equality repairs retain the positive completed point within caller work`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (assert (and (= (* x x) 2) (= (* y y) 3) (> x 0) (> y 0)))
+        """.trimIndent())
+        val work = QfNraWork(QfNraParams(maximumWork = 8192))
+        val arithmetic = PolynomialArithmetic(work)
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+        val assignment = assertIs<QfNraAssignment>(work.probe {
+            probe.probeWitness(source.realCount, emptyMap()) { null }
+        })
+
+        assertEquals(BigFraction.ofLong(2), algebraic.power(assignment.realValue(0), 2).rational)
+        assertEquals(BigFraction.ofLong(3), algebraic.power(assignment.realValue(1), 2).rational)
+        assertEquals(1, algebraic.sign(assignment.realValue(0)))
+        assertEquals(1, algebraic.sign(assignment.realValue(1)))
+    }
+
+    @Test
+    fun `coupled line completion retains checked irrational coordinates and source fixings`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real)
+            (declare-const y Real)
+            (declare-const fixed Real)
+            (declare-const unused Real)
+            (assert (and (= (* x x) 2) (= y x) (> x 0) (= fixed 3)))
+        """.trimIndent())
+        val fixed = mapOf(2 to BigFraction.ofLong(3))
+        val work = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(work)
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic, fixed)
+        val guides = requireNotNull(formula.conjunctiveAtoms(arithmetic, 128))
+        val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
+
+        val assignment = assertIs<QfNraAssignment>(work.probe { work.coupled {
+            probe.coupled(guides, List(source.realCount) { fixed[it] ?: BigFraction.ZERO }, fixed,
+                atomTermCounts = guides.map { it.polynomial.terms.size })
+        } })
+
+        assertEquals(BigFraction.ofLong(2), algebraic.power(assignment.realValue(0), 2).rational)
+        assertEquals(1, algebraic.sign(assignment.realValue(0)))
+        assertEquals(0, algebraic.compare(assignment.realValue(0), assignment.realValue(1)))
+        assertEquals(BigFraction.ofLong(3), assignment.realValue(2).rational)
+        assertEquals(BigFraction.ZERO, assignment.realValue(3).rational)
+    }
+
+    @Test
     fun `dyadic repairs refresh shared weights before returning a checked hierarchy`() {
         for (extended in listOf(false, true)) {
             val declarations = if (extended) "(declare-const fixed Real) (declare-const unused Real)" else ""
