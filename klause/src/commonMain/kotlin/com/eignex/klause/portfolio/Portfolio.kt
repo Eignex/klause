@@ -942,7 +942,10 @@ class Portfolio(
             if (!unproductiveTrial && !workers[arm].auxiliaryProof) {
                 val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
                 bandit.update(arm, reward, weight)
-                families.record(policyFamily(arm), progressed = reward > 0.0, plateau = improving)
+                val family = policyFamily(arm)
+                val observableSearch = family.observable && work > 0L && !claim.preparing &&
+                    failure !is SearchInitializationCancelled
+                families.record(family, progressed = reward > 0.0, plateau = improving || observableSearch)
             }
             // Credit an arm earns while others run, from peers using what it shared, pays out now as one segment's
             // evidence: an arm the policy has stopped picking would otherwise hold it forever.
