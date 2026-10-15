@@ -50,7 +50,8 @@ internal class LpSourceEvidenceCapture(
                 if (reduced.isZero) continue
                 val upper = reduced < BigFraction.ZERO
                 val row = endpoint(model, column, upper, images[column])
-                add(SourceDerivation.Combination.Term(if (upper) reduced.negated() else reduced, cite(row, step, admitted)))
+                add(SourceDerivation.Combination.Term(if (upper) reduced.negated() else reduced,
+                    cite(row, step, admitted)))
             }
         }
         SourceDerivation.Combination(terms)
