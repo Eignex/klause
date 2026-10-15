@@ -1,13 +1,18 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SearchGroup
+import com.eignex.klause.ir.SearchHints
+import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.propagation.Assumptions
@@ -22,9 +27,38 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
+
+    @Test
+    fun `annotated circuit diversity has initial admission and complete source authority`() {
+        val annotation = SearchHints(listOf(
+            SearchGroup(intArrayOf(), intArrayOf(0, 1, 2)),
+            SearchGroup(intArrayOf(), intArrayOf(3), VariableSelection.InputOrder),
+        )).toBacktrackParams(0, 4)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
+        val objective = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
+        for (subcircuit in listOf(false, true)) {
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, if (it == 3) 1 else 2) },
+                arrayOf(Circuit(intArrayOf(0, 1, 2), subcircuit = subcircuit))).bake()
+
+            val workers = PortfolioBuilder.build(problem, scenario, objective)
+
+            try {
+                val generic = workers.single { it.label == "bt/first-fail" }
+                assertFalse(generic.improvementOnly)
+                assertEquals(ArmFamily.Backtrack, generic.family)
+                assertTrue(generic.permitsSourceProofs)
+                assertTrue(generic.controlsObjectiveCutoff)
+                assertNotNull(generic.sourceBinding)
+                assertSame(workers.first().sharingInvocation, generic.sharingInvocation)
+            } finally {
+                workers.forEach { it.close() }
+            }
+        }
+    }
 
     @Test
     fun `numerical completion materializes finite heuristic workers without theory neighborhoods`() {
