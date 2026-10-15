@@ -65,7 +65,12 @@ class LagrangianBoundTest {
         val bound = LagrangianBound(problem, objective)
 
         val result = assertNotNull(
-            bound.computeBound(PropagationSession(problem), Double.POSITIVE_INFINITY, LongArray(bound.multiplierCount), 1),
+            bound.computeBound(
+                PropagationSession(problem),
+                Double.POSITIVE_INFINITY,
+                LongArray(bound.multiplierCount),
+                1,
+            ),
         )
 
         assertFalse(result.prune)

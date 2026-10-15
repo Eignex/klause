@@ -15,6 +15,7 @@ import com.eignex.klause.propagation.propagate
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -39,7 +40,7 @@ class LexLessPropagatorTest {
                 val expected = xs.size < ys.size || (xs.size == ys.size && !strict)
 
                 assertEquals(expected, problem.propagators[0].propagate(state, 0))
-                if (!expected) assertTrue(problem.propagators[0].conflictReason(state, 0)!!.isEmpty())
+                if (!expected) assertNull(problem.propagators[0].conflictReason(state, 0))
             }
         }
     }
