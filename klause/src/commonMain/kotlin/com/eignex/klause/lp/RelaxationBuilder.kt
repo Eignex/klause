@@ -89,6 +89,19 @@ interface RelaxationBuilder {
         premiseLits: IntArray = EmptyIntArray,
     ) {}
 
+    /**
+     * Emit a real row valid when [intVar] equals [value], recording both integer bound premises.
+     * A builder without premise-aware real emission contributes no row.
+     */
+    fun realRowForIntValue(
+        intVar: Int,
+        value: Long,
+        columns: IntArray,
+        coeffs: DoubleArray,
+        op: LinearOp,
+        rhs: Double,
+    ) {}
+
     /** The live pin of Boolean variable [boolVar] in this build's domains, or null when unpinned (or
      *  the builder has no Boolean backing). Lets a conditionally-active factor emit only the rows its
      *  activation literal currently justifies. */

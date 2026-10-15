@@ -5528,6 +5528,7 @@ public abstract interface class com/eignex/klause/lp/RelaxationBuilder {
 	public fun realColumn (I)I
 	public fun realRow ([I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
 	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
+	public fun realRowForIntValue (IJ[I[DLcom/eignex/klause/ir/LinearOp;D)V
 	public abstract fun rootDomain (I)Lcom/eignex/klause/ir/IntDomain;
 	public abstract fun row ([I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;)V
 	public static synthetic fun row$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
@@ -5545,6 +5546,7 @@ public final class com/eignex/klause/lp/RelaxationBuilder$DefaultImpls {
 	public static fun realColumn (Lcom/eignex/klause/lp/RelaxationBuilder;I)I
 	public static fun realRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
 	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
+	public static fun realRowForIntValue (Lcom/eignex/klause/lp/RelaxationBuilder;IJ[I[DLcom/eignex/klause/ir/LinearOp;D)V
 	public static synthetic fun row$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public static fun statesBothBounds (Lcom/eignex/klause/lp/RelaxationBuilder;I)Z
 	public static fun statesBothBounds (Lcom/eignex/klause/lp/RelaxationBuilder;[I)Z

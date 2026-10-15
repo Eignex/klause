@@ -2,6 +2,7 @@ package com.eignex.klause.factor.table
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -62,6 +63,18 @@ class RealElementTest {
         val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 0))
 
         assertIs<SolveResult.Unsat>(result)
+    }
+
+    @Test
+    fun `a failed real selection leaves its feasible sibling available`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 2)),
+            arrayOf<Factor>(RealElement(0, 0, doubleArrayOf(1.0, 2.0))),
+            numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(2.0))
+
+        val result = BacktrackSolver(source.bake()).solve(BacktrackParams(randomSeed = 0,
+            valueSelector = IndomainMin))
+
+        assertEquals(2L, assertIs<SolveResult.Sat>(result).assignment.ints[0])
     }
 
     @Test

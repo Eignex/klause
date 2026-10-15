@@ -16,8 +16,9 @@ internal fun RealElement.emitLpRelaxation(builder: RelaxationBuilder) {
     if (arrIsVars) {
         val selected = builder.realColumn(entries[position])
         if (selected < 0) return
-        builder.realRow(intArrayOf(output, selected), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
+        builder.realRowForIntValue(idx, domain.min, intArrayOf(output, selected), doubleArrayOf(1.0, -1.0),
+            LinearOp.EQ, 0.0)
     } else {
-        builder.realRow(intArrayOf(output), doubleArrayOf(1.0), LinearOp.EQ, constants[position])
+        builder.realRowForIntValue(idx, domain.min, intArrayOf(output), doubleArrayOf(1.0), LinearOp.EQ, constants[position])
     }
 }
