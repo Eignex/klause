@@ -352,6 +352,12 @@ deliberately omit CP propagation. Every inert built-in role carries a reason. A 
 family can decline emission under feature, resource or domain gates, and omitted rows
 weaken the relaxation.
 
+Strict increasing chains reject an endpoint that needs a successor above `Long.MAX_VALUE`
+or a predecessor below `Long.MIN_VALUE`. Distinct-value kernel scans compare signed
+bounds directly and keep group initialization separate from legitimate endpoint values.
+Lexicographic comparisons with an empty common prefix use the vector-length tie-break;
+a length-only conflict has no domain premises.
+
 Product bounds clamp corner products to signed-word endpoints instead of wrapping them.
 Repeated operands use nonnegative square bounds and exact integer square-root inverse
 bounds. The inverse uses signed-word division comparisons, so it cannot overflow or

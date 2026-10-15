@@ -14,6 +14,7 @@ import com.eignex.klause.propagation.reasonOf
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class IncreasingPropagatorTest {
@@ -24,6 +25,20 @@ class IncreasingPropagatorTest {
         intDomains = Array(n) { IntDomain(lo.toLong(), hi.toLong()) },
         factors = arrayOf<Factor>(Increasing(IntArray(n) { it }, strict = strict)),
     )
+
+    @Test
+    fun `strict chains reject a descent across both signed word endpoints`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(Long.MAX_VALUE, Long.MAX_VALUE), IntDomain(Long.MIN_VALUE, Long.MIN_VALUE)),
+            factors = arrayOf<Factor>(Increasing(intArrayOf(0, 1), strict = true)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.currentFactor = 0
+
+        assertFalse(problem.propagators[0].propagate(state, 0))
+    }
 
     @Test
     fun `forward sweep raises later mins and backward sweep lowers earlier maxes`() {

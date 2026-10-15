@@ -51,16 +51,24 @@ internal class IncreasingPropagator(private val xs: IntArray, private val gap: I
         // Forward: xs(i).min ≥ xs(i−1).min + gap. Each tighten feeds the next iteration, so the
         // prefix maximum propagates in one pass; a failed tighten (min crosses max) is the conflict.
         for (i in 1 until xs.size) {
-            val need = d[xs[i - 1]].min + gap
+            val previous = d[xs[i - 1]].min
+            if (gap != 0 && previous == Long.MAX_VALUE) {
+                return fail(neighbour(xs[i - 1], true, previous), xs[i])
+            }
+            val need = previous + gap
             if (need <= d[xs[i]].min) continue
-            val ant = neighbour(xs[i - 1], true, need - gap)
+            val ant = neighbour(xs[i - 1], true, previous)
             if (!state.tightenIntMin(xs[i], need, ant)) return fail(ant, xs[i])
         }
         // Backward: xs(i).max ≤ xs(i+1).max − gap.
         for (i in xs.size - 2 downTo 0) {
-            val cap = d[xs[i + 1]].max - gap
+            val next = d[xs[i + 1]].max
+            if (gap != 0 && next == Long.MIN_VALUE) {
+                return fail(neighbour(xs[i + 1], false, next), xs[i])
+            }
+            val cap = next - gap
             if (cap >= d[xs[i]].max) continue
-            val ant = neighbour(xs[i + 1], false, cap + gap)
+            val ant = neighbour(xs[i + 1], false, next)
             if (!state.tightenIntMax(xs[i], cap, ant)) return fail(ant, xs[i])
         }
         return true

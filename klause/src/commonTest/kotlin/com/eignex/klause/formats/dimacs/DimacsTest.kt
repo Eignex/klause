@@ -139,6 +139,29 @@ class DimacsTest {
     }
 
     @Test
+    fun `empty soft clauses preserve the largest representable fixed cost`() {
+        val w = Dimacs.parseWcnf("4611686018427387904 0\n4611686018427387903 0\n")
+
+        assertEquals(Long.MAX_VALUE, w.objective.constant)
+    }
+
+    @Test
+    fun `rejects overflowing empty soft clause costs`() {
+        val ex = assertFailsWith<DimacsFormatException> {
+            Dimacs.parseWcnf("4611686018427387904 0\n4611686018427387904 0\n")
+        }
+
+        assertTrue("fixed objective cost" in ex.message.orEmpty(), ex.message.orEmpty())
+    }
+
+    @Test
+    fun `headerless wcnf rejects a literal whose magnitude exceeds the index range`() {
+        val ex = assertFailsWith<DimacsFormatException> { Dimacs.parseWcnf("1 -2147483648 0\n") }
+
+        assertTrue("literal index" in ex.message.orEmpty(), ex.message.orEmpty())
+    }
+
+    @Test
     fun `a zero-weight soft clause is dropped`() {
         val w = Dimacs.parseWcnf("h 1 0\n0 -1 0\n")
         // No relaxation variable and no cost for the zero-weight clause.

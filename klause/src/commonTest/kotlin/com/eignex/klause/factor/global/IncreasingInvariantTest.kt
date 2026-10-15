@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class IncreasingInvariantTest {
@@ -28,6 +29,37 @@ class IncreasingInvariantTest {
         for (i in 0 until n) state.assignment.setInt(i, values[i].toLong())
         state.recompute()
         return state
+    }
+
+    @Test
+    fun `strict chains score equal signed word endpoints as violated`() {
+        for (endpoint in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2,
+                intDomains = Array(2) { IntDomain(endpoint, endpoint) },
+                factors = arrayOf<Factor>(Increasing(intArrayOf(0, 1), strict = true)),
+            )
+            val state = LocalSearchState(problem.bake(), Random(0))
+            state.assignment.setInt(0, endpoint)
+            state.assignment.setInt(1, endpoint)
+
+            assertTrue(state.factors[0].isViolated(state, 0), "endpoint=$endpoint")
+            assertTrue(state.factors[0].violationDegree(state, 0) > 0, "endpoint=$endpoint")
+        }
+    }
+
+    @Test
+    fun `strict seeding refuses a successor beyond the signed word maximum`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(Long.MAX_VALUE, Long.MAX_VALUE), IntDomain(-1, 1)),
+            factors = arrayOf<Factor>(Increasing(intArrayOf(0, 1), strict = true)),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+
+        assertFalse(state.factors[0].seedFeasible(state, 0))
     }
 
     @Test

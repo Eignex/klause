@@ -21,6 +21,30 @@ import kotlin.test.assertTrue
 class LexLessPropagatorTest {
 
     @Test
+    fun `empty vector comparisons follow lexicographic length ordering`() {
+        for (strict in listOf(false, true)) {
+            for ((xs, ys) in listOf(
+                intArrayOf() to intArrayOf(),
+                intArrayOf() to intArrayOf(0),
+                intArrayOf(0) to intArrayOf(),
+            )) {
+                val problem = Problem(
+                    numBoolVars = 0,
+                    numIntVars = 1,
+                    intDomains = arrayOf(IntDomain(0, 1)),
+                    factors = arrayOf<Factor>(LexLess(xs, ys, strict)),
+                )
+                val state = PropagationState(problem, Assumptions.None)
+                state.currentFactor = 0
+                val expected = xs.size < ys.size || (xs.size == ys.size && !strict)
+
+                assertEquals(expected, problem.propagators[0].propagate(state, 0))
+                if (!expected) assertTrue(problem.propagators[0].conflictReason(state, 0)!!.isEmpty())
+            }
+        }
+    }
+
+    @Test
     fun `a lex conflict cites only the prefix and the pair that decides it`() {
         // xs = (x0, x1, x2) <lex ys = (y0, y1, y2): x0 = y0 = 1 and x1 > y1 settle it at position 1; the
         // tightened position 2 plays no part.

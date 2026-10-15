@@ -34,6 +34,7 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
     }
 
     private fun addEdge(u: Int, v: Int, capacity: Int, edgeCost: Long) {
+        val reverseCost = subExact(0L, edgeCost)
         to.add(v)
         cap.add(capacity)
         cost.add(edgeCost)
@@ -41,7 +42,7 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
         head[u] = to.size - 1
         to.add(u)
         cap.add(0)
-        cost.add(-edgeCost)
+        cost.add(reverseCost)
         nextEdge.add(head[v])
         head[v] = to.size - 1
     }
@@ -96,9 +97,11 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
 
     /** SPFA shortest path from source by cost; fills [prevEdge]; null if the sink is unreachable. */
     private fun shortestPath(prevEdge: IntArray): Long? {
-        val dist = LongArray(nodeCount) { INF }
+        val dist = LongArray(nodeCount)
+        val reached = BooleanArray(nodeCount)
         val inQueue = BooleanArray(nodeCount)
         dist[source] = 0L
+        reached[source] = true
         val queue = IntArrayDeque()
         queue.addLast(source)
         inQueue[source] = true
@@ -108,10 +111,11 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
             val du = dist[u]
             var e = head[u]
             while (e != -1) {
-                if (cap[e] > 0 && du != INF) {
+                if (cap[e] > 0) {
                     val nd = addExact(du, cost[e])
-                    if (nd < dist[to[e]]) {
+                    if (!reached[to[e]] || nd < dist[to[e]]) {
                         dist[to[e]] = nd
+                        reached[to[e]] = true
                         prevEdge[to[e]] = e
                         if (!inQueue[to[e]]) {
                             queue.addLast(to[e])
@@ -122,11 +126,6 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
                 e = nextEdge[e]
             }
         }
-        return if (dist[sink] == INF) null else dist[sink]
-    }
-
-    private companion object {
-        /** Unreachable sentinel; kept well below Long.MAX_VALUE so additions never overflow it. */
-        const val INF: Long = Long.MAX_VALUE / 4
+        return if (reached[sink]) dist[sink] else null
     }
 }
