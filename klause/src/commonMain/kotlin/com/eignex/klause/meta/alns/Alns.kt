@@ -657,9 +657,15 @@ internal class Alns(
             }
         }
 
-        private fun observeBootstrapWork() {
-            cpBootstrap?.let { telemetry.bootstrapCpNodes = it.stats.search.nodes.sum.toLong() }
-            lsBootstrap?.let { telemetry.bootstrapLsMoves = it.stats.ls.moves.sum.toLong() }
+        private fun observeBootstrapWork(
+            cp: ResumableSearch? = cpBootstrap,
+            ls: ResumableSearch? = lsBootstrap,
+        ) {
+            cp?.let { telemetry.bootstrapCpNodes = it.stats.search.nodes.sum.toLong() }
+            ls?.let {
+                bootstrapStats = it.stats
+                telemetry.bootstrapLsMoves = bootstrapStats.ls.moves.sum.toLong()
+            }
         }
 
         private fun charge(instructions: Long) {
@@ -673,9 +679,7 @@ internal class Alns(
             return completed
         }
 
-        private fun releaseBootstrap(): List<AutoCloseable?> {
-            observeBootstrapWork()
-            lsBootstrap?.let { bootstrapStats = it.stats }
+        private fun releaseBootstrap(): List<ResumableSearch?> {
             val searches = listOf(cpBootstrap, lsBootstrap)
             cpBootstrap = null
             lsBootstrap = null
@@ -683,10 +687,11 @@ internal class Alns(
         }
 
         private fun closeBootstrap() {
-            closeSearches(releaseBootstrap())
+            val bootstrap = releaseBootstrap()
+            closeSearches(bootstrap) { observeBootstrapWork(bootstrap[0], bootstrap[1]) }
         }
 
-        private fun closeSearches(searches: List<AutoCloseable?>) {
+        private fun closeSearches(searches: List<AutoCloseable?>, afterClose: () -> Unit = {}) {
             var failure: Throwable? = null
             for (search in searches) {
                 try {
@@ -696,19 +701,25 @@ internal class Alns(
                     if (primary == null) failure = closeFailure else primary.addSuppressed(closeFailure)
                 }
             }
+            try {
+                afterClose()
+            } catch (observationFailure: Throwable) {
+                val primary = failure
+                if (primary == null) failure = observationFailure else primary.addSuppressed(observationFailure)
+            }
             failure?.let { throw it }
         }
 
         override fun close() {
             if (closed) return
             closed = true
-            val searches = releaseBootstrap() + neighborhood
+            val bootstrap = releaseBootstrap()
+            val searches = bootstrap + neighborhood
             neighborhood = null
             try {
-                closeSearches(searches)
+                closeSearches(searches) { observeBootstrapWork(bootstrap[0], bootstrap[1]) }
             } finally {
                 activeSearch = false
-                observeBootstrapWork()
             }
         }
     }
