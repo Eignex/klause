@@ -199,4 +199,5 @@ internal fun <V> composedFixpoint(
     assumptions: Assumptions = Assumptions.None,
     enforcingPeers: Set<Int>,
     onWork: (Long) -> Unit = {},
-): Verification<Sample, V> = validateComposedFixpoint(problem, candidate, cancellation, assumptions, enforcingPeers, onWork)
+): Verification<Sample, V> =
+    validateComposedFixpoint(problem, candidate, cancellation, assumptions, enforcingPeers, onWork)
