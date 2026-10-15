@@ -69,7 +69,11 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             continue
         }
         if (factor is RealArrayMinMax) {
-            val selected = if (factor.max) factor.xs.maxOf { reals[it] } else factor.xs.minOf { reals[it] }
+            var selected = reals[factor.xs[0]]
+            for (operand in factor.xs) {
+                val value = reals[operand]
+                if (if (factor.max) value > selected else value < selected) selected = value
+            }
             if (selected != reals[factor.result]) return Verification.Rejected("real factor $id refutes the assignment")
             continue
         }
