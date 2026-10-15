@@ -84,7 +84,9 @@ internal object MixedMoveCompletionProbe {
         val values = Json.parseToJsonElement(initialBytes.decodeToString()).jsonObject
             .mapValues { fraction(it.value.jsonPrimitive.content) }
         require(values.keys == compiled.columns.map { it.name }.toSet()) { "Supply every original column once" }
-        val checkedInitial = original.sourceWitness(compiled.columns.map { values.getValue(it.name) })
+        val checkedInitial = runCatching {
+            original.sourceWitness(compiled.columns.map { values.getValue(it.name) })
+        }.getOrNull()
         val ints = LongArray(compiled.model.numIntVars)
         val reals = MutableList(compiled.model.numRealVars) { BigFraction.ZERO }
         for (column in compiled.columns) {
@@ -94,6 +96,11 @@ internal object MixedMoveCompletionProbe {
                 ints[column.id] = value.num.longValueExact()
             }
         }
+        val initialReals = DoubleArray(reals.size) { reals[it].toDouble() }
+        require(checkedInitial != null || (!exact && compiled.withinTolerance(ints, initialReals))) {
+            "Initial point fails its configured original source guarantee"
+        }
+        val initialCost = checkedInitial?.objective ?: requireNotNull(compiled.sourceObjective(ints, initialReals))
         val objectiveSpec = requireNotNull(compiled.objective)
         val mappedReals = compiled.columns.filter { it.real }.map { it.id }.toSet()
         val auxiliaries = reals.indices.filter { it !in mappedReals }
@@ -103,7 +110,7 @@ internal object MixedMoveCompletionProbe {
                 objectiveSpec.realCoefficients.indices.all {
                     objectiveSpec.realCoefficients[it] == if (it == auxiliaries.single()) 1.0 else 0.0
                 }) { "Unmapped coordinates must be the source objective definition" }
-            reals[auxiliaries.single()] = checkedInitial.objective
+            reals[auxiliaries.single()] = initialCost
         }
         val initial = Sample(BooleanArray(compiled.model.numBoolVars), ints,
             DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals)
@@ -116,7 +123,8 @@ internal object MixedMoveCompletionProbe {
             put("revision", Reports.readGitSha())
             put("sourceSHA256", hash)
             put("initialSHA256", sha256(initialBytes))
-            put("initialObjective", checkedInitial.objective.toString())
+            put("initialObjective", initialCost.toString())
+            put("initialSourceGuarantee", if (checkedInitial != null) "exact source feasible" else "source tolerance")
             put("exact", exact)
             put("instructions", instructions)
             put("seed", seed)
