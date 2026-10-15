@@ -52,7 +52,8 @@ internal class AlnsWorkerConfig(
     private val numericalCompletion: Boolean = false,
 ) :
     WorkerConfig {
-    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = AlnsWorkerConfig(profile, budget, numericalCompletion)
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
+        AlnsWorkerConfig(profile, budget, numericalCompletion)
 
     fun withNumericalCompletion(): AlnsWorkerConfig = AlnsWorkerConfig(profile, nodeBudget, true)
 
