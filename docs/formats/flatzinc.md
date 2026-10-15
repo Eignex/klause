@@ -102,7 +102,8 @@ encodings belong to selected private consumers. Grid multiplication and fixed po
 retain `GridProduct` and `GridPower` instead of frontend tables. Native filtering
 limits each pass to 4096 operand combinations and checks pinned tuples; native
 scoring grades the rounded relation. Selected private enforcing encodings decline
-above 4096 operand combinations or on containing cancellation. Source-check a
+above 4096 operand combinations or on containing cancellation. Nonrepresentable
+grid ranges decline with a source diagnostic. Source-check a
 returned candidate before assigning it feasibility credit. Even a source-valid
 grid witness does not turn a grid optimum or refutation into a source proof.
 

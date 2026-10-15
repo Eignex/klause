@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.factor.arithmetic.GridCoordinate
 import com.eignex.klause.factor.arithmetic.GridPower
 import com.eignex.klause.factor.arithmetic.Power
 
@@ -22,17 +21,8 @@ internal fun FlatZincCompiler.emitFloatPower(c: FznConstraint) {
     val base = resolveFloatVarOrConst(c.args[0])
     val result = resolveFloatVarOrConst(c.args[2])
     if (listOf(base, result).filterIsInstance<FloatRef.Var>().any { !it.bk.lpOnly }) {
-        fun grid(ref: FloatRef): GridCoordinate = when (ref) {
-            is FloatRef.Var -> {
-                if (ref.bk.lpOnly) unsupportedHere("float_pow cannot mix exact and grid coordinates")
-                GridCoordinate(ref.bk.varId, ref.bk.lo, ref.bk.hi, ref.bk.buckets)
-            }
-            is FloatRef.Const -> resolveFloatElement(FznExpr.FloatLit(ref.value),
-                "__grid_power_${floatVars.size}", lpOnly = false).let {
-                GridCoordinate(it.varId, it.lo, it.hi, it.buckets)
-            }
-        }
-        factors.add(GridPower(grid(base), value.value.toInt(), grid(result)))
+        factors.add(GridPower(gridArithmeticCoordinate(base, "__grid_power"), value.value.toInt(),
+            gridArithmeticCoordinate(result, "__grid_power")))
         return
     }
     fun coordinate(expression: FznExpr): Power.Coordinate.Real {
