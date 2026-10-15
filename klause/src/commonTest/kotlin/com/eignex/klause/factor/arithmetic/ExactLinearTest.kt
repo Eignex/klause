@@ -8,8 +8,11 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
@@ -20,6 +23,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class ExactLinearTest {
+    @Test
+    fun `numerical completion retains exact negative values of a free real column`() {
+        val value = BigFraction.ofLong(-1) / BigFraction.ofLong(10)
+        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.EQ, value)
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(row), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+
+        val result = LeafRealSolver(source, null).use { it.solve(Sample(booleanArrayOf(), longArrayOf(0))) }
+
+        assertEquals(LpVerdict.FEASIBLE, result.verdict)
+        assertEquals(listOf(value), result.exactReals)
+    }
+
     @Test
     fun `remapped repeated coordinates enforce the combined exact relation`() {
         val source = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
