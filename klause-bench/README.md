@@ -196,6 +196,14 @@ outputs, including `cases/<index>/record.json` for the offline source verifier.
 `lab compare` links experiments; `lab schedule`, `reschedule`, `schedules` and
 `check` manage regression runs under the lab's operations guide.
 
+Exact-linear records distinguish `smtRealGraphOpenings`, completed primitive
+table captures (`smtGraphPointHintCaptures`, `smtLpPointHintCaptures`) and
+`smtDefaultGraphHintReleases`. The capture counters name the existing point's
+producer path, including LP fallback in a graph-first opening. A completed table
+can contain only declined preferences. Release counts a live default consultation,
+not avoided registration or capture work. These observations add no numerical
+invocation and establish neither a timing cause nor a whole-source witness gain.
+
 `lab files` lists a job's files and `lab cat <id> <path> [tail-bytes]` prints one, such as
 `job.log`, `setup.log` or `cases/<index>/record.json`, over HTTP: reading a job needs no SSH.
 `lab ssh <id> [instance] [command]` reaches a running AWS job's instance. Measure as a lab

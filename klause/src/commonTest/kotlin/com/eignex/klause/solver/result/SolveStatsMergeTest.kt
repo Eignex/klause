@@ -291,12 +291,16 @@ class SolveStatsMergeTest {
             smt = SmtStats(
                 reductionNs = 7,
                 sourceLp = SourceLpWorkStats(operations = 2, floatWork = 11, modeledWork = 13),
+                realGraphOpenings = 2, graphPointHintCaptures = 3,
+                lpPointHintCaptures = 5, defaultGraphHintReleases = 7,
             ),
         )
         val right = SolveStats(
             smt = SmtStats(
                 reductionNs = 17,
                 sourceLp = SourceLpWorkStats(operations = 3, floatWork = 19, modeledWork = 23),
+                realGraphOpenings = 11, graphPointHintCaptures = 13,
+                lpPointHintCaptures = 17, defaultGraphHintReleases = 19,
             ),
         )
 
@@ -306,5 +310,9 @@ class SolveStatsMergeTest {
         assertEquals(24L, merged.reductionNs)
         assertEquals(30L, merged.sourceLp.floatWork)
         assertEquals(36L, merged.sourceLp.modeledWork)
+        assertEquals(13L, merged.realGraphOpenings)
+        assertEquals(16L, merged.graphPointHintCaptures)
+        assertEquals(22L, merged.lpPointHintCaptures)
+        assertEquals(26L, merged.defaultGraphHintReleases)
     }
 }

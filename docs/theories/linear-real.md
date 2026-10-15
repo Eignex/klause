@@ -132,6 +132,13 @@ Hint applicability observations distinguish an initially unavailable point, an
 uncovered selected Boolean and a primitive callback returning no preference.
 They do not distinguish unavailable point state, scalar admission or an individual
 guard's row decline, and they perform no additional producer or owner calls.
+Separate exact-linear observations count completed graph-first openings, completed
+primitive table captures from graph and LP points, and live default consultations
+that release graph-first hints. A capture identifies its actual producing path;
+graph-first admission alone does not identify a later fallback point. These counts
+reuse completed branch outcomes without additional checks, polls or charges. They
+measure neither elapsed cost nor witness validity, and a completed table can contain
+only declined preferences.
 
 ## Implementation
 
