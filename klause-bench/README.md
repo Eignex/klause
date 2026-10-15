@@ -1528,6 +1528,41 @@ This diagnostic neither loads the target nor invokes the decoder or demangler.
 A unique captured association supplies no calling-convention, private-field,
 live task/thread, full-root, clock/loss, code-size or compiler savings proof.
 
+### Native compiler boundary lifecycle
+
+`com.eignex.klause.bench.profile.NativeVmBoundaryLifecycleVerification` runs a
+distinct original-user Java startup after a pinned observer attaches. It requires
+the hash-pinned source/entry association and executable-entry reports. Every
+selected boundary must have one exact source contract, physical location and
+probe name; all referenced bytes are rechecked against the pinned JVM library.
+Conflicting names, cross-boundary aliases and incomplete inputs fail before
+attachment. The observer package is hash-checked before extraction.
+
+Compiler-thread entry/loop, interface/runtime initialization, requesting-thread
+compilation/native wrappers, queue notification, runtime shutdown and dynamic
+thread creation have entry/return callbacks. Those callbacks read no argument
+registers, return values or private fields. Public compilation USDT identities
+retain their bounded raw fragments. Selected-process exec, fork from any of its
+threads, and thread exit share the guarded per-thread sequence stream with native
+callbacks. Complete terminal snapshots and an ordered drain remain required.
+
+The remote review rechecks original inputs, the exact executed script, child and
+observer identities, namespaces, warning controls and the owned loss-counter
+contract described under [live argument candidates](#live-native-argument-candidates).
+It retains all malformed records, gaps, unmatched returns and unfinished frames.
+A thread exit does not replace a missing return. Public compilation events retain
+their observed boundary contexts and every JFR identity/thread candidate;
+ambiguity supplies no compile-ID or clock association. Raw JFR and compilation
+logs remain independent inputs. Termination gives the capture process time to
+clean up its managed child/observer before forced termination, and both successful
+and failed captures retain their raw outputs in the compressed archive.
+
+Boundary spans include waiting and supply no compiler elapsed-time metric.
+Absent/inlined hooks, descendants, TID reuse, private task ownership, calling
+conventions, complete root census, clock alignment, code-size and compiler savings
+remain separate requirements. This diagnostic neither repeats a measured solver
+workload nor transfers earlier outcome, allocation, RNG or work controls.
+
 ### Live native argument candidates
 
 `com.eignex.klause.bench.profile.NativeVmLiveArgumentVerification` captures a
