@@ -4,6 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.RandomVariable
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -17,6 +19,7 @@ import com.eignex.klause.lp.bounding.solveNode
 import com.eignex.klause.lp.bounding.sparseCertifiedPrune
 import com.eignex.klause.lp.bounding.sparseSafePrune
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
@@ -28,11 +31,13 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.VarRef
@@ -559,6 +564,76 @@ class LpBoundingTest {
                         exact.toDouble(), sink, Cancellation.Never).prune)
                 }
             }
+        }
+    }
+
+    @Test
+    fun `continuous bounds retain original MPS objective constants scales and sense`() {
+        for ((sense, minimum) in listOf("MIN" to 0.5, "MAX" to -1.125)) {
+            val compiled = Mps.parse(
+                "NAME SOURCE\nOBJSENSE\n $sense\nROWS\n N COST\nCOLUMNS\n" +
+                    " M0 'MARKER' 'INTORG'\n I COST 0.125\n M1 'MARKER' 'INTEND'\n X COST 0.5\n" +
+                    "RHS\n R COST -0.375\nBOUNDS\n LO B I 0\n UP B I 1\n" +
+                    " LO B X 0.25\n UP B X 1.25\nENDATA",
+            ).toExactSourceProblem()
+            val sourceObjective = assertNotNull(compiled.objective).toLinearObjective()
+            val objective = if (compiled.maximize) sourceObjective.negated() else sourceObjective
+            val sink = SolveStatsSink(backend = "continuous-original-source")
+            val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, successful ->
+                successful && certifier == LpCertifier.SAFE_OBJECTIVE
+            })
+            LpEngine(compiled.model, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink, context).use { engine ->
+                val relaxer = assertNotNull(engine.lpRelaxer)
+
+                assertEquals(minimum, engine.rootLpRelaxationBound(relaxer, emptyList()))
+                assertTrue(engine.sparseSafePrune(relaxer, PropagationSession(compiled.model),
+                    minimum - 0.125, sink, Cancellation.Never, -1, true).prune)
+                assertFalse(engine.sparseCertifiedPrune(relaxer, PropagationSession(compiled.model),
+                    minimum, sink, Cancellation.Never).prune)
+            }
+        }
+    }
+
+    @Test
+    fun `nonfinite dual candidates cannot publish a continuous root bound`() {
+        for (dual in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)) {
+            val problem = Problem(0, 0, emptyArray(), arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.25),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.25))
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newTableauSolver(model: LpModel, cancellation: Cancellation, iterationLimit: Int,
+                    workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions): TableauCutSolver {
+                    val delegate = ProductionLpEngineFactory.newTableauSolver(model, cancellation, iterationLimit,
+                        workLimit, trackDegeneracy, pricing)
+                    return object : TableauCutSolver by delegate {
+                        override fun solve(warm: Basis?): FloatLpResult? = delegate.solve(warm)?.also {
+                            it.duals.fill(dual)
+                        }
+                    }
+                }
+            }
+            val sink = SolveStatsSink(backend = "continuous-nonfinite")
+            LpEngine(problem, LinearObjective(realCoefficients = doubleArrayOf(0.5)),
+                LpParams(lpPlan = LpPlan(bounding = true)), sink, LpSolveContext(factory)).use { engine ->
+                assertTrue(engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList()).isNaN())
+            }
+        }
+    }
+
+    @Test
+    fun `cancelled continuous bounding cannot prune or publish a root bound`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L), constant = 3L,
+            realCoefficients = doubleArrayOf(0.5))
+        val sink = SolveStatsSink(backend = "continuous-cancelled")
+        val cancelled = Cancellation { true }
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+
+            assertFalse(engine.sparseSafePrune(relaxer, PropagationSession(problem),
+                3.0, sink, cancelled, -1, true).prune)
+            assertTrue(engine.rootLpRelaxationBound(relaxer, emptyList(), cancelled).isNaN())
         }
     }
 
