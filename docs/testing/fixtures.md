@@ -223,5 +223,6 @@ exercise grid and exact arithmetic paths and original MiniZinc witness checks; g
 and exhaustion claims retain their approximation limits.
 
 The self-authored `klause-bench/smoke-corpus/mps-numerical` sources exercise open
-integer numerical optima, exhaustive integer gaps, integer infeasibility beside an
+integer numerical optima, marker versus general bounds, wide attained coordinates,
+constant contradictions, exhaustive integer gaps, integer infeasibility beside an
 unbounded relaxation and integral improving rays. They contain no external data.
