@@ -652,6 +652,30 @@ class Xcsp3SourceCheckerTest {
         }
     }
 
+    @Test
+    fun `ragged matrix checking does not certify unrelated constraints`() {
+        val model = File.createTempFile("xcsp-matrix-mixed-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables><var id="i">0..1</var><var id="j">0..1</var><var id="v">1..3</var></variables>
+                  <constraints><element><matrix>(1,2)(3)</matrix><index>i j</index><value>v</value></element>
+                    <intension>eq(v,2)</intension></constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>i j v</list><values>0 0 1</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals("unknown", checked.status)
+            assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = [
         "<cumulative><origins>x y</origins><lengths>1 1</lengths><heights>1500000000 1500000000</heights>" +

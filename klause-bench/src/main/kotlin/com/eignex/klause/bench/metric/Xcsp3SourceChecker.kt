@@ -69,9 +69,14 @@ internal object Xcsp3SourceChecker {
         return runCatching {
             val assignment = names.trim().split(Regex("\\s+")).zip(values.trim().split(Regex("\\s+")))
                 .associate { (name, value) -> name to value.toInt() }
-            CheckerArithmeticGuard(assignment).apply {
+            val arithmetic = CheckerArithmeticGuard(assignment).apply {
                 loadConstraints(parser)
                 loadObjectives(parser)
+            }
+            if (parser.oEntries.isEmpty()) arithmetic.raggedMatrixVerdict()?.let { holds ->
+                return result(if (holds) "valid" else "invalid", "exact original matrix selections " +
+                    if (holds) "accept candidate" else "reject candidate", if (holds) "v $pinned" else null)
+                    .copy(checker = "$CHECKER + exact matrix element check")
             }
             val checker = SolutionChecker(false, source.absolutePath, pinned.byteInputStream())
             when {
@@ -148,10 +153,17 @@ internal object Xcsp3SourceChecker {
 
 private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) : XCallbacks2 {
     private val implementation = Implem(this).apply { rawParameters() }
+    private val matrixChecks = ArrayList<Pair<Boolean, Boolean?>>()
+    private var otherConstraints = false
+
+    // The pinned reference loader converts constant matrices with the first row's width.
+    fun raggedMatrixVerdict(): Boolean? = if (!otherConstraints && matrixChecks.any { it.first } &&
+        matrixChecks.all { it.second != null }) matrixChecks.all { it.second == true } else null
 
     override fun implem(): Implem = implementation
 
     override fun loadCtr(c: XCtr) {
+        if (c.type.name != "element" || c.childs.firstOrNull()?.type?.name != "matrix") otherConstraints = true
         c.childs.forEach { checkTrees(it.value) }
         when (c.type.name) {
             "sum" -> super<XCallbacks2>.loadCtr(c)
@@ -308,6 +320,11 @@ private class CheckerArithmeticGuard(private val assignment: Map<String, Int>) :
             decline("matrix element column range")
         }
         integers(matrix).forEach { integer(it, "matrix element entry") }
+        val ragged = matrix.any { (it as? Array<*>)?.size != (matrix.firstOrNull() as? Array<*>)?.size }
+        val holds = if (c.childs[2].type.name == "value") {
+            integers(checkNotNull(row[positions[1].intValueExact()])).single() == integers(c.childs[2].value).single()
+        } else null
+        matrixChecks.add(ragged to holds)
     }
 
     private fun checkEndpoints(origins: Any, lengths: Any) {
