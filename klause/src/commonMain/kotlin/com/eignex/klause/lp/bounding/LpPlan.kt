@@ -341,12 +341,12 @@ data class LpPlan(
      */
     val energeticEvery: Int = 1,
     /**
-     * Learn a clause from an infeasible node. When true, an infeasibility proof is turned into
-     * a nogood over absolute variable-bound atoms — a globally valid clause implied by the original
-     * constraints — and registered at the next restart (where its literals are no longer all-false),
-     * so the dead region is pruned in sibling subtrees. Two sources: the node LP's Farkas
-     * infeasibility certificate (requires [bounding]) and the energetic over-subscription window
-     * (requires [energeticReasoning]). When the certificate resolves to an asserting
+     * Retain source-feasibility clauses over absolute variable-bound atoms. Farkas certificates
+     * produce conflict nogoods, mixed-row projections produce implications guarded by their complete
+     * row and bound premises, and energetic reasoning produces over-subscription nogoods. The
+     * bounded LP pool registers them at restart so sibling subtrees can reuse the deduction.
+     * LP sources require [bounding]; energetic sources require [energeticReasoning].
+     * When a conflict certificate resolves to an asserting
      * 1UIP clause the engine backjumps and learns immediately, so this helps even with
      * restarts off; non-asserting certificates still fall back to restart-time registration. A
      * certificate leaning on a live-big-M reified row cites the bounds that justify the M alongside its
