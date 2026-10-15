@@ -312,6 +312,7 @@ class Portfolio(
     ): MinimizeResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSearch>(workers.size))
         val incumbent = incumbents.exchange
+        if (incumbent.current() != null) run.endFeasibilityCoverage()
         val pending = MutableList<Candidate<MinimizeResult.WithSample, V>?>(workers.size) { null }
         val start = TimeSource.Monotonic.markNow()
         val readBound = { incumbents.bound() }
@@ -332,6 +333,7 @@ class Portfolio(
             if (!incumbents.isImproving(candidate.objective)) return
             val worker = workers[claim.arm]
             if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
+            run.endFeasibilityCoverage()
             try {
                 acceptedVersion++
                 onAccepted?.invoke(AcceptedPortfolioIncumbent(acceptedVersion, r.sample, candidate.objective))
@@ -694,6 +696,11 @@ class Portfolio(
         private var sliceWork = baseSliceWork
         private val families = FamilyPolicy(bandit.random, profile?.let(FamilyPrior::of) ?: FamilyPrior.UNIFORM)
         private var improving = false
+        private var feasibilityComplete = false
+
+        fun endFeasibilityCoverage() {
+            feasibilityComplete = true
+        }
 
         /** Whether every arm has retired. */
         val allRetired: Boolean get() = remaining == 0
@@ -733,11 +740,12 @@ class Portfolio(
             try {
                 while (!token()) {
                     val claim = claim(index) ?: break
+                    val started = runTimeSource.markNow()
                     try {
                         segment(claim)
                     } finally {
+                        val spent = started.elapsedNow().inWholeNanoseconds
                         locked {
-                            val spent = checkNotNull(activeSince[claim.arm]).elapsedNow().inWholeNanoseconds
                             busy[claim.arm] = false
                             activeSince[claim.arm] = null
                             armNanos[claim.arm] += spent
@@ -856,7 +864,7 @@ class Portfolio(
         }
 
         private fun owedCompleteArm(eligibleArms: List<Int>): Int? {
-            if (improving) return null
+            if (feasibilityComplete) return null
             val active = eligibleArms.filter { !retired[it] && !workers[it].auxiliaryProof }
             val complete = active.filter { workers[it].family == ArmFamily.Backtrack }
             val free = complete.filter { !busy[it] }
