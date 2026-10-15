@@ -45,7 +45,8 @@ class PortfolioEvidenceTest {
             val worker = PortfolioWorker.ofMinimize("exhausted", 0) { bound, _, _, _ ->
                 assertEquals(Double.POSITIVE_INFINITY, bound())
                 sequenceOf(MinimizeResult.Unknown(TerminationReason.SearchExhausted))
-            }.bindEvidence(identity, provesResults = proofs).bindInvocation(invocation).also {
+            }.bindEvidence(identity, provesResults = proofs).bindInvocation(invocation)
+                .bindSharingInvocation(invocation).also {
                 it.controlsObjectiveCutoff = controlled
             }
 
