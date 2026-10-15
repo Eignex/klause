@@ -43,7 +43,7 @@ class OpenWitnessTest {
             realLower = doubleArrayOf(-2.0, 0.0), realUpper = doubleArrayOf(2.0, 2.0))
         val third = BigFraction.ofLong(3).reciprocal()
         val valid = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(-third.toDouble(), third.toDouble()),
-            exactReals = listOf(-third, third))
+            exactReals = listOf(third.negated(), third))
         val relaxed = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(0.0, 1.0),
             exactReals = listOf(BigFraction.ZERO, BigFraction.ONE))
 

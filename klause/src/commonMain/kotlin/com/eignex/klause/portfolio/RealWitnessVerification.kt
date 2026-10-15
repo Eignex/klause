@@ -34,7 +34,7 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
         if (factor.variables.reals.isEmpty()) continue
         if (factor is RealAbs) {
             val operand = reals[factor.operand]
-            val magnitude = if (operand < BigFraction.ZERO) -operand else operand
+            val magnitude = if (operand < BigFraction.ZERO) operand.negated() else operand
             if (magnitude != reals[factor.result]) {
                 return Verification.Rejected("real factor $id refutes the assignment")
             }
