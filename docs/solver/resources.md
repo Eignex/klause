@@ -250,7 +250,10 @@ index or Boolean draw.
 For a default opening with an established complete pure-real difference graph,
 an at-most-one or exactly-one source Boolean cardinality over three or more
 literals retains direct comparison guidance under the existing operation token.
-Graph preparation captures this constant metadata during its existing factor pass.
+Opening classification charges at most 65,536 full-source factor visits to its
+existing token, stopping at the first qualifying cardinality. A private source-size
+decline retains ordinary graph polarity; cancellation withholds the provider.
+The captured Boolean metadata transfers neither factor enforcement nor ownership.
 Other graph sources release only optional hint rows and values at the first live
 primitive consultation.
 The opening registration and all capture work already spent remain charged without refund; subsequent

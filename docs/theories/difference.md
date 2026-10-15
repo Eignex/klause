@@ -194,8 +194,9 @@ defer LP construction and check the active graph at partial and complete Boolean
 including the root. A feasible partial graph supplies consistency and can guide
 comparison polarity without a model contribution. Default direct guidance retains
 that point beside a source at-most-one or exactly-one Boolean cardinality over
-three or more literals. Graph preparation retains this source shape in its existing
-factor pass, with no extra graph check or allowance. Other admitted graph sources
+three or more literals. Bounded opening classification reads the full source under
+its existing token, including cardinalities retained by the finite owner outside
+the arithmetic fragment. It adds no graph check or allowance. Other admitted graph sources
 release optional hint rows and values at the first live default consultation and
 supply no preference. Registration and all capture work already spent remain charged; later checks
 skip released capture in the same opening. An unavailable point or a caller preference
