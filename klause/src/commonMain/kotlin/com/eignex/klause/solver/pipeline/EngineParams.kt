@@ -322,6 +322,10 @@ private fun parseRestart(s: String): RestartPolicy = when (s.lowercase()) {
  *  takes set edits). */
 internal fun scalarTokens(spec: String?, axis: String): List<AxisToken> {
     val tokens = spec?.let { AxisEdits.tokens(it) } ?: return emptyList()
+    return scalarTokens(tokens, axis)
+}
+
+internal fun scalarTokens(tokens: List<AxisToken>, axis: String): List<AxisToken> {
     tokens.firstOrNull { it.op != AxisToken.Op.SET }?.let {
         pipelineConfigError("ls: $axis is single-valued and takes no +/- edit (got `${it.value}`)")
     }

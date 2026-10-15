@@ -240,20 +240,23 @@ sealed class ExecutionOption<T> private constructor(internal val id: String) {
 
     /** The `scoring` execution setting. */
     data object Scoring : ExecutionOption<List<AxisToken>>("scoring") {
-        override fun capture(value: List<AxisToken>): List<AxisToken> = value.toList()
-        override fun decode(params: EngineParams): List<AxisToken>? = params.string(id)?.let { scalarTokens(it, "scoring") }
+        override fun capture(value: List<AxisToken>): List<AxisToken> = scalarTokens(value.toList(), "scoring")
+        override fun decode(params: EngineParams): List<AxisToken>? =
+            params.string(id)?.let { scalarTokens(it, "scoring") }
     }
 
     /** The `acceptance` execution setting. */
     data object Acceptance : ExecutionOption<List<AxisToken>>("acceptance") {
-        override fun capture(value: List<AxisToken>): List<AxisToken> = value.toList()
-        override fun decode(params: EngineParams): List<AxisToken>? = params.string(id)?.let { scalarTokens(it, "acceptance") }
+        override fun capture(value: List<AxisToken>): List<AxisToken> = scalarTokens(value.toList(), "acceptance")
+        override fun decode(params: EngineParams): List<AxisToken>? =
+            params.string(id)?.let { scalarTokens(it, "acceptance") }
     }
 
     /** The `restart` execution setting. */
     data object Restart : ExecutionOption<List<AxisToken>>("restart") {
-        override fun capture(value: List<AxisToken>): List<AxisToken> = value.toList()
-        override fun decode(params: EngineParams): List<AxisToken>? = params.string(id)?.let { scalarTokens(it, "restart") }
+        override fun capture(value: List<AxisToken>): List<AxisToken> = scalarTokens(value.toList(), "restart")
+        override fun decode(params: EngineParams): List<AxisToken>? =
+            params.string(id)?.let { scalarTokens(it, "restart") }
     }
 
     /** The `strategy` execution setting. */
@@ -430,7 +433,9 @@ internal abstract class ExecutionOptionReader {
     abstract fun finish(engine: String, valid: String)
 }
 
-private class CapturedExecutionOptionReader(private val values: MutableMap<String, OptionValue>) : ExecutionOptionReader() {
+private class CapturedExecutionOptionReader(
+    private val values: MutableMap<String, OptionValue>,
+) : ExecutionOptionReader() {
     @Suppress("UNCHECKED_CAST")
     override operator fun <T> get(option: ExecutionOption<T>): T? = when (val entry = values.remove(option.id)) {
         null -> null
