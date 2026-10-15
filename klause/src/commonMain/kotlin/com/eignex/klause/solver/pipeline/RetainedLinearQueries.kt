@@ -58,7 +58,7 @@ internal class RetainedLinearQueries(
         openTheoryClauses = planned?.session?.learnedClauseStats() ?: state.clauses, openHints = state.hints,
         search = state.progress(planned?.session))
     val exhausted: Boolean get() = !state.work.hasAllowance() ||
-        state.work.snapshot().openTheoryChecks >= params.maxLeaves
+        state.work.acceptedChecks >= params.maxLeaves
 
     fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T {
         check(!closed) { "conditioned query owner is closed" }
