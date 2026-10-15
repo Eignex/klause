@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -24,30 +25,44 @@ import com.eignex.klause.solver.result.SearchEvent
  * schedule); this adapter owns only the run-time wiring (λ-shaping, warm-start, event sink, and the solve-wide
  * [nodeBudget] every segment spends).
  */
-internal class LocalSearchWorkerConfig(
+internal class LocalSearchWorkerConfig private constructor(
     val recipe: LocalSearchRecipe,
-    val nodeBudget: NodeBudget? = null,
-    private val reportResiduals: Boolean = false,
-    private val reportPhaseTimes: Boolean = false,
-    private val seedOffset: Int = 0,
-    private val numericalCompletion: Boolean = false,
+    val nodeBudget: NodeBudget?,
+    private val reportResiduals: Boolean,
+    private val reportPhaseTimes: Boolean,
+    private val seedOffset: Int,
+    private val numericalCompletion: Boolean,
+    private val toleranceCheck: ((Sample) -> Boolean)?,
 ) :
     WorkerConfig {
 
+    constructor(
+        recipe: LocalSearchRecipe,
+        nodeBudget: NodeBudget? = null,
+        reportResiduals: Boolean = false,
+        reportPhaseTimes: Boolean = false,
+        seedOffset: Int = 0,
+        numericalCompletion: Boolean = false,
+    ) : this(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, numericalCompletion, null)
+
+    fun withToleranceCheck(check: (Sample) -> Boolean): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
+            numericalCompletion, check)
+
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes,
-            numericalCompletion = numericalCompletion)
+        LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes, seedOffset,
+            numericalCompletion, toleranceCheck)
 
     fun withNumericalCompletion(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, true)
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, true, toleranceCheck)
 
     override val label: String get() = recipe.label
 
     override fun withLsResiduals(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset, numericalCompletion)
+        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset, numericalCompletion, toleranceCheck)
 
     override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset, numericalCompletion)
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset, numericalCompletion, toleranceCheck)
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the
@@ -88,8 +103,8 @@ internal class LocalSearchWorkerConfig(
             definitionalSweep = definitionalSweep,
             perMoveInvariants = definitionalSweep != null && recipe.perMoveInvariants,
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
-            // Continuous columns are scored in floating point; the exact residual LP decides each candidate.
-            completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective) else null,
+            // Floating scores guide candidates; the residual LP retains the configured source guarantee.
+            completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective, toleranceCheck) else null,
         ).apply {
             objectiveBound = boundHandle
             if (effectiveProblem === problem) {

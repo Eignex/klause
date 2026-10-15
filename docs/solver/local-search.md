@@ -651,6 +651,14 @@ against those constraints before publication; a rejected or indeterminate candid
 cannot refute the source model. Completed samples retain authoritative coordinates
 and source scope rather than substituting the local-search score for a witness check.
 
+Numerical finite completion uses the same original-source tolerance callback as
+CP when the invocation supplies one. The residual LP must accept its floating gap,
+and the callback checks the full completed source point again before returning a
+witness. That witness retains floating coordinates without exact-real authority;
+it carries no optimum proof. Without the callback, including explicit exact MPS
+invocations, unavailable exact certification leaves completion undecided. Both
+policies retain numerical execution and the containing cancellation/work ledger.
+
 Linear completion retains a worker-private conditioned query owner. Boolean pins
 and arbitrary-width integer equalities use the prepared source plan's arithmetic
 route; continuous coordinates remain theory-owned. Native work charges each

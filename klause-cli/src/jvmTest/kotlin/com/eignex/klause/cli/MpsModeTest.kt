@@ -210,6 +210,30 @@ class MpsModeTest {
     }
 
     @Test
+    fun `bounded decimal LS completion retains the configured MPS source guarantee`() {
+        val source = File.createTempFile("mps-ls-source-guarantee", ".mps").apply {
+            writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
+                " M1 'MARKER' 'INTEND'\n X COST 0.1 R 1\nRHS\n RHS R 0.2\n" +
+                "BOUNDS\n LI B I 0\n UI B I 1\n LO B X 0.1\nENDATA\n")
+            deleteOnExit()
+        }
+        for (exact in listOf(false, true)) {
+            val flags = if (exact) arrayOf("--exact") else emptyArray()
+            val text = capture {
+                assertEquals(0, runCli(arrayOf("-s", "-e", "ls", "-p", "1", "--param",
+                    "node-limit=100", *flags, source.absolutePath)))
+            }
+
+            assertTrue("s SATISFIABLE" in text.lines(), text)
+            assertTrue(if (exact) "exact original MPS source witness" in text
+                else "MPS source tolerance witness" in text, text)
+            assertFalse("optimizationStatus=" in text, text)
+            assertFalse("exact-neighborhood" in text, text)
+            assertFalse("declaredTheoryRoute=" in text, text)
+        }
+    }
+
+    @Test
     fun `bounded mixed decimal loading retains finite execution under default and exact settings`() {
         val source = File.createTempFile("mps-finite-decimal", ".mps").apply {
             writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +
