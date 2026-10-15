@@ -13,11 +13,11 @@ import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
-import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -25,8 +25,8 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.hours

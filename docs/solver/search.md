@@ -683,6 +683,8 @@ composed verifier as ordinary CP leaves. Unavailable or interrupted completion
 returns no candidate; it cannot invoke an open theory or establish infeasibility.
 The probe returns accepted witnesses only, including a feasible base of a certified
 unbounded leaf, and exports no optimum, refutation, bound or recession claim.
+A witness accepted before the root allowance expires can still be published while
+the invocation remains active; publication performs no fresh completion or verification.
 Only exact completed incumbents support its internal accepted-bound pruning;
 tolerance witnesses retain witness-only authority. The flag stays off by default.
 
