@@ -37,8 +37,11 @@ this route does not implement exact function optimization. See the
 [transcendental theory contract](../theories/transcendental.md).
 
 Bounded representable Int × Int products use `Product`; Int × Real products use
-`RealProduct`, and Real × Real products use `ContinuousProduct`. Compound integer
-operands receive exact defining equalities. Every intermediate range must fit the
+`RealProduct`, and Real × Real products use `ContinuousProduct`. Nonlinear source
+lowering first closes integer bounds from exact unconditional linear premises under
+the containing cancellation token. Proved finite ranges guide operand and global
+lowering; surviving open sides retain exact source fallback. Linear-only loading
+keeps its single-scan inference. Compound integer operands receive exact defining equalities. Every intermediate range must fit the
 native integer representation, and mixed coefficients must preserve exact values.
 Open or overflowing integers retain typed arbitrary-precision source coordinates
 through [nonlinear integer execution](../theories/nonlinear-integer.md). Native

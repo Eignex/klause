@@ -43,6 +43,9 @@ internal fun Compiler.Builder.integerProduct(parts: List<IntComb>): IntComb {
 }
 
 internal fun Compiler.Builder.finiteProductRange(term: LinComb): Pair<Long, Long> {
+    if (term.coeffs.any { (id, coefficient) -> coefficient != 0L && intDomains[id] is PresolveDomain.Open }) {
+        closeProductBounds()
+    }
     var lo = bigIntOf(term.constant)
     var hi = lo
     for ((id, coefficient) in term.coeffs) {

@@ -5,6 +5,9 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -41,6 +44,56 @@ class SmtLibAdmissionTest {
             val x = PolynomialExpression.Variable(SourceRealId(0))
             assertEquals(PolynomialExpression.Product(listOf(x, x)), selection.whenTrue)
         }
+    }
+
+    @Test
+    fun `proved operand bounds retain native products and finite distinctness before lowering`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const n Int) (declare-const m Int) (declare-const k Int) " +
+                "(declare-const x Real) (declare-const y Real) " +
+                "(assert (and (>= m 0) (<= m 1) (or (= k 0) (= k 2)) (= n (+ m 1)))) " +
+                "(assert (distinct n m k)) (assert (= x 2)) (assert (= y 4)) " +
+                "(assert (= (* (to_real n) x) y)) (check-sat)",
+        )
+        val source = assertIs<SmtLibInput.Linear>(input).problem
+
+        val witness = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve()).assignment
+
+        assertTrue(source.model.factors.any { it is RealProduct })
+        assertTrue(source.model.factors.any { it is AllDifferent })
+        assertEquals("2", witness.intValue(source.intVarNames.getValue("n")))
+        assertEquals("1", witness.intValue(source.intVarNames.getValue("m")))
+        assertEquals("0", witness.intValue(source.intVarNames.getValue("k")))
+    }
+
+    @Test
+    fun `genuine open nonlinear integers retain the original exact source`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const n Int) (declare-const x Real) (declare-const y Real) " +
+                "(assert (>= n 0)) (assert (= x 2)) (assert (= (* (to_real n) x) y)) (check-sat)",
+        )
+
+        val source = assertIs<SmtLibInput.NonlinearInteger>(input).problem
+
+        assertEquals(mapOf("n" to 0), source.intVarNames)
+        assertEquals(mapOf("x" to 0, "y" to 1), source.realVarNames)
+    }
+
+    @Test
+    fun `cancellation during nonlinear bound closure withholds source admission`() {
+        var work = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = work > 0
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+
+        val input = SmtLibAdmission.parse(
+            "(declare-const n Int) (declare-const m Int) (declare-const x Real) " +
+                "(assert (and (>= m 0) (<= m 1) (= n (+ m 1)))) " +
+                "(assert (= (* (to_real n) x) 4)) (check-sat)", cancellation = stop,
+        )
+
+        assertEquals(SmtLibInput.Interrupted, input)
     }
 
     @Test

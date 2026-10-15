@@ -143,7 +143,8 @@ private fun parseLinearAdmission(
     settings: ProblemSettings,
     cancellation: Cancellation,
 ): SmtLibProblem {
-    val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings)
+    val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings,
+        sourceCancellation = cancellation)
     val reader = SExprReader(source)
     val scope = SmtLibScope(cancellation)
     val declarations = ArrayList<SExpr>()
@@ -251,7 +252,7 @@ private fun hasSignedNumberSymbol(expression: SExpr, cancellation: Cancellation)
     return false
 }
 
-private fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): Boolean {
+internal fun hasNonlinearSyntax(expression: SExpr, cancellation: Cancellation): Boolean {
     val work = ArrayDeque<SExpr>()
     work.addLast(expression)
     while (work.isNotEmpty()) {
