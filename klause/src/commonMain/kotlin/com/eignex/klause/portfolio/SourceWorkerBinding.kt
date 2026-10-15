@@ -1,5 +1,7 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.ir.ObjectiveSense
+
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -24,6 +26,16 @@ internal class SourceWorkerBinding(
     init {
         require(invocation == null || quadraticInvocation == null) { "worker has incompatible execution bindings" }
         require(quadraticInvocation?.matchesModel(model) != false) { "quadratic producer differs from the worker model" }
+        require(quadraticInvocation == null || (preparedPlan != null && quadraticInvocation.matchesModel(
+            ModelIdentity.of(preparedPlan.originalSource, quadraticInvocation.objective)))) {
+            "quadratic producer has another source plan"
+        }
+        require(quadraticInvocation == null || preparedPlan?.quadraticObjective == null ||
+            (preparedPlan.quadraticObjective === quadraticInvocation.objective &&
+                preparedPlan.maximize == (quadraticInvocation.sense == ObjectiveSense.MAXIMIZE))) {
+            "quadratic producer has another source objective or direction"
+        }
+        require(sharingInvocation == null || invocation != null) { "sharing requires an actual producer invocation" }
         require(invocation == null || model.matches(invocation.model)) { "producer differs from the worker model" }
         require(invocation == null || scope == invocation.scope) { "producer has another source scope" }
         require(invocation == null || preparedPlan === invocation.preparedPlan) { "producer has another source plan" }

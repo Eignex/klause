@@ -54,7 +54,8 @@ class FiniteExactNeighborhoodTest {
             numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 3.0)).bake()
         val point = assertNotNull(source.fixedDiscreteSample())
         val binding = EngineInvocation(source.prepareExecutionPlan(preferFinite = true), ModelIdentity.of(source))
-        val worker = finiteExactNeighborhoodWorker(source, point, null, null, false, 17, 0).bindSource(SourceWorkerBinding(binding, provesResults = false))
+        val worker = finiteExactNeighborhoodWorker(source, point, null, null, false, 17, 0)
+            .bindSource(SourceWorkerBinding(binding, provesResults = false))
 
         val result = worker.use { it.solve(Cancellation.Never) }
 
