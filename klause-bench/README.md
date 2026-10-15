@@ -126,6 +126,13 @@ joint-conflict sources, plus signed MiniZinc and XCSP3 inputs. The adjacent Flat
 fixture supports direct CLI captures. MiniZinc and
 XCSP3 runs use `param=source-validation=true` for original-source witness checking.
 
+`mps-linear-source-v1` retains self-authored decimal mixed rows, enabled/disabled
+indicators, shared contradictions, constant objectives, bound closure, wide numbers
+and duplicate decimal terms. Compare default and `exact=true` configurations at
+pinned revisions. Use `SourceRecordCheck` with `captureSources=true` for independent
+original-decimal validation; this fixture suite requires hash-named source bytes.
+Reference agreement does not verify an exported solver proof certificate.
+
 ## Klause-lab
 
 [Klause-lab](https://github.com/Eignex/klause-lab) owns remote experiment execution,
