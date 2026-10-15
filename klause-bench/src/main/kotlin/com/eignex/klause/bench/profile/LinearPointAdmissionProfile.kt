@@ -136,7 +136,7 @@ internal object LinearPointAdmissionProfile {
                         put("firstFractionalFiniteInteger", fractionalFinite?.firstOrNull())
                         put("firstFractionalOpenInteger", firstFractionalOpen)
                         put("firstFractionalOpenPoint", firstFractionalOpen?.let {
-                            point?.getOrNull(model.numRealVars + it)?.toString()
+                            point.getOrNull(model.numRealVars + it)?.toString()
                         })
                         put("dirty", field(component, "dirty") as Boolean)
                         put("pendingPointForward", field(component, "pendingPointForward") as Boolean)
