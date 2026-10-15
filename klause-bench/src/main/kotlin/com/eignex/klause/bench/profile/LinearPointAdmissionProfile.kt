@@ -17,6 +17,7 @@ import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.security.MessageDigest
+import java.util.HexFormat
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -41,8 +42,7 @@ internal object LinearPointAdmissionProfile {
         val file = CorpusFetcher.resolve(reference.source)
         val bytes = CorpusFiles.open(file).use { it.readNBytes(32 * 1024 * 1024 + 1) }
         require(bytes.size <= 32 * 1024 * 1024)
-        val actual = MessageDigest.getInstance("SHA-256").digest(bytes)
-            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
         require(actual == expected) { "original source identity differs" }
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
@@ -69,6 +69,8 @@ internal object LinearPointAdmissionProfile {
             put("openingBudgetMs", 60_000)
             put("traversalDecisions", 0)
             put("sourceVerdictClaim", false)
+            put("entryPoint", "direct-library-linear-opening")
+            put("cliRoutingEquivalence", "unverified")
             put("opening", started.javaClass.simpleName)
             put("sourceBooleans", compiled.boolVarNames.size)
             put("sourceIntegers", compiled.intVarNames.size)
