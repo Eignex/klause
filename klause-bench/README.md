@@ -799,8 +799,8 @@ not only the worker's completion flag.
 `BacktrackSolver.minimize` API with `LpPlan(bounding=true, lbTreeSearch=false|true)`.
 Rounding and pumping keep their plan default (`false`); this isolates explicit
 library enablement and does not represent the curated CLI recipe. Both variants
-use the exact original-decimal source adapter, with the ordinary source-tolerance
-callback in default mode and no callback in exact mode. Open integer declarations
+use the finite MPS lowering and require exact source preservation, with the ordinary
+source-tolerance callback in default mode and no callback in exact mode. Open integer declarations
 are refused rather than boxed or routed to an open theory.
 
 A private JVM uses one active processor, Serial GC and `-Xmx3g`. After one warmup
