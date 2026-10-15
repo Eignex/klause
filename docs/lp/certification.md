@@ -141,6 +141,14 @@ that direction. Source origins precede integer rounding, and strict supporting
 endpoints exclude equality. Integral data uses checked Int128 arithmetic, with a
 rational fallback after overflow or fractional admission. The caller may select
 rows incident to specified columns. Integral-only rows allocate no projection terms.
+Rows containing one continuous column can also pair with another singleton row
+on that column. An exact weighted sum cancels the continuous term and projects the
+remaining integral coordinates, retaining both logical columns and both row scopes.
+At most eight pairs per continuous column are tried under the same arithmetic and
+allocation allowance. Selected rows include their singleton companions. Missing
+logical endpoint support declines a direction; cancellation supplies no authority
+for an unrelated continuous endpoint. Completed row deductions survive optional
+pair exhaustion, and cancellation withholds unpublished results.
 
 After interval projection, a fixed base logical equality can restrict a target
 through the gcd of the other integer coefficients. Finite real intervals and
