@@ -1,6 +1,14 @@
 package com.eignex.klause.theory
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.pipeline.IntVariableOwner
+import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.LinearForm
@@ -19,6 +27,43 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class RealAbsEncodingTest {
+    @Test
+    fun `polynomial completion preserves exact algebraic absolute values`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            ContinuousProduct(0, 0, 2), RealAbs(0, 1),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, -1.0),
+        ), numRealVars = 3, realLower = doubleArrayOf(-2.0, 0.0, 2.0),
+            realUpper = doubleArrayOf(0.0, 2.0, 2.0))
+
+        val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source).solve())
+
+        val arithmetic = AlgebraicArithmetic()
+        val operand = assertNotNull(result.assignment.algebraicRealValue(0))
+        val magnitude = assertNotNull(result.assignment.algebraicRealValue(1))
+        assertEquals(0, arithmetic.compare(arithmetic.negate(operand), magnitude))
+        assertTrue(arithmetic.compare(magnitude, arithmetic.rational(BigFraction.ONE)) > 0)
+    }
+
+    @Test
+    fun `real absolute value preserves finite integer image ownership`() {
+        val parsed = parseFlatZinc(
+            """var -2..2: n; var float: x; var float: y;
+                constraint int2float(n,x); constraint float_abs(x,y);
+                constraint float_eq(y,1.0); solve satisfy;""",
+            exactFloats = true,
+        )
+        val source = parsed.problem
+        val plan = source.prepareExecutionPlan()
+        val integer = parsed.intVarsByName.getValue("n")
+        val relation = source.factors.filterIsInstance<RealAbs>().single()
+
+        val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source).solve())
+
+        assertEquals(IntVariableOwner.CP, assertNotNull(plan.componentPlan).intOwner(integer))
+        assertTrue(result.assignment.intValue(integer) in setOf("-1", "1"))
+        assertEquals("1", result.assignment.realValue(relation.result))
+    }
+
     @Test
     fun `exact FlatZinc absolute value retains the native relation at a rational point`() {
         val parsed = parseFlatZinc(
