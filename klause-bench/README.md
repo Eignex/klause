@@ -1816,6 +1816,33 @@ saved-record review. Zero owned buffer-loss counters establish only that counter
 scope; kernel probe delivery, generation/lifetime, private-read authorization,
 complete roots, clocks, code size and compiler savings remain unproved.
 
+`com.eignex.klause.bench.profile.NativeVmTaskGenerationReview` accepts `manifest`,
+`manifest-sha256` and `archive` HTTPS inputs for a saved entry capture. It verifies
+the complete archive membership and extracts the fixed required records without
+running the captured child or attaching probes. Downloads are bounded at 4 MiB
+for the manifest and 32 MiB for the archive; selected files are bounded at 16 MiB
+each and 64 MiB combined. The reviewer rechecks every original proof input,
+physical alias/source definition, library span and executed program.
+The manifest binds saved bytes; accepting an observation also requires the
+original capture's authenticated source and worker provenance.
+
+Saved task entries retain their source names, signed compile identities, raw
+pointer arguments, process/thread sequences and payload errors. Selected terminal
+delivery and the complete owned loss-counter proof remain separate from global
+kernel coverage. Initialization candidate edges retain every equal-pointer
+initialization compatible with known per-thread sequence. Cross-thread timestamp
+relations are recorded without imposing an order or proving the absence of hidden
+reuse. Null tasks and orphan frees remain unresolved.
+
+Observed wrapper nesting retains unfinished and orphan callbacks. Public identity
+candidates preserve the independent JFR compilation records, all recorded phase
+and inlining events, and the original XML states. A unique candidate does not
+establish wrapper identity, broker return, task generation or compiled lifetime.
+Raw inputs remain retained on malformed data, resource failure or proof decline;
+oversized derived inventories are withheld with an explicit failure. The review
+does not authorize private reads, complete roots, elapsed clocks, code size or
+compiler savings.
+
 ### Native executable entry bytes
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
