@@ -591,7 +591,11 @@ internal class WitnessProbe(
             var linear = true
             for (term in payload) {
                 arithmetic.step()
-                val variables = term.monomial.variables.filter { arithmetic.step(); it !in fixed }
+                val variables = term.monomial.variables.filter {
+                    arithmetic.step()
+                    if (it !in seed.indices) return null
+                    it !in fixed
+                }
                 active.addAll(variables)
                 if (variables.size > 1) groups.add(variables)
                 if (variables.size > 1 || variables.any { term.monomial.exponent(it) != 1 }) linear = false
@@ -784,9 +788,13 @@ internal class WitnessProbe(
     }
 
     private fun dyadicWeight(monomial: Monomial, exponents: IntArray): Long? {
+        arithmetic.step()
+        val variables = monomial.variables
+        repeat(variables.size) { arithmetic.step() }
         var weight = 0L
-        for (id in exponents.indices) {
+        for (id in variables) {
             arithmetic.step()
+            if (id !in exponents.indices) return null
             val degree = monomial.exponent(id).toLong()
             val exponent = exponents[id].toLong()
             if (degree < 0 || exponent !in -(MAX_WITNESS_BITS - 1L)..(MAX_WITNESS_BITS - 1L)) return null
@@ -795,6 +803,7 @@ internal class WitnessProbe(
             val product = degree * exponent
             weight = dyadicSum(weight, product) ?: return null
         }
+        arithmetic.step()
         return weight
     }
 
