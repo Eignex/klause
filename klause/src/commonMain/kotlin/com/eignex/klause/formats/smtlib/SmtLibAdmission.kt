@@ -7,12 +7,12 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
-import com.eignex.klause.ir.TranscendentalProblem
-import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.NonlinearIntegerProblem
-import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.PolynomialRealProblem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
@@ -199,7 +199,9 @@ private fun parseLinearAdmission(
             it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real)
         }
     ) smtUnsupported("polynomial objectives require exact source capture")
-    val products = problem.model.factors.any { it is Power || it is Product || it is RealProduct || it is ContinuousProduct }
+    val products = problem.model.factors.any {
+        it is Power || it is Product || it is RealProduct || it is ContinuousProduct
+    }
     val signedDeclarations = (builder.intNames.keys + builder.realNames.keys + builder.boolNames.keys).any {
         it.length > 1 && it[0] == '-' && it.drop(1).all { digit -> digit in '0'..'9' || digit == '.' }
     }
@@ -210,7 +212,9 @@ private fun parseLinearAdmission(
             it is Power || it is Product || it is RealProduct || it is ContinuousProduct
         })
     ) smtUnsupported("nonlinear source requires one nonincremental satisfaction query")
-    if (problem.model.factors.any { it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real) } &&
+    if (problem.model.factors.any {
+            it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real)
+        } &&
         (builder.intNames.isEmpty() || (0 until problem.model.numIntVars).any { id ->
             problem.model.intBounds.isOpenLower(id) || problem.model.intBounds.isOpenUpper(id)
         })) {

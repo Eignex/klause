@@ -1,10 +1,10 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.lowering.FloatRepresentation
-import com.eignex.klause.model.ContinuousRealEquality
-import com.eignex.klause.model.ContinuousRealExpr
 import com.eignex.klause.model.And
 import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.ContinuousRealEquality
+import com.eignex.klause.model.ContinuousRealExpr
 import com.eignex.klause.model.FloatLinearConstraint
 import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.model.IntCmpOp

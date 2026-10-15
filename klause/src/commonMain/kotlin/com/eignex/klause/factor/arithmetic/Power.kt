@@ -44,8 +44,12 @@ class Power(
     }
 
     override val variables: VarList = when (base) {
-        is Coordinate.Integer -> IntVars(intArrayOf(base.id.index, (result as Coordinate.Integer).id.index).distinct().toIntArray())
-        is Coordinate.Real -> RealVars(intArrayOf(base.id.index, (result as Coordinate.Real).id.index).distinct().toIntArray())
+        is Coordinate.Integer -> IntVars(
+            intArrayOf(base.id.index, (result as Coordinate.Integer).id.index).distinct().toIntArray(),
+        )
+        is Coordinate.Real -> RealVars(
+            intArrayOf(base.id.index, (result as Coordinate.Real).id.index).distinct().toIntArray(),
+        )
     }
 
     override fun remap(mapping: VarRemap): Factor = Power(base.remap(mapping), exponent, result.remap(mapping))

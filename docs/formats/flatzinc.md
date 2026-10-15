@@ -36,8 +36,8 @@ bounds expansion without making constraint order select a partial encoding.
 
 `int_pow`, `int_pow_fixed` and `klause_int_pow` retain `Power` for fixed
 nonnegative integer exponents. The MiniZinc library routes fixed nonnegative
-`pow` through `klause_int_pow`; its negative and variable-exponent decompositions
-retain their standard source semantics. Raw variable or negative exponent predicates
+`pow` through `klause_int_pow`; its negative fixed powers retain the standard integer-division decomposition.
+Variable powers remain outside the native advertised surface. Raw variable or negative exponent predicates
 decline. Exact `float_pow` accepts fixed nonnegative integral exponents and retains
 real coordinates for polynomial completion. Grid coordinates, negative/fractional
 exponents and variable real exponents decline.

@@ -14,8 +14,8 @@ import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.IntMax
 import com.eignex.klause.model.IntMin
 import com.eignex.klause.model.IntMod
-import com.eignex.klause.model.IntPower
 import com.eignex.klause.model.IntMul
+import com.eignex.klause.model.IntPower
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntScale
 import com.eignex.klause.model.IntSum

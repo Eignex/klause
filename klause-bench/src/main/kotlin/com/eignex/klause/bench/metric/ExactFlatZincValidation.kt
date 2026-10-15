@@ -234,7 +234,9 @@ internal object ExactFlatZincValidation {
 
         private fun powerMatches(base: ExactObjective, power: ExactObjective, output: ExactObjective): Boolean {
             require(power.integral) { "nonintegral source power exponent" }
-            val exponent = requireNotNull(power.toString().toIntOrNull()) { "source power exponent exceeds checker representation" }
+            val exponent = requireNotNull(power.toString().toIntOrNull()) {
+                "source power exponent exceeds checker representation"
+            }
             require(exponent >= 0) { "negative source power exponent" }
             fun ratio(value: ExactObjective): Pair<BigInteger, BigInteger> {
                 val parts = value.toString().split('/')

@@ -1242,6 +1242,52 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
+public final class com/eignex/klause/factor/arithmetic/Power : com/eignex/klause/ir/Factor {
+	public fun <init> (III)V
+	public fun <init> (Lcom/eignex/klause/factor/arithmetic/Power$Coordinate;ILcom/eignex/klause/factor/arithmetic/Power$Coordinate;)V
+	public fun canSubstituteAffine (IIII)Z
+	public final fun getBase ()Lcom/eignex/klause/factor/arithmetic/Power$Coordinate;
+	public fun getBoolVars ()[I
+	public final fun getExponent ()I
+	public fun getIntVars ()[I
+	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
+	public final fun getResult ()Lcom/eignex/klause/factor/arithmetic/Power$Coordinate;
+	public fun getStructuralKeyWeight ()I
+	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
+	public fun isValueAnonymous ()Z
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
+	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
+}
+
+public abstract interface class com/eignex/klause/factor/arithmetic/Power$Coordinate {
+}
+
+public final class com/eignex/klause/factor/arithmetic/Power$Coordinate$Integer : com/eignex/klause/factor/arithmetic/Power$Coordinate {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-2srAOhM ()I
+	public final fun copy-BbWYBdc (I)Lcom/eignex/klause/factor/arithmetic/Power$Coordinate$Integer;
+	public static synthetic fun copy-BbWYBdc$default (Lcom/eignex/klause/factor/arithmetic/Power$Coordinate$Integer;IILjava/lang/Object;)Lcom/eignex/klause/factor/arithmetic/Power$Coordinate$Integer;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-2srAOhM ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/factor/arithmetic/Power$Coordinate$Real : com/eignex/klause/factor/arithmetic/Power$Coordinate {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-P0Uu7zc ()I
+	public final fun copy-NWoOmUI (I)Lcom/eignex/klause/factor/arithmetic/Power$Coordinate$Real;
+	public static synthetic fun copy-NWoOmUI$default (Lcom/eignex/klause/factor/arithmetic/Power$Coordinate$Real;IILjava/lang/Object;)Lcom/eignex/klause/factor/arithmetic/Power$Coordinate$Real;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-P0Uu7zc ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klause/ir/Factor {
 	public fun <init> (III)V
 	public fun canSubstituteAffine (IIII)Z
@@ -5329,6 +5375,10 @@ public final class com/eignex/klause/lowering/FloatRepresentation {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/lowering/PowerLoweringKt {
+	public static final fun powerAsProducts (Lcom/eignex/klause/ir/PolynomialExpression;I)Lcom/eignex/klause/ir/PolynomialExpression;
+}
+
 public final class com/eignex/klause/lp/BuiltInRelaxationProjectionProvider : com/eignex/klause/lp/RelaxationProjectionProvider {
 	public static final field INSTANCE Lcom/eignex/klause/lp/BuiltInRelaxationProjectionProvider;
 	public fun select (Lcom/eignex/klause/ir/Factor;)Lcom/eignex/klause/lp/RelaxationProjection;
@@ -6078,6 +6128,35 @@ public final synthetic class com/eignex/klause/model/ContinuousRealExpr$Multiply
 }
 
 public final class com/eignex/klause/model/ContinuousRealExpr$Multiply$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ContinuousRealExpr$Power : com/eignex/klause/model/ContinuousRealExpr {
+	public static final field Companion Lcom/eignex/klause/model/ContinuousRealExpr$Power$Companion;
+	public fun <init> (Lcom/eignex/klause/model/ContinuousRealExpr;I)V
+	public final fun component1 ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public final fun component2 ()I
+	public final fun copy (Lcom/eignex/klause/model/ContinuousRealExpr;I)Lcom/eignex/klause/model/ContinuousRealExpr$Power;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/ContinuousRealExpr$Power;Lcom/eignex/klause/model/ContinuousRealExpr;IILjava/lang/Object;)Lcom/eignex/klause/model/ContinuousRealExpr$Power;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBase ()Lcom/eignex/klause/model/ContinuousRealExpr;
+	public final fun getExponent ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/ContinuousRealExpr$Power$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/ContinuousRealExpr$Power$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/ContinuousRealExpr$Power;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/ContinuousRealExpr$Power;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/ContinuousRealExpr$Power$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
@@ -6851,6 +6930,36 @@ public final synthetic class com/eignex/klause/model/IntMul$$serializer : kotlin
 }
 
 public final class com/eignex/klause/model/IntMul$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/IntPower : com/eignex/klause/model/IntExpr {
+	public static final field Companion Lcom/eignex/klause/model/IntPower$Companion;
+	public fun <init> (Lcom/eignex/klause/model/IntExpr;I)V
+	public final fun component1 ()Lcom/eignex/klause/model/IntExpr;
+	public final fun component2 ()I
+	public final fun copy (Lcom/eignex/klause/model/IntExpr;I)Lcom/eignex/klause/model/IntPower;
+	public static synthetic fun copy$default (Lcom/eignex/klause/model/IntPower;Lcom/eignex/klause/model/IntExpr;IILjava/lang/Object;)Lcom/eignex/klause/model/IntPower;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBase ()Lcom/eignex/klause/model/IntExpr;
+	public final fun getExponent ()I
+	public fun hashCode ()I
+	public fun toIntExpr ()Lcom/eignex/klause/model/IntExpr;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/eignex/klause/model/IntPower$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/eignex/klause/model/IntPower$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/eignex/klause/model/IntPower;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/eignex/klause/model/IntPower;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/eignex/klause/model/IntPower$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
@@ -9205,6 +9314,12 @@ public final class com/eignex/klause/schema/OptNominalHandle {
 	public final fun getPresent ()Lcom/eignex/klause/schema/BoolHandle;
 	public final fun getValue ()Lcom/eignex/klause/schema/NominalHandle;
 	public final fun ne (Ljava/lang/String;)Lcom/eignex/klause/model/BoolExpr;
+}
+
+public final class com/eignex/klause/schema/PowersKt {
+	public static final fun pow (Lcom/eignex/klause/model/ContinuousRealExpr;I)Lcom/eignex/klause/model/ContinuousRealExpr;
+	public static final fun pow (Lcom/eignex/klause/model/IntTerm;I)Lcom/eignex/klause/model/IntExpr;
+	public static final fun pow (Lcom/eignex/klause/schema/FloatTerm;I)Lcom/eignex/klause/model/ContinuousRealExpr;
 }
 
 public final class com/eignex/klause/schema/SetHandlesKt {

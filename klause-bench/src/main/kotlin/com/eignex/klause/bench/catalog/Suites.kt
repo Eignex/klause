@@ -772,7 +772,7 @@ internal object Suites {
 
     private val productAliases = suite("product-aliases", "Repeated product roles and fixed-power chains") {
         license = "internal"
-        for (name in listOf("square", "power-chain", "result-aliases")) {
+        for (name in listOf("square", "power-chain", "result-aliases", "power-scopes")) {
             vendoredMzn(name, Category.CSP, Expected.Sat, model = "product-aliases/$name.mzn")
         }
     }

@@ -51,12 +51,14 @@ class ExactFlatZincValidationTest {
 
     @Test
     fun `fixed power predicates check original exact coordinates and reject corruption`() {
-        for ((predicate, input, exponent, output) in listOf(
+        for (case in listOf(
             listOf("int_pow", "-2", "63", "-9223372036854775808"),
             listOf("klause_int_pow", "0", "0", "1"),
             listOf("int_pow_fixed", "-1", "2147483647", "-1"),
             listOf("float_pow", "1/3", "4.0", "1/81"),
         )) {
+            val (predicate, input, exponent) = case
+            val output = case[3]
             val source = "var float: x; var float: y; constraint $predicate(x, $exponent, y); solve satisfy;"
             val valid = ExactFlatZincValidation.inspect(source, "x = $input;\ny = $output;", null)
             val corrupted = ExactFlatZincValidation.inspect(source, "x = $input;\ny = 0;", null)

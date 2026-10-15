@@ -1,7 +1,7 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -10,16 +10,16 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.PropagationProblem
-import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationProblem
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.schema.IntHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.skema.SchemaDef
 import kotlin.random.Random
 import kotlin.test.Test

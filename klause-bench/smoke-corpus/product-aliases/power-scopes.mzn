@@ -1,0 +1,11 @@
+var 1..3: x;
+var -3..-1: y;
+var bool: square_is_four;
+constraint square_is_four <-> pow(x, 2) = 4;
+constraint not square_is_four;
+constraint not int_pow_fixed(x, 2, 4);
+constraint pow(y, -3) = 0;
+constraint pow(x, 0) = 1;
+constraint pow(x, 1) = x;
+solve satisfy;
+output ["x = ", show(x), ";\ny = ", show(y), ";\nsquare_is_four = ", show(square_is_four), ";\n"];

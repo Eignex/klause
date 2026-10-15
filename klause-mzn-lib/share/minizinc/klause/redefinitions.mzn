@@ -74,6 +74,11 @@ predicate float_lin_ne_reif(array[int] of float: as,
 % Multiplication.
 predicate int_times(var int: a, var int: b, var int: c);
 predicate klause_int_pow(var int: a, int: b, var int: c);
+predicate klause_int_pow_reif(var int: a, int: b, var int: c, var bool: r) =
+  let {
+    var compute_pow_bounds(a, b): value :: is_defined_var;
+    constraint klause_int_pow(a, b, value) :: defines_var(value);
+  } in r <-> value = c;
 
 % int → float coercion. klause's FlatZincCompiler emits a Linear factor
 % binding x's int value to y's bucket index.
