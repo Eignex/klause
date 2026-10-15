@@ -3,10 +3,12 @@ package com.eignex.klause.theory
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -43,6 +45,38 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class SelectionEncoderTest {
+    @Test
+    fun `real selection and a polynomial product share one continuous point`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 1)),
+            arrayOf<Factor>(ContinuousProduct(0, 0, 1), RealElement(0, 2, intArrayOf(0, 1))),
+            numRealVars = 3, realLower = doubleArrayOf(1.0, 2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0, 2.0))
+        val shared = assertNotNull(source.prepareExecutionPlan().polynomialModel)
+        val pins = mapOf(shared.integerColumns.getValue(0) to BigFraction.ONE)
+
+        val result = shared.service.invocation().use { it.check(PolynomialCondition(lower = pins, upper = pins)) }
+
+        assertIs<QfNraResult.Unsatisfiable>(result)
+    }
+
+    @Test
+    fun `interrupted real selection installation exposes no partial relation`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 4)),
+            arrayOf<Factor>(RealElement(0, 0, doubleArrayOf(0.0, 1.0, 2.0, 3.0))),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0))
+        var work = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 2
+            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        }
+        val declines = mutableListOf<EncoderDecline>()
+
+        val installed = FactorProjectionProviders.Default.prepare(source).installLinearFactor(0,
+            EncodingTarget.LINEAR, cancellation = cancellation, onDecline = declines::add)
+
+        assertNull(installed)
+        assertEquals(listOf(EncoderDecline.RESOURCE), declines)
+    }
+
     @Test
     fun `binary constant selection preserves full width endpoint values`() {
         for ((position, expected) in listOf(0 to Long.MIN_VALUE, 1 to Long.MAX_VALUE)) {

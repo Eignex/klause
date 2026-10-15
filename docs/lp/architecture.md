@@ -128,6 +128,12 @@ learning cannot be retracted selectively, restore an objective-independent
 region or prepare a fresh root. Portfolio sharing requires matching objectives,
 cutoffs and assumptions; source publication validation precedes admission.
 
+Real array selection emits index-range rows at every build. A source-justified
+fixed integer index additionally selects one exact real equality, so finite leaf
+completion solves the selected relation directly. An unfixed index contributes
+only the range relaxation; complete arithmetic consumers install its equivalent
+guarded formula. The original real coordinates remain the witness authority.
+
 Finite satisfaction and optimization searches share root hull pruning and global
 cut harvesting. Satisfaction uses a zero objective and admits variable shaving;
 objective shaving and incumbent-relative fixings remain optimization work. Root

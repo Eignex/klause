@@ -272,6 +272,13 @@ retains source attribution and uses the receiving cancellation/work allowance;
 an interrupted relation is discarded. Native finite projections remain available
 alongside arithmetic participation.
 
+`RealElement` retains an integer index and ordered binary64 constants or real-column
+entries. Its finite propagation restricts the index range; exact arithmetic checks
+certify the selected real equality. A fixed index emits that equality into the LP
+leaf. Its complete linear and polynomial encoders preserve the same index and
+continuous coordinates, including repeated entries and result aliases. Real local
+search scores and repairs are heuristic and require exact source certification.
+
 `FactorProjectionProviders.prepare(problem)` captures immutable selected propagation,
 scoring, relaxation and theory encoder descriptors against one canonical `Problem`. The descriptors
 couple declared capabilities to their factories or emitters; null selects an unsupported

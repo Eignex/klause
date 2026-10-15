@@ -138,6 +138,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is ContinuousProduct -> ContinuousProductInvariant(a, b, result)
 
+    is RealElement -> RealElementInvariant(this)
+
     is ReifiedRealLinear -> RealRowInvariant(vars, intCoeffs, realVars, realCoeffs, op, bound, strict, aux)
 
     is GaussianXor,

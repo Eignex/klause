@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
@@ -15,6 +16,8 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.abs
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.toLongExact
 
 internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> {
     for ((id, factor) in model.factors.withIndex()) {
@@ -62,6 +65,15 @@ internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification
             if (integer * reals[factor.realOperand] != reals[factor.result]) {
                 return Verification.Rejected("real factor $id refutes the assignment")
             }
+            continue
+        }
+        if (factor is RealElement) {
+            val index = sample.exactIntValue(factor.idx)
+            val position = if (index.fitsLong()) factor.position(index.toLongExact()) else null
+            if (position == null) return Verification.Rejected("real factor $id has an invalid index")
+            val selected = if (factor.arrIsVars) reals[factor.entries[position]]
+                else checkNotNull(BigFraction.ofDouble(factor.constants[position]))
+            if (selected != reals[factor.result]) return Verification.Rejected("real factor $id refutes the assignment")
             continue
         }
         val form = factor.linearForm
