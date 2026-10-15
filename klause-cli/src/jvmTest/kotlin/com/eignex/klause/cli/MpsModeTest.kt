@@ -20,6 +20,23 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `an infeasible constant MPS row retains numerical refutation under either policy`() {
+        val source = File.createTempFile("mps-constant-infeasible", ".mps").apply {
+            writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R 1\n" +
+                "BOUNDS\n FR B X\nENDATA\n")
+            deleteOnExit()
+        }
+        for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
+            val text = capture {
+                assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
+            }
+
+            assertTrue("s UNSATISFIABLE" in text.lines(), text)
+            assertFalse(text.lines().any { it.startsWith("v ") }, text)
+        }
+    }
+
+    @Test
     fun `fixed MPS indicators retain numerical bound closure under either certification policy`() {
         val source = File.createTempFile("mps-fixed-indicator", ".mps").apply {
             writeText("ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +

@@ -45,7 +45,11 @@ internal object MpsMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             val source = Mps.parse(openFileSource(path))
             val settings = common.config.problemSettings()
-            val lowered = source.toProblem(settings)
+            val lowered = try {
+                source.toProblem(settings)
+            } catch (_: MpsLoweringException) {
+                source.toExactSourceProblem(settings)
+            }
             var compiled = if (common.exact && !lowered.sourceExact) source.toExactSourceProblem(settings) else lowered
             var routingLpStats = LpStats()
             val routingStart = TimeSource.Monotonic.markNow()

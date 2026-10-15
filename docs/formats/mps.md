@@ -30,6 +30,9 @@ source implication. These representations do not select an engine or transfer
 bounded integer choices to arithmetic search. The default purely continuous hybrid
 projection retains its explicit tolerance correspondence.
 
+A hybrid lowering refusal retains the exact source adapter for numerical admission.
+An infeasible constant row remains an explicit contradiction for the solver.
+
 `MpsModel.toExactSourceProblem` preserves parsed decimal numbers in native
 `ExactLinear` rows, clearing denominators without rounding. Real column
 bounds are exact rows with open real declaration arrays; integer bounds outside
