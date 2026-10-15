@@ -175,6 +175,41 @@ class SourceDrivenStrategy(
             closure.close(state, proposed, cancellation)?.let { return it }
         }
 
+        val greedyFallback = evaluation != null && feasibleAcceptance == AcceptanceRule.GreedyDescent
+        var explorationSink = collectMoves(state, cancellation, stalled,
+            if (evaluation == null || greedyFallback) state.cost else 0L)
+        var ordinary: Move? = null
+        if (evaluation != null) {
+            if (greedyFallback) {
+                ordinary = selectMove(state, stall, stalled, null)
+                if (ordinary != null && score(state, ordinary) < 0.0) {
+                    evaluation.retainOrdinary(ordinary)
+                    return ordinary
+                }
+                if (explorationSink == null) {
+                    val seed = sources.firstOrNull {
+                        it.source is ObjectiveSeed && it.enabled && (!it.stallGated || stalled) &&
+                            it.effectivePhase.appliesAt(0L)
+                    }
+                    if (seed != null) {
+                        explorationSink = if (seed.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
+                    }
+                }
+            }
+            explorationSink?.let(evaluation::seed)
+        }
+        val completed = selectMove(state, stall, stalled, evaluation)
+        if (completed != null) return completed
+        if (ordinary != null) evaluation?.retainOrdinary(ordinary)
+        return ordinary
+    }
+
+    private fun collectMoves(
+        state: LocalSearchState,
+        cancellation: Cancellation,
+        stalled: Boolean,
+        phaseCost: Long,
+    ): MoveSink? {
         noiseSink.clear()
         scoreSink.clear()
         alternativeSink.clear()
@@ -191,10 +226,11 @@ class SourceDrivenStrategy(
             noiseSink.alternativeRepairs = alternativeSink
             scoreSink.alternativeRepairs = alternativeSink
         }
+        var explorationSink: MoveSink? = null
         for (cs in sources) {
             if (!cs.enabled) continue
             if (cs.stallGated && !stalled) continue
-            if (!cs.effectivePhase.appliesAt(if (evaluation == null) state.cost else 0L)) continue
+            if (!cs.effectivePhase.appliesAt(phaseCost)) continue
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
             val closure = state.booleanRepairs
             if (closure == null) {
@@ -218,9 +254,9 @@ class SourceDrivenStrategy(
                 closure.closeInto(state, raw.list, sink, cancellation)
                 if (alternatives != null) closure.closeInto(state, alternatives.list, alternativeSink, cancellation)
             }
-            if (cs.source is ObjectiveSeed) evaluation?.seed(sink)
+            if (cs.source is ObjectiveSeed) explorationSink = sink
         }
-        return selectMove(state, stall, stalled, evaluation)
+        return explorationSink
     }
 
     private fun selectMove(
@@ -235,7 +271,8 @@ class SourceDrivenStrategy(
         if (evaluation != null) {
             val primary = ccNoise + ccScore
             val alternatives = if (primary.any { score(state, it) < 0.0 }) emptyList() else ccAlternative
-            evaluation.prepare(primary + alternatives) { score(state, it) }
+            evaluation.prepare(primary + alternatives,
+                deterministic = feasibleAcceptance == AcceptanceRule.GreedyDescent) { score(state, it) }
         }
         fun admitted(moves: List<Move>): List<Move> =
             if (evaluation == null) moves else moves.filter { evaluation.sample(it) != null }
@@ -283,6 +320,9 @@ class SourceDrivenStrategy(
         if (effectiveAcceptance == AcceptanceRule.GreedyDescent && productive != null &&
             (productive in noiseMoves || productive in scoreMoves)
         ) return productive
+        if (evaluation != null && effectiveAcceptance == AcceptanceRule.GreedyDescent &&
+            noiseMoves.none { grade(it) < 0.0 } && scoreMoves.none { grade(it) < 0.0 }
+        ) return null
         val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { grade(it) }
         if (effectiveAcceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
         return move

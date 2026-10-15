@@ -957,7 +957,7 @@ internal class LocalSearchEngine(
                         }
                         if (m != null) {
                             feasibleMisses = 0
-                            if (moveEvaluation != null) {
+                            if (moveEvaluation != null && moveEvaluation.ordinaryMove != m) {
                                 val solution = moveEvaluation.sample(m) ?: moveEvaluation.attempt(m)
                                 if (solution != null) {
                                     timing.inPhase("application") {
@@ -968,11 +968,13 @@ internal class LocalSearchEngine(
                                     if ((moveEvaluation.score(m) ?: 0.0) < 0.0) nextMoveCompletion = totalFlips
                                 }
                             } else {
+                                val costBefore = state.cost
                                 val savedSnap = state.assignment.snapshot()
                                 timing.inPhase("application") {
                                     state.apply(m)
-                                    if (state.cost != 0L) revertMove(state, m, savedSnap)
+                                    if (costBefore == 0L && state.cost != 0L) revertMove(state, m, savedSnap)
                                 }
+                                if (costBefore != 0L) roundFeedback?.record(costBefore, state.cost, totalFlips + 1)
                                 liveCompletion = null
                             }
                             flipsSinceRestart++

@@ -654,13 +654,17 @@ and source scope rather than substituting the local-search score for a witness c
 
 Self-owned optimization from a completion-checked incumbent with finite and continuous
 coordinates and a continuous objective term admits at most two completion probes per pick after source generation
-and configuration filtering. Uncompleted restart states retain ordinary traversal;
-private finite proposals from a checked incumbent bypass raw objective rejection. One
-probe follows the best raw score. If that productive raw direction completes to an
-improvement, strict greedy descent retains its reservoir-selected proposal without
-another numerical query or tie draw. Existing proposal multiplicities are retained;
-exploration does not insert a duplicate into a pool. Otherwise a second probe explores
-a rotating proposal. An enabled `ObjectiveSeed` also offers a rotating finite
+and configuration filtering. Uncompleted restart states retain ordinary traversal.
+Strict greedy descent first uses its ordinary improving raw selection, including
+repair selection when a completed point retains a heuristic row residual. If that
+selection supplies no improving move, the completion fallback admits the best raw-ranked
+finite proposal and a rotating proposal, without another random ranking draw.
+If the fallback selects no accepted completion, the original ordinary noise choice
+remains available without another random draw. Other acceptance rules rank their
+bounded probes through the ordinary greedy reservoir.
+Private finite proposals from a checked incumbent bypass raw objective rejection;
+only accepted completed candidates enter the fallback acceptance pools. Exploration
+does not insert a duplicate into a pool. An enabled `ObjectiveSeed` also offers a rotating finite
 coordinate touching a continuous factor: a channeling-aware flip, neighbor or domain
 endpoint, including directions whose direct objective cost rises. Its proposals retain
 that source's configured phase and pool.

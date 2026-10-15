@@ -24,6 +24,8 @@ internal class CompletedMoveEvaluation(
     private val seedSink = MoveSink()
     var productiveMove: Move? = null
         private set
+    var ordinaryMove: Move? = null
+        private set
 
     fun begin() {
         val sample = current()
@@ -37,6 +39,11 @@ internal class CompletedMoveEvaluation(
         }
         exploration = null
         productiveMove = null
+        ordinaryMove = null
+    }
+
+    fun retainOrdinary(move: Move) {
+        ordinaryMove = move
     }
 
     fun seed(destination: MoveSink) {
@@ -84,14 +91,17 @@ internal class CompletedMoveEvaluation(
         }
     }
 
-    fun prepare(moves: List<Move>, rawScore: (Move) -> Double) {
+    fun prepare(moves: List<Move>, deterministic: Boolean = false, rawScore: (Move) -> Double) {
+        if (cancellation() || !mayAttempt()) return
         val finiteMoves = moves.filter(::changesFinite)
         if (finiteMoves.isEmpty()) return
         val distinct = finiteMoves.distinct()
         val exploring = exploration?.takeIf { it in distinct }
             ?: distinct[proposal % distinct.size]
         proposal = if (proposal == Int.MAX_VALUE) 0 else proposal + 1
-        val ranked = AcceptanceRule.Greedy.choose(state.rng, finiteMoves, emptyList(), 1.0, rawScore)
+        val ranked = if (deterministic) finiteMoves.minByOrNull(rawScore) else {
+            AcceptanceRule.Greedy.choose(state.rng, finiteMoves, emptyList(), 1.0, rawScore)
+        }
         if (ranked != null && rawScore(ranked) < 0.0) {
             attempt(ranked)
             if ((score(ranked) ?: Double.POSITIVE_INFINITY) < 0.0) {
