@@ -20,6 +20,24 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `exact continuous decimals retain numerical execution and source certificates`() {
+        val source = File.createTempFile("mps-exact-continuous", ".mps").apply {
+            writeText("ROWS\n N COST\n E R\nCOLUMNS\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
+                "BOUNDS\n LO B X 0\n UP B X 1\nENDATA\n")
+            deleteOnExit()
+        }
+        val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { exact = true })
+
+        val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--exact", source.absolutePath))) }
+
+        assertIs<SolvablePipeline.FiniteCp>(loaded.pipeline)
+        assertNull(loaded.toleranceCheck)
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o 1/30" in text.lines(), text)
+        assertTrue("exact original MPS source witness" in text, text)
+    }
+
+    @Test
     fun `default bounded decimal optimization publishes an original source tolerance witness`() {
         val source = File.createTempFile("mps-finite-tolerance", ".mps").apply {
             writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I R -0.1\n" +

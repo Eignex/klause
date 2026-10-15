@@ -52,7 +52,9 @@ arithmetic encoding available, with bounded integers retaining finite ownership.
 Named objectives without terms retain their source constant and direction.
 The shared pipeline selects execution from these capabilities after bound closure;
 `sourceExact` and exact coefficient storage alone do not request whole-model exact
-traversal. Explicit `--exact` requires certificates and disables tolerance acceptance.
+traversal. Explicit `--exact` requires certificates and disables tolerance acceptance;
+representable original decimal rows retain numerical execution for purely continuous
+sources as well as bounded mixed sources.
 
 ## Tolerance publication
 
