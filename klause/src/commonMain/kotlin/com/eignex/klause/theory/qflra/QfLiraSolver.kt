@@ -1018,7 +1018,23 @@ class ExactLiraSearchComponent private constructor(
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = lp.solve(sparsePointRecovery = true)
-            ?: return ComponentResult.Indeterminate
+        if (complete) {
+            val key = if (result == null) "NO_RESULT" else listOf(
+                result.verdict.name,
+                when (result.float?.optimal) {
+                    true -> "FLOAT_OPTIMAL"
+                    false -> "FLOAT_PARTIAL"
+                    null -> "NO_FLOAT"
+                },
+                if (result.exactPrimal == null) "NO_POINT" else "EXACT_POINT",
+                result.reconstruction?.let { "RECONSTRUCTION_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_RECONSTRUCTION",
+                result.exactPoint?.let { "RECOVERY_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_RECOVERY",
+                result.refinement?.let { "REFINEMENT_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_REFINEMENT",
+                result.continuation?.let { "CONTINUATION_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_CONTINUATION",
+            ).joinToString("_")
+            smtStats?.observeCompleteSearchLinearOutcome(key)
+        }
+        if (result == null) return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate
         dirty = false
         candidate = result.exactPrimal?.take(model.numRealVars + model.numIntVars)
