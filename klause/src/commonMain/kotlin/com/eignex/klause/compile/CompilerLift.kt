@@ -3,8 +3,6 @@ package com.eignex.klause.compile
 import com.eignex.klause.factor.IntFunctionLowering
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.model.BoolExpr
-import com.eignex.klause.model.Implies
 import com.eignex.klause.model.IntAbs
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.IntCompare
@@ -20,7 +18,6 @@ import com.eignex.klause.model.IntMul
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntScale
 import com.eignex.klause.model.IntSum
-import com.eignex.klause.model.Not
 import com.eignex.klause.model.SetCard
 
 /**
@@ -112,58 +109,6 @@ internal fun Lowering.materializeIntVar(expr: IntExpr): IntRef = when (expr) {
         assertExpr(IntCompare(ref, IntCmpOp.EQ, expr))
         ref
     }
-}
-
-internal fun Lowering.liftElement(index: IntExpr, items: List<IntExpr>): IntExpr {
-    val idxLifted = lift(index)
-    val itemsLifted = items.map { lift(it) }
-    val itemDoms = itemsLifted.map { domainOf(it) }
-    val auxDomain = IntDomain(itemDoms.minOf { it.min }, itemDoms.maxOf { it.max })
-    val auxName = newAuxIntVar(auxDomain)
-    val auxRef = IntRef(auxName)
-    val idxDom = domainOf(idxLifted)
-    // For each j the index could take, link the aux to items[j] when index = j; for
-    // out-of-bounds j, force index ≠ j.
-    for (j in idxDom.min..idxDom.max) {
-        if (j >= 0 && j < items.size) {
-            assertExpr(
-                Implies(
-                    IntCompare(idxLifted, IntCmpOp.EQ, IntLit(j.toInt())),
-                    IntCompare(auxRef, IntCmpOp.EQ, itemsLifted[j.toInt()]),
-                ),
-            )
-        } else {
-            assertExpr(IntCompare(idxLifted, IntCmpOp.NE, IntLit(j.toInt())))
-        }
-    }
-    return auxRef
-}
-
-internal fun Lowering.liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE: IntExpr): IntExpr {
-    val tLifted = lift(thenE)
-    val eLifted = lift(elseE)
-    val tDom = domainOf(tLifted)
-    val eDom = domainOf(eLifted)
-    val auxName = newAuxIntVar(IntDomain(minOf(tDom.min, eDom.min), maxOf(tDom.max, eDom.max)))
-    val auxRef = IntRef(auxName)
-    // cond ⇒ aux = thenE; ¬cond ⇒ aux = elseE.
-    assertExpr(Implies(cond, IntCompare(auxRef, IntCmpOp.EQ, tLifted)))
-    assertExpr(Implies(Not(cond), IntCompare(auxRef, IntCmpOp.EQ, eLifted)))
-    return auxRef
-}
-
-internal fun Lowering.liftMinMax(children: List<IntExpr>, isMin: Boolean): IntExpr {
-    val lifted = children.map { lift(it) }
-    val doms = lifted.map { domainOf(it) }
-    val auxDomain = if (isMin) {
-        IntDomain(doms.minOf { it.min }, doms.minOf { it.max })
-    } else {
-        IntDomain(doms.maxOf { it.min }, doms.maxOf { it.max })
-    }
-    val auxName = newAuxIntVar(auxDomain)
-    val argIds = lifted.map { intVarOf(materializeIntVar(it).name) }.toIntArray()
-    factors += IntFunctionLowering.minMaxFactors(intVarOf(auxName), argIds, isMax = !isMin) { newBoolVar() }
-    return IntRef(auxName)
 }
 
 internal fun Lowering.liftAbs(child: IntExpr): IntExpr {
