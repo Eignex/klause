@@ -13,11 +13,9 @@ import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
-import com.eignex.klause.lp.engine.ExactLpEntry
 import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
-import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.exactColumnLower
@@ -149,8 +147,7 @@ internal class LiveQfLraSystem(
     private val normalized = preparedTerms.values.associateTo(HashMap()) { keys ->
         keys.positive to SmtTermSlot(intern(keys.positive.expression(), declaredFixed))
     }
-    private val terms = normalized.values.map { it.term.coefficients }.filter { it.size != 1 }.distinct()
-    private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
+    private val definitions = HashMap<Map<Int, BigFraction>, Int>()
 
     fun install(): Boolean {
         val structural = sourceColumns.map { column ->
@@ -163,23 +160,14 @@ internal class LiveQfLraSystem(
                 tag = column.tag,
             )
         }
-        val logical = List(terms.size) { ExactLpColumn(ExactLpBounds(), integral = false) }
-        val entries = List(columns) { ArrayList<ExactLpEntry>() }
-        terms.forEachIndexed { row, term ->
-            for ((column, coefficient) in term) {
-                if (column in entries.indices && !coefficient.isZero) {
-                    entries[column] += ExactLpEntry(row, ExactLpNumber.of(coefficient.negated()))
-                }
-            }
-        }
         return lp.install(
             source,
             ExactLpModel(
-                entries,
-                List(terms.size) { ExactLpNumber.of(0L) },
-                structural + logical,
-                List(terms.size) { ExactLpRow() },
-                ExactLpObjective(List(columns + terms.size) { ExactLpNumber.of(0L) }),
+                List(columns) { emptyList() },
+                emptyList(),
+                structural,
+                emptyList(),
+                ExactLpObjective(List(columns) { ExactLpNumber.of(0L) }),
             ),
         )
     }

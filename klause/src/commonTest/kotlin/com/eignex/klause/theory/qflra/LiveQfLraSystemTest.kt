@@ -36,6 +36,62 @@ import kotlin.test.assertTrue
 
 class LiveQfLraSystemTest {
     @Test
+    fun `unasserted source expressions preserve the active row allowance`() {
+        val source = source().withFactors(arrayOf(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.LE, 5.0),
+        ))
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 1) }).use { lp ->
+            val system = LiveQfLraSystem(source, lp)
+            assertTrue(system.install())
+
+            assertTrue(system.assertRow(row(listOf(1, 3), 4), axiom))
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, assertNotNull(lp.solve()).verdict)
+        }
+    }
+
+    @Test
+    fun `a prepared definition first used in a child retains only its sibling premise`() {
+        val factor = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0)
+        val source = source().withFactors(arrayOf(factor))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertTrue(system.assertComparison(factor.linearRows.single().exactForm(2)
+                .comparison(true) { false }, null, premise(0)))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertTrue(system.assertRow(row(listOf(-1, -1), -4), premise(1)))
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, assertNotNull(lp.solve()).verdict)
+            val lower = assertNotNull(lp.state?.activeSide(2, false))
+            assertEquals(listOf(Lit.make(1, false)),
+                assertNotNull(session.explainAtoms(lp.boundPremise(lower.witness))).literals.toList())
+        }
+    }
+
+    @Test
+    fun `a false constant row refutes an empty source layout`() {
+        val source = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            factors = emptyArray())
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp)
+            assertTrue(system.install())
+
+            assertTrue(system.assertRow(row(emptyList(), -1), axiom))
+
+            assertEquals(LpVerdict.INFEASIBLE, assertNotNull(lp.solve()).verdict)
+        }
+    }
+
+    @Test
     fun `sparse shared definitions preserve exact source equalities`() {
         val factors = arrayOf<Factor>(
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 2), doubleArrayOf(0.5, -1.5), LinearOp.EQ, -2.0),

@@ -57,6 +57,7 @@ internal object LinearLpShapeInspection {
             put("theoryReals", source.numRealVars)
             put("theoryFactors", source.factors.size)
             put("sourceStructuralColumns", source.numRealVars + source.numIntVars)
+            put("declaredFixedSourceColumns", (field(system, "declaredFixed") as? Map<*, *>)?.size)
             put("lpStructuralColumns", member(model, "getN") as? Number)
             put("lpRows", member(model, "getM") as? Number)
             put("lpTotalColumns", member(model, "getNumVars") as? Number)

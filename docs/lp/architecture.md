@@ -70,6 +70,13 @@ are recomputed from those rational entries. A normalization whose nonzero entrie
 cannot project to finite nonzero floating values declines numerical completion.
 An omitted relaxation row supplies no feasibility or proof authority by itself.
 
+The live linear adapter installs source-coordinate columns first. A compound
+expression receives an unconditional definition row when an assertion first needs
+it. That definition persists across retraction; its bound assertions and source
+premises follow the numerical scopes. The source-coordinate prefix stays stable,
+and complete witness publication still checks the original source. Numerical
+dimension and work guards apply to the installed model without a larger allowance.
+
 A numerical row enabled by an integer indicator equality records both source bound
 premises. Its emission depends on that live pin and is retired when the pin retracts.
 These conditional rows cannot use a persistent unconditional layout. Complete
