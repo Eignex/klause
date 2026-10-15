@@ -752,15 +752,15 @@ captured consumer scope available to this admission path, so it uses bootstrap i
 of importing a seed. Shared objective telemetry passes the common objective
 admission check; ALNS re-evaluates the point against its own objective and compares
 strict improvement using its exact evaluation. Importing an already installed point
-does not publish that point again. Samples own
-immutable coordinates and do not transfer mutable worker state or proof authority.
+does not publish that point again. Samples own immutable coordinates and do not transfer mutable worker state or proof authority.
 
 An absent, stale or unsuitable candidate leaves unfinished bootstrap preparation
 and search intact. Interrupted checking leaves the candidate eligible for a later
-slice; a fully checked supplied seed survives invocation expiry before shared polling. Adoption releases both bootstrap handles before opening repair,
+slice; a fully checked supplied seed survives invocation expiry before shared polling.
+Adoption releases both bootstrap handles before opening repair,
 retaining their measured work in statistics, including counters finalized by close.
-Release detaches the handles before closing them: adoption, terminal completion, explicit close and exceptions each
-close a child at most once, including when a close throws. Invocation cancellation
+Release detaches the handles before closing them: adoption, terminal completion, explicit
+close and exceptions each close a child at most once, including when a close throws. Invocation cancellation
 pauses owned state; closing the containing handle releases it. Seed acquisition
 renews no instruction, native-work, query or wall-time allowance. Repair uses the
 original containing budget and existing cooperative slice limits.
