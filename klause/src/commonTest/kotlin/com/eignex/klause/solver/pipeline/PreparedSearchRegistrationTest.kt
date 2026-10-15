@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -275,8 +276,10 @@ class PreparedSearchRegistrationTest {
                 intBounds = IntBounds.fromModelBounds(LongArray(integerCount), LongArray(integerCount), null, null),
                 numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-                factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+                factors = arrayOf<Factor>(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0)) + if (integerCount == 0) emptyArray() else arrayOf(
+                    Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
             )
             for (callerWins in listOf(false, true)) {
                 val stats = SmtStatsSink()
@@ -309,6 +312,35 @@ class PreparedSearchRegistrationTest {
     }
 
     @Test
+    fun `default mixed openings without an active arithmetic row retain ordinary traversal`() {
+        val source = Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+        )
+        val stats = SmtStatsSink()
+        source.componentPlan().search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
+            SearchLearnedDbParams(), stats).use { planned ->
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            assertNull(planned.session.boolValue(0))
+            assertNull(planned.candidateHints.preferredBool(0))
+
+            val result = assertIs<SearchResult.Satisfied>(planned.session.solve(1,
+                SearchSolveParams(maxDecisions = 2), candidateHints = observedCandidateHints(
+                    SearchCandidateHints.None, planned.candidateHints, stats.hintUsage)))
+
+            assertEquals(true, result.model.valueOf(SearchBoolValue(0)))
+            assertEquals(BIG_ZERO, result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
+            assertEquals(BigFraction.ZERO, result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
+        }
+        assertEquals(0L, stats.hintUsage.snapshot().componentSelections)
+        assertEquals(0L, stats.hintUsage.snapshot().indexesAdmitted)
+    }
+
+    @Test
     fun `default primitive preferences expire on arithmetic retraction and opening close`() {
         for (integerCount in listOf(0, 1)) {
             val source = Problem(
@@ -316,8 +348,10 @@ class PreparedSearchRegistrationTest {
                 intBounds = IntBounds.fromModelBounds(LongArray(integerCount), LongArray(integerCount), null, null),
                 numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-                factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+                factors = arrayOf<Factor>(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0)) + if (integerCount == 0) emptyArray() else arrayOf(
+                    Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
             )
             val planned = source.componentPlan().search(source, emptyMap(), Long.MAX_VALUE, Cancellation.Never,
                 SearchLearnedDbParams())
@@ -421,8 +455,10 @@ class PreparedSearchRegistrationTest {
                 intBounds = IntBounds.fromModelBounds(LongArray(integerCount), LongArray(integerCount), null, null),
                 numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
-                factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0)),
+                factors = arrayOf<Factor>(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0)) + if (integerCount == 0) emptyArray() else arrayOf(
+                    Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.EQ, 0.0)),
             )
             var stopped = false
             var charged = 0L
