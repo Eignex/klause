@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
@@ -132,6 +133,13 @@ class DefinitionalSweep internal constructor(
                     if (f.result in 0 until numIntVars) isProductResult[f.result] = true
                 }
             }
+            for (f in factors) {
+                if (f is Power && f.base is Power.Coordinate.Integer) {
+                    val output = (f.result as Power.Coordinate.Integer).id.index
+                    claim(output, f, -1)
+                    if (output in 0 until numIntVars) isProductResult[output] = true
+                }
+            }
             if (definedHints.isNotEmpty()) {
                 val hinted = BooleanArray(numIntVars)
                 for (v in definedHints) if (v in 0 until numIntVars) hinted[v] = true
@@ -199,6 +207,11 @@ class DefinitionalSweep internal constructor(
                     visit(f.operand)
                     node = FunctionalObjective.Abs(v, FunctionalObjective.Operand.v(f.operand))
                     inputs = intArrayOf(f.operand)
+                } else if (f is Power) {
+                    val input = (f.base as Power.Coordinate.Integer).id.index
+                    visit(input)
+                    node = FunctionalObjective.Power(v, FunctionalObjective.Operand.v(input), f.exponent)
+                    inputs = intArrayOf(input)
                 } else if (f is ArrayMinMax) {
                     for (input in f.xs) visit(input)
                     node = FunctionalObjective.Extreme(

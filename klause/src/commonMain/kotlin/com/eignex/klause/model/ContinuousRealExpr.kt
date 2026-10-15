@@ -22,6 +22,18 @@ sealed interface ContinuousRealExpr {
         }
     }
 
+    /** Fixed nonnegative integer power with `0^0 = 1`. */
+    @Serializable
+    @SerialName("continuous_power")
+    data class Power(
+        /** Continuous operand. */
+        val base: ContinuousRealExpr,
+        /** Fixed nonnegative integer exponent. */
+        val exponent: Int,
+    ) : ContinuousRealExpr {
+        init { require(exponent >= 0) }
+    }
+
     /** Exact product without rounding or constant folding. */
     @Serializable
     @SerialName("continuous_multiply")

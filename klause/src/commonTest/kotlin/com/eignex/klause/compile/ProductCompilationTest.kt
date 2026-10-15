@@ -1,6 +1,7 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -41,9 +42,6 @@ class ProductCompilationTest {
             "SMT product" to SmtLib.parse(
                 "(declare-const x Int) (assert (and (<= 1 x 3) (= (* x x) 4)))",
             ).model,
-            "SMT power" to SmtLib.parse(
-                "(declare-const x Int) (assert (and (<= 1 x 3) (= (^ x 2) 4)))",
-            ).model,
             "XCSP3" to Xcsp3.parse(
                 """<instance><variables><var id="x">1..3</var></variables>
                     <constraints><intension>eq(mul(x,x),4)</intension></constraints></instance>""",
@@ -76,14 +74,14 @@ class ProductCompilationTest {
         }
     }
     @Test
-    fun `fixed power chains preserve source grading with pinned outputs`() {
+    fun `native powers preserve source grading with pinned outputs`() {
         for ((exponent, expected) in listOf(2 to 4L, 3 to 8L, 4 to 16L)) {
             val parsed = SmtLib.parse(
                 "(declare-const x Int) (assert (and (<= 1 x 3) (= (^ x $exponent) $expected)))",
             )
             val problem = parsed.model
-            val products = problem.factors.filterIsInstance<Product>()
-            val output = products.last().result
+            val power = problem.factors.filterIsInstance<Power>().single()
+            val output = (power.result as Power.Coordinate.Integer).id.index
             val input = parsed.intVarNames.getValue("x")
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1),
                 Assumptions.None.withInt(output, expected))
@@ -93,10 +91,7 @@ class ProductCompilationTest {
             for (id in 0 until problem.numIntVars) state.assignment.setInt(id, state.rootDomains[id].min)
             for (id in 0 until problem.numBoolVars) state.assignment.setBool(id, true)
             state.assignment.setInt(input, 2)
-            for (product in products) {
-                state.assignment.setInt(product.result,
-                    state.assignment.intValue(product.a) * state.assignment.intValue(product.b))
-            }
+            state.assignment.setInt(output, expected)
             state.recompute()
             assertEquals(0L, state.cost)
             val move = Move.IntSet(input, 3)

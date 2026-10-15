@@ -43,7 +43,9 @@ native integer representation, and mixed coefficients must preserve exact values
 Open or overflowing integers retain typed arbitrary-precision source coordinates
 through [nonlinear integer execution](../theories/nonlinear-integer.md). Native
 finite mixed products compose through [exact polynomial completion](../theories/polynomial-real.md#shared-model-composition).
-Fixed powers use repeated squaring. Wide exponents retain compact squaring DAGs;
+Bounded fixed integer powers above one retain `Power`, including compound operands
+with exact defining equalities. Zero and identity powers simplify arithmetically.
+Polynomial source snapshots retain native power nodes. Wide exponents retain compact squaring DAGs;
 representation limits produce explicit UNKNOWN without truncating the source.
 
 ## Linear and conditional lowering

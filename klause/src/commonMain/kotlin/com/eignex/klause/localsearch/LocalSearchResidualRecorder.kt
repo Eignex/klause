@@ -140,6 +140,7 @@ internal class LocalSearchResidualRecorder {
             is FunctionalObjective.Abs -> "IntDef.Abs"
             is FunctionalObjective.Extreme -> "IntDef.Extreme"
             is FunctionalObjective.Times -> "IntDef.Times"
+            is FunctionalObjective.Power -> "IntDef.Power"
             is FunctionalObjective.Plus -> "IntDef.Plus"
             is FunctionalObjective.Lin -> "IntDef.Lin"
         }

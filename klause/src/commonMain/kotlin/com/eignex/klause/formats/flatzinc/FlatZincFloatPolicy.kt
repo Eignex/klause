@@ -132,6 +132,12 @@ private class FloatChoicePlanner(
 
         c.name == "float_times" && c.args.size == 3 -> productAlternatives(c)
 
+        c.name in setOf("float_pow", "klause_float_pow") && c.args.size == 3 -> {
+            val exponent = declarations.resolveFloatVarOrConst(c.args[1]) as? FloatRef.Const
+            if (exponent != null && exponent.value >= 0 && exponent.value <= Int.MAX_VALUE.toDouble() &&
+                exponent.value == exponent.value.toInt().toDouble()) 0 else null
+        }
+
         else -> null
     }
 

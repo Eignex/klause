@@ -128,6 +128,12 @@ and result aliases remain searched. Abs scores and move deltas replace every ali
 role together; direct repairs propose the output magnitude or either admissible
 operand sign. Signed-word overflow stays violated and receives no wrapped witness.
 
+Integer `Power` outputs form functional definition nodes with exact signed-word
+power evaluation before domain clipping. Overflow cannot satisfy a signed endpoint.
+Competing and cyclic definitions remain searched. Native repairs include the current
+power value and every admissible exact signed root of the current output; alias moves
+substitute into both operand and result roles before grading.
+
 Hinted min/max expression outputs, their materialized affine operands and output aliases
 form a one-way definition cone. Unhinted min/max globals remain searched. Competing
 definitions and cyclic cones remain searched; independent constraints on a defined

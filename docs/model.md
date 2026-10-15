@@ -23,6 +23,14 @@ them. A rewrite creates a fresh source scope; mutating an existing model is outs
 the library contract. Custom factors keep their membership and structural keys stable.
 Finite propagation and assignment workspaces are mutable and owned by their session.
 
+`Power` retains a fixed nonnegative integer exponent and typed integer or real
+source coordinates. Its integer membership does not require enumerating a source
+domain. Finite projections filter signs, inverse bounds and bounded hole sets,
+check exact assignments and maintain functional outputs. Polynomial encoders retain
+one native power expression; linear encoders enforce exponent zero or one, or a
+higher integer power under a captured operand fixing whose power fits a signed word.
+Neither floating scores nor a product relaxation enforce the source relation.
+
 ## Published assignments and objectives
 
 `Sample`, exact theory assignments and reconstructed witnesses own immutable

@@ -25,6 +25,12 @@ shared AND indicators and source conjunction semantics.
 
 ## XCSP3 lowering
 
+Integer intension `pow(base, exponent)` retains `Power` with a fixed nonnegative
+integer exponent. Compound operands receive source equalities; materialized output
+bounds must fit the signed-word representation. Variable, negative and fractional
+exponents are unsupported. DIMACS/WCNF have no numeric powers; OPB/WBO monomials
+remain Boolean conjunctions, including repeated literals.
+
 XCSP3 variable-matrix selection uses a
 row-major index equality and a native `Element` factor. The compiler marks the
 flattened index, selected result and affine expression outputs as functionally defined. Local search
