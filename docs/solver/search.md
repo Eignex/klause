@@ -522,7 +522,10 @@ endpoint and retain all supporting row and bound premises. Singleton-continuous
 row pairs can cancel their shared continuous term before projection; their reasons
 include both row scopes and each supporting logical endpoint. Optional integer-residue
 checks retain both real interval sides and the prior target endpoint that delimits
-their excluded prefix or suffix. Unexpressible numerical
+their excluded prefix or suffix. Dense rows can substitute source equalities that
+define individual real coordinates, retaining every defining row scope and logical
+endpoint in the integer consequence. These projections share the node's numerical
+allowance. Unexpressible numerical
 scope withholds a consequence. Search-time row selection follows narrowed finite
 endpoints and Boolean pins; the resulting domain bounds retract on the CP trail.
 With LP learning enabled, each successful row tightening also queues its consequence

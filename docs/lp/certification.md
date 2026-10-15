@@ -150,6 +150,16 @@ logical endpoint support declines a direction; cancellation supplies no authorit
 for an unrelated continuous endpoint. Completed row deductions survive optional
 pair exhaustion, and cancellation withholds unpublished results.
 
+Dense mixed rows can substitute active singleton-continuous equalities before
+projection. Each substitution retains the defining row's logical column and
+scope; the exact weighted row sum supplies the projected RHS and coefficients.
+Other continuous terms still require their source endpoints. Search-time row
+selection follows the definitions into their consuming rows and includes the
+required equality supports. At most eight dense rows and 128 definitions per row
+are considered under the same allowance, after ordinary and paired projections.
+An incomplete expansion supplies no deduction. Completed projections retain all
+defining row premises and use the same source-map and retraction checks.
+
 After interval projection, a fixed base logical equality can restrict a target
 through the gcd of the other integer coefficients. Finite real intervals and
 strict endpoints determine the admissible integer residue interval. At most
