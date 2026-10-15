@@ -7,9 +7,11 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.PbOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
@@ -57,7 +59,7 @@ internal object BooleanObjectiveDescentProbe {
             parts[0] to parts[1]
         }
         require(options.keys - setOf(
-            "prepareMs", "timeout", "conditional", "conditionalClosure", "conditionalRecipe", "conditionalNary",
+            "prepareMs", "timeout", "conditional", "conditionalClosure", "conditionalRecipe", "conditionalNary", "conditionalBound",
         ) ==
             setOf("suite", "problem", "sha256", "witness64", "work"))
         val suite = requireNotNull(options["suite"])
@@ -70,6 +72,8 @@ internal object BooleanObjectiveDescentProbe {
         require(closureMode in listOf("true", "false", "both"))
         require(conditional in 0..32)
         require(closureMode == "false" || conditional > 0)
+        val bounded = options["conditionalBound"]?.toBooleanStrict() ?: false
+        require(!bounded || conditional > 0)
         val includeNary = options["conditionalNary"]?.toBooleanStrict() ?: false
         require(!includeNary || closureMode != "false")
         val recipeLabel = options["conditionalRecipe"] ?: "cbls/fixed"
@@ -128,11 +132,12 @@ internal object BooleanObjectiveDescentProbe {
             val rows = buildJsonArray {
                 var index = 0
                 var identity: String? = null
+                var overlayIdentity: String? = null
                 for (closedRepairs in variants) {
                     val results = conditionalRepairs(
                         problem, objective, sweep, initial, roots, conditional, work, timeout,
                         suite, name, digest, parsed.numOriginalBoolVars, sourceObjective, prepared.reconstruct,
-                        closedRepairs, recipeLabel, includeNary,
+                        closedRepairs, recipeLabel, includeNary, bounded,
                     )
                     for (result in results) {
                         val row = result.jsonObject
@@ -140,6 +145,10 @@ internal object BooleanObjectiveDescentProbe {
                             .getValue("preparedModelSha256").jsonPrimitive.content
                         check(identity == null || identity == signature)
                         identity = signature
+                        val overlay = row.getValue("record").jsonObject
+                            .getValue("repairModelSha256").jsonPrimitive.content
+                        check(overlayIdentity == null || overlayIdentity == overlay)
+                        overlayIdentity = overlay
                         add(JsonObject(row + ("index" to JsonPrimitive(index++))))
                     }
                 }
@@ -250,17 +259,24 @@ internal object BooleanObjectiveDescentProbe {
         closedRepairs: Boolean,
         recipeLabel: String,
         includeNary: Boolean,
+        bounded: Boolean,
     ) = buildJsonArray {
         val setupStarted = System.nanoTime()
         val pins = requireNotNull(LocalSearchModel.of(problem.bake()).pinsUnder(Assumptions.None))
         pins.forEachBool { id, value -> require(initial.boolValue(id) == value) }
         val preparedIdentity = preparedIdentity(problem, objective, pins)
+        val repairProblem = if (bounded) strictObjectiveProblem(problem, objective, initial) else problem
+        val repairIdentity = if (bounded) {
+            sha256((preparedIdentity + ":strictly-below:" + objective.evaluateLong(initial)).toByteArray())
+        } else preparedIdentity
         val model = LocalSearchModel.open(problem)
         val base = LocalSearchState(model, Random(3), pins)
         for (v in 0 until problem.numBoolVars) base.assignment.setBool(v, initial.boolValue(v))
         base.invariants = sweep.network(0, problem.numBoolVars)
         base.recompute()
         require(base.cost == 0L)
+        val repairModel = if (bounded) LocalSearchModel.open(repairProblem) else model
+        val repairBase = if (bounded) LocalSearchState(repairModel, Random(3), pins) else base
         val graph = if (closedRepairs) BinaryRepairGraph.prepare(problem, pins,
             Cancellation.after(timeout.milliseconds), includeNary) else null
         val targets = roots.filter { !pins.isFrozenBool(it) }.mapNotNull { v ->
@@ -273,7 +289,7 @@ internal object BooleanObjectiveDescentProbe {
             val materializeStarted = System.nanoTime()
             val (root, delta) = target
             val assumptions = pins.withBool(root, !initial.boolValue(root))
-            val state = LocalSearchState(model, Random(3), assumptions, base.projection)
+            val state = LocalSearchState(repairModel, Random(3), assumptions, repairBase.projection)
             for (v in 0 until problem.numBoolVars) state.assignment.setBool(v, initial.boolValue(v))
             assumptions.forEachBool { id, value -> state.assignment.setBool(id, value) }
             val closure = graph?.let { BinaryRepairClosure(it, assumptions) }
@@ -284,7 +300,8 @@ internal object BooleanObjectiveDescentProbe {
             state.invariants = sweep.network(0, problem.numBoolVars)
             state.recompute()
             if (!seedRejected && graph != null) check(graph.violations(state) == 0L)
-            val initialCost = state.cost
+            val initialSearchCost = state.cost
+            val initialCost = state.cost - if (bounded) state.factorDegree[problem.numFactors] else 0
             val cancellation = Cancellation.after(timeout.milliseconds)
             val recipe = LocalSearchCatalog.byLabel(recipeLabel).strategy
             val strategy = closure?.wrap(recipe, cancellation) ?: recipe
@@ -292,7 +309,8 @@ internal object BooleanObjectiveDescentProbe {
             val started = System.nanoTime()
             var moves = 0L
             var stalled = false
-            var bestHardCost = state.cost
+            var bestHardCost = initialCost
+            var bestSearchCost = state.cost
             while (!seedRejected && state.cost != 0L && moves < work && !cancellation.isCancelled()) {
                 val move = strategy.pickMove(state)
                 if (move == null) {
@@ -301,7 +319,9 @@ internal object BooleanObjectiveDescentProbe {
                 }
                 state.apply(move)
                 moves++
-                bestHardCost = minOf(bestHardCost, state.cost)
+                val hardCost = state.cost - if (bounded) state.factorDegree[problem.numFactors] else 0
+                bestHardCost = minOf(bestHardCost, hardCost)
+                bestSearchCost = minOf(bestSearchCost, state.cost)
             }
             val elapsedNanos = System.nanoTime() - started
             assumptions.forEachBool { id, value -> check(state.assignment.boolValue(id) == value) }
@@ -314,6 +334,9 @@ internal object BooleanObjectiveDescentProbe {
             val feasible = !seedRejected && state.cost == 0L
             val sourceSample = if (feasible) reconstruct(state.assignment.snapshot()) else null
             val value = sourceSample?.let(sourceObjective::evaluateExact)
+            check(value == null || !bounded || value < sourceObjective.evaluateExact(initial))
+            val boundCost = if (bounded) state.factorDegree[problem.numFactors] else 0
+            val hardCost = state.cost - boundCost
             add(buildJsonObject {
                 put("index", index); put("status", "DONE")
                 put("arm", "conditional-${if (closedRepairs) "closed" else "raw"}-$recipeLabel-$root")
@@ -331,13 +354,17 @@ internal object BooleanObjectiveDescentProbe {
                         })
                     }
                     put("sourceHashes", buildJsonObject { put("model", digest) })
-                    put("preparedModelSha256", preparedIdentity); put("searchFactorCount", problem.numFactors)
+                    put("preparedModelSha256", preparedIdentity); put("searchFactorCount", repairProblem.numFactors)
+                    put("repairModelSha256", repairIdentity)
                     put("initialObjective", sourceObjective.evaluateExact(initial).toString())
                     put("strictImprovements",
                         if (value != null && value < sourceObjective.evaluateExact(initial)) 1 else 0)
                     put("targetRoot", root); put("targetDelta", delta)
                     put("rootPins", pins.numBools); put("pinsSatisfied", true)
-                    put("initialHardCost", initialCost); put("finalHardCost", state.cost)
+                    put("bounded", bounded); put("boundCost", boundCost)
+                    put("initialSearchCost", initialSearchCost); put("finalSearchCost", state.cost)
+                    put("bestSearchCost", bestSearchCost)
+                    put("initialHardCost", initialCost); put("finalHardCost", hardCost)
                     put("bestHardCost", bestHardCost)
                     put("naryRepairs", closedRepairs && includeNary)
                     put("closedRepairs", closedRepairs); put("closureSeedRejected", seedRejected)
@@ -368,6 +395,28 @@ internal object BooleanObjectiveDescentProbe {
                 "sourceObjective=$value moves=$moves elapsedNanos=$elapsedNanos")
         }
         println("conditional targets=${targets.size} requested=$count sharedSetupNanos=$sharedSetupNanos")
+    }
+
+    private fun strictObjectiveProblem(problem: Problem, objective: LinearObjective, initial: Sample): Problem {
+        val coefficients = objective.boolWeights
+        val terms = coefficients.indices.filter { coefficients[it] != 0L }
+        var total = 0L
+        for (variable in terms) {
+            require(coefficients[variable] > 0L)
+            total = Math.addExact(total, coefficients[variable])
+        }
+        Math.addExact(total, objective.constant)
+        val limit = Math.subtractExact(Math.subtractExact(objective.evaluateLong(initial), objective.constant), 1L)
+        require(limit >= 0L)
+        val bound = PseudoBoolean(
+            LongArray(terms.size) { coefficients[terms[it]] },
+            IntArray(terms.size) { Lit.make(terms[it], true) }, PbOp.LE, limit,
+        )
+        return Problem(
+            problem.numBoolVars, 0, emptyArray(), problem.factors + bound,
+            impliedFactorMask = problem.impliedFactorMask?.copyOf(problem.numFactors + 1),
+            hasSymmetryBreaking = problem.hasSymmetryBreaking, settings = problem.settings,
+        )
     }
 
     private fun preparedIdentity(problem: Problem, objective: LinearObjective, pins: Assumptions): String {

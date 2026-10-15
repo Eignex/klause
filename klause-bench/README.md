@@ -1485,6 +1485,13 @@ reject contradictory or canceled proposals; neither queries CP during the walk.
 and requires matching clause/objective/pin fingerprints. Records distinguish binary
 and longer-clause visits, accepted transitions, physical writes and seed-only witnesses.
 Closure construction and fixed-order profile timings do not establish default gains.
+`conditionalBound=true` appends a public pseudo-Boolean constraint requiring the
+complete objective to improve strictly. Base root pins are extracted before this
+overlay, every original clause remains present, and the walk uses an open local-search
+model. Positive Boolean coefficients and total range are checked. Rows separate hard
+cost, bound cost and combined search cost, and hash the overlay identity separately.
+Only a source-checked feasible witness establishes improvement; an unknown bounded
+walk supplies no lower bound or refutation.
 
 ### Objective representation probe
 
