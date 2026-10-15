@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.arithmetic.AbsAffineValue
+import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.WideLinComb
@@ -13,6 +14,7 @@ import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.negate
 import com.eignex.klause.util.signum
@@ -81,14 +83,11 @@ internal fun Compiler.Builder.freshWideInt(magnitude: BigInt?): IntComb {
     return IntComb.Wide(WideLinComb(cols.columns.indices.associate { cols.columns[it] to w[it] }, BIG_ZERO))
 }
 
-/** `|x|` as a fresh quantity `y` with `y ≥ x`, `y ≥ −x` and `y = x ∨ y = −x`, at arbitrary precision. */
 internal fun Compiler.Builder.wideAbsTerm(x: WideLinComb): IntComb {
     val y = freshWideInt(intCombMagnitude(IntComb.Wide(x)))
-    val xc = IntComb.Wide(x)
-    val negX = IntComb.Wide(x.scaled(BIG_ONE.negate()))
-    assertRelation(">=", y, xc)
-    assertRelation(">=", y, negX)
-    factors.add(Clause(intArrayOf(reifyRelation("=", y, xc), reifyRelation("=", y, negX))))
+    val output = y.toWide()
+    factors.add(AffineAbs(AbsAffineValue(x.coeffs, x.constant),
+        AbsAffineValue(output.coeffs, output.constant)))
     return y
 }
 

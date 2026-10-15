@@ -1,5 +1,6 @@
 package com.eignex.klause.theory
 
+import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.RealAbs
@@ -8,6 +9,7 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.absoluteValueRows
+import com.eignex.klause.lowering.affineAbsoluteValueRows
 import com.eignex.klause.lowering.gridAbsoluteValueRows
 import com.eignex.klause.lowering.polynomialRow
 import com.eignex.klause.lowering.realAbsoluteValueRows
@@ -17,6 +19,15 @@ internal object AbsEncoding {
         factor as Abs
         for (form in absoluteValueRows(factor.operand, factor.result)) encoding.linear(form)
         null
+    }
+
+    val affineLinear = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
+        for (form in affineAbsoluteValueRows(factor as AffineAbs)) encoding.linear(form)
+        null
+    }
+
+    val affinePolynomial = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
+        installPolynomial(affineAbsoluteValueRows(factor as AffineAbs), encoding)
     }
 
     val realLinear = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.evidence
 
+import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -120,11 +121,21 @@ fun Problem.sourceProofContext(
         if (factor !is Linear || factor.op == LinearOp.NE) return@all false
         (0 until factor.size).none { Term.isBool(factor.ref(it)) }
     }
+    val completeAffineAbs = source.factors.any { it is AffineAbs } && source.factors.all { factor ->
+        factor is AffineAbs || (factor is Linear && factor.op != LinearOp.NE &&
+            (0 until factor.size).none { Term.isBool(factor.ref(it)) })
+    }
     val checker = object : SourceSemanticsChecker {
         override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
             val pins = restrictionChecker.witness(sample, scope, cancellation)
             if (pins != SourceEvidenceCheck.Checked) return pins
-            if (completeAffine) {
+            if (completeAffine || completeAffineAbs) {
+                for ((index, factor) in source.factors.withIndex()) {
+                    if (cancellation()) return SourceEvidenceCheck.Unavailable("original-source check cancelled")
+                    if (factor is AffineAbs && !factor.isSatisfied(sample::exactIntValue)) {
+                        return SourceEvidenceCheck.Rejected("original absolute value $index refutes the assignment")
+                    }
+                }
                 for (id in 0 until source.numIntVars) {
                     if (cancellation()) return SourceEvidenceCheck.Unavailable("original-source check cancelled")
                     val domain = source.intDomainOrNull(id) ?: continue
