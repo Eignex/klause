@@ -37,6 +37,7 @@ import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.BigInt
