@@ -2,8 +2,8 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Power
-import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.model.ContinuousRealEquality
 import com.eignex.klause.model.ContinuousRealExpr
 

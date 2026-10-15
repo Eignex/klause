@@ -14,14 +14,14 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import com.eignex.klause.schema.IntHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.pow
 import com.eignex.skema.SchemaDef
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PowerCompilationTest {

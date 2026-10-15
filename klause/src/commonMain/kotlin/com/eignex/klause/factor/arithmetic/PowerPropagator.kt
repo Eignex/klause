@@ -16,7 +16,9 @@ internal class PowerPropagator(private val base: Int, private val exponent: Int,
         val output = state.intDomains[result]
         val segments = if (exponent and 1 != 0) listOf(input.min to input.max) else
             listOf(input.min to minOf(-1L, input.max), maxOf(0L, input.min) to input.max)
-        val supported = segments.mapNotNull { (lo, hi) -> powerPreimage(lo, hi, exponent, output.min, output.max) { state.work++ } }
+        val supported = segments.mapNotNull { (lo, hi) ->
+            powerPreimage(lo, hi, exponent, output.min, output.max) { state.work++ }
+        }
         if (supported.isEmpty()) return false
         if (!state.tightenIntMin(base, supported.minOf { it.first }, premises) ||
             !state.tightenIntMax(base, supported.maxOf { it.second }, premises)) return false
@@ -44,7 +46,9 @@ internal class PowerPropagator(private val base: Int, private val exponent: Int,
             state.work++
             val value = results[i]
             val roots = if (exponent and 1 != 0) {
-                listOfNotNull(powerPreimage(Long.MIN_VALUE, Long.MAX_VALUE, exponent, value, value) { state.work++ }?.first)
+                listOfNotNull(
+                    powerPreimage(Long.MIN_VALUE, Long.MAX_VALUE, exponent, value, value) { state.work++ }?.first,
+                )
             } else listOfNotNull(
                 powerPreimage(Long.MIN_VALUE, -1L, exponent, value, value) { state.work++ }?.first,
                 powerPreimage(0L, Long.MAX_VALUE, exponent, value, value) { state.work++ }?.first,

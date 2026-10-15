@@ -3,8 +3,8 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor

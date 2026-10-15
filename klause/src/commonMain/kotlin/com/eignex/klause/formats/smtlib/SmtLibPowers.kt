@@ -33,7 +33,8 @@ internal fun Compiler.Builder.integerPower(base: IntComb, power: IntComb): IntCo
     if (exponent == 1) return base
     val term = (base as? IntComb.Narrow)?.lin ?: smtUnsupported("wide power requires exact source lowering")
     if (term.coeffs.isEmpty()) {
-        val value = integerPowerOrNull(term.constant, exponent) ?: smtUnsupported("constant power requires exact source lowering")
+        val value = integerPowerOrNull(term.constant, exponent)
+            ?: smtUnsupported("constant power requires exact source lowering")
         return IntComb.Narrow(LinComb(emptyMap(), value))
     }
     if (inferringBounds) smtUnsupported("power requires source lowering")

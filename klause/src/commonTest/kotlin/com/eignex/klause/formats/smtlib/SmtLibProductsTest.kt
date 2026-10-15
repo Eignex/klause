@@ -2,16 +2,16 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.Product
-import com.eignex.klause.factor.arithmetic.Power
-import com.eignex.klause.factor.arithmetic.RealProduct
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SmtLibProductsTest {
