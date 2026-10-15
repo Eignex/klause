@@ -197,6 +197,7 @@ class ExactLiraSearchComponent private constructor(
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private var unassignedBooleans = model.numBoolVars
     private var completeTraversalObserved = false
+    private var mixedDifferenceCompletion = false
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
@@ -215,6 +216,7 @@ class ExactLiraSearchComponent private constructor(
     private var assignment: ExactLiraAssignment? = null
     private var outcome: ComponentCheck? = null
     private var candidate: List<BigFraction>? = null
+    private var floatCandidate: DoubleArray? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
     private var pointHintLevel = -1
@@ -286,6 +288,11 @@ class ExactLiraSearchComponent private constructor(
 
     internal fun observeWith(stats: SmtStatsSink) {
         smtStats = stats
+    }
+
+    internal fun useMixedDifferenceCompletion() {
+        check(context == null)
+        mixedDifferenceCompletion = true
     }
 
     internal fun observeCompleteTraversal() {
@@ -577,10 +584,12 @@ class ExactLiraSearchComponent private constructor(
     }
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) {
+        floatCandidate = null
         pointHintValues = null
         lp.onRestart(context)
     }
     override fun close() {
+        floatCandidate = null
         releasePartialPointHints()
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
     }
@@ -722,6 +731,7 @@ class ExactLiraSearchComponent private constructor(
         assignment = null
         outcome = null
         candidate = null
+        floatCandidate = null
         val priorHints = pointHintValues
         pointHintValues = null
         val wasDirty = dirty
@@ -960,6 +970,7 @@ class ExactLiraSearchComponent private constructor(
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
+        floatCandidate = null
         pointHintValues = null
         // Root publications precede their delivery to components during shared initialization.
         if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
@@ -1046,7 +1057,18 @@ class ExactLiraSearchComponent private constructor(
             return ComponentResult.Conflict(explanation)
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
-        if (bools.any { it == UNASSIGNED }) candidate?.let { capturePointHints(it, context) }
+        if (bools.any { it == UNASSIGNED }) {
+            candidate?.let { capturePointHints(it, context) }
+        } else if (candidate == null && mixedDifferenceCompletion && result.float?.optimal == true &&
+            model.numIntVars > 0 && model.numRealVars > 0 &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+        ) {
+            val coordinates = model.numRealVars + model.numIntVars
+            lpStop.charge(coordinates.toLong())
+            if (!operationStop() && result.float.primal.size >= coordinates) {
+                floatCandidate = result.float.primal.copyOf(coordinates)
+            }
+        }
         if (operationStop()) return ComponentResult.Indeterminate
         captureCompleteWitness(candidate)
         // Source integer branching requires an independently checked continuous witness.
@@ -1097,6 +1119,18 @@ class ExactLiraSearchComponent private constructor(
             return split?.let { listOf(SearchDecision.Theory(it.negative), SearchDecision.Theory(it.positive)) }
         }
         if (candidate == null) {
+            val retained = floatCandidate
+            floatCandidate = null
+            if (retained != null) {
+                val rows = agreementSourceRows(context)
+                if (rows != null) candidate = completeMixedDifferencePoint(
+                    model.numRealVars, model.numIntVars, retained, rows, lpStop,
+                )
+                if (!operationStop()) captureCompleteWitness(candidate)
+                if (outcome != null) return null
+            }
+        }
+        if (candidate == null || operationStop()) {
             outcome = ComponentCheck.Indeterminate
             return null
         }
@@ -1279,6 +1313,7 @@ class ExactLiraSearchComponent private constructor(
         assignment = null
         outcome = null
         candidate = null
+        floatCandidate = null
         pointHintValues = null
         dirty = true
     }

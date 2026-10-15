@@ -105,12 +105,15 @@ internal class DifferenceGraph(val numVars: Int) {
         cancelled: () -> Boolean = { false },
         initial: LongArray? = null,
         onNegativeCycle: ((IntArray) -> Unit)? = null,
+        onWork: ((Long) -> Unit)? = null,
     ): Potentials {
         require(initial == null || initial.size == numVars)
+        onWork?.invoke(numVars.toLong() * 2L)
         val dist = initial?.copyOf() ?: LongArray(numVars)
         val predecessor = IntArray(numVars) { -1 }
         var untilPoll = POLL_INTERVAL
         repeat(numVars) {
+            onWork?.invoke(size.toLong())
             if (cancelled()) return Potentials.Abandoned
             var changed = false
             for (e in 0 until size) {
@@ -130,7 +133,7 @@ internal class DifferenceGraph(val numVars: Int) {
                 }
             }
             if (!changed) return Potentials.Found(dist)
-            val negative = hasNegativePredecessorCycle(predecessor, cancelled, onNegativeCycle)
+            val negative = hasNegativePredecessorCycle(predecessor, cancelled, onNegativeCycle, onWork)
                 ?: return Potentials.Abandoned
             if (cancelled()) return Potentials.Abandoned
             if (negative) return Potentials.Infeasible
@@ -142,7 +145,10 @@ internal class DifferenceGraph(val numVars: Int) {
         predecessor: IntArray,
         cancelled: () -> Boolean,
         onNegativeCycle: ((IntArray) -> Unit)?,
+        onWork: ((Long) -> Unit)?,
     ): Boolean? {
+        // One allocation and bounded node, predecessor, cycle and explanation walks.
+        onWork?.invoke(numVars.toLong() * 6L)
         if (cancelled()) return null
         val visited = IntArray(numVars) { -1 }
         var untilPoll = POLL_INTERVAL
