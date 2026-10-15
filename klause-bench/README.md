@@ -1896,7 +1896,8 @@ compiler/build identity and parsed native Power factors without solving. It fail
 when compilation retains no Power relation. `factorKind=Abs`, `RealAbs` or `GridAbs`
 selects an absolute-value retention check; `exact=true` selects exact float parsing.
 The `abs-relations` suite supplies integer magnitudes, aliases, Boolean scopes,
-optional values and real forms for original MiniZinc compilation and source checks.
+optional values and real forms for original MiniZinc compilation and source checks,
+plus XCSP3 distance and Boolean-scope source fixtures.
 These diagnostics measure no throughput
 and export no proofs.
 

@@ -1,0 +1,4 @@
+<instance format="XCSP3" type="CSP">
+  <variables><var id="x">-3..3</var></variables>
+  <constraints><intension>or(eq(abs(x),2),eq(x,0))</intension></constraints>
+</instance>
