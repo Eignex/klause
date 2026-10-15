@@ -761,8 +761,10 @@ flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome 
 without an objective cost; optimization publications require exact cost consistency
 and strict improvement in the original direction. It uses authoritative coordinate comments when supplied and
 checks binary integer/float extrema, integer array extrema, and constant or variable
-integer/Boolean array selection directly from the original predicates. Index bounds
-and repeated entries retain their source meaning. It checks the preceding `% objective=` cost or finite `_objective` field against the
+integer/Boolean/set array selection directly from the original predicates. Set values
+use normalized integer intervals for equality and source-universe bounds, without
+enumerating ranges. Index bounds and repeated entries retain their source meaning.
+It checks the preceding `% objective=` cost or finite `_objective` field against the
 original solve objective. When both are present, their exact values must agree. Its source scope
 is `flatzinc-binary64`, as described under source validation below. Interrupted
 captures reject verdict markers and terminal `optimizationStatus` comments, including
