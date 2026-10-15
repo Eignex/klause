@@ -7,6 +7,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
@@ -16,6 +17,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
@@ -45,6 +47,281 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AlnsTest {
+
+    @Test
+    fun `available incumbents start repair without bootstrapping`() {
+        val problem = selectProblem()
+        val seed = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0))
+        val improved = selectOptimum()
+        for (retained in listOf(false, true)) for (shared in listOf(false, true)) {
+            var repairs = 0
+            val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+                override fun minimize(objective: LinearObjective, params: LocalSearchParams) = error("bootstrap")
+            }
+            val alns = Alns(
+                inner = inner,
+                pooledIncumbents = selectExchangeHolding(seed).takeIf { shared },
+                destroyOperators = listOf(DestroyOperator.Random),
+                repairOperators = listOf(RepairOperator {
+                    repairs++
+                    assertEquals(seed, it.incumbent)
+                    improved
+                }),
+                minDestroyFraction = 1.0,
+                maxDestroyFraction = 1.0,
+                maxIterations = 1,
+                flipsPerIteration = 8,
+            )
+            val params = LocalSearchParams(initialAssignment = seed.takeUnless { shared }, maxInstructions = 8)
+
+            val result = if (retained) alns.resumable(selectObjective, params).use {
+                assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE) {})
+            } else alns.minimize(selectObjective, params)
+
+            assertEquals(improved, result.assignment)
+            assertEquals(1, repairs)
+            assertEquals(0L, result.stats.alns.bootstrapCpNodes)
+            assertEquals(0L, result.stats.alns.bootstrapLsMoves)
+            assertEquals(8L, result.stats.alns.outerAllowance)
+        }
+    }
+
+    @Test
+    fun `an incumbent arriving between slices releases both bootstrap handles before repair`() {
+        val problem = selectProblem()
+        val exchange = IncumbentExchange.minimizing<Sample>()
+        var cpSlices = 0
+        var lsSlices = 0
+        var cpCloses = 0
+        var lsCloses = 0
+        var repairs = 0
+        val cp = object : ResumableSearch {
+            override val isDone: Boolean get() = false
+            override val stats: SolveStats get() = SolveStats(search = SearchStats(nodes = SumResult(13.0)))
+            override fun runSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? { cpSlices++; return null }
+            override fun close() { cpCloses++ }
+        }
+        val ls = object : ResumableSearch by cp {
+            override val stats: SolveStats get() = SolveStats(ls = LocalSearchStats(moves = SumResult(7.0)))
+            override fun runSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? { lsSlices++; return null }
+            override fun close() { lsCloses++ }
+        }
+        val backtrack = object :
+            ResumableOptimizer<BacktrackParams>, Optimizer<BacktrackParams> by BacktrackSolver(problem) {
+            override fun resumable(objective: LinearObjective, params: BacktrackParams) = cp
+        }
+        val inner = object :
+            ResumableOptimizer<LocalSearchParams>, Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun resumable(objective: LinearObjective, params: LocalSearchParams) = ls
+        }
+        val alns = Alns(
+            inner = inner,
+            backtrack = backtrack,
+            pooledIncumbents = exchange,
+            repairOperators = listOf(RepairOperator {
+                assertEquals(1, cpCloses)
+                assertEquals(1, lsCloses)
+                repairs++
+                it.incumbent
+            }),
+            minDestroyFraction = 1.0,
+            maxDestroyFraction = 1.0,
+            maxIterations = 1,
+            flipsPerIteration = 50,
+        )
+        val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
+        assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        exchange.offer(Sample(BooleanArray(0), LongArray(0)), 1000.0)
+        assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        val seed = selectOptimum()
+        exchange.offer(seed, selectObjective.evaluate(seed))
+        assertNull(handle.runInstructionSlice(Cancellation { true }, Long.MAX_VALUE, 50) {})
+        assertEquals(0, cpCloses)
+        val result = assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        handle.close()
+        handle.close()
+
+        assertEquals(seed, result.assignment)
+        assertEquals(2, cpSlices)
+        assertEquals(2, lsSlices)
+        assertEquals(1, cpCloses)
+        assertEquals(1, lsCloses)
+        assertEquals(1, repairs)
+        assertEquals(13L, result.stats.alns.bootstrapCpNodes)
+        assertEquals(7L, result.stats.alns.bootstrapLsMoves)
+        assertEquals(150L, handle.chargedInstructions)
+        assertEquals(50L, result.stats.alns.outerAllowance)
+    }
+
+    @Test
+    fun `invalid and foreign objective shared candidates leave bootstrap available`() {
+        val problem = selectProblem()
+        val optimum = selectOptimum()
+        val candidates = listOf(
+            Sample(BooleanArray(0), LongArray(0)) to 0.0,
+            Sample(BooleanArray(SELECT_WEIGHTS.size), LongArray(0)) to 0.0,
+            optimum to -1.0,
+        )
+        for ((sample, value) in candidates) {
+            var bootstraps = 0
+            val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+                override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
+                    bootstraps++
+                    return MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                }
+            }
+            val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(sample, value) }
+            val result = Alns(inner, pooledIncumbents = exchange).minimize(selectObjective, LocalSearchParams())
+
+            assertIs<MinimizeResult.Unknown>(result)
+            assertEquals(1, bootstraps)
+        }
+    }
+
+    @Test
+    fun `compatible pinned shared incumbents can seed repair`() {
+        val seed = selectOptimum()
+        val params = LocalSearchParams(assumptions = Assumptions(bools = mapOf(0 to seed.boolValue(0))))
+        val result = Alns(NoFeasibleLs(selectProblem()), maxIterations = 0,
+            pooledIncumbents = selectExchangeHolding(seed)).minimize(selectObjective, params)
+
+        assertEquals(seed, result.assignment)
+    }
+
+    @Test
+    fun `deduced restrictions reject a supplied incumbent without exact pins`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyList<Factor>()).bake()
+        val seed = Sample(BooleanArray(0), longArrayOf(0))
+        val result = Alns(NoFeasibleLs(problem), maxIterations = 0).minimize(
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LocalSearchParams(initialAssignment = seed, assumptions = Assumptions.None.withTightenedMin(0, 1)),
+        )
+
+        assertIs<MinimizeResult.Unknown>(result)
+    }
+
+    @Test
+    fun `a worse shared incumbent cannot replace a supplied seed`() {
+        val seed = selectOptimum()
+        val worse = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0))
+        val result = Alns(NoFeasibleLs(selectProblem()), maxIterations = 0,
+            pooledIncumbents = selectExchangeHolding(worse)).minimize(
+            selectObjective, LocalSearchParams(initialAssignment = seed),
+        )
+
+        assertEquals(seed, result.assignment)
+    }
+
+    @Test
+    fun `seed ordering preserves exact improvements hidden by rounded telemetry`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyList<Factor>()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 9_007_199_254_740_992)
+        val supplied = Sample(BooleanArray(0), longArrayOf(1))
+        val improved = Sample(BooleanArray(0), longArrayOf(0))
+        val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(improved, objective.evaluate(improved)) }
+
+        val result = Alns(NoFeasibleLs(problem), maxIterations = 0, pooledIncumbents = exchange).minimize(
+            objective, LocalSearchParams(initialAssignment = supplied),
+        )
+
+        assertEquals(objective.evaluate(supplied), objective.evaluate(improved))
+        assertEquals(improved, result.assignment)
+    }
+
+    @Test
+    fun `real seeds require the configured source guarantee and full finite coordinates`() {
+        val problem = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val approximate = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
+        val exact = approximate.copy(reals = doubleArrayOf(0.5), exactReals = listOf(BigFraction.ofLong(1) / BigFraction.ofLong(2)))
+        for (tolerance in listOf(false, true)) for (seed in listOf(approximate, exact,
+            Sample(BooleanArray(0), LongArray(0)),
+            Sample(BooleanArray(0), LongArray(0), doubleArrayOf(Double.NaN)))) {
+            val alns = Alns(NoFeasibleLs(problem), maxIterations = 0).apply {
+                incumbentToleranceCheck = if (tolerance) ({ it.numRealVars == 1 && it.approximateRealValue(0) == 0.5 }) else null
+            }
+            val result = alns.minimize(objective, LocalSearchParams(initialAssignment = seed))
+
+            if (seed === exact || tolerance && seed === approximate) assertEquals(seed, result.assignment)
+            else assertIs<MinimizeResult.Unknown>(result)
+        }
+    }
+
+    @Test
+    fun `cancelled seed validation retries the same shared version on resume`() {
+        val problem = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val seed = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
+        val exchange = IncumbentExchange.minimizing<Sample>().apply { offer(seed, 0.5) }
+        var expired = false
+        var checks = 0
+        val alns = Alns(NoFeasibleLs(problem), maxIterations = 0, pooledIncumbents = exchange).apply {
+            incumbentToleranceCheck = { checks++; expired = checks == 1; true }
+        }
+        val handle = alns.resumable(objective, LocalSearchParams())
+
+        assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE) {})
+        expired = false
+        val result = handle.use { assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE) {}) }
+
+        assertEquals(seed, result.assignment)
+        assertEquals(2, checks)
+    }
+
+    @Test
+    fun `adoption close failures release all children and solver ownership exactly once`() {
+        val problem = selectProblem()
+        val exchange = IncumbentExchange.minimizing<Sample>()
+        var cpCloses = 0
+        var lsCloses = 0
+        val cp = object : ResumableSearch {
+            override val isDone: Boolean get() = false
+            override val stats: SolveStats get() = SolveStats.EMPTY
+            override fun runSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? = null
+            override fun close() { cpCloses++; error("CP close") }
+        }
+        val ls = object : ResumableSearch by cp { override fun close() { lsCloses++ } }
+        val backtrack = object :
+            ResumableOptimizer<BacktrackParams>, Optimizer<BacktrackParams> by BacktrackSolver(problem) {
+            override fun resumable(objective: LinearObjective, params: BacktrackParams) = cp
+        }
+        val inner = object :
+            ResumableOptimizer<LocalSearchParams>, Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun resumable(objective: LinearObjective, params: LocalSearchParams) = ls
+        }
+        val alns = Alns(inner, backtrack = backtrack, pooledIncumbents = exchange, maxIterations = 0)
+        val handle = alns.resumable(selectObjective, LocalSearchParams())
+        assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE) {})
+        val seed = selectOptimum()
+        exchange.offer(seed, selectObjective.evaluate(seed))
+
+        val failure = assertFailsWith<IllegalStateException> {
+            handle.runSlice(Cancellation.Never, Long.MAX_VALUE) {}
+        }
+        handle.close()
+        alns.resumable(selectObjective, LocalSearchParams()).close()
+
+        assertEquals("CP close", failure.message)
+        assertEquals(1, cpCloses)
+        assertEquals(1, lsCloses)
+    }
 
     @Test
     fun `cancelled literal scope expansion consumes its charged iteration once`() {
