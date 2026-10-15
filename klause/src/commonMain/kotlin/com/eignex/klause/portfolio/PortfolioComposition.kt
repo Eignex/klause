@@ -429,7 +429,7 @@ internal object PortfolioComposition {
         if (scenario.cores != 1 || scenario.kind != Kind.COP ||
             scenario.arms < PortfolioScenario.DEFAULT_ARMS || scenario.lsPool != null ||
             scenario.btPool != null || scenario.btEdit != null ||
-            facts.profile.problemClass != ProblemClass.FiniteCp || facts.binaryIntegers ||
+            facts.profile.problemClass != ProblemClass.FiniteCp || facts.binaryIntegers || !facts.circuit ||
             arms.any { it.label == BacktrackArm.FirstFail.label }
         ) {
             return null
