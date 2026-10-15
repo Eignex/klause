@@ -1462,10 +1462,12 @@ Only the API-reported allocated buffer is read, with an explicit size limit;
 returned buffers are released on success and failure. Status, allocation size,
 provider metadata and partial/error captures are retained.
 
-Every original symbol record remains. Exact matches to the three source
-signatures are listed separately, preserving duplicates and excluding undefined
-or non-function definitions. Other bounded query groups retain their demangled
-records without a source-signature claim. A demangled signature supplies no proof of the
+Every original symbol record remains. Exact matches to pinned broker, nmethod,
+compiler-thread lifecycle, runtime initialization, queue notification and
+requesting-thread source signatures are listed separately, preserving duplicates
+and excluding undefined or non-function definitions. Other bounded query groups
+retain their demangled records without a source-signature claim. A demangled
+signature supplies no proof of the
 actual argument registers, live task pointer, root association, clock/loss,
 code-size result or compiler saving. Validate those boundaries before probing.
 

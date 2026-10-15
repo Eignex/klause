@@ -13,6 +13,17 @@ SIGNATURES = {
     'invoke_compiler_on_method': 'CompileBroker::invoke_compiler_on_method(CompileTask*)',
     'post_compiled_method': 'nmethod::post_compiled_method(CompileTask*)',
     'total_size': 'nmethod::total_size() const',
+    'compiler_thread_loop': 'CompileBroker::compiler_thread_loop()',
+    'CompilerThread': 'CompilerThread::thread_entry(JavaThread*, JavaThread*)',
+    'create_native_wrapper': 'AdapterHandlerLibrary::create_native_wrapper(methodHandle const&)',
+    'init_compiler_runtime': 'CompileBroker::init_compiler_runtime()',
+    'compile_method_base': (
+        'CompileBroker::compile_method_base(methodHandle const&, int, int, int, '
+        'CompileTask::CompileReason, bool, Thread*)'),
+    'on_empty_queue': 'AbstractCompiler::on_empty_queue(CompileQueue*, CompilerThread*)',
+    'shutdown_compiler_runtime': 'CompileBroker::shutdown_compiler_runtime(AbstractCompiler*, CompilerThread*)',
+    'ciObjectFactory': 'ciObjectFactory::initialize()',
+    'possibly_add_compiler_threads': 'CompileBroker::possibly_add_compiler_threads(JavaThread*)',
 }
 
 
