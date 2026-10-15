@@ -53,10 +53,11 @@ class PreparedSourcePlanTest {
     @Test
     fun `routing retains resource declines during encoder reinstallation after bound closure`() {
         for (interruption in listOf("none", "installer", "cancellation", "work")) {
-            val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
-                arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
-                openIntHi = booleanArrayOf(true))
-            val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
+            val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+            ), openIntHi = booleanArrayOf(true, true))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 0), constant = 7)
             var boundsComplete = false
             var initialInstallations = 0
             var laterInstallations = 0
@@ -69,7 +70,7 @@ class PreparedSourcePlanTest {
             }
             val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)
-                if (target != EncodingTarget.LINEAR || !selected.enforcesSource) selected
+                if (target == EncodingTarget.POLYNOMIAL || !selected.enforcesSource) selected
                 else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
                     val decline = selected.install(view, encoding)
                     if (!boundsComplete) {
@@ -103,11 +104,13 @@ class PreparedSourcePlanTest {
             assertTrue(boundsComplete)
             assertTrue(laterInstallations > 0)
             val prepared = if (interruption == "none") {
-                assertIs<SourceProblemRoute.Finite>(route).preparedPlan.also {
-                    assertEquals(IntVariableOwner.CP, assertNotNull(it.componentPlan).intOwner(0))
+                assertIs<SourceProblemRoute.OpenTheory>(route, interruption).preparedPlan.also {
+                    val ownership = assertNotNull(it.componentPlan)
+                    assertEquals(IntVariableOwner.CP, ownership.intOwner(0))
+                    assertEquals(IntVariableOwner.THEORY, ownership.intOwner(1))
                 }
             } else {
-                assertIs<SourceProblemRoute.UnsupportedOpen>(route).preparedPlan.also {
+                assertIs<SourceProblemRoute.UnsupportedOpen>(route, interruption).preparedPlan.also {
                     assertEquals(PreparedExecutionKind.DECLINED, it.kind)
                     assertEquals(PreparedPlanDecline.RESOURCE, it.decline)
                     assertNull(it.componentPlan)
@@ -122,6 +125,7 @@ class PreparedSourcePlanTest {
             assertTrue(bounded !== source)
             assertEquals(2L, bounded.intBounds.upper(0))
             assertFalse(source.intBounds.hasUpper(0))
+            assertFalse(bounded.intBounds.hasUpper(1))
             assertNotNull(prepared.factorProjections).requireSource(bounded)
             if (interruption == "work") assertTrue(charged >= limit)
             if (interruption == "installer") assertFalse(stop())
