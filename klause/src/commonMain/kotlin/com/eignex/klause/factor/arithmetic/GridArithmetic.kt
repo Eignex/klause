@@ -52,7 +52,8 @@ internal data class GridCoordinate(val variable: Int, val lower: Double, val upp
 internal sealed interface GridArithmetic : Factor {
     val inputs: List<GridCoordinate>
     val output: GridCoordinate
-    fun image(value: (Int) -> Long): Long?
+    fun evaluate(value: (Int) -> Long): Double
+    fun image(value: (Int) -> Long): Long? = output.index(evaluate(value))
 
     fun accepts(value: (Int) -> Long): Boolean =
         inputs.all { it.contains(value(it.variable)) } && output.contains(value(output.variable)) &&
@@ -64,7 +65,7 @@ internal class GridProduct(val a: GridCoordinate, val b: GridCoordinate, overrid
     override val inputs: List<GridCoordinate> = listOf(a, b)
     override val variables: VarList = SpanIntVars(intArrayOf(a.variable, b.variable, output.variable).distinct().toIntArray())
 
-    override fun image(value: (Int) -> Long): Long? = output.index(a.value(value(a.variable)) * b.value(value(b.variable)))
+    override fun evaluate(value: (Int) -> Long): Double = a.value(value(a.variable)) * b.value(value(b.variable))
 
     override fun remap(mapping: VarRemap): Factor = GridProduct(a.remap(mapping), b.remap(mapping), output.remap(mapping))
 
@@ -85,7 +86,7 @@ internal class GridPower(val base: GridCoordinate, val exponent: Int, override v
     override val inputs: List<GridCoordinate> = listOf(base)
     override val variables: VarList = SpanIntVars(intArrayOf(base.variable, output.variable).distinct().toIntArray())
 
-    override fun image(value: (Int) -> Long): Long? = output.index(base.value(value(base.variable)).pow(exponent))
+    override fun evaluate(value: (Int) -> Long): Double = base.value(value(base.variable)).pow(exponent)
 
     override fun remap(mapping: VarRemap): Factor = GridPower(base.remap(mapping), exponent, output.remap(mapping))
 
