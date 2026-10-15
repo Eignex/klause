@@ -64,6 +64,10 @@ internal class CompletedMoveEvaluation(
             ?: distinct[proposal % distinct.size]
         proposal = if (proposal == Int.MAX_VALUE) 0 else proposal + 1
         val ranked = distinct.minByOrNull(rawScore)
+        if (ranked != null && rawScore(ranked) < 0.0) {
+            attempt(ranked)
+            if ((score(ranked) ?: Double.POSITIVE_INFINITY) < 0.0) return
+        }
         attempt(exploring)
         if (ranked != null && ranked != exploring) attempt(ranked)
     }

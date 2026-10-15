@@ -1187,7 +1187,9 @@ class LocalSearchState private constructor(
         check(!probeActive && !moveActive) { "local-search probes cannot be nested" }
         moveActive = true
         try {
-            return probeMove(move, objective, refineCumulative, weightedResidual, elementEligibility, feasibleObjective, capture)
+            return probeMove(
+                move, objective, refineCumulative, weightedResidual, elementEligibility, feasibleObjective, capture,
+            )
         } finally {
             moveActive = false
         }
