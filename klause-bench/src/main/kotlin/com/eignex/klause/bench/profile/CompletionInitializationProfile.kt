@@ -81,7 +81,7 @@ object CompletionInitializationProfile {
         private val adapter = Class.forName("com.eignex.klause.solver.pipeline.OpenExactNeighborhood")
         private val condition = Class.forName("com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition")
         private val constructor = adapter.getDeclaredConstructor(Problem::class.java, TheoryParams::class.java,
-            LinearObjective::class.java, PreparedSourcePlan::class.java, kotlin.jvm.functions.Function0::class.java)
+            LinearObjective::class.java, PreparedSourcePlan::class.java, Function0::class.java)
         private val conditionConstructor = condition.getDeclaredConstructor(Map::class.java, Map::class.java,
             Map::class.java, BigFraction::class.java)
         private val check = adapter.getMethod("check", condition, Cancellation::class.java)
