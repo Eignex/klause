@@ -218,9 +218,11 @@ private fun parseLinearAdmission(
     if (problem.model.factors.any {
             it is ContinuousProduct || it is RealProduct || (it is Power && it.base is Power.Coordinate.Real)
         } &&
-        (builder.intNames.isEmpty() || (0 until problem.model.numIntVars).any { id ->
-            problem.model.intBounds.isOpenLower(id) || problem.model.intBounds.isOpenUpper(id)
-        } && problem.model.requiresPolynomialCompletion(FactorProjectionProviders.Default.prepare(problem.model)))) {
+        (builder.intNames.isEmpty() ||
+            ((0 until problem.model.numIntVars).any { id ->
+                problem.model.intBounds.isOpenLower(id) || problem.model.intBounds.isOpenUpper(id)
+            } && problem.model.requiresPolynomialCompletion(FactorProjectionProviders.Default.prepare(problem.model))))
+    ) {
         smtUnsupported("pure real nonlinear source requires polynomial lowering")
     }
     return problem
