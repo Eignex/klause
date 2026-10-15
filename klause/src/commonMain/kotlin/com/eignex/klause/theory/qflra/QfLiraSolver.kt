@@ -1075,20 +1075,34 @@ class ExactLiraSearchComponent private constructor(
         return ComponentResult.Consistent
     }
 
+    private fun observeCompleteStage(stage: String) {
+        if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage)
+    }
+
     private fun branch(context: SearchContext): List<SearchDecision>? {
+        observeCompleteStage("BRANCH")
         val finite = finiteIntVars.firstOrNull { variable ->
             context.intLowerBound(variable) == null ||
                 context.intLowerBound(variable) != context.intUpperBound(variable)
         }
-        if (finite != null) return finitePointBranch(finite, context)
+        if (finite != null) {
+            observeCompleteStage("FINITE_PENDING")
+            return finitePointBranch(finite, context)
+        }
         if (bools.any { it == UNASSIGNED } || outcome != null) return null
+        observeCompleteStage("FINITE_BOOLEAN_COMPLETE")
         if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
             return null
         }
-        disjunctionBranch(context)?.let { return it }
+        disjunctionBranch(context)?.let {
+            observeCompleteStage("DISJUNCTION_BRANCH")
+            return it
+        }
         if (outcome != null) return null
+        observeCompleteStage("DISJUNCTION_BRANCHER_DONE")
         node.nextDisequality(model, disjunctionAtoms, bools)?.let { address ->
+            observeCompleteStage("DISEQUALITY_BRANCH")
             val row = model.factors[address.factor].linearRows[address.row]
             val truth = checkNotNull(node.rowTruth(address, row, bools))
             val comparison = exactForms[address.factor][address.row].comparison(truth) {
@@ -1118,16 +1132,22 @@ class ExactLiraSearchComponent private constructor(
             if (split == null) outcome = ComponentCheck.Indeterminate
             return split?.let { listOf(SearchDecision.Theory(it.negative), SearchDecision.Theory(it.positive)) }
         }
+        observeCompleteStage("SOURCE_BRANCHERS_DONE")
         if (candidate == null) {
             val retained = floatCandidate
             floatCandidate = null
             if (retained != null) {
                 val rows = agreementSourceRows(context)
-                if (rows != null) candidate = completeMixedPoint(
-                    model.numRealVars, model.numIntVars, retained, rows, lpStop,
-                )
+                if (rows != null) {
+                    candidate = completeMixedPoint(model.numRealVars, model.numIntVars, retained, rows, lpStop,
+                        onStage = ::observeCompleteStage)
+                } else {
+                    observeCompleteStage("RECOVERY_ROWS_UNAVAILABLE")
+                }
                 if (!operationStop()) captureCompleteWitness(candidate)
                 if (outcome != null) return null
+            } else {
+                observeCompleteStage("RECOVERY_NO_FLOAT")
             }
         }
         if (candidate == null || operationStop()) {
