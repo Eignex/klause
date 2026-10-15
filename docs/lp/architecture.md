@@ -80,6 +80,13 @@ Published integer bounds enter before source comparisons so root fixings can sim
 their expressions. A fixing is reusable in child scopes only when both active sides
 were established at numerical depth zero. Substitution retains both source premises;
 child-scoped fixings do not determine permanent expression identities.
+Selected compound expressions share one atomic definition append up to the next
+source-column assertion. That assertion enters before preparation continues, so
+its root fixings can simplify later expressions. A declined append retains the
+sequential assertion path under the same cancellation and numerical allowance.
+Spent preparation work remains charged after a decline.
+Only committed definitions enter the adapter's column map; a conflicting source
+prefix can return without preparing later comparisons.
 
 A numerical row enabled by an integer indicator equality records both source bound
 premises. Its emission depends on that live pin and is retired when the pin retracts.

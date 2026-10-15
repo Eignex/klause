@@ -28,6 +28,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
+import com.eignex.klause.util.Cancellation
 
 internal class QfLraSystem(private val model: Problem) {
     fun build(booleanValue: (Int) -> Boolean?): QfLraRelaxation {
@@ -180,6 +181,46 @@ internal class LiveQfLraSystem(
         premise,
     )
 
+    fun prepareComparisons(
+        comparisons: List<ExactComparison>,
+        first: Int,
+        stop: Cancellation = Cancellation.Never,
+    ): Int? {
+        val state = lp.state ?: return null
+        val pending = LinkedHashMap<Map<Int, BigFraction>, Int>()
+        var end = first
+        while (end < comparisons.size) {
+            if (stop()) return null
+            val comparison = comparisons[end]
+            val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
+            val term = termSlot(key).term
+            // A source-column assertion can establish a root fixing needed by the following expressions.
+            if (term.coefficients.size == 1) {
+                if (end == first) return first + 1
+                break
+            }
+            if (term.coefficients !in definitions && term.coefficients !in pending) {
+                pending[term.coefficients] = state.model.numVars + pending.size
+            }
+            end++
+        }
+        if (pending.size > 1) {
+            val rows = pending.keys.mapIndexed { index, coefficients ->
+                if (stop()) return null
+                LpScopedRow(
+                    state.rows.lastId + index + 1L,
+                    coefficients.map { it.key to ExactLpNumber.of(it.value.negated()) },
+                    ExactLpNumber.of(0L),
+                    ExactLpColumn(ExactLpBounds(), integral = false),
+                )
+            }
+            // Publish only committed mappings; a decline uses sequential assertion under the same stop token.
+            if (stop()) return null
+            if (lp.append(rows, scoped = false)) definitions.putAll(pending)
+        }
+        return end.takeUnless { stop() }
+    }
+
     fun assertComparison(comparison: ExactComparison, direction: LinearOp?, premise: SearchAtomPremise): Boolean {
         // Only source layouts are retained; transient comparisons must not grow a search-wide cache.
         val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison.terms)
@@ -250,13 +291,7 @@ internal class LiveQfLraSystem(
         strict: Boolean,
         premise: SearchAtomPremise,
     ): Boolean {
-        val fixed = rootFixedColumns(key.columns)
-        val slot = if (fixed.isEmpty()) {
-            key.slot ?: normalized.getOrPut(key) { SmtTermSlot(intern(key.expression(), declaredFixed)) }
-                .also { key.slot = it }
-        } else {
-            SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
-        }
+        val slot = termSlot(key)
         val term = slot.term
         val column = slot.column.takeIf { it >= 0 } ?: (definitionColumn(term.coefficients) ?: return false)
         slot.column = column
@@ -266,6 +301,16 @@ internal class LiveQfLraSystem(
             ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
             term.premise(premise),
         )
+    }
+
+    private fun termSlot(key: SmtTermKey): SmtTermSlot {
+        val fixed = rootFixedColumns(key.columns)
+        return if (fixed.isEmpty()) {
+            key.slot ?: normalized.getOrPut(key) { SmtTermSlot(intern(key.expression(), declaredFixed)) }
+                .also { key.slot = it }
+        } else {
+            SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
+        }
     }
 
     private fun definitionColumn(coefficients: Map<Int, BigFraction>): Int? =

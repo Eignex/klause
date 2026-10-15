@@ -815,7 +815,11 @@ class ExactLiraSearchComponent private constructor(
             is LpBoundBatchResult.Applied -> Unit
         }
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
+        val comparisons = ArrayList<ExactComparison>()
+        val premises = ArrayList<SearchAtomPremise>()
+        val indices = ArrayList<Int>()
         for ((index, prepared) in preparedRows.withIndex()) {
+            if (operationStop()) return false
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // Root checks still permit substitution through newly published root-fixed columns.
             if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
@@ -832,9 +836,20 @@ class ExactLiraSearchComponent private constructor(
             if (comparison.op == LinearOp.NE) {
                 disequalities += Triple(address, comparison, premise)
             } else {
-                if (!system.assertComparison(comparison, null, premise)) return false
-                sourceAssertionLevels[index] = context.decisionLevel
+                comparisons += comparison
+                premises += premise
+                indices += index
             }
+        }
+        var first = 0
+        while (first < comparisons.size) {
+            val end = system.prepareComparisons(comparisons, first, operationStop) ?: return false
+            for (index in first until end) {
+                if (!system.assertComparison(comparisons[index], null, premises[index])) return false
+                sourceAssertionLevels[indices[index]] = context.decisionLevel
+                if (lp.state?.conflict != null) return true
+            }
+            first = end
         }
         for (atom in node.sourceBranches) {
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)

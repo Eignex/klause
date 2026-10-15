@@ -26,6 +26,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -55,13 +56,18 @@ class LiveQfLraSystemTest {
     fun `a prepared definition first used in a child retains only its sibling premise`() {
         val factor = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
             doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0)
-        val source = source().withFactors(arrayOf(factor))
+        val second = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 5.0)
+        val source = source().withFactors(arrayOf(factor, second))
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source, lp)
             assertTrue(system.install())
             val session = SearchSession(listOf(lp))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertNotNull(system.prepareComparisons(listOf(factor, second).map {
+                it.linearRows.single().exactForm(2).comparison(true) { false }
+            }, 0))
             assertTrue(system.assertComparison(factor.linearRows.single().exactForm(2)
                 .comparison(true) { false }, null, premise(0)))
             session.popTo(0)
@@ -73,6 +79,64 @@ class LiveQfLraSystemTest {
             val lower = assertNotNull(lp.state?.activeSide(2, false))
             assertEquals(listOf(Lit.make(1, false)),
                 assertNotNull(session.explainAtoms(lp.boundPremise(lower.witness))).literals.toList())
+        }
+    }
+
+    @Test
+    fun `a declined definition batch preserves a conflicting source prefix`() {
+        val factors = arrayOf(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.GE, 4.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), LinearOp.LE, 5.0),
+        )
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 1) }).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(factors), lp)
+            assertTrue(system.install())
+            val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+
+            assertNotNull(system.prepareComparisons(comparisons, 0))
+            assertTrue(system.assertComparison(comparisons.first(), null, axiom))
+            assertTrue(system.assertComparison(comparisons[1], null, axiom))
+
+            assertEquals(LpVerdict.INFEASIBLE, assertNotNull(lp.solve()).verdict)
+        }
+    }
+
+    @Test
+    fun `an earlier source equality simplifies a later expression without row capacity`() {
+        val factors = arrayOf(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 2.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0),
+        )
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 0) }).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(factors), lp)
+            assertTrue(system.install())
+            val comparisons = factors.map { it.linearRows.single().exactForm(2).comparison(true) { false } }
+
+            var first = 0
+            while (first < comparisons.size) {
+                val end = assertNotNull(system.prepareComparisons(comparisons, first))
+                for (index in first until end) assertTrue(system.assertComparison(comparisons[index], null, axiom))
+                first = end
+            }
+
+            assertEquals(BigFraction.ONE, assertNotNull(lp.state?.activeSide(1, true)).side.number.value)
+        }
+    }
+
+    @Test
+    fun `cancelled definition preparation leaves capacity for a later assertion`() {
+        val factor = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0)
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 1) }).use { lp ->
+            val system = LiveQfLraSystem(source().withFactors(arrayOf(factor)), lp)
+            assertTrue(system.install())
+            val comparison = factor.linearRows.single().exactForm(2).comparison(true) { false }
+
+            assertNull(system.prepareComparisons(listOf(comparison), 0, Cancellation { true }))
+            assertTrue(system.assertRow(row(listOf(1, 2), 4), axiom))
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, assertNotNull(lp.solve()).verdict)
         }
     }
 
