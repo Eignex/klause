@@ -63,11 +63,13 @@ internal sealed interface GridArithmetic : Factor {
 internal class GridProduct(val a: GridCoordinate, val b: GridCoordinate, override val output: GridCoordinate) :
     GridArithmetic {
     override val inputs: List<GridCoordinate> = listOf(a, b)
-    override val variables: VarList = SpanIntVars(intArrayOf(a.variable, b.variable, output.variable).distinct().toIntArray())
+    override val variables: VarList =
+        SpanIntVars(intArrayOf(a.variable, b.variable, output.variable).distinct().toIntArray())
 
     override fun evaluate(value: (Int) -> Long): Double = a.value(value(a.variable)) * b.value(value(b.variable))
 
-    override fun remap(mapping: VarRemap): Factor = GridProduct(a.remap(mapping), b.remap(mapping), output.remap(mapping))
+    override fun remap(mapping: VarRemap): Factor =
+        GridProduct(a.remap(mapping), b.remap(mapping), output.remap(mapping))
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.GRID_PRODUCT) { sink ->
         val ordered = if (compareValuesBy(a, b, { it.variable }, { it.lower.toRawBits() },

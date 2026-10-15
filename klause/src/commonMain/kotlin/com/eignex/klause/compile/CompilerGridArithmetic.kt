@@ -80,7 +80,8 @@ internal fun Lowering.assertGridContinuousEquality(equality: ContinuousRealEqual
     }
     fun equate(expression: ContinuousRealExpr, output: GridCoordinate) {
         when (expression) {
-            is ContinuousRealExpr.Multiply -> factors.add(GridProduct(lift(expression.left), lift(expression.right), output))
+            is ContinuousRealExpr.Multiply ->
+                factors.add(GridProduct(lift(expression.left), lift(expression.right), output))
             is ContinuousRealExpr.Power -> factors.add(GridPower(lift(expression.base), expression.exponent, output))
             is ContinuousRealExpr.Affine -> affine(listOf(lift(expression) to 1.0), 0.0, output)
         }

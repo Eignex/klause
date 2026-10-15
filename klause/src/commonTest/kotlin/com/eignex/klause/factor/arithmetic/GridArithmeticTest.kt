@@ -33,7 +33,8 @@ class GridArithmeticTest {
     fun `square filtering retains domain holes through retracted output pins`() {
         val relation = GridProduct(GridCoordinate(0, -2.0, 2.0, 5), GridCoordinate(0, -2.0, 2.0, 5),
             GridCoordinate(1, 0.0, 4.0, 5))
-        val problem = Problem(0, 2, arrayOf(IntDomain(0, 4).excludeValue(0), IntDomain(0, 4)), arrayOf<Factor>(relation))
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 4).excludeValue(0), IntDomain(0, 4)),
+            arrayOf<Factor>(relation))
         val session = PropagationSession(problem)
         session.seed(Assumptions.None)
 
