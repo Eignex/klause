@@ -344,6 +344,13 @@ premise into a single immutable domain replacement. The mutation retains individ
 hole reasons and all changed bound, value and fixed-variable wakeups; one trail record
 restores the complete prior domain. Index exclusions retain position-specific reasons.
 
+Unconditional interior carves made without undo logging at position zero retain their
+membership in state-owned interval runs. Their establishment level, null reason and
+carve position zero remain available to late equality atoms and historical queries
+after logging starts. Conditional and trailed carves retain ordered records and undo
+prefixes; retraction preserves the untrailed root runs. Prepared buffers carry the same
+state-owned storage through suspended preparation.
+
 One completed CP fixpoint's integer publication callback shares Boolean- and root-grounded
 native subproofs. Assertion delivery follows the callback, so its native point stays fixed.
 The memo holds at most 4,096 literal entries and each export retains its 4,096-frame visit

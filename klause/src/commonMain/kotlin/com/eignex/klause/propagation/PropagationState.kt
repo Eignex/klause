@@ -255,6 +255,9 @@ class PropagationState private constructor(
     // deduction from one carved after it ([carvedAt]).
     internal val holeHistPos: Array<IntArrayList?> = prepared?.holeHistPos ?: (arrayOfNulls(problem.numIntVars))
 
+    // Untrailed unconditional root carves retain their exact membership and position across every pop.
+    internal val rootHoleHist: Array<RootHoleHistory?> = prepared?.rootHoleHist ?: arrayOfNulls(problem.numIntVars)
+
     // Per Boolean variable, the undo-log size when its current pin was logged, so a lazy reason can tell a pin
     // that predates its deduction from a later one ([boolPinnedAt]). Meaningful only while the variable is pinned.
     internal val boolPinPos = prepared?.boolPinPos ?: (IntArray(problem.numBoolVars))

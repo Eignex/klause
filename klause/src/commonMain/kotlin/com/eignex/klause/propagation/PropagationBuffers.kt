@@ -31,6 +31,7 @@ internal class PropagationBuffers(
     val holeHistVal: Array<LongArrayList?>,
     val holeHistLvl: Array<IntArrayList?>,
     val holeHistPos: Array<IntArrayList?>,
+    val rootHoleHist: Array<RootHoleHistory?>,
     val boolAntecedents: Array<IntArray?>,
     val intMinAntecedents: Array<IntArray?>,
     val intMaxAntecedents: Array<IntArray?>,
@@ -134,6 +135,8 @@ internal class PropagationBuffers(
             yield(null)
             val holeHistPos = arrayOfNulls<IntArrayList>(problem.numIntVars)
             yield(null)
+            val rootHoleHist = arrayOfNulls<RootHoleHistory>(problem.numIntVars)
+            yield(null)
             val boolAntecedents = arrayOfNulls<IntArray>(problem.numBoolVars)
             yield(null)
             val intMinAntecedents = arrayOfNulls<IntArray>(problem.numIntVars)
@@ -190,6 +193,7 @@ internal class PropagationBuffers(
                 holeHistVal,
                 holeHistLvl,
                 holeHistPos,
+                rootHoleHist,
                 boolAntecedents,
                 intMinAntecedents,
                 intMaxAntecedents,
