@@ -97,7 +97,8 @@ internal fun FlatZincCompiler.resolveFloatVarOrConst(e: FznExpr): FloatRef = whe
 
         is FlatZincArray.FloatParam -> FloatRef.Const(arr.values[arrayOffset(arr.length, e.index, e.name)])
 
-        is FlatZincArray.IntParam -> FloatRef.Const(exactFloatInteger(arr.values[arrayOffset(arr.length, e.index, e.name)]))
+        is FlatZincArray.IntParam ->
+            FloatRef.Const(exactFloatInteger(arr.values[arrayOffset(arr.length, e.index, e.name)]))
 
         else -> failHere("`${e.name}` is not a float array")
     }
