@@ -6,10 +6,13 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.util.Cancellation
 import java.io.File
+import java.lang.management.ManagementFactory
 import java.util.Base64
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.time.Duration.Companion.seconds
 
 internal object PolynomialWitnessProbeProfile {
@@ -22,8 +25,14 @@ internal object PolynomialWitnessProbeProfile {
         require(cases.size in 1..8 && cases.map { it.id }.distinct().size == cases.size)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         File(out, "request.json").writeBytes(request)
-        Reports.writeJson(File(out, "provenance.json").path, InstalledBuild.current)
-        File(out, "revision.txt").writeText(Reports.readGitSha() ?: "unavailable")
+        Reports.writeJson(File(out, "provenance.json").path, InstalledBuild.reference)
+        File(out, "settings.json").writeText(buildJsonObject {
+            put("revision", Reports.readGitSha())
+            put("javaCores", Runtime.getRuntime().availableProcessors())
+            put("jvmOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
+            put("containingTimeoutMs", 60000)
+            put("preparationCheckpoints", 2)
+        }.toString() + "\n")
         val access = ProbeAccess()
         for ((index, source) in cases.withIndex()) {
             val bytes = Base64.getDecoder().decode(source.base64)
