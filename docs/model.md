@@ -177,7 +177,13 @@ together with its available finite completion, selects the arithmetic language.
 A bounded mixed product can retain finite choices and conditioned linear completion;
 its factor class alone does not require polynomial traversal. `PreparedSourcePlan` retains the original source
 object, canonical execution model, source declaration counts, coordinate mappings,
-component descriptors and objective direction. Its descriptors use extensible
+component descriptors and objective direction. Its internal structural capture selects a
+sealed finite/linear, polynomial, nonlinear-integer, transcendental or declined
+payload. Each runnable variant carries its required model or completion directly;
+consumers dispatch on that variant. Declined polynomial assembly can retain a typed
+finite projection beside its explicit unsupported or resource cause. The public
+kind and nullable projection getters remain compatibility views of that capture.
+Its descriptors use extensible
 semantic identifiers and retain original factor indices. `ComponentPlan` supplies
 the finite/linear projection mechanism; `SharedPolynomialModel` supplies polynomial
 lowering and exact completion data under the same preparation owner. Polynomial
@@ -220,7 +226,12 @@ A mixed strategy exposes its admitted siblings and their individual declines.
 Resource exhaustion belongs to invocation results, rather than build-time admission.
 
 `withObjective` captures linear or exact quadratic operation data without reselecting
-source ownership. Unsupported objectives do not erase supported satisfaction.
+source ownership. Each binding has its own objective and direction while sharing the
+completed structural capture, mappings, provider selections and polynomial finite
+projection. Binding does not repeat encoders or retain their construction token.
+A rewrite or provider change still requires new structural preparation; immutable
+reuse supplies no invocation state, work allowance or evidence authority.
+Unsupported objectives do not erase supported satisfaction.
 Finite counting and accurate sampling use complete cells independently of the
 sampling backend. Their real coordinates remain existential. Native polynomial and
 nonlinear requests have no enumeration, count or sampling surface solely because a

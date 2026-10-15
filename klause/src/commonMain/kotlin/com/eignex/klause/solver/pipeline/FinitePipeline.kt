@@ -59,9 +59,9 @@ class FinitePipelineRequest(
     },
 ) {
     /** Finite projection data selected by [preparedPlan]. */
-    val componentPlan: ComponentPlan = requireNotNull(preparedPlan.componentPlan) {
+    val componentPlan: ComponentPlan = requireNotNull(preparedPlan.execution.finiteLinear) {
         "finite preparation requires a finite/linear source plan"
-    }
+    }.ownership
 
     init {
         require(preparedPlan.model === problem) { "finite request and plan must retain the same canonical model" }

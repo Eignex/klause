@@ -26,7 +26,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
-import com.eignex.klause.solver.pipeline.PreparedExecutionKind
+import com.eignex.klause.solver.pipeline.PreparedExecution
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
@@ -154,7 +154,7 @@ class SourceStrategy internal constructor(
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
         val plan = preparePolynomialOptimization(scope.stop, scope.polynomialPreparation())
             .withObjective(objective, maximize = sense == ObjectiveSense.MAXIMIZE)
-        if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
+        if (plan.execution !is PreparedExecution.Polynomial ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
         ) return unsupportedQuadratic(sense, if (plan.decline == PreparedPlanDecline.RESOURCE) {
             if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted
@@ -195,7 +195,7 @@ class SourceStrategy internal constructor(
         if (!scope.supportsPolynomial(engine)) return unsupportedQuadratic(sense)
         val plan = preparePolynomialOptimization(scope.stop, scope.polynomialPreparation())
             .withObjective(objective, sense)
-        if (plan.kind != PreparedExecutionKind.POLYNOMIAL ||
+        if (plan.execution !is PreparedExecution.Polynomial ||
             !plan.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
         ) return unsupportedQuadratic(sense, if (plan.decline == PreparedPlanDecline.RESOURCE) {
             if (scope.stop()) scope.unknown().reason else TerminationReason.BudgetExhausted

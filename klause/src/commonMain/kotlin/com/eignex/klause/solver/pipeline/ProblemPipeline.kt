@@ -193,13 +193,16 @@ private fun Problem.pipelineRouteObserved(
     } else preparationStop
     val arithmetic = if (reuseInitial && !stopped) requireNotNull(initial) else routed.prepareExecutionPlan(
         this, objective, maximize, preferFinite = finiteCompletion, providers, projections, arithmeticStop)
-    if (arithmetic.kind == PreparedExecutionKind.DECLINED) {
-        return SourceProblemRoute.UnsupportedOpen(null, routed, arithmetic)
+    val arithmeticExecution = when (val execution = arithmetic.execution) {
+        is PreparedExecution.Declined -> return SourceProblemRoute.UnsupportedOpen(null, routed, arithmetic)
+        is PreparedExecution.Polynomial -> return SourceProblemRoute.PolynomialTheory(
+            arithmetic.polynomialRequest(), objective, maximize,
+        )
+        is PreparedExecution.FiniteLinear -> execution
+        is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental ->
+            error("factor source requires factor execution")
     }
-    if (arithmetic.kind == PreparedExecutionKind.POLYNOMIAL) {
-        return SourceProblemRoute.PolynomialTheory(arithmetic.polynomialRequest(), objective, maximize)
-    }
-    val arithmeticRoute = arithmetic.componentPlan?.theoryPipeline
+    val arithmeticRoute = arithmeticExecution.ownership.theoryPipeline
     val preferExact = routeLinearToTheory &&
         (arithmeticRoute == ProblemPipeline.EXACT_LRA || arithmeticRoute == ProblemPipeline.EXACT_LIRA)
     val preferFinite = finiteIntegerRanges && !preferExact &&
@@ -207,10 +210,12 @@ private fun Problem.pipelineRouteObserved(
         routed.finiteRealCompletionSupported(projections)
     val prepared = if (preferFinite) routed.prepareExecutionPlan(this, objective, maximize,
         preferFinite = true, providers, projections, boundCancellation) else arithmetic
-    if (prepared.kind == PreparedExecutionKind.DECLINED) {
-        return SourceProblemRoute.UnsupportedOpen(null, routed, prepared)
+    val selected = when (val execution = prepared.execution) {
+        is PreparedExecution.Declined -> return SourceProblemRoute.UnsupportedOpen(null, routed, prepared)
+        is PreparedExecution.FiniteLinear -> execution
+        else -> error("finite preference requires finite/linear execution")
     }
-    val plan = requireNotNull(prepared.componentPlan)
+    val plan = selected.ownership
     if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
         return SourceProblemRoute.Finite(routed, plan, prepared)
     }
