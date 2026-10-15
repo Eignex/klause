@@ -12,7 +12,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
+import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
@@ -37,6 +39,27 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
+    @Test
+    fun `cold annealing follows the objective after reaching feasibility`() {
+        val problem = Problem(2, 0, emptyArray(), emptyArray())
+        val objective = LinearObjective(boolWeights = longArrayOf(1, 2))
+        for (seed in 0L..7L) {
+            val strategy = SimulatedAnnealing.optimizer(
+                Geometric(initialTemperature = 1e-6, minTemperature = 1e-6),
+            )
+            val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy)
+            val params = LocalSearchParams(
+                maxFlips = 2L, randomSeed = seed,
+                initialAssignment = Sample(booleanArrayOf(false, true), longArrayOf()),
+            )
+
+            val result = search.improvements(objective, params, warm = null)
+                .filterIsInstance<MinimizeResult.WithSample>().last()
+
+            assertEquals(0.0, objective.evaluate(result.sample), "seed=$seed")
+        }
+    }
+
     @Test
     fun `optimization seed cost observations follow definition reconciliation`() {
         val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(

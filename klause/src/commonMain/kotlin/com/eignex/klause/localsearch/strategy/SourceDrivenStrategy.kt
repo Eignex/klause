@@ -246,13 +246,15 @@ class SourceDrivenStrategy(
      *  feasible (gated on `cost == 0`, so the infeasibility fight keeps the constraint gradient); the
      *  break basis already folds the shaped objective. */
     private fun score(state: LocalSearchState, move: Move): Double {
-        // Feasibility-preserving objective descent (a strategy that sets [feasibleAcceptance], e.g. CBLS's
-        // GreedyDescent): at cost == 0 rank by the *raw* objective delta — independent of the
+        // Feasibility-first self-owned walks and explicit feasible acceptance rank the raw objective
+        // at cost == 0, independently of the
         // pre-feasibility shaping lambda, which is zero under the default FeasibilityFirst — and disqualify
         // any move that re-introduces a violation. Without the disqualification a large objective reward
         // buys an infeasible single flip that then out-scores the feasibility-preserving swap and is
         // reverted every step; trading feasibility for objective is the ratchet arm's job, not this one.
-        if (state.cost == 0L && feasibleAcceptance != null) {
+        val gatedObjective = feasibleDescent == FeasibleDescent.SelfOwned &&
+            state.shaping.feasibilityGated && state.shaping.objective != null
+        if (state.cost == 0L && (feasibleAcceptance != null || gatedObjective)) {
             if (state.netDelta(move) > 0L) return Double.POSITIVE_INFINITY
             val objective = state.shaping.objective ?: return 0.0
             return state.objectiveDelta(objective, move) ?: 0.0

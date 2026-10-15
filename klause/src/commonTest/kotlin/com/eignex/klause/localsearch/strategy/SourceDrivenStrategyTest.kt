@@ -1,12 +1,17 @@
 package com.eignex.klause.localsearch.strategy
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.CostShaping
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -29,6 +34,50 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SourceDrivenStrategyTest {
+    @Test
+    fun `explicit zero linear shaping retains neutral objective scores`() {
+        val problem = Problem(1, 0, emptyArray(), emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setBool(0, true)
+        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(1))
+        state.shaping.feasibilityGated = CostShaping.Linear(0.0).feasibilityGated
+        state.recompute()
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ObjectiveSeed())), scoring = MoveScoring.Break,
+            acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+
+        val move = strategy.pickMove(state)
+
+        assertNull(move)
+    }
+
+    @Test
+    fun `self owned feasible walks rank maintained objectives under feasibility first`() {
+        val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+        ))
+        for (seed in 0..7) {
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(seed))
+            state.assignment.setBool(2, true)
+            state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+                BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), true),
+            ))?.network(0, 3)
+            state.shaping.objective = LinearObjective(boolWeights = longArrayOf(1, 0, 2))
+            state.shaping.feasibilityGated = true
+            state.recompute()
+            val strategy = SourceDrivenStrategy(
+                sources = listOf(ConfiguredSource(ObjectiveSeed())), scoring = MoveScoring.Break,
+                acceptance = AcceptanceRule.Greedy, feasibleDescent = FeasibleDescent.SelfOwned,
+            )
+
+            val move = strategy.pickMove(state)
+
+            assertEquals(Move.BoolFlip(1), move, "seed=$seed")
+        }
+    }
+
 
     @Test
     fun `equal Element alternatives preserve primary choices and random draws`() {
