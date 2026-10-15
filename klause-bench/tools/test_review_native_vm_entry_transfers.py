@@ -10,6 +10,28 @@ import review_native_vm_entry_transfers as review
 
 
 class ReviewNativeVmEntryTransfersTest(unittest.TestCase):
+    def test_legacy_capture_uses_only_the_pinned_original_fixed_query_contract(self):
+        data = {'sourceSha256': review.LEGACY_PRODUCER_SHA256,
+                'entries': {query: [] for query in review.LEGACY_QUERIES},
+                'symbols': {'candidates': {query: [] for query in review.LEGACY_QUERIES}}}
+        original = copy.deepcopy(data)
+
+        queries, definitions = review.inventory(data)
+
+        self.assertEqual(review.LEGACY_QUERIES, queries)
+        self.assertEqual({}, definitions)
+        self.assertEqual(original, data)
+
+    def test_missing_query_contract_rejects_unknown_producers_or_incomplete_legacy_groups(self):
+        for producer, queries in [('a' * 64, review.LEGACY_QUERIES),
+                                  (review.LEGACY_PRODUCER_SHA256, review.LEGACY_QUERIES[:-1])]:
+            with self.subTest(producer=producer, queries=queries):
+                data = {'sourceSha256': producer, 'entries': {query: [] for query in queries},
+                        'symbols': {'candidates': {query: [] for query in queries}}}
+
+                with self.assertRaises(ValueError):
+                    review.inventory(data)
+
     def test_direct_targets_keep_boundary_and_capture_span_distinctions(self):
         rows = [{'address': 100 + index, 'bytesHex': '90', 'mnemonic': 'call', 'operands': operand}
                 for index, operand in enumerate(['0x64', '0x69', '0x70', '0x80'])]

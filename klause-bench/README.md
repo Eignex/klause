@@ -1519,7 +1519,10 @@ do not derive private field offsets, task lifetime or compiler savings from it.
 `entries=<https URL>`, `entries-sha256=<hash>` and `producer-sha256=<hash>`.
 Authenticate the original capture and its exact reader source before supplying
 these hashes; a reader version need not match the current source. The retained
-download is bounded to 32 MiB. The child rechecks symbol-owned bytes against the
+download is bounded to 32 MiB. Captures without an explicit query list are accepted
+only for the pinned original reader hash and its five fixed source queries; both
+saved candidate groups must match that contract. Unknown producer versions cannot
+infer queries from available records. The child rechecks symbol-owned bytes against the
 same pinned library and validates every saved linear instruction boundary and
 byte slice, without decoding again or loading the target library.
 
