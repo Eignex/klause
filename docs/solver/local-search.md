@@ -754,8 +754,8 @@ objective; strict improvement is compared using its exact evaluation. Samples ow
 immutable coordinates and do not transfer mutable worker state or proof authority.
 
 An absent, stale or unsuitable candidate leaves unfinished bootstrap preparation
-and search intact. Cancellation during admission leaves the candidate eligible for
-a later slice. Adoption releases both bootstrap handles before opening repair,
+and search intact. Interrupted checking leaves the candidate eligible for a later
+slice; a fully checked supplied seed survives invocation expiry before shared polling. Adoption releases both bootstrap handles before opening repair,
 retaining their measured work in statistics, including counters finalized by close.
 Release detaches the handles before closing them: adoption, terminal completion, explicit close and exceptions each
 close a child at most once, including when a close throws. Invocation cancellation
