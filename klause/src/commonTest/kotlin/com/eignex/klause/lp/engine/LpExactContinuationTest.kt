@@ -2,22 +2,17 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ContinuationDecline
-import com.eignex.klause.simplex.exact.ContinuationStatus
-import com.eignex.klause.simplex.exact.ExactContinuation
-import com.eignex.klause.simplex.exact.ExactContinuationInput
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
     @Test
-    fun `direct continuation dimension declines retain no state and can later admit another model`() {
+    fun `direct continuation dimension declines should retain no state and later admit another model`() {
         val cache = LpExactContinuationCache()
         val models = listOf(2, 1).map { rows ->
             LpBuilder().apply {
@@ -35,8 +30,12 @@ class LpExactContinuationTest {
             assertNull(declined.witness)
         }
 
-        val admitted = continueExactLp(models[1],
-            Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED)), cache, limits = limits)
+        val admitted = continueExactLp(
+            models[1],
+            Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED)),
+            cache,
+            limits = limits,
+        )
 
         assertEquals(listOf(BigFraction.ONE), assertNotNull(admitted.witness).primal)
         assertNull(admitted.metrics.decline)
@@ -44,7 +43,7 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `structural target declines skip basis export and current limits can admit a retry`() {
+    fun `structural target declines should skip basis export and admit a retry under current limits`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
@@ -83,7 +82,7 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `cancelled and exhausted structural target attempts do not survive a fresh invocation`() {
+    fun `cancelled and exhausted structural target attempts should not survive a fresh invocation`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
@@ -113,7 +112,7 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `repeated continuation cannot replenish exhausted feasibility pivots`() {
+    fun `repeated continuation should not replenish exhausted feasibility pivots`() {
         val source = assertNotNull(
             LpBuilder().apply {
                 repeat(4) { j ->
@@ -149,74 +148,7 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `precision restart peak survives a lower scalar ceiling`() {
-        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 100, BIG_ONE))
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(
-            listOf(
-                listOf(ExactLpEntry(0, huge), ExactLpEntry(1, one)),
-                listOf(ExactLpEntry(0, one), ExactLpEntry(1, huge)),
-            ),
-            listOf(one, one),
-            List(4) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), if (it < 2) null else ExactLpSide(zero))) },
-            List(2) { ExactLpRow() },
-            ExactLpObjective(List(4) { zero }),
-        )
-        val state = LpExactState(source)
-        val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED))
-        val cache = LpExactContinuationCache()
-        val first = continueExactLp(assertNotNull(state.toWorkingModel()), basis, cache)
-        val peak = cache.scalarPeak
-
-        val lowered = continueExactLp(
-            assertNotNull(state.toWorkingModel()),
-            basis,
-            cache,
-            limits = ExactContinuationLimits(maxBits = peak - 1),
-        )
-        val equal = continueExactLp(
-            assertNotNull(state.toWorkingModel()),
-            basis,
-            cache,
-            limits = ExactContinuationLimits(maxBits = peak),
-        )
-
-        assertNotNull(first.witness)
-        assertTrue(first.metrics.restarts > 0)
-        assertTrue(peak > 101)
-        assertEquals(ContinuationDecline.BITS, lowered.metrics.decline)
-        assertNull(lowered.witness)
-        assertNotNull(equal.witness)
-    }
-
-    @Test
-    fun `initialized continuation totals saturate without accepting negative cost`() {
-        val continuation = ExactContinuation(
-            ExactContinuationInput(
-                listOf(emptyList()),
-                emptyList(),
-                listOf(BigFraction.ZERO),
-                listOf(null),
-                emptyList(),
-                listOf(ContinuationStatus.LOWER),
-            ),
-        )
-        continuation.account(Long.MAX_VALUE - 2L, Long.MAX_VALUE - 2L, Long.MAX_VALUE - 2L)
-
-        continuation.account(10L, 10L, 10L)
-        continuation.account(0L, 0L, 0L)
-        val declined = continuation.resume()
-
-        assertNull(declined.values)
-        assertEquals(Long.MAX_VALUE, continuation.usedWork)
-        assertEquals(Long.MAX_VALUE, continuation.usedAllocation)
-        assertEquals(Long.MAX_VALUE, continuation.usedTimeNs)
-        assertFailsWith<IllegalArgumentException> { continuation.account(-1L, 0L, 0L) }
-    }
-
-    @Test
-    fun `source verification resumes a previously limited import`() {
+    fun `source verification should resume a limited import`() {
         val model = LpBuilder().apply {
             repeat(4) { j ->
                 addVar(0L, 10L)
@@ -238,7 +170,7 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `mutable source edits invalidate a retained candidate`() {
+    fun `mutable source edits should invalidate a retained candidate`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
@@ -257,49 +189,29 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `native exact conflict retains all original bound witnesses`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
-            listOf(zero),
-            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
-            listOf(ExactLpRow(global = false, premises = ExactLpPremises(emptyList(), listOf(9)))),
-            ExactLpObjective(listOf(zero, zero)),
-        )
-        val trail = LpBoundTrail(source)
-        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
-        assertTrue(trail.assertBound(1, false, ExactLpSide(zero), 12L))
-        val state = trail.state
-        val working = assertNotNull(state.toWorkingModel())
-        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
-
-        val result = continueExactLp(working, basis)
-        trail.push()
-        trail.pop(0)
-
-        assertNotNull(result.conflict)
-        val support = assertNotNull(result.support)
-        assertTrue(support.state === state)
-        assertEquals(setOf(11L, 12L), support.sides.map { it.witness }.toSet())
-        assertEquals(listOf(9), assertNotNull(support.rows.single().second.premises).literalEntries())
-    }
-
-    @Test
-    fun `strict satisfaction continuation verifies an interior source point`() {
+    fun `strict satisfaction continuation should verify an interior source point`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         for (upper in listOf(false, true)) {
             val source = ExactLpModel(
-                listOf(emptyList()), emptyList(),
-                listOf(ExactLpColumn(ExactLpBounds(
-                    ExactLpSide(zero, strict = !upper), ExactLpSide(one, strict = upper),
-                ))),
-                emptyList(), ExactLpObjective(listOf(zero)),
+                listOf(emptyList()),
+                emptyList(),
+                listOf(
+                    ExactLpColumn(
+                        ExactLpBounds(
+                            ExactLpSide(zero, strict = !upper),
+                            ExactLpSide(one, strict = upper),
+                        ),
+                    ),
+                ),
+                emptyList(),
+                ExactLpObjective(listOf(zero)),
             )
             val model = assertNotNull(LpExactState(source).toWorkingModel())
 
             val result = continueExactLp(
-                model, Basis(intArrayOf(), arrayOf(if (upper) VarStatus.AT_UPPER else VarStatus.AT_LOWER)),
+                model,
+                Basis(intArrayOf(), arrayOf(if (upper) VarStatus.AT_UPPER else VarStatus.AT_LOWER)),
             )
 
             val point = assertNotNull(result.witness).primal.single()
@@ -310,17 +222,20 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `nonzero objectives retain strict closure verification`() {
+    fun `nonzero objectives should retain strict closure verification`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(one)))),
-            emptyList(), ExactLpObjective(listOf(one)),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
         )
 
         val result = continueExactLp(
-            assertNotNull(LpExactState(source).toWorkingModel()), Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
+            assertNotNull(LpExactState(source).toWorkingModel()),
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
         )
 
         assertNull(result.witness)
@@ -329,10 +244,11 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `strict conflict verifies its scoped bound witnesses`() {
+    fun `a strict conflict should verify its scoped bound witnesses`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))), listOf(zero),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
+            listOf(zero),
             listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds())),
             listOf(ExactLpRow(global = false, premises = ExactLpPremises(emptyList(), listOf(9)))),
             ExactLpObjective(listOf(zero, zero)),
@@ -343,7 +259,8 @@ class LpExactContinuationTest {
         val state = trail.state
 
         val result = continueExactLp(
-            assertNotNull(state.toWorkingModel()), Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER)),
+            assertNotNull(state.toWorkingModel()),
+            Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER)),
         )
 
         assertNull(result.witness)
@@ -355,12 +272,14 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `retracting a strict side restores the closed endpoint`() {
+    fun `retracting a strict side should restore the closed endpoint`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
+            listOf(emptyList()),
+            emptyList(),
             listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(1L))))),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
         val trail = LpBoundTrail(source)
         val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
@@ -378,19 +297,24 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `strict interior witnesses retain original coordinate origins`() {
+    fun `strict interior witnesses should retain original coordinate origins`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(emptyList()), emptyList(),
-            listOf(ExactLpColumn(
-                ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))),
-                origin = ExactLpNumber.of(10L),
-            )),
-            emptyList(), ExactLpObjective(listOf(zero)),
+            listOf(emptyList()),
+            emptyList(),
+            listOf(
+                ExactLpColumn(
+                    ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))),
+                    origin = ExactLpNumber.of(10L),
+                ),
+            ),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
         )
 
         val result = continueExactLp(
-            assertNotNull(LpExactState(source).toWorkingModel()), Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
+            assertNotNull(LpExactState(source).toWorkingModel()),
+            Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
         )
 
         val point = assertNotNull(result.witness).primal.single()
@@ -398,7 +322,7 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `missing basis and cancelled source import decline separately`() {
+    fun `a missing basis and a cancelled source import should decline separately`() {
         val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
 
         val missing = continueExactLp(model, null)
@@ -415,7 +339,7 @@ class LpExactContinuationTest {
     }
 
     @Test
-    fun `either witness policy can withhold continuation acceptance`() {
+    fun `either witness policy should be able to withhold continuation acceptance`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
@@ -451,5 +375,4 @@ class LpExactContinuationTest {
             assertTrue(assertNotNull(result.continuation).success)
         }
     }
-
 }

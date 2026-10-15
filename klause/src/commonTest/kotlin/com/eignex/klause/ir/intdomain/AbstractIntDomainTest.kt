@@ -9,9 +9,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class AbstractIntDomainTest {
-
     @Test
-    fun `domain narrowing uses its captured bitset threshold`() {
+    fun `domain narrowing should use its captured bitset threshold`() {
         val small = IntDomain(0, 100, DomainStorageSettings(8))
         val large = IntDomain(0, 100, DomainStorageSettings(128))
         val saved = KlauseConfig.current
@@ -27,7 +26,7 @@ class AbstractIntDomainTest {
     }
 
     @Test
-    fun `domain restoration keeps the storage policy through representation changes`() {
+    fun `domain restoration should keep the storage policy through representation changes`() {
         val domain = IntDomain(0, 100, DomainStorageSettings(8)).excludeValue(50)
 
         val restored = domain.includeInteriorValue(50)
@@ -39,15 +38,8 @@ class AbstractIntDomainTest {
         assertTrue(50L in narrowed)
     }
 
-
     @Test
-    fun `excludeValues empty list is identity`() {
-        val d = ContiguousDomain(1, 5)
-        assertTrue(d.excludeValues(LongArray(0)) === d)
-    }
-
-    @Test
-    fun `excludeValues with no present value is identity`() {
+    fun `excludeValues with no present value should be identity`() {
         val d = ContiguousDomain(1, 5).excludeValue(3)
         assertTrue(d.excludeValues(longArrayOf(-1, 0, 3, 6, 9)) === d)
     }
@@ -67,7 +59,7 @@ class AbstractIntDomainTest {
     }
 
     @Test
-    fun `equals respects holes`() {
+    fun `equals should respect holes`() {
         val a = ContiguousDomain(1, 5).excludeValue(3)
         val b = ContiguousDomain(1, 5).excludeValue(3)
         val c = ContiguousDomain(1, 5).excludeValue(4)
@@ -78,7 +70,7 @@ class AbstractIntDomainTest {
     }
 
     @Test
-    fun `equals and hashCode stay span-independent on non-enumerable domains`() {
+    fun `equals and hashCode should stay span-independent on non-enumerable domains`() {
         val a = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
         val b = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
         val c = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_001L)

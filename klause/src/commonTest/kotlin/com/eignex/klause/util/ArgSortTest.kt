@@ -6,7 +6,7 @@ import kotlin.test.assertFailsWith
 
 class ArgSortTest {
     @Test
-    fun `caller buffers retain stable ordering across changing logical lengths`() {
+    fun `caller buffers should retain stable ordering across changing logical lengths`() {
         val order = IntArray(9) { -1 }
         val scratch = IntArray(9) { -1 }
         val keys = doubleArrayOf(2.0, -0.0, 2.0, 0.0, -3.0, Double.NaN, 2.0, -3.0, 1.0)
@@ -20,7 +20,7 @@ class ArgSortTest {
     }
 
     @Test
-    fun `invalid logical lengths preserve caller buffers`() {
+    fun `invalid logical lengths should preserve caller buffers`() {
         for (size in listOf(-1, 4)) {
             val order = intArrayOf(7, 8, 9)
             val scratch = intArrayOf(4, 5, 6)
@@ -33,7 +33,7 @@ class ArgSortTest {
     }
 
     @Test
-    fun `aliased or insufficient scratch is rejected before mutation`() {
+    fun `aliased or insufficient scratch should be rejected before mutation`() {
         val order = intArrayOf(7, 8, 9)
         for (scratch in listOf(order, intArrayOf(4, 5))) {
             assertFailsWith<IllegalArgumentException> { argsortBy(3, order, scratch) { a, b -> a - b } }

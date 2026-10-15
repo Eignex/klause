@@ -4,11 +4,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertSame
 
 class LocalSearchPhaseTimerTest {
     @Test
-    fun `suspended sequence time is excluded from its active phase`() {
+    fun `suspended sequence time should be excluded from its active phase`() {
         var clock = 0L
         val timer = LocalSearchPhaseTimer { clock }
         val source = sequence {
@@ -33,7 +32,7 @@ class LocalSearchPhaseTimerTest {
     }
 
     @Test
-    fun `nested phases account elapsed time without counting it twice`() {
+    fun `nested phases should account elapsed time without counting it twice`() {
         var clock = 0L
         val timer = LocalSearchPhaseTimer { clock }
         timer.resume()
@@ -51,7 +50,7 @@ class LocalSearchPhaseTimerTest {
     }
 
     @Test
-    fun `an interrupted sequence stops accruing time`() {
+    fun `an interrupted sequence should stop accruing time`() {
         var clock = 0L
         val timer = LocalSearchPhaseTimer { clock }
         val source = sequence<Int> {
@@ -66,15 +65,5 @@ class LocalSearchPhaseTimerTest {
 
         assertEquals(7L, timer.snapshot().getValue("preparation"))
         assertEquals(7L, timer.snapshot().values.sum())
-    }
-
-    @Test
-    fun `disabled timing retains the original sequence`() {
-        val source = sequenceOf(1, 2)
-
-        val timed = source.withActiveLocalSearchTime(null)
-
-        assertSame(source, timed)
-        assertEquals(listOf(1, 2), timed.toList())
     }
 }

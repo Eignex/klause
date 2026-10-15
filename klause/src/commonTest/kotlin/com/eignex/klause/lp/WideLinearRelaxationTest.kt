@@ -14,11 +14,15 @@ import kotlin.test.assertNull
 
 class WideLinearRelaxationTest {
     @Test
-    fun `wide ordinary and objective comparisons retain exact normalized source ratios`() {
+    fun `wide comparisons should retain exact normalized source ratios`() {
         val tiny = BigFraction.of(BIG_ONE, parseBigInt("100000000000000000000"))
         for (relation in listOf(LinearOp.LE, LinearOp.GE, LinearOp.EQ)) {
-            val source = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, tiny), relation, BigFraction.ofLong(3))
+            val source = ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, tiny),
+                relation,
+                BigFraction.ofLong(3),
+            )
 
             val row = assertNotNull(source.numericalRow())
 
@@ -28,10 +32,14 @@ class WideLinearRelaxationTest {
     }
 
     @Test
-    fun `a nonzero coefficient lost by floating projection declines admission`() {
+    fun `coefficient lost by floating projection should decline admission`() {
         val tiny = BigFraction.of(BIG_ONE, parseBigInt("1" + "0".repeat(400)))
-        val source = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-            listOf(BigFraction.ONE, tiny), LinearOp.LE, BigFraction.ONE)
+        val source = ExactLinear.of(
+            intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+            listOf(BigFraction.ONE, tiny),
+            LinearOp.LE,
+            BigFraction.ONE,
+        )
 
         val row = source.numericalRow()
 
@@ -40,9 +48,13 @@ class WideLinearRelaxationTest {
     }
 
     @Test
-    fun `disequality does not acquire numerical completion`() {
-        val source = ExactLinear.of(intArrayOf(Term.ofRealVar(0)),
-            listOf(BigFraction.ONE), LinearOp.NE, BigFraction.ZERO)
+    fun `disequality should not acquire numerical completion`() {
+        val source = ExactLinear.of(
+            intArrayOf(Term.ofRealVar(0)),
+            listOf(BigFraction.ONE),
+            LinearOp.NE,
+            BigFraction.ZERO,
+        )
 
         assertNull(source.numericalRow())
     }

@@ -18,9 +18,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LinearSubSumAggregationTest {
-
     @Test
-    fun `a declared sub-sum folds into a declared target row`() {
+    fun `a declared sub-sum should fold into a declared target row`() {
         val equality = sumDef()
         val inequality = Linear(intArrayOf(1, 1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 10)
         val definition = object : Factor by equality, Propagator by equality.propagatorProjection() {}
@@ -33,7 +32,6 @@ class LinearSubSumAggregationTest {
         assertEquals(10L, reduced.integerConstants?.bound)
     }
 
-    // s = x + y, encoded as s − x − y = 0 with s the lowest-id (and pivot) variable.
     private fun sumDef() = Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)
 
     private fun linears(p: Problem) = p.factors.filterIsInstance<Linear>()
@@ -46,34 +44,30 @@ class LinearSubSumAggregationTest {
     }
 
     @Test
-    fun `a partial sub-sum is left untouched`() {
-        // x + w ≤ 5 contains only x, not the whole {x, y} sub-sum.
+    fun `a partial sub-sum should be left untouched`() {
         val p = Problem(
             0,
             4,
             Array(4) { IntDomain(0, 8) },
             listOf(sumDef(), Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 5)),
         )
-        assertTrue(Presolve.aggregateSubSums(p).isEmpty, "an incomplete sub-sum offers no exact fold")
+        assertTrue(Presolve.aggregateSubSums(p).isEmpty)
     }
 
     @Test
-    fun `an unevenly scaled sub-sum is left untouched`() {
-        // 2x + y contains x and y at different multiples of their form coefficients.
+    fun `an unevenly scaled sub-sum should be left untouched`() {
         val p = Problem(
             0,
             4,
             Array(4) { IntDomain(0, 8) },
             listOf(sumDef(), Linear(intArrayOf(2, 1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 9)),
         )
-        assertTrue(Presolve.aggregateSubSums(p).isEmpty, "no single multiplier covers the sub-sum")
+        assertTrue(Presolve.aggregateSubSums(p).isEmpty)
     }
 
     @Test
-    fun `a zero-coefficient partner does not divide by zero`() {
-        // `s + 0·x − w = 0` keeps its zero term (coalescing preserves it). Multiplier matching must not
-        // take `c % 0` on that term: a zero coefficient counts as no partner, leaving a single-partner
-        // "definition" that is no sub-sum — so the pass declines cleanly rather than throwing.
+    fun `a zero-coefficient partner should not count as a sub-sum partner`() {
+        // Multiplier matching must not take `c % 0` on the zero term.
         val p = Problem(
             0,
             4,
@@ -83,11 +77,11 @@ class LinearSubSumAggregationTest {
                 Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 5),
             ),
         )
-        assertTrue(Presolve.aggregateSubSums(p).isEmpty, "a zero-coefficient term is not a sub-sum partner")
+        assertTrue(Presolve.aggregateSubSums(p).isEmpty)
     }
 
     @Test
-    fun `a used definition stays valid through later dependencies and repeated passes`() {
+    fun `a used definition should stay valid through later dependencies and repeated passes`() {
         val definition = Linear(intArrayOf(1, -1, -1), intArrayOf(1, 2, 3), LinearOp.EQ, 0)
         val target = Linear(intArrayOf(2, 2, 1), intArrayOf(2, 3, 4), LinearOp.LE, 3)
         val dependency = Linear(intArrayOf(1, -1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)
@@ -108,7 +102,7 @@ class LinearSubSumAggregationTest {
     }
 
     @Test
-    fun `unrepresentable substitutions retain their original constraints`() {
+    fun `unrepresentable substitutions should retain their original constraints`() {
         val cases = listOf(
             Linear(longArrayOf(1, Long.MIN_VALUE, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0) to
                 Linear(longArrayOf(Long.MIN_VALUE, -1), intArrayOf(1, 2), LinearOp.LE, 0),

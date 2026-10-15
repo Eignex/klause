@@ -24,10 +24,15 @@ import kotlin.test.assertTrue
 
 class RestartPolicyTest {
     @Test
-    fun `anchored perturbations preserve Boolean and integer pins`() {
-        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
-        ))
+    fun `anchored perturbations should preserve Boolean and integer pins`() {
+        val problem = Problem(
+            1,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            ),
+        )
         val pins = Assumptions.None.withBool(0, true).withInt(0, 1)
         val anchor = Sample(booleanArrayOf(true), longArrayOf(1))
         for (kind in PerturbationKind.entries) {
@@ -44,10 +49,13 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun `an anchored restart cannot replace caller pins with anchor values`() {
+    fun `an anchored restart should not replace caller pins with anchor values`() {
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0),
-            Assumptions.None.withBool(0, true).withInt(0, 1))
+        val state = LocalSearchState(
+            LocalSearchModel.open(problem),
+            Random(0),
+            Assumptions.None.withBool(0, true).withInt(0, 1),
+        )
         val anchor = Sample(booleanArrayOf(false), longArrayOf(0))
 
         AdaptivePerturbationRestart(perturbationStrength = 0).restart(state, anchor)
@@ -57,7 +65,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun `anchored restarts clear tabu tenure and preserve write activity`() {
+    fun `anchored restarts should clear tabu tenure and preserve write activity`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray())
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.apply(Move.BoolFlip(0))
@@ -70,7 +78,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun `fixed cadence triggers at boundary`() {
+    fun `fixed cadence should trigger at the boundary`() {
         val p = FixedCadenceRestart(maxFlipsBeforeRestart = 100)
         assertEquals(false, p.shouldRestart(0))
         assertEquals(false, p.shouldRestart(99))
@@ -79,7 +87,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun `adaptive perturbation anchors to best then perturbs`() {
+    fun `adaptive perturbation should anchor to the best then perturb`() {
         val problem = Problem(6, 0, emptyArray(), emptyList())
         val state = LocalSearchState(problem.bake(), Random(0))
         state.restart()
@@ -97,7 +105,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun `luby cadence emits the doubling restart sequence`() {
+    fun `luby cadence should emit the doubling restart sequence`() {
         val p = LubyRestart(unit = 1)
         val problem = Problem(1, 0, emptyArray(), emptyList())
         val state = LocalSearchState(problem.bake(), Random(0))
@@ -118,7 +126,7 @@ class RestartPolicyTest {
         RoundLog(proposed = 1, accepted = 1, costMean = 0.0, costVariance = 0.0, bestCost = bestCost, temperature = 1.0)
 
     @Test
-    fun `stagnation restart resets its counter on a strict improvement`() {
+    fun `stagnation restart should reset its counter on a strict improvement`() {
         val p = StagnationRestart(patience = 3, maxFlipsBeforeRestart = 1_000_000)
         p.observe(round(5.0))
         p.observe(round(5.0)) // flat: 1
@@ -129,7 +137,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun `stagnation restart honours the hard flip ceiling and clears on restart`() {
+    fun `stagnation restart should honour the hard flip ceiling and clear on restart`() {
         val p = StagnationRestart(patience = 100, maxFlipsBeforeRestart = 500)
         assertFalse(p.shouldRestart(499))
         assertTrue(p.shouldRestart(500), "the ceiling must force a restart even without stagnation")
@@ -141,10 +149,8 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun `engine uses the restart policy from the strategy schedule bundle`() {
-        // When the strategy's ScheduleBundle declares a restart policy, the engine must use it over the
-        // solver-level param. The spy never restarts but counts queries; if the solver param were used
-        // the spy would never be touched.
+    fun `engine should use the restart policy from the strategy schedule bundle`() {
+        // The spy never restarts, so it is only queried if the engine reads the bundle's policy.
         val spy = object : RestartPolicy {
             var queried = 0
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean {
@@ -170,6 +176,6 @@ class RestartPolicyTest {
         )
         LocalSearchSolver(problem.bake(), strategy = strategy, restartPolicy = FixedCadenceRestart(1_000_000))
             .solve(LocalSearchParams(maxFlips = 200L, randomSeed = 4L))
-        assertTrue(spy.queried > 0, "the engine must use the restart policy from the strategy's schedule bundle")
+        assertTrue(spy.queried > 0)
     }
 }

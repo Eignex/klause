@@ -28,10 +28,15 @@ import kotlin.test.assertTrue
 
 class CellContextTest {
     @Test
-    fun `decoding preserves approximate and exact coordinates without an augmented certificate`() {
+    fun `decoding should preserve approximate and exact coordinates without an augmented certificate`() {
         val model = Problem(
-            1, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            1,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         ).bake()
         val context = CellContext.resolve(model, null, null)
         val third = BigFraction.ofLong(3).reciprocal()
@@ -50,9 +55,13 @@ class CellContextTest {
             val decoded = context.decode(augmented)
 
             assertEquals(
-                Sample(booleanArrayOf(true), longArrayOf(1), doubleArrayOf(third.toDouble()),
+                Sample(
+                    booleanArrayOf(true),
+                    longArrayOf(1),
+                    doubleArrayOf(third.toDouble()),
                     exactReals = if (exact) listOf(third) else null,
-                    exactInts = if (exact) listOf(bigIntOf(1)) else null),
+                    exactInts = if (exact) listOf(bigIntOf(1)) else null,
+                ),
                 decoded,
             )
             assertNull(decoded.witnessCertificate)
@@ -61,17 +70,35 @@ class CellContextTest {
     }
 
     @Test
-    fun `hashed mixed cells preserve source valid real witnesses`() {
+    fun `hashed mixed cells should preserve source valid real witnesses`() {
         val model = Problem(
-            1, 1, arrayOf(IntDomain(0, 1)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 1)),
             arrayOf(
                 Clause(intArrayOf(Lit.make(0, true))),
-                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
-                    doubleArrayOf(3.0), LinearOp.LE, 0.0),
-                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
-                    doubleArrayOf(3.0), LinearOp.GE, 0.0),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(0),
+                    doubleArrayOf(-1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.LE,
+                    0.0,
+                ),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(0),
+                    doubleArrayOf(-1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.GE,
+                    0.0,
+                ),
             ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         ).bake()
         val context = CellContext.resolve(model, intArrayOf(), intArrayOf(0))
         val hash = Xor(intArrayOf(Lit.make(context.hashDomain.single(), true)), 1)
@@ -87,7 +114,7 @@ class CellContextTest {
     }
 
     @Test
-    fun `a hashed cell caps distinct projections rather than full witnesses`() {
+    fun `hashed cell should cap distinct projections rather than full witnesses`() {
         val model = Problem(5, 0, emptyArray<IntDomain>(), emptyArray()).bake()
         val context = CellContext.resolve(model, intArrayOf(0, 1), null)
         val hash = Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true)), 0)
@@ -100,9 +127,11 @@ class CellContextTest {
     }
 
     @Test
-    fun `mixed projections match direct integer and Boolean semantics`() {
+    fun `mixed projections should match direct integer and Boolean semantics`() {
         val model = Problem(
-            2, 2, Array(2) { IntDomain(0, 2) },
+            2,
+            2,
+            Array(2) { IntDomain(0, 2) },
             arrayOf(
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 2),
             ),
@@ -118,7 +147,7 @@ class CellContextTest {
     }
 
     @Test
-    fun `a distinct projection cap supplies a lower bound without claiming exhaustion`() {
+    fun `distinct projection cap should supply a lower bound without claiming exhaustion`() {
         val model = Problem(4, 0, emptyArray<IntDomain>(), emptyArray()).bake()
         val context = CellContext.resolve(model, intArrayOf(0, 1), null)
 
@@ -130,7 +159,7 @@ class CellContextTest {
     }
 
     @Test
-    fun `the largest integer cap permits a complete small cell`() {
+    fun `largest integer cap should permit a complete small cell`() {
         val model = Problem(1, 0, emptyArray<IntDomain>(), emptyArray()).bake()
         val context = CellContext.resolve(model, intArrayOf(0), null)
 
@@ -142,7 +171,7 @@ class CellContextTest {
     }
 
     @Test
-    fun `an interrupted projected cell cannot be treated as exact`() {
+    fun `interrupted projected cell should not be treated as exact`() {
         val model = Problem(4, 0, emptyArray<IntDomain>(), emptyArray()).bake()
         val context = CellContext.resolve(model, intArrayOf(0, 1), null)
 
@@ -153,7 +182,7 @@ class CellContextTest {
     }
 
     @Test
-    fun `the empty projection has one representative when any source witness exists`() {
+    fun `empty projection should have one representative when any source witness exists`() {
         val model = Problem(4, 0, emptyArray<IntDomain>(), emptyArray()).bake()
         val context = CellContext.resolve(model, intArrayOf(), intArrayOf())
 

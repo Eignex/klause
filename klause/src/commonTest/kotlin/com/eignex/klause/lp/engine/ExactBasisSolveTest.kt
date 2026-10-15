@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class ExactBasisSolveTest {
     @Test
-    fun `basis reconstruction preserves nonsymmetric source equations`() {
+    fun `basis reconstruction should preserve nonsymmetric source equations`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 10L)
             val y = addVar(0L, 10L)
@@ -30,7 +30,7 @@ class ExactBasisSolveTest {
     }
 
     @Test
-    fun `strict boundaries fail both point and basis acceptance`() {
+    fun `strict boundaries should fail both point and basis acceptance`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 1.0, strict = true)
@@ -44,7 +44,7 @@ class ExactBasisSolveTest {
     }
 
     @Test
-    fun `fractional nonbasic upper is seated exactly`() {
+    fun `a fractional nonbasic upper bound should be seated exactly`() {
         val model = LpBuilder().apply { addRealVar(0.0, 0.5) }.build(Sense.MINIMIZE)
         val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_UPPER))
 
@@ -54,7 +54,7 @@ class ExactBasisSolveTest {
     }
 
     @Test
-    fun `malformed declarations decline before basis solving`() {
+    fun `malformed declarations should decline before basis solving`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 2L)
             addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
@@ -74,7 +74,7 @@ class ExactBasisSolveTest {
     }
 
     @Test
-    fun `large determinant does not prevent exact basis verification`() {
+    fun `a large determinant should not prevent exact basis verification`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 1L)
             val y = addVar(0L, 1L)
@@ -89,5 +89,4 @@ class ExactBasisSolveTest {
         assertNotNull(verifyExactBasis(model, basis).witness)
         assertNotNull(verifyExactBasis(model, basis).witness)
     }
-
 }

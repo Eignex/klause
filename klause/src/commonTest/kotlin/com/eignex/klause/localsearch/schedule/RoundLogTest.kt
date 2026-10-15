@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class RoundLogTest {
 
     @Test
-    fun `accumulator computes mean and population variance of the cost deltas`() {
+    fun `accumulator should compute mean and population variance of the cost deltas`() {
         val acc = RoundAccumulator()
         // deltas 2, 4, 4, 4, 5, 5, 7, 9: mean 5, population variance 4.
         for (d in listOf(2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0)) acc.record(d, accepted = true)
@@ -18,7 +18,7 @@ class RoundLogTest {
     }
 
     @Test
-    fun `clear resets the accumulator for the next round`() {
+    fun `clear should reset the accumulator for the next round`() {
         val acc = RoundAccumulator()
         acc.record(1.0, accepted = true)
         acc.observeCost(1.0)
@@ -31,14 +31,14 @@ class RoundLogTest {
     }
 
     @Test
-    fun `round log rejects inconsistent counts`() {
+    fun `round log should reject inconsistent counts`() {
         assertFailsWith<IllegalArgumentException> { RoundLog(2, 3, 0.0, 0.0, 0.0, 1.0) }
         assertFailsWith<IllegalArgumentException> { RoundLog(-1, 0, 0.0, 0.0, 0.0, 1.0) }
         assertFailsWith<IllegalArgumentException> { RoundLog(2, 1, 0.0, -1.0, 0.0, 1.0) }
     }
 
     @Test
-    fun `variance stays accurate over a long round`() {
+    fun `variance should stay accurate over a long round`() {
         val acc = RoundAccumulator()
         // Alternating 0 and 100 over many samples: mean 50, population variance 2500.
         repeat(10_000) { acc.record(if (it % 2 == 0) 0.0 else 100.0, accepted = it % 2 == 0) }

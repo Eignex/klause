@@ -33,7 +33,7 @@ class ProblemProfileTest {
     )
 
     @Test
-    fun `each model shape falls in its class`() {
+    fun `classOf should classify each model shape`() {
         val openUpper = Bits(2).also { it.set(1) }
         val cases = listOf(
             "clauses" to Problem(
@@ -72,13 +72,13 @@ class ProblemProfileTest {
     }
 
     @Test
-    fun `a domain past the 32-bit range marks the model wide`() {
+    fun `profile should be wide when a domain exceeds Int range`() {
         assertTrue(ProblemProfile.of(ints(row, hi = Int.MAX_VALUE + 1L), optimizing = false).wide)
         assertFalse(ProblemProfile.of(ints(row), optimizing = false).wide)
     }
 
     @Test
-    fun `a cumulative constraint marks the model scheduling`() {
+    fun `profile should be scheduling when a cumulative constraint is present`() {
         val cumulative = Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), capacity = 1)
 
         assertTrue(ProblemProfile.of(ints(cumulative), optimizing = true).scheduling)

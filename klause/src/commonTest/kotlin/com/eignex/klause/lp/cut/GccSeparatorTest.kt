@@ -26,12 +26,18 @@ import kotlin.test.assertTrue
 class GccSeparatorTest {
 
     @Test
-    fun `local gcc cuts retain occurrence bounds until their scope is popped`() {
+    fun `local gcc cuts should retain occurrence bounds until their scope is popped`() {
         val factor = GlobalCardinality(
-            xs = intArrayOf(0, 1), cover = longArrayOf(0, 1), countVars = intArrayOf(2, 3), closed = true,
+            xs = intArrayOf(0, 1),
+            cover = longArrayOf(0, 1),
+            countVars = intArrayOf(2, 3),
+            closed = true,
         )
         val problem = Problem(
-            0, 4, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 2)), arrayOf(factor),
+            0,
+            4,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(factor),
         )
         val session = PropagationSession(problem)
         session.pinIntAtMost(2, 0)
@@ -40,7 +46,9 @@ class GccSeparatorTest {
         val cut = GccSeparator().separate(context).single()
         val source = assertNotNull(SourceCut.fromCut(cut, relaxation).orNull())
         val guard = CutPremise.Bound(
-            CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 2) to BigFraction.ONE)), true, BigFraction.ZERO,
+            CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 2) to BigFraction.ONE)),
+            true,
+            BigFraction.ZERO,
         )
         val map = assertNotNull(relaxation.sourceMap)
 
@@ -51,11 +59,6 @@ class GccSeparatorTest {
         assertNull(source.toCut(map.withCpBounds(relaxation.model, session)).orNull())
     }
 
-    /**
-     * Separate the GCC cut at the LP vertex chosen by [coef]: with no GCC rows in the relaxation each
-     * column seats at the cost-favoured bound, so `coef = -1` maximizes `Σx` (violates the upper cut)
-     * and `coef = +1` minimizes it (violates the lower cut).
-     */
     private fun cuts(factor: GlobalCardinality, hi: Int, coef: Long): List<Cut> {
         val n = factor.xs.size
         val p = Problem(0, n, Array(n) { IntDomain(0, hi.toLong()) }, arrayOf<Factor>(factor))
@@ -70,10 +73,8 @@ class GccSeparatorTest {
     private fun upper(factor: GlobalCardinality, hi: Int) = cuts(factor, hi, -1L).single { it.rel == Relation.LE }.rhs
 
     @Test
-    fun `cut bounds the sum by the occurrence-capped distribution`() {
-        // 6 vars over cover {0,1,2}, each value used in [1,3] times: forced 0+1+2 = 3, then 3 free
-        // slots. Each value's residual capacity is high−low = 2, so min fills value 0 (×2) then value 1
-        // (×1) = 3+1 = 4; max fills value 2 (×2) then value 1 (×1) = 3+4+1 = 8.
+    fun `gcc cut should bound the sum by the occurrence-capped distribution`() {
+        // Min fills 0+1+2 then 0, 0, 1 = 4; max fills 0+1+2 then 2, 2, 1 = 8.
         val gcc = GlobalCardinality(
             xs = intArrayOf(0, 1, 2, 3, 4, 5),
             cover = longArrayOf(0, 1, 2),
@@ -86,7 +87,7 @@ class GccSeparatorTest {
     }
 
     @Test
-    fun `open gcc is not separated`() {
+    fun `open gcc should not be separated`() {
         val gcc = GlobalCardinality(
             xs = intArrayOf(0, 1, 2),
             cover = longArrayOf(1, 2),

@@ -12,23 +12,23 @@ class IncumbentExchangeConcurrencyTest {
     private val perArm = 200
 
     @Test
-    fun `concurrent publishers each install a distinct version`() {
+    fun `concurrent publishers should each install a distinct version`() {
         val exchange = IncumbentExchange.minimizing<Int>()
         val installed = ConcurrentLinkedQueue<Long>()
         runArms { arm -> publishDescending(exchange, arm) { installed += it.incumbent.version } }
-        assertEquals(installed.size, installed.toSet().size, "no version is installed twice")
-        assertEquals(installed.max(), exchange.current()?.version, "the last version installed is the one standing")
+        assertEquals(installed.size, installed.toSet().size)
+        assertEquals(installed.max(), exchange.current()?.version)
     }
 
     @Test
-    fun `concurrent publishers converge on the best offer`() {
+    fun `concurrent publishers should converge on the best offer`() {
         val exchange = IncumbentExchange.minimizing<Int>()
         runArms { arm -> publishDescending(exchange, arm) {} }
-        assertEquals(1.0, exchange.current()?.objective, "the lowest objective offered by any arm stands")
+        assertEquals(1.0, exchange.current()?.objective)
     }
 
     @Test
-    fun `an incumbent's assignment always matches its objective`() {
+    fun `incumbent assignment should always match its objective`() {
         val exchange = IncumbentExchange.minimizing<Int>()
         val mismatched = ConcurrentLinkedQueue<String>()
         runArms { arm ->
@@ -38,10 +38,9 @@ class IncumbentExchangeConcurrencyTest {
                 mismatched += "${standing.assignment}/${standing.objective}"
             }
         }
-        assertTrue(mismatched.isEmpty(), "assignment and objective must swap together, saw $mismatched")
+        assertTrue(mismatched.isEmpty(), "mismatched: $mismatched")
     }
 
-    /** Offer a strictly descending series ending at 1.0, tagging each assignment with its own objective. */
     private fun publishDescending(
         exchange: IncumbentExchange<Int, Double>,
         arm: Int,
@@ -56,7 +55,6 @@ class IncumbentExchangeConcurrencyTest {
         if (last is Publication.Installed) onInstalled(last)
     }
 
-    /** Run [body] on [arms] threads released together, and join them. */
     private fun runArms(body: (Int) -> Unit) {
         val barrier = CyclicBarrier(arms)
         val threads = List(arms) { arm ->

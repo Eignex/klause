@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class OrLibraryTest {
     @Test
-    fun `a set covering instance covers each row at least once`() {
+    fun `a set covering instance should cover each row at least once`() {
         val (name, mps) = OrLibrary.setCovering("scp0", "2 3\n1 2 3\n2 1 2\n1 3\n").single()
 
         assertEquals("scp0", name)
@@ -15,7 +15,7 @@ class OrLibraryTest {
     }
 
     @Test
-    fun `a generalised assignment file yields one maximised model per problem`() {
+    fun `a generalised assignment file should yield one maximised model per problem`() {
         val text = "2\n1 2\n5 6\n1 1\n2\n1 1\n7\n3\n4\n"
 
         val models = OrLibrary.generalisedAssignment("gap0", text)
@@ -25,7 +25,7 @@ class OrLibraryTest {
     }
 
     @Test
-    fun `a bin packing model has a tenth spare bins above the best known count`() {
+    fun `a bin packing model should have a tenth spare bins above the best known count`() {
         val text = "1\nu0\n10 20 10\n" + List(20) { "5" }.joinToString(" ")
 
         val mps = OrLibrary.binPacking("binpack0", text).single().second
@@ -34,7 +34,7 @@ class OrLibraryTest {
     }
 
     @Test
-    fun `a converted model reads back as MPS`() {
+    fun `a converted model should read back as MPS`() {
         val mps = OrLibrary.multidimensionalKnapsack("mknap0", "1\n2 1 0\n3 4\n1 2\n2\n").single().second
 
         val model = Mps.parse(mps)

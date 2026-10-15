@@ -11,7 +11,7 @@ import kotlin.test.assertIs
 
 class LocalSearchRunTest {
     @Test
-    fun `an incumbent consumer failure closes the walk and releases the solver`() {
+    fun `an incumbent consumer failure should close the walk and release the solver`() {
         val solver = LocalSearchSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
         val params = LocalSearchParams(maxFlips = 1L, randomSeed = 7L)
         val walk = solver.resumable(LinearObjective(), params)

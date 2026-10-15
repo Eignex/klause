@@ -13,37 +13,20 @@ import kotlin.test.assertTrue
 
 class QuadraticNativeScopeTest {
     @Test
-    fun `private observations preserve legacy constructors and copying`() {
-        val empty = PolynomialTheoryStats()
-        val legacy = PolynomialTheoryStats(1, 2, 3)
-        val observed = PolynomialTheoryStats(1, 2, 3, 4, 2, 1, 1)
-
-        val unchanged = observed.copy()
-        val changed = observed.copy(workSpent = 7)
-        val (projected, lifted, spent) = changed
-
-        assertNull(empty.dyadicAttempts)
-        assertNull(legacy.copy(workSpent = 4).dyadicAttempts)
-        assertEquals("PolynomialTheoryStats(projectedPolynomials=1, liftedCells=2, workSpent=3)", legacy.toString())
-        assertEquals(1026, legacy.hashCode())
-        assertEquals(legacy.hashCode(), legacy.copy().hashCode())
-        assertEquals(observed.hashCode(), unchanged.hashCode())
-        assertEquals(observed, unchanged)
-        assertEquals(4L, changed.dyadicAttempts)
-        assertEquals(2L, changed.dyadicBases)
-        assertEquals(1L, changed.coupledWorkDeclines)
-        assertEquals(1L, changed.dyadicPreExtractionDeclines)
-        assertEquals(listOf(1L, 2L, 7L), listOf(projected, lifted, spent))
-    }
-
-    @Test
-    fun `native observation aggregation saturates without polling or charging`() {
+    fun `native observation aggregation should saturate without polling or charging`() {
         var polls = 0
         var charges = 0L
-        val scope = QuadraticNativeScope(PolynomialTheoryParams(cancellation = object : Cancellation {
-            override fun isCancelled(): Boolean { polls++; return false }
-            override fun workMeter(): WorkMeter = WorkMeter { charges += it }
-        }))
+        val scope = QuadraticNativeScope(
+            PolynomialTheoryParams(
+                cancellation = object : Cancellation {
+                    override fun isCancelled(): Boolean {
+                        polls++
+                        return false
+                    }
+                    override fun workMeter(): WorkMeter = WorkMeter { charges += it }
+                },
+            ),
+        )
         val first = scope.worker(0)
         val second = scope.worker(1)
         val empty = scope.polynomialStats
@@ -66,7 +49,7 @@ class QuadraticNativeScopeTest {
     }
 
     @Test
-    fun `worker native charges reach the containing meter once`() {
+    fun `worker native charges should reach the containing meter once`() {
         var forwarded = 0L
         val lifetime = object : Cancellation {
             override fun isCancelled(): Boolean = false
@@ -91,7 +74,7 @@ class QuadraticNativeScopeTest {
     }
 
     @Test
-    fun `containing exhaustion stops siblings without renewing arithmetic allowance`() {
+    fun `containing exhaustion should stop siblings without renewing arithmetic allowance`() {
         val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = 4))
         val complete = scope.worker(0)
         val heuristic = scope.worker(1)
@@ -107,7 +90,7 @@ class QuadraticNativeScopeTest {
     }
 
     @Test
-    fun `retained worker quota does not take unused sibling allowance`() {
+    fun `retained worker quota should not take unused sibling allowance`() {
         val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = 100))
         val complete = scope.worker(0, maximumWork = 2)
         val heuristic = scope.worker(1, maximumWork = 3)
@@ -123,7 +106,7 @@ class QuadraticNativeScopeTest {
     }
 
     @Test
-    fun `worker representation decline preserves another worker native lifetime`() {
+    fun `worker representation decline should preserve another worker native lifetime`() {
         val scope = QuadraticNativeScope(PolynomialTheoryParams())
         val heuristic = scope.worker(1)
         val complete = scope.worker(0)

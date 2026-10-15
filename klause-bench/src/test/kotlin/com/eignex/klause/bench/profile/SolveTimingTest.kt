@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class SolveTimingTest {
     @Test
-    fun `times each repeat of a smoke problem into timings json`() {
+    fun `solve timing should record each repeat of a smoke problem into timings json`() {
         val out = createTempDirectory("solve-timing").toFile()
         try {
             val timings = SolveTiming.measure(listOf("suite=opb-core", "problem=sporttournament06", "repeats=2"), out)
@@ -24,7 +24,7 @@ class SolveTimingTest {
     }
 
     @Test
-    fun `rejects unknown problems and malformed arguments`() {
+    fun `solve timing should reject unknown problems and malformed arguments`() {
         val out = File("build/unused")
         assertFailsWith<IllegalStateException> { SolveTiming.measure(listOf("suite=opb-core", "problem=nope"), out) }
         assertFailsWith<IllegalArgumentException> { SolveTiming.measure(listOf("repeats=0"), out) }

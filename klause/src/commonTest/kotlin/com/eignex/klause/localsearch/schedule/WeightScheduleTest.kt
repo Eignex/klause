@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class WeightScheduleTest {
 
     @Test
-    fun `feasibility-jump config reproduces decay-then-bump bit for bit`() {
+    fun `feasibility-jump config should reproduce decay-then-bump bit for bit`() {
         val decay = 0.9
         val inc = 2.0
         val w = doubleArrayOf(5.0, 1.0, 3.0)
@@ -25,7 +25,7 @@ class WeightScheduleTest {
     }
 
     @Test
-    fun `cbls config reproduces bump-then-smooth toward the scaled seed`() {
+    fun `cbls config should reproduce bump-then-smooth toward the scaled seed`() {
         val smoothFactor = 0.8
         val baseWeight = 2.0
         val w = doubleArrayOf(5.0, 1.0)
@@ -47,7 +47,7 @@ class WeightScheduleTest {
     }
 
     @Test
-    fun `stall cadence bumps only after the configured number of non-improving steps`() {
+    fun `stall cadence should bump only after the configured number of non-improving steps`() {
         val ws = WeightSchedule(bumpAfter = 3, increment = 1.0) // relaxKeep 1.0 → no relax
         val w = doubleArrayOf(0.0)
         val base = doubleArrayOf(0.0)
@@ -61,7 +61,7 @@ class WeightScheduleTest {
     }
 
     @Test
-    fun `integer cost drops take precedence over fractional increases`() {
+    fun `integer cost drops should take precedence over fractional increases`() {
         val ws = WeightSchedule(bumpAfter = 1)
         val w = doubleArrayOf(1.0)
         val cost = 9007199254740993L
@@ -74,7 +74,7 @@ class WeightScheduleTest {
     }
 
     @Test
-    fun `fractional feedback re-anchors on restart and reset`() {
+    fun `fractional feedback should re-anchor on restart and reset`() {
         for (reset in listOf(false, true)) {
             val ws = WeightSchedule(bumpAfter = 1)
             val w = doubleArrayOf(1.0)
@@ -90,7 +90,7 @@ class WeightScheduleTest {
     }
 
     @Test
-    fun `a rewound step re-anchors the trackers without bumping`() {
+    fun `a rewound step should re-anchor the trackers without bumping`() {
         val ws = WeightSchedule(bumpAfter = 1, increment = 1.0)
         val w = doubleArrayOf(0.0)
         val base = doubleArrayOf(0.0)

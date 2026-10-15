@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class MutableIntObjectMapTest {
 
     @Test
-    fun `put overwrites existing key without growing size`() {
+    fun `put should overwrite an existing key without growing size`() {
         val m = MutableIntObjectMap<String>()
         m.put(5, "a")
         m.put(5, "b")
@@ -18,7 +18,7 @@ class MutableIntObjectMapTest {
     }
 
     @Test
-    fun `getOrPut inserts once and reuses thereafter`() {
+    fun `getOrPut should insert once and reuse thereafter`() {
         val m = MutableIntObjectMap<MutableList<Int>>()
         m.getOrPut(3) { mutableListOf() }.add(1)
         m.getOrPut(3) { mutableListOf() }.add(2)
@@ -27,7 +27,7 @@ class MutableIntObjectMapTest {
     }
 
     @Test
-    fun `extreme keys and zero coexist`() {
+    fun `extreme keys and zero should coexist`() {
         val m = MutableIntObjectMap<Int>()
         m.put(Int.MIN_VALUE, 1)
         m.put(Int.MAX_VALUE, 2)
@@ -39,7 +39,7 @@ class MutableIntObjectMapTest {
     }
 
     @Test
-    fun `remove deletes and leaves other entries findable across collisions`() {
+    fun `remove should keep other entries findable across collisions`() {
         val m = MutableIntObjectMap<Int>(4)
         for (k in 0 until 50) m.put(k, k * k)
         for (k in 0 until 50 step 3) assertTrue(m.remove(k))
@@ -54,7 +54,7 @@ class MutableIntObjectMapTest {
     }
 
     @Test
-    fun `clear empties and the map is reusable`() {
+    fun `clear should empty the map and keep it reusable`() {
         val m = MutableIntObjectMap<Int>()
         for (k in 0 until 30) m.put(k, k)
         m.clear()
@@ -66,11 +66,10 @@ class MutableIntObjectMapTest {
     }
 
     @Test
-    fun `growth preserves all entries`() {
+    fun `growth should preserve all entries`() {
         val m = MutableIntObjectMap<Int>(8)
         for (k in 0 until 1000) m.put(k * 7, k)
         assertEquals(1000, m.size)
         for (k in 0 until 1000) assertEquals(k, m[k * 7])
     }
-
 }

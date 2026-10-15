@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class ConflictOrderingTest {
 
     @Test
-    fun `COS picks the most recently conflicting var`() {
+    fun `COS should pick the most recently conflicting var`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -29,7 +29,7 @@ class ConflictOrderingTest {
     }
 
     @Test
-    fun `COS replays conflict order in reverse after a pin removes the top`() {
+    fun `COS should replay conflict order in reverse after a pin removes the top`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -41,13 +41,12 @@ class ConflictOrderingTest {
         cos.onConflict(VarRef.IntVar(0))
         cos.onConflict(VarRef.IntVar(2))
         cos.onConflict(VarRef.IntVar(1))
-        // Pin var 1; pick should now return var 2 (next-most-recent).
         session.pinInt(1, 0)
         assertEquals(VarRef.IntVar(2), cos.pick(session, Random(0L)))
     }
 
     @Test
-    fun `COS stamps conflict-graph vars from unsat reason`() {
+    fun `COS should stamp conflict-graph vars from the unsat reason`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -58,7 +57,6 @@ class ConflictOrderingTest {
         val cos = ConflictOrdering(InputOrder)
         val unsat = PropagationResult.Unsat(conflictInts = intArrayOf(0, 2, 3))
         cos.onConflict(VarRef.IntVar(3), unsat)
-        // Pin var 3 and verify pick returns one of {0, 2} (stamped via unsat reason set).
         session.pinInt(3, 0)
         val picked = cos.pick(session, Random(0L))
         assertTrue(

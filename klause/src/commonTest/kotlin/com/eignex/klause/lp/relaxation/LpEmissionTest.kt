@@ -18,9 +18,11 @@ import kotlin.test.assertTrue
 
 class LpEmissionTest {
     @Test
-    fun `repeated edits in one scope restore the enclosing emission on nested pops`() {
+    fun `emission cache should restore the enclosing emission on nested retracts`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 10)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8)),
         )
         val rootDomain = problem.finiteIntDomain(0)
@@ -51,12 +53,20 @@ class LpEmissionTest {
     }
 
     @Test
-    fun `a stale prepared emission cannot overwrite a later publication`() {
+    fun `stale prepared emission should fail to overwrite a later publication`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 10)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(
                 ReifiedRealLinear(
-                    0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(), doubleArrayOf(), LinearOp.GE, 8.0,
+                    0,
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    LinearOp.GE,
+                    8.0,
                 ),
             ),
         )
@@ -79,9 +89,11 @@ class LpEmissionTest {
     }
 
     @Test
-    fun `a changed live big M retains the exact fresh row and its premises`() {
+    fun `changed live big M should retain the exact fresh row and its premises`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 10)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8)),
         )
         var live = problem.finiteIntDomain(0)
@@ -104,9 +116,11 @@ class LpEmissionTest {
     }
 
     @Test
-    fun `a live reification invalidates only its own source region`() {
+    fun `live reification should invalidate only its own source region`() {
         val problem = Problem(
-            1, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+            1,
+            2,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
             arrayOf<Factor>(
                 ReifiedRealLinear(
                     0,
@@ -137,12 +151,20 @@ class LpEmissionTest {
     }
 
     @Test
-    fun `cancelled refresh leaves the published ancestor unchanged`() {
+    fun `cancelled refresh should leave the published ancestor unchanged`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 10)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(
                 ReifiedRealLinear(
-                    0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(), doubleArrayOf(), LinearOp.GE, 8.0,
+                    0,
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    LinearOp.GE,
+                    8.0,
                 ),
             ),
         )

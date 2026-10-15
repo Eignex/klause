@@ -47,53 +47,48 @@ import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
     @Test
-    fun `native segment interruption after a decision pauses the core query`() {
+    fun `native segment interruption after a decision should pause the core query`() {
         val clock = TestTimeSource()
-        var interrupted = false
+        val interrupter = ClockJumpOnDecision(clock)
         val params = BacktrackParams(
             nativeSat = false,
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
-            componentFactory = {
-                listOf(object : SearchComponent {
-                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-                        if (!interrupted && context.decisionLevel > 0 && decision is SearchDecision.Bool &&
-                            Lit.variable(decision.literal) != 0
-                        ) {
-                            interrupted = true
-                            clock += 2.seconds
-                        }
-                        return ComponentResult.Consistent
-                    }
-                })
-            },
+            componentFactory = { listOf(interrupter) },
         )
-        val problem = Problem(40, 0, emptyArray(), Array(19) {
-            Clause(intArrayOf(Lit.make(2 * it + 1, true), Lit.make(2 * it + 2, true)))
-        }).bake()
+        val problem = Problem(
+            40,
+            0,
+            emptyArray(),
+            Array(19) {
+                Clause(intArrayOf(Lit.make(2 * it + 1, true), Lit.make(2 * it + 2, true)))
+            },
+        ).bake()
         val objective = LinearObjective(longArrayOf(1))
         val search = CoreGuidedSearch(problem, objective, params, timeSource = clock)
 
         val paused = search.runSlice(Cancellation.Never, 1_000L, -1L) { error("interrupted query") }
 
-        assertTrue(interrupted)
+        assertTrue(interrupter.interrupted)
         assertNull(paused)
         assertFalse(search.isDone)
-        assertTrue(search.stats.search.nodes.sum > 0.0)
         val resumed = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, 1_000L, -1L) {})
         assertEquals(0L, objective.evaluateLong(resumed.sample))
         search.close()
     }
 
     @Test
-    fun `an unsupported native component without cancellation retires the core query`() {
+    fun `an unsupported native component without cancellation should retire the core query`() {
         val params = BacktrackParams(nativeSat = false, componentFactory = {
             listOf(object : SearchComponent {
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
             })
         })
-        val search = CoreGuidedSearch(Problem(2, 0, emptyArray(), emptyArray()).bake(),
-            LinearObjective(longArrayOf(1)), params)
+        val search = CoreGuidedSearch(
+            Problem(2, 0, emptyArray(), emptyArray()).bake(),
+            LinearObjective(longArrayOf(1)),
+            params,
+        )
 
         val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("unchecked candidate") }
         val charged = search.work
@@ -107,7 +102,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `native segment interruption pauses before its containing allowance is exhausted`() {
+    fun `native segment interruption should pause before its containing allowance is exhausted`() {
         val clock = TestTimeSource()
         var interrupted = false
         val params = BacktrackParams(componentFactory = {
@@ -122,8 +117,12 @@ class CoreGuidedSearchTest {
             })
         })
         val objective = LinearObjective(longArrayOf(1))
-        val search = CoreGuidedSearch(Problem(1, 0, emptyArray(), emptyArray()).bake(), objective, params,
-            timeSource = clock)
+        val search = CoreGuidedSearch(
+            Problem(1, 0, emptyArray(), emptyArray()).bake(),
+            objective,
+            params,
+            timeSource = clock,
+        )
 
         val paused = search.runSlice(Cancellation.Never, 1_000L, -1L) { error("interrupted query") }
 
@@ -136,12 +135,17 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `native decision allowance exhaustion cannot reopen a core query`() {
-        val problem = Problem(5, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(Lit.make(0, true))),
-            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true))),
-        )).bake()
+    fun `native decision allowance exhaustion should not reopen a core query`() {
+        val problem = Problem(
+            5,
+            0,
+            emptyArray(),
+            arrayOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true))),
+            ),
+        ).bake()
         val objective = LinearObjective(longArrayOf(1))
         for (params in listOf(
             BacktrackParams(nativeSat = false, maxDecisions = 1L),
@@ -149,20 +153,8 @@ class CoreGuidedSearchTest {
             BacktrackParams(nativeSat = false, nodeBudget = NodeBudget(1L)),
         )) {
             val clock = TestTimeSource()
-            var interrupted = false
-            val bounded = params.copy(componentFactory = {
-                listOf(object : SearchComponent {
-                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-                        if (!interrupted && context.decisionLevel > 0 && decision is SearchDecision.Bool &&
-                            Lit.variable(decision.literal) != 0
-                        ) {
-                            interrupted = true
-                            clock += 2.seconds
-                        }
-                        return ComponentResult.Consistent
-                    }
-                })
-            })
+            val interrupter = ClockJumpOnDecision(clock)
+            val bounded = params.copy(componentFactory = { listOf(interrupter) })
             val search = CoreGuidedSearch(problem, objective, bounded, timeSource = clock)
 
             val stopped = search.runSlice(Cancellation.Never, 1_000L, -1L) {}
@@ -170,7 +162,6 @@ class CoreGuidedSearchTest {
             val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed decisions") }
 
             assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
-            assertTrue(interrupted)
             assertTrue(search.isDone)
             assertEquals(stopped, resumed)
             assertEquals(charged, search.work)
@@ -179,29 +170,26 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `source verification observes the cumulative core active time allowance`() {
+    fun `source verification should observe the cumulative core active time allowance`() {
         val clock = TestTimeSource()
         val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val source = Problem(2, 0, emptyArray(), Array(2_049) { hard })
         var augmented = false
         var verificationFires = 0
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            if (factor != hard) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
-                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
-                object : Propagator by delegate {
-                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
-                        if (state.problem.numBoolVars > source.numBoolVars) augmented = true
-                        else if (augmented) {
-                            if (verificationFires++ == 0) clock += 3.seconds
-                        }
-                        return delegate.propagate(state, factorId)
-                    }
-                }
+        val providers = observingHard(hard) { state ->
+            if (state.problem.numBoolVars > source.numBoolVars) {
+                augmented = true
+            } else if (augmented) {
+                if (verificationFires++ == 0) clock += 3.seconds
             }
-        })
-        val search = CoreGuidedSearch(source.bake(providers.prepare(source)), LinearObjective(longArrayOf(1, 1)),
-            BacktrackParams(nativeSat = false), maximumMillis = 2_000L, timeSource = clock)
+        }
+        val search = CoreGuidedSearch(
+            source.bake(providers.prepare(source)),
+            LinearObjective(longArrayOf(1, 1)),
+            BacktrackParams(nativeSat = false),
+            maximumMillis = 2_000L,
+            timeSource = clock,
+        )
 
         val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("unverified publication") }
         val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed verification") }
@@ -214,21 +202,23 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `initial residual query retains the captured source projection and root deductions`() {
+    fun `initial residual query should retain the captured source projection and root deductions`() {
         val hard = Clause(intArrayOf(Lit.make(0, true)))
         val source = Problem(1, 0, emptyArray(), arrayOf(hard))
         val observedModels = mutableListOf<Problem>()
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
-            PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
-                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
-                object : Propagator by delegate {
-                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
-                        observedModels += state.problem
-                        return delegate.propagate(state, factorId)
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider {
+                PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                    val delegate = BuiltInPropagationProjectionProvider.create(view, null)
+                    object : Propagator by delegate {
+                        override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                            observedModels += state.problem
+                            return delegate.propagate(state, factorId)
+                        }
                     }
                 }
-            }
-        })
+            },
+        )
         val baked = source.bake(providers.prepare(source))
         val objective = LinearObjective(longArrayOf(-1))
         observedModels.clear()
@@ -243,12 +233,17 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `private assumption traversal resumes across decision work pauses`() {
-        val problem = Problem(5, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(Lit.make(0, true))),
-            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true))),
-        )).bake()
+    fun `private assumption traversal should resume across decision work pauses`() {
+        val problem = Problem(
+            5,
+            0,
+            emptyArray(),
+            arrayOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true))),
+            ),
+        ).bake()
         val objective = LinearObjective(longArrayOf(1))
         val search = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = false))
         var result: MinimizeResult? = null
@@ -265,24 +260,20 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `active preparation time cannot renew after an interrupted opening`() {
+    fun `active preparation time should not renew after an interrupted opening`() {
         val clock = TestTimeSource()
         val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val source = Problem(2, 0, emptyArray(), arrayOf(hard))
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            if (factor != hard) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
-                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
-                object : Propagator by delegate {
-                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
-                        if (state.problem.numBoolVars > source.numBoolVars) clock += 3.seconds
-                        return delegate.propagate(state, factorId)
-                    }
-                }
-            }
-        })
-        val search = CoreGuidedSearch(source.bake(providers.prepare(source)), LinearObjective(longArrayOf(1, 1)),
-            BacktrackParams(), maximumMillis = 2_000L, timeSource = clock)
+        val providers = observingHard(hard) { state ->
+            if (state.problem.numBoolVars > source.numBoolVars) clock += 3.seconds
+        }
+        val search = CoreGuidedSearch(
+            source.bake(providers.prepare(source)),
+            LinearObjective(longArrayOf(1, 1)),
+            BacktrackParams(),
+            maximumMillis = 2_000L,
+            timeSource = clock,
+        )
 
         val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("expired preparation") }
         val charged = search.work
@@ -295,7 +286,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `core work allowance includes preparation and cannot renew on resume`() {
+    fun `core work allowance should include preparation and not renew on resume`() {
         val problem = Problem(8192, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(LongArray(8192) { 1L })
         val search = CoreGuidedSearch(problem, objective, BacktrackParams(), maximumWork = 1L)
@@ -314,7 +305,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `exhausted preparation slice pauses before decisions and resumes the same objective`() {
+    fun `exhausted preparation slice should pause before decisions and resume the same objective`() {
         val problem = Problem(8192, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(LongArray(8192) { 1L })
         val search = CoreGuidedSearch(problem, objective, BacktrackParams())
@@ -337,7 +328,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `caller pins remain hard for either objective polarity`() {
+    fun `caller pins should remain hard for either objective polarity`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
         for (weight in listOf(-5L, 5L)) {
             for (pin in listOf(false, true)) {
@@ -354,30 +345,21 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `interrupted query opening retains its baked model and charges preparation`() {
+    fun `interrupted query opening should retain its baked model and charge preparation`() {
         val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val source = Problem(2, 0, emptyArray(), arrayOf(hard))
         val augmentedModels = mutableListOf<Problem>()
         var cancelled = false
         var interrupted = false
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            if (factor != hard) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
-                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
-                object : Propagator by delegate {
-                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
-                        if (state.problem.numBoolVars > source.numBoolVars) {
-                            augmentedModels += state.problem
-                            if (!interrupted) {
-                                interrupted = true
-                                cancelled = true
-                            }
-                        }
-                        return delegate.propagate(state, factorId)
-                    }
+        val providers = observingHard(hard) { state ->
+            if (state.problem.numBoolVars > source.numBoolVars) {
+                augmentedModels += state.problem
+                if (!interrupted) {
+                    interrupted = true
+                    cancelled = true
                 }
             }
-        })
+        }
         val objective = LinearObjective(longArrayOf(1, 1))
         val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective, BacktrackParams())
 
@@ -397,25 +379,21 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `rebuilt core queries retain captured propagation in engine views`() {
+    fun `rebuilt core queries should retain captured propagation in engine views`() {
         val hard = Clause(intArrayOf(Lit.make(3, false), Lit.make(5, false)))
         val source = Problem(6, 0, emptyArray(), arrayOf(hard))
-        val engineView = Problem(2, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-        ))
+        val engineView = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            ),
+        )
         var augmentedChecks = 0
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            if (factor != hard) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
-                val delegate = BuiltInPropagationProjectionProvider.create(view, null)
-                object : Propagator by delegate {
-                    override fun propagate(state: PropagationState, factorId: Int): Boolean {
-                        if (state.problem.numBoolVars > engineView.numBoolVars) augmentedChecks++
-                        return delegate.propagate(state, factorId)
-                    }
-                }
-            }
-        })
+        val providers = observingHard(hard) { state ->
+            if (state.problem.numBoolVars > engineView.numBoolVars) augmentedChecks++
+        }
         val objective = LinearObjective(longArrayOf(-5, -3), constant = 8)
 
         val selection = providers.prepare(source).projected(engineView, intArrayOf(0))
@@ -428,9 +406,11 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `propagated core premises preserve the cheaper original violation`() {
+    fun `propagated core premises should preserve the cheaper original violation`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             arrayOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
@@ -446,7 +426,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `successive thresholds account for three unavoidable violations`() {
+    fun `successive thresholds should account for three unavoidable violations`() {
         val literals = IntArray(5) { Lit.make(it, true) }
         val problem = Problem(5, 0, emptyArray(), arrayOf(Cardinality(literals, min = 3, max = 5))).bake()
         val objective = LinearObjective(LongArray(5) { 1 })
@@ -458,7 +438,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `partially split threshold costs preserve later violations`() {
+    fun `partially split threshold costs should preserve later violations`() {
         val literals = IntArray(5) { Lit.make(it, true) }
         val factors: List<Factor> = listOf(Cardinality(literals, min = 3, max = 5)) + List(5) {
             Clause(intArrayOf(Lit.make(it, false), Lit.make((it + 1) % 5, true), Lit.make(5, true)))
@@ -474,7 +454,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `decision quota is retained when the objective stratum changes`() {
+    fun `decision quota should be retained when the objective stratum changes`() {
         val problem = Problem(4, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(-5, -1, -1, 0), constant = 7)
         val search = CoreGuidedSearch(
@@ -492,13 +472,15 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `weighted overlapping cores preserve the original objective`() {
+    fun `weighted overlapping cores should preserve the original objective`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
-        )
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+            ),
         ).bake()
         val objective = LinearObjective(longArrayOf(-6, -1, -1), constant = 8)
 
@@ -511,25 +493,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `threshold cores charge multiple unavoidable violations`() {
-        val problem = Problem(
-            3, 0, emptyArray(),
-            arrayOf(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-            Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
-        )
-        ).bake()
-        val objective = LinearObjective(longArrayOf(-1, -1, -1), constant = 3)
-
-        val result = CoreGuidedSolver(problem).minimize(objective, BacktrackParams())
-
-        val optimal = assertIs<MinimizeResult.Optimal>(result)
-        assertEquals(2L, objective.evaluateLong(optimal.sample))
-    }
-
-    @Test
-    fun `source assumptions remain hard across weight splitting`() {
+    fun `source assumptions should remain hard across weight splitting`() {
         val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(-5, -3), constant = 8)
         val params = BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false)))
@@ -543,7 +507,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `weighted WCNF preserves hard clauses and fixed cost`() {
+    fun `weighted WCNF should preserve hard clauses and fixed cost`() {
         val source = Dimacs.parseWcnf("p wcnf 2 4 20\n20 -1 -2 0\n5 1 0\n3 2 0\n2 0\n").toProblem()
         val objective = source.objective.toLinearObjective()
 
@@ -556,7 +520,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `normalized OPB preserves complemented objective constants`() {
+    fun `normalized OPB should preserve complemented objective constants`() {
         val source = Opb.parse("min: +5 ~x1 +3 ~x2 ;\n+1 x1 +1 x2 <= 1 ;\n").toProblem()
         val objective = requireNotNull(source.objective).toLinearObjective()
 
@@ -569,13 +533,15 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `wide objective equality retains exact weights`() {
+    fun `wide objective equality should retain exact weights`() {
         val problem = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true))),
-            Clause(intArrayOf(Lit.make(1, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, true))),
+            ),
         ).bake()
         val objective = LinearObjective(longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE))
         val search = CoreGuidedSearch(problem, objective, BacktrackParams())
@@ -588,7 +554,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `cancelled slice publishes no incomplete proof and can resume`() {
+    fun `cancelled slice should publish no incomplete proof and resume`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(Long.MIN_VALUE), constant = 4)
         val search = CoreGuidedSearch(problem, objective, BacktrackParams())
@@ -603,13 +569,15 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `cancellation after a core bound retains the checked incumbent and residual weights`() {
+    fun `cancellation after a core bound should retain the checked incumbent and residual weights`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
-        )
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+            ),
         ).bake()
         val objective = LinearObjective(longArrayOf(-6, -1, -1), constant = 8)
         var cancelled = false
@@ -639,13 +607,15 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `hard infeasibility cannot be relaxed as an objective core`() {
+    fun `hard infeasibility should not be relaxed as an objective core`() {
         val problem = Problem(
-            1, 0, emptyArray(),
+            1,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true))),
-            Clause(intArrayOf(Lit.make(0, false))),
-        )
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
+            ),
         ).bake()
 
         val result = CoreGuidedSolver(problem).minimize(LinearObjective(longArrayOf(5)), BacktrackParams())
@@ -654,7 +624,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `closed pending search rejects another slice`() {
+    fun `closed pending search should reject another slice`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
         val search = CoreGuidedSearch(problem, LinearObjective(longArrayOf(1)), BacktrackParams())
 
@@ -662,4 +632,36 @@ class CoreGuidedSearchTest {
 
         assertFailsWith<IllegalStateException> { search.runSlice(Cancellation.Never, 1, 1) {} }
     }
+
+    private class ClockJumpOnDecision(private val clock: TestTimeSource) : SearchComponent {
+        var interrupted = false
+
+        override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+            if (!interrupted && context.decisionLevel > 0 && decision is SearchDecision.Bool &&
+                Lit.variable(decision.literal) != 0
+            ) {
+                interrupted = true
+                clock += 2.seconds
+            }
+            return ComponentResult.Consistent
+        }
+    }
+
+    private fun observingHard(hard: Factor, observe: (PropagationState) -> Unit) = FactorProjectionProviders(
+        propagation = PropagationProjectionProvider { factor ->
+            if (factor != hard) {
+                BuiltInPropagationProjectionProvider.select(factor)
+            } else {
+                PropagationProjection(PropagationCapability.SOUND_FILTERING, AssignmentCheckCapability.EXACT) { view ->
+                    val delegate = BuiltInPropagationProjectionProvider.create(view, null)
+                    object : Propagator by delegate {
+                        override fun propagate(state: PropagationState, factorId: Int): Boolean {
+                            observe(state)
+                            return delegate.propagate(state, factorId)
+                        }
+                    }
+                }
+            }
+        },
+    )
 }

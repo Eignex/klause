@@ -41,7 +41,9 @@ class CpLpAdapterRebuildTest {
             assertEquals(expectedAuthority.column(column), recentered.column(column), "column $column")
             if (column < expected.n) {
                 assertEquals(
-                    expectedAuthority.columnEntries(column), recentered.columnEntries(column), "matrix $column",
+                    expectedAuthority.columnEntries(column),
+                    recentered.columnEntries(column),
+                    "matrix $column",
                 )
             }
         }
@@ -53,10 +55,7 @@ class CpLpAdapterRebuildTest {
     }
 
     @Test
-    fun `the adapter reproduces a per-node rebuild bit-for-bit`() {
-        // x0 + 2·x1 + 3·x2 ≥ 5 over [0,10], minimize x0 + x1 + x2 — a pure-linear, persistent-eligible
-        // relaxation. Build once from declared domains, then re-bind to a branch-tightened session and
-        // compare against a fresh build of that same session.
+    fun `adapter should reproduce a per-node rebuild bit for bit`() {
         val problem = Problem(
             0,
             3,
@@ -67,7 +66,7 @@ class CpLpAdapterRebuildTest {
         val relaxer = CpToLpRelaxation(problem, obj)
 
         val base = relaxer.build(PropagationSession(problem))
-        assertTrue(base.persistentEligible, "a pure-linear relaxation must be persistent-eligible")
+        assertTrue(base.persistentEligible)
 
         val node = PropagationSession(problem)
         node.implyIntAtLeast(0, 2)
@@ -79,9 +78,7 @@ class CpLpAdapterRebuildTest {
     }
 
     @Test
-    fun `a linear row over coefficients beyond Int range bounds soundly`() {
-        // 3e9·x >= 6e9 over x in [0,10], minimize x. The exact row carries Long coefficients into the
-        // relaxation, so the LP optimum is x = 2.
+    fun `adapter should bound soundly over coefficients beyond Int range`() {
         val problem = Problem(
             0,
             1,
@@ -92,14 +89,11 @@ class CpLpAdapterRebuildTest {
             .build(PropagationSession(problem))
         val sol = solveLp(r.model)
         assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-        assertEquals(2.0, sol.objectiveValue, 1e-6, "3e9·x >= 6e9 gives min x = 2")
+        assertEquals(2.0, sol.objectiveValue, 1e-6)
     }
 
     @Test
-    fun `the adapter reproduces a circuit arc relaxation when an arc is pruned`() {
-        // A 3-node circuit: arc columns are laid out from the declared domains and pinned live, so the
-        // relaxation is persistent-eligible. Pruning value 2 from succ[0] drops arc 0->2; re-binding
-        // must pin that arc column to 0 exactly as a per-node rebuild does.
+    fun `adapter should reproduce a circuit arc relaxation when an arc is pruned`() {
         val problem = Problem(
             0,
             3,
@@ -112,17 +106,15 @@ class CpLpAdapterRebuildTest {
             circuitArcs = true,
         )
         val base = relaxer.build(PropagationSession(problem))
-        assertTrue(base.persistentEligible, "a circuit arc relaxation must be persistent-eligible")
+        assertTrue(base.persistentEligible)
 
         val node = PropagationSession(problem)
-        node.implyIntAtMost(0, 1) // drop value 2 from succ[0]
+        node.implyIntAtMost(0, 1)
         assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
-    fun `the adapter reproduces a table hull when a tuple becomes infeasible`() {
-        // Table {(0,5),(2,2),(4,0)}: each tuple's selector is present while every entry stays live.
-        // Pruning value 5 from x1 drops the (0,5) selector; re-binding must pin it to 0 like a rebuild.
+    fun `adapter should reproduce a table hull when a tuple becomes infeasible`() {
         val problem = Problem(
             0,
             2,
@@ -131,18 +123,16 @@ class CpLpAdapterRebuildTest {
         )
         val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 0)), tableHull = true)
         val base = relaxer.build(PropagationSession(problem))
-        assertTrue(base.persistentEligible, "a table hull relaxation must be persistent-eligible")
+        assertTrue(base.persistentEligible)
 
         val node = PropagationSession(problem)
-        node.implyIntAtMost(1, 4) // value 5 leaves x1 — tuple (0,5) infeasible
+        node.implyIntAtMost(1, 4)
         assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
-    fun `the adapter reproduces a table hull over values beyond Int range`() {
-        // Tuple values past 2^31 (a float-scaled table): the selector's presence rule stores the true
-        // Long value, so pruning a wide value must pin the tuple's column exactly as a rebuild does. A
-        // truncated presence value would test membership of the wrong value and diverge from the rebuild.
+    fun `adapter should reproduce a table hull over values beyond Int range`() {
+        // A truncated presence value would test membership of the wrong value.
         val b = 4_000_000_000L
         val problem = Problem(
             0,
@@ -152,17 +142,16 @@ class CpLpAdapterRebuildTest {
         )
         val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 0)), tableHull = true)
         val base = relaxer.build(PropagationSession(problem))
-        assertTrue(base.persistentEligible, "a table hull relaxation must be persistent-eligible")
+        assertTrue(base.persistentEligible)
 
         val node = PropagationSession(problem)
-        node.implyIntAtMost(0, b + 3) // value b+4 leaves x0 — tuple (b+4, 0) infeasible
+        node.implyIntAtMost(0, b + 3)
         assertSameModel(relaxer.build(node).model, base, node)
     }
 
     @Test
-    fun `a cumulative energetic relaxation is not persistent-eligible`() {
-        // The energetic makespan row's right-hand side is recomputed from the live starts, so its
-        // coefficients/rhs vary per node — not re-bindable, it stays on the per-node rebuild.
+    fun `cumulative energetic relaxation should not be persistent eligible`() {
+        // The energetic row's rhs is recomputed from the live starts on every node.
         val factors = arrayOf<Factor>(
             Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.GE, 3),
             Linear(intArrayOf(1, -1), intArrayOf(3, 1), LinearOp.GE, 3),
@@ -172,9 +161,6 @@ class CpLpAdapterRebuildTest {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 20) }, factors)
         val relaxer =
             CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)), cumulative = true)
-        assertFalse(
-            relaxer.build(PropagationSession(problem)).persistentEligible,
-            "a live-coefficient energetic row varies per node and must not be persisted",
-        )
+        assertFalse(relaxer.build(PropagationSession(problem)).persistentEligible)
     }
 }

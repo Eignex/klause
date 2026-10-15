@@ -16,11 +16,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class LinearSourceValueTest {
-    private val scope = SourceScope(SourceRevision("value", "exact-affine"),
-        objective = SourceObjective("cost", ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(
+        SourceRevision("value", "exact-affine"),
+        objective = SourceObjective("cost", ObjectiveSense.MINIMIZE),
+    )
 
     @Test
-    fun `source values retain non dyadic coefficients and coordinate authority`() {
+    fun `source values should keep non dyadic coefficients and coordinate authority`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val third = BigFraction.ofLong(3).reciprocal()
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to third))
@@ -32,10 +34,15 @@ class LinearSourceValueTest {
     }
 
     @Test
-    fun `wide integer source values do not project through long or double`() {
+    fun `wide integer source values should not project through long or double`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val source = SourceProofContext(scope, setOf(integer), emptyMap(), mapOf(integer to BigFraction.ofLong(7)),
-            BigFraction.MINUS_ONE)
+        val source = SourceProofContext(
+            scope,
+            setOf(integer),
+            emptyMap(),
+            mapOf(integer to BigFraction.ofLong(7)),
+            BigFraction.MINUS_ONE,
+        )
         val sample = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(parseBigInt("18446744073709551616")))
 
         val value = source.linearValue(sample, Cancellation.Never)
@@ -44,7 +51,7 @@ class LinearSourceValueTest {
     }
 
     @Test
-    fun `approximate coordinates cannot manufacture an exact source value`() {
+    fun `approximate coordinates should not produce an exact source value`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0 / 3.0))
@@ -55,7 +62,7 @@ class LinearSourceValueTest {
     }
 
     @Test
-    fun `missing affine objective capture cannot become a zero value`() {
+    fun `a missing affine objective capture should not become a zero value`() {
         val source = SourceProofContext(scope, emptySet(), emptyMap())
         val sample = Sample(booleanArrayOf(), longArrayOf())
 
@@ -65,7 +72,7 @@ class LinearSourceValueTest {
     }
 
     @Test
-    fun `cancelled evaluation cannot publish a constant objective value`() {
+    fun `cancelled evaluation should not publish a constant objective value`() {
         val source = SourceProofContext(scope, emptySet(), emptyMap(), emptyMap())
         val sample = Sample(booleanArrayOf(), longArrayOf())
 

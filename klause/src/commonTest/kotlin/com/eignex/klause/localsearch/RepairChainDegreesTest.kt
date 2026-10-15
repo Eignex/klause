@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class RepairChainDegreesTest {
     @Test
-    fun `regression is measured against the first recorded degree`() {
+    fun `regression should be measured against the first recorded degree`() {
         val book = RepairChainDegrees()
         book.record(0, 2)
         book.record(0, 5)
@@ -17,7 +17,7 @@ class RepairChainDegreesTest {
     }
 
     @Test
-    fun `a narrow walk after growth retains its tied target and forgets old factors`() {
+    fun `a narrow walk after growth should retain its tied target and forget old factors`() {
         val book = RepairChainDegrees()
         val degrees = IntArray(80) { 1 }
         val weights = DoubleArray(80) { 1.0 }

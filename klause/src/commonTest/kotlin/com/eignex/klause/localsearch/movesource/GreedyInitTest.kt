@@ -23,9 +23,11 @@ import kotlin.test.assertTrue
 class GreedyInitTest {
 
     @Test
-    fun `a greedy pass preserves a comparison output defined by a frozen input`() {
+    fun `a greedy pass should preserve a comparison output defined by a frozen input`() {
         val problem = Problem(
-            3, 1, arrayOf(IntDomain(0, 1)),
+            3,
+            1,
+            arrayOf(IntDomain(0, 1)),
             arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
@@ -46,9 +48,11 @@ class GreedyInitTest {
     }
 
     @Test
-    fun `a greedy pass preserves a product output defined by frozen inputs`() {
+    fun `a greedy pass should preserve a product output defined by frozen inputs`() {
         val problem = Problem(
-            3, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 4)),
+            3,
+            3,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 4)),
             arrayOf<Factor>(Product(0, 1, 2)) + Array<Factor>(3) { bool ->
                 ReifiedLinear(bool, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 2)
             },
@@ -57,7 +61,8 @@ class GreedyInitTest {
         state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
             .network(problem.numIntVars, problem.numBoolVars)
         state.assumptions = Assumptions(
-            bools = mapOf(0 to true, 1 to true, 2 to true), ints = mapOf(0 to 0L, 1 to 0L),
+            bools = mapOf(0 to true, 1 to true, 2 to true),
+            ints = mapOf(0 to 0L, 1 to 0L),
         )
         for (bool in 0..2) state.assignment.setBool(bool, true)
         state.recompute()
@@ -68,9 +73,11 @@ class GreedyInitTest {
     }
 
     @Test
-    fun `a greedy pass preserves an implicitly seeded permutation`() {
+    fun `a greedy pass should preserve an implicitly seeded permutation`() {
         val problem = Problem(
-            1, 3, Array(3) { IntDomain(0, 2) },
+            1,
+            3,
+            Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1, 2), 0, 3),
                 ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
@@ -89,9 +96,6 @@ class GreedyInitTest {
         assertEquals(seeded, state.assignment.snapshot())
     }
 
-    /** A two-variable sum `x0 + x1 = 6` over 0..5 each: from the all-zero start (degree 6),
-     *  coordinate descent improves on the first variable touched (best partial value) and zeroes
-     *  it on the second, so a single forward pass strictly reduces violation. */
     private fun problem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 2,
@@ -100,7 +104,7 @@ class GreedyInitTest {
     )
 
     @Test
-    fun `a greedy pass reduces violation`() {
+    fun `a greedy pass should reduce violation`() {
         val state = freshState(problem(), 7L)
         val before = state.cost
         assertTrue(before > 0L, "all-zero start must violate the sum constraint")
@@ -109,15 +113,7 @@ class GreedyInitTest {
     }
 
     @Test
-    fun `the pass is deterministic for a fixed seed`() {
-        val a = freshState(problem(), 42L).also { GreedyInit().run(it) }
-        val b = freshState(problem(), 42L).also { GreedyInit().run(it) }
-        assertEquals(a.assignment.intValue(0), b.assignment.intValue(0))
-        assertEquals(a.assignment.intValue(1), b.assignment.intValue(1))
-    }
-
-    @Test
-    fun `a pass told to stop leaves the assignment as it was`() {
+    fun `a stopped pass should leave the assignment unchanged`() {
         val state = freshState(problem(), 7L)
 
         GreedyInit().run(state) { true }
@@ -126,7 +122,7 @@ class GreedyInitTest {
     }
 
     @Test
-    fun `cancellation after a coordinate keeps its repair and skips the next coordinate`() {
+    fun `cancellation after a coordinate should keep its repair and skip the next coordinate`() {
         val state = freshState(problem(), 7L)
         var checks = 0
 
@@ -136,7 +132,7 @@ class GreedyInitTest {
     }
 
     @Test
-    fun `resuming a partial pass completes the same repair as an uninterrupted pass`() {
+    fun `a resumed partial pass should complete the same repair as an uninterrupted pass`() {
         val expected = freshState(problem(), 7L)
         val resumed = freshState(problem(), 7L)
         val initializer = GreedyInit()
@@ -153,7 +149,7 @@ class GreedyInitTest {
     }
 
     @Test
-    fun `a cancelled pass clears repair activity before the search resumes`() {
+    fun `a cancelled pass should clear repair activity before the search resumes`() {
         val state = freshState(problem(), 7L)
         state.apply(Move.IntSet(0, 1L))
 
@@ -163,7 +159,7 @@ class GreedyInitTest {
     }
 
     @Test
-    fun `a failed pass retains completed repair and restores search activity tracking`() {
+    fun `a failed pass should retain completed repair and restore search activity tracking`() {
         val state = freshState(problem(), 7L)
         var checks = 0
 

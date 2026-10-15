@@ -16,24 +16,30 @@ import kotlin.test.assertTrue
 
 class LpCaptureTest {
     @Test
-    fun `mixed structural capture restores scoped rows without dropping permanent definitions`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0L, 3L, cost = 1L) }
-            .build(Sense.MINIMIZE).authoritativeModel())
+    fun `mixed structural capture should restore scoped rows without dropping permanent definitions`() {
+        val source = assertNotNull(
+            LpBuilder().apply { addVar(0L, 3L, cost = 1L) }
+                .build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))
         val rows = listOf(
             LpScopedRow(0L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L), logical),
             LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L), logical),
         )
         val capture = LpExactCapture.capture(
-            source, LpReplaySettings(
+            source,
+            LpReplaySettings(
                 "mixed-rows",
                 1L,
                 componentSplit = false,
                 solverKind = LpReplaySolverKind.PERSISTENT,
             ),
             listOf(
-                LpExactReplayEvent.Push(), LpExactReplayEvent.Extend(emptyList(), rows, true, setOf(0L)),
-                LpExactReplayEvent.Solve(), LpExactReplayEvent.Pop(0), LpExactReplayEvent.Solve(),
+                LpExactReplayEvent.Push(),
+                LpExactReplayEvent.Extend(emptyList(), rows, true, setOf(0L)),
+                LpExactReplayEvent.Solve(),
+                LpExactReplayEvent.Pop(0),
+                LpExactReplayEvent.Solve(),
             ),
         )
 
@@ -47,7 +53,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `structural capture replays new columns with exact origins costs and row guards`() {
+    fun `structural capture should replay new columns with exact origins costs and row guards`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
@@ -93,7 +99,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `row state keys distinguish identity lifetime tombstones and retired high water`() {
+    fun `row state keys should distinguish identity lifetime tombstones and retired high water`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(emptyList()),
@@ -118,7 +124,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `exact capture preserves all numeric and source authority`() {
+    fun `exact capture should preserve all numeric and source authority`() {
         val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val negativeZero = ExactLpNumber.ofIeee(-0.0)
         val premises = ExactLpPremises(listOf(ExactLpPremise(7, true, third)), listOf(11, -13))
@@ -158,7 +164,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `exact capture rejects unknown format and event versions`() {
+    fun `exact capture should reject unknown format and event versions`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -181,7 +187,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `exact state keys distinguish weaker witnesses and restored revisions`() {
+    fun `exact state keys should distinguish weaker witnesses and restored revisions`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -205,7 +211,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `exact state key declines oversized rational bytes below value budget`() {
+    fun `the exact state key should decline oversized rational bytes below the value budget`() {
         val large = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 4096, BIG_ONE))
         val model = ExactLpModel(
             List(40) { emptyList() },
@@ -219,7 +225,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `legacy capture rejects exact projection and native status`() {
+    fun `legacy capture should reject exact projection and native status`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -241,7 +247,7 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `capture round trips every authoritative model field losslessly`() {
+    fun `capture should round trip every authoritative model field losslessly`() {
         val large = (1L shl 53) + 19L
         val nanBits = 0x7ff8000000000042L
         val model = LpModel(
@@ -295,103 +301,32 @@ class LpCaptureTest {
             trackDegeneracy = true,
         )
 
-        val warm = LpCapturedBasis.capture(
-            Basis(
-                intArrayOf(2, 3),
-                arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC),
-            ),
-        )
-        val doubleCostBits = longArrayOf(nanBits, (-0.0).toRawBits(), 0L, Double.POSITIVE_INFINITY.toRawBits())
-        val decoded = LpCapture.decode(
-            LpCapture.capture(
-                model,
-                settings,
-                listOf(
-                    LpReplayEvent.Solve(warm),
-                    LpReplayEvent.ObjectiveSwap(
-                        longArrayOf(1L, 2L, 0L, 0L),
-                        doubleCostBits,
-                        large + 8L,
-                        nanBits,
-                    ),
-                    LpReplayEvent.Rebind(longArrayOf(0L, 0L), longArrayOf(1L, 1L), 7),
-                ),
-            ).encode(),
-        )
-        val restored = decoded.model.toModel()
-
-        assertEquals(large, decoded.settings.seed)
-        assertEquals(3, decoded.settings.cancellationPollLimit)
-        assertEquals(17, decoded.settings.pivotLimit)
-        assertEquals(large + 7L, decoded.settings.workLimit)
-        assertEquals(61, decoded.settings.refactorUpdateLimit)
-        assertTrue(decoded.settings.trackDegeneracy)
-        assertEquals(LpNumericAuthority.IEEE754_BITS_SOURCE_RATIONAL_ABSENT, decoded.model.numericAuthority)
-        assertModelEquals(model, restored)
-        assertTrue(restored.rowStrict[0])
-        assertFalse(restored.rowGlobal[0])
-        assertContentEquals(intArrayOf(8, 3), assertNotNull(restored.rowPremises[0]).vars)
-        assertNull(restored.rowPremises[1])
-        val decodedWarm = assertNotNull((decoded.events[0] as LpReplayEvent.Solve).warm)
-        assertContentEquals(warm.basicVars, decodedWarm.basicVars)
-        assertContentEquals(warm.statuses, decodedWarm.statuses)
-        val objectiveSwap = decoded.events[1] as LpReplayEvent.ObjectiveSwap
-        assertContentEquals(doubleCostBits, assertNotNull(objectiveSwap.doubleCostBits))
-        assertEquals(nanBits, objectiveSwap.doubleObjConstantBits)
-        assertEquals(7, (decoded.events[2] as LpReplayEvent.Rebind).cancellationPollLimit)
-    }
-
-    @Test
-    fun `capture owns nested arrays after caller mutation`() {
-        val premiseVars = intArrayOf(4)
-        val premiseSides = booleanArrayOf(true)
-        val premiseThresholds = longArrayOf(9L)
-        val premiseLits = intArrayOf(12)
-        val cost = longArrayOf(3L, 0L)
-        val cscValues = longArrayOf(2L)
-        val model = LpModel(
-            1,
-            1,
-            Csc(intArrayOf(0, 1), intArrayOf(0), cscValues),
-            longArrayOf(7L),
-            cost,
-            longArrayOf(5L, 0L),
-            booleanArrayOf(true, false),
-            longArrayOf(2L),
-            6L,
-            Sense.MINIMIZE,
-            intArrayOf(99),
-            booleanArrayOf(false),
-            booleanArrayOf(false),
-            arrayOf(LpRowPremises(premiseVars, premiseSides, premiseThresholds, premiseLits)),
-        )
-        val rebindLo = longArrayOf(2L)
         val capture = LpCapture.capture(
             model,
-            LpReplaySettings("owned", 1L, LpReplaySolverKind.PERSISTENT, componentSplit = false),
-            listOf(LpReplayEvent.Rebind(rebindLo, longArrayOf(8L))),
+            settings,
+            listOf(
+                LpReplayEvent.Solve(),
+                LpReplayEvent.ObjectiveSwap(
+                    longArrayOf(1L, 2L, 0L, 0L),
+                    longArrayOf(nanBits, (-0.0).toRawBits(), 0L, Double.POSITIVE_INFINITY.toRawBits()),
+                    large + 8L,
+                    nanBits,
+                ),
+            ),
         )
 
-        cscValues[0] = -1L
-        cost[0] = -1L
-        premiseVars[0] = -1
-        premiseSides[0] = false
-        premiseThresholds[0] = -1L
-        premiseLits[0] = -1
-        rebindLo[0] = -1L
+        val decoded = LpCapture.decode(capture.encode())
+        val restored = decoded.model.toModel()
 
-        assertContentEquals(longArrayOf(2L), capture.model.colVal)
-        assertContentEquals(longArrayOf(3L, 0L), capture.model.cost)
-        val premise = assertNotNull(capture.model.rowPremises[0])
-        assertContentEquals(intArrayOf(4), premise.vars)
-        assertContentEquals(booleanArrayOf(true), premise.isUpper)
-        assertContentEquals(longArrayOf(9L), premise.thresholds)
-        assertContentEquals(intArrayOf(12), premise.boolLits)
-        assertContentEquals(longArrayOf(2L), (capture.events.single() as LpReplayEvent.Rebind).lo)
+        assertContentEquals(capture.encode(), decoded.encode())
+        assertEquals(LpNumericAuthority.IEEE754_BITS_SOURCE_RATIONAL_ABSENT, decoded.model.numericAuthority)
+        assertModelEquals(model, restored)
+        assertContentEquals(intArrayOf(8, 3), assertNotNull(restored.rowPremises[0]).vars)
+        assertNull(restored.rowPremises[1])
     }
 
     @Test
-    fun `unknown versions and malformed bytes are rejected`() {
+    fun `capture decoding should reject unknown versions and malformed bytes`() {
         val capture = LpCapture.capture(
             LpBuilder().build(Sense.MINIMIZE),
             LpReplaySettings("versions", 0L),

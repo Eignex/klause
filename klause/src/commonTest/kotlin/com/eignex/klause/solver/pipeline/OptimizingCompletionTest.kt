@@ -43,14 +43,14 @@ class OptimizingCompletionTest {
     }
 
     @Test
-    fun `a candidate completes to the continuous point that minimizes the objective`() {
+    fun `a candidate should complete to the continuous point that minimizes the objective`() {
         val y = assertNotNull(assertIs<Completion.Witness>(complete(strict = false)).sample.exactReals)[0]
 
         assertEquals(BigFraction.ofLong(3), y)
     }
 
     @Test
-    fun `an optimum on a strict row's boundary falls back to a point strictly inside it`() {
+    fun `an optimum on a strict row boundary should fall back to a point strictly inside it`() {
         val y = assertNotNull(assertIs<Completion.Witness>(complete(strict = true)).sample.exactReals)[0]
 
         assertTrue(y > BigFraction.ofLong(3) && y <= BigFraction.ofLong(4), "y=$y")

@@ -15,7 +15,6 @@ import kotlin.test.assertTrue
 
 class CutoffBoundTest {
 
-    /** Two integer columns over the invented box; [openHi] / [openLo] mark column 0's invented sides. */
     private fun problem(openHi: Boolean = true, openLo: Boolean = false, hi: Long = 1_000_000L): BakedProblem = Problem(
         numBoolVars = 0,
         numIntVars = 2,
@@ -76,8 +75,7 @@ class CutoffBoundTest {
 
     @Test
     fun `a term against the invented box should not wrap the objective floor`() {
-        // The second column reaches -3*2^61 so the gap to the incumbent exceeds a Long; only exact
-        // 128-bit accumulation still reads a bound off it instead of a wrapped negative gap.
+        // The gap to the incumbent exceeds a Long; only 128-bit accumulation reads a bound off it.
         val boxed = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -94,8 +92,6 @@ class CutoffBoundTest {
 
     @Test
     fun `minimize should still reach the optimum once the cutoff closes an open column`() {
-        // x0 + x1 >= 5 with x0 open above and priced at 3: the optimum spends x1 first. The root
-        // tightening runs against each incumbent it finds on the way there.
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 2,

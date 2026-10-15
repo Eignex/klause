@@ -36,7 +36,7 @@ import kotlin.test.assertNull
 
 class SourceWitnessAssemblerTest {
     @Test
-    fun `missing source coordinates withhold a witness`() {
+    fun `missing source coordinates should withhold a witness`() {
         val source = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
@@ -59,7 +59,7 @@ class SourceWitnessAssemblerTest {
     }
 
     @Test
-    fun `two exact representations of one real coordinate withhold a witness`() {
+    fun `two exact representations of one real coordinate should withhold a witness`() {
         val source = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
@@ -68,20 +68,23 @@ class SourceWitnessAssemblerTest {
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(1.0),
         )
-        val values = AssembledSearchModel(mapOf(
-            SearchExactRealValue(SourceRealId(0)) to BigFraction.ONE,
-            SearchExactRealExpressionValue(SourceRealId(0)) to ExactRealValue(ExactRealExpression.Pi),
-        ))
+        val values = AssembledSearchModel(
+            mapOf(
+                SearchExactRealValue(SourceRealId(0)) to BigFraction.ONE,
+                SearchExactRealExpressionValue(SourceRealId(0)) to ExactRealValue(ExactRealExpression.Pi),
+            ),
+        )
 
         val result = SourceWitnessAssembler(source).assemble(
-            values, SourceMapping(source, source, TransformationGuarantees.IDENTITY),
+            values,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY),
         )
 
         assertNull(result)
     }
 
     @Test
-    fun `foreign reconstruction mappings withhold a witness`() {
+    fun `foreign original sources should not relabel a reduced witness`() {
         val source = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
@@ -94,34 +97,15 @@ class SourceWitnessAssemblerTest {
         )
 
         val result = SourceWitnessAssembler(source).assemble(
-            AssembledSearchModel(emptyMap()), SourceMapping(foreign, foreign, TransformationGuarantees.IDENTITY),
+            AssembledSearchModel(emptyMap()),
+            SourceMapping(foreign, source, TransformationGuarantees.IDENTITY),
         )
 
         assertNull(result)
     }
 
     @Test
-    fun `foreign original sources cannot relabel a reduced witness`() {
-        val source = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            factors = emptyArray(),
-        )
-        val foreign = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            factors = emptyArray(),
-        )
-
-        val result = SourceWitnessAssembler(source).assemble(
-            AssembledSearchModel(emptyMap()), SourceMapping(foreign, source, TransformationGuarantees.IDENTITY),
-        )
-
-        assertNull(result)
-    }
-
-    @Test
-    fun `unmapped exact coordinates withhold a witness`() {
+    fun `unmapped exact coordinates should withhold a witness`() {
         val source = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
@@ -130,14 +114,15 @@ class SourceWitnessAssemblerTest {
         val model = AssembledSearchModel(mapOf(SearchExactIntValue(SourceIntId(0)) to parseBigInt("1")))
 
         val result = SourceWitnessAssembler(source).assemble(
-            model, SourceMapping(source, source, TransformationGuarantees.IDENTITY),
+            model,
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY),
         )
 
         assertNull(result)
     }
 
     @Test
-    fun `neutral witness snapshots own their exact integer coordinates`() {
+    fun `neutral witness snapshots should own their exact integer coordinates`() {
         val bools = booleanArrayOf(true)
         val ints = arrayOf(parseBigInt("9223372036854775808"))
         val witness = SourceCoordinateWitness(bools, ints, emptyList())
@@ -150,11 +135,14 @@ class SourceWitnessAssemblerTest {
     }
 
     @Test
-    fun `typed contributions survive producer closure without a native assignment key`() {
+    fun `typed contributions should survive producer closure without a native assignment key`() {
         val source = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(
-                longArrayOf(0), longArrayOf(0), null, Bits(1).also { it.set(0) },
+                longArrayOf(0),
+                longArrayOf(0),
+                null,
+                Bits(1).also { it.set(0) },
             ),
             factors = emptyArray(),
         )
@@ -169,9 +157,12 @@ class SourceWitnessAssemblerTest {
             }
         }
         val session = SearchSession(listOf(component))
-        val result = assertNotNull(SourceWitnessAssembler(source).assemble(
-            session.model(), SourceMapping(source, source, TransformationGuarantees.IDENTITY),
-        ))
+        val result = assertNotNull(
+            SourceWitnessAssembler(source).assemble(
+                session.model(),
+                SourceMapping(source, source, TransformationGuarantees.IDENTITY),
+            ),
+        )
 
         component.close()
 
@@ -179,7 +170,7 @@ class SourceWitnessAssemblerTest {
     }
 
     @Test
-    fun `rational coordinates retain their exact fraction`() {
+    fun `rational coordinates should keep their exact fraction`() {
         val source = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
@@ -191,15 +182,18 @@ class SourceWitnessAssemblerTest {
         val third = BigFraction.ofLong(3).reciprocal()
         val model = AssembledSearchModel(mapOf(SearchExactRealValue(SourceRealId(0)) to third))
 
-        val result = assertNotNull(SourceWitnessAssembler(source).assemble(
-            model, SourceMapping(source, source, TransformationGuarantees.IDENTITY),
-        ))
+        val result = assertNotNull(
+            SourceWitnessAssembler(source).assemble(
+                model,
+                SourceMapping(source, source, TransformationGuarantees.IDENTITY),
+            ),
+        )
 
         assertEquals("1/3", result.realValue(0))
     }
 
     @Test
-    fun `algebraic contributions retain the selected conjugate root`() {
+    fun `algebraic contributions should keep the selected conjugate root`() {
         val arithmetic = AlgebraicArithmetic(PolynomialArithmetic())
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val source = Problem(
@@ -212,29 +206,40 @@ class SourceWitnessAssemblerTest {
         )
         val model = AssembledSearchModel(mapOf(SearchExactAlgebraicRealValue(SourceRealId(0)) to root))
 
-        val witness = assertNotNull(SourceWitnessAssembler(source).assemble(
-            model, SourceMapping(source, source, TransformationGuarantees.IDENTITY),
-        ))
+        val witness = assertNotNull(
+            SourceWitnessAssembler(source).assemble(
+                model,
+                SourceMapping(source, source, TransformationGuarantees.IDENTITY),
+            ),
+        )
 
         assertEquals("root(2;[-2,0,1])", witness.realValue(0))
         assertEquals(0, arithmetic.compare(root, assertNotNull(witness.algebraicRealValue(0))))
     }
 
     @Test
-    fun `symbolic contributions retain authoritative expression text`() {
-        val witness = SourceCoordinateWitness(booleanArrayOf(), emptyArray(), listOf(
-            SourceRealCoordinate.Expression(ExactRealValue(ExactRealExpression.Pi)),
-        ))
+    fun `symbolic contributions should keep authoritative expression text`() {
+        val witness = SourceCoordinateWitness(
+            booleanArrayOf(),
+            emptyArray(),
+            listOf(
+                SourceRealCoordinate.Expression(ExactRealValue(ExactRealExpression.Pi)),
+            ),
+        )
 
         assertEquals("pi", witness.realValue(0))
         assertEquals(ExactRealExpression.Pi, assertNotNull(witness.symbolicRealValue(0)).expression)
     }
 
     @Test
-    fun `symbolic real contributions decline rational ray conversion`() {
-        val witness = SourceCoordinateWitness(booleanArrayOf(), emptyArray(), listOf(
-            SourceRealCoordinate.Expression(ExactRealValue(ExactRealExpression.Pi)),
-        ))
+    fun `symbolic real contributions should decline rational ray conversion`() {
+        val witness = SourceCoordinateWitness(
+            booleanArrayOf(),
+            emptyArray(),
+            listOf(
+                SourceRealCoordinate.Expression(ExactRealValue(ExactRealExpression.Pi)),
+            ),
+        )
 
         val point = witness.exactWitness(1)
 
@@ -242,7 +247,7 @@ class SourceWitnessAssemblerTest {
     }
 
     @Test
-    fun `approximate compatibility coordinates decline rational ray conversion`() {
+    fun `approximate compatibility coordinates should decline rational ray conversion`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0))
         val assignments = listOf(OpenTheoryAssignment.Difference(sample), OpenTheoryAssignment.Sampled(sample))
 
@@ -252,7 +257,7 @@ class SourceWitnessAssemblerTest {
     }
 
     @Test
-    fun `integer-only snapshots need no real payload for ray conversion`() {
+    fun `integer-only snapshots should need no real payload for ray conversion`() {
         val assignment = OpenTheoryAssignment.Sampled(Sample(booleanArrayOf(), longArrayOf(3)))
 
         val point = assertNotNull(assignment.exactWitness(0))
@@ -261,9 +266,10 @@ class SourceWitnessAssemblerTest {
     }
 
     @Test
-    fun `rational ray conversion preserves exact wide integer coordinates`() {
+    fun `rational ray conversion should preserve exact wide integer coordinates`() {
         val witness = SourceCoordinateWitness(
-            booleanArrayOf(), arrayOf(parseBigInt("9223372036854775808")),
+            booleanArrayOf(),
+            arrayOf(parseBigInt("9223372036854775808")),
             listOf(SourceRealCoordinate.Rational(BigFraction.ofLong(3).reciprocal())),
         )
 
@@ -274,28 +280,36 @@ class SourceWitnessAssemblerTest {
     }
 
     @Test
-    fun `integer reconstruction retains arbitrary precision through affine steps`() {
-        val open = Bits(2).also { it.set(0); it.set(1) }
+    fun `integer reconstruction should keep arbitrary precision through affine steps`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
         val source = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, open),
             factors = emptyArray(),
         )
         val rebuild = SourceRebuilds(listOf(RebuildStep.AffineValue(0, 1, intArrayOf(1), longArrayOf(2), 1)))
-        val model = AssembledSearchModel(mapOf(
-            SearchExactIntValue(SourceIntId(0)) to parseBigInt("0"),
-            SearchExactIntValue(SourceIntId(1)) to parseBigInt("9223372036854775808"),
-        ))
+        val model = AssembledSearchModel(
+            mapOf(
+                SearchExactIntValue(SourceIntId(0)) to parseBigInt("0"),
+                SearchExactIntValue(SourceIntId(1)) to parseBigInt("9223372036854775808"),
+            ),
+        )
 
-        val result = assertNotNull(SourceWitnessAssembler(source).assemble(
-            model, SourceMapping(source, source, TransformationGuarantees.IDENTITY, rebuild),
-        ))
+        val result = assertNotNull(
+            SourceWitnessAssembler(source).assemble(
+                model,
+                SourceMapping(source, source, TransformationGuarantees.IDENTITY, rebuild),
+            ),
+        )
 
         assertEquals("18446744073709551617", result.intValue(0))
     }
 
     @Test
-    fun `source reconstruction uses the existing Boolean rebuild steps`() {
+    fun `source reconstruction should use the existing Boolean rebuild steps`() {
         val source = Problem(
             numBoolVars = 2,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
@@ -304,9 +318,12 @@ class SourceWitnessAssemblerTest {
         val rebuild = SourceRebuilds(listOf(RebuildStep.CopyLiteral(0, Lit.make(1, true))))
         val model = AssembledSearchModel(mapOf(SearchBoolValue(0) to false, SearchBoolValue(1) to true))
 
-        val result = assertNotNull(SourceWitnessAssembler(source).assemble(
-            model, SourceMapping(source, source, TransformationGuarantees.IDENTITY, rebuild),
-        ))
+        val result = assertNotNull(
+            SourceWitnessAssembler(source).assemble(
+                model,
+                SourceMapping(source, source, TransformationGuarantees.IDENTITY, rebuild),
+            ),
+        )
 
         assertEquals(true, result.boolValue(0))
     }

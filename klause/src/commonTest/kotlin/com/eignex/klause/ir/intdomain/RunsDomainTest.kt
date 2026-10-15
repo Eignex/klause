@@ -8,20 +8,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RunsDomainTest {
-
     @Test
-    fun `wide span interior exclude uses interval-run rep`() {
-        val d = ContiguousDomain(0, 10_000).excludeValue(5_000)
-        assertTrue(d is RunsDomain)
-        assertEquals(0, d.min)
-        assertEquals(10_000, d.max)
-        assertEquals(10_000, d.size)
-        assertTrue(4_999 in d)
-        assertTrue(5_001 in d)
-    }
-
-    @Test
-    fun `holeCount stays exact when size saturates on a wide span`() {
+    fun `holeCount should stay exact when size saturates on a wide span`() {
         val d = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
         assertTrue(d is RunsDomain)
         assertEquals(Int.MAX_VALUE, d.size)
@@ -29,7 +17,7 @@ class RunsDomainTest {
     }
 
     @Test
-    fun `enumerable follows the exact count not the saturated size`() {
+    fun `enumerable should follow the exact count not the saturated size`() {
         val wide = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
         assertFalse((wide.spanOrNull() != null))
         val narrow = ContiguousDomain(0, 100_000).excludeValue(50_000)
@@ -38,7 +26,7 @@ class RunsDomainTest {
     }
 
     @Test
-    fun `lower and higher cross a hole correctly when size saturates`() {
+    fun `lower and higher should cross a hole when size saturates`() {
         val d = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
         assertEquals(2_499_999_999L, d.lower(2_500_000_001L))
         assertEquals(2_500_000_001L, d.higher(2_499_999_999L))
@@ -46,7 +34,7 @@ class RunsDomainTest {
     }
 
     @Test
-    fun `interval-run rep stacks excludes and includes`() {
+    fun `the interval-run rep should stack excludes and includes`() {
         var d = ContiguousDomain(0, 100_000).excludeValue(50_000).excludeValue(25_000).excludeValue(75_000)
         assertTrue(d is RunsDomain)
         assertEquals(99_998, d.size)

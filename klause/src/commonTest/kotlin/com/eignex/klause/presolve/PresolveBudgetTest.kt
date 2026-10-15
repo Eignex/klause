@@ -8,37 +8,34 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolveBudgetTest {
-
     @Test
-    fun `a slice fires once its share of the budget is charged`() {
+    fun `a slice should fire once its share of the budget is charged`() {
         val budget = PresolveBudget(1000)
         val slice = budget.slice(400)
 
-        assertFalse(slice(), "nothing charged yet")
+        assertFalse(slice())
         budget.charge(300)
         assertFalse(slice(), "300 of the 400 share charged")
         budget.charge(100)
-        assertTrue(slice(), "the share is charged")
+        assertTrue(slice())
     }
 
     @Test
-    fun `a slice fires when the whole budget runs out before its share does`() {
+    fun `a slice should fire when the whole budget runs out before its share does`() {
         val budget = PresolveBudget(300)
         val slice = budget.slice(1000)
 
         assertFalse(slice())
         budget.charge(300)
-        assertTrue(slice(), "the phase budget is gone, so the slice cannot continue")
+        assertTrue(slice())
     }
 
     @Test
-    fun `an unspent share is left in the pool for the next slice`() {
-        // The point of slicing against remaining rather than handing out fixed quanta: a pass that
-        // returns early does not burn its allowance.
+    fun `an unspent share should be left in the pool for the next slice`() {
         val budget = PresolveBudget(1000)
         val first = budget.slice(500)
         budget.charge(100)
-        assertFalse(first(), "the first pass used only 100")
+        assertFalse(first())
 
         val second = budget.slice(budget.remaining())
         budget.charge(800)
@@ -48,7 +45,7 @@ class PresolveBudgetTest {
     }
 
     @Test
-    fun `work charged through a slice composed with another token lands in the budget`() {
+    fun `work charged through a composed slice should land in the budget`() {
         val budget = PresolveBudget(1000)
         val token = budget.slice(500) or Cancellation.Never
 
@@ -58,7 +55,7 @@ class PresolveBudgetTest {
     }
 
     @Test
-    fun `the phase token charges its budget and fires once the budget is spent`() {
+    fun `the phase token should fire once its budget is spent`() {
         val budget = PresolveBudget(100)
         val phase = budget.orSpent(Cancellation.Never)
         assertSame(budget.slice(100).workMeter(), phase.workMeter())
@@ -69,7 +66,7 @@ class PresolveBudgetTest {
     }
 
     @Test
-    fun `the phase token fires when the outer token does`() {
+    fun `the phase token should fire when the outer token does`() {
         assertTrue(PresolveBudget(100).orSpent(Cancellation { true })())
     }
 }

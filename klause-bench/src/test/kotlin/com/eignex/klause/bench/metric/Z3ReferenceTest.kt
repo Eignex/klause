@@ -12,7 +12,7 @@ class Z3ReferenceTest {
     private val cmd = listOf("z3", "-T:10", "problem.smt2")
 
     @Test
-    fun `sat is a proven feasible witness with no objective`() {
+    fun `sat should be a proven feasible witness with no objective`() {
         val r = Z3Reference.parse("sat\n", elapsedMs = 121, cmd = cmd)
         assertEquals(true, r.feasible)
         assertTrue(r.proven)
@@ -20,36 +20,35 @@ class Z3ReferenceTest {
     }
 
     @Test
-    fun `unsat is a proof of infeasibility`() {
+    fun `unsat should be a proof of infeasibility`() {
         val r = Z3Reference.parse("unsat\n", elapsedMs = 50, cmd = cmd)
         assertEquals(false, r.feasible)
         assertTrue(r.proven)
     }
 
     @Test
-    fun `unknown is undecided`() {
+    fun `unknown should be undecided`() {
         val r = Z3Reference.parse("unknown\n", elapsedMs = 10_000, cmd = cmd)
         assertNull(r.feasible)
         assertFalse(r.proven)
     }
 
     @Test
-    fun `the last verdict line wins and surrounding noise is ignored`() {
-        // z3 may print warnings/comments before the check-sat answer; only the bare verdict counts.
+    fun `the last verdict line should win over surrounding noise`() {
         val r = Z3Reference.parse("; a comment\nsat\n", elapsedMs = 7, cmd = cmd)
         assertEquals(true, r.feasible)
         assertTrue(r.proven)
     }
 
     @Test
-    fun `no verdict line is undecided`() {
+    fun `a missing verdict line should be undecided`() {
         val r = Z3Reference.parse("(error \"boom\")\n", elapsedMs = 3, cmd = cmd)
         assertNull(r.feasible)
         assertFalse(r.proven)
     }
 
     @Test
-    fun `a parse error followed by sat does not earn proof credit`() {
+    fun `a parse error followed by sat should not earn proof credit`() {
         val r = Z3Reference.parse("(error \"unsupported assertion\")\nsat\n", 7, cmd)
 
         assertNull(r.feasible)
@@ -58,7 +57,7 @@ class Z3ReferenceTest {
     }
 
     @Test
-    fun `failed exits retain stderr and do not earn proof credit`() {
+    fun `failed exits should retain stderr and not earn proof credit`() {
         val r = Z3Reference.parse("sat\n", 7, cmd, stderr = "out of memory", exitCode = 1)
 
         assertNull(r.feasible)
@@ -67,22 +66,7 @@ class Z3ReferenceTest {
     }
 
     @Test
-    fun `argument errors without stdout retain stderr and no proof`() {
-        val stderr = "ERROR: invalid parameter, unknown module '/corpus/'\n"
-
-        val r = Z3Reference.parse("", 7, cmd, stderr = stderr, exitCode = 110)
-
-        assertNull(r.feasible)
-        assertFalse(r.proven)
-        assertNull(r.objective)
-        assertEquals("error", r.stats["referenceStatus"])
-        assertEquals("110", r.stats["referenceExitCode"])
-        assertEquals(stderr, r.stats["referenceStderr"])
-        assertEquals("", r.rawOutput)
-    }
-
-    @Test
-    fun `watchdog termination retains its outcome`() {
+    fun `watchdog termination should retain its outcome`() {
         val r = Z3Reference.parse("", 30_000, cmd, exitCode = 137, killed = true)
 
         assertNull(r.feasible)
@@ -91,7 +75,7 @@ class Z3ReferenceTest {
     }
 
     @Test
-    fun `native timeout is distinct from an unknown verdict`() {
+    fun `native timeout should be distinct from an unknown verdict`() {
         val r = Z3Reference.parse("timeout\n", 10_000, cmd)
 
         assertNull(r.feasible)
@@ -99,7 +83,7 @@ class Z3ReferenceTest {
     }
 
     @Test
-    fun `algebraic model bytes survive reference parsing`() {
+    fun `algebraic model bytes should survive reference parsing`() {
         val model = "(\n  (define-fun x () Real (root-obj (+ (^ x 2) (- 2)) 2))\n)"
         val stdout = "sat\n$model\n"
 

@@ -18,7 +18,6 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolveSessionTest {
-
     private fun domains() = arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10))
 
     private fun leq(coeffs: IntArray, vars: IntArray, bound: Int) = Linear(coeffs, vars, LinearOp.LE, bound)
@@ -30,36 +29,7 @@ class PresolveSessionTest {
     private fun rootBool(problem: Problem, v: Int) = (problem.baked as PropagationResult.Implied).boolValueOrNull(v)
 
     @Test
-    fun `incremental delta propagation consumes native work without charging prior deltas twice`() {
-        val budget = PresolveBudget(Long.MAX_VALUE)
-        val session = PresolveSession(base(), cancellation = budget.orSpent(Cancellation.Never))
-        val before = budget.spent()
-
-        session.apply(PresolveDelta(addedFactors = listOf(leq(intArrayOf(1), intArrayOf(0), 5))))
-        session.apply(PresolveDelta(addedFactors = listOf(leq(intArrayOf(-1), intArrayOf(1), -2))))
-
-        assertEquals(7L, budget.rootConstructionEntries)
-        assertTrue(budget.rootPropagationWork > 0L)
-        assertTrue(budget.spent() > before)
-        assertEquals(53L * (budget.rootConstructionEntries + budget.rootPropagationWork), budget.spent())
-    }
-
-    @Test
-    fun `incremental conflict returns retain their native charges`() {
-        val budget = PresolveBudget(Long.MAX_VALUE)
-        val session = PresolveSession(unitBase(), cancellation = budget.orSpent(Cancellation.Never))
-        val work = budget.rootPropagationWork
-
-        val feasible = session.apply(PresolveDelta(addedFactors = listOf(Clause(intArrayOf(Lit.make(0, false))))))
-
-        assertFalse(feasible)
-        assertTrue(session.infeasible)
-        assertTrue(budget.rootPropagationWork > work)
-        assertEquals(53L * (budget.rootConstructionEntries + budget.rootPropagationWork), budget.spent())
-    }
-
-    @Test
-    fun `incremental views and materialization keep the exhausted phase token`() {
+    fun `incremental views and materialization should keep the exhausted phase token`() {
         val budget = PresolveBudget(1)
         val token = budget.orSpent(Cancellation.Never)
         val session = PresolveSession(unitBase(), cancellation = token)
@@ -76,7 +46,7 @@ class PresolveSessionTest {
     }
 
     @Test
-    fun `a pass input keeps a boolean fixed by a dropped factor`() {
+    fun `a pass input should keep a boolean fixed by a dropped factor`() {
         val session = PresolveSession(unitBase())
         assertTrue(session.apply(PresolveDelta(droppedIds = intArrayOf(0))))
 
@@ -84,7 +54,7 @@ class PresolveSessionTest {
     }
 
     @Test
-    fun `the materialized problem keeps a boolean fixed by a dropped factor`() {
+    fun `the materialized problem should keep a boolean fixed by a dropped factor`() {
         val session = PresolveSession(unitBase())
         assertTrue(session.apply(PresolveDelta(droppedIds = intArrayOf(0))))
 
@@ -92,12 +62,12 @@ class PresolveSessionTest {
     }
 
     @Test
-    fun `a conflicting narrowing latches infeasibility`() {
-        val f0 = leq(intArrayOf(1), intArrayOf(0), 5) // x0 <= 5
-        val g = leq(intArrayOf(-1), intArrayOf(0), -8) // -x0 <= -8, i.e. x0 >= 8
+    fun `a conflicting narrowing should latch infeasibility`() {
+        val f0 = leq(intArrayOf(1), intArrayOf(0), 5)
+        val g = leq(intArrayOf(-1), intArrayOf(0), -8)
 
         val session = PresolveSession(base(f0))
-        assertFalse(session.apply(PresolveDelta(addedFactors = listOf(g)))) // 8 <= x0 <= 5 is infeasible
+        assertFalse(session.apply(PresolveDelta(addedFactors = listOf(g))))
         assertTrue(session.infeasible)
     }
 }

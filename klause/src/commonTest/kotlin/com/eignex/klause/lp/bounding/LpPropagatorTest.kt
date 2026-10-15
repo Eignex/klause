@@ -68,7 +68,7 @@ import kotlin.test.assertTrue
 
 class LpPropagatorTest {
     @Test
-    fun `premised bound batches explain the first conflicting prefix`() {
+    fun `premised bound batches should explain the first conflicting prefix`() {
         val problem = Problem(3, 2, Array(2) { IntDomain(0, 10) }, emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)))
             .build(PropagationSession(problem))
@@ -80,14 +80,28 @@ class LpPropagatorTest {
             val first = base.intColOf[0]
             val second = base.intColOf[1]
 
-            val result = lp.assertBounds(listOf(
-                LpPremisedBound(first, false, ExactLpSide(ExactLpNumber.of(4L)),
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(0))),
-                LpPremisedBound(first, true, ExactLpSide(ExactLpNumber.of(3L)),
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(2))),
-                LpPremisedBound(second, false, ExactLpSide(ExactLpNumber.of(7L)),
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(4))),
-            ))
+            val result = lp.assertBounds(
+                listOf(
+                    LpPremisedBound(
+                        first,
+                        false,
+                        ExactLpSide(ExactLpNumber.of(4L)),
+                        SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                    ),
+                    LpPremisedBound(
+                        first,
+                        true,
+                        ExactLpSide(ExactLpNumber.of(3L)),
+                        SearchAtomPremise.Asserted(SearchDecision.Bool(2)),
+                    ),
+                    LpPremisedBound(
+                        second,
+                        false,
+                        ExactLpSide(ExactLpNumber.of(7L)),
+                        SearchAtomPremise.Asserted(SearchDecision.Bool(4)),
+                    ),
+                ),
+            )
 
             assertEquals(2, assertIs<LpBoundBatchResult.Conflict>(result).count)
             val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
@@ -97,7 +111,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `premised bound batches retract before a sibling explanation`() {
+    fun `premised bound batches should retract before a sibling explanation`() {
         val problem = Problem(4, 1, arrayOf(IntDomain(0, 10)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
             .build(PropagationSession(problem))
@@ -108,21 +122,45 @@ class LpPropagatorTest {
             for (variable in 0..3) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
             val column = base.intColOf[0]
             assertTrue(lp.atLevel(1))
-            assertIs<LpBoundBatchResult.Applied>(lp.assertBounds(listOf(
-                LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(5L)),
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(0))),
-                LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(5L)),
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(2))),
-            )))
+            assertIs<LpBoundBatchResult.Applied>(
+                lp.assertBounds(
+                    listOf(
+                        LpPremisedBound(
+                            column,
+                            false,
+                            ExactLpSide(ExactLpNumber.of(5L)),
+                            SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                        ),
+                        LpPremisedBound(
+                            column,
+                            true,
+                            ExactLpSide(ExactLpNumber.of(5L)),
+                            SearchAtomPremise.Asserted(SearchDecision.Bool(2)),
+                        ),
+                    ),
+                ),
+            )
             assertTrue(lp.atLevel(0))
             assertTrue(lp.atLevel(1))
 
-            assertIs<LpBoundBatchResult.Conflict>(lp.assertBounds(listOf(
-                LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(7L)),
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(4))),
-                LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(6L)),
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(6))),
-            )))
+            assertIs<LpBoundBatchResult.Conflict>(
+                lp.assertBounds(
+                    listOf(
+                        LpPremisedBound(
+                            column,
+                            false,
+                            ExactLpSide(ExactLpNumber.of(7L)),
+                            SearchAtomPremise.Asserted(SearchDecision.Bool(4)),
+                        ),
+                        LpPremisedBound(
+                            column,
+                            true,
+                            ExactLpSide(ExactLpNumber.of(6L)),
+                            SearchAtomPremise.Asserted(SearchDecision.Bool(6)),
+                        ),
+                    ),
+                ),
+            )
 
             val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
             assertEquals(listOf(5, 7), assertNotNull(conflict.explanation).literals.sorted())
@@ -130,7 +168,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `an unavailable batched bound premise withholds the whole conflict`() {
+    fun `unavailable batched bound premise should withhold the whole conflict`() {
         for (upperUnavailable in listOf(false, true)) {
             val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray())
             val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
@@ -143,12 +181,24 @@ class LpPropagatorTest {
                 val premise = SearchAtomPremise.Asserted(SearchDecision.Bool(0))
                 val column = base.intColOf[0]
 
-                assertIs<LpBoundBatchResult.Conflict>(lp.assertBounds(listOf(
-                    LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(4L)),
-                        if (upperUnavailable) premise else SearchAtomPremise.Unavailable),
-                    LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(3L)),
-                        if (upperUnavailable) SearchAtomPremise.Unavailable else premise),
-                )))
+                assertIs<LpBoundBatchResult.Conflict>(
+                    lp.assertBounds(
+                        listOf(
+                            LpPremisedBound(
+                                column,
+                                false,
+                                ExactLpSide(ExactLpNumber.of(4L)),
+                                if (upperUnavailable) premise else SearchAtomPremise.Unavailable,
+                            ),
+                            LpPremisedBound(
+                                column,
+                                true,
+                                ExactLpSide(ExactLpNumber.of(3L)),
+                                if (upperUnavailable) SearchAtomPremise.Unavailable else premise,
+                            ),
+                        ),
+                    ),
+                )
 
                 assertNull(assertIs<ComponentResult.Conflict>(lp.propagate(session)).explanation)
             }
@@ -156,7 +206,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `a stopped premised batch retains spent work and publishes no bounds`() {
+    fun `stopped premised batch should retain spent work and publish no bounds`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
             .build(PropagationSession(problem))
@@ -171,10 +221,12 @@ class LpPropagatorTest {
             val column = base.intColOf[0]
             val premise = SearchAtomPremise.All(emptyList())
 
-            val result = lp.assertBounds(listOf(
-                LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(2L)), premise),
-                LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(8L)), premise),
-            ))
+            val result = lp.assertBounds(
+                listOf(
+                    LpPremisedBound(column, false, ExactLpSide(ExactLpNumber.of(2L)), premise),
+                    LpPremisedBound(column, true, ExactLpSide(ExactLpNumber.of(8L)), premise),
+                ),
+            )
 
             assertIs<LpBoundBatchResult.Declined>(result)
             assertSame(before, lp.state)
@@ -183,7 +235,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `owner and distinct call stops both withhold LP proofs`() {
+    fun `owner and call stops should both withhold LP proofs`() {
         for (stopOwner in listOf(false, true)) {
             var ownerStopped = false
             var callStopped = false
@@ -206,7 +258,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `compaction declines a cut edit that would publish uninstalled rows`() {
+    fun `compaction should decline a cut edit that would publish uninstalled rows`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
             .build(PropagationSession(problem))
@@ -214,14 +266,28 @@ class LpPropagatorTest {
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
             assertTrue(lp.atLevel(1))
-            assertTrue(lp.append(LpScopedRow(0L, emptyList(), ExactLpNumber.of(0L),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), true))
+            assertTrue(
+                lp.append(
+                    LpScopedRow(
+                        0L,
+                        emptyList(),
+                        ExactLpNumber.of(0L),
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+                    ),
+                    true,
+                ),
+            )
             assertTrue(lp.atLevel(0))
             val before = assertNotNull(lp.state)
             val remap = LpLayoutRemap(before.model.n, before.rows)
             val current = base.withModel(assertNotNull(before.ownerWorkingModel()))
-            val replacement = assertNotNull(cuts.prepare(before, current,
-                listOf(Cut(base.intColOf, longArrayOf(1L), Relation.GE, 0L, global = true))))
+            val replacement = assertNotNull(
+                cuts.prepare(
+                    before,
+                    current,
+                    listOf(Cut(base.intColOf, longArrayOf(1L), Relation.GE, 0L, global = true)),
+                ),
+            )
 
             assertFalse(lp.compact(before, remap, replacement))
 
@@ -233,12 +299,16 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `a published source refresh invalidates prior preparations without invalidating numerical state`() {
+    fun `published source refresh should invalidate prior preparations but keep numerical state`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val domains = RootDomains(problem)
-        val sources = LpRetainedSources(problem, CpToLpRelaxation(
-            problem, LinearObjective(intCoefficients = longArrayOf(1)),
-        ))
+        val sources = LpRetainedSources(
+            problem,
+            CpToLpRelaxation(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1)),
+            ),
+        )
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
             assertTrue(lp.editSources(assertNotNull(sources.prepare(assertNotNull(lp.state), domains))))
@@ -255,17 +325,23 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `a declined cut batch retains numerical state and source publication`() {
+    fun `declined cut batch should retain numerical state and source publication`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
             .build(PropagationSession(problem))
         val cuts = LpRetainedCuts()
         LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 1) }).use { lp ->
             assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
-            val edit = assertNotNull(cuts.prepare(assertNotNull(lp.state), base, listOf(
-                Cut(base.intColOf, longArrayOf(1), Relation.GE, 0, global = true),
-                Cut(base.intColOf, longArrayOf(1), Relation.LE, 3, global = true),
-            )))
+            val edit = assertNotNull(
+                cuts.prepare(
+                    assertNotNull(lp.state),
+                    base,
+                    listOf(
+                        Cut(base.intColOf, longArrayOf(1), Relation.GE, 0, global = true),
+                        Cut(base.intColOf, longArrayOf(1), Relation.LE, 3, global = true),
+                    ),
+                ),
+            )
             val before = lp.state
 
             assertFalse(lp.editCuts(edit))
@@ -277,9 +353,11 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `source edits assert live bounds before numerical preparation and retain rollback`() {
+    fun `source edits should assert live bounds before numerical preparation and retain rollback`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(3, 10)),
+            1,
+            1,
+            arrayOf(IntDomain(3, 10)),
             arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8)),
         )
         var live = problem.finiteIntDomain(0).withMinAtLeast(4L)
@@ -288,7 +366,8 @@ class LpPropagatorTest {
             override fun boolValue(varId: Int): Boolean? = null
         }
         val sources = LpRetainedSources(
-            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+            problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
         )
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
@@ -320,7 +399,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `continuous CP rows decline the legacy bound adapter without changing domains`() {
+    fun `continuous CP rows should decline the legacy bound adapter without changing domains`() {
         val problem = Problem(
             0,
             1,
@@ -345,7 +424,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `raising live effort resumes exact state and records only new work`() {
+    fun `raising live effort should resume exact state and record only new work`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             List(3) { listOf(ExactLpEntry(it, ExactLpNumber.of(-1L))) },
@@ -397,7 +476,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `an unnamed local row withholds the entire exact conflict clause`() {
+    fun `unnamed local row should withhold the entire exact conflict clause`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
@@ -420,7 +499,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `failed bound invalidation overrides a cached feasible consumer check`() {
+    fun `failed bound invalidation should override a cached feasible consumer check`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(emptyList()),
@@ -443,32 +522,13 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `cancelled rollback restores bounds and a declined adoption invalidates authority`() {
+    fun `cancelled rollback should restore bounds and a declined adoption should invalidate authority`() {
         var cancelled = false
         var reject = false
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
-                return object : PersistentLpSolver by delegate {
-                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
-                        !reject && delegate.adopt(state, token)
-                }
+        val factory = wrappingFactory { delegate ->
+            object : PersistentLpSolver by delegate {
+                override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                    !reject && delegate.adopt(state, token)
             }
         }
         val source = ExactLpModel(
@@ -504,7 +564,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `row budget decline does not become a feasible neutral check`() {
+    fun `row budget decline should not become a feasible neutral check`() {
         val source = ExactLpModel(
             listOf(emptyList()),
             emptyList(),
@@ -530,42 +590,23 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `a throwing solve invalidates its owner and preserves the cleanup failure`() {
+    fun `throwing solve should invalidate its owner and preserve the cleanup failure`() {
         val primary = IllegalStateException("solve failed")
         val cleanup = IllegalStateException("close failed")
         var fail = true
         var constructions = 0
         var closes = 0
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                constructions++
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
-                return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
-                        if (fail) throw primary
-                        return delegate.resolveBounds(allowance)
-                    }
-                    override fun close() {
-                        closes++
-                        delegate.close()
-                        if (fail) throw cleanup
-                    }
+        val factory = wrappingFactory { delegate ->
+            constructions++
+            object : PersistentLpSolver by delegate {
+                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                    if (fail) throw primary
+                    return delegate.resolveBounds(allowance)
+                }
+                override fun close() {
+                    closes++
+                    delegate.close()
+                    if (fail) throw cleanup
                 }
             }
         }
@@ -596,7 +637,7 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `root restoration retains the installation authority across owner release`() {
+    fun `root restoration should retain the installation authority across owner release`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(emptyList()),
@@ -620,36 +661,17 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `an unavailable root reset invalidates bound authority`() {
+    fun `unavailable root reset should invalidate bound authority`() {
         for (cancelled in listOf(false, true)) {
             var fail = false
             var closes = 0
-            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newPersistentSolver(
-                    model: LpModel,
-                    cancellation: Cancellation,
-                    refactorUpdateLimit: Int,
-                    iterationLimit: Int,
-                    workLimit: Long,
-                    trackDegeneracy: Boolean,
-                    pricing: LpPricingOptions,
-                ): PersistentLpSolver {
-                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                        model,
-                        cancellation,
-                        refactorUpdateLimit,
-                        iterationLimit,
-                        workLimit,
-                        trackDegeneracy,
-                        pricing,
-                    )
-                    return object : PersistentLpSolver by delegate {
-                        override fun adopt(state: LpExactState, token: Cancellation): Boolean =
-                            !(fail && !cancelled) && delegate.adopt(state, token)
-                        override fun close() {
-                            closes++
-                            delegate.close()
-                        }
+            val factory = wrappingFactory { delegate ->
+                object : PersistentLpSolver by delegate {
+                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                        !(fail && !cancelled) && delegate.adopt(state, token)
+                    override fun close() {
+                        closes++
+                        delegate.close()
                     }
                 }
             }
@@ -680,4 +702,26 @@ class LpPropagatorTest {
         }
     }
 
+    private fun wrappingFactory(wrap: (PersistentLpSolver) -> PersistentLpSolver): LpEngineFactory =
+        object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver = wrap(
+                ProductionLpEngineFactory.newPersistentSolver(
+                    model,
+                    cancellation,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    workLimit,
+                    trackDegeneracy,
+                    pricing,
+                ),
+            )
+        }
 }

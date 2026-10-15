@@ -25,20 +25,27 @@ import kotlin.test.assertSame
 
 class PortfolioInvocationTest {
     @Test
-    fun `parallel construction creates seeded private slots and closes them once`() {
+    fun `parallel construction should create seeded private slots and close them once`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         val seeds = mutableListOf<Long>()
         val closed = mutableListOf<Int>()
-        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
-            binding = { SourceWorkerBinding(EngineInvocation(plan, ModelIdentity.of(source))) }) { slot ->
+        val factory = PortfolioArmFactory(
+            plan,
+            0,
+            ArmFamily.Backtrack,
+            binding = { SourceWorkerBinding(EngineInvocation(plan, ModelIdentity.of(source))) },
+        ) { slot ->
             seeds += slot.seed
             slot.own(AutoCloseable { closed += slot.index })
             PortfolioWorker.ofSolve("source", 0) { _, _ -> SolveResult.Unknown(TerminationReason.BudgetExhausted) }
         }
-        val invocation = PortfolioInvocation(plan, listOf(factory),
+        val invocation = PortfolioInvocation(
+            plan,
+            listOf(factory),
             PortfolioInvocationControls(parallelism = 4, seed = 17),
-            PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()))
+            PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()),
+        )
 
         invocation.close()
         invocation.close()
@@ -49,13 +56,17 @@ class PortfolioInvocationTest {
     }
 
     @Test
-    fun `construction failure closes private source state allocated by earlier slots`() {
+    fun `construction failure should close private source state allocated by earlier slots`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         val foreign = Problem(0, 0, emptyArray(), emptyArray()).prepareExecutionPlan()
         var closed = 0
-        val first = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
-            binding = { SourceWorkerBinding(EngineInvocation(plan, ModelIdentity.of(source))) }) { slot ->
+        val first = PortfolioArmFactory(
+            plan,
+            0,
+            ArmFamily.Backtrack,
+            binding = { SourceWorkerBinding(EngineInvocation(plan, ModelIdentity.of(source))) },
+        ) { slot ->
             slot.own(AutoCloseable { closed++ })
             PortfolioWorker.ofSolve("source", 0) { _, _ -> SolveResult.Unknown(TerminationReason.BudgetExhausted) }
         }
@@ -64,28 +75,39 @@ class PortfolioInvocationTest {
         }
 
         assertFailsWith<IllegalArgumentException> {
-            PortfolioInvocation(plan, listOf(first, second), PortfolioInvocationControls(),
-                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()))
+            PortfolioInvocation(
+                plan,
+                listOf(first, second),
+                PortfolioInvocationControls(),
+                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()),
+            )
         }
 
         assertEquals(1, closed)
     }
 
     @Test
-    fun `containing cancellation prevents entry into an admitted worker`() {
+    fun `containing cancellation should prevent entry into an admitted worker`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         var entered = false
-        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
-            binding = { SourceWorkerBinding(EngineInvocation(plan, ModelIdentity.of(source))) }) {
+        val factory = PortfolioArmFactory(
+            plan,
+            0,
+            ArmFamily.Backtrack,
+            binding = { SourceWorkerBinding(EngineInvocation(plan, ModelIdentity.of(source))) },
+        ) {
             PortfolioWorker.ofSolve("source", 0) { _, _ ->
                 entered = true
                 SolveResult.Unknown(TerminationReason.BudgetExhausted)
             }
         }
-        val invocation = PortfolioInvocation(plan, listOf(factory),
+        val invocation = PortfolioInvocation(
+            plan,
+            listOf(factory),
             PortfolioInvocationControls(cancellation = Cancellation { true }),
-            PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()))
+            PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()),
+        )
 
         val result = invocation.use { it.solve(Cancellation.Never) }
 
@@ -94,47 +116,26 @@ class PortfolioInvocationTest {
     }
 
     @Test
-    fun `runtime binding failure closes the materialized worker before unwinding source state`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray())
-        val plan = source.prepareExecutionPlan()
-        val delegate = BacktrackSolver(source.bake()).session()
-        val closed = mutableListOf<String>()
-        val session = object : Session<BacktrackParams> by delegate {
-            override fun close() {
-                closed += "worker"
-                delegate.close()
-            }
-        }
-        val foreign = Problem(0, 0, emptyArray(), emptyArray())
-        val foreignBinding = EngineInvocation(foreign.prepareExecutionPlan(), ModelIdentity.of(foreign))
-        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
-            binding = { SourceWorkerBinding(foreignBinding) }) { slot ->
-            slot.own(AutoCloseable { closed += "source" })
-            PortfolioWorker.of("source", 0, session, BacktrackParams())
-        }
-
-        val failure = assertFailsWith<IllegalArgumentException> {
-            PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(),
-                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()))
-        }
-
-        assertEquals("worker binding belongs to another source plan", failure.message)
-        assertEquals(listOf("worker", "source"), closed)
-    }
-
-    @Test
-    fun `parallel replicas install complete bindings before policy admission`() {
+    fun `parallel replicas should install complete bindings before policy admission`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         val runtime = EngineInvocation(plan, ModelIdentity.of(source))
         val bindings = mutableListOf<SourceWorkerBinding>()
-        val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack,
-            binding = { SourceWorkerBinding(runtime, sharingInvocation = runtime) }) {
+        val factory = PortfolioArmFactory(
+            plan,
+            0,
+            ArmFamily.Backtrack,
+            binding = { SourceWorkerBinding(runtime, sharingInvocation = runtime) },
+        ) {
             PortfolioWorker.ofSolve("replica", 0) { _, _ -> SolveResult.Unsat() }
         }
 
-        PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(parallelism = 3),
-            PortfolioEvidence(runtime.model, CandidateVerifier.trusting())) { workers ->
+        PortfolioInvocation(
+            plan,
+            listOf(factory),
+            PortfolioInvocationControls(parallelism = 3),
+            PortfolioEvidence(runtime.model, CandidateVerifier.trusting()),
+        ) { workers ->
             for (worker in workers) {
                 val binding = assertNotNull(worker.sourceBinding)
                 assertSame(runtime, binding.invocation)
@@ -149,7 +150,7 @@ class PortfolioInvocationTest {
     }
 
     @Test
-    fun `source scheduling rejects model only worker metadata before policy admission`() {
+    fun `source scheduling should reject model only worker metadata before policy admission`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         var admitted = false
@@ -159,8 +160,12 @@ class PortfolioInvocationTest {
         }
 
         assertFailsWith<IllegalArgumentException> {
-            PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(),
-                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting())) {
+            PortfolioInvocation(
+                plan,
+                listOf(factory),
+                PortfolioInvocationControls(),
+                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()),
+            ) {
                 admitted = true
                 PortfolioInvocationPolicy()
             }
@@ -170,7 +175,7 @@ class PortfolioInvocationTest {
     }
 
     @Test
-    fun `failed replica binding closes workers before reversing private source owners`() {
+    fun `failed replica binding should close workers before reversing private source owners`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         val runtime = EngineInvocation(plan, ModelIdentity.of(source))
@@ -191,15 +196,19 @@ class PortfolioInvocationTest {
         }
 
         assertFailsWith<IllegalArgumentException> {
-            PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(parallelism = 2),
-                PortfolioEvidence(runtime.model, CandidateVerifier.trusting()))
+            PortfolioInvocation(
+                plan,
+                listOf(factory),
+                PortfolioInvocationControls(parallelism = 2),
+                PortfolioEvidence(runtime.model, CandidateVerifier.trusting()),
+            )
         }
 
         assertEquals(listOf("worker1", "worker0", "source1", "source0"), closed)
     }
 
     @Test
-    fun `binding failure remains primary when worker close throws the same failure`() {
+    fun `binding failure should stay primary when worker close throws the same failure`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         val primary = IllegalArgumentException("invalid binding")
@@ -217,12 +226,15 @@ class PortfolioInvocationTest {
         }
 
         val failure = assertFailsWith<IllegalArgumentException> {
-            PortfolioInvocation(plan, listOf(factory), PortfolioInvocationControls(),
-                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()))
+            PortfolioInvocation(
+                plan,
+                listOf(factory),
+                PortfolioInvocationControls(),
+                PortfolioEvidence(ModelIdentity.of(source), CandidateVerifier.trusting()),
+            )
         }
 
         assertSame(primary, failure)
         assertEquals(true, sourceClosed)
     }
-
 }

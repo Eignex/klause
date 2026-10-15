@@ -17,12 +17,12 @@ class MiniZincCompatibilityTest {
             "Error: type error: no function or predicate with this signature found: int_search",
         ],
     )
-    fun `legacy annotation failures are source type incompatibilities`(diagnostic: String) {
+    fun `annotation failures should be source type incompatibilities`(diagnostic: String) {
         assertEquals("type-error", MiniZincCompileFailure.classify(diagnostic))
     }
 
     @Test
-    fun `array index mismatch is source instance incompatibility`() {
+    fun `array index mismatch should be a source instance incompatibility`() {
         assertEquals(
             "index-set-mismatch",
             MiniZincCompileFailure.classify(
@@ -40,12 +40,12 @@ class MiniZincCompatibilityTest {
             "compiler timed out",
         ],
     )
-    fun `infrastructure and unclassified failures cannot quarantine a source`(diagnostic: String) {
+    fun `infrastructure and unclassified failures should not quarantine a source`(diagnostic: String) {
         assertNull(MiniZincCompileFailure.classify(diagnostic))
     }
 
     @Test
-    fun `library identity changes when an included source changes`() {
+    fun `library identity should change when an included source changes`() {
         val root = Files.createTempDirectory("mznlibrary").toFile()
         try {
             File(root, "nested").mkdirs()
@@ -61,7 +61,7 @@ class MiniZincCompatibilityTest {
     }
 
     @Test
-    fun `abnormal compiler exits cannot classify stale type diagnostics as source incompatibility`() {
+    fun `abnormal compiler exits should not classify stale type diagnostics as source incompatibility`() {
         val identity = MiniZincCompilerIdentity(
             version = "test",
             executable = "test",

@@ -12,7 +12,7 @@ import kotlin.test.assertIs
 class TotalizerOptimizerTest {
 
     @Test
-    fun `weighted - heavier soft kept over lighter under mutex`() {
+    fun `weighted optimization should keep the heavier soft over the lighter under a mutex`() {
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 0,
@@ -33,7 +33,7 @@ class TotalizerOptimizerTest {
     }
 
     @Test
-    fun `globally unsat returns Infeasible`() {
+    fun `a globally unsatisfiable model should return infeasible`() {
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 0,

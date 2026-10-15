@@ -35,13 +35,13 @@ class DifferenceFragmentsTest {
     private fun diff(a: Int, b: Int, op: LinearOp, c: Int) = Linear(intArrayOf(1, -1), intArrayOf(a, b), op, c)
 
     @Test
-    fun `an unconditional difference row becomes an unguarded edge`() {
+    fun `unconditional difference row should become an unguarded edge`() {
         val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2))
         assertEquals(1, f.edges.count { it.guard == DifferenceEdge.ALWAYS })
     }
 
     @Test
-    fun `an open model side does not become a difference range edge`() {
+    fun `open model side should not become a domain bound edge`() {
         val bounds = IntBounds.fromFiniteBounds(
             longArrayOf(-8),
             longArrayOf(8),
@@ -57,15 +57,15 @@ class DifferenceFragmentsTest {
     }
 
     @Test
-    fun `a reified difference row becomes an edge guarded by its aux`() {
+    fun `reified difference row should become an edge guarded by its aux`() {
         val r = ReifiedLinear(7, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3)
         val f = assertNotNull(frag(listOf(r), 2))
         val guarded = f.edges.single { it.guard == Lit.make(7, true) }
-        assertEquals(3L, guarded.bound, "the edge holds exactly when the aux is true")
+        assertEquals(3L, guarded.bound)
     }
 
     @Test
-    fun `a reified row also contributes the negation its false aux asserts`() {
+    fun `reified difference row should add the negated edge under a false aux`() {
         val r = ReifiedLinear(7, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3)
         val f = assertNotNull(frag(listOf(r), 2))
         val negated = f.edges.single { it.guard == Lit.make(7, false) }
@@ -73,46 +73,46 @@ class DifferenceFragmentsTest {
     }
 
     @Test
-    fun `a reified equality contributes nothing under a false aux`() {
+    fun `reified equality should add no edge under a false aux`() {
         val r = ReifiedLinear(7, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 3)
         val f = assertNotNull(frag(listOf(r), 2))
         assertTrue(f.edges.none { it.guard == Lit.make(7, false) })
     }
 
     @Test
-    fun `a clause does not disqualify the model`() {
+    fun `clause should not disqualify the fragment`() {
         val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3), Clause(intArrayOf(Lit.make(0, true)))), 2))
         assertTrue(f.edges.any { it.guard == DifferenceEdge.ALWAYS })
     }
 
     @Test
-    fun `a general linear row is left out but the differences are still collected`() {
+    fun `general linear row should be skipped while difference rows are collected`() {
         val general = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3)
         val f = assertNotNull(frag(listOf(general, diff(0, 1, LinearOp.LE, 3)), 2))
-        assertEquals(1, f.edges.size, "the general row contributes no edge and the difference row one")
-        assertEquals(3L, f.edges.single().bound, "the edge is the difference row's")
+        assertEquals(1, f.edges.size)
+        assertEquals(3L, f.edges.single().bound)
     }
 
     @Test
-    fun `a contradictory pair is refuted by the graph`() {
+    fun `contradictory difference pair should form a negative cycle`() {
         val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, -1), diff(1, 0, LinearOp.LE, -1)), 2))
-        assertNotNull(f.graph().negativeCycle(), "the pair sums to 0 <= -2")
+        assertNotNull(f.graph().negativeCycle())
     }
 
     @Test
-    fun `an equality contributes both directions`() {
+    fun `equality should contribute edges in both directions`() {
         val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.EQ, 2), diff(0, 1, LinearOp.LE, 1)), 2))
         assertNotNull(f.graph().negativeCycle())
     }
 
     @Test
-    fun `declared domains enter as differences against zero`() {
+    fun `declared domains should become edges against zero`() {
         val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2, arrayOf(IntDomain(0, 5), IntDomain(0, 5))))
         assertEquals(4, f.edges.count { it.guard == DifferenceEdge.ALWAYS && it.bound != 3L })
     }
 
     @Test
-    fun `a Long minimum lower bound does not wrap into an upper bound`() {
+    fun `Long MIN_VALUE lower bound should not wrap into a domain edge`() {
         val modelBounds = IntBounds.fromModelBounds(
             longArrayOf(Long.MIN_VALUE),
             longArrayOf(3),
@@ -128,13 +128,13 @@ class DifferenceFragmentsTest {
     }
 
     @Test
-    fun `a model with no difference rows yields nothing`() {
+    fun `fragment should be null without difference rows`() {
         val general = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3)
-        assertNull(frag(listOf(general), 2), "no edges is not a fragment")
+        assertNull(frag(listOf(general), 2))
     }
 
     @Test
-    fun `complete difference coverage holds only when every row is a difference or boolean structure`() {
+    fun `complete difference coverage should require only difference and boolean rows`() {
         val cases = listOf(
             arrayOf<Factor>(diff(0, 1, LinearOp.LE, 3), Clause(intArrayOf(Lit.make(0, true)))) to true,
             arrayOf<Factor>(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3)) to false,
@@ -146,7 +146,7 @@ class DifferenceFragmentsTest {
     }
 
     @Test
-    fun `potential sample satisfies active difference edges`() {
+    fun `potential sample should satisfy active difference edges`() {
         val fragment = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2))
         val sample = fragment.potentialSample(2, BooleanArray(0))
         assertTrue(sample is Potentials.Found)
@@ -155,7 +155,7 @@ class DifferenceFragmentsTest {
     }
 
     @Test
-    fun `a spent budget abandons the sample instead of reporting infeasible`() {
+    fun `potential sample should be abandoned when the budget is spent`() {
         val fragment = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2))
         assertEquals(Potentials.Abandoned, fragment.potentialSample(2, BooleanArray(0)) { true })
     }

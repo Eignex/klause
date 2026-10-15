@@ -14,7 +14,7 @@ class IndomainSplitTest {
     private val rng = Random(1)
 
     @Test
-    fun `indomain split midpoint does not overflow on a full long span`() {
+    fun `indomain split midpoint should not overflow on a full long span`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -26,7 +26,7 @@ class IndomainSplitTest {
     }
 
     @Test
-    fun `indomain split takes the floor midpoint on negative bounds`() {
+    fun `indomain split should take the floor midpoint on negative bounds`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,

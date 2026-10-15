@@ -10,14 +10,13 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AllDifferentInvariantTest {
 
     @Test
-    fun `matching seed succeeds where first-fit greedy fails on tight domains`() {
-        // First-fit gives v0 the value 0, leaving the singleton v1 with nothing; a matching places
-        // v1 on 0 and shifts v0, so the seed must still succeed.
+    fun `matching seed should succeed where first-fit greedy fails on tight domains`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -25,13 +24,13 @@ class AllDifferentInvariantTest {
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
         )
         val state = LocalSearchState(problem.bake(), Random(0))
-        assertTrue(state.factors[0].seedFeasible(state, 0), "matching seed must place all vars distinctly")
+        assertTrue(state.factors[0].seedFeasible(state, 0))
         state.recompute()
-        assertTrue(state.cost == 0L, "the seeded assignment must satisfy all-different")
+        assertEquals(0L, state.cost)
     }
 
     @Test
-    fun `structured moves include feasibility-preserving 3-cycles`() {
+    fun `structured moves should include feasibility-preserving 3-cycles`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 5,
@@ -47,21 +46,21 @@ class AllDifferentInvariantTest {
         var sawRotation = false
         for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L, 29L)) {
             val state = seeded(seed)
-            assertTrue(state.cost == 0L, "the identity permutation must be feasible")
+            assertEquals(0L, state.cost)
             val sink = MoveSink()
             state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
             for (m in sink.list) {
                 if (m is Compound && m.parts.size == 3) sawRotation = true
                 val check = seeded(0)
                 check.apply(m)
-                assertTrue(check.cost == 0L, "structured move $m broke all-different")
+                assertEquals(0L, check.cost, "$m")
             }
         }
-        assertTrue(sawRotation, "3-cycle rotations must be emitted alongside 2-swaps")
+        assertTrue(sawRotation)
     }
 
     @Test
-    fun `repair proposes multiple unused targets when domain has many spare values`() {
+    fun `repair should propose multiple unused targets when the domain has spare values`() {
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 10)
         val problem = Problem(
             numBoolVars = 0,
@@ -76,23 +75,19 @@ class AllDifferentInvariantTest {
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
         val sink = MoveSink()
         state.factors[0].proposeRepairMoves(state, factorId = 0, sink = sink)
-        // MAX_REPAIR_TARGETS caps proposals at 4.
         val intSets = sink.list.filterIsInstance<IntSet>()
-        assertTrue(intSets.size in 2..4, "expected 2-4 candidates (cap 4), got ${intSets.size}: $intSets")
+        assertTrue(intSets.size in 2..4, "$intSets")
         val occupantSet = intSets.map { it.varId }.toSet()
-        assertTrue(
-            occupantSet.size == 1 && (occupantSet.contains(0) || occupantSet.contains(1)),
-            "candidates should pin one occupant, got $occupantSet",
-        )
+        assertTrue(occupantSet.size == 1 && (occupantSet.contains(0) || occupantSet.contains(1)), "$occupantSet")
         val targetSet = intSets.map { it.newValue }.toSet()
-        assertTrue(targetSet.size == intSets.size, "duplicate targets: $intSets")
+        assertEquals(intSets.size, targetSet.size, "$intSets")
         for (t in targetSet) {
-            assertTrue(t != 5L && t != 0L, "target $t collides with existing assignment")
+            assertTrue(t != 5L && t != 0L, "target $t")
         }
     }
 
     @Test
-    fun `repair emits value-swap candidates when domain is fully saturated`() {
+    fun `repair should emit value-swap candidates when the domain is saturated`() {
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 3)
         val problem = Problem(
             numBoolVars = 0,
@@ -109,21 +104,14 @@ class AllDifferentInvariantTest {
         val sink = MoveSink()
         state.factors[0].proposeRepairMoves(state, factorId = 0, sink = sink)
         val compounds = sink.list.filterIsInstance<Compound>()
-        assertTrue(compounds.isNotEmpty(), "expected swap candidates with saturated domain; got ${sink.list}")
+        assertTrue(compounds.isNotEmpty(), "${sink.list}")
         for (c in compounds) {
-            assertTrue(c.parts.size == 2, "swap should be 2-part, got ${c.parts.size}")
+            assertEquals(2, c.parts.size)
             val a = c.parts[0] as IntSet
             val b = c.parts[1] as IntSet
-            assertTrue(a.varId != b.varId, "swap should target distinct vars")
-            assertTrue(
-                a.newValue == state.assignment.intValue(b.varId),
-                "swap part 0 takes part 1's old value",
-            )
-            assertTrue(
-                b.newValue == state.assignment.intValue(a.varId),
-                "swap part 1 takes part 0's old value",
-            )
+            assertTrue(a.varId != b.varId)
+            assertEquals(state.assignment.intValue(b.varId), a.newValue)
+            assertEquals(state.assignment.intValue(a.varId), b.newValue)
         }
     }
-
 }

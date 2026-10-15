@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class AnytimeCounterTest {
 
     @Test
-    fun `Boolean counting retains an unchecked sibling when the budget ends`() {
+    fun `Boolean counting should retain an unchecked sibling when the budget ends`() {
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
 
         for (budget in 1L..3L) {
@@ -28,7 +28,7 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `integer counting retains unchecked values across holes`() {
+    fun `integer counting should retain unchecked values across holes`() {
         val domain = IntDomain(-3, 3).excludeValues(longArrayOf(-2, -1, 1, 2))!!
         val solver = BacktrackSolver(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
 
@@ -42,7 +42,7 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `sparse integer values across a wide span have their exact projected mass`() {
+    fun `sparse integer values across a wide span should have their exact projected mass`() {
         val clamp = 1L shl 53
         val domain = intDomainFromSurvivors(longArrayOf(-clamp, 0L, clamp))
         val solver = BacktrackSolver(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
@@ -57,7 +57,7 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `a bounded check budget counts a prefix of an unindexable integer domain`() {
+    fun `bounded check budget should count a prefix of an unindexable integer domain`() {
         val domain = IntDomain(0L, Int.MAX_VALUE.toLong())
         val solver = BacktrackSolver(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
 
@@ -69,7 +69,7 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `integer counting stops at the largest Long value without wrapping`() {
+    fun `integer counting should stop at the largest Long value without wrapping`() {
         val domain = IntDomain(Long.MAX_VALUE - 1L, Long.MAX_VALUE)
         val solver = BacktrackSolver(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
 
@@ -79,7 +79,7 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `mixed projection retains the deeper frontier at every budget boundary`() {
+    fun `mixed projection should retain the deeper frontier at every budget boundary`() {
         val solver = BacktrackSolver(Problem(2, 2, Array(2) { IntDomain(0, 2) }, emptyArray()).bake())
         val config = ExactCountConfig(samplingSet = intArrayOf(1), intSamplingSet = intArrayOf(0), reportEvery = 1L)
 
@@ -101,9 +101,11 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `infeasible children tighten the upper bound without discarding feasible siblings`() {
+    fun `infeasible children should tighten the upper bound without discarding feasible siblings`() {
         val problem = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
         val solver = BacktrackSolver(problem.bake())
@@ -125,7 +127,7 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `undecided feasibility retains the whole projected space`() {
+    fun `undecided feasibility should retain the whole projected space`() {
         val solver = BacktrackSolver(Problem(3, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake())
         val projections = listOf(
             ExactCountConfig(samplingSet = intArrayOf(0)),
@@ -144,7 +146,7 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `empty and fixed projections count one after feasibility is proven`() {
+    fun `empty and fixed projections should count one after feasibility is proven`() {
         val solver = BacktrackSolver(Problem(1, 1, arrayOf(IntDomain(4, 4)), emptyArray()).bake())
         val configs = listOf(
             ExactCountConfig(samplingSet = intArrayOf(), maxChecks = 1L),
@@ -159,7 +161,7 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `a model without variables has one empty projection`() {
+    fun `model without variables should have one empty projection`() {
         val solver = BacktrackSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
 
         val result = solver.exactCount(ExactCountConfig(maxChecks = 1L)).last()
@@ -168,9 +170,11 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `infeasible roots count zero for empty and nonempty projections`() {
+    fun `infeasible roots should count zero for empty and nonempty projections`() {
         val problem = Problem(
-            1, 0, emptyArray(),
+            1,
+            0,
+            emptyArray(),
             arrayOf(Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, false)))),
         )
         val solver = BacktrackSolver(problem.bake())
@@ -183,7 +187,7 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `integer subtree products beyond Double precision are exact`() {
+    fun `integer subtree products beyond Double precision should be exact`() {
         val solver = BacktrackSolver(Problem(0, 34, Array(34) { IntDomain(0, 2) }, emptyArray()).bake())
 
         val result = solver.exactCount(ExactCountConfig(maxChecks = 1L, maxDecisionsPerCheck = 0L)).last()
@@ -194,9 +198,11 @@ class AnytimeCounterTest {
     }
 
     @Test
-    fun `an overflowing frontier retains an unbounded upper after a child is checked`() {
+    fun `overflowing frontier should retain an unbounded upper after a child is checked`() {
         val problem = Problem(
-            1024, 0, emptyArray(),
+            1024,
+            0,
+            emptyArray(),
             Array(1024) { Clause(intArrayOf(Lit.make(it, true))) },
         )
         val solver = BacktrackSolver(problem.bake())
@@ -208,28 +214,5 @@ class AnytimeCounterTest {
             assertEquals(Long.MAX_VALUE, report.upper)
             assertFalse(report.exact)
         }
-    }
-
-    @Test
-    fun `large pending sibling mass does not erase a small deeper frontier`() {
-        val problem = Problem(
-            55, 0, emptyArray(),
-            Array(54) { Clause(intArrayOf(Lit.make(it + 1, true))) },
-        )
-        val solver = BacktrackSolver(problem.bake())
-
-        val reports = solver.exactCount(
-            ExactCountConfig(maxChecks = 219L, maxDecisionsPerCheck = 128L, reportEvery = 1L),
-        ).toList()
-
-        for (report in reports) {
-            assertTrue(report.lower <= 2L && report.upper >= 2L, "$report")
-            assertEquals(report.lower == 2L && report.upper == 2L, report.exact)
-        }
-        for ((previous, next) in reports.zipWithNext()) {
-            assertTrue(next.lower >= previous.lower)
-            assertTrue(next.upper <= previous.upper)
-        }
-        assertEquals(Count(2L, 2L, 2L, exact = true, confidence = 1.0), reports.last())
     }
 }

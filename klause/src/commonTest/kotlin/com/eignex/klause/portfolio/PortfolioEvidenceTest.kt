@@ -34,10 +34,15 @@ import kotlin.test.assertIs
 class PortfolioEvidenceTest {
 
     @Test
-    fun `unrestricted exhaustion retains refutation only for a complete bound worker`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), arrayOf(
-            Linear(coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = 1),
-        ))
+    fun `unrestricted exhaustion should retain refutation only for a complete bound worker`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 0)),
+            arrayOf(
+                Linear(coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = 1),
+            ),
+        )
         val objective = LinearObjective()
         val identity = ModelIdentity.of(source, objective)
         val invocation = EngineInvocation(source.prepareExecutionPlan(objective), identity, objective)
@@ -51,13 +56,16 @@ class PortfolioEvidenceTest {
 
             val result = Portfolio.thompson(listOf(worker)).use { it.minimize() }
 
-            if (proofs && controlled) assertIs<MinimizeResult.Infeasible>(result)
-            else assertIs<MinimizeResult.Unknown>(result)
+            if (proofs && controlled) {
+                assertIs<MinimizeResult.Infeasible>(result)
+            } else {
+                assertIs<MinimizeResult.Unknown>(result)
+            }
         }
     }
 
     @Test
-    fun `a native witness without a publication still satisfies its producer restrictions`() {
+    fun `a native witness without a publication should still satisfy its producer restrictions`() {
         val source = Problem(1, 0, emptyArray(), emptyArray())
         val model = ModelIdentity.of(source)
         val plan = source.prepareExecutionPlan()
@@ -74,7 +82,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `portfolio admission consumes a restricted native witness publication`() {
+    fun `portfolio admission should consume a restricted native witness publication`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val plan = source.prepareExecutionPlan(objective)
@@ -83,7 +91,8 @@ class PortfolioEvidenceTest {
         val producer = EngineInvocation(plan, model, objective, Assumptions(ints = mapOf(0 to 2L)))
         val point = Sample(booleanArrayOf(), longArrayOf(2))
         point.witnessCertificate = EvidenceCertificate.published(
-            CompletedEnginePublication.Witness(producer, point, 2.0))
+            CompletedEnginePublication.Witness(producer, point, 2.0),
+        )
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
             .bindSource(SourceWorkerBinding(producer))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
@@ -94,14 +103,15 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `portfolio admission rejects a foreign native prepared plan`() {
+    fun `portfolio admission should reject a foreign native prepared plan`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val model = ModelIdentity.of(source)
         val containing = EngineInvocation(source.prepareExecutionPlan(), model)
         val producer = EngineInvocation(source.prepareExecutionPlan(), model)
         val point = Sample(booleanArrayOf(), longArrayOf(2))
         point.witnessCertificate = EvidenceCertificate.published(
-            CompletedEnginePublication.Witness(producer, point, null))
+            CompletedEnginePublication.Witness(producer, point, null),
+        )
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
             .bindSource(SourceWorkerBinding(producer))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
@@ -112,14 +122,15 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `portfolio admission rejects a substituted native publication value`() {
+    fun `portfolio admission should reject a substituted native publication value`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val model = ModelIdentity.of(source, objective)
         val binding = EngineInvocation(source.prepareExecutionPlan(objective), model, objective)
         val point = Sample(booleanArrayOf(), longArrayOf(2))
         point.witnessCertificate = EvidenceCertificate.published(
-            CompletedEnginePublication.Witness(binding, point, 2.0))
+            CompletedEnginePublication.Witness(binding, point, 2.0),
+        )
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
             .bindSource(SourceWorkerBinding(binding))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
@@ -130,7 +141,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `portfolio admission rejects a violated native producer condition`() {
+    fun `portfolio admission should reject a violated native producer condition`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val model = ModelIdentity.of(source)
         val plan = source.prepareExecutionPlan()
@@ -138,7 +149,8 @@ class PortfolioEvidenceTest {
         val producer = EngineInvocation(plan, model, sourceAssumptions = Assumptions(ints = mapOf(0 to 1L)))
         val point = Sample(booleanArrayOf(), longArrayOf(2))
         point.witnessCertificate = EvidenceCertificate.published(
-            CompletedEnginePublication.Witness(producer, point, null))
+            CompletedEnginePublication.Witness(producer, point, null),
+        )
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
             .bindSource(SourceWorkerBinding(producer))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(containing)
@@ -149,7 +161,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `a mismatched model witness is quarantined without proving infeasibility`() {
+    fun `a mismatched model witness should be quarantined without proving infeasibility`() {
         val model = ModelIdentity.of(Any())
         val worker = PortfolioWorker.ofSolve("foreign", 0) { _, _ ->
             SolveResult.Sat(Sample(booleanArrayOf(true), LongArray(0)))
@@ -164,7 +176,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `indeterminate candidates cannot become incumbents or justify exhaustion`() {
+    fun `indeterminate candidates should not become incumbents or justify exhaustion`() {
         val model = ModelIdentity.of(Any())
         val sample = Sample(booleanArrayOf(true), LongArray(0))
         val worker = PortfolioWorker.ofMinimize("undecided", 0) { _, _, _, _ ->
@@ -184,7 +196,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `withheld terminal certificates retain witnesses without publishing proofs`() {
+    fun `withheld terminal certificates should retain witnesses without publishing proofs`() {
         val model = ModelIdentity.of(Any())
         val sample = Sample(booleanArrayOf(true), LongArray(0))
         val claims = listOf(
@@ -203,7 +215,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `withheld infeasibility certificates leave the model unknown`() {
+    fun `withheld infeasibility certificates should leave the model unknown`() {
         val model = ModelIdentity.of(Any())
         val worker = PortfolioWorker.ofMinimize("withheld", 0) { _, _, _, _ -> sequenceOf(MinimizeResult.Infeasible()) }
             .bindEvidence(model, provesResults = false)
@@ -213,8 +225,9 @@ class PortfolioEvidenceTest {
         assertIs<MinimizeResult.Unknown>(result)
         assertEquals(0L, result.stats.portfolio.arms.single().faults)
     }
+
     @Test
-    fun `outer binding cannot promote a witness-only worker to proof authority`() {
+    fun `outer binding should not promote a witness-only worker to proof authority`() {
         val identity = ModelIdentity.of(Any())
         val sample = Sample(booleanArrayOf(), longArrayOf())
         val worker = PortfolioWorker.ofMinimize("witness-only", 0) { _, _, _, _ ->
@@ -227,7 +240,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `model binding without a runtime invocation cannot prove infeasibility`() {
+    fun `model binding without a runtime invocation should not prove infeasibility`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val model = ModelIdentity.of(source)
         val worker = PortfolioWorker.ofSolve("unbound", 0) { _, _ -> SolveResult.Unsat() }.bindEvidence(model)
@@ -239,7 +252,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `model binding without a runtime invocation retains only an optimization witness`() {
+    fun `model binding without a runtime invocation should retain only an optimization witness`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val model = ModelIdentity.of(source, objective)
@@ -255,7 +268,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `runtime bound source completion retains its optimization terminal`() {
+    fun `runtime bound source completion should retain its optimization terminal`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val model = ModelIdentity.of(source, objective)
@@ -274,23 +287,52 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `exact objective ordering preserves improvements hidden by floating projection`() {
+    fun `exact objective ordering should preserve improvements hidden by floating projection`() {
         for (real in listOf(false, true)) {
-            val objective = if (real) LinearObjective(constant = 1L shl 62, realCoefficients = doubleArrayOf(-1.0))
-                else LinearObjective(constant = 1L shl 62, intCoefficients = longArrayOf(-1))
-            val first = if (real) Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), listOf(BigFraction.ONE))
-                else Sample(booleanArrayOf(), longArrayOf(1))
-            val optimum = if (real) Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
-                listOf(BigFraction.ofLong(2))) else Sample(booleanArrayOf(), longArrayOf(2))
-            val source = if (real) Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-                realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(2.0))
-            else Problem(0, 1, arrayOf(IntDomain(1, 2)), emptyArray())
+            val objective = if (real) {
+                LinearObjective(constant = 1L shl 62, realCoefficients = doubleArrayOf(-1.0))
+            } else {
+                LinearObjective(constant = 1L shl 62, intCoefficients = longArrayOf(-1))
+            }
+            val first = if (real) {
+                Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), listOf(BigFraction.ONE))
+            } else {
+                Sample(booleanArrayOf(), longArrayOf(1))
+            }
+            val optimum = if (real) {
+                Sample(
+                    booleanArrayOf(),
+                    longArrayOf(),
+                    doubleArrayOf(2.0),
+                    listOf(BigFraction.ofLong(2)),
+                )
+            } else {
+                Sample(booleanArrayOf(), longArrayOf(2))
+            }
+            val source = if (real) {
+                Problem(
+                    0,
+                    0,
+                    emptyArray(),
+                    emptyArray(),
+                    numRealVars = 1,
+                    realLower = doubleArrayOf(1.0),
+                    realUpper = doubleArrayOf(2.0),
+                )
+            } else {
+                Problem(0, 1, arrayOf(IntDomain(1, 2)), emptyArray())
+            }
             val identity = ModelIdentity.of(source, objective)
             val binding = EngineInvocation(source.prepareExecutionPlan(objective), identity, objective)
             val complete = PortfolioWorker.ofMinimize("bt/exact", 0) { _, _, _, _ ->
-                sequenceOf(MinimizeResult.BestFound(first, objective.evaluateExact(first).toDouble(),
-                    TerminationReason.BudgetExhausted),
-                    MinimizeResult.Optimal(optimum, objective.evaluateExact(optimum).toDouble()))
+                sequenceOf(
+                    MinimizeResult.BestFound(
+                        first,
+                        objective.evaluateExact(first).toDouble(),
+                        TerminationReason.BudgetExhausted,
+                    ),
+                    MinimizeResult.Optimal(optimum, objective.evaluateExact(optimum).toDouble()),
+                )
             }.bindSource(SourceWorkerBinding(binding))
             val portfolio = Portfolio.thompson(listOf(complete))
             portfolio.exactLinearObjective = objective
@@ -299,14 +341,15 @@ class PortfolioEvidenceTest {
 
             val result = portfolio.use { it.minimize() }
 
-            assertEquals(objective.evaluateExact(optimum),
-                objective.evaluateExact(assertIs<MinimizeResult.Optimal>(result).sample))
+            assertEquals(
+                objective.evaluateExact(optimum),
+                objective.evaluateExact(assertIs<MinimizeResult.Optimal>(result).sample),
+            )
         }
     }
 
-
     @Test
-    fun `a foreign completion scope is quarantined before engine admission`() {
+    fun `a foreign completion scope should be quarantined before engine admission`() {
         val model = ModelIdentity.of(Any())
         val scope = SourceScope(SourceRevision("original", "exact-affine"))
         val worker = PortfolioWorker.ofSolve("complete", 0) { _, _ -> SolveResult.Unsat() }
@@ -314,14 +357,17 @@ class PortfolioEvidenceTest {
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
         val foreign = scope.copy(revision = scope.revision.copy(identity = "foreign"))
 
-        val checked = verifier.proof(worker, EvidenceKind.Infeasible,
-            CompletedEngineResult.Solve(foreign, SolveResult.Unsat()))
+        val checked = verifier.proof(
+            worker,
+            EvidenceKind.Infeasible,
+            CompletedEngineResult.Solve(foreign, SolveResult.Unsat()),
+        )
 
         assertIs<Verification.Rejected>(checked)
     }
 
     @Test
-    fun `an invalid completed optimum witness cannot gain admission from its label`() {
+    fun `an invalid completed optimum witness should not gain admission from its label`() {
         val model = ModelIdentity.of(Any())
         val scope = SourceScope(SourceRevision("original", "exact-affine"))
         val worker = PortfolioWorker.ofSolve("complete", 0) { _, _ -> SolveResult.Unsat() }
@@ -336,7 +382,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `a base model witness cannot enter an invocation whose conditions it violates`() {
+    fun `a base model witness should not enter an invocation whose conditions it violates`() {
         val model = ModelIdentity.of(Any())
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
@@ -364,12 +410,15 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `a scoped witness satisfies Boolean integer and exact real conditions`() {
+    fun `a scoped witness should satisfy Boolean integer and exact real conditions`() {
         val model = ModelIdentity.of(Any())
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val condition = SourceCondition(mapOf(0 to true), mapOf(integer to BigFraction.ONE, real to BigFraction.ONE),
-            mapOf(integer to BigFraction.ONE, real to BigFraction.ONE))
+        val condition = SourceCondition(
+            mapOf(0 to true),
+            mapOf(integer to BigFraction.ONE, real to BigFraction.ONE),
+            mapOf(integer to BigFraction.ONE, real to BigFraction.ONE),
+        )
         val scope = SourceScope(SourceRevision("original", "exact-affine"), condition)
         val point = Sample(booleanArrayOf(true), longArrayOf(1), doubleArrayOf(1.0), listOf(BigFraction.ONE))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
@@ -381,11 +430,13 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `an approximate real coordinate cannot establish an invocation window`() {
+    fun `an approximate real coordinate should not establish an invocation window`() {
         val model = ModelIdentity.of(Any())
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val scope = SourceScope(SourceRevision("original", "exact-affine"),
-            SourceCondition(lower = mapOf(real to BigFraction.ZERO)))
+        val scope = SourceScope(
+            SourceRevision("original", "exact-affine"),
+            SourceCondition(lower = mapOf(real to BigFraction.ZERO)),
+        )
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }.bindEvidence(model)
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindSourceScope(scope)
@@ -396,7 +447,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `cancelling the containing invocation leaves its witness check indeterminate`() {
+    fun `cancelling the containing invocation should leave its witness check indeterminate`() {
         val model = ModelIdentity.of(Any())
         val scope = SourceScope(SourceRevision("original", "exact-affine"), SourceCondition(bools = mapOf(0 to true)))
         val point = Sample(booleanArrayOf(false), longArrayOf())
@@ -410,12 +461,14 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `a completed optimum outside its source condition cannot establish a bound`() {
+    fun `a completed optimum outside its source condition should not establish a bound`() {
         val model = ModelIdentity.of(Any())
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val scope = SourceScope(SourceRevision("original", "exact-affine"),
+        val scope = SourceScope(
+            SourceRevision("original", "exact-affine"),
             SourceCondition(lower = mapOf(integer to BigFraction.ONE)),
-            SourceObjective("x", ObjectiveSense.MINIMIZE))
+            SourceObjective("x", ObjectiveSense.MINIMIZE),
+        )
         val point = Sample(booleanArrayOf(), longArrayOf(0))
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Sat(point) }
             .bindSource(SourceWorkerBinding(model, scope = scope))
@@ -428,7 +481,7 @@ class PortfolioEvidenceTest {
     }
 
     @Test
-    fun `a completed runtime optimum needs no invented source revision`() {
+    fun `a completed runtime optimum should need no invented source revision`() {
         val source = Problem(0, 1, arrayOf(IntDomain(1, 3)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val plan = source.prepareExecutionPlan(objective)
@@ -439,14 +492,17 @@ class PortfolioEvidenceTest {
             .bindSource(SourceWorkerBinding(binding))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
 
-        val checked = verifier.proof(worker, EvidenceKind.Bound,
-            CompletedEngineResult.Minimize(binding, MinimizeResult.Optimal(point, 1.0)))
+        val checked = verifier.proof(
+            worker,
+            EvidenceKind.Bound,
+            CompletedEngineResult.Minimize(binding, MinimizeResult.Optimal(point, 1.0)),
+        )
 
         assertIs<Verification.Accepted<*, *>>(checked)
     }
 
     @Test
-    fun `a runtime completion cannot cross an execution assumption boundary`() {
+    fun `a runtime completion should not cross an execution assumption boundary`() {
         val source = Problem(1, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         val model = ModelIdentity.of(source)
@@ -454,13 +510,18 @@ class PortfolioEvidenceTest {
         val worker = PortfolioWorker.ofSolve("fixture", 0) { _, _ -> SolveResult.Unsat() }
             .bindSource(SourceWorkerBinding(binding))
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(binding)
-        val conditional = EngineInvocation(plan, model,
-            executionAssumptions = Assumptions(bools = mapOf(0 to true)))
+        val conditional = EngineInvocation(
+            plan,
+            model,
+            executionAssumptions = Assumptions(bools = mapOf(0 to true)),
+        )
 
-        val checked = verifier.proof(worker, EvidenceKind.Infeasible,
-            CompletedEngineResult.Solve(conditional, SolveResult.Unsat()))
+        val checked = verifier.proof(
+            worker,
+            EvidenceKind.Infeasible,
+            CompletedEngineResult.Solve(conditional, SolveResult.Unsat()),
+        )
 
         assertIs<Verification.Rejected>(checked)
     }
-
 }

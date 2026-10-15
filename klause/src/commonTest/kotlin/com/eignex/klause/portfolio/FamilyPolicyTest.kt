@@ -15,7 +15,7 @@ class FamilyPolicyTest {
         (0 until rounds).count { policy.choose(pair) == family }
 
     @Test
-    fun `complete search deductions preserve family balance before a witness`() {
+    fun `complete search deductions should preserve family balance before a witness`() {
         val policy = FamilyPolicy(Random(3))
 
         repeat(8) { policy.record(ArmFamily.Backtrack, progressed = true, plateau = false) }
@@ -24,7 +24,7 @@ class FamilyPolicyTest {
     }
 
     @Test
-    fun `complete search progress earns family share after a witness`() {
+    fun `complete search progress should earn family share after a witness`() {
         val policy = FamilyPolicy(Random(3))
 
         repeat(8) { policy.record(ArmFamily.Backtrack, progressed = true, plateau = true) }
@@ -33,7 +33,7 @@ class FamilyPolicyTest {
     }
 
     @Test
-    fun `a plateaued local search hands its share to backtrack`() {
+    fun `a plateaued local search should hand its share to backtrack`() {
         val policy = FamilyPolicy(Random(3))
 
         repeat(8) { policy.record(ArmFamily.LocalSearch, progressed = false, plateau = true) }
@@ -42,7 +42,7 @@ class FamilyPolicyTest {
     }
 
     @Test
-    fun `local search wins its share back once it progresses again`() {
+    fun `local search should win its share back once it progresses again`() {
         val policy = FamilyPolicy(Random(3))
         repeat(8) { policy.record(ArmFamily.LocalSearch, progressed = false, plateau = true) }
 
@@ -52,7 +52,7 @@ class FamilyPolicyTest {
     }
 
     @Test
-    fun `a leaning prior still gives the other family turns`() {
+    fun `a leaning prior should still give the other family turns`() {
         val profile = ProblemProfile(ProblemClass.Continuous, optimizing = true, wide = false, scheduling = false)
         val policy = FamilyPolicy(Random(3), FamilyPrior.of(profile))
 
@@ -60,7 +60,7 @@ class FamilyPolicyTest {
     }
 
     @Test
-    fun `only an eligible family is chosen`() {
+    fun `policy should choose only an eligible family`() {
         val policy = FamilyPolicy(Random(3))
         repeat(8) { policy.record(ArmFamily.Lns, progressed = true, plateau = true) }
 

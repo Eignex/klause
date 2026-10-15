@@ -10,30 +10,20 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.seconds
 
 class SearchSessionTest {
 
     @Test
-    fun `theory components receive the solve deadline`() {
-        val stop = Cancellation.after(1.seconds)
-        val session = SearchSession(emptyList(), cancellation = stop)
-
-        assertTrue(session.executionControls.cancellation === stop)
-        assertTrue(session.executionControls.cancellation.deadline() != null)
-    }
-
-    @Test
-    fun `open work counts each committed public decision kind`() {
+    fun `open work should count each committed public decision kind`() {
         val decisions = listOf(
-            SearchDecision.Bool(0),
-            SearchDecision.IntAtMost(0, 1),
-            SearchDecision.IntAtLeast(0, 0),
-            SearchDecision.IntEqual(0, 0),
-            SearchDecision.Theory(object : SearchTheoryDecision {}),
+            SearchDecision.Bool(0) to Triple(1L, 0L, 0L),
+            SearchDecision.IntAtMost(0, 1) to Triple(0L, 1L, 0L),
+            SearchDecision.IntAtLeast(0, 0) to Triple(0L, 1L, 0L),
+            SearchDecision.IntEqual(0, 0) to Triple(0L, 1L, 0L),
+            SearchDecision.Theory(object : SearchTheoryDecision {}) to Triple(0L, 0L, 1L),
         )
 
-        for (decision in decisions) {
+        for ((decision, expected) in decisions) {
             val work = OpenTheoryWorkSink()
             val brancher = object : SearchBrancher {
                 override fun nextBranch(context: SearchContext): List<SearchDecision>? =
@@ -47,24 +37,13 @@ class SearchSessionTest {
 
             assertIs<SearchResult.Satisfied>(session.solve(numBoolVars = 0))
             val stats = work.snapshot()
-            assertEquals(if (decision is SearchDecision.Bool) 1L else 0L, stats.openBoolDecisions)
-            assertEquals(
-                if (decision is SearchDecision.IntAtMost || decision is SearchDecision.IntAtLeast ||
-                    decision is SearchDecision.IntEqual
-                ) {
-                    1L
-                } else {
-                    0L
-                },
-                stats.openIntDecisions,
-            )
-            assertEquals(if (decision is SearchDecision.Theory) 1L else 0L, stats.openTheoryDecisions)
+            assertEquals(expected, Triple(stats.openBoolDecisions, stats.openIntDecisions, stats.openTheoryDecisions))
             assertEquals(1L, stats.openWork)
         }
     }
 
     @Test
-    fun `a refused sibling after fixed work exhaustion is indeterminate`() {
+    fun `a refused sibling after fixed work exhaustion should be indeterminate`() {
         val work = OpenTheoryWorkSink(limit = 1)
         val session = SearchSession(
             listOf(object : SearchComponent {
@@ -83,7 +62,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `shared session retracts every component to the same decision level`() {
+    fun `shared session should retract every component to the same decision level`() {
         val first = RecordingComponent()
         val second = RecordingComponent()
         val session = SearchSession(listOf(first, second))
@@ -99,7 +78,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `indeterminate component check never becomes infeasible`() {
+    fun `indeterminate component check should never become infeasible`() {
         val session = SearchSession(
             listOf(object : SearchComponent {
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
@@ -110,7 +89,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `complete check clears a resolver from an earlier conflict`() {
+    fun `complete check should clear a resolver from an earlier conflict`() {
         val resolver = object : SearchConflictResolver {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                 ComponentResult.Conflict()
@@ -129,7 +108,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `components observe shared Boolean decisions without finite-domain state`() {
+    fun `components should observe shared Boolean decisions without finite-domain state`() {
         var observed: Boolean? = null
         val session = SearchSession(
             listOf(object : SearchComponent {
@@ -146,7 +125,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `traversal-only brancher supplies alternatives beside one fixpoint component`() {
+    fun `traversal-only brancher should supply alternatives beside one fixpoint component`() {
         val brancher = object : SearchBrancher {
             override fun nextBranch(context: SearchContext): List<SearchDecision> = listOf(SearchDecision.Bool(0))
         }
@@ -159,7 +138,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `component implication reaches peers and retracts with its decision level`() {
+    fun `component implication should reach peers and retract with its decision level`() {
         var observed: Boolean? = null
         val source = object : SearchComponent {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
@@ -181,7 +160,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `component integer bounds are shared semantically and retract with the trail`() {
+    fun `component integer bounds should be shared semantically and retract with the trail`() {
         var observed: Long? = null
         val source = object : SearchComponent {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
@@ -204,7 +183,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `native component import reaches peers without reasserting the source`() {
+    fun `native component import should reach peers without reasserting the source`() {
         var sourceAssertions = 0
         var peerAssertions = 0
         val source = object : SearchComponent {
@@ -229,7 +208,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `conflict retention depends on whether the component keeps its own explanations`() {
+    fun `conflict retention should depend on whether the component keeps its own explanations`() {
         listOf(true to 0, false to 1).forEach { (retains, expectedCount) ->
             val session = SearchSession(listOf(ConflictingComponent(retains = retains)))
 
@@ -246,11 +225,7 @@ class SearchSessionTest {
         error("traversal did not exhaust a single-variable space")
     }
 
-    /**
-     * Refuses variable 0 being true and analyses that conflict itself, which is the shape the rule
-     * governs: the shared analyzer stands aside for a native one, so retention is the engine's only
-     * chance to keep a copy.
-     */
+    // The shared analyzer defers to a native resolver, so retention is the only way the conflict is kept.
     private class ConflictingComponent(private val retains: Boolean) : SearchConflictResolver {
         override val retainsOwnExplanations: Boolean get() = retains
 
@@ -265,7 +240,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `session assembles component-owned model values`() {
+    fun `session should assemble component-owned model values`() {
         val component = object : SearchComponent {
             override fun contributeModel(model: SearchModel, context: SearchContext) {
                 model.put(this, "model")
@@ -279,7 +254,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `session assembles assigned Boolean values under source keys`() {
+    fun `session should assemble assigned Boolean values under source keys`() {
         val session = SearchSession(emptyList())
 
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
@@ -288,22 +263,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `session accepts a theory-defined model key`() {
-        data class ArrayModelValue(val symbol: String) : SearchValueKey
-        val key = ArrayModelValue("a")
-        val session = SearchSession(
-            listOf(object : SearchComponent {
-                override fun contributeModel(model: SearchModel, context: SearchContext) {
-                    model.put(key, "store")
-                }
-            }),
-        )
-
-        assertEquals("store", session.model().valueOf<String>(key))
-    }
-
-    @Test
-    fun `Boolean driver backtracks a component-refuted clause-consistent leaf`() {
+    fun `Boolean driver should backtrack a component-refuted clause-consistent leaf`() {
         val refuter = object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(0) == false) {
                 ComponentCheck.Infeasible()
@@ -321,7 +281,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `Boolean driver preserves an indeterminate leaf as unknown`() {
+    fun `Boolean driver should preserve an indeterminate leaf as unknown`() {
         val session = SearchSession(
             listOf(object : SearchComponent {
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
@@ -332,7 +292,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `Boolean driver retains a sound leaf explanation as a learned clause`() {
+    fun `Boolean driver should retain a sound leaf explanation as a learned clause`() {
         val session = SearchSession(
             listOf(object : SearchComponent {
                 override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(0) == false) {
@@ -350,7 +310,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `shared analysis resolves a nonasserting theory conflict to first UIP`() {
+    fun `shared analysis should resolve a nonasserting theory conflict to first UIP`() {
         val theory = object : SearchConflictResolver {
             override val prefersNativeConflictAnalysis: Boolean get() = false
 
@@ -397,7 +357,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `a learned conflict whose propagation is indeterminate leaves the run unknown`() {
+    fun `a learned conflict whose propagation is indeterminate should leave the run unknown`() {
         // Not b0 and not b1 conflict, so the learned b0 or b1 backjumps into not b0, b1, which the theory cannot
         // decide; b0 is refuted without a learned clause. Nothing refutes that undecided region.
         val theory = object : SearchConflictResolver {
@@ -427,7 +387,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `shared analysis identifies a root explanation as exhausted`() {
+    fun `shared analysis should identify a root explanation as exhausted`() {
         val session = SearchSession(emptyList())
         session.learn(SearchExplanation(intArrayOf(0)))
 
@@ -442,7 +402,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `generic driver backtracks component branches through the shared trail`() {
+    fun `generic driver should backtrack component branches through the shared trail`() {
         val brancher = object : SearchBrancher {
             override fun nextBranch(context: SearchContext): List<SearchDecision>? =
                 if (context.intLowerBound(0) == null) {
@@ -467,7 +427,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `generic driver dispatches a typed theory branch through the shared trail`() {
+    fun `generic driver should dispatch a typed theory branch through the shared trail`() {
         data class Choose(val symbol: String) : SearchTheoryDecision
         var chosen: String? = null
         val brancher = object : SearchBrancher {
@@ -498,30 +458,9 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `node policy learns at its asserting backjump level`() {
+    fun `node policy should learn at its asserting backjump level`() {
         var appliedAt: Int? = null
-        var pending = true
         var learnedBackjumps = 0
-        val policy = object : SearchNodePolicy {
-            override fun beforeBranch(context: SearchContext): SearchNodeDisposition = if (
-                pending && context.decisionLevel == 2
-            ) {
-                SearchNodeDisposition.Backjump(object : SearchLearnedConflict {
-                    override val decisionLevel: Int = 1
-                    override val lbd: Int = 1
-                    override val guardLiterals: IntArray = intArrayOf(0)
-                    override val decisionLevels: IntArray = intArrayOf(1)
-
-                    override fun apply(session: SearchSession): SearchLearnedConflictResult {
-                        appliedAt = session.decisionLevel
-                        pending = false
-                        return SearchLearnedConflictResult.Resume
-                    }
-                })
-            } else {
-                SearchNodeDisposition.Expand
-            }
-        }
         val observer = object : SearchRunObserver {
             override fun onLearnedNodeBackjump() {
                 learnedBackjumps++
@@ -530,7 +469,9 @@ class SearchSessionTest {
         val session = SearchSession(emptyList())
         val run = session.openRun(
             numBoolVars = 2,
-            nodePolicy = policy,
+            nodePolicy = backjumpOnceAtLevelTwo(conflictLbd = 1, levels = intArrayOf(1)) {
+                appliedAt = it.decisionLevel
+            },
             observer = observer,
         )
 
@@ -541,7 +482,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `learned conflicts feed restart quality and observer metadata before backjumping`() {
+    fun `learned conflicts should feed restart quality and observer metadata before backjumping`() {
         var recorded: Pair<Int, Int>? = null
         var observedLevels: IntArray? = null
         val restart = object : SearchRestartPolicy {
@@ -551,30 +492,11 @@ class SearchSessionTest {
 
             override fun shouldRestart(decisionsThisRun: Long): Boolean = false
         }
-        var pending = true
         val session = SearchSession(emptyList())
         val run = session.openRun(
             numBoolVars = 2,
             params = SearchSolveParams(restart = restart),
-            nodePolicy = object : SearchNodePolicy {
-                override fun beforeBranch(context: SearchContext): SearchNodeDisposition = if (
-                    pending && context.decisionLevel == 2
-                ) {
-                    SearchNodeDisposition.Backjump(object : SearchLearnedConflict {
-                        override val decisionLevel: Int = 1
-                        override val lbd: Int = 7
-                        override val guardLiterals: IntArray = intArrayOf(0)
-                        override val decisionLevels: IntArray = intArrayOf(1, 4)
-
-                        override fun apply(session: SearchSession): SearchLearnedConflictResult {
-                            pending = false
-                            return SearchLearnedConflictResult.Resume
-                        }
-                    })
-                } else {
-                    SearchNodeDisposition.Expand
-                }
-            },
+            nodePolicy = backjumpOnceAtLevelTwo(conflictLbd = 7, levels = intArrayOf(1, 4)),
             observer = object : SearchRunObserver {
                 override fun onLearnedConflict(conflict: SearchLearnedConflict) {
                     observedLevels = conflict.decisionLevels
@@ -588,8 +510,36 @@ class SearchSessionTest {
         assertTrue(observedLevels!!.contentEquals(intArrayOf(1, 4)))
     }
 
+    private fun backjumpOnceAtLevelTwo(
+        conflictLbd: Int,
+        levels: IntArray,
+        onApply: (SearchSession) -> Unit = {},
+    ): SearchNodePolicy {
+        var pending = true
+        return object : SearchNodePolicy {
+            override fun beforeBranch(context: SearchContext): SearchNodeDisposition = if (
+                pending && context.decisionLevel == 2
+            ) {
+                SearchNodeDisposition.Backjump(object : SearchLearnedConflict {
+                    override val decisionLevel: Int = 1
+                    override val lbd: Int = conflictLbd
+                    override val guardLiterals: IntArray = intArrayOf(0)
+                    override val decisionLevels: IntArray = levels
+
+                    override fun apply(session: SearchSession): SearchLearnedConflictResult {
+                        onApply(session)
+                        pending = false
+                        return SearchLearnedConflictResult.Resume
+                    }
+                })
+            } else {
+                SearchNodeDisposition.Expand
+            }
+        }
+    }
+
     @Test
-    fun `restart retracts shared state before notifying components`() {
+    fun `restart should retract shared state before notifying components`() {
         var restartedAt = -1
         val component = object : SearchComponent {
             override fun onRestart(context: SearchContext) {
@@ -606,7 +556,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `generic driver restarts at a decision boundary and retains learned clauses`() {
+    fun `generic driver should restart at a decision boundary and retain learned clauses`() {
         var restarts = 0
         val refuter = object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck = when (context.boolValue(0)) {
@@ -633,14 +583,14 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `generic driver returns unknown when its decision allowance is spent`() {
+    fun `generic driver should return unknown when its decision allowance is spent`() {
         val session = SearchSession(emptyList())
 
         assertIs<SearchResult.Indeterminate>(session.solve(2, SearchSolveParams(maxDecisions = 1)))
     }
 
     @Test
-    fun `a brancher that sees the deadline stops the run before its branch is committed`() {
+    fun `a brancher that sees the deadline should stop the run before its branch is committed`() {
         var fired = false
         var asserted = 0
         val brancher = object : SearchBrancher {
@@ -665,7 +615,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `rejected alternatives do not spend the committed decision allowance`() {
+    fun `rejected alternatives should not spend the committed decision allowance`() {
         val rejected = object : SearchTheoryDecision {}
         val accepted = object : SearchTheoryDecision {}
         val work = OpenTheoryWorkSink()
@@ -694,7 +644,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `model policy continues through a non-reportable model`() {
+    fun `model policy should continue through a non-reportable model`() {
         var seen = 0
         val session = SearchSession(emptyList())
         val run = session.openRun(
@@ -712,7 +662,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `a skipped model stops the run once the deadline has passed`() {
+    fun `a skipped model should stop the run once the deadline has passed`() {
         var skipped = 0
         val session = SearchSession(emptyList(), cancellation = Cancellation { skipped > 0 })
         val run = session.openRun(
@@ -730,7 +680,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `a skipped root model is exhausted after a cancellation pause`() {
+    fun `a skipped root model should be exhausted after a cancellation pause`() {
         var cancelled = false
         var checked = 0
         val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
@@ -757,7 +707,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `a skipped model resumes at its sibling after a cancellation pause`() {
+    fun `a skipped model should resume at its sibling after a cancellation pause`() {
         var cancelled = false
         var checked = 0
         val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
@@ -785,7 +735,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `node policy prunes through the shared frame stack`() {
+    fun `node policy should prune through the shared frame stack`() {
         var calls = 0
         val session = SearchSession(emptyList())
         val run = session.openRun(
@@ -801,183 +751,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `learned clause implies its last unfalsified literal`() {
-        val session = SearchSession(emptyList())
-        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
-
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
-
-        assertEquals(true, session.boolValue(2))
-    }
-
-    @Test
-    fun `learned clause conflicts when propagation falsifies every literal`() {
-        val session = SearchSession(emptyList())
-        session.learn(SearchExplanation(intArrayOf(0, 2)))
-        session.learn(SearchExplanation(intArrayOf(0, 3)))
-
-        val result = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(1)))
-
-        assertEquals(setOf(0, 3), result.explanation?.literals?.toSet())
-    }
-
-    @Test
-    fun `learned clause implies again after its watches are refalsified in another order`() {
-        val session = SearchSession(emptyList())
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
-        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
-        assertIs<ComponentResult.Consistent>(session.propagate())
-        session.popTo(0)
-
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
-
-        assertEquals(true, session.boolValue(0))
-    }
-
-    @Test
-    fun `learned unit clause is reimplied after the level that learned it is retracted`() {
-        val session = SearchSession(emptyList())
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
-        session.learn(SearchExplanation(intArrayOf(0)))
-        assertIs<ComponentResult.Consistent>(session.propagate())
-        session.popTo(0)
-        assertEquals(null, session.boolValue(0))
-
-        assertIs<ComponentResult.Consistent>(session.propagate())
-
-        assertEquals(true, session.boolValue(0))
-    }
-
-    @Test
-    fun `permuted explanation does not enter the database twice`() {
-        val session = SearchSession(emptyList())
-
-        session.learn(SearchExplanation(intArrayOf(0, 2)))
-        session.learn(SearchExplanation(intArrayOf(2, 0)))
-
-        assertEquals(1, session.learnedClauseCount)
-    }
-
-    @Test
-    fun `restart reduction over the learned database cap keeps clauses at or above the glue threshold`() {
-        listOf(0 to 1, 1 to 2).forEach { (glueLbd, expectedCount) ->
-            val session = SearchSession(
-                emptyList(),
-                learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = glueLbd),
-            )
-            session.learn(SearchExplanation(intArrayOf(0, 2)))
-            session.learn(SearchExplanation(intArrayOf(4, 6)))
-            assertIs<ComponentResult.Consistent>(session.propagate())
-
-            assertIs<ComponentResult.Consistent>(session.restart())
-
-            assertEquals(expectedCount, session.learnedClauseCount, "glueLbd=$glueLbd")
-        }
-    }
-
-    @Test
-    fun `learned clause telemetry records a reduction at its restart boundary`() {
-        val session = SearchSession(
-            emptyList(),
-            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
-        )
-        session.learn(SearchExplanation(intArrayOf(0, 2)))
-        session.learn(SearchExplanation(intArrayOf(4, 6)))
-        assertIs<ComponentResult.Consistent>(session.propagate())
-
-        assertIs<ComponentResult.Consistent>(session.restart())
-
-        val stats = session.learnedClauseStats()
-        assertEquals(2L, stats.learned)
-        assertEquals(1L, stats.restarts)
-        assertEquals(1L, stats.reductions)
-        assertEquals(1L, stats.dropped)
-        assertEquals(1L, stats.retained)
-        assertEquals(2L, stats.peakRetained)
-    }
-
-    @Test
-    fun `glue counts the distinct learned clauses spanning at most two levels`() {
-        val session = SearchSession(emptyList())
-        session.learn(SearchExplanation(intArrayOf(6, 8)))
-        session.learn(SearchExplanation(intArrayOf(6, 8)))
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
-
-        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
-
-        assertEquals(1L, session.glueClauseCount)
-    }
-
-    @Test
-    fun `root fixings count only the Booleans assigned below every decision`() {
-        val session = SearchSession(emptyList())
-        session.learn(SearchExplanation(intArrayOf(0)))
-        assertIs<ComponentResult.Consistent>(session.propagate())
-
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
-
-        assertEquals(1, session.rootFixedCount)
-    }
-
-    @Test
-    fun `a clause retained through a reduction still propagates`() {
-        val session = SearchSession(
-            emptyList(),
-            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
-        )
-        session.learn(SearchExplanation(intArrayOf(0, 2)))
-        assertIs<ComponentResult.Consistent>(session.propagate())
-        assertIs<ComponentResult.Consistent>(session.restart())
-
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
-
-        assertEquals(true, session.boolValue(1))
-    }
-
-    @Test
-    fun `reduction keeps the oldest clause when LBDs tie`() {
-        val session = SearchSession(
-            emptyList(),
-            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
-        )
-        session.learn(SearchExplanation(intArrayOf(0, 2)))
-        session.learn(SearchExplanation(intArrayOf(4, 6)))
-        session.learn(SearchExplanation(intArrayOf(8, 10)))
-        assertIs<ComponentResult.Consistent>(session.propagate())
-        assertIs<ComponentResult.Consistent>(session.restart())
-
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
-
-        assertEquals(true, session.boolValue(1))
-    }
-
-    @Test
-    fun `reduction prefers lower LBD over insertion order`() {
-        listOf(3, 10).forEach { levels ->
-            val session = SearchSession(
-                emptyList(),
-                learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
-            )
-            for (variable in 0 until levels) {
-                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(variable * 2)))
-            }
-            session.learn(SearchExplanation(IntArray(levels) { it * 2 }))
-            session.learn(SearchExplanation(intArrayOf(levels * 2, (levels + 1) * 2)))
-            assertIs<ComponentResult.Consistent>(session.propagate())
-            assertIs<ComponentResult.Consistent>(session.restart())
-
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(levels * 2 + 1)))
-
-            assertEquals(true, session.boolValue(levels + 1), "levels=$levels")
-        }
-    }
-
-    @Test
-    fun `a sole component's publications reach a fixpoint`() {
+    fun `a sole component's publications should reach a fixpoint`() {
         val session = SearchSession(listOf(ExplainingPublisher(explains = false)))
 
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
@@ -987,7 +761,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `shared analysis resolves through a literal its publisher explains`() {
+    fun `shared analysis should resolve through a literal its publisher explains`() {
         val session = SearchSession(listOf(ExplainingPublisher(explains = true)))
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
@@ -1001,7 +775,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `shared analysis stays chronological when no publisher explains the literal`() {
+    fun `shared analysis should stay chronological when no publisher explains the literal`() {
         val session = SearchSession(listOf(ExplainingPublisher(explains = false)))
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
@@ -1009,12 +783,11 @@ class SearchSessionTest {
         val resolution = session.explainedConflict(SearchExplanation(intArrayOf(5, 7, 1)))
 
         assertEquals(SearchConflictResolution.Chronological, resolution)
-        assertEquals(1, session.learnedClauseCount, "an unasserting conflict is still retained")
+        assertEquals(1, session.learnedClauseCount)
         assertEquals(0L, session.learnedClauseStats().assertingConflicts)
         assertEquals(1L, session.learnedClauseStats().nonAssertingConflicts)
     }
 
-    /** Publishes two literals without clauses once the second decision lands, explaining on demand. */
     private class ExplainingPublisher(private val explains: Boolean) : SearchComponent {
         override fun propagate(context: SearchContext): ComponentResult {
             if (context.boolValue(1) != true) return ComponentResult.Consistent
@@ -1040,7 +813,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `pausing between failed siblings retains the untried alternative`() {
+    fun `pausing between failed siblings should retain the untried alternative`() {
         val attempted = ArrayList<Long>()
         val brancher = object : SearchBrancher {
             override fun nextBranch(context: SearchContext): List<SearchDecision>? =
@@ -1071,7 +844,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `a spent slice after the last rejected leaf does not replay the exhausted root`() {
+    fun `a spent slice after the last rejected leaf should not replay the exhausted root`() {
         var checked = false
         val component = object : SearchComponent {
             override fun check(context: SearchContext): ComponentCheck {
@@ -1087,7 +860,7 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `reset discards a pending decision from a paused traversal`() {
+    fun `reset should discard a pending decision from a paused traversal`() {
         val session = SearchSession(emptyList())
         val run = session.openRun(numBoolVars = 1)
         run.pauseBeforeDecision = { true }

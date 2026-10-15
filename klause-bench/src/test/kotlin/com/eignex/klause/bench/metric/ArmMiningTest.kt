@@ -35,7 +35,7 @@ class ArmMiningTest {
     private fun mined(record: SolveRecord) = checkNotNull(ArmMining.mined("s/fam/inst", "rewards", emptyMap(), record))
 
     @Test
-    fun `an arm telemetry line parses into accounting and per-signal credit`() {
+    fun `an arm telemetry line should parse into accounting and per-signal credit`() {
         val arm = ArmMining.parseArm(
             "domwdeg",
             "segments=4 work=1200 reward=0.25 failures=1 faults=0 ms=42 maxMs=20 initMs=4 reseeds=2 " +
@@ -49,7 +49,7 @@ class ArmMiningTest {
     }
 
     @Test
-    fun `the best-valued attribution entry wins an optimisation case`() {
+    fun `the best-valued attribution entry should win an optimisation case`() {
         val case = mined(
             rec(
                 stats = mapOf("arm.a" to "work=10 reward=0.5", "arm.b" to "work=10 reward=0.5"),
@@ -64,26 +64,26 @@ class ArmMiningTest {
     }
 
     @Test
-    fun `the arm credited with the first solution wins a satisfaction case`() {
+    fun `the arm credited with the first solution should win a satisfaction case`() {
         val case = mined(rec(mapOf("arm.a" to "work=10 reward=0.0", "arm.b" to "work=10 reward=1.0 FirstSolution=1.0")))
 
         assertEquals(setOf("b"), case.winners)
     }
 
     @Test
-    fun `an infeasibility proof names no winner`() {
+    fun `an infeasibility proof should name no winner`() {
         val case = mined(rec(mapOf("arm.a" to "work=10 reward=0.0"), feasible = false))
 
         assertTrue(case.winners.isEmpty())
     }
 
     @Test
-    fun `a record without arm telemetry is not mined`() {
+    fun `a record without arm telemetry should not be mined`() {
         assertNull(ArmMining.mined("s/fam/inst", "base", emptyMap(), rec(mapOf("nodes" to "12"))))
     }
 
     @Test
-    fun `contribution weights each case's reward by the work the arm spent there`() {
+    fun `contribution should weight each case reward by the work the arm spent there`() {
         val cases = listOf(
             mined(rec(mapOf("arm.a" to "work=300 reward=1.0 CutUses=2.0"))),
             mined(rec(mapOf("arm.a" to "work=100 reward=0.0 CutUses=1.0"))),
@@ -97,7 +97,7 @@ class ArmMiningTest {
     }
 
     @Test
-    fun `replicas of one arm count as that arm once per case`() {
+    fun `replicas of one arm should count as that arm once per case`() {
         val stats = mapOf("arm.bt/domwdeg" to "work=100 reward=1.0", "arm.bt/domwdeg#2" to "work=100 reward=0.0")
 
         val arm = ArmMining.contributions(listOf(mined(rec(stats)))).single()
@@ -108,7 +108,7 @@ class ArmMiningTest {
     }
 
     @Test
-    fun `a quarantined arm run is called out at the top of the report`() {
+    fun `a quarantined arm run should be called out at the top of the report`() {
         val report = ArmMining.render(listOf(mined(rec(mapOf("arm.broken" to "work=10 reward=0.0 faults=1")))))
 
         assertTrue(report.startsWith("!!! 1 quarantined arm run"), report)
@@ -116,7 +116,7 @@ class ArmMiningTest {
     }
 
     @Test
-    fun `a quarantine the run recorded is printed under its fault`() {
+    fun `a recorded quarantine should be printed under its fault`() {
         val stats = mapOf(
             "arm.broken" to "work=10 reward=0.0 faults=1",
             SolverInvocation.QUARANTINED to "broken quarantined: int 3 = 7 conflicts",
@@ -128,7 +128,7 @@ class ArmMiningTest {
     }
 
     @Test
-    fun `lab case files load only the cases whose record ran a portfolio`() {
+    fun `lab case files should load only cases whose record ran a portfolio`() {
         val file = File.createTempFile("cases", ".json").apply { deleteOnExit() }
         file.writeText(
             """
@@ -151,7 +151,7 @@ class ArmMiningTest {
     }
 
     @Test
-    fun `a case is sliced by the class the portfolio reported for its model`() {
+    fun `a case should be sliced by the class the portfolio reported for its model`() {
         val file = File.createTempFile("cases", ".json").apply { deleteOnExit() }
         file.writeText(
             """

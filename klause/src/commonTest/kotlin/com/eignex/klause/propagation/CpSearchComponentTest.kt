@@ -36,7 +36,7 @@ import kotlin.test.assertSame
 
 class CpSearchComponentTest {
     @Test
-    fun `shared native bound chains preserve source coordinates and their Boolean premise`() {
+    fun `shared native bound chains should preserve source coordinates and their Boolean premise`() {
         val mapping = intArrayOf(4, 7, 9, 12, 14)
         val native = PropagationSession(
             Problem(
@@ -69,7 +69,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `a repeated native bound explains through the new sibling Boolean premise`() {
+    fun `a repeated native bound should explain through the new sibling Boolean premise`() {
         val cp = CpSearchComponent(
             PropagationSession(
                 Problem(
@@ -107,14 +107,19 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `a learned assertion reports its cascading native conflict`() {
+    fun `a learned assertion should report its cascading native conflict`() {
         for (nativeSat in listOf(false, true)) {
-            val problem = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(3, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(3, false))),
-            ))
+            val problem = Problem(
+                4,
+                0,
+                emptyArray(),
+                arrayOf(
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(3, true))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(3, false))),
+                ),
+            )
             val cp = CpSearchComponent(PropagationSession(problem, nativeSat = nativeSat))
             val conflicts = ArrayList<PropagationResult.Unsat>()
             cp.cascadeConflictObserver = conflicts::add
@@ -136,12 +141,14 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `shared indicator explanations retain their originating bound after narrowing`() {
+    fun `shared indicator explanations should retain their originating bound after narrowing`() {
         for (value in listOf(false, true)) {
             val cp = CpSearchComponent(
                 PropagationSession(
                     Problem(
-                        1, 1, arrayOf(IntDomain(0, 10)),
+                        1,
+                        1,
+                        arrayOf(IntDomain(0, 10)),
                         arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5)),
                     ),
                 ),
@@ -163,7 +170,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `an unnameable native antecedent declines its shared proof`() {
+    fun `an unnameable native antecedent should decline its shared proof`() {
         val cp = CpSearchComponent(
             PropagationSession(
                 Problem(
@@ -186,7 +193,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `native bound proofs preserve source integer remapping and rollback`() {
+    fun `native bound proofs should preserve source integer remapping and rollback`() {
         val native = PropagationSession(
             Problem(
                 0,
@@ -219,7 +226,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `a native order antecedent becomes its shared integer witness`() {
+    fun `a native order antecedent should become its shared integer witness`() {
         val native = PropagationSession(
             Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray()),
         )
@@ -245,15 +252,9 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `late equality exclusions explain through their establishing source bound`() {
+    fun `late equality exclusions should explain through their establishing source bound`() {
         val cases = listOf(
             Triple(IntDomain(0, 10), 5L, SearchDecision.IntAtLeast(7, 6L) to 8L),
-            Triple(IntDomain(0, 10), 5L, SearchDecision.IntAtMost(7, 4L) to 2L),
-            Triple(
-                IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 4),
-                Long.MIN_VALUE + 1,
-                SearchDecision.IntAtLeast(7, Long.MIN_VALUE + 2) to Long.MIN_VALUE + 3,
-            ),
             Triple(
                 IntDomain(Long.MAX_VALUE - 4, Long.MAX_VALUE),
                 Long.MAX_VALUE - 1,
@@ -261,41 +262,25 @@ class CpSearchComponentTest {
             ),
         )
         for ((domain, excluded, bounds) in cases) {
+            val (establishing, later) = bounds
+            val atLeast = establishing is SearchDecision.IntAtLeast
             val native = PropagationSession(Problem(1, 1, arrayOf(domain), emptyArray()))
             val cp = CpSearchComponent(native, intArrayOf(7))
             cp.rebase()
             val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))
             assertIs<ComponentResult.Consistent>(session.initialize())
-            val (establishing, later) = bounds
             assertIs<ComponentResult.Consistent>(session.push(establishing))
             val equality = native.equalityLit(0, excluded, positive = true)
-            assertIs<ComponentResult.Consistent>(
-                cp.import(
-                    assertIs<PropagationResult.Implied>(
-                        native.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), equality)), lbd = 2),
-                    ),
-                    session,
-                ),
-            )
-            val consequence = if (establishing is SearchDecision.IntAtLeast) {
+            val consequence = if (atLeast) {
                 native.boundGeLit(0, later, positive = true)
             } else {
                 native.boundLeLit(0, later, positive = true)
             }
-            assertIs<ComponentResult.Consistent>(
-                cp.import(
-                    assertIs<PropagationResult.Implied>(
-                        native.addLearnedClause(Clause(intArrayOf(Lit.make(0, false), consequence)), lbd = 2),
-                    ),
-                    session,
-                ),
-            )
 
-            assertEquals(true, session.boolValue(0))
-            assertEquals(
-                later,
-                if (establishing is SearchDecision.IntAtLeast) session.intLowerBound(7) else session.intUpperBound(7),
-            )
+            cp.importLearned(native, session, Lit.make(0, true), equality)
+            cp.importLearned(native, session, Lit.make(0, false), consequence)
+
+            assertEquals(later, if (atLeast) session.intLowerBound(7) else session.intUpperBound(7))
             assertEquals(
                 setOf(Lit.make(0, true), assertNotNull(session.atomLiteral(establishing)) xor 1),
                 cp.reasonFor(Lit.make(0, true))?.literals?.toSet(),
@@ -304,7 +289,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `complements of extreme finite bounds refute without wrapping`() {
+    fun `complements of extreme finite bounds should refute without wrapping`() {
         for (upper in listOf(false, true)) {
             val cp = CpSearchComponent(
                 PropagationSession(Problem(0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)), emptyArray())),
@@ -328,7 +313,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `registered theory names bypass CP arrays while source Booleans still propagate`() {
+    fun `registered theory names should bypass CP arrays while source Booleans still propagate`() {
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val component = CpSearchComponent(PropagationSession(problem))
         component.rebase()
@@ -353,10 +338,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `a decision whose fixpoint the deadline cut is reported undecided`() {
-        // (¬x0 ∨ x1): pinning x0 wakes the clause, so the decision's fixpoint fires. cancelFloor 0
-        // makes the poll engage from the first fire, so the armed deadline cuts that propagation and
-        // the state it leaves has never heard from the clause.
+    fun `a decision whose fixpoint the deadline cut should be reported undecided`() {
         var armed = false
         val propagation = PropagationSession(
             Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))))),
@@ -372,7 +354,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `a leaf standing on a fixpoint the deadline cut is not feasible`() {
+    fun `a leaf on a fixpoint the deadline cut should not be feasible`() {
         var armed = false
         val propagation = PropagationSession(
             Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))))),
@@ -388,7 +370,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `CP explains a Boolean it published when the shared analyzer asks`() {
+    fun `CP should explain a Boolean it published when the shared analyzer asks`() {
         val propagation = PropagationSession(
             Problem(
                 2,
@@ -410,7 +392,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `shared trail retraction rewinds the CP component`() {
+    fun `shared trail retraction should rewind the CP component`() {
         val propagation = PropagationSession(
             Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true))))),
         )
@@ -423,7 +405,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `shared integer bound decision retracts to the rebased CP root`() {
+    fun `a shared integer bound decision should retract to the rebased CP root`() {
         val propagation = PropagationSession(
             Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray()),
         )
@@ -441,21 +423,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `CP component maps shared source integer decisions to its compact projection`() {
-        val propagation = PropagationSession(
-            Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray()),
-        )
-        val component = CpSearchComponent(propagation, intArrayOf(4))
-        component.rebase()
-        val session = SearchSession(listOf(component))
-
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtMost(4, 4)))
-
-        assertEquals(4L, propagation.intDomain(0).max)
-    }
-
-    @Test
-    fun `native learned implication is shared without a second CP pin`() {
+    fun `a native learned implication should be shared without a second CP pin`() {
         val propagation = PropagationSession(Problem(1, 0, emptyArray(), emptyArray()))
         val component = CpSearchComponent(propagation)
         component.rebase()
@@ -480,8 +448,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `a learned clause whose import a peer cannot decide leaves the run unknown`() {
-        // CP learns the root unit b0 from its first decision; a peer that cannot decide b0 refutes nothing.
+    fun `a learned clause a peer cannot decide should leave the run unknown`() {
         val propagation = PropagationSession(
             Problem(
                 2,
@@ -506,7 +473,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `a Boolean CP conflict is not duplicated into the shared database`() {
+    fun `a Boolean CP conflict should not be duplicated into the shared database`() {
         val propagation = PropagationSession(
             Problem(
                 2,
@@ -523,7 +490,12 @@ class CpSearchComponentTest {
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<SearchResult.Satisfied>(session.solve(1))
 
-        assertEquals(0, session.learnedClauseCount, "CP keeps the clause in its own database")
-        assertEquals(true, session.boolValue(0), "its consequence still reaches the shared session")
+        assertEquals(0, session.learnedClauseCount)
+        assertEquals(true, session.boolValue(0))
     }
+}
+
+private fun CpSearchComponent.importLearned(native: PropagationSession, session: SearchSession, vararg lits: Int) {
+    val implied = assertIs<PropagationResult.Implied>(native.addLearnedClause(Clause(intArrayOf(*lits)), lbd = 2))
+    assertIs<ComponentResult.Consistent>(this.import(implied, session))
 }

@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 class XorHashFamilyTest {
 
     @Test
-    fun `hashing keeps which integer sides were invented rather than declared`() {
+    fun `hashing should keep invented integer sides open`() {
         val open = Problem(
             numBoolVars = 2,
             numIntVars = 1,
@@ -24,13 +24,13 @@ class XorHashFamilyTest {
 
         val augmented = open.withHashes(hashes)
 
-        assertTrue(augmented.intBounds.isOpenUpper(0), "an invented endpoint must not read back as declared")
+        assertTrue(augmented.intBounds.isOpenUpper(0))
     }
 
     private val samplingSet = intArrayOf(0, 1, 2, 3, 4)
 
     @Test
-    fun `draw is deterministic for a fixed seed`() {
+    fun `draw should be deterministic for a fixed seed`() {
         val a = XorHashFamily(samplingSet, seed = 42L).draw(4)
         val b = XorHashFamily(samplingSet, seed = 42L).draw(4)
         assertEquals(a.size, b.size)
@@ -41,10 +41,10 @@ class XorHashFamilyTest {
     }
 
     @Test
-    fun `every hash ranges only over the sampling set and is non-empty`() {
+    fun `every hash should range only over the sampling set and be non-empty`() {
         val set = samplingSet.toHashSet()
         for (h in XorHashFamily(samplingSet, seed = 7L).draw(8)) {
-            assertTrue(h.literals.isNotEmpty(), "hash must include at least one variable")
+            assertTrue(h.literals.isNotEmpty())
             for (lit in h.literals) {
                 assertTrue(Lit.variable(lit) in set, "hash touched a var outside the sampling set")
             }
@@ -53,7 +53,7 @@ class XorHashFamilyTest {
     }
 
     @Test
-    fun `empty sampling set yields no hashes`() {
+    fun `empty sampling set should yield no hashes`() {
         assertEquals(0, XorHashFamily(IntArray(0), seed = 0L).draw(5).size)
     }
 }

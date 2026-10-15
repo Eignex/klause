@@ -8,8 +8,7 @@ import kotlin.test.assertTrue
 class MinCostAssignmentTest {
 
     @Test
-    fun `simple assignment picks the cheapest distinct values`() {
-        // 2 vars, 2 values; the cheap diagonal (0,1) costs 1+1, the anti-diagonal 5+5.
+    fun `assignment should pick the cheapest distinct values`() {
         val a = MinCostAssignment(2, 2)
         a.addOption(0, 0, 1)
         a.addOption(0, 1, 5)
@@ -23,8 +22,7 @@ class MinCostAssignmentTest {
     }
 
     @Test
-    fun `detects infeasibility when no perfect matching exists`() {
-        // Both variables can only take value 0 — no distinct assignment.
+    fun `assignment should be infeasible when no perfect matching exists`() {
         val a = MinCostAssignment(2, 2)
         a.addOption(0, 0, 1)
         a.addOption(1, 0, 1)
@@ -32,7 +30,7 @@ class MinCostAssignmentTest {
     }
 
     @Test
-    fun `handles negative costs`() {
+    fun `assignment should handle negative costs`() {
         val a = MinCostAssignment(2, 3)
         a.addOption(0, 0, -3)
         a.addOption(0, 1, -1)
@@ -40,11 +38,11 @@ class MinCostAssignmentTest {
         a.addOption(1, 2, -5)
         val r = a.solve()
         assertTrue(r.feasible)
-        assertEquals(-8L, r.cost) // var0→val0 (-3), var1→val2 (-5)
+        assertEquals(-8L, r.cost)
     }
 
     @Test
-    fun `large representable costs preserve feasible assignments`() {
+    fun `large representable costs should preserve feasible assignments`() {
         for (cost in longArrayOf(Long.MAX_VALUE / 4 - 1, Long.MAX_VALUE / 4, Long.MAX_VALUE / 4 + 1, Long.MAX_VALUE)) {
             val assignment = MinCostAssignment(1, 1)
             assignment.addOption(0, 0, cost)
@@ -58,7 +56,7 @@ class MinCostAssignmentTest {
     }
 
     @Test
-    fun `unrepresentable reverse costs decline through checked overflow`() {
+    fun `unrepresentable reverse costs should decline through checked overflow`() {
         val assignment = MinCostAssignment(1, 1)
 
         assertFailsWith<CheckedLongOverflowException> {

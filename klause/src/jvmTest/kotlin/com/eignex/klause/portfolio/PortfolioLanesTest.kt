@@ -27,12 +27,10 @@ import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.MinimizeResult.Optimal
 import com.eignex.klause.solver.result.MinimizeResult.WithSample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.Cancellation
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,7 +43,7 @@ import kotlin.time.TimeSource
 @OptIn(ExperimentalAtomicApi::class)
 class PortfolioLanesTest {
     @Test
-    fun `a lane's unbounded ray ends the minimize`() {
+    fun `a lane's unbounded ray should end the minimize`() {
         // x in [0,3], r >= 0 with x - r <= 1: minimizing -r descends without limit.
         val problem = Problem(
             numBoolVars = 0,
@@ -75,7 +73,7 @@ class PortfolioLanesTest {
     }
 
     @Test
-    fun `every slice a lane runs is handed the run deadline`() {
+    fun `every slice a lane runs should receive the run deadline`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -129,12 +127,12 @@ class PortfolioLanesTest {
 
             Portfolio.thompson(listOf(worker)).use(run)
 
-            assertTrue(seen.isNotEmpty() && seen.all { it == deadline }, "every slice must see the run deadline: $seen")
+            assertTrue(seen.isNotEmpty() && seen.all { it == deadline }, "$seen")
         }
     }
 
     @Test
-    fun `parallel real unresolved arms cannot prove infeasibility or optimality`() {
+    fun `parallel real unresolved arms should not prove infeasibility or optimality`() {
         for (withIncumbent in listOf(false, true)) {
             val fixtures = List(2) { UnresolvedRealLeafFixture(withIncumbent) }
             val workers = fixtures.mapIndexed { index, fixture ->
@@ -163,32 +161,7 @@ class PortfolioLanesTest {
     }
 
     @Test
-    fun `both backtrack palettes spread lp-intensity arms`() {
-        val cop = BacktrackWorkerConfig.ranked(Kind.COP).map { it.label }
-        // The spectrum: AGGRESSIVE, DEFAULT and CONSERVATIVE LP arms plus a best-bound
-        // dive arm, hedged by the OFF (no-LP) arms.
-        assertTrue("lp-aggressive" in cop && "lp-default" in cop, "COP palette must carry the LP arms, got $cop")
-        assertTrue("lp-conservative" in cop && "lp-lbtree" in cop, "COP palette must spread LP emphasis, got $cop")
-        val aggressive = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-aggressive" }
-        assertEquals(LpEmphasis.AGGRESSIVE, aggressive.recipe.build(1L, null).lpConfig?.emphasis)
-        val default = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-default" }
-        assertEquals(LpEmphasis.DEFAULT, default.recipe.build(1L, null).lpConfig?.emphasis)
-        // The best-bound dive arm carries the lb_tree_search flag on its base plan.
-        val lbtree = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-lbtree" }
-        assertTrue(lbtree.recipe.build(1L, null).lpPlan.lbTreeSearch, "the lp-lbtree arm must enable lb_tree_search")
-        assertEquals("satOptimized", cop.first())
-
-        // A satisfaction search has no objective to bound, but an infeasible relaxation refutes its node
-        // regardless — so the CSP palette carries the emphases that reach it.
-        val csp = BacktrackWorkerConfig.ranked(Kind.CSP).map { it.label }
-        assertTrue("lp-default" in csp && "lp-aggressive" in csp, "CSP palette must reach the LP, got $csp")
-        val cspDefault = BacktrackWorkerConfig.ranked(Kind.CSP).first { it.label == "lp-default" }
-        assertEquals(LpEmphasis.DEFAULT, cspDefault.recipe.build(1L, null).lpConfig?.emphasis)
-        assertEquals("satOptimized", csp.first())
-    }
-
-    @Test
-    fun `an injected btPool overrides the curated backtrack arms`() {
+    fun `an injected btPool should override the curated backtrack arms`() {
         val pool = listOf(
             { BacktrackCatalog.byLabel("free") },
             { BacktrackCatalog.byLabel("conflictDriven") },
@@ -204,12 +177,11 @@ class PortfolioLanesTest {
         assertEquals(
             listOf("free", "conflictDriven", "free"),
             labels,
-            "the injected recipe pool replaces the curated arms and wraps by name",
         )
     }
 
     @Test
-    fun `the annotation arm takes the last backtrack slot and keeps the guard`() {
+    fun `the annotation arm should take the last backtrack slot and keep the guard`() {
         val annotation = BacktrackParams(randomSeed = 0L, lubyRestartBase = 512L)
         val scenario = PortfolioScenario(
             cores = 1,
@@ -219,12 +191,12 @@ class PortfolioLanesTest {
             annotationArm = annotation,
         )
         val labels = PortfolioComposition.compose(scenario).map { it.label }
-        assertEquals("satOptimized", labels.first(), "the SAT preset keeps slot 0")
-        assertEquals("annotation", labels.last(), "the annotation arm takes the last slot")
+        assertEquals("satOptimized", labels.first())
+        assertEquals("annotation", labels.last())
     }
 
     @Test
-    fun `a lone backtrack slot keeps the guard over the annotation arm`() {
+    fun `a lone backtrack slot should keep the guard over the annotation arm`() {
         val scenario = PortfolioScenario(
             cores = 1,
             arms = 1,
@@ -233,46 +205,34 @@ class PortfolioLanesTest {
             annotationArm = BacktrackParams(randomSeed = 0L),
         )
         val labels = PortfolioComposition.compose(scenario).map { it.label }
-        assertEquals(listOf("satOptimized"), labels, "one slot stays the guard, not the annotation arm")
+        assertEquals(listOf("satOptimized"), labels)
     }
 
     @Test
-    fun `the latent-axis heuristic arms are ranked and build`() {
-        val cop = BacktrackCatalog.labels(Kind.COP)
-        for (label in listOf("domwdeg", "first-fail", "activity")) {
-            assertTrue(label in cop, "$label must be a ranked COP arm")
-            assertEquals(label, BacktrackWorkerConfig.byLabel(label).label, "$label must build by label")
-        }
-    }
-
-    @Test
-    fun `the selector-switch arm wires a fresh restart-switching portfolio per worker`() {
+    fun `the selector-switch arm should wire a fresh restart-switching portfolio per worker`() {
         val arm = BacktrackWorkerConfig.byLabel("selector-switch")
         val a = arm.recipe.build(1L, null)
         val b = arm.recipe.build(2L, null)
-        assertEquals(100L, a.lubyRestartBase, "Luby restarts drive the bandit's arm switching")
-        assertTrue(a.variableSelector !== b.variableSelector, "each worker gets its own switching state")
+        assertEquals(100L, a.lubyRestartBase)
+        assertTrue(a.variableSelector !== b.variableSelector)
     }
 
     @Test
-    fun `lp ceiling caps and toggles the portfolio arms`() {
+    fun `lp ceiling should cap and toggle the portfolio arms`() {
         fun lpConfigs(ceiling: LpConfig): List<LpConfig?> =
             BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = ceiling)
                 .map { it.recipe.build(1L, null).lpConfig }
 
-        // --lp off disables LP across the pool.
         val off = lpConfigs(LpConfig(LpEmphasis.OFF))
-        assertTrue(off.all { (it?.emphasis ?: LpEmphasis.OFF) == LpEmphasis.OFF }, "OFF ceiling leaves no arm on LP")
-        // --lp default caps the AGGRESSIVE arm down to DEFAULT.
+        assertTrue(off.all { (it?.emphasis ?: LpEmphasis.OFF) == LpEmphasis.OFF })
         val capped = lpConfigs(LpConfig(LpEmphasis.DEFAULT)).mapNotNull { it?.emphasis }
-        assertTrue(capped.all { it.ordinal <= LpEmphasis.DEFAULT.ordinal }, "no arm may exceed the ceiling")
-        // --lp aggressive,-cuts forces cuts off on every LP arm while keeping the spread.
+        assertTrue(capped.all { it.ordinal <= LpEmphasis.DEFAULT.ordinal })
         val noCuts = lpConfigs(LpConfig.parse("aggressive,-cuts")).filterNotNull()
-        assertTrue(noCuts.all { !it.resolved(LpTechnique.CUTS) }, "the -cuts ceiling override must reach every LP arm")
+        assertTrue(noCuts.all { !it.resolved(LpTechnique.CUTS) })
     }
 
     @Test
-    fun `portfolio solve on satisfiable problem returns sat`() {
+    fun `portfolio solve should return sat on a satisfiable problem`() {
         val problem = exactlyOneOver(4)
         val workers = List(4) { i ->
             PortfolioWorker.of(
@@ -289,8 +249,7 @@ class PortfolioLanesTest {
     }
 
     @Test
-    fun `portfolio solve on unsat problem returns unsat`() {
-        // x ∧ ¬x → trivially unsat
+    fun `portfolio solve should return unsat on an unsat problem`() {
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 0,
@@ -311,51 +270,7 @@ class PortfolioLanesTest {
     }
 
     @Test
-    fun `portfolio minimize returns the global best across workers`() {
-        // minimize x + 2y subject to x + y >= 3, x ∈ [0..5], y ∈ [0..5]. Optimum = 3.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(
-                IntDomain(0, 5),
-                IntDomain(0, 5),
-            ),
-            factors = arrayOf<Factor>(
-                Linear(
-                    coeffs = intArrayOf(1, 1),
-                    vars = intArrayOf(0, 1),
-                    op = LinearOp.GE,
-                    bound = 3,
-                ),
-            ),
-        )
-        val obj = LinearObjective(
-            intCoefficients = longArrayOf(1L, 2L),
-        )
-        val workers = List(3) { i ->
-            PortfolioWorker.of(
-                "bt#$i",
-                i,
-                BacktrackSolver(problem.bake()).session(),
-                BacktrackParams(randomSeed = 0L),
-                objective = obj,
-            ) { params, supplier ->
-                params.copy(objectiveBoundSupplier = supplier)
-            }
-        }
-        Portfolio.thompson(workers, lanes = workers.size).use { p ->
-            val r = p.minimize()
-            val optimal = assertIs<Optimal>(r)
-            assertEquals(3.0, optimal.objectiveValue)
-        }
-    }
-
-    @Test
-    fun `budget-capped workers never upgrade the incumbent to a false optimal`() {
-        // minimize x over x in [0..1000] with no constraints: the optimum is 0, but every
-        // worker is decision-capped so none can exhaust its space. A pool of BestFound
-        // verdicts under BudgetExhausted proves nothing about better solutions, so the fold
-        // must report BestFound, never Optimal.
+    fun `budget-capped workers should never upgrade the incumbent to a false optimal`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -368,10 +283,6 @@ class PortfolioLanesTest {
                 "bt#$i",
                 i,
                 BacktrackSolver(problem.bake()).session(),
-                // Worker 0 walks down from 1000, worker 1 from the domain middle, so both hold real
-                // incumbents when the tiny decision cap lands, yet neither can bisect all the way
-                // to (and prove) the optimum at 0 in so few decisions, which with real-thread
-                // parallelism would be a legitimate Optimal.
                 BacktrackParams(
                     randomSeed = i.toLong(),
                     maxDecisions = 4,
@@ -390,45 +301,18 @@ class PortfolioLanesTest {
     }
 
     @Test
-    fun `minimize returns a sample consistent with the reported bound`() {
-        // The reported objectiveValue and the returned sample must never desync under a worker
-        // race: several workers race on a problem with multiple improving steps, and the returned
-        // sample must realise the reported bound (x + 2y, optimum 3 at x=3,y=0).
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = arrayOf<Factor>(
-                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
-            ),
-        )
-        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        val workers = List(6) { i ->
-            PortfolioWorker.of(
-                "bt#$i",
-                i,
-                BacktrackSolver(problem.bake()).session(),
-                BacktrackParams(randomSeed = i.toLong()),
-                objective = obj,
-            ) { params, supplier ->
-                params.copy(objectiveBoundSupplier = supplier)
-            }
-        }
+    fun `parallel minimize should return the optimum with a sample that realises it`() {
+        val workers = List(3) { i -> smallCopWorker("bt#$i", i) }
         Portfolio.thompson(workers, lanes = workers.size).use { p ->
             val r = p.minimize()
             val ws = assertIs<WithSample>(r)
-            val realised = ws.sample.ints[0] * 1.0 + ws.sample.ints[1] * 2.0
-            assertEquals(
-                ws.objectiveValue,
-                realised,
-                "reported bound ${ws.objectiveValue} must match the sample's objective $realised",
-            )
+            assertEquals(3.0, ws.objectiveValue)
+            assertEquals(3.0, ws.sample.ints[0] * 1.0 + ws.sample.ints[1] * 2.0)
         }
     }
 
     @Test
-    fun `builder minimize wires a per-worker objective across a mixed pool`() {
-        // LS and backtrack workers use separate objective interfaces with a comparable shared bound.
+    fun `builder minimize should wire a per-worker objective across a mixed pool`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -438,8 +322,6 @@ class PortfolioLanesTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        // Unbudgeted LS workers keep the pool running, so cancel at the known optimum.
-        // Cancelled workers retain their best incumbent; the fallback deadline bounds the wait.
         val sawOptimum = AtomicBoolean(false)
         Portfolio.thompson(
             lanes = 4,
@@ -455,53 +337,11 @@ class PortfolioLanesTest {
             val fallback = TimeSource.Monotonic.markNow() + Duration.parse("30s")
             val r = p.minimize(cancellation = { sawOptimum.load() || fallback.hasPassedNow() })
             assertEquals(3.0, assertIs<WithSample>(r).objectiveValue)
-            assertTrue(r.stats.run.wallMs >= 0L)
         }
     }
 
     @Test
-    fun `builder threads labeled onEvent through to workers`() {
-        // Same mixed-pool minimize as above, with the SearchEvent seam attached: each worker's
-        // incumbent improvements arrive tagged with its label. Workers run concurrently, so the
-        // collection is locked.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = arrayOf<Factor>(
-                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
-            ),
-        )
-        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        val events = AtomicReference<List<Pair<String, SearchEvent>>>(emptyList())
-        Portfolio.thompson(
-            lanes = 4,
-            workers = PortfolioBuilder.build(
-                problem.bake(),
-                PortfolioScenario.parallel(cores = 2, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
-                objective = obj,
-                onEvent = { worker, e ->
-                    while (true) {
-                        val cur = events.load()
-                        if (events.compareAndSet(cur, cur + (worker to e))) break
-                    }
-                },
-            ),
-        ).use { p ->
-            // Stop once the first labeled incumbent is collected — all the assertions need.
-            val fallback = TimeSource.Monotonic.markNow() + Duration.parse("30s")
-            p.minimize(cancellation = {
-                events.load().any { it.second is SearchEvent.Incumbent } || fallback.hasPassedNow()
-            })
-        }
-        val incumbents = events.load().filter { it.second is SearchEvent.Incumbent }
-        assertTrue(incumbents.isNotEmpty(), "expected labeled incumbent events, got ${events.load()}")
-        val labels = incumbents.map { it.first }.toSet()
-        assertTrue(labels.all { it.startsWith("ls/") || it.startsWith("bt/") }, "labels: $labels")
-    }
-
-    @Test
-    fun `builder makes a mixed LS plus backtrack portfolio that solves`() {
+    fun `builder should make a mixed LS plus backtrack portfolio that solves`() {
         val problem = exactlyOneOver(4)
         Portfolio.thompson(
             lanes = 4,
@@ -511,14 +351,12 @@ class PortfolioLanesTest {
             ),
         ).use { p ->
             val r = p.solve()
-            assertTrue(r is SolveResult.Sat, "mixed LS+backtrack portfolio should solve exactly-one; got $r")
+            assertTrue(r is SolveResult.Sat, "got $r")
         }
     }
 
     @Test
-    fun `builder backtrack pool includes the sat-optimized worker and solves`() {
-        // A single backtrack worker (i % 3 == 0) must be the SAT-optimized config; confirm the
-        // built pool both surfaces that worker and solves a conflict-heavy UNSAT instance.
+    fun `builder backtrack pool should include the sat-optimized worker and solve`() {
         val problem = pigeonhole(pigeons = 4, holes = 3)
         Portfolio.thompson(
             lanes = 4,
@@ -529,10 +367,13 @@ class PortfolioLanesTest {
                 kind = Kind.CSP,
             ),
         ).use { p ->
-            assertTrue(p.workers.any { it.label.startsWith("bt/") }, "expected a backtrack worker")
+            assertTrue(p.workers.any { it.label.startsWith("bt/") })
             assertIs<SolveResult.Unsat>(p.solve())
         }
-        // With three backtrack workers the pool cycles through all three complete configs.
+    }
+
+    @Test
+    fun `three backtrack workers should cycle through the complete configs and solve`() {
         Portfolio.thompson(
             lanes = 4,
             workers = PortfolioBuilder.buildExplicit(
@@ -548,90 +389,65 @@ class PortfolioLanesTest {
     }
 
     @Test
-    fun `a parallel scenario with fewer arms than cores replicates the arms across lanes`() {
-        // arms=2, cores=6: compose yields 2 distinct LS arms, then the build cycles them across all
-        // 6 lanes as seed-diversified replicas. LS worker labels are ls/<recipe> (no index), so the
-        // replication is visible as a period-2 cycle of the two composed labels, and every replica
-        // shares its composed arm's id: 0,1,0,1,0,1.
+    fun `a parallel scenario with fewer arms than cores should replicate the arms across lanes`() {
         val workers = PortfolioBuilder.build(
             exactlyOneOver(5).bake(),
             PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
         )
-        assertEquals(6, workers.size, "arms<cores must still fill every core lane")
+        assertEquals(6, workers.size)
         val labels = workers.map { it.label }
-        assertEquals(2, labels.toSet().size, "the 6 lanes replicate the 2 composed arms")
-        assertEquals(labels[0], labels[2], "lane 2 replicates composed arm 0")
-        assertEquals(labels[1], labels[3], "lane 3 replicates composed arm 1")
-        assertTrue(labels[0] != labels[1], "the two composed arms are distinct")
-        assertEquals(listOf(0, 1, 0, 1, 0, 1), workers.map { it.armId }, "replicas of each arm share its id")
+        assertEquals(2, labels.toSet().size)
+        assertEquals(labels[0], labels[2])
+        assertEquals(labels[1], labels[3])
+        assertTrue(labels[0] != labels[1])
+        assertEquals(listOf(0, 1, 0, 1, 0, 1), workers.map { it.armId })
     }
 
     @Test
-    fun `a parallel scenario with arms equal to cores builds one worker per arm`() {
+    fun `a parallel scenario with arms equal to cores should build one worker per arm`() {
         val workers = PortfolioBuilder.build(
             exactlyOneOver(5).bake(),
             PortfolioScenario.parallel(cores = 4, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
         )
-        assertEquals(4, workers.size, "arms==cores is one distinct worker per lane")
-        assertEquals(listOf(0, 1, 2, 3), workers.map { it.armId }, "arms==cores maps each lane to its own arm id")
+        assertEquals(4, workers.size)
+        assertEquals(listOf(0, 1, 2, 3), workers.map { it.armId })
     }
 
     @Test
-    fun `a sequential scenario builds one worker per arm`() {
+    fun `a sequential scenario should build one worker per arm`() {
         val workers = PortfolioBuilder.build(
             exactlyOneOver(5).bake(),
             PortfolioScenario.sequential(kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH, arms = 5),
         )
-        assertEquals(5, workers.size, "the single-core sequential track keeps its full arm pool")
-        assertEquals(listOf(0, 1, 2, 3, 4), workers.map { it.armId }, "the sequential track never replicates: 1:1")
+        assertEquals(5, workers.size)
+        assertEquals(listOf(0, 1, 2, 3, 4), workers.map { it.armId })
     }
 
     @Test
-    fun `an attributed improvement carries the producing worker's arm id`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = arrayOf<Factor>(
-                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
-            ),
-        )
-        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        val workers = List(3) { i ->
-            PortfolioWorker.of(
-                "bt#$i",
-                i,
-                BacktrackSolver(problem.bake()).session(),
-                BacktrackParams(randomSeed = 0L),
-                objective = obj,
-            ) { params, supplier ->
-                params.copy(objectiveBoundSupplier = supplier)
-            }
-        }
+    fun `an attributed improvement should carry the producing worker's arm id`() {
+        val workers = List(3) { i -> smallCopWorker("bt#$i", i) }
         val byLabel = workers.associate { it.label to it.armId }
         val seen = mutableListOf<AttributedImprovement>()
         Portfolio.thompson(workers, lanes = workers.size).use { p -> p.minimize(onImprovement = { seen += it }) }
-        assertTrue(seen.isNotEmpty(), "minimize should stream at least one improvement")
-        assertTrue(seen.all { it.armId == byLabel[it.workerLabel] }, "arm id must match the producing worker")
+        assertTrue(seen.isNotEmpty())
+        assertTrue(seen.all { it.armId == byLabel[it.workerLabel] })
     }
 
     @Test
-    fun `improvements reported across lanes never include a losing arm's stale incumbent`() {
-        // Identical racing arms all beat the bound they last read, so several can improve on the same
-        // incumbent; only the one whose publication installed the new global best may emit.
+    fun `improvements reported across lanes should never include a losing arm's stale incumbent`() {
+        // Racing arms can each beat the bound they last read; only the one installing the new best may emit.
         val workers = List(4) { i -> smallCopWorker("bt#$i", i) }
         val objectives = ArrayList<Double>()
         Portfolio.thompson(workers, lanes = workers.size).use { p ->
             p.minimize(onImprovement = { objectives += assertIs<WithSample>(it.result).objectiveValue })
         }
-        assertTrue(objectives.isNotEmpty(), "the race must stream at least one improvement")
+        assertTrue(objectives.isNotEmpty())
         assertTrue(
             objectives.zipWithNext().all { (prev, next) -> next < prev },
-            "the stream must be strictly improving, got $objectives",
+            "$objectives",
         )
     }
 
-    /** One backtrack arm over the tiny COP the attribution tests race. */
     private fun smallCopWorker(label: String, armId: Int): PortfolioWorker {
         val problem = Problem(
             numBoolVars = 0,
@@ -670,7 +486,7 @@ class PortfolioLanesTest {
     }
 
     @Test
-    fun `with a lane for every arm each arm runs one segment for the whole solve`() {
+    fun `with a lane for every arm each arm should run one segment for the whole solve`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,

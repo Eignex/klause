@@ -19,7 +19,7 @@ class PolynomialProjectionTest {
     private val y = Polynomial.variable(1)
 
     @Test
-    fun `projection separates a change in the number of real sections`() {
+    fun `projection should separate a change in the number of real sections`() {
         val polynomial = arithmetic.subtract(arithmetic.power(y, 2), x)
 
         val projection = PolynomialProjection.compute(listOf(polynomial), 2, arithmetic)
@@ -28,7 +28,7 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `projection separates coincident sections of different polynomials`() {
+    fun `projection should separate coincident sections of different polynomials`() {
         val polynomials = listOf(arithmetic.subtract(y, x), arithmetic.add(y, x))
 
         val projection = PolynomialProjection.compute(polynomials, 2, arithmetic)
@@ -37,7 +37,7 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `projection separates distinct root changes of a repeated polynomial`() {
+    fun `projection should separate distinct root changes of a repeated polynomial`() {
         val quadratic = arithmetic.add(arithmetic.add(arithmetic.power(y, 2), y), x)
         val polynomial = arithmetic.power(quadratic, 2)
 
@@ -47,7 +47,7 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `projection retains the boundary where a leading coefficient vanishes`() {
+    fun `projection should retain the boundary where a leading coefficient vanishes`() {
         val polynomial = arithmetic.subtract(
             arithmetic.add(arithmetic.multiply(x, arithmetic.power(y, 2)), y),
             Polynomial.ONE,
@@ -59,7 +59,7 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `projection preserves lower variable boundaries through an absent dimension`() {
+    fun `projection should preserve lower variable boundaries through an absent dimension`() {
         val polynomials = listOf(arithmetic.subtract(x, Polynomial.ONE), y)
 
         val projection = PolynomialProjection.compute(polynomials, 3, arithmetic)
@@ -68,7 +68,7 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `projection separates equal degree polynomials sharing specialized roots`() {
+    fun `projection should separate equal degree polynomials sharing specialized roots`() {
         val base = arithmetic.subtract(arithmetic.power(y, 2), Polynomial.ONE)
         val mixed = arithmetic.multiply(x, y)
         val polynomials = listOf(arithmetic.add(base, mixed), arithmetic.subtract(base, mixed))
@@ -79,7 +79,7 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `an empty family retains every declared real dimension`() {
+    fun `an empty family should retain every declared real dimension`() {
         val projection = PolynomialProjection.compute(emptyList(), 3, arithmetic)
 
         assertEquals(3, projection.variableCount)
@@ -87,14 +87,14 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `zero and rational constants introduce no section boundaries`() {
+    fun `zero and rational constants should introduce no section boundaries`() {
         val projection = PolynomialProjection.compute(listOf(Polynomial.ZERO, Polynomial.ONE), 2, arithmetic)
 
         assertEquals(0L, projection.polynomialCount)
     }
 
     @Test
-    fun `producer and returned list mutations do not change projection boundaries`() {
+    fun `producer and returned list mutations should not change projection boundaries`() {
         val producer = mutableListOf(arithmetic.subtract(arithmetic.power(y, 2), x))
         val projection = PolynomialProjection.compute(producer, 2, arithmetic)
 
@@ -105,7 +105,7 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `interrupted projection publishes no partial family`() {
+    fun `interrupted projection should publish no partial family`() {
         var polls = 0
         val interrupted = PolynomialArithmetic(Cancellation { ++polls > 15 })
         val polynomial = arithmetic.subtract(arithmetic.power(y, 3), x)
@@ -116,7 +116,7 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `resource limited projection publishes no partial family`() {
+    fun `resource limited projection should publish no partial family`() {
         val limited = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
         val polynomial = arithmetic.subtract(arithmetic.power(y, 2), x)
 
@@ -126,7 +126,7 @@ class PolynomialProjectionTest {
     }
 
     @Test
-    fun `projection rejects variables outside the declared coordinate space`() {
+    fun `projection should reject variables outside the declared coordinate space`() {
         assertFailsWith<IllegalArgumentException> {
             PolynomialProjection.compute(listOf(y), 1, arithmetic)
         }

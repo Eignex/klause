@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class MutableIntIntMapTest {
 
     @Test
-    fun `put overwrites existing key without growing size`() {
+    fun `put should overwrite an existing key without growing size`() {
         val m = MutableIntIntMap()
         m.put(5, 1)
         m.put(5, 2)
@@ -18,7 +18,7 @@ class MutableIntIntMapTest {
     }
 
     @Test
-    fun `addTo increments from zero default and returns new value`() {
+    fun `addTo should increment from zero and return the new value`() {
         val m = MutableIntIntMap()
         assertEquals(1, m.addTo(7, 1))
         assertEquals(3, m.addTo(7, 2))
@@ -28,15 +28,15 @@ class MutableIntIntMapTest {
     }
 
     @Test
-    fun `value equal to default is still reported present`() {
+    fun `value equal to default should still be reported present`() {
         val m = MutableIntIntMap()
         m.put(5, 0)
         assertEquals(0, m.getOrDefault(5, 0))
-        assertTrue(m.containsKey(5), "present key must be reported even if its value == default")
+        assertTrue(m.containsKey(5))
     }
 
     @Test
-    fun `extreme keys and zero coexist`() {
+    fun `extreme keys and zero should coexist`() {
         val m = MutableIntIntMap()
         m.put(Int.MIN_VALUE, 1)
         m.put(Int.MAX_VALUE, 2)
@@ -48,7 +48,7 @@ class MutableIntIntMapTest {
     }
 
     @Test
-    fun `remove deletes and leaves other entries findable across collisions`() {
+    fun `remove should keep other entries findable across collisions`() {
         val m = MutableIntIntMap(4)
         for (k in 0 until 50) m.put(k, k * k)
         for (k in 0 until 50 step 3) assertTrue(m.remove(k))
@@ -60,11 +60,11 @@ class MutableIntIntMapTest {
                 assertEquals(k * k, m.getOrDefault(k, -1), "survivor key $k")
             }
         }
-        assertFalse(m.remove(0), "already-removed key returns false")
+        assertFalse(m.remove(0))
     }
 
     @Test
-    fun `clear empties and the map is reusable`() {
+    fun `clear should empty the map and keep it reusable`() {
         val m = MutableIntIntMap()
         for (k in 0 until 30) m.put(k, k)
         m.clear()
@@ -76,7 +76,7 @@ class MutableIntIntMapTest {
     }
 
     @Test
-    fun `forEach visits every entry exactly once`() {
+    fun `forEach should visit every entry exactly once`() {
         val m = MutableIntIntMap()
         val expected = HashMap<Int, Int>()
         for (k in -10..10) {
@@ -92,11 +92,10 @@ class MutableIntIntMapTest {
     }
 
     @Test
-    fun `growth preserves all entries`() {
+    fun `growth should preserve all entries`() {
         val m = MutableIntIntMap(8)
         for (k in 0 until 1000) m.put(k * 7, k)
         assertEquals(1000, m.size)
         for (k in 0 until 1000) assertEquals(k, m.getOrDefault(k * 7, -1))
     }
-
 }

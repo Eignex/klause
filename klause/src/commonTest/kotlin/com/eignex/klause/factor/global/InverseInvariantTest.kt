@@ -14,7 +14,6 @@ import kotlin.test.assertTrue
 
 class InverseInvariantTest {
 
-    // Vars 0..2 = f[0..2], vars 3..5 = g[0..2], both over domain [0,2]
     private val f = intArrayOf(0, 1, 2)
     private val g = intArrayOf(3, 4, 5)
 
@@ -26,8 +25,7 @@ class InverseInvariantTest {
     )
 
     @Test
-    fun `self-inverse structured moves preserve the involution`() {
-        // XCSP3 channel over one list: f and g are the same variables, so the constraint is f(f(x))=x.
+    fun `self-inverse structured moves should preserve the involution`() {
         val vars = intArrayOf(0, 1, 2, 3)
         val problem = Problem(
             numBoolVars = 0,
@@ -35,7 +33,6 @@ class InverseInvariantTest {
             intDomains = Array(4) { IntDomain(0, 3) },
             factors = arrayOf<Factor>(Inverse(f = vars, g = vars)),
         )
-        // Two valid involutions to start from: all fixed points, and two transpositions.
         val starts = listOf(intArrayOf(0, 1, 2, 3), intArrayOf(1, 0, 3, 2))
         fun seeded(start: IntArray, seed: Long): LocalSearchState {
             val state = LocalSearchState(problem.bake(), Random(seed))
@@ -47,24 +44,22 @@ class InverseInvariantTest {
         for (start in starts) {
             for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L)) {
                 val state = seeded(start, seed)
-                assertTrue(state.cost == 0L, "the starting involution must be feasible")
+                assertEquals(0L, state.cost)
                 val sink = MoveSink()
                 state.factors[0].proposeStructuredMoves(state, 0, sink)
                 for (m in sink.list) {
                     moves++
                     val check = seeded(start, 0)
                     check.apply(m)
-                    assertTrue(check.cost == 0L, "involution move $m broke the self-inverse")
+                    assertEquals(0L, check.cost, "$m")
                 }
             }
         }
-        assertTrue(moves > 0, "self-inverse must propose involution-preserving moves")
+        assertTrue(moves > 0)
     }
 
     @Test
-    fun `matching seed finds a feasible inverse when the identity is out of domain`() {
-        // f[0] cannot be 0 and f[2] cannot be 2, so the identity permutation is infeasible; a
-        // matching seed must still find a feasible inverse pair.
+    fun `matching seed should find a feasible inverse when the identity is out of domain`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 6,
@@ -79,16 +74,15 @@ class InverseInvariantTest {
             factors = arrayOf<Factor>(Inverse(f, g, fOffset = 0, gOffset = 0)),
         )
         val state = LocalSearchState(problem.bake(), Random(0))
-        assertTrue(state.factors[0].seedFeasible(state, 0), "matching seed must find a feasible inverse")
+        assertTrue(state.factors[0].seedFeasible(state, 0))
         state.recompute()
-        assertEquals(0L, state.cost, "the seeded assignment must satisfy inverse")
+        assertEquals(0L, state.cost)
     }
 
     @Test
-    fun `delta predicts degree change on corrective assignment`() {
+    fun `delta should predict degree change on corrective assignment`() {
         val p = problem()
         val state = LocalSearchState(p.bake(), Random(0))
-        // Start with identity, break g[0] to 2 (was 0)
         for (i in 0..2) state.assignment.setInt(i, i.toLong())
         state.assignment.setInt(3, 2)
         state.assignment.setInt(4, 1)
@@ -96,7 +90,6 @@ class InverseInvariantTest {
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
         val before = state.factors[0].violationDegree(state, 0)
-        // Fix g[0] back to 0
         val delta = state.factors[0].deltaIfIntSet(state, 0, 3, 0)
         state.apply(Move.IntSet(3, 0))
         val after = state.factors[0].violationDegree(state, 0)

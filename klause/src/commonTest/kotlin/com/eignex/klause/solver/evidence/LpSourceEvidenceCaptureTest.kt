@@ -20,26 +20,37 @@ import kotlin.test.assertNotNull
 
 class LpSourceEvidenceCaptureTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-    private val scope = SourceScope(SourceRevision("original", "exact-affine"),
-        objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(
+        SourceRevision("original", "exact-affine"),
+        objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
+    )
 
     private fun context(lower: Long, upper: Long = 9): SourceProofContext {
         val premises = mapOf(
-            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
-                BigFraction.ofLong(-lower))),
+            "lower" to SourcePremise(
+                SourceInequality(
+                    mapOf(x to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(-lower),
+                ),
+            ),
             "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(upper))),
         )
         return SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
     }
 
     @Test
-    fun `an unestablished integer guard cannot hide an unconditional LP citation`() {
+    fun `an unestablished integer guard should not hide an unconditional LP citation`() {
         val guard = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         val original = context(3)
         val model = LpBuilder().apply { addVar(3, 9, cost = 1) }.build(Sense.MINIMIZE)
         val bound = CertifiedLpBound(BigFraction.ofLong(3), assertNotNull(integerCertify(model, doubleArrayOf())))
-        val rows = mapOf("conditional" to SourcePremise(original.premises.getValue("lower").inequality,
-            emptyMap(), mapOf(guard to BigFraction.ONE))) + original.premises
+        val rows = mapOf(
+            "conditional" to SourcePremise(
+                original.premises.getValue("lower").inequality,
+                emptyMap(),
+                mapOf(guard to BigFraction.ONE),
+            ),
+        ) + original.premises
         val context = SourceProofContext(scope, setOf(x, guard), rows, mapOf(x to BigFraction.ONE))
 
         val evidence = LpSourceEvidenceCapture(context, listOf(x)).bound(model, bound)
@@ -48,15 +59,22 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `a conditional LP citation retains its established integer invocation pin`() {
+    fun `a conditional LP citation should retain its established integer invocation pin`() {
         val guard = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        val condition = SourceCondition(lower = mapOf(guard to BigFraction.ONE),
-            upper = mapOf(guard to BigFraction.ONE))
+        val condition = SourceCondition(
+            lower = mapOf(guard to BigFraction.ONE),
+            upper = mapOf(guard to BigFraction.ONE),
+        )
         val scoped = scope.copy(condition = condition)
         val model = LpBuilder().apply { addVar(3, 9, cost = 1) }.build(Sense.MINIMIZE)
         val bound = CertifiedLpBound(BigFraction.ofLong(3), assertNotNull(integerCertify(model, doubleArrayOf())))
-        val rows = mapOf("conditional" to SourcePremise(context(3).premises.getValue("lower").inequality,
-            emptyMap(), mapOf(guard to BigFraction.ONE)))
+        val rows = mapOf(
+            "conditional" to SourcePremise(
+                context(3).premises.getValue("lower").inequality,
+                emptyMap(),
+                mapOf(guard to BigFraction.ONE),
+            ),
+        )
         val context = SourceProofContext(scoped, setOf(x, guard), rows, mapOf(x to BigFraction.ONE))
 
         val evidence = LpSourceEvidenceCapture(context, listOf(x)).bound(model, bound)
@@ -66,7 +84,7 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `mixed multipliers capture a fractional bound in original objective units`() {
+    fun `mixed multipliers should capture a fractional bound in original objective units`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val quarter = assertNotNull(BigFraction.ofDouble(0.25))
         val source = LpBuilder().apply {
@@ -76,17 +94,25 @@ class LpSourceEvidenceCaptureTest {
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         val certificate = assertNotNull(nodeDualCertificate(model, doubleArrayOf()))
         val bound = CertifiedLpBound(
-            certificate.exactObjectiveBound(), dualMultipliers = certificate.exactMultipliers(),
+            certificate.exactObjectiveBound(),
+            dualMultipliers = certificate.exactMultipliers(),
         )
         val original = context(0L, 10L)
         val premises = original.premises + mapOf(
             "real lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), quarter.negated())),
-            "real upper" to SourcePremise(SourceInequality(
-                mapOf(real to BigFraction.ONE), quarter + BigFraction.ONE,
-            )),
+            "real upper" to SourcePremise(
+                SourceInequality(
+                    mapOf(real to BigFraction.ONE),
+                    quarter + BigFraction.ONE,
+                ),
+            ),
         )
-        val context = SourceProofContext(scope, setOf(x, real), premises,
-            mapOf(x to BigFraction.ONE, real to assertNotNull(BigFraction.ofDouble(0.5))))
+        val context = SourceProofContext(
+            scope,
+            setOf(x, real),
+            premises,
+            mapOf(x to BigFraction.ONE, real to assertNotNull(BigFraction.ofDouble(0.5))),
+        )
 
         val evidence = LpSourceEvidenceCapture(context, listOf(x, real)).bound(model, bound)
 
@@ -94,7 +120,7 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `retained integer multipliers produce a source bound after coordinate shifting`() {
+    fun `retained integer multipliers should produce a source bound after coordinate shifting`() {
         val model = LpBuilder().apply {
             val column = addVar(2, 9, cost = 1)
             addRow(intArrayOf(column), longArrayOf(1), Relation.GE, 3)
@@ -108,7 +134,7 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `an LP row absent from the original source cannot establish a stronger bound`() {
+    fun `an LP row absent from the original source should not establish a stronger bound`() {
         val model = LpBuilder().apply {
             val column = addVar(0, 9, cost = 1)
             addRow(intArrayOf(column), longArrayOf(1), Relation.GE, 4)
@@ -122,7 +148,7 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `a stale integer LP certificate withholds source capture`() {
+    fun `a stale integer LP certificate should withhold source capture`() {
         val model = LpBuilder().apply { addVar(3, 9, cost = 1) }.build(Sense.MINIMIZE)
         val bound = CertifiedLpBound(BigFraction.ofLong(3), assertNotNull(integerCertify(model, doubleArrayOf())))
         val context = context(3)
@@ -134,14 +160,17 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `an exact Farkas conflict cites the original incompatible rows`() {
+    fun `an exact Farkas conflict should cite the original incompatible rows`() {
         val model = LpBuilder().apply {
             val column = addVar(0, 9)
             addRow(intArrayOf(column), longArrayOf(1), Relation.LE, 1)
             addRow(intArrayOf(column), longArrayOf(1), Relation.GE, 2)
         }.build(Sense.MINIMIZE)
-        val conflict = BigRationalConflict(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.ONE),
-            listOf(ExactSimplexBound(1, false), ExactSimplexBound(2, false)))
+        val conflict = BigRationalConflict(
+            intArrayOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.ONE),
+            listOf(ExactSimplexBound(1, false), ExactSimplexBound(2, false)),
+        )
         val context = context(2, 1)
 
         val evidence = LpSourceEvidenceCapture(context, listOf(x)).conflict(model, conflict)
@@ -150,14 +179,17 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `an omitted Farkas endpoint cannot be replaced by the infeasible engine label`() {
+    fun `an omitted Farkas endpoint should not be replaced by the infeasible engine label`() {
         val model = LpBuilder().apply {
             val column = addVar(0, 9)
             addRow(intArrayOf(column), longArrayOf(1), Relation.LE, 1)
             addRow(intArrayOf(column), longArrayOf(1), Relation.GE, 2)
         }.build(Sense.MINIMIZE)
-        val conflict = BigRationalConflict(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.ONE),
-            listOf(ExactSimplexBound(1, false)))
+        val conflict = BigRationalConflict(
+            intArrayOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.ONE),
+            listOf(ExactSimplexBound(1, false)),
+        )
         val context = context(2, 1)
 
         val evidence = LpSourceEvidenceCapture(context, listOf(x)).conflict(model, conflict)
@@ -166,7 +198,7 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `cancelled LP derivation capture is explicitly unavailable`() {
+    fun `cancelled LP derivation capture should be explicitly unavailable`() {
         val model = LpBuilder().apply { addVar(3, 9, cost = 1) }.build(Sense.MINIMIZE)
         val bound = CertifiedLpBound(BigFraction.ofLong(3), assertNotNull(integerCertify(model, doubleArrayOf())))
         val context = context(3)
@@ -177,7 +209,7 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `rational dual capture owns multiplier coordinates`() {
+    fun `rational dual capture should own multiplier coordinates`() {
         val model = LpBuilder().apply {
             val column = addVar(0, 9, cost = 1)
             addRow(intArrayOf(column), longArrayOf(1), Relation.GE, 3)
@@ -193,19 +225,24 @@ class LpSourceEvidenceCaptureTest {
     }
 
     @Test
-    fun `a minimized LP dual captures the original maximization upper bound`() {
+    fun `a minimized LP dual should capture the original maximization upper bound`() {
         val model = LpBuilder().apply { addVar(0, 3, cost = -1) }.build(Sense.MINIMIZE)
-        val bound = CertifiedLpBound(BigFraction.ofLong(-3),
-            assertNotNull(integerCertify(model, doubleArrayOf())))
+        val bound = CertifiedLpBound(
+            BigFraction.ofLong(-3),
+            assertNotNull(integerCertify(model, doubleArrayOf())),
+        )
         val original = context(0, 3)
         val scoped = scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE))
-        val context = SourceProofContext(scoped, original.coordinates, original.premises,
-            mapOf(x to BigFraction.ONE))
+        val context = SourceProofContext(
+            scoped,
+            original.coordinates,
+            original.premises,
+            mapOf(x to BigFraction.ONE),
+        )
 
         val evidence = LpSourceEvidenceCapture(context, listOf(x)).bound(model, bound)
 
         assertEquals(SourceClaim.Bound(BigFraction.ofLong(3)), evidence.claim)
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
     }
-
 }

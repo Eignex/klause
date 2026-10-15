@@ -6,12 +6,15 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.Propagator
@@ -20,14 +23,17 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AffineEliminationTest {
-
     @Test
-    fun `affine elimination folds declared rows and reconstructs a feasible assignment`() {
+    fun `affine elimination should fold declared rows and reconstruct a feasible assignment`() {
         val rows = listOf(
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
             Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 7),
@@ -64,9 +70,6 @@ class AffineEliminationTest {
         }
     }
 
-    /** Brute feasible-set preservation: every feasible assignment of the reduced problem reconstructs
-     *  to a feasible assignment of the original, and the reconstructed set is *exactly* the original's
-     *  feasible set (no solution lost, none invented). Small domains only — full enumeration. */
     private fun checkFeasibleSetPreserved(name: String, original: Problem) {
         val baked = original.bake()
         val delta = Presolve.eliminateAffineSingletons(baked)
@@ -93,7 +96,6 @@ class AffineEliminationTest {
         return out
     }
 
-    /** Enumerate every integer assignment over [domains] (bounds only; small domains). */
     private fun enumerate(domains: Array<IntDomain>, body: (LongArray) -> Unit) {
         val n = domains.size
         val assign = LongArray(n) { domains[it].min }
@@ -113,9 +115,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `the single partner of a holed pivot keeps only values that rebuild onto its domain`() {
-        // x (0) in {3, 7} defined by x - 2y = 1, with y (1) in 1..3 kept out of a residue doubleton by
-        // y + w <= 4: y = 2 would put x on its hole, which the bounds alone cannot see.
+    fun `a holed pivot with one partner should keep only partner values that rebuild onto its domain`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -133,9 +133,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `a holed pivot with several partners stays in the model`() {
-        // x (0) in {0, 4} = y + z over y, z in 0..2: the holes cannot move onto two partners, so y is
-        // folded out instead and x keeps its domain.
+    fun `a holed pivot with several partners should stay in the model`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -150,9 +148,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `folds an affine substitution whose product coefficient exceeds Int range`() {
-        // x = 100000*y folded into 100000*x + y <= 500000 yields a coefficient of 10^10 — beyond Int
-        // but well within Long, so the pivot is eliminated with the wide coefficient carried exactly.
+    fun `affine elimination should fold a substitution whose product coefficient exceeds Int range`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -166,9 +162,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `skips an affine fold whose product coefficient would overflow Long`() {
-        // x = 5e9*y folded into 5e9*x + y <= 10e9 needs 2.5e19, past Long. The fold would overflow, so
-        // the pivot is left un-eliminated (sound) rather than wrapping the coefficient.
+    fun `affine elimination should skip a fold whose product coefficient would overflow Long`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -182,39 +176,35 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not eliminate when both equation vars appear in a non-linear factor`() {
-        // x (0) and y (1) both appear in an AllDifferent — neither the unit fold (x is in a global) nor
-        // the residue elimination (y is not contained) can act, so nothing is eliminated.
+    fun `an equation whose vars both appear in a non-linear factor should not be eliminated`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 3), IntDomain(0, 5)),
             factors = listOf(
-                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1), // x = 2y+1
-                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6), // both in a global
+                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
+                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6),
             ),
         )
         checkRoundTrip("vars-in-global", problem, expectEliminated = false, expectSat = true)
     }
 
     @Test
-    fun `aliases x = y out of a non-linear factor`() {
-        // x0 = x1 and x0 also in AllDifferent(x0, x2): the alias case substitutes x0 -> x1 into the
-        // global via remap, eliminating x0 even though it's not a linear factor.
+    fun `an alias x = y should be substituted out of a non-linear factor`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = listOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0), // x0 = x1
-                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 4), // x0 in a global
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 4),
             ),
         )
         checkRoundTrip("alias-into-global", problem, expectEliminated = true, expectSat = true)
     }
 
     @Test
-    fun `leaves an alias when remapping its linear row would overflow`() {
+    fun `an alias should stay when remapping its linear row would overflow`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -229,17 +219,14 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not affine-substitute a scaled element index`() {
-        // x = 2y + 1 as an Element index would reindex the array, which Element cannot represent, so
-        // the substitution declines and x is left in place. The extra `y <= 1` keeps y non-contained
-        // so the residue-class pass can't eliminate it instead (isolating the Element decline).
+    fun `a scaled element index should not be affine-substituted`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(1, 3), IntDomain(5, 7), IntDomain(0, 1)),
             factors = listOf(
-                Linear(intArrayOf(1, -2), intArrayOf(0, 2), LinearOp.EQ, 1), // x = 2y + 1
-                Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 1), // y <= 1 (keeps y non-contained)
+                Linear(intArrayOf(1, -2), intArrayOf(0, 2), LinearOp.EQ, 1),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 1), // keeps the residue pass from acting
                 Element(idx = 0, result = 1, arr = longArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 1),
             ),
         )
@@ -247,8 +234,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `chained eliminations reconstruct correctly`() {
-        // x = 2y+1 and y = z+1: eliminate x, then y (its defining EQ's partner folds), then z stays.
+    fun `chained eliminations should reconstruct correctly`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -262,8 +248,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not eliminate an n-term equality with no unit pivot`() {
-        // 2x0 + 3x1 + 4x2 = 12: no coefficient is +/-1, so no variable can be projected out integrally.
+    fun `an n-term equality without a unit pivot should not be eliminated`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -274,10 +259,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not eliminate a contained non-unit pivot that does not divide a partner`() {
-        // 2x0 + 4x1 + 3x2 = 8: the pivot 2 divides the bound and x1's coefficient but not x2's, so the
-        // fold would be non-integral. x0 is contained but stays — only the residue doubleton path could
-        // act, and it needs a two-term equality, so nothing is eliminated.
+    fun `a contained non-unit pivot that does not divide a partner should not be eliminated`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -288,10 +270,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not eliminate a contained non-unit pivot that does not divide the bound`() {
-        // 2x0 - 4x1 - 6x2 = 7: 2 divides every partner coefficient but not the odd bound, so no integer
-        // x0 exists for any partner assignment — the projection would be unsound, so x0 is left in place
-        // (the equality is correctly unsatisfiable and the verdict is preserved).
+    fun `a contained non-unit pivot that does not divide the bound should not be eliminated`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -302,10 +281,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not eliminate a non-unit pivot when neither equation var is contained`() {
-        // 2x0 - 4x1 = 8 with BOTH x0 and x1 pinned into a global: the divisibility holds, but a non-unit
-        // fold needs a contained pivot it can absorb, and neither var is contained, so neither the
-        // non-unit unit-loop case nor the residue doubleton can act — nothing is eliminated.
+    fun `a non-unit pivot should not be eliminated when neither equation var is contained`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -319,9 +295,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not eliminate a non-unit pivot whose objective variable is protected`() {
-        // 2x0 - 4x1 - 6x2 = 8 with x0 in the objective: even though x0 is contained and the divisibility
-        // holds, an objective variable is never eliminated, so the equality survives untouched.
+    fun `a non-unit pivot in the objective should not be eliminated`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -329,14 +303,11 @@ class AffineEliminationTest {
             factors = listOf(Linear(intArrayOf(2, -4, -6), intArrayOf(0, 1, 2), LinearOp.EQ, 8)),
         )
         val delta = Presolve.eliminateAffineSingletons(problem.bake(), objectiveIntVars = setOf(0))
-        assertTrue(delta.isEmpty, "objective-protected: must not eliminate x0")
+        assertTrue(delta.isEmpty)
     }
 
     @Test
-    fun `eliminates a non-unit doubleton via residue-class restriction`() {
-        // 2x + 3y = 12 has no unit pivot, but x is contained, so x = (12 - 3y)/2 — an integer only for
-        // even y. Eliminate x, restrict y to {0,2,4} (the residue class keeping x in [0,6]), and
-        // reconstruct x with the divisor.
+    fun `a non-unit doubleton should be eliminated via residue-class restriction`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -348,10 +319,7 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not divide by a zero pivot coefficient`() {
-        // 0*x0 - 2*x1 = 1: a term with a zero coefficient is non-unit, so the pivot loop reaches the
-        // divisibility test for x0; the zero coefficient can never be a pivot and must not be used as a
-        // modulus. The equality (-2*x1 = 1) is unsatisfiable, and that verdict is preserved.
+    fun `a zero pivot coefficient should never be used as a divisor`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -361,4 +329,90 @@ class AffineEliminationTest {
         checkRoundTrip("zero-pivot", problem, expectEliminated = false, expectSat = false)
     }
 
+    private fun row(vararg terms: Pair<Int, Long>, op: LinearOp, bound: Long) = Linear(
+        LongArray(terms.size) { terms[it].second },
+        IntArray(terms.size) { terms[it].first },
+        op,
+        bound,
+    )
+
+    private fun model(n: Int, hi: Long, open: Set<Int>, vararg factors: Factor): Problem = Problem(
+        numBoolVars = 0,
+        intBounds = IntBounds.fromModelBounds(
+            LongArray(n),
+            LongArray(n) { hi },
+            null,
+            if (open.isEmpty()) null else Bits(n).also { b -> open.forEach { b.set(it) } },
+        ),
+        factors = arrayOf(*factors),
+    )
+
+    @Test
+    fun `a bounded column should be eliminated and rebuilt from its partner`() {
+        val problem = model(
+            2,
+            10L,
+            emptySet(),
+            row(0 to 1L, 1 to -1L, op = LinearOp.EQ, bound = 0L),
+            row(0 to 1L, op = LinearOp.LE, bound = 4L),
+        )
+
+        val delta = Presolve.eliminateSourceAffineSingletons(
+            problem,
+            emptySet(),
+            Cancellation.Never,
+            AffinePivotOrder.MARKOWITZ,
+        )
+
+        assertFalse(delta.isEmpty)
+        val reduced = assertNotNull(problem.withSourcePassDelta(delta))
+        val ints = longArrayOf(0L, 3L)
+        delta.rebuild.rebuildInto(booleanArrayOf(), ints)
+        assertEquals(3L, ints[0])
+        assertTrue(reduced.factors.none { f -> f.intVars.any { it == 0 } })
+    }
+
+    @Test
+    fun `a column open on a side should never be a pivot`() {
+        val problem = model(
+            2,
+            10L,
+            setOf(0),
+            row(0 to 1L, 1 to -1L, op = LinearOp.EQ, bound = 0L),
+            row(0 to 1L, op = LinearOp.LE, bound = 4L),
+        )
+
+        val delta = Presolve.eliminateSourceAffineSingletons(
+            problem,
+            emptySet(),
+            Cancellation.Never,
+            AffinePivotOrder.MARKOWITZ,
+        )
+
+        val reduced = assertNotNull(problem.withSourcePassDelta(delta))
+        assertTrue(reduced.factors.any { f -> f.intVars.any { it == 0 } })
+    }
+
+    @Test
+    fun `a column with declared holes should never be a pivot`() {
+        // y is an objective column, so x is the only pivot the equality offers.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 4).excludeValues(longArrayOf(1, 2, 3))!!, IntDomain(0, 10)),
+            factors = listOf(
+                row(0 to 1L, 1 to -1L, op = LinearOp.EQ, bound = 1L),
+                row(0 to 1L, 1 to 1L, op = LinearOp.LE, bound = 9L),
+            ),
+        )
+
+        val delta = Presolve.eliminateSourceAffineSingletons(
+            problem,
+            setOf(1),
+            Cancellation.Never,
+            AffinePivotOrder.MARKOWITZ,
+        )
+
+        assertTrue(delta.isEmpty)
+    }
 }

@@ -8,73 +8,60 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.LinearObjective
+import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class PairSwapTest {
 
-    private val cap = 8
-
-    /** Mixed bool/int problem with same-shaped int domains so swaps are sometimes legal. */
-    private fun mixedProblem(): Problem = Problem(
-        numBoolVars = 3,
-        numIntVars = 3,
-        intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
-        factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 9)),
+    private fun problem(): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 4,
+        intDomains = Array(4) { IntDomain(0, 5) },
+        factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.LE, 99)),
     )
 
-    /** A starting assignment with bool variety and distinct int values so both swap kinds fire. */
-    private fun prepare(state: LocalSearchState) {
-        state.assignment.setBool(0, true)
+    private fun prepared(seed: Long): LocalSearchState {
+        val state = LocalSearchState(problem().bake(), Random(seed))
+        state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(0, 1, 0, 1))
+        // Distinct values so int swaps are always legal.
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 4)
         state.assignment.setInt(2, 1)
+        state.assignment.setInt(3, 3)
         state.recompute()
-    }
-
-    /** The expected two-phase construction: up to [cap] bool-pair swaps, then up to [cap] int-pair swaps. */
-    private fun expectedPairSwapFill(state: LocalSearchState, sink: MoveSink) {
-        val rng = state.rng
-        val nBool = state.problem.numBoolVars
-        repeat(cap) {
-            val swap = run {
-                if (nBool < 2) return@run null
-                val a = rng.nextInt(nBool)
-                val b = rng.nextInt(nBool)
-                if (a == b) return@run null
-                if (state.assumptions.isFrozenBool(a) || state.assumptions.isFrozenBool(b)) return@run null
-                if (state.assignment.boolValue(a) == state.assignment.boolValue(b)) return@run null
-                Move.Compound(listOf(Move.BoolFlip(a), Move.BoolFlip(b)))
-            } ?: return@repeat
-            sink.addCompound(swap.parts)
-        }
-        val nInt = state.problem.numIntVars
-        repeat(cap) {
-            val swap = run {
-                if (nInt < 2) return@run null
-                val a = rng.nextInt(nInt)
-                val b = rng.nextInt(nInt)
-                if (a == b) return@run null
-                if (state.assumptions.isFrozenInt(a) || state.assumptions.isFrozenInt(b)) return@run null
-                val va = state.assignment.intValue(a)
-                val vb = state.assignment.intValue(b)
-                if (va == vb) return@run null
-                if (vb !in state.rootDomains[a] ||
-                    va !in state.rootDomains[b]
-                ) {
-                    return@run null
-                }
-                Move.Compound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
-            } ?: return@repeat
-            sink.addCompound(swap.parts)
-        }
+        return state
     }
 
     @Test
-    fun `generate emits the capped bool-then-int swap multiset`() {
-        for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L)) {
-            assertSourceMatchesGenerator(::mixedProblem, seed, PairSwap(cap), prepare = ::prepare) { state, sink ->
-                expectedPairSwapFill(state, sink)
+    fun `objective hot-spot var should be -1 when the objective exposes no int gradient`() {
+        val state = LocalSearchState(problem().bake(), Random(1))
+        assertEquals(-1, state.shaping.objectiveHotSpotIntVar(state.rng))
+    }
+
+    @Test
+    fun `hot-spot pair swaps should anchor their first endpoint on an objective var`() {
+        val state = prepared(7)
+        val sink = MoveSink()
+        var swaps = 0
+        repeat(30) {
+            sink.clear()
+            PairSwap.hotSpot(cap = 8).generate(state, sink)
+            for (m in sink.list) {
+                m as Move.Compound
+                val first = m.parts[0]
+                if (first is Move.IntSet) {
+                    swaps++
+                    assertTrue(
+                        first.varId == 1 || first.varId == 3,
+                        "first endpoint ${first.varId} must be an objective var",
+                    )
+                }
             }
         }
+        assertTrue(swaps > 0, "the fixture must produce int swaps")
     }
 }

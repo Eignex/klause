@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 class ExtremumRepairTest {
     @Test
-    fun `alias repairs backsolve affine min and max operands`() {
+    fun `alias repairs should backsolve affine min and max operands`() {
         for (extreme in listOf("min", "max")) {
             val parsed = Xcsp3.parse(
                 """
@@ -42,7 +42,7 @@ class ExtremumRepairTest {
     }
 
     @Test
-    fun `inverse repairs respect input domains pins and implicit owners`() {
+    fun `inverse repairs should respect input domains pins and implicit owners`() {
         for (restriction in listOf("domain", "pin", "owner")) {
             val domain = if (restriction == "domain") "0 2" else "0..2"
             val parsed = Xcsp3.parse(
@@ -74,7 +74,7 @@ class ExtremumRepairTest {
     }
 
     @Test
-    fun `shared input collisions cannot publish an unreachable extremum repair`() {
+    fun `shared input collisions should not publish an unreachable extremum repair`() {
         val parsed = Xcsp3.parse(
             """
             <instance><variables><var id="x">-2..2</var><var id="r">-2..2</var></variables>
@@ -100,7 +100,7 @@ class ExtremumRepairTest {
     }
 
     @Test
-    fun `constant witnesses permit inverse repairs across input domain gaps`() {
+    fun `constant witnesses should permit inverse repairs across input domain gaps`() {
         for (max in listOf(false, true)) {
             val domain = if (max) "-3 0" else "0 3"
             val target = if (max) -2L else 2L
@@ -129,7 +129,7 @@ class ExtremumRepairTest {
     }
 
     @Test
-    fun `inverse bound repairs round affine operands toward a constant witness`() {
+    fun `inverse bound repairs should round affine operands toward a constant witness`() {
         for ((max, coefficient) in listOf(false to 2, true to 2, false to -2, true to -2)) {
             val negativeInput = max == (coefficient > 0)
             val domain = if (negativeInput) "-2..0" else "0..2"
@@ -161,7 +161,7 @@ class ExtremumRepairTest {
     }
 
     @Test
-    fun `inverse validation recomputes shared product inputs`() {
+    fun `inverse validation should recompute shared product inputs`() {
         val parsed = Xcsp3.parse(
             """
             <instance><variables><var id="x">-2..2</var><var id="y">-2</var><var id="r">-4..4</var></variables>

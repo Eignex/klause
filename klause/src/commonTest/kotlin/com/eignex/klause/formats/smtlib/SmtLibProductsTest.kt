@@ -16,32 +16,7 @@ import kotlin.test.assertTrue
 
 class SmtLibProductsTest {
     @Test
-    fun `bounded integer products use the shared product factor`() {
-        val parsed = SmtLib.parse(
-            "(declare-const x Int) (declare-const y Int) " +
-                "(assert (and (<= 1 x 3) (<= 1 y 3) (= (* x y) 6)))",
-        )
-
-        assertTrue(parsed.model.factors.any { it is Product })
-    }
-
-    @Test
-    fun `bounded product witnesses satisfy the original integer equation`() {
-        val parsed = SmtLib.parse(
-            "(declare-const x Int) (declare-const y Int) " +
-                "(assert (and (<= 1 x 3) (<= 1 y 3) (= (* x y) 6)))",
-        )
-
-        val result = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams(maxDecisions = 100))
-
-        val sample = assertIs<SolveResult.Sat>(result).assignment
-        val x = sample.intValue(parsed.intVarNames.getValue("x"))
-        val y = sample.intValue(parsed.intVarNames.getValue("y"))
-        assertEquals(6L, x * y)
-    }
-
-    @Test
-    fun `bounded product lowering preserves the complete source solution set`() {
+    fun `bounded product lowering should preserve the complete source solution set`() {
         val parsed = SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) " +
                 "(assert (and (<= 1 x 3) (<= 1 y 3) (= (* x y) 6)))",
@@ -55,7 +30,7 @@ class SmtLibProductsTest {
     }
 
     @Test
-    fun `bounded integer product exhaustion proves source infeasibility`() {
+    fun `bounded integer product exhaustion should prove source infeasibility`() {
         val parsed = SmtLib.parse(
             "(declare-const x Int) (declare-const y Int) " +
                 "(assert (and (<= 1 x 3) (<= 1 y 3) (= (* x y) 5)))",
@@ -67,7 +42,7 @@ class SmtLibProductsTest {
     }
 
     @Test
-    fun `bounded integer real products use the shared mixed product factor`() {
+    fun `bounded integer real products should use the shared mixed product factor`() {
         val parsed = SmtLib.parse(
             "(declare-const x Int) (declare-const y Real) " +
                 "(assert (and (<= 1 x 3) (= (* (to_real x) y) 6)))",
@@ -77,14 +52,14 @@ class SmtLibProductsTest {
     }
 
     @Test
-    fun `real products use the shared continuous product factor`() {
+    fun `real products should use the shared continuous product factor`() {
         val parsed = SmtLib.parse("(declare-const x Real) (assert (= (* x x) 2))")
 
         assertTrue(parsed.model.factors.any { it is ContinuousProduct })
     }
 
     @Test
-    fun `bounded powers retain one native relation`() {
+    fun `bounded powers should retain one native relation`() {
         val parsed = SmtLib.parse("(declare-const x Int) (assert (and (<= 0 x 2) (= (^ x 4) 16)))")
 
         assertEquals(4, parsed.model.factors.filterIsInstance<Power>().single().exponent)
@@ -92,7 +67,7 @@ class SmtLibProductsTest {
     }
 
     @Test
-    fun `compound operand range checks preserve sign reversal beyond word bounds`() {
+    fun `compound operand range checks should preserve sign reversal beyond word bounds`() {
         val source = "(declare-const x Int) (declare-const y Int) " +
             "(assert (= x (- 9223372036854775808))) (assert (<= 1 y 2)) " +
             "(assert (= (* (+ (- x) 1) y) 1))"
@@ -101,7 +76,7 @@ class SmtLibProductsTest {
     }
 
     @Test
-    fun `word overflowing and open products decline finite lowering`() {
+    fun `word overflowing and open products should decline finite lowering`() {
         val sources = listOf(
             "(declare-const x Int) (assert (= (* x x) 4))",
             "(declare-const x Int) (assert (and (<= 3037000500 x 3037000501) (= (* x x) 1)))",

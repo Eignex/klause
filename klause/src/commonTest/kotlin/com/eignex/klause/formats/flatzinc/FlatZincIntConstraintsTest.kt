@@ -2,18 +2,21 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.table.Element
+import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
-import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.localsearch.LocalSearchModel
 
 class FlatZincIntConstraintsTest {
-
     @Test
-    fun `negative bounds make nonnegative channel sums false without restricting their inputs`() {
+    fun `negative bounds should make nonnegative channel sums false without restricting their inputs`() {
         for (op in listOf("le", "eq")) {
             for (bound in listOf(-1L, Long.MIN_VALUE)) {
                 val program = parseFlatZinc(
@@ -36,8 +39,10 @@ class FlatZincIntConstraintsTest {
 
                 assertEquals(
                     setOf(
-                        listOf(false, false, false), listOf(false, true, false),
-                        listOf(true, false, false), listOf(true, true, false),
+                        listOf(false, false, false),
+                        listOf(false, true, false),
+                        listOf(true, false, false),
+                        listOf(true, true, false),
                     ),
                     assignments,
                 )
@@ -46,7 +51,7 @@ class FlatZincIntConstraintsTest {
     }
 
     @Test
-    fun `hard nonnegative channel sums with negative bounds are infeasible`() {
+    fun `hard nonnegative channel sums with negative bounds should be infeasible`() {
         for (op in listOf("le", "eq")) {
             val program = parseFlatZinc(
                 """
@@ -65,7 +70,7 @@ class FlatZincIntConstraintsTest {
     }
 
     @Test
-    fun `zero sum expansion falls back for every row when the model exceeds its clause limit`() {
+    fun `zero sum expansion should fall back for every row when the model exceeds its clause limit`() {
         for (limit in listOf(6, 7)) {
             for (reverse in listOf(false, true)) {
                 val rows = listOf(
@@ -99,7 +104,7 @@ class FlatZincIntConstraintsTest {
     }
 
     @Test
-    fun `reified nonnegative zero sums preserve every Boolean assignment`() {
+    fun `reified nonnegative zero sums should preserve every Boolean assignment`() {
         for (op in listOf("le", "eq")) {
             val program = parseFlatZinc(
                 """
@@ -121,8 +126,10 @@ class FlatZincIntConstraintsTest {
 
             assertEquals(
                 setOf(
-                    listOf(false, false, true), listOf(false, true, true),
-                    listOf(true, false, false), listOf(true, true, false),
+                    listOf(false, false, true),
+                    listOf(false, true, true),
+                    listOf(true, false, false),
+                    listOf(true, true, false),
                 ),
                 assignments,
             )
@@ -130,7 +137,7 @@ class FlatZincIntConstraintsTest {
     }
 
     @Test
-    fun `signed sums preserve cancellation between Boolean channels`() {
+    fun `signed sums should preserve cancellation between Boolean channels`() {
         val program = parseFlatZinc(
             """
             var bool: a;
@@ -152,7 +159,7 @@ class FlatZincIntConstraintsTest {
     }
 
     @Test
-    fun `unreified zero sums pin only nonzero weighted channels`() {
+    fun `unreified zero sums should pin only nonzero weighted channels`() {
         val program = parseFlatZinc(
             """
             var bool: a;
@@ -172,10 +179,13 @@ class FlatZincIntConstraintsTest {
 
         assertEquals(setOf(listOf(false, false), listOf(false, true)), assignments)
     }
+
     @Test
-    fun `square propagation retains source witnesses when corner products overflow`() {
-        val parsed = parseFlatZinc("var 2900000000..4000000000: x; " +
-            "constraint int_times(x, x, 9000000000000000000); solve satisfy;")
+    fun `square propagation should retain source witnesses when corner products overflow`() {
+        val parsed = parseFlatZinc(
+            "var 2900000000..4000000000: x; " +
+                "constraint int_times(x, x, 9000000000000000000); solve satisfy;",
+        )
         val baked = parsed.problem.bake()
         val variable = parsed.intVarsByName.getValue("x")
 
@@ -184,4 +194,61 @@ class FlatZincIntConstraintsTest {
         assertNotNull(pins)
     }
 
+    @Test
+    fun `binary extrema should retain native operands with result aliases`() {
+        for (name in listOf("int_min", "int_max")) {
+            val program =
+                parseFlatZinc(
+                    """
+                var 0..2: x;
+                var 1..1: y;
+                constraint $name(x, y, x);
+                solve satisfy;
+                    """.trimIndent(),
+                )
+            val factor = program.problem.factors.filterIsInstance<ArrayMinMax>().single()
+
+            assertEquals(listOf(0, 1), factor.xs.toList())
+            assertEquals(0, factor.result)
+            val sample = assertIs<SolveResult.Sat>(
+                BacktrackSolver(program.problem.bake())
+                    .solve(BacktrackParams(randomSeed = 0)),
+            ).assignment
+            assertEquals(
+                sample.ints[0],
+                if (name == "int_max") {
+                    maxOf(sample.ints[0], 1L)
+                } else {
+                    minOf(sample.ints[0], 1L)
+                },
+            )
+        }
+    }
+
+    @Test
+    fun `array extrema and selection should retain correlated native factors`() {
+        val program =
+            parseFlatZinc(
+                """
+            var 1..2: i;
+            var 0..2: x;
+            var 0..2: y;
+            var 0..2: m;
+            constraint array_int_maximum(m, [x, y, x]);
+            constraint array_var_int_element(i, [x, y], m);
+            constraint int_eq(x, 0);
+            constraint int_eq(y, 2);
+            solve satisfy;
+                """.trimIndent(),
+            )
+
+        assertEquals(1, program.problem.factors.filterIsInstance<ArrayMinMax>().size)
+        assertEquals(1, program.problem.factors.filterIsInstance<Element>().single().indexOffset)
+        val sample = assertIs<SolveResult.Sat>(
+            BacktrackSolver(program.problem.bake())
+                .solve(BacktrackParams(randomSeed = 0)),
+        ).assignment
+        assertEquals(2L, sample.ints[0])
+        assertEquals(2L, sample.ints[3])
+    }
 }

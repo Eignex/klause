@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class ProblemSetsTest {
     @Test
-    fun `a set reads its problems and its includes in order, each once`() {
+    fun `a set should read its problems and includes in order each once`() {
         val root = Files.createTempDirectory("sets").toFile()
         try {
             root.resolve("a.txt").writeText("# a\nhakank/x/x\nsatlib/uf20-01  # one\n")
@@ -26,7 +26,7 @@ class ProblemSetsTest {
     }
 
     @Test
-    fun `a set that includes itself is refused`() {
+    fun `a set that includes itself should be refused`() {
         val root = Files.createTempDirectory("sets").toFile()
         try {
             root.resolve("a.txt").writeText("@b\n")
@@ -39,7 +39,7 @@ class ProblemSetsTest {
     }
 
     @Test
-    fun `every committed set loads`() {
+    fun `every committed set should load`() {
         val root = File("sets")
         for (name in ProblemSets.names(root)) {
             val entries = ProblemSets.load(listOf(name), root)
@@ -48,7 +48,7 @@ class ProblemSetsTest {
     }
 
     @Test
-    fun `sweep holds every thematic problem once`() {
+    fun `sweep should hold every thematic problem once`() {
         val root = File("sets")
         val sweep = ProblemSets.load(listOf("sweep"), root)
         val focused = listOf(

@@ -1,11 +1,26 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.Chb
+import com.eignex.klause.backtrack.selector.DomWdeg
+import com.eignex.klause.backtrack.selector.DomainMaxRegret
+import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.LargestDomain
+import com.eignex.klause.backtrack.selector.LastConflict
+import com.eignex.klause.backtrack.selector.RandomVariable
+import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.brute.BruteForceParams
+import com.eignex.klause.brute.BruteForceSolver
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -14,10 +29,21 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchConflictResolution
+import com.eignex.klause.solver.search.SearchConflictResolver
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchLearnedConflict
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
+import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -30,31 +56,40 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BacktrackSolverTest {
-
     @Test
-    fun `a completed satisfaction call releases its additional peers`() {
+    fun `a completed satisfaction call should release its additional peers`() {
         var closes = 0
         val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
 
-        val result = solver.solve(BacktrackParams(componentFactory = {
-            listOf(object : SearchComponent, AutoCloseable {
-                override fun close() { closes++ }
-            })
-        }))
+        val result = solver.solve(
+            BacktrackParams(componentFactory = {
+                listOf(object : SearchComponent, AutoCloseable {
+                    override fun close() {
+                        closes++
+                    }
+                })
+            }),
+        )
 
         assertIs<SolveResult.Sat>(result)
         assertEquals(1, closes)
     }
 
     @Test
-    fun `closing an abandoned enumeration releases additional peers in reverse order`() {
+    fun `closing an abandoned enumeration should release additional peers in reverse order`() {
         val closed = ArrayList<Int>()
         val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
-        val stream = solver.openEnumerate(BacktrackParams(componentFactory = {
-            List(2) { index -> object : SearchComponent, AutoCloseable {
-                override fun close() { closed += index }
-            } }
-        }))
+        val stream = solver.openEnumerate(
+            BacktrackParams(componentFactory = {
+                List(2) { index ->
+                    object : SearchComponent, AutoCloseable {
+                        override fun close() {
+                            closed += index
+                        }
+                    }
+                }
+            }),
+        )
         val sample = stream.next()
         val values = BooleanArray(2) { sample.boolValue(it) }
 
@@ -66,19 +101,26 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `finite initialization failures preserve multiple peer cleanup failures`() {
+    fun `finite initialization failures should preserve multiple peer cleanup failures`() {
         val primary = IllegalArgumentException("initialization")
         val cleanups = List(2) { IllegalStateException("cleanup-$it") }
         val closed = ArrayList<Int>()
         val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
 
         val failure = assertFailsWith<IllegalArgumentException> {
-            solver.solve(BacktrackParams(componentFactory = {
-                List(2) { index -> object : SearchComponent, AutoCloseable {
-                    override fun initialize(context: SearchContext): ComponentResult = throw primary
-                    override fun close() { closed += index; throw cleanups[index] }
-                } }
-            }))
+            solver.solve(
+                BacktrackParams(componentFactory = {
+                    List(2) { index ->
+                        object : SearchComponent, AutoCloseable {
+                            override fun initialize(context: SearchContext): ComponentResult = throw primary
+                            override fun close() {
+                                closed += index
+                                throw cleanups[index]
+                            }
+                        }
+                    }
+                }),
+            )
         }
 
         assertSame(primary, failure)
@@ -87,10 +129,10 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `successful search propagation informs the finite selector`() {
+    fun `successful search propagation should inform the finite selector`() {
         for (nativeSat in listOf(false, true)) {
             val deductions = ArrayList<PropagationResult.Implied>()
-            val base = com.eignex.klause.backtrack.selector.InputOrder
+            val base = InputOrder
             val selector = object : VariableSelector by base {
                 override fun fresh(): VariableSelector = this
                 override fun onPropagation(implied: PropagationResult.Implied) {
@@ -98,13 +140,19 @@ class BacktrackSolverTest {
                 }
             }
             val problem = Problem(
-                2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+                2,
+                0,
+                emptyArray(),
+                arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
             )
 
-            val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(
-                variableSelector = selector, valueSelector = com.eignex.klause.backtrack.selector.IndomainMax,
-                nativeSat = nativeSat,
-            ))
+            val result = BacktrackSolver(problem.bake()).solve(
+                BacktrackParams(
+                    variableSelector = selector,
+                    valueSelector = IndomainMax,
+                    nativeSat = nativeSat,
+                ),
+            )
 
             assertIs<SolveResult.Sat>(result)
             assertTrue(deductions.any { it.boolValueOrNull(1) == true })
@@ -113,99 +161,66 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `learned conflicts retain the participating assumption core`() {
-        val component = object : com.eignex.klause.solver.search.SearchConflictResolver {
-            override fun assert(
-                decision: com.eignex.klause.solver.search.SearchDecision,
-                context: com.eignex.klause.solver.search.SearchContext,
-            ): com.eignex.klause.solver.search.ComponentResult = if (
-                decision is com.eignex.klause.solver.search.SearchDecision.Bool && decision.literal ushr 1 == 1
-            ) {
-                com.eignex.klause.solver.search.ComponentResult.Conflict()
-            } else {
-                com.eignex.klause.solver.search.ComponentResult.Consistent
-            }
+    fun `learned conflicts should retain the participating assumption core`() {
+        val component = object : SearchConflictResolver {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                if (decision is SearchDecision.Bool && decision.literal ushr 1 == 1) {
+                    ComponentResult.Conflict()
+                } else {
+                    ComponentResult.Consistent
+                }
 
-            override fun resolveConflict(
-                context: com.eignex.klause.solver.search.SearchContext,
-            ): com.eignex.klause.solver.search.SearchConflictResolution =
-                com.eignex.klause.solver.search.SearchConflictResolution.Backjump(
-                    object : com.eignex.klause.solver.search.SearchLearnedConflict {
+            override fun resolveConflict(context: SearchContext): SearchConflictResolution =
+                SearchConflictResolution.Backjump(
+                    object : SearchLearnedConflict {
                         override val decisionLevel: Int = 0
                         override val lbd: Int = 1
                         override val guardLiterals: IntArray = intArrayOf()
                         override val decisionLevels: IntArray = intArrayOf(1)
 
-                        override fun apply(
-                            session: com.eignex.klause.solver.search.SearchSession,
-                        ): com.eignex.klause.solver.search.SearchLearnedConflictResult =
-                            com.eignex.klause.solver.search.SearchLearnedConflictResult.Chronological
+                        override fun apply(session: SearchSession): SearchLearnedConflictResult =
+                            SearchLearnedConflictResult.Chronological
                     },
                 )
         }
         val assumption = Assumptions(bools = mapOf(0 to true))
-        val result = BacktrackSolver(
-            Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray()).bake(),
-        ).solve(
-            BacktrackParams(
-                assumptions = assumption,
-                componentFactory = { listOf(component) },
-            ),
-        )
+        val params = BacktrackParams(assumptions = assumption, componentFactory = { listOf(component) })
+
+        val result = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake()).solve(params)
 
         assertEquals(assumption, assertIs<SolveResult.Unsat>(result).assumptionCore)
     }
 
     @Test
-    fun `component factory drives theory branches through legacy DFS`() {
-        val branch = object : com.eignex.klause.solver.search.SearchTheoryDecision {}
-        val result = BacktrackSolver(
-            Problem(numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray()).bake(),
-        ).solve(
-            BacktrackParams(
-                componentFactory = {
-                    listOf(object : com.eignex.klause.solver.search.SearchBrancher {
-                        private var selected = false
+    fun `component factory should drive theory branches through legacy DFS`() {
+        val branch = SearchDecision.Theory(object : SearchTheoryDecision {})
+        fun brancher() = object : SearchBrancher {
+            private var selected = false
 
-                        override fun assert(
-                            decision: com.eignex.klause.solver.search.SearchDecision,
-                            context: com.eignex.klause.solver.search.SearchContext,
-                        ): com.eignex.klause.solver.search.ComponentResult {
-                            selected = decision == com.eignex.klause.solver.search.SearchDecision.Theory(branch)
-                            return com.eignex.klause.solver.search.ComponentResult.Consistent
-                        }
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                selected = decision == branch
+                return ComponentResult.Consistent
+            }
 
-                        override fun retract(decisionLevel: Int) {
-                            if (decisionLevel == 0) selected = false
-                        }
+            override fun retract(decisionLevel: Int) {
+                if (decisionLevel == 0) selected = false
+            }
 
-                        override fun nextBranch(
-                            context: com.eignex.klause.solver.search.SearchContext,
-                        ): List<com.eignex.klause.solver.search.SearchDecision>? = if (selected) {
-                            null
-                        } else {
-                            listOf(
-                                com.eignex.klause.solver.search.SearchDecision.Theory(branch),
-                            )
-                        }
+            override fun nextBranch(context: SearchContext): List<SearchDecision>? =
+                if (selected) null else listOf(branch)
 
-                        override fun check(
-                            context: com.eignex.klause.solver.search.SearchContext,
-                        ): com.eignex.klause.solver.search.ComponentCheck = if (selected) {
-                            com.eignex.klause.solver.search.ComponentCheck.Feasible
-                        } else {
-                            com.eignex.klause.solver.search.ComponentCheck.Indeterminate
-                        }
-                    })
-                },
-            ),
-        )
+            override fun check(context: SearchContext): ComponentCheck =
+                if (selected) ComponentCheck.Feasible else ComponentCheck.Indeterminate
+        }
+        val params = BacktrackParams(componentFactory = { listOf(brancher()) })
+
+        val result = BacktrackSolver(Problem(0, 0, emptyArray(), emptyArray()).bake()).solve(params)
 
         assertIs<SolveResult.Sat>(result)
     }
 
     @Test
-    fun `a leaf whose assignment violates a factor fails as unsound`() {
+    fun `a leaf violating a factor should fail as unsound`() {
         // A selector that stops before any column is fixed stands in for an engine defect that reads an open
         // node as a solved leaf: the minima it reports put both columns of the AllDifferent at 0.
         val stopsEarly = object : VariableSelector {
@@ -226,11 +241,7 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `unsat core captures chained propagation through intermediate factors`() {
-        // Four clauses chained: x0 -> x1 -> x2 -> not x2. Bake-time propagation forces
-        // x0 = true (unit clause), then x1 = true (clause says not x0 or x1), then x2 = true,
-        // then the final clause requires x2 = false, a contradiction. All four factors
-        // are load-bearing — the BFS through reason-arrays must collect every one.
+    fun `unsat core should capture chained propagation through intermediate factors`() {
         val p = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -252,10 +263,7 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `maxInstructions tightens budget vs maxDecisions when smaller`() {
-        // 10 unconstrained bools — DFS needs to pin all 10 to reach a SAT leaf since
-        // there are no propagators to collapse the tree. maxInstructions = 2 hits the
-        // cap after 2 decisions, giving Unknown. A generous budget reaches SAT.
+    fun `maxInstructions should cap the search when smaller than maxDecisions`() {
         val p = Problem(
             numBoolVars = 10,
             numIntVars = 0,
@@ -281,7 +289,7 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `solve respects assumptions`() {
+    fun `solve should respect assumptions`() {
         val p = Problem(
             numBoolVars = 2,
             numIntVars = 0,
@@ -295,9 +303,11 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `returned assumption core retains transitive propagated premises`() {
+    fun `returned assumption core should retain transitive propagated premises`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             arrayOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
@@ -313,7 +323,7 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `enumerate yields every distinct SAT model on exactly-one`() {
+    fun `enumerate should yield every distinct model of exactly-one`() {
         val p = Problem(
             numBoolVars = 4,
             numIntVars = 0,
@@ -331,14 +341,14 @@ class BacktrackSolverTest {
         )
         val models = BacktrackSolver(p.bake()).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
         assertEquals(4, models.size)
-        assertEquals(4, models.toSet().size, "models must be distinct")
+        assertEquals(4, models.toSet().size)
         for (m in models) {
             assertEquals(1, m.bools.count { it })
         }
     }
 
     @Test
-    fun `minimize finds the optimal feasible assignment`() {
+    fun `minimize should find the optimal feasible assignment`() {
         val p = Problem(
             numBoolVars = 4,
             numIntVars = 0,
@@ -362,10 +372,8 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `a deadline firing inside propagation yields Unknown rather than a solution`() {
-        // Satisfiable (x0 or x1). With cancelFloor 0 a fired deadline cuts the very first fixpoint
-        // short, leaving an under-propagated state the search must not report as SAT — the honest
-        // verdict is Unknown, never a solution built on a cut-short fixpoint.
+    fun `a deadline firing inside propagation should yield Unknown rather than a solution`() {
+        // cancelFloor 0 lets the deadline cut the very first fixpoint short.
         val p = Problem(
             numBoolVars = 2,
             numIntVars = 0,
@@ -376,7 +384,190 @@ class BacktrackSolverTest {
             BacktrackParams(randomSeed = 0L, cancellation = Cancellation { true }, propagationCancelFloor = 0),
         )
         assertIs<SolveResult.Unknown>(fired)
-        // With no deadline the same problem is solved.
         assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
+
+    @Test
+    fun `a column open below should be solved under every domain-reading selector`() {
+        val selectors = listOf(
+            "DomWdeg" to DomWdeg(),
+            "SmallestDomain" to SmallestDomain,
+            "LargestDomain" to LargestDomain,
+            "InputOrder" to InputOrder,
+            "RandomVariable" to RandomVariable,
+            "DomainMaxRegret" to DomainMaxRegret,
+            "Chb" to Chb(),
+            "Vsids" to Vsids(),
+            "LastConflict" to LastConflict(DomWdeg()),
+        )
+        for ((name, selector) in selectors) {
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+                factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, -5)),
+            )
+
+            val result = BacktrackSolver(problem.bake()).solve(
+                BacktrackParams(variableSelector = selector, randomSeed = 0L),
+            )
+
+            val sat = assertIs<SolveResult.Sat>(result, name)
+            assertTrue(
+                sat.assignment.ints[0] <= -5L,
+                "$name answered ${'$'}{sat.assignment.ints[0]}, which breaks the row",
+            )
+        }
+    }
+
+    @Test
+    fun `an equality on an unbounded column should propagate to its single value`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)),
+        )
+
+        val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+        assertEquals(7L, assertIs<SolveResult.Sat>(result).assignment.ints[0])
+    }
+
+    @Test
+    fun `a global over a column no span can enumerate should answer without walking it`() {
+        // A truncated span here would walk 2^31 values and answer from the wrong set.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, Long.MAX_VALUE), IntDomain(0, Long.MAX_VALUE)),
+            factors = arrayOf<Factor>(
+                AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+            ),
+        )
+
+        val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+        val ints = assertIs<SolveResult.Sat>(result).assignment.ints
+        assertTrue(ints[0] <= 3L, "the row bounds the indexed column, got ${'$'}{ints[0]}")
+        assertTrue(ints[0] != ints[1])
+    }
+
+    @Test
+    fun `backtrack solve should prove a strict order cycle unsat`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, -1),
+                Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, -1),
+            ),
+        )
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(variableSelector = InputOrder, randomSeed = 0L))
+        assertIs<SolveResult.Unsat>(r)
+    }
+
+    @Test
+    fun `backtrack solve should stay correct with aggressive restarts and clause forgetting`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, 3) },
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, -1),
+                Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.LE, -1),
+            ),
+        )
+        val r = BacktrackSolver(problem.bake()).solve(
+            BacktrackParams(
+                lubyRestartBase = 4,
+                maxLearnedClauses = 0,
+                lbdGlueThreshold = 2,
+                randomSeed = 9L,
+            ),
+        )
+        val sat = assertIs<SolveResult.Sat>(r)
+        val v = sat.assignment.ints
+        assertTrue(v[0] < v[1] && v[1] < v[2] && v[2] < v[3], "got ${v.toList()}")
+    }
+
+    @Test
+    fun `branch and bound should not over-prune with negative coefficients and holes`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(
+                IntDomain(0, 4),
+                IntDomain(0, 4).excludeValue(2),
+                IntDomain(0, 4).excludeValue(0).excludeValue(4),
+            ),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1L, 2L, -1L))
+
+        val truth = assertIs<MinimizeResult.Optimal>(
+            BruteForceSolver(problem.bake()).minimize(objective, BruteForceParams()),
+        )
+        val got = assertIs<MinimizeResult.WithSample>(
+            BacktrackSolver(problem.bake()).minimize(objective, BacktrackParams(randomSeed = 3L)),
+        )
+
+        assertEquals(truth.objective, got.objective)
+    }
+
+    @Test
+    fun `improvements should strictly decrease then end with optimal`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(randomSeed = 0L, variableSelector = InputOrder, valueSelector = IndomainMax)
+
+        val seq = BacktrackSolver(problem.bake()).improvements(obj, params).toList()
+
+        val terminal = assertIs<MinimizeResult.Optimal>(seq.last())
+        val intermediate = seq.dropLast(1).map { assertIs<MinimizeResult.BestFound>(it).objective }
+        assertEquals(0.0, terminal.objective)
+        assertTrue(intermediate.isNotEmpty() && intermediate.zipWithNext().all { (a, b) -> b < a })
+    }
+
+    @Test
+    fun `improvements should yield a single infeasible on an infeasible problem`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(3, 5)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
+        val seq = BacktrackSolver(problem.bake()).improvements(obj, BacktrackParams(randomSeed = 0L)).toList()
+        assertEquals(1, seq.size)
+        assertIs<MinimizeResult.Infeasible>(seq[0])
+    }
+
+    @Test
+    fun `minimize should equal the last improvement`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 7)),
+            factors = emptyArray(),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
+        val solver = BacktrackSolver(problem.bake())
+        val params = BacktrackParams(randomSeed = 0L, variableSelector = InputOrder, valueSelector = IndomainMin)
+        val viaMinimize = solver.minimize(obj, params)
+        val viaImprovements = solver.improvements(obj, params).last()
+        assertEquals(viaMinimize.withoutStats(), viaImprovements.withoutStats())
+    }
+}
+
+private fun MinimizeResult.withoutStats(): MinimizeResult = when (this) {
+    is MinimizeResult.Optimal -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.BestFound -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.Unbounded -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.Infeasible -> copy(stats = SolveStats.EMPTY)
+    is MinimizeResult.Unknown -> copy(stats = SolveStats.EMPTY)
 }

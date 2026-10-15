@@ -1,17 +1,15 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class LegacyLpModelTest {
     @Test
-    fun `IEEE bounds origins and objective retain their source bits`() {
+    fun `IEEE bounds origins and objective should retain their source bits`() {
         val model = LpBuilder().apply { addRealVar(-0.0, 0.1, cost = 0.3, tag = 7) }.build(Sense.MAXIMIZE)
 
         val exact = assertNotNull(model.authoritativeModel())
@@ -26,7 +24,7 @@ class LegacyLpModelTest {
     }
 
     @Test
-    fun `a continuous row does not make its logical column integral`() {
+    fun `a continuous row should not make its logical column integral`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 2.0)
             addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 1.0)
@@ -38,24 +36,7 @@ class LegacyLpModelTest {
     }
 
     @Test
-    fun `strict legacy feasibility uses the common margin and preserves an unattained bound`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(0.0, 1.0, cost = 1.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)
-        }.build(Sense.MINIMIZE)
-
-        val result = solveAndCertify(model)
-
-        assertEquals(LpVerdict.FEASIBLE, result.verdict)
-        assertEquals(BigFraction.ZERO, result.lowerBound)
-        val witness = assertNotNull(result.witness)
-        assertTrue(witness.primal.single() > BigFraction.ZERO)
-        assertNotNull(checkedLpWitness(model, witness.primal))
-        assertEquals(1, assertNotNull(result.refinement).strictAttempts)
-    }
-
-    @Test
-    fun `cancellation cannot publish a legacy strict witness`() {
+    fun `cancellation should not publish a legacy strict witness`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)

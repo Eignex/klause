@@ -6,7 +6,7 @@ import kotlin.test.assertContentEquals
 class CollectionExtrasTest {
 
     @Test
-    fun `toSortedIntArray returns an ascending snapshot`() {
+    fun `toSortedIntArray should return an ascending snapshot`() {
         val list = IntArrayList().apply {
             add(3)
             add(1)
@@ -23,7 +23,7 @@ class CollectionExtrasTest {
     }
 
     @Test
-    fun `toSortedLongArray returns an ascending snapshot`() {
+    fun `toSortedLongArray should return an ascending snapshot`() {
         val list = LongArrayList().apply {
             add(3L)
             add(1L)
@@ -37,7 +37,7 @@ class CollectionExtrasTest {
     }
 
     @Test
-    fun `sortedKeys returns the keys ascending for every map flavour`() {
+    fun `sortedKeys should return the keys ascending for every map flavour`() {
         val ii = MutableIntIntMap().apply {
             put(5, 0)
             put(-1, 0)

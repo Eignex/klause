@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 
 class TranscendentalSourceCheckTest {
     @Test
-    fun `negating an invalid log does not create a witness`() {
+    fun `negating an invalid log should not create a witness`() {
         val logarithm = TranscendentalExpression.Function(TranscendentalFunction.LOG, constant(0))
         val equality = TranscendentalFormula.Atom(logarithm, PolynomialRelation.EQ, constant(1))
         val source = TranscendentalFormula.Not(equality)
@@ -26,10 +26,12 @@ class TranscendentalSourceCheckTest {
     }
 
     @Test
-    fun `inactive numeric conditional branch does not impose a log domain`() {
+    fun `inactive numeric conditional branch should not impose a log domain`() {
         val logarithm = TranscendentalExpression.Function(TranscendentalFunction.LOG, constant(0))
         val choice = TranscendentalExpression.Conditional(
-            TranscendentalFormula.BooleanVariable(SourceBoolId(0)), constant(1), logarithm,
+            TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
+            constant(1),
+            logarithm,
         )
         val equality = TranscendentalFormula.Atom(choice, PolynomialRelation.EQ, constant(1))
 
@@ -39,7 +41,7 @@ class TranscendentalSourceCheckTest {
     }
 
     @Test
-    fun `disjunction requires defined arithmetic in each atom`() {
+    fun `disjunction should require defined arithmetic in each atom`() {
         val logarithm = TranscendentalExpression.Function(TranscendentalFunction.LOG, constant(-1))
         val equality = TranscendentalFormula.Atom(logarithm, PolynomialRelation.EQ, constant(1))
         val source = TranscendentalFormula.Or(listOf(TranscendentalFormula.Constant(true), equality))
@@ -50,11 +52,13 @@ class TranscendentalSourceCheckTest {
     }
 
     @Test
-    fun `inactive Boolean conditional branch does not impose a log domain`() {
+    fun `inactive Boolean conditional branch should not impose a log domain`() {
         val logarithm = TranscendentalExpression.Function(TranscendentalFunction.LOG, constant(0))
         val equality = TranscendentalFormula.Atom(logarithm, PolynomialRelation.EQ, constant(1))
         val source = TranscendentalFormula.Conditional(
-            TranscendentalFormula.BooleanVariable(SourceBoolId(0)), TranscendentalFormula.Constant(true), equality,
+            TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
+            TranscendentalFormula.Constant(true),
+            equality,
         )
 
         val result = checker(booleanArrayOf(true)).check(source)
@@ -63,7 +67,7 @@ class TranscendentalSourceCheckTest {
     }
 
     @Test
-    fun `strict function inequality is certified by rational separation`() {
+    fun `strict function inequality should be certified by rational separation`() {
         val exponential = TranscendentalExpression.Function(TranscendentalFunction.EXP, constant(1))
         val source = TranscendentalFormula.Atom(exponential, PolynomialRelation.GT, constant(2))
 
@@ -72,10 +76,11 @@ class TranscendentalSourceCheckTest {
         assertEquals(SourceTruth.TRUE, result)
     }
 
-    private fun checker(bools: BooleanArray = booleanArrayOf()): TranscendentalSourceCheck =
-        TranscendentalSourceCheck(
-            ExactRealArithmetic(TranscendentalArithmetic(), AlgebraicArithmetic()), emptyList(), bools,
-        )
+    private fun checker(bools: BooleanArray = booleanArrayOf()): TranscendentalSourceCheck = TranscendentalSourceCheck(
+        ExactRealArithmetic(TranscendentalArithmetic(), AlgebraicArithmetic()),
+        emptyList(),
+        bools,
+    )
 
     private fun constant(value: Long): TranscendentalExpression.Constant {
         val fraction = BigFraction.ofLong(value)

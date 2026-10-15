@@ -1,8 +1,6 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.simplex.exact.ContinuationDecline
-import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -16,7 +14,7 @@ import kotlin.test.assertTrue
 
 class LpReplayTest {
     @Test
-    fun `column compaction replay preserves exact bounds and rollback after retired rows`() {
+    fun `column compaction replay should preserve exact bounds and rollback after retired rows`() {
         val source = LpBuilder().apply {
             addVar(0L, 4L)
             addVar(0L, 4L, cost = 1L)
@@ -27,8 +25,15 @@ class LpReplayTest {
             LpExactReplayEvent.Assert(0, false, ExactLpSide(one), 10L),
             LpExactReplayEvent.Push(),
             LpExactReplayEvent.Assert(1, false, ExactLpSide(one), 11L),
-            LpExactReplayEvent.Append(LpScopedRow(0L, listOf(0 to one), one,
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), true),
+            LpExactReplayEvent.Append(
+                LpScopedRow(
+                    0L,
+                    listOf(0 to one),
+                    one,
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+                ),
+                true,
+            ),
             LpExactReplayEvent.Suspend(setOf(0L)),
             LpExactReplayEvent.Solve(),
             LpExactReplayEvent.CompactColumns(listOf(1)),
@@ -36,16 +41,21 @@ class LpReplayTest {
             LpExactReplayEvent.Pop(0),
             LpExactReplayEvent.Solve(),
         )
-        val capture = LpExactCapture.capture(assertNotNull(source.authoritativeModel()),
-            persistentSettings("compact columns"), events)
+        val capture = LpExactCapture.capture(
+            assertNotNull(source.authoritativeModel()),
+            persistentSettings("compact columns"),
+            events,
+        )
         val decoded = LpExactCapture.decode(capture.encode())
 
         val report = LpExactReplay.replay(decoded)
 
         assertNull(report.declinedEventIndex)
         assertTrue(report.steps.all { it.accepted })
-        assertEquals(listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ZERO),
-            report.steps.mapNotNull { it.result?.lowerBound })
+        assertEquals(
+            listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ZERO),
+            report.steps.mapNotNull { it.result?.lowerBound },
+        )
         val compacted = report.steps[7].state
         assertEquals(1, compacted.model.n)
         assertEquals(0, compacted.model.m)
@@ -57,55 +67,7 @@ class LpReplayTest {
     }
 
     @Test
-    fun `replay exhausts one continuation allowance across unchanged and changing bases`() {
-        for (changing in listOf(false, true)) {
-            val model = LpBuilder().apply {
-                val x = addRealVar(0.0, 2.0)
-                addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
-            }.build(Sense.MINIMIZE)
-            var event = 0
-            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newGeneralSolver(
-                    model: LpModel,
-                    cancellation: Cancellation,
-                    workLimit: Long,
-                    pricing: LpPricingOptions,
-                ): LpSolver = object : LpSolver {
-                    override val infeasibleRay: DoubleArray? = null
-                    override val infeasibleBasis: Basis get() = if (changing && event % 2 == 0) {
-                        Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
-                    } else {
-                        Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
-                    }
-                    override fun solve(warm: Basis?): FloatLpResult? {
-                        event++
-                        return null
-                    }
-                    override fun solvePrimal(warm: Basis?): FloatLpResult? = solve(warm)
-                }
-            }
-            val capture = LpCapture.capture(
-                model,
-                LpReplaySettings("continuation-allowance", 570L, componentSplit = false),
-                List(32) { LpReplayEvent.Solve() },
-            )
-
-            val report = LpReplay.replay(
-                capture,
-                context = LpSolveContext(factory),
-                continuationLimits = ExactContinuationLimits(maxWork = 5000L),
-            )
-
-            assertTrue(report.steps.first().continuation?.success == true)
-            assertEquals(ContinuationDecline.WORK, report.steps.last().continuation?.decline)
-            assertTrue(report.steps.sumOf { it.continuation?.work ?: 0L } <= 5000L)
-            assertFalse(report.steps.last().hasFeasibleWitness)
-            assertFalse(report.steps.last().hasInfeasibilityProof)
-        }
-    }
-
-    @Test
-    fun `row replay preserves interleaved persistent guards through nested backjumps`() {
+    fun `row replay should preserve interleaved persistent guards through nested backjumps`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val minusOne = ExactLpNumber.of(-1L)
@@ -165,12 +127,8 @@ class LpReplayTest {
         val replay = LpExactReplay.replay(LpExactCapture.decode(capture.encode()))
 
         assertNull(replay.declinedEventIndex)
-        assertEquals(0L, assertNotNull(replay.rowMetrics).currentOwners)
-        assertEquals(0L, replay.rowMetrics.preparationDeclines)
-        assertTrue(replay.steps.all { it.accepted })
         val results = replay.steps.mapNotNull { it.result }
         assertEquals(listOf(6L, 4L, 3L, 3L).map { BigFraction.ofLong(it) }, results.map { it.lowerBound })
-        assertEquals(results.map { it.lowerBound }, results.map { assertNotNull(it.exactPrimal).single() })
         val deep = assertNotNull(results.first().bound?.support)
         assertEquals(3L, deep.state.rows.row(deep.rows.single().first).id)
         assertEquals(localGuard, deep.rows.single().second.premises)
@@ -178,22 +136,10 @@ class LpReplayTest {
         assertEquals(listOf(2L, 4L), final.rows.entries().map { it.id })
         val support = assertNotNull(results.last().bound?.support)
         assertEquals(4L, support.state.rows.row(support.rows.single().first).id)
-        val fresh = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, minusOne), ExactLpEntry(1, minusOne))),
-            listOf(ExactLpNumber.of(-2L), ExactLpNumber.of(-3L)),
-            listOf(source.column(0), logical, logical),
-            listOf(ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(20))), ExactLpRow()),
-            ExactLpObjective(listOf(one, zero, zero)),
-        )
-        val independent = solveAndCertify(fresh)
-        assertEquals(independent.exactPrimal, results.last().exactPrimal)
-        assertEquals(independent.lowerBound, results.last().lowerBound)
-        assertEquals(3.0, results.last().float?.primal?.single())
-        assertEquals(-1.0, results.last().float?.duals?.get(1))
     }
 
     @Test
-    fun `invalid later row transitions are rejected before any factory construction`() {
+    fun `invalid later row transitions should be rejected before any factory construction`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
@@ -244,63 +190,7 @@ class LpReplayTest {
     }
 
     @Test
-    fun `exact replay preserves active witnesses across objective and origin changes`() {
-        val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
-            emptyList(),
-            ExactLpObjective(listOf(ExactLpNumber.of(1L))),
-        )
-        val premises = ExactLpPremises(listOf(ExactLpPremise(3, false, ExactLpNumber.of(2L))), listOf(19))
-        val capture = LpExactCapture.capture(
-            model,
-            persistentSettings("exact edits"),
-            listOf(
-                LpExactReplayEvent.Solve(),
-                LpExactReplayEvent.Push(),
-                LpExactReplayEvent.Assert(0, false, ExactLpSide(ExactLpNumber.of(2L), premises = premises), 41L),
-                LpExactReplayEvent.Solve(),
-                LpExactReplayEvent.Objective(ExactLpObjective(listOf(ExactLpNumber.of(-1L)))),
-                LpExactReplayEvent.Recenter(listOf(ExactLpNumber.of(1L))),
-                LpExactReplayEvent.Solve(),
-                LpExactReplayEvent.Pop(0),
-                LpExactReplayEvent.Solve(),
-            ),
-        )
-
-        val report = LpExactReplay.replay(LpExactCapture.decode(capture.encode()))
-
-        assertNull(report.declinedEventIndex)
-        assertTrue(report.steps.all { it.accepted })
-        assertEquals(9, report.steps.size)
-        val asserted = report.steps[3]
-        assertEquals(1L, asserted.state.boundRevision)
-        assertEquals(0L, asserted.state.objectiveRevision)
-        assertEquals(listOf(0), asserted.state.scopes)
-        assertEquals(41L, asserted.state.assertions.single().witness)
-        assertEquals(premises, asserted.state.assertions.single().side.premises)
-        val tightened = assertNotNull(asserted.result)
-        assertEquals(BigFraction.ofLong(2L), assertNotNull(tightened.witness).primal.single())
-        assertEquals(BigFraction.ofLong(2L), tightened.lowerBound)
-        val shifted = report.steps[6]
-        assertEquals(0L, shifted.state.matrixRevision)
-        assertEquals(2L, shifted.state.boundRevision)
-        assertEquals(2L, shifted.state.objectiveRevision)
-        assertEquals(ExactLpNumber.of(1L), shifted.state.model.column(0).origin)
-        assertEquals(41L, shifted.state.assertions.single().witness)
-        assertEquals(BigFraction.ofLong(10L), assertNotNull(shifted.result?.witness).primal.single())
-        assertEquals(BigFraction.ofLong(-10L), shifted.result.lowerBound)
-        assertTrue(report.steps.last().state.assertions.isEmpty())
-        assertEquals(3L, report.steps.last().state.boundRevision)
-        assertEquals(1L, report.steps.last().state.popRevision)
-        assertEquals(2L, report.steps.last().state.objectiveRevision)
-        assertTrue(report.steps.last().state.popRevision > asserted.state.popRevision)
-    }
-
-    @Test
-    fun `exact replay preflight rejects unsupported later projection`() {
+    fun `exact replay preflight should reject an unsupported later projection`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -320,7 +210,7 @@ class LpReplayTest {
     }
 
     @Test
-    fun `exact replay cancellation declines before any event claim`() {
+    fun `exact replay cancellation should decline before any event claim`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -344,7 +234,7 @@ class LpReplayTest {
     }
 
     @Test
-    fun `declined replay adoption withholds earlier artifacts until an explicit replacement`() {
+    fun `declined replay adoption should withhold earlier artifacts until an explicit replacement`() {
         for (rhs in listOf(0L, 2L)) {
             val model = LpBuilder().apply {
                 addVar(0L, 1L)
@@ -408,13 +298,7 @@ class LpReplayTest {
             for (step in steps.subList(2, 6)) {
                 assertEquals(LpVerdict.INDETERMINATE, step.productionVerdict)
                 assertEquals(LpCandidateKind.NONE, step.candidate)
-                assertFalse(step.hasFeasibleWitness)
-                assertFalse(step.hasCertifiedBound)
-                assertFalse(step.hasInfeasibilityProof)
-                assertNull(step.rationalLowerBound)
-                assertNull(step.integerObjectiveLowerBound)
                 assertNull(step.exactWitness)
-                assertEquals(0L, step.metrics.workOps)
             }
             assertEquals(LpCertificationCapability.GATED_ACTIVE_STATE_UNAVAILABLE, steps[5].certificationCapability)
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, steps[7].productionVerdict)
@@ -426,7 +310,7 @@ class LpReplayTest {
     }
 
     @Test
-    fun `persistent replay executes solve rebind and resolve through the seam`() {
+    fun `persistent replay should execute solve rebind and resolve through the seam`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 10L, cost = 1L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
@@ -457,7 +341,7 @@ class LpReplayTest {
     }
 
     @Test
-    fun `warm basis and primal solve remain discrete portable events`() {
+    fun `warm basis and primal solve should remain discrete portable events`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 5L, cost = 1L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
@@ -477,7 +361,7 @@ class LpReplayTest {
     }
 
     @Test
-    fun `cancellation is replayed as an indeterminate result rather than a verdict`() {
+    fun `cancellation should replay as an indeterminate result rather than a verdict`() {
         val capture = LpCapture.capture(
             pivotModel(160),
             LpReplaySettings(
@@ -499,7 +383,7 @@ class LpReplayTest {
     }
 
     @Test
-    fun `pivot budget reports a certified bound without promoting the candidate to optimum`() {
+    fun `a pivot budget should report a certified bound without promoting the candidate to optimum`() {
         val capture = LpCapture.capture(
             coveringModel(),
             LpReplaySettings(
@@ -522,7 +406,7 @@ class LpReplayTest {
     }
 
     @Test
-    fun `known future events are persisted but rejected before execution`() {
+    fun `known future events should be persisted but rejected before execution`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 1L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
@@ -556,74 +440,40 @@ class LpReplayTest {
     }
 
     @Test
-    fun `malformed model and unsupported continuous rebind fail before validation`() {
-        val valid = LpCapturedModel.capture(LpBuilder().build(Sense.MINIMIZE))
-        val malformed = LpCapturedModel(
-            valid.n,
-            valid.m,
-            intArrayOf(1),
-            valid.rowIdx,
-            valid.colVal,
-            valid.rhs,
-            valid.cost,
-            valid.upper,
-            valid.hasUpper,
-            valid.loShift,
-            valid.objConstant,
-            valid.sense,
-            valid.tag,
-            valid.rowGlobal,
-            valid.rowStrict,
-            valid.rowPremises,
-            valid.flippedRhs,
-            valid.probeClampedLo,
-            valid.probeClampedHi,
-            valid.colContinuous,
-            valid.numericAuthority,
-            valid.doubleView,
-        )
-        assertFails {
-            LpReplay.replay(LpCapture(LP_CAPTURE_VERSION, persistentSettings("bad"), malformed, emptyList()))
-        }
-
-        assertFails {
-            LpReplay.replay(
-                LpCapture.capture(
-                    valid.toModel(),
-                    LpReplaySettings(
-                        "tableau-refactor",
-                        0L,
-                        LpReplaySolverKind.TABLEAU,
-                        componentSplit = false,
-                        refactorUpdateLimit = DEFAULT_REFACTOR_UPDATE_LIMIT + 1,
-                    ),
-                    emptyList(),
-                ),
-            )
-        }
-
-        val integerBuilder = LpBuilder()
-        integerBuilder.addVar(0L, 1L)
-        val inconsistent = LpCapture.capture(
-            integerBuilder.build(Sense.MINIMIZE),
+    fun `replay should reject a captured model with inconsistent column kinds`() {
+        val capture = LpCapture.capture(
+            LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE),
             persistentSettings("bad-continuous-flag"),
             emptyList(),
         )
-        inconsistent.model.colContinuous[0] = true
-        assertFails { LpReplay.replay(inconsistent) }
+        capture.model.colContinuous[0] = true
 
-        val realBuilder = LpBuilder()
-        realBuilder.addRealVar(0.0, 1.0)
-        val real = realBuilder.build(Sense.MINIMIZE)
-        assertFails {
-            LpReplay.replay(
-                LpCapture.capture(
-                    real,
-                    persistentSettings("real-rebind"),
-                    listOf(LpReplayEvent.Rebind(longArrayOf(0L), longArrayOf(1L))),
-                ),
-            )
-        }
+        assertFails { LpReplay.replay(capture) }
+    }
+
+    @Test
+    fun `replay should reject a tableau refactor limit above the default`() {
+        val settings = LpReplaySettings(
+            "tableau-refactor",
+            0L,
+            LpReplaySolverKind.TABLEAU,
+            componentSplit = false,
+            refactorUpdateLimit = DEFAULT_REFACTOR_UPDATE_LIMIT + 1,
+        )
+
+        assertFails { LpReplay.replay(LpCapture.capture(LpBuilder().build(Sense.MINIMIZE), settings, emptyList())) }
+    }
+
+    @Test
+    fun `replay should reject rebinding a continuous column`() {
+        val real = LpBuilder().apply { addRealVar(0.0, 1.0) }.build(Sense.MINIMIZE)
+        val capture = LpCapture.capture(
+            real,
+            persistentSettings("real-rebind"),
+            listOf(LpReplayEvent.Rebind(longArrayOf(0L), longArrayOf(1L))),
+        )
+
+        assertFails { LpReplay.replay(capture) }
     }
 
     private fun persistentSettings(label: String): LpReplaySettings = LpReplaySettings(

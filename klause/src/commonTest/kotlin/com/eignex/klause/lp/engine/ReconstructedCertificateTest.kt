@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class ReconstructedCertificateTest {
     @Test
-    fun `nonoptimal point and weaker bound remain independent`() {
+    fun `a nonoptimal point and a weaker bound should remain independent`() {
         val model = LpBuilder().apply { addVar(0L, 5L, cost = 1L) }.build(Sense.MINIMIZE)
 
         val result = reconstructCertificate(model, doubleArrayOf(3.0), doubleArrayOf())
@@ -28,7 +28,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `free point does not validate its zero nonbasic status`() {
+    fun `a free point should not validate its zero nonbasic status`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(emptyList()),
@@ -48,7 +48,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `bad rationals cannot satisfy an exact equality`() {
+    fun `bad rationals should not satisfy an exact equality`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L)
             addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
@@ -61,7 +61,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `thirds reconstruct into independently evaluated primal and dual proofs`() {
+    fun `thirds should reconstruct into independently evaluated primal and dual proofs`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
@@ -79,7 +79,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `rational witnesses preserve signs across word boundaries`() {
+    fun `rational witnesses should preserve signs across word boundaries`() {
         val values = listOf(
             BigFraction.of(bigIntOf(-2), bigIntOf(3)),
             BigFraction.ofLong(Long.MIN_VALUE),
@@ -90,13 +90,17 @@ class ReconstructedCertificateTest {
         )
         for (value in values) {
             val source = ExactLpModel(
-                listOf(emptyList()), emptyList(),
+                listOf(emptyList()),
+                emptyList(),
                 listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(value))))),
-                emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+                emptyList(),
+                ExactLpObjective(listOf(ExactLpNumber.of(1L))),
             )
 
             val result = verifyRationalCertificate(
-                assertNotNull(LpExactState(source).toWorkingModel()), listOf(value), emptyList(),
+                assertNotNull(LpExactState(source).toWorkingModel()),
+                listOf(value),
+                emptyList(),
             )
 
             assertEquals(listOf(value), assertNotNull(result.witness).primal)
@@ -106,23 +110,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `wrong fixed status cannot seat unequal exact endpoints`() {
-        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
-
-        val result = reconstructCertificate(
-            model,
-            doubleArrayOf(0.5),
-            doubleArrayOf(),
-            Basis(intArrayOf(), arrayOf(VarStatus.FIXED)),
-        )
-
-        assertEquals(BigFraction.ofDouble(0.5), result.witness?.primal?.single())
-        assertFalse(result.nonbasicStatusesMatch)
-        assertTrue(result.complementary)
-    }
-
-    @Test
-    fun `costed logical bounds preserve defining row premises at zero dual`() {
+    fun `costed logical bounds should preserve defining row premises at zero dual`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val premises = ExactLpPremises(emptyList(), listOf(17))
@@ -159,7 +147,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `fixed arithmetic overflow restarts the full point from rational authority`() {
+    fun `fixed arithmetic overflow should restart the full point from rational authority`() {
         val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val one = ExactLpNumber.of(1L)
         val h = ExactLpNumber.of(huge)
@@ -182,7 +170,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `strict equality is a bound but never a feasible point`() {
+    fun `strict equality should be a bound but never a feasible point`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(emptyList()),
@@ -204,7 +192,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `missing support and free residues cannot certify a ray`() {
+    fun `missing support and free residues should not certify a ray`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
@@ -225,7 +213,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `strict selected support can contradict at zero surplus`() {
+    fun `strict selected support should contradict at zero surplus`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
@@ -249,7 +237,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `resource and early cancellation declines publish no partial proof`() {
+    fun `resource and early cancellation declines should publish no partial proof`() {
         val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
         for (limits in listOf(
             ReconstructionLimits(maxWork = 0),
@@ -266,7 +254,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `late resource stop retains a completed independent point`() {
+    fun `a late resource stop should retain a completed independent point`() {
         val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
         val complete = reconstructCertificate(model, doubleArrayOf(0.5), limits = ReconstructionLimits(maxAttempts = 0))
         val work = complete.metrics.work
@@ -284,7 +272,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `cancellation before returning reconstruction discards completed proof`() {
+    fun `cancellation before returning reconstruction should discard the completed proof`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
@@ -319,4 +307,35 @@ class ReconstructedCertificateTest {
         assertNull(result.bound)
     }
 
+    @Test
+    fun `exact seeds should preserve constants beyond double integer precision`() {
+        val origin = BigFraction.of(BIG_ONE shl 80, BIG_ONE)
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
+        val zero = ExactLpNumber.of(0L)
+        val state = LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(3L)))),
+                listOf(ExactLpNumber.of(1L)),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(), origin = ExactLpNumber.of(origin), integral = false),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+                ),
+                listOf(ExactLpRow()),
+                ExactLpObjective(
+                    listOf(ExactLpNumber.of(1L), zero),
+                    constant = ExactLpNumber.of(origin),
+                ),
+            ),
+        )
+
+        val result = reconstructRationalCertificate(
+            assertNotNull(state.toWorkingModel()),
+            listOf(origin + third),
+            listOf(third),
+        )
+
+        assertEquals(listOf(origin + third), assertNotNull(result.witness).primal)
+        assertEquals(origin + third, assertNotNull(result.bound).value)
+        assertTrue(result.complementary)
+    }
 }

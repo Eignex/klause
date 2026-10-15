@@ -23,10 +23,7 @@ class CliqueCutSeparatorTest {
     private fun cliqueVars(r: LpRelaxation, cut: Cut): Set<Int> = cut.cols.map { r.colVarId[it] }.toSet()
 
     @Test
-    fun `extends a base at-most-one into a full clique cut`() {
-        // x0..x3 pairwise mutually exclusive (a K4): Cardinality(x0,x1)<=1 is the base clique, the
-        // binary exclusions add the rest. Maximising the sum relaxes to x_i = 1/2 (Σ = 2), which the
-        // clique cut Σ x <= 1 cuts off.
+    fun `separator should extend a base at-most-one into a full clique cut`() {
         val p = Problem(
             numBoolVars = 4,
             numIntVars = 0,
@@ -47,10 +44,9 @@ class CliqueCutSeparatorTest {
         val sol = requireNotNull(RevisedSimplex(r.model).solve())
         val cuts = CliqueCutSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
 
-        assertTrue(cuts.isNotEmpty(), "a violated clique should be separated")
+        assertTrue(cuts.isNotEmpty())
         val cut = cuts.first { it.rel == Relation.LE }
         assertEquals(1L, cut.rhs)
         assertEquals(setOf(0, 1, 2, 3), cliqueVars(r, cut))
     }
-
 }

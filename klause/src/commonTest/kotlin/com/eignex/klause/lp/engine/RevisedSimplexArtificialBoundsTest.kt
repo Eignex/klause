@@ -30,7 +30,7 @@ class RevisedSimplexArtificialBoundsTest {
     }
 
     @Test
-    fun `a dual infeasible slack start is solved by the dual to the primal and exact optimum`() {
+    fun `a dual infeasible slack start should reach the exact optimum`() {
         // min −x₁ − x₂ over x₁ + 2x₂ ≤ 4, 3x₁ + x₂ ≤ 6 with x open above: optimum −14/5.
         val model = working(
             listOf(listOf(0 to 1L, 1 to 3L), listOf(0 to 2L, 1 to 1L)),
@@ -53,7 +53,7 @@ class RevisedSimplexArtificialBoundsTest {
     }
 
     @Test
-    fun `an artificial bound active at the boxed optimum widens to the true optimum`() {
+    fun `an artificial bound active at the boxed optimum should widen to the true optimum`() {
         // min −x₁ over x₁ − 10000x₂ ≤ 0, 2x₂ ≤ 1000: x₁ = 5e6 lies past the initial 1e6 box.
         val model = working(
             listOf(listOf(0 to 1L), listOf(0 to -10_000L, 1 to 2L)),
@@ -74,7 +74,7 @@ class RevisedSimplexArtificialBoundsTest {
     }
 
     @Test
-    fun `an unbounded lp is not reported optimal on artificial bounds`() {
+    fun `an unbounded lp should not be reported optimal on artificial bounds`() {
         // min −x₁ over x₁ − x₂ ≤ 1 with x open above: x₁ = x₂ + 1 grows without bound.
         val model = working(
             listOf(listOf(0 to 1L), listOf(0 to -1L)),
@@ -93,7 +93,7 @@ class RevisedSimplexArtificialBoundsTest {
     }
 
     @Test
-    fun `a ray of the boxed lp is not reported as infeasibility of the real lp`() {
+    fun `a ray of the boxed lp should not be reported as infeasibility of the real lp`() {
         // min 20000x₂ + x₃ over 10000x₂ + x₃ + s = 0, s ∈ [0, 1], x₂ ≥ 500, x₃ free: the start box x₃ ≥ −1e6
         // cannot reach x₃ ≈ −5e6, so the boxed LP is infeasible while the real one is not.
         val model = working(

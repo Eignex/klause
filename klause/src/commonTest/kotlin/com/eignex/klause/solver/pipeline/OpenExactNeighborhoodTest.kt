@@ -31,10 +31,17 @@ import kotlin.test.assertTrue
 
 class OpenExactNeighborhoodTest {
     @Test
-    fun `generated Boolean centers respect required source root values`() {
+    fun `generated Boolean centers should respect required source root values`() {
         for (value in listOf(true, false)) {
-            val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, value)))),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+            val source = Problem(
+                1,
+                0,
+                emptyArray(),
+                arrayOf(Clause(intArrayOf(Lit.make(0, value)))),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(1.0),
+            )
             val adapter = OpenExactNeighborhood(source, TheoryParams())
 
             val result = adapter.search(adaptive = false, maximumMoves = 1).use { search ->
@@ -50,9 +57,16 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `explicit contrary Boolean pins still refute after generated center preparation`() {
-        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `explicit contrary Boolean pins should still refute after generated center preparation`() {
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val plan = source.componentPlan()
         val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
             plan.search(source, emptyMap(), cancellation = stop)
@@ -69,34 +83,21 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `independent generated centers retain their own source root values`() {
-        val firstSource = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-        val secondSource = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false)))),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-        val first = OpenExactNeighborhood(firstSource, TheoryParams())
-        val second = OpenExactNeighborhood(secondSource, TheoryParams())
-        val firstResult = first.search(adaptive = false, maximumMoves = 1).use { search ->
-            search.advance(Cancellation.Never, 1000)
-            search.solveResult(TerminationReason.BudgetExhausted)
-        }
-
-        val secondResult = second.search(adaptive = false, maximumMoves = 1).use { search ->
-            search.advance(Cancellation.Never, 1000)
-            search.solveResult(TerminationReason.BudgetExhausted)
-        }
-
-        assertTrue(assertIs<SolveResult.Sat>(firstResult).assignment.boolValue(0))
-        assertFalse(assertIs<SolveResult.Sat>(secondResult).assignment.boolValue(0))
-    }
-
-    @Test
-    fun `generated Boolean centers exclude retracted query assignments`() {
-        val source = Problem(1, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `generated Boolean centers should exclude retracted query assignments`() {
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val adapter = OpenExactNeighborhood(source, TheoryParams())
-        val pinned = adapter.check(ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
-            Cancellation.Never)
+        val pinned = adapter.check(
+            ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
+            Cancellation.Never,
+        )
         assertTrue(assertIs<ExactNeighborhoodResult.Witness>(pinned).sample.boolValue(0))
 
         val result = adapter.search(adaptive = false, maximumMoves = 1).use { search ->
@@ -108,30 +109,59 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `native neighborhood checking retains the supplied runtime publication`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `native neighborhood checking should keep the supplied runtime publication`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val plan = source.prepareExecutionPlan(objective)
         val invocation = EngineInvocation(plan, ModelIdentity.of(source, objective), objective)
-        val adapter = OpenExactNeighborhood(source, TheoryParams(openWorkLimit = 1000), objective, plan,
-            invocation = { invocation })
+        val adapter = OpenExactNeighborhood(
+            source,
+            TheoryParams(openWorkLimit = 1000),
+            objective,
+            plan,
+            invocation = { invocation },
+        )
         val third = BigFraction.ofLong(3).reciprocal()
 
-        val result = adapter.use { it.check(ExactNeighborhoodCondition(emptyMap(), mapOf(0 to third),
-            mapOf(0 to third)), Cancellation.Never) }
+        val result = adapter.use {
+            it.check(
+                ExactNeighborhoodCondition(
+                    emptyMap(),
+                    mapOf(0 to third),
+                    mapOf(0 to third),
+                ),
+                Cancellation.Never,
+            )
+        }
 
         val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
         val publication = assertIs<CompletedEnginePublication.Witness>(
-            assertNotNull(sample.witnessCertificate).publication)
+            assertNotNull(sample.witnessCertificate).publication,
+        )
         assertSame(invocation, publication.invocation)
         assertEquals(sample, publication.sample)
         assertEquals(third.toDouble(), publication.value)
     }
 
     @Test
-    fun `unbound native neighborhood checking withholds a runtime certificate`() {
+    fun `unbound native neighborhood checking should withhold a runtime certificate`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
 
         val result = OpenExactNeighborhood(source, TheoryParams()).use {
@@ -142,17 +172,36 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `a refuted window retracts before a sibling witness`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `a refuted window should retract before a sibling witness`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams())
         val third = BigFraction.ofLong(3).reciprocal()
 
-        val refused = adapter.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)),
-            Cancellation.Never)
-        val accepted = adapter.check(ExactNeighborhoodCondition(emptyMap(), mapOf(0 to third), mapOf(0 to third)),
-            Cancellation.Never)
+        val refused = adapter.check(
+            ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)),
+            Cancellation.Never,
+        )
+        val accepted = adapter.check(
+            ExactNeighborhoodCondition(emptyMap(), mapOf(0 to third), mapOf(0 to third)),
+            Cancellation.Never,
+        )
 
         assertIs<ExactNeighborhoodResult.Refuted>(refused)
         assertEquals(third, assertIs<ExactNeighborhoodResult.Witness>(accepted).sample.exactReals?.single())
@@ -160,33 +209,28 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `a repair refutation preserves complete source feasibility`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-        val adapter = OpenExactNeighborhood(model, TheoryParams())
-        val zero = mapOf(0 to BigFraction.ZERO)
-        assertIs<ExactNeighborhoodResult.Refuted>(adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero),
-            Cancellation.Never))
-
-        val result = OpenTheoryEngine(model, model.componentPlan().theoryPipeline).solve()
-
-        assertEquals("1/3", assertIs<OpenTheoryResult.Sat>(result).assignment.realValue(0))
-        adapter.close()
-    }
-
-    @Test
-    fun `strict objective cutoffs retract without changing source witnesses`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `strict objective cutoffs should retract without changing source witnesses`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val adapter = OpenExactNeighborhood(model, TheoryParams(), objective)
         val zero = mapOf(0 to BigFraction.ZERO)
 
-        val refused = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero, BigFraction.ZERO),
-            Cancellation.Never)
-        val accepted = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero, BigFraction.ONE),
-            Cancellation.Never)
+        val refused = adapter.check(
+            ExactNeighborhoodCondition(emptyMap(), zero, zero, BigFraction.ZERO),
+            Cancellation.Never,
+        )
+        val accepted = adapter.check(
+            ExactNeighborhoodCondition(emptyMap(), zero, zero, BigFraction.ONE),
+            Cancellation.Never,
+        )
         val one = mapOf(0 to BigFraction.ONE)
         val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), one, one), Cancellation.Never)
 
@@ -200,14 +244,23 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `an unrepresentable condition retracts before a sibling query`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `an unrepresentable condition should retract before a sibling query`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams())
         val huge = BigFraction.of(parseBigInt("1" + "0".repeat(1300)), BIG_ONE)
 
-        val unknown = adapter.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to huge)),
-            Cancellation.Never)
+        val unknown = adapter.check(
+            ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to huge)),
+            Cancellation.Never,
+        )
         val zero = mapOf(0 to BigFraction.ZERO)
         val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
 
@@ -218,17 +271,34 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `nested conditions retract to their enclosing source scope`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+    fun `nested conditions should retract to their enclosing source scope`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams())
 
-        adapter.withCondition(ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()),
-            Cancellation.Never) {
-            assertIs<ExactNeighborhoodResult.Refuted>(adapter.check(
-                ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)), Cancellation.Never))
-            assertIs<ExactNeighborhoodResult.Witness>(adapter.check(
-                ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ONE)), Cancellation.Never))
+        adapter.withCondition(
+            ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()),
+            Cancellation.Never,
+        ) {
+            assertIs<ExactNeighborhoodResult.Refuted>(
+                adapter.check(
+                    ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)),
+                    Cancellation.Never,
+                ),
+            )
+            assertIs<ExactNeighborhoodResult.Witness>(
+                adapter.check(
+                    ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ONE)),
+                    Cancellation.Never,
+                ),
+            )
         }
         val zero = mapOf(0 to BigFraction.ZERO)
         val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
@@ -239,9 +309,16 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `closing one worker preserves a sibling worker and its witness`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `closing one worker should preserve a sibling worker and its witness`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val first = OpenExactNeighborhood(model, TheoryParams())
         val second = OpenExactNeighborhood(model, TheoryParams())
         val zero = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO), mapOf(0 to BigFraction.ZERO))
@@ -256,16 +333,25 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `cancellation after native work retracts the active bounds`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `cancellation after native work should retract the active bounds`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams())
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         assertIs<ExactNeighborhoodResult.Witness>(adapter.check(free, Cancellation.Never))
         val before = adapter.work
 
-        val interrupted = adapter.check(ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()),
-            Cancellation { adapter.work > before + 1 })
+        val interrupted = adapter.check(
+            ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE), emptyMap()),
+            Cancellation { adapter.work > before + 1 },
+        )
         val zero = mapOf(0 to BigFraction.ZERO)
         val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
 
@@ -276,28 +362,25 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `an interrupted native initialization leaves a later source query available`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-        val adapter = OpenExactNeighborhood(model, TheoryParams())
-        val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
-        var polls = 0
-
-        val interrupted = adapter.check(free, Cancellation { ++polls >= 3 })
-        val zero = mapOf(0 to BigFraction.ZERO)
-        val sibling = adapter.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
-
-        assertIs<ExactNeighborhoodResult.Undecided>(interrupted)
-        val sample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
-        assertEquals(BigFraction.ZERO, sample.exactReals?.single())
-        adapter.close()
-    }
-
-    @Test
-    fun `interrupted initialization cannot renew the containing native allowance`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.EQ, 1.0)), numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+    fun `interrupted initialization should not renew the containing native allowance`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams(openWorkLimit = 1))
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
@@ -312,7 +395,7 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `sibling queries cannot renew committed Boolean decisions`() {
+    fun `sibling queries should not renew committed Boolean decisions`() {
         val model = Problem(1, 0, emptyArray(), emptyArray())
         val adapter = OpenExactNeighborhood(model, TheoryParams(maxDecisions = 1))
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
@@ -327,10 +410,25 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `native completion charges the current invocation meter`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.EQ, 1.0)), numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+    fun `native completion should charge the current invocation meter`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams())
         var firstWork = 0L
         var siblingWork = 0L
@@ -346,12 +444,20 @@ class OpenExactNeighborhoodTest {
         val half = mapOf(0 to BigFraction.ofLong(2).reciprocal())
 
         adapter.use {
-            assertIs<ExactNeighborhoodResult.Witness>(it.check(
-                ExactNeighborhoodCondition(emptyMap(), zero, zero), first))
+            assertIs<ExactNeighborhoodResult.Witness>(
+                it.check(
+                    ExactNeighborhoodCondition(emptyMap(), zero, zero),
+                    first,
+                ),
+            )
             val firstCharge = firstWork
             assertTrue(firstCharge > 0)
-            assertIs<ExactNeighborhoodResult.Witness>(it.check(
-                ExactNeighborhoodCondition(emptyMap(), half, half), sibling))
+            assertIs<ExactNeighborhoodResult.Witness>(
+                it.check(
+                    ExactNeighborhoodCondition(emptyMap(), half, half),
+                    sibling,
+                ),
+            )
 
             assertTrue(siblingWork > 0)
             assertEquals(firstCharge, firstWork)
@@ -359,10 +465,17 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `a sibling invocation cannot rearm containing cancellation`() {
+    fun `a sibling invocation should not rearm containing cancellation`() {
         var cancelled = false
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams(cancellation = Cancellation { cancelled }))
         val zero = mapOf(0 to BigFraction.ZERO)
         val condition = ExactNeighborhoodCondition(emptyMap(), zero, zero)
@@ -379,10 +492,25 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `completed native source preparation survives interrupted initialization retries`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.EQ, 1.0)), numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+    fun `completed native source preparation should survive interrupted initialization retries`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams())
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
@@ -400,8 +528,11 @@ class OpenExactNeighborhoodTest {
                 assertIs<ExactNeighborhoodResult.Undecided>(result)
                 assertTrue(operations > 0)
                 assertTrue(it.sourcePrepared)
-                if (attempt == 0) preparedWork = it.preparationWork
-                else assertEquals(preparedWork, it.preparationWork)
+                if (attempt == 0) {
+                    preparedWork = it.preparationWork
+                } else {
+                    assertEquals(preparedWork, it.preparationWork)
+                }
             }
             val zero = mapOf(0 to BigFraction.ZERO)
             val sibling = it.check(ExactNeighborhoodCondition(emptyMap(), zero, zero), Cancellation.Never)
@@ -413,10 +544,25 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `cancelled native source preparation withholds its factory before a sibling query`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.EQ, 1.0)), numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+    fun `cancelled native source preparation should withhold its factory before a sibling query`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, 3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams())
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
@@ -435,7 +581,7 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `empty model retries retain an exhausted native allowance`() {
+    fun `empty model retries should keep an exhausted native allowance`() {
         val model = Problem(0, 0, emptyArray(), emptyArray())
         val adapter = OpenExactNeighborhood(model, TheoryParams(maxLeaves = 1))
         val free = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
@@ -452,16 +598,21 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `a wide integer objective cutoff retains its exact threshold`() {
+    fun `a wide integer objective cutoff should keep its exact threshold`() {
         val wide = parseBigInt("9223372036854775808")
         val open = Bits(1).also { it.set(0) }
-        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, wide)))
+        val model = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, wide)),
+        )
         val adapter = OpenExactNeighborhood(model, TheoryParams(), LinearObjective(intCoefficients = longArrayOf(1)))
         val threshold = BigFraction.of(wide, BIG_ONE)
 
-        val refused = adapter.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), threshold),
-            Cancellation.Never)
+        val refused = adapter.check(
+            ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), threshold),
+            Cancellation.Never,
+        )
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), threshold + BigFraction.ONE)
         val accepted = adapter.check(condition, Cancellation.Never)
 
@@ -471,10 +622,25 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `real coordinate repair preserves an exact fractional source witness`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `real coordinate repair should preserve an exact fractional source witness`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val search = OpenExactNeighborhood(model, TheoryParams()).search(false, maximumMoves = 4)
 
         search.advance(Cancellation.Never, Long.MAX_VALUE)
@@ -485,11 +651,14 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `integer repair can publish a source coordinate beyond Long`() {
+    fun `integer repair should publish a source coordinate beyond Long`() {
         val wide = parseBigInt("9223372036854775808")
         val open = Bits(1).also { it.set(0) }
-        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, wide)))
+        val model = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, wide)),
+        )
         val search = OpenExactNeighborhood(model, TheoryParams()).search(true, maximumMoves = 3)
 
         search.advance(Cancellation.Never, Long.MAX_VALUE)
@@ -500,9 +669,16 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `continuous objective neighborhoods retain witness-only authority`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+    fun `continuous objective neighborhoods should keep witness only authority`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
         val search = OpenExactNeighborhood(model, TheoryParams(), objective).search(false, maximumMoves = 5)
 

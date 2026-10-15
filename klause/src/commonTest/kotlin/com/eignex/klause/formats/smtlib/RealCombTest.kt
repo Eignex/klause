@@ -9,7 +9,7 @@ import kotlin.test.assertFalse
 
 class RealCombTest {
     @Test
-    fun `rational scaling retains one third exactly`() {
+    fun `rational scaling should retain one third exactly`() {
         val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         val source = RealComb(mapOf(0 to BigFraction.ONE), mapOf(0 to third), third)
 
@@ -21,7 +21,7 @@ class RealCombTest {
     }
 
     @Test
-    fun `wide adjacent integers stay distinct through combination`() {
+    fun `wide adjacent integers should stay distinct through combination`() {
         val first = BigFraction.ofLong(9007199254740992L)
         val second = BigFraction.ofLong(9007199254740993L)
         val sum = sumRealCombs(
@@ -37,7 +37,7 @@ class RealCombTest {
     }
 
     @Test
-    fun `combination owns its exact coefficient maps`() {
+    fun `combination should own its exact coefficient maps`() {
         val ints = mutableMapOf(0 to BigFraction.ONE)
         val reals = mutableMapOf(1 to BigFraction.MINUS_ONE)
         val source = RealComb(ints, reals, BigFraction.ZERO)

@@ -17,9 +17,7 @@ import kotlin.test.assertIs
 class RegressionVariableSelectorTest {
 
     @Test
-    fun `a reused selector is copied per solve so a prior problem's state cannot leak`() {
-        // One selector carried through a shared BacktrackParams across two solves of different size:
-        // the engine copies it per search, so the larger solve gets fresh, correctly-sized state.
+    fun `a reused selector should be copied per solve`() {
         val selector = RegressionVariableSelector.linUcb(seed = 1L)
         val small = Problem(
             numBoolVars = 0,
@@ -38,13 +36,11 @@ class RegressionVariableSelectorTest {
         )
         val r = BacktrackSolver(large.bake()).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0L until n.toLong()).toSet(), sat.assignment.ints.toSet(), "not a permutation")
+        assertEquals((0L until n.toLong()).toSet(), sat.assignment.ints.toSet())
     }
 
     @Test
-    fun `a reused selector is copied on the minimize path too`() {
-        // The COP path (minimize) builds its own shared run separately from solve; the selector copy
-        // must cover it, else the small solve's activity arrays are indexed against the larger one.
+    fun `a reused selector should be copied per minimize`() {
         val selector = RegressionVariableSelector.linUcb(seed = 1L)
         val small = Problem(
             numBoolVars = 0,

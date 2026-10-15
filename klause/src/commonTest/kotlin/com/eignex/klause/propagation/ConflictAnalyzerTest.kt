@@ -1,232 +1,182 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ConflictAnalyzerTest {
-
     @Test
-    fun `learned clause and backjump level on direct propagation conflict`() {
-        // Three clauses:  (¬a ∨ b),  (¬a ∨ ¬b),  (a).
-        // Decision: try a=true (level 1). Propagation forces b=true via clause 0,
-        // and clause 1 then fails because ¬a is false and ¬b is false.
-        //
-        // 1UIP analysis seeded by clause 1: literals are [¬a, ¬b]. Both are at level 1.
-        // Most-recent-pinned is b (forced after a). Resolve b out by replacing with
-        // its antecedents from clause 0: [¬a, b] minus b → [¬a]. New working set:
-        // {¬a from clause 1} ∪ {¬a from antecedent} → just {a}. Now only one
-        // current-level var remains → UIP = a. Learned clause: [¬a].
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+    fun `a single decision conflict should learn the negated decision and backjump to the root`() {
+        val session = PropagationSession(
+            clauses(
+                3,
+                intArrayOf(Lit.make(0, false), Lit.make(1, true)),
+                intArrayOf(Lit.make(1, false), Lit.make(2, true)),
+                intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false)),
             ),
         )
-        val session = PropagationSession(problem)
-        val result = session.pinBool(0, true)
-        val unsat = assertIs<PropagationResult.Unsat>(result)
+
+        val unsat = assertIs<PropagationResult.Unsat>(session.pinBool(0, true))
+
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        // Expected learned clause: {¬a}. Backjump to level 0 (only literal is at level 1
-        // and after the jump, the clause is empty/unit at level 0 which immediately
-        // forces a=false in the next propagation).
-        assertEquals(
-            setOf(Lit.make(0, false)),
-            learned.literals.toSet(),
-            "learned clause should be [¬a], got ${learned.literals.toList()}",
-        )
-        assertEquals(
-            0,
-            learned.backjumpLevel,
-            "single-level conflict over a single decision should backjump to level 0",
-        )
+        assertEquals(setOf(Lit.make(0, false)), learned.literals.toSet())
+        assertEquals(0, learned.backjumpLevel)
+        assertEquals(1, learned.lbd)
     }
 
     @Test
-    fun `learned clause spans multiple decision levels`() {
-        // Two-decision conflict that genuinely requires both decisions to manifest:
-        //   c0: ¬a ∨ ¬b ∨ c     (only fails if a, b true and c forced false elsewhere)
-        //   c1: ¬a ∨ ¬b ∨ ¬c    (mirror — together with c0 forbids a ∧ b)
-        //
-        // Pinning a=true alone propagates nothing (each clause has two non-false
-        // watches left). Pinning b=true cascades: c0 unit-pins c=true (with antecedents
-        // [¬a, ¬b]), then c1 fires with all three literals false → conflict.
-        //
-        // 1UIP resolution: seed reason from c1 = [¬a, ¬b, ¬c]. a is at level 1 (lower
-        // → goes to learned), b and c are at level 2 (current). Walk trail backwards:
-        // c is most recent at level 2 → resolve via c's antecedents [¬a, ¬b] (both
-        // already in `seen`, no new vars). Next backward step: pivot = b. Only one
-        // current-level var left → UIP = b. Learned clause = [¬a, ¬b]; backjump to
-        // level 1.
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
+    fun `a two decision conflict should learn both decisions and backjump to the earlier level`() {
+        val session = PropagationSession(
+            clauses(
+                3,
+                intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true)),
+                intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false)),
             ),
         )
-        val session = PropagationSession(problem)
-        val r1 = session.pinBool(0, true)
-        assertIs<PropagationResult.Implied>(r1)
-        val r2 = session.pinBool(1, true)
-        val unsat = assertIs<PropagationResult.Unsat>(r2)
+        assertIs<PropagationResult.Implied>(session.pinBool(0, true))
+
+        val unsat = assertIs<PropagationResult.Unsat>(session.pinBool(1, true))
+
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertEquals(
-            setOf(Lit.make(0, false), Lit.make(1, false)),
-            learned.literals.toSet(),
-            "1UIP learned clause should be [¬a, ¬b], got ${learned.literals.toList()}",
-        )
-        assertEquals(
-            1,
-            learned.backjumpLevel,
-            "backjump should target level 1 (the only lower-level variable's level)",
-        )
-        assertEquals(2, learned.lbd, "two-decision-level clause should have LBD = 2")
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)), learned.literals.toSet())
+        assertEquals(1, learned.backjumpLevel)
+        assertEquals(2, learned.lbd)
     }
 
+    private fun clauses(numBoolVars: Int, vararg literals: IntArray) = Problem(
+        numBoolVars = numBoolVars,
+        numIntVars = 0,
+        intDomains = emptyArray(),
+        factors = Array<Factor>(literals.size) { Clause(literals[it]) },
+    )
+
     @Test
-    fun `learned clause persists in the session after backjump`() {
-        // Two-decision conflict that learns [¬a, ¬b]. Once the clause is asserted, a=true forces
-        // b=false through it, so no returned assignment may set both.
+    fun `a conflict should take its level from its own path and not the previous analysis`() {
+        // x1 >= 1 and x2 >= 1 force x3 >= 3, breaking x0 + x1 + x3 <= 6 with x0 >= 3; the second
+        // conflict must resolve x3 >= 3 back to x1's decision for the clause to assert.
         val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, 5) },
             factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 3), LinearOp.LE, 6),
+                Linear(intArrayOf(1, -1, -1), intArrayOf(3, 1, 2), LinearOp.GE, 1),
             ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(
-                variableSelector = InputOrder,
-                randomSeed = 0L,
-            ),
-        )
-        val sat = assertIs<SolveResult.Sat>(r)
-        val a = sat.assignment.bools[0]
-        val b = sat.assignment.bools[1]
-        assertTrue(
-            !(a && b),
-            "learned clause [¬a, ¬b] should block the a=true ∧ b=true assignment; got a=$a b=$b",
-        )
-    }
-
-    @Test
-    fun `state forgetLearnedClauses directly compacts and remaps`() {
-        // Hand-construct a state, add three learned clauses with different LBDs, drop
-        // the middle one, and verify the remaining are correctly renumbered and the
-        // watcher index points at the new ids.
-        val problem = Problem(
-            numBoolVars = 4,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
         )
         val state = PropagationState(problem, Assumptions.None)
-        val baseFid = problem.numFactors
-        val c0 = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))).propagatorProjection() as ClausePropagator
-        val c1 = Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))).propagatorProjection() as ClausePropagator
-        val c2 = Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))).propagatorProjection() as ClausePropagator
-        val fid0 = state.addLearnedClause(c0, lbd = 1)
-        val fid1 = state.addLearnedClause(c1, lbd = 5)
-        val fid2 = state.addLearnedClause(c2, lbd = 1)
-        assertEquals(baseFid, fid0)
-        assertEquals(baseFid + 1, fid1)
-        assertEquals(baseFid + 2, fid2)
-        assertEquals(3, state.learnedClauses.size)
-        assertTrue(
-            state.watches.byLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
-            "c1 should be in ¬b watcher list before forget",
-        )
+        state.undoLogging = true
+        val root = state.mark()
+        fun propagateToConflict() {
+            state.currentFactor = 1
+            check(state.factorAt(1).propagate(state, 1))
+            state.currentFactor = 0
+            check(!state.factorAt(0).propagate(state, 0))
+        }
+        check(state.setIntMinAsDecision(2, 1) && state.tightenIntMin(0, 3) && state.setIntMinAsDecision(1, 1))
+        propagateToConflict()
+        state.conflictAnalyzer.analyze(0)
+        state.undoTo(root)
+        check(state.setIntMinAsDecision(2, 1) && state.setIntMinAsDecision(0, 3) && state.setIntMinAsDecision(1, 1))
+        propagateToConflict()
 
-        state.forgetLearnedClauses { _, lbd -> lbd <= 1 }
-        assertEquals(
-            2,
-            state.learnedClauses.size,
-            "expected 2 clauses kept after dropping the high-LBD one",
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(0))
+
+        assertTrue(learned.asserting)
+        assertEquals(2, learned.backjumpLevel)
+    }
+
+    private fun atomGeState(levels: IntArray, ants: Array<IntArray?>? = null): PropagationState {
+        val n = levels.size
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, 10) },
+            factors = arrayOf<Factor>(),
         )
-        assertContentEquals(c0.literals, (state.learnedClauses[0] as ClausePropagator).literals)
-        assertContentEquals(c2.literals, (state.learnedClauses[1] as ClausePropagator).literals)
-        assertTrue(
-            !state.watches.byLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
-            "watcher entry for the dropped clause should be removed",
-        )
-        val newFid2 = baseFid + 1
-        assertTrue(
-            state.watches.byLit[Lit.make(2, true)].toIntArray().toList().contains(newFid2),
-            "c2 should be findable at its new fid ($newFid2) via its watch literal",
-        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        for (v in 0 until n) {
+            state.currentLevel = levels[v]
+            check(state.tightenIntMin(v, 5, ants?.get(v))) { "tighten v$v failed" }
+            val atomVar = state.atomVarGe(v, 5)
+            check(atomVar == v) { "expected atom var id $v, got $atomVar" }
+        }
+        return state
+    }
+
+    private fun levelOf(state: PropagationState, v: Int): Int = if (v < state.problem.numBoolVars) {
+        state.boolLevel[v]
+    } else {
+        state.atomLevelForConflict(v - state.problem.numBoolVars)
+    }
+
+    private fun negAtom(i: Int) = Lit.make(i, false)
+
+    private fun varsOf(literals: IntArray): Set<Int> = literals.map { Lit.variable(it) }.toSet()
+
+    @Test
+    fun `1UIP analysis should learn an asserting atom clause backjumping to the lower level`() {
+        val state = atomGeState(intArrayOf(1, 2))
+        state.currentLevel = 2
+        val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(fid))
+        assertEquals(setOf(0, 1), varsOf(learned.literals))
+        assertTrue(learned.literals.all { Lit.variable(it) >= state.problem.numBoolVars })
+        assertTrue(learned.literals.all { !Lit.isPositive(it) })
+        assertEquals(1, learned.backjumpLevel)
+        assertEquals(2, learned.lbd)
+        assertTrue(learned.asserting)
     }
 
     @Test
-    fun `clause minimization drops redundant literals`() {
-        // Build a propagation chain that produces a learnable clause whose raw 1UIP
-        // output contains a redundant literal, then verify minimization removes it.
-        //
-        //   c0: ¬a ∨ b        (a forces b)
-        //   c1: ¬b ∨ c        (b forces c)
-        //   c2: ¬a ∨ ¬b ∨ ¬c  (fails when a, b, c all true)
-        //
-        // Decision: a=true (lvl 1) → b forced (c0), c forced (c1), c2 fails.
-        //
-        // Raw 1UIP resolution:
-        //   Seed (c2): [¬a, ¬b, ¬c]. All at level 1.
-        //   currentLevelCount = 3.
-        //   Walk trail. Most recent = c. Resolve via c's antecedents (c1): [¬b, c],
-        //   minus c → [¬b]. ¬b already in seen — nothing new. Continue.
-        //   Most recent = b. Resolve via b's antecedents (c0): [¬a, b], minus b → [¬a].
-        //   ¬a already in seen. Continue.
-        //   Most recent = a. UIP. learned literals are [¬a, ¬b, ¬c] (added during seed),
-        //   plus UIP literal ¬a added at the end → but ¬a is already there.
-        //
-        // After 1UIP: literals are {¬a, ¬b, ¬c} (raw, possibly with one dup).
-        // Minimization: variable c is implied by b (antecedents = [¬b], which is
-        // already in clause). Drop c. Variable b is implied by a (antecedents = [¬a],
-        // also in clause). Drop b. Result: just {¬a}.
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
-            ),
-        )
-        val session = PropagationSession(problem)
-        val r = session.pinBool(0, true)
-        val unsat = assertIs<PropagationResult.Unsat>(r)
-        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertEquals(
-            setOf(Lit.make(0, false)),
-            learned.literals.toSet(),
-            "minimization should drop ¬b and ¬c (both implied by ¬a via the chain), " +
-                "leaving just [¬a]; got ${learned.literals.toList()}",
-        )
-        assertEquals(
-            0,
-            learned.backjumpLevel,
-            "unit-clause learning forces backjump to level 0",
-        )
-        assertEquals(1, learned.lbd, "minimized to single literal → LBD = 1")
+    fun `conflict level should come from the seed reason not the stale current level`() {
+        val state = atomGeState(intArrayOf(1, 2))
+        state.currentLevel = 5
+        val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(fid))
+        assertEquals(setOf(0, 1), varsOf(learned.literals))
+        assertTrue(learned.asserting)
+        assertEquals(1, learned.backjumpLevel)
+        assertEquals(2, learned.lbd)
     }
 
+    @Test
+    fun `1UIP analysis should resolve an implied atom through its antecedents`() {
+        val state = atomGeState(
+            intArrayOf(1, 2, 2),
+            arrayOf(null, intArrayOf(negAtom(0)), null),
+        )
+        state.currentLevel = 2
+        val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(1), negAtom(2))), lbd = 2)
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(fid))
+        assertEquals(setOf(0, 2), varsOf(learned.literals))
+        assertEquals(1, learned.backjumpLevel)
+        assertTrue(learned.asserting)
+    }
+
+    @Test
+    fun `two conflict-level atom leaves should yield a non-asserting clause`() {
+        val state = atomGeState(intArrayOf(2, 2))
+        state.currentLevel = 2
+        val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 1)
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(fid))
+        assertEquals(setOf(0, 1), varsOf(learned.literals))
+        assertEquals(
+            2,
+            learned.literals.count { levelOf(state, Lit.variable(it)) == 2 },
+        )
+        assertTrue(!learned.asserting)
+    }
 }

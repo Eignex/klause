@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class ProfileCaptureArchiveTest {
     @Test
-    fun `compressed capture preserves exact raw bytes`() {
+    fun `compressed capture should preserve exact raw bytes`() {
         val out = Files.createTempDirectory("profile-capture-test-").toFile()
         try {
             ProfileCaptureArchive.run(out) { out.resolve("record.txt").writeText("raw\r\n") }
@@ -24,7 +24,7 @@ class ProfileCaptureArchiveTest {
     }
 
     @Test
-    fun `live recording remains outside the compressed capture`() {
+    fun `live recording should remain outside the compressed capture`() {
         val out = Files.createTempDirectory("profile-live-test-").toFile()
         try {
             out.resolve("profile.jfr").writeText("live")
@@ -42,7 +42,7 @@ class ProfileCaptureArchiveTest {
     }
 
     @Test
-    fun `action failure stays primary after its output is captured`() {
+    fun `action failure should stay primary after its output is captured`() {
         val out = Files.createTempDirectory("profile-failure-test-").toFile()
         val failure = IllegalArgumentException("original action")
         try {
@@ -62,7 +62,7 @@ class ProfileCaptureArchiveTest {
     }
 
     @Test
-    fun `symbolic links are refused without reading or removing external outputs`() {
+    fun `symbolic links should be refused without reading or removing external outputs`() {
         val root = Files.createTempDirectory("profile-link-test-").toFile()
         try {
             val external = root.resolve("external").apply { mkdirs() }
@@ -84,7 +84,7 @@ class ProfileCaptureArchiveTest {
     }
 
     @Test
-    fun `action failure retains archive failure as a suppressed exception`() {
+    fun `action failure should retain archive failure as a suppressed exception`() {
         val root = Files.createTempDirectory("profile-errors-test-").toFile()
         val failure = IllegalArgumentException("original action")
         try {

@@ -21,7 +21,7 @@ class BenchSelectionTest {
     private fun names(selected: List<SelectedProblem>) = selected.map { it.ref.name }
 
     @Test
-    fun `a per-family cap counts the provider's family rather than the name prefix`() {
+    fun `a per-family cap should count the provider family rather than the name prefix`() {
         val candidates = listOf(
             problem("xcsp3-cop", "Rack-1", family = "Rack"),
             problem("xcsp3-cop", "Rack-2", family = "Rack"),
@@ -34,7 +34,7 @@ class BenchSelectionTest {
     }
 
     @Test
-    fun `a suite default caps its families only when no per-family cap is given`() {
+    fun `a suite default should cap its families only when no per-family cap is given`() {
         val candidates = listOf(problem("hakank", "a/1", default = 1), problem("hakank", "a/2", default = 1))
 
         assertEquals(
@@ -44,7 +44,7 @@ class BenchSelectionTest {
     }
 
     @Test
-    fun `families of the same name in two suites are capped apart`() {
+    fun `families of the same name in two suites should be capped apart`() {
         val candidates = listOf(problem("one", "a/1"), problem("one", "a/2"), problem("two", "a/1"))
 
         val selected = BenchSelection.capFamilies(candidates, perFamily = 1, seed = null)
@@ -53,7 +53,7 @@ class BenchSelectionTest {
     }
 
     @Test
-    fun `a filter fills the cap and reads no instance past it`() {
+    fun `a filter should fill the cap and read no instance past it`() {
         val candidates = listOf(
             problem("s", "f/csp"),
             problem("s", "f/cop1"),
@@ -74,7 +74,7 @@ class BenchSelectionTest {
     }
 
     @Test
-    fun `compiler exclusions leave room for valid siblings before family and overall caps`() {
+    fun `compiler exclusions should leave room for valid siblings before family and overall caps`() {
         val candidates = listOf(
             problem("s", "f/broken", family = "f"),
             problem("s", "f/valid", family = "f"),
@@ -96,7 +96,7 @@ class BenchSelectionTest {
     }
 
     @Test
-    fun `compiler infrastructure failures stop selection instead of consuming a cap`() {
+    fun `compiler infrastructure failures should stop selection instead of consuming a cap`() {
         val candidates = listOf(problem("s", "f/one"), problem("s", "f/two"))
 
         assertFailsWith<IllegalStateException> {
@@ -107,7 +107,7 @@ class BenchSelectionTest {
     }
 
     @Test
-    fun `seeded compatibility selection fills caps deterministically`() {
+    fun `seeded compatibility selection should fill caps deterministically`() {
         val candidates = (1..8).map { problem("s", "f/$it") }
         val selections = List(2) { _ ->
             BenchSelection.capFamilies(candidates, perFamily = 3, seed = 7, compatible = { candidate ->

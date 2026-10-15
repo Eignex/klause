@@ -8,11 +8,11 @@ import kotlin.test.assertTrue
 class LongHashSetTest {
 
     @Test
-    fun `every query on a never-populated set is safe and it stays usable after`() {
+    fun `never populated set should answer every query and stay usable`() {
         val s = LongHashSet()
         assertFalse(s.contains(0L))
         assertFalse(s.contains(Long.MIN_VALUE))
-        assertFalse(s.remove(7L), "remove on a never-populated set is a no-op")
+        assertFalse(s.remove(7L))
         assertEquals(0, s.toLongArray().size)
         var visits = 0
         s.forEach { visits++ }
@@ -25,7 +25,7 @@ class LongHashSetTest {
     }
 
     @Test
-    fun `add reports novelty and dedupes`() {
+    fun `add should report novelty and deduplicate`() {
         val s = LongHashSet()
         assertTrue(s.add(5L))
         assertFalse(s.add(5L))
@@ -37,7 +37,7 @@ class LongHashSetTest {
     }
 
     @Test
-    fun `extreme members and zero coexist`() {
+    fun `extreme members and zero should coexist`() {
         val s = LongHashSet()
         s.add(Long.MIN_VALUE)
         s.add(Long.MAX_VALUE)
@@ -49,7 +49,7 @@ class LongHashSetTest {
     }
 
     @Test
-    fun `remove deletes and survivors remain findable across collisions`() {
+    fun `remove should keep survivors findable across collisions`() {
         val s = LongHashSet(4)
         for (k in 0 until 50) s.add(k.toLong())
         for (k in 0 until 50 step 2) assertTrue(s.remove(k.toLong()))
@@ -60,12 +60,12 @@ class LongHashSetTest {
                 assertTrue(s.contains(k.toLong()), "survivor $k")
             }
         }
-        assertFalse(s.remove(0L), "already-removed returns false")
+        assertFalse(s.remove(0L))
         assertEquals(25, s.size)
     }
 
     @Test
-    fun `clear empties and the set is reusable`() {
+    fun `clear should empty the set and keep it reusable`() {
         val s = LongHashSet()
         for (k in 0 until 30) s.add(k.toLong())
         s.clear()
@@ -77,7 +77,7 @@ class LongHashSetTest {
     }
 
     @Test
-    fun `forEach visits every member exactly once`() {
+    fun `forEach should visit every member exactly once`() {
         val s = LongHashSet()
         val expected = HashSet<Long>()
         for (k in -20L..20L) {
@@ -90,11 +90,10 @@ class LongHashSetTest {
     }
 
     @Test
-    fun `growth preserves all members including wide-range keys`() {
+    fun `growth should preserve all members including wide range keys`() {
         val s = LongHashSet(8)
         for (k in 0 until 1000) s.add(k.toLong() * 0x1_0000_0007L)
         assertEquals(1000, s.size)
         for (k in 0 until 1000) assertTrue(s.contains(k.toLong() * 0x1_0000_0007L))
     }
-
 }

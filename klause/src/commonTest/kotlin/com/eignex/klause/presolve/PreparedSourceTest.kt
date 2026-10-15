@@ -16,8 +16,6 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PreparedSourceTest {
-
-    /** `x = y + z` with `y + z <= 4`, every column open: the aggregate pass rewrites the second row. */
     private fun aggregatable(): Problem {
         val open = Bits(3).also { bits -> repeat(3) { bits.set(it) } }
         return Problem(
@@ -31,7 +29,7 @@ class PreparedSourceTest {
     }
 
     @Test
-    fun `preparation reports the passes that rewrote the model`() {
+    fun `preparation should report the passes that rewrote the model`() {
         val prepared = PresolvePipeline.prepareSource(aggregatable())
 
         assertTrue(prepared.changed)
@@ -39,7 +37,7 @@ class PreparedSourceTest {
     }
 
     @Test
-    fun `source reduction runs after routing slice exhaustion`() {
+    fun `source reduction should run after routing slice exhaustion`() {
         val parent = PresolveBudget(6_000L)
         val routeStop = parent.slice(parent.remaining() / 2)
         routeStop.charge(3_000L)
@@ -56,8 +54,7 @@ class PreparedSourceTest {
     }
 
     @Test
-    fun `a model that already passed the phase is not put through it again`() {
-        // The same rewritable pair, already baked: reaching this boundary is what says the phase ran.
+    fun `a model that already passed the phase should not be prepared again`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -74,8 +71,7 @@ class PreparedSourceTest {
     }
 
     @Test
-    fun `the bounded lane presolves the prepared model rather than the caller's own`() {
-        // Two columns against the source model's three, so the outcome names which model the lane read.
+    fun `the bounded lane should presolve the prepared model rather than the caller model`() {
         val prepared = PreparedSource(
             source = aggregatable(),
             problem = Problem(

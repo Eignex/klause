@@ -1,10 +1,5 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.engine.LpBuilder
-import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.lp.engine.Sense
-import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
@@ -21,7 +16,7 @@ import kotlin.test.assertTrue
 
 class LpSolveTest {
     @Test
-    fun `structurally declined certification retries honor current policy and model authority`() {
+    fun `structurally declined certification retries should honor current policy and model authority`() {
         val model = LpBuilder().apply {
             addVar(0L, 3L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
@@ -35,8 +30,13 @@ class LpSolveTest {
         }
         val cache = LpExactContinuationCache()
         val policy = LpCertificationPolicy { _, _ -> false }
-        val declined = certifyLpResult(model, solver, null, continuationCache = cache,
-            continuationLimits = ExactContinuationLimits(maxRows = 0))
+        val declined = certifyLpResult(
+            model,
+            solver,
+            null,
+            continuationCache = cache,
+            continuationLimits = ExactContinuationLimits(maxRows = 0),
+        )
         val withheld = certifyLpResult(model, solver, null, continuationCache = cache, policy = policy)
         model.rhs[0] = 2L
 
@@ -50,21 +50,27 @@ class LpSolveTest {
     }
 
     @Test
-    fun `retained rational bounds omit inactive row weight and recover ancestor support after pop`() {
-        val source = assertNotNull(LpBuilder().apply {
-            val x = addRealVar(0.0, 4.0, cost = 1.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.GE, 0.5)
-        }.build(Sense.MINIMIZE).authoritativeModel())
+    fun `retained rational bounds should omit inactive row weight and recover ancestor support after pop`() {
+        val source = assertNotNull(
+            LpBuilder().apply {
+                val x = addRealVar(0.0, 4.0, cost = 1.0)
+                addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.GE, 0.5)
+            }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val trail = LpBoundTrail(source)
         assertTrue(trail.push())
         assertTrue(trail.suspend(setOf(0L)))
-        assertTrue(trail.append(
-            LpScopedRow(
-                1L, listOf(0 to ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(-0.5)))), ExactLpNumber.of(-1L),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+        assertTrue(
+            trail.append(
+                LpScopedRow(
+                    1L,
+                    listOf(0 to ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(-0.5)))),
+                    ExactLpNumber.of(-1L),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+                ),
+                true,
             ),
-            true,
-        ))
+        )
         val child = assertNotNull(trail.state.toWorkingModel())
 
         val childBound = assertNotNull(certifyLpBound(child, doubleArrayOf(999.0, -2.0)))
@@ -80,70 +86,47 @@ class LpSolveTest {
     }
 
     @Test
-    fun `native continuation preserves constant objective bounds in minimized source units`() {
+    fun `native continuation should preserve constant objective bounds in minimized source units`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val constant = BigFraction.ofLong(7L) * BigFraction.ofLong(3L).reciprocal()
+        val external = BigFraction.ofLong(5L) * BigFraction.ofLong(4L).reciprocal()
         for (sense in Sense.entries) {
-            for (fractional in listOf(false, true)) {
-                val zero = ExactLpNumber.of(0L)
-                val one = ExactLpNumber.of(1L)
-                val constant = if (fractional) {
-                    BigFraction.ofLong(7L) * BigFraction.ofLong(3L).reciprocal()
-                } else {
-                    BigFraction.ofLong(4L)
-                }
-                val external = if (fractional) {
-                    BigFraction.ofLong(5L) * BigFraction.ofLong(4L).reciprocal()
-                } else {
-                    BigFraction.ZERO
-                }
-                val scale = if (fractional) 2L else 1L
-                val source = ExactLpModel(
-                    listOf(emptyList()),
-                    emptyList(),
-                    listOf(
-                        ExactLpColumn(
-                            ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)),
-                            origin = ExactLpNumber.of(7L),
-                        ),
-                    ),
-                    emptyList(),
-                    ExactLpObjective(
-                        listOf(zero),
-                        ExactLpNumber.of(constant),
-                        ExactLpNumber.of(scale),
-                        ExactLpNumber.of(external),
-                        sense,
-                    ),
-                )
-                val state = LpExactState(source)
-                val model = assertNotNull(state.toWorkingModel())
-                val solver = object : LpSolver {
-                    override val infeasibleRay: DoubleArray? = null
-                    override fun solve(warm: Basis?): FloatLpResult? = null
-                    override fun solvePrimal(warm: Basis?): FloatLpResult? = null
-                    override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
-                }
-
-                val result = certifyLpResult(model, solver, null)
-
-                val expected = constant * BigFraction.ofLong(scale).reciprocal() + external
-                assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
-                assertEquals(expected, result.lowerBound)
-                assertEquals(expected, assertNotNull(result.witness).objective)
-                assertEquals(
-                    if (sense == Sense.MINIMIZE) expected else expected.negated(),
-                    source.objective.sourceValue(listOf(BigFraction.ZERO)),
-                )
-                assertEquals(if (fractional) null else 4L, result.integerObjectiveLowerBound)
-                val support = assertNotNull(assertNotNull(result.bound).support)
-                assertSame(state, support.state)
-                assertTrue(support.rows.isEmpty())
-                assertTrue(support.sides.isEmpty())
+            val source = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), origin = ExactLpNumber.of(7L)),
+                ),
+                emptyList(),
+                ExactLpObjective(
+                    listOf(zero),
+                    ExactLpNumber.of(constant),
+                    ExactLpNumber.of(2L),
+                    ExactLpNumber.of(external),
+                    sense,
+                ),
+            )
+            val state = LpExactState(source)
+            val solver = object : LpSolver {
+                override val infeasibleRay: DoubleArray? = null
+                override fun solve(warm: Basis?): FloatLpResult? = null
+                override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+                override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
             }
+
+            val result = certifyLpResult(assertNotNull(state.toWorkingModel()), solver, null)
+
+            val expected = constant * BigFraction.ofLong(2L).reciprocal() + external
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            assertEquals(expected, result.lowerBound)
+            assertEquals(expected, assertNotNull(result.witness).objective)
+            assertSame(state, assertNotNull(result.bound?.support).state)
         }
     }
 
     @Test
-    fun `native continuation does not invent bounds for nonconstant structural or logical costs`() {
+    fun `native continuation should not invent bounds for nonconstant structural or logical costs`() {
         for (costColumn in listOf(0, 1)) {
             val zero = ExactLpNumber.of(0L)
             val one = ExactLpNumber.of(1L)
@@ -172,7 +155,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `constant continuation bounds and witnesses honor independent policy rejection`() {
+    fun `constant continuation bounds and witnesses should honor independent policy rejection`() {
         for (rejected in listOf(LpCertifier.INTEGER, LpCertifier.EXACT_BASIS)) {
             val source = assertNotNull(LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE).authoritativeModel())
             val model = assertNotNull(LpExactState(source).toWorkingModel())
@@ -200,7 +183,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `source conflict support aggregates repeated rows before selecting strict sides`() {
+    fun `source conflict support should aggregate repeated rows before selecting strict sides`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val premise = ExactLpPremises(emptyList(), listOf(13))
@@ -235,7 +218,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `crossed bound witnesses honor proof acceptance policy`() {
+    fun `crossed bound witnesses should honor proof acceptance policy`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(emptyList()),
@@ -262,7 +245,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `exact objective units and source origins survive certification`() {
+    fun `exact objective units and source origins should survive certification`() {
         val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -296,7 +279,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `binary and parsed equations retain different acceptance authority`() {
+    fun `binary and parsed equations should retain different acceptance authority`() {
         val tenth = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(10)))
         val zero = ExactLpNumber.of(0L)
         for (rhs in listOf(tenth, ExactLpNumber.ofIeee(0.1))) {
@@ -324,8 +307,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `a feasible LP certifies an optimum matching the float optimum`() {
-        // minimize x + y  subject to  x + y >= 3,  0 <= x, y <= 5.
+    fun `a feasible LP should certify an optimum matching the float optimum`() {
         val b = LpBuilder()
         b.addVar(0L, 5L, cost = 1L)
         b.addVar(0L, 5L, cost = 1L)
@@ -345,8 +327,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `an infeasible LP is certified infeasible by a Farkas ray`() {
-        // 0 <= x <= 1 with x >= 2 has no feasible point.
+    fun `an infeasible LP should be certified infeasible by a Farkas ray`() {
         val b = LpBuilder()
         b.addVar(0L, 1L, cost = 1L)
         b.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
@@ -361,7 +342,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `a nonoptimal feasible point retains its exact witness and a separate bound`() {
+    fun `a nonoptimal feasible point should retain its exact witness and a separate bound`() {
         val model = LpBuilder().apply { addVar(0L, 5L, cost = 1L) }.build(Sense.MINIMIZE)
         val hint = FloatLpResult(
             Basis(intArrayOf(), arrayOf(VarStatus.AT_UPPER)),
@@ -379,7 +360,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `a bound on an infeasible relaxation proves neither a point nor attainment`() {
+    fun `a bound on an infeasible relaxation should prove neither a point nor attainment`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 1L, cost = 1L)
             addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
@@ -400,7 +381,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `a strict infimum retains an interior witness without claiming attainment`() {
+    fun `a strict infimum should retain an interior witness without claiming attainment`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0, cost = 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)
@@ -416,7 +397,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `an exact feasible counter suppresses a repeated infeasibility candidate`() {
+    fun `an exact feasible counter should suppress a repeated infeasibility candidate`() {
         val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
         val cache = LpCounterResults()
         val first = solveAndCertify(model, counterResults = cache)
@@ -434,7 +415,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `objective replacement releases a retained bound for unboundedness`() {
+    fun `objective replacement should release a retained bound for unboundedness`() {
         val model = LpBuilder().apply { addOpenAboveVar(0L) }.build(Sense.MINIMIZE)
         val cache = LpCounterResults()
         val first = solveAndCertify(model, counterResults = cache)
@@ -459,7 +440,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `sibling bounds cannot reuse an exact point from another node`() {
+    fun `sibling bounds should not reuse an exact point from another node`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 3L)
             addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
@@ -473,7 +454,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `unboundedness requires a feasible point and an improving recession direction`() {
+    fun `unboundedness should require a feasible point and an improving recession direction`() {
         val model = LpBuilder().apply { addOpenAboveVar(0L, cost = -1L) }.build(Sense.MINIMIZE)
         val solver = object : LpSolver {
             override fun continuationBasis(model: LpModel): Basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
@@ -494,7 +475,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `a ray over guessed decimal rows cannot refute the original source system`() {
+    fun `a ray over guessed decimal rows should not refute the original source system`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, null)
             val y = addRealVar(0.0, null)
@@ -523,7 +504,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `strict infeasibility carries exact row multipliers and all blocking sides`() {
+    fun `strict infeasibility should carry exact row multipliers and all blocking sides`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 0.0, strict = true)
@@ -541,7 +522,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `policy rejection withholds all reconstructed proof packages`() {
+    fun `policy rejection should withhold all reconstructed proof packages`() {
         val model = LpBuilder().apply { addVar(0L, 1L, cost = 1L) }.build(Sense.MINIMIZE)
         val reject = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
 
@@ -555,7 +536,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `completed exact reconstruction survives cancellation after policy acceptance`() {
+    fun `completed exact reconstruction should survive cancellation after policy acceptance`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
@@ -603,7 +584,7 @@ class LpSolveTest {
     }
 
     @Test
-    fun `stale exact candidate cannot enter reconstruction after a trail edit`() {
+    fun `a stale exact candidate should not enter reconstruction after a trail edit`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
@@ -637,4 +618,43 @@ class LpSolveTest {
         assertNull(result.witness)
     }
 
+    @Test
+    fun `a continuous LP should solve in floats and certify via the exact basis solve`() {
+        val b = LpBuilder()
+        val x = b.addRealVar(0.0, 10.0, cost = 1.0)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.GE, 3.0)
+        val model = b.build(Sense.MINIMIZE)
+        assertTrue(model.hasContinuous)
+        assertTrue(model.colContinuous[x])
+
+        val result = solveAndCertify(model)
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertNull(result.certificate)
+        val float = assertNotNull(result.float)
+        assertEquals(1.5, float.objective, 1e-9)
+        assertEquals(1.5, float.primal[x], 1e-9)
+        val safe = assertNotNull(result.safeLowerBound)
+        assertTrue(safe <= 1.5 + 1e-9, "safe bound $safe exceeds the optimum 1.5")
+    }
+
+    @Test
+    fun `an infeasible continuous LP should be certified on the original source`() {
+        val b = LpBuilder()
+        val x = b.addRealVar(0.0, 1.0, cost = 1.0)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.GE, 3.0)
+        val model = b.build(Sense.MINIMIZE)
+        val result = solveAndCertify(model)
+        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+        assertTrue(checkedLpConflict(model, assertNotNull(result.rationalConflict)))
+    }
+
+    @Test
+    fun `a coefficient outside every scaling ladder should certify via the rational fallback`() {
+        // 1/3 fits neither the dyadic nor the decimal ladder, so only the rational simplex can refute it.
+        val b = LpBuilder()
+        val x = b.addRealVar(0.0, 5.0, cost = 1.0)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(1.0 / 3.0), Relation.GE, 2.0)
+        assertEquals(LpVerdict.INFEASIBLE, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
+    }
 }

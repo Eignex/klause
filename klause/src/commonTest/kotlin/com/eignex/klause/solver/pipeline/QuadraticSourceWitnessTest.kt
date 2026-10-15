@@ -36,19 +36,29 @@ import kotlin.test.assertSame
 
 class QuadraticSourceWitnessTest {
     @Test
-    fun `a polynomial portfolio admits original coordinates with private lowering auxiliaries`() {
+    fun `polynomial portfolio should admit original coordinates with private lowering auxiliaries`() {
         val x = PolynomialExpression.Variable(SourceRealId(0))
         val auxiliary = PolynomialExpression.Variable(SourceRealId(1))
-        val formula = PolynomialRealFormula.And(listOf(
-            PolynomialRealFormula.Atom(x, PolynomialRelation.EQ,
-                PolynomialExpression.Constant.of(BigFraction.ofLong(2).num)),
-            PolynomialRealFormula.Atom(auxiliary, PolynomialRelation.EQ, x),
-        ))
+        val formula = PolynomialRealFormula.And(
+            listOf(
+                PolynomialRealFormula.Atom(
+                    x,
+                    PolynomialRelation.EQ,
+                    PolynomialExpression.Constant.of(BigFraction.ofLong(2).num),
+                ),
+                PolynomialRealFormula.Atom(auxiliary, PolynomialRelation.EQ, x),
+            ),
+        )
         val source = PolynomialRealProblem(formula, 2, 0, 1, 0, mapOf("x" to 0), emptyMap())
         val request = source.pipelineRequest()
-        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(
-            QuadraticCoefficient.ONE, QuadraticVariable.Real(SourceRealId(0)),
-        )))
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(
+                    QuadraticCoefficient.ONE,
+                    QuadraticVariable.Real(SourceRealId(0)),
+                ),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(request, objective, engine = FiniteEngine.MIXED)
 
@@ -56,77 +66,128 @@ class QuadraticSourceWitnessTest {
         assertEquals(1, point.sample.numRealVars)
         assertEquals(BigFraction.ofLong(2), point.value.rational)
         val publication = assertNotNull(point.sample.witnessCertificate?.quadraticPublication)
-        val expected = assertNotNull(request.preparedPlan.quadraticEngineInvocation(objective,
-            ObjectiveSense.MINIMIZE, Assumptions.None))
-        assertIs<SourceEvidenceCheck.Checked>(publication.verify(expected, point, AlgebraicArithmetic()) {
-            checkQuadraticSourceWitness(request.preparedPlan, it, Cancellation.Never, PolynomialLimits())
-        })
+        val expected = assertNotNull(
+            request.preparedPlan.quadraticEngineInvocation(
+                objective,
+                ObjectiveSense.MINIMIZE,
+                Assumptions.None,
+            ),
+        )
+        assertIs<SourceEvidenceCheck.Checked>(
+            publication.verify(expected, point, AlgebraicArithmetic()) {
+                checkQuadraticSourceWitness(request.preparedPlan, it, Cancellation.Never, PolynomialLimits())
+            },
+        )
     }
 
     @Test
-    fun `shared IR checking rejects a point that violates a continuous product`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 2.0))
-        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0, 2.0),
-            exactReals = listOf(BigFraction.ONE, BigFraction.ofLong(2)))
+    fun `shared IR checking should reject a point that violates a continuous product`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(ContinuousProduct(0, 0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-1.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 2.0),
+        )
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(1.0, 2.0),
+            exactReals = listOf(BigFraction.ONE, BigFraction.ofLong(2)),
+        )
 
-        val checked = checkQuadraticSourceWitness(source.pipelineRequest().preparedPlan, point,
-            Cancellation.Never, PolynomialLimits())
+        val checked = checkQuadraticSourceWitness(
+            source.pipelineRequest().preparedPlan,
+            point,
+            Cancellation.Never,
+            PolynomialLimits(),
+        )
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
 
     @Test
-    fun `shared IR checking retains original finite factors`() {
+    fun `shared IR checking should keep original finite factors`() {
         val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
         val point = Sample(booleanArrayOf(false), longArrayOf())
 
-        val checked = checkQuadraticSourceWitness(source.preparePolynomialExecutionPlan(), point,
-            Cancellation.Never, PolynomialLimits())
+        val checked = checkQuadraticSourceWitness(
+            source.preparePolynomialExecutionPlan(),
+            point,
+            Cancellation.Never,
+            PolynomialLimits(),
+        )
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
 
     @Test
-    fun `native integer checking retains interleaved original numeric coordinates`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
-            "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
-        )).problem
-        val root = AlgebraicArithmetic().roots(RationalPolynomial(
-            listOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE),
-        )).last()
+    fun `native integer checking should keep interleaved original numeric coordinates`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(
+            SmtLibAdmission.parse(
+                "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
+            ),
+        ).problem
+        val root = AlgebraicArithmetic().roots(
+            RationalPolynomial(
+                listOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE),
+            ),
+        ).last()
         val point = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(1.5), algebraicReals = listOf(root))
 
-        val checked = checkQuadraticSourceWitness(source.pipelineRequest().preparedPlan, point,
-            Cancellation.Never, PolynomialLimits())
+        val checked = checkQuadraticSourceWitness(
+            source.pipelineRequest().preparedPlan,
+            point,
+            Cancellation.Never,
+            PolynomialLimits(),
+        )
 
         assertIs<SourceEvidenceCheck.Checked>(checked)
     }
 
     @Test
-    fun `native integer checking rejects a wrong original integer coordinate`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
-            "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
-        )).problem
-        val point = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(1.0),
-            exactReals = listOf(BigFraction.ONE))
+    fun `native integer checking should reject a wrong original integer coordinate`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(
+            SmtLibAdmission.parse(
+                "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n)))",
+            ),
+        ).problem
+        val point = Sample(
+            booleanArrayOf(),
+            longArrayOf(2),
+            doubleArrayOf(1.0),
+            exactReals = listOf(BigFraction.ONE),
+        )
 
-        val checked = checkQuadraticSourceWitness(source.pipelineRequest().preparedPlan, point,
-            Cancellation.Never, PolynomialLimits())
+        val checked = checkQuadraticSourceWitness(
+            source.pipelineRequest().preparedPlan,
+            point,
+            Cancellation.Never,
+            PolynomialLimits(),
+        )
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
 
     @Test
-    fun `native integer producers publish their original wide point and exact value`() {
-        val source = assertIs<SmtLibInput.NonlinearInteger>(SmtLibAdmission.parse(
-            "(declare-const n Int) (declare-const x Real) " +
-                "(assert (= n 9223372036854775808)) (assert (= (* x x) 2))",
-        )).problem
+    fun `native integer producers should publish their original wide point and exact value`() {
+        val source = assertIs<SmtLibInput.NonlinearInteger>(
+            SmtLibAdmission.parse(
+                "(declare-const n Int) (declare-const x Real) " +
+                    "(assert (= n 9223372036854775808)) (assert (= (* x x) 2))",
+            ),
+        ).problem
         val request = source.pipelineRequest()
-        val objective = QuadraticObjectiveSpec(listOf(QuadraticObjectiveTerm(
-            QuadraticCoefficient.ONE, QuadraticVariable.Int(SourceIntId(0)),
-        )))
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(
+                    QuadraticCoefficient.ONE,
+                    QuadraticVariable.Int(SourceIntId(0)),
+                ),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.minimize(request, objective, engine = FiniteEngine.MIXED)
 
@@ -136,10 +197,17 @@ class QuadraticSourceWitnessTest {
         assertSame(point.sample, publication.incumbent.sample)
         assertEquals(parseBigInt("9223372036854775808"), point.sample.exactIntValue(0))
         assertEquals("9223372036854775808", point.value.rational.toString())
-        val expected = assertNotNull(request.preparedPlan.quadraticEngineInvocation(objective,
-            ObjectiveSense.MINIMIZE, Assumptions.None))
-        assertIs<SourceEvidenceCheck.Checked>(publication.verify(expected, point, AlgebraicArithmetic()) {
-            checkQuadraticSourceWitness(request.preparedPlan, it, Cancellation.Never, PolynomialLimits())
-        })
+        val expected = assertNotNull(
+            request.preparedPlan.quadraticEngineInvocation(
+                objective,
+                ObjectiveSense.MINIMIZE,
+                Assumptions.None,
+            ),
+        )
+        assertIs<SourceEvidenceCheck.Checked>(
+            publication.verify(expected, point, AlgebraicArithmetic()) {
+                checkQuadraticSourceWitness(request.preparedPlan, it, Cancellation.Never, PolynomialLimits())
+            },
+        )
     }
 }

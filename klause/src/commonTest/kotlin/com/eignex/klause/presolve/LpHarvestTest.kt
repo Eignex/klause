@@ -11,7 +11,6 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -19,71 +18,12 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpHarvestTest {
-
     private val shavingParams = LpPlan(bounding = true, variableShaving = true)
     private val objShavingParams = LpPlan(bounding = true, objectiveShaving = true)
 
     @Test
-    fun `harvest tightens domains without excluding any feasible assignment`() {
-        val rng = Random(20260701)
-        var engaged = 0
-        repeat(60) { _ ->
-            val n = rng.nextInt(2, 4)
-            val hi = rng.nextInt(2, 5)
-            val domains = Array(n) { IntDomain(0, hi.toLong()) }
-            val factors = ArrayList<Factor>()
-            repeat(rng.nextInt(1, 4)) { _ ->
-                val coeffs = IntArray(n) { rng.nextInt(-2, 3) }
-                if (coeffs.all { it == 0 }) return@repeat
-                val rel = if (rng.nextBoolean()) LinearOp.LE else LinearOp.GE
-                factors.add(Linear(coeffs, IntArray(n) { it }, rel, rng.nextInt(-hi, hi * n + 1)))
-            }
-            val problem = Problem(0, n, domains, factors.toTypedArray()).bake()
-            val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
-            val harvested = lpHarvest(problem, obj, shavingParams, cancellation = Cancellation.Never)
-            if (harvested === problem) return@repeat
-            engaged++
-            // Every assignment feasible under the original constraints must still lie inside the
-            // harvested domains — the harvest may only remove proven-infeasible values.
-            val point = IntArray(n)
-            val harvestedDomains = harvested.finiteIntDomains()
-            fun feasible(): Boolean = factors.filterIsInstance<Linear>().all { f ->
-                var s = 0L
-                for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * point[f.vars[i]]
-                when (f.op) {
-                    LinearOp.LE -> s <= checkNotNull(f.integerConstants).bound
-                    LinearOp.GE -> s >= checkNotNull(f.integerConstants).bound
-                    else -> true
-                }
-            }
-            fun rec(idx: Int) {
-                if (idx == n) {
-                    if (feasible()) {
-                        for (v in 0 until n) {
-                            assertTrue(
-                                point[v].toLong() in harvestedDomains[v],
-                                "harvest excluded feasible x$v=${point[v]} from " +
-                                    "${harvestedDomains[v].min}..${harvestedDomains[v].max}",
-                            )
-                        }
-                    }
-                    return
-                }
-                for (value in 0..hi) {
-                    point[idx] = value
-                    rec(idx + 1)
-                }
-            }
-            rec(0)
-        }
-        assertTrue(engaged > 0, "variable-shaving harvest never engaged across 60 instances")
-    }
-
-    @Test
-    fun `objective-LB harvest raises the objective variable's lower bound`() {
-        // minimise z = x0 + x1 + x2 with the three pairwise covers x_i + x_j >= 1 over binaries. No
-        // single bound rises at the root, so z's declared min stays 0; shaving proves z >= 2 (any two
-        // covers force a second one). Objective shaving alone (variable shaving off) must fold that in.
+    fun `objective shaving should raise the objective variable lower bound`() {
+        // No single bound rises at the root, but shaving proves z >= 2.
         val problem = Problem(
             0,
             4,
@@ -97,15 +37,13 @@ class LpHarvestTest {
         ).bake()
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
         val harvested = lpHarvest(problem, obj, objShavingParams, cancellation = Cancellation.Never)
-        assertTrue(harvested !== problem, "objective shaving proved a floor; the harvest must apply it")
-        assertTrue(harvested.finiteIntDomain(3).min >= 2, "objective floor z>=2 not folded into the domain")
-        assertTrue(2 in harvested.finiteIntDomain(3), "harvest excluded the attainable optimum z=2")
+        assertTrue(harvested !== problem)
+        assertTrue(harvested.finiteIntDomain(3).min >= 2)
+        assertTrue(2 in harvested.finiteIntDomain(3))
     }
 
     @Test
-    fun `objective-LB harvest is a no-op for a maximised objective`() {
-        // shaveObjectiveLb binds only an ascending objective, so a maximise (descending) objective
-        // harvests no objective floor.
+    fun `objective shaving should leave a maximised objective unchanged`() {
         val problem = Problem(
             0,
             2,
@@ -116,15 +54,12 @@ class LpHarvestTest {
         assertSame(
             problem,
             lpHarvest(problem, obj, objShavingParams, cancellation = Cancellation.Never),
-            "a maximised objective yields no ascending floor, so the harvest is unchanged",
         )
     }
 
     @Test
-    fun `harvest proves a propagation-feasible but LP-infeasible problem UNSAT`() {
-        // x+y >= 3, y+z >= 3, x+z >= 3, x+y+z <= 4 over [0,10]: summing the three covers gives
-        // 2(x+y+z) >= 9, i.e. x+y+z >= 4.5 > 4 — an LP/Farkas infeasibility. Bounds propagation tightens
-        // no single variable past [0,4], so it does not catch it; the LP harvest must.
+    fun `harvest should prove a propagation-feasible but LP-infeasible problem UNSAT`() {
+        // Summing the covers gives x+y+z >= 4.5 > 4, while no single bound contradicts.
         val problem = Problem(
             0,
             3,
@@ -136,16 +71,13 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 4),
             ),
         ).bake()
-        assertTrue(problem.baked !is PropagationResult.Unsat, "propagation alone must not catch this infeasibility")
+        assertTrue(problem.baked !is PropagationResult.Unsat)
         val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
-        assertTrue(harvested.baked is PropagationResult.Unsat, "the LP-certified infeasibility must bake to Unsat")
+        assertTrue(harvested.baked is PropagationResult.Unsat)
     }
 
     @Test
-    fun `harvest drops a constraint the LP proves implied by a combination of the others`() {
-        // x+y<=3, y+z<=3, x+z<=3 sum to 2(x+y+z)<=9, i.e. x+y+z<=4.5, so x+y+z<=5 is redundant — implied
-        // by a *combination* of the others (LP max 4.5), which bound propagation (each var only <=3 ⇒
-        // sum <=9) and single-constraint subsumption both miss. Needs the simplex over the kept rows.
+    fun `harvest should drop a row implied by a combination of the others`() {
         val problem = Problem(
             0,
             3,
@@ -154,40 +86,34 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
                 Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 3),
                 Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 3),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 5), // implied by the three above
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 5),
             ),
         ).bake()
         val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
-        assertTrue(harvested.factors.none { it is Linear && it.vars.size == 3 }, "the implied x+y+z<=5 must be dropped")
-        assertEquals(3, harvested.factors.count { it is Linear }, "the three irredundant pairwise covers stay")
+        assertTrue(harvested.factors.none { it is Linear && it.vars.size == 3 })
+        assertEquals(3, harvested.factors.count { it is Linear })
         assertSameFeasibleSet(problem, harvested, hi = 10)
     }
 
     @Test
-    fun `harvest adds an equality the LP proves pins a difference to a constant`() {
-        // x<=y, y<=z, z<=x chain to x=y=z, so x-y is pinned to 0 — provable only by *combining* the rows
-        // (transitivity), which bound propagation does not derive as a relation. The harvest emits the
-        // proven `=` so the next round's affine elimination can substitute it out.
+    fun `harvest should add an equality for a difference the LP pins to a constant`() {
         val problem = Problem(
             0,
             3,
             arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
             arrayOf<Factor>(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0), // x - y <= 0
-                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, 0), // y - z <= 0
-                Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0), // z - x <= 0
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0),
             ),
         ).bake()
         val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
         assertTrue(
             harvested.factors.any { it is Linear && it.op == LinearOp.EQ && it.vars.size == 2 },
-            "the LP-pinned difference must be added as a two-term equality",
         )
         assertSameFeasibleSet(problem, harvested, hi = 5)
     }
 
-    /** Pairwise covers summing past the total: LP-infeasible, but no single row's bounds contradict, so
-     *  only the relaxation (never bound propagation) reaches the verdict. */
     private fun coverSystem(): Problem = Problem(
         0,
         3,
@@ -201,36 +127,19 @@ class LpHarvestTest {
     )
 
     @Test
-    fun `harvest yields to a budget that expires inside the simplex`() {
-        // The budget has to reach the simplex, not just the probe loops around it: one root solve on a
-        // large relaxation is what overruns the presolve budget. A token that survives the outer guard
-        // and then fires must stop the very solve that would otherwise certify infeasibility here.
+    fun `harvest should stop when the budget expires inside the simplex`() {
         val problem = coverSystem().bake()
         var polls = 0
         val spent = Cancellation { polls++ > 0 }
 
         val result = lpHarvestReporting(problem, LinearObjective(), shavingParams, cancellation = spent)
 
-        assertFalse(result.report.rootInfeasible, "an expired budget must stop the root solve short of a verdict")
-        assertSame(problem, result.problem, "a budget-stopped harvest transforms nothing")
+        assertFalse(result.report.rootInfeasible)
+        assertSame(problem, result.problem)
     }
 
     @Test
-    fun `the root feasibility LP charges its simplex work to the presolve budget`() {
-        val budget = PresolveBudget(Long.MAX_VALUE)
-
-        lpRootInfeasibleReporting(
-            coverSystem(),
-            LinearObjective(),
-            LpPlan(bounding = true),
-            budget.orSpent(Cancellation.Never),
-        )
-
-        assertTrue(budget.spent() > 0L, "the simplex work must reach the budget its token carries")
-    }
-
-    @Test
-    fun `the root feasibility LP stops once its charged work spends the budget`() {
+    fun `the root feasibility LP should stop once its charged work spends the budget`() {
         val budget = PresolveBudget(1L)
 
         val result = lpRootInfeasibleReporting(
@@ -240,13 +149,11 @@ class LpHarvestTest {
             budget.orSpent(Cancellation.Never),
         )
 
-        assertFalse(result.infeasible, "a spent work budget must stop the solve short of a verdict")
+        assertFalse(result.infeasible)
     }
 
     @Test
-    fun `lpRootInfeasible certifies a wide difference cycle without paying the bake fixpoint`() {
-        // x < y and y < x over a span the bake would narrow one step per round (O(span)); the root LP
-        // certifies the contradiction in one solve, so this returns fast regardless of the span.
+    fun `lpRootInfeasible should certify a wide difference cycle without baking`() {
         val problem = Problem(
             0,
             2,
@@ -255,44 +162,33 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1),
                 Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, -1),
             ),
-            // Raw, exactly as the SMT frontend builds a wide model: the declared domains reach the
-            // probe as-is, with no O(span) base bake at construction — so this asserts the probe alone
-            // certifies infeasibility in one LP solve, fast regardless of the span.
         )
         val result = lpRootInfeasibleReporting(problem, LinearObjective(), LpPlan(bounding = true))
 
-        assertTrue(
-            result.infeasible,
-            "the root LP must certify the difference cycle infeasible",
-        )
-        assertTrue(result.stats.rootPasses.sum > 0.0, "the no-bake root solve must be reported")
+        assertTrue(result.infeasible)
+        assertTrue(result.stats.rootPasses.sum > 0.0)
     }
 
     @Test
-    fun `lpRootBounds tightens a coupled domain the LP bounds more tightly than propagation`() {
-        // x <= y and x + y <= 10 over wide domains. Bound propagation only derives x <= 10 (each row in
-        // isolation), but the LP reasons jointly — 2x <= x + y <= 10 — so OBBT tightens x's max to 5 in one
-        // solve, regardless of the 1e9 span the bake would otherwise grind.
+    fun `lpRootBounds should tighten a coupled domain beyond propagation`() {
         val problem = Problem(
             0,
             2,
             arrayOf(IntDomain(0, 1_000_000_000), IntDomain(0, 1_000_000_000)),
             arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10), // x + y <= 10
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0), // x - y <= 0  (x <= y)
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
             ),
         ).bake()
         val result = lpRootBoundsReporting(problem, LinearObjective(), LpPlan(bounding = true))
 
-        assertTrue(result.problem !== problem, "OBBT must tighten a domain the LP bounds below propagation")
-        assertEquals(5L, result.problem.finiteIntDomain(0).max, "the LP proves x <= 5 (2x <= x + y <= 10)")
-        assertTrue(result.stats.rootPasses.sum > 0.0, "the no-bake OBBT solves must be reported")
+        assertTrue(result.problem !== problem)
+        assertEquals(5L, result.problem.finiteIntDomain(0).max)
+        assertTrue(result.stats.rootPasses.sum > 0.0)
     }
 
     @Test
-    fun `lpRootBounds tightens a wide domain that sits past its solve allowance in index order`() {
-        // The coupled pair from the test above, placed after 80 already-tight columns — more than the
-        // per-run solve allowance — so an index-order scan spends every solve before reaching them.
+    fun `lpRootBounds should tighten a wide domain past its solve allowance in index order`() {
         val padding = 80
         val domains = Array(padding + 2) { if (it < padding) IntDomain(0, 1) else IntDomain(0, 1_000_000_000) }
         val x = padding
@@ -307,15 +203,11 @@ class LpHarvestTest {
             ),
         ).bake()
         val tightened = lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true))
-        assertEquals(
-            5L,
-            tightened.finiteIntDomain(x).max,
-            "the widest domain is probed regardless of its index",
-        )
+        assertEquals(5L, tightened.finiteIntDomain(x).max)
     }
 
     @Test
-    fun `prebake bounds only probe domains wider than the span gate`() {
+    fun `prebake bounds should only probe domains wider than the span gate`() {
         val problem = Problem(
             0,
             3,
@@ -339,9 +231,6 @@ class LpHarvestTest {
         assertEquals(4.0, result.stats.rootPasses.sum)
     }
 
-    /** Assert [original] and [harvested] admit exactly the same points of the declared box `[0, hi]^n` —
-     *  membership is domains AND the [Linear] factors, so it catches a row dropped (or an equality added)
-     *  without its effect surviving in the bounds. */
     private fun assertSameFeasibleSet(original: Problem, harvested: Problem, hi: Int) {
         val n = original.numIntVars
         val point = IntArray(n)

@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class IndexedMaxHeapTest {
 
     @Test
-    fun `extractMax returns ids in non-increasing key order`() {
+    fun `extractMax should return ids in non-increasing key order`() {
         val h = IndexedMaxHeap(5)
         val keys = doubleArrayOf(3.0, 1.0, 4.0, 1.5, 9.0)
         for (id in keys.indices) h.insert(id, keys[id])
@@ -17,11 +17,11 @@ class IndexedMaxHeapTest {
         val order = buildList { while (h.size > 0) add(h.extractMax()) }
         val expected = keys.indices.sortedByDescending { keys[it] }
         assertEquals(expected, order)
-        assertEquals(-1, h.extractMax(), "empty heap returns -1")
+        assertEquals(-1, h.extractMax())
     }
 
     @Test
-    fun `updateKey moves an entry to and from the max position`() {
+    fun `updateKey should move an entry to and from the max position`() {
         val h = IndexedMaxHeap(3)
         h.insert(0, 1.0)
         h.insert(1, 2.0)
@@ -35,31 +35,31 @@ class IndexedMaxHeapTest {
     }
 
     @Test
-    fun `remove then restore reinserts at the cached key`() {
+    fun `restore should reinsert a removed entry at its cached key`() {
         val h = IndexedMaxHeap(3)
         h.insert(0, 5.0)
         h.insert(1, 8.0)
         h.insert(2, 2.0)
         h.remove(1)
         assertFalse(h.contains(1))
-        assertEquals(0, h.peekMax(), "with 8 removed, 5 (id 0) is the max")
-        h.restore(1) // back at its cached key 8.0
+        assertEquals(0, h.peekMax())
+        h.restore(1)
         assertTrue(h.contains(1))
         assertEquals(1, h.peekMax())
     }
 
     @Test
-    fun `insert and updateKey are no-ops on the wrong precondition`() {
+    fun `insert and updateKey should be no-ops on the wrong precondition`() {
         val h = IndexedMaxHeap(2)
         h.insert(0, 1.0)
-        h.insert(0, 99.0) // already present → ignored
+        h.insert(0, 99.0)
         assertEquals(1.0, h.keyOf(0))
-        h.updateKey(1, 5.0) // absent → ignored, no crash
+        h.updateKey(1, 5.0)
         assertFalse(h.contains(1))
     }
 
     @Test
-    fun `scaleKeys preserves order and rejects non-positive factors`() {
+    fun `scaleKeys should preserve order and reject non-positive factors`() {
         val h = IndexedMaxHeap(3)
         h.insert(0, 1.0)
         h.insert(1, 2.0)
@@ -73,16 +73,14 @@ class IndexedMaxHeapTest {
     }
 
     @Test
-    fun `resetAllKeysInIdOrder requires a full heap and roots the lowest id`() {
+    fun `resetAllKeysInIdOrder should require a full heap and root the lowest id`() {
         val h = IndexedMaxHeap(4)
         for (id in 0 until 4) h.insert(id, id.toDouble())
         h.resetAllKeysInIdOrder(0.0)
         assertEquals(4, h.size)
         for (id in 0 until 4) assertTrue(h.contains(id))
-        assertEquals(0, h.peekMax(), "equal keys tie-break to the lowest id at the root")
-        // Calling without a full heap fails.
+        assertEquals(0, h.peekMax())
         h.extractMax()
         assertFailsWith<IllegalArgumentException> { h.resetAllKeysInIdOrder(1.0) }
     }
-
 }

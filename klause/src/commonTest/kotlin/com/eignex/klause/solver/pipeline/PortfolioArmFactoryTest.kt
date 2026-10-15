@@ -12,7 +12,7 @@ import kotlin.test.assertFailsWith
 
 class PortfolioArmFactoryTest {
     @Test
-    fun `arm construction rejects a foreign prepared source before allocating private state`() {
+    fun `arm construction should reject a foreign prepared source before allocating private state`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val plan = source.prepareExecutionPlan()
         val foreign = Problem(0, 0, emptyArray(), emptyArray()).prepareExecutionPlan()
@@ -25,7 +25,7 @@ class PortfolioArmFactoryTest {
     }
 
     @Test
-    fun `replica slots retain composed attribution while receiving distinct seeds`() {
+    fun `replica slots should keep composed attribution while receiving distinct seeds`() {
         val plan = Problem(0, 0, emptyArray(), emptyArray()).prepareExecutionPlan()
         val observedSeeds = mutableListOf<Long>()
         val factory = PortfolioArmFactory(plan, 0, ArmFamily.Backtrack) { slot ->

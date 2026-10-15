@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 class CostShapingTest {
 
     @Test
-    fun `feasibility first treats infeasible as infinite`() {
+    fun `feasibility first should treat infeasible as infinite`() {
         val s = CostShaping.FeasibilityFirst
         assertEquals(5.0, s.shape(0, 5.0))
         assertEquals(Double.POSITIVE_INFINITY, s.shape(1, 5.0))
@@ -27,14 +27,14 @@ class CostShapingTest {
     }
 
     @Test
-    fun `saturating shaping caps violation contribution`() {
+    fun `saturating shaping should cap the violation contribution`() {
         val s = CostShaping.saturating(lambda = 1.0, cap = 3.0)
-        assertEquals(3.0 + 10.0, s.shape(100, 10.0), "violations should saturate at cap=3")
-        assertEquals(1.0 + 10.0, s.shape(1, 10.0), "violation below cap passes through")
+        assertEquals(3.0 + 10.0, s.shape(100, 10.0))
+        assertEquals(1.0 + 10.0, s.shape(1, 10.0))
     }
 
     @Test
-    fun `shapedBreakScore incorporates linear objective delta when shaping is on`() {
+    fun `shaped break score should include the linear objective delta when shaping is on`() {
         // Both flips resolve cost 1 to 0, so they tie on break score; with weights 100 vs 1
         // and lambda 1.0 the shaped scores differ exactly by the weight gap of 99.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
@@ -47,56 +47,37 @@ class CostShapingTest {
         state.shaping.shapingLambda = 1.0
         val score0 = state.shapedBreakScore(BoolFlip(0))
         val score1 = state.shapedBreakScore(BoolFlip(1))
-        assertEquals(99.0, score0 - score1, "shaped break gap must equal objective gap")
+        assertEquals(99.0, score0 - score1)
     }
 
     @Test
-    fun `incremental objective drives shaped delta for non-linear objectives`() {
-        // |2*b0 - b1 - 1|: a piecewise-linear objective LinearObjective can't express, folded
-        // into shaped descent via IncrementalObjective.
+    fun `an incremental objective should drive the shaped delta for non-linear objectives`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
-        val abs = object : IncrementalObjective {
-            override fun evaluate(sample: Sample): Double {
-                val b0 = if (sample.bools[0]) 1 else 0
-                val b1 = if (sample.bools[1]) 1 else 0
-                return abs(2.0 * b0 - b1 - 1.0)
-            }
+        val objective = object : IncrementalObjective {
+            override fun evaluate(sample: Sample): Double = score(sample.bools[0], sample.bools[1])
             override fun deltaIfApplied(assignment: Assignment, move: Move): Double {
-                val before = score(assignment.boolValue(0), assignment.boolValue(1))
-                val after = when (move) {
-                    is Move.BoolFlip -> when (move.varId) {
-                        0 -> score(!assignment.boolValue(0), assignment.boolValue(1))
-                        1 -> score(assignment.boolValue(0), !assignment.boolValue(1))
-                        else -> before
-                    }
-
-                    else -> before
-                }
-                return after - before
+                val b0 = assignment.boolValue(0)
+                val b1 = assignment.boolValue(1)
+                val flipped = (move as? Move.BoolFlip)?.varId
+                return score(b0 != (flipped == 0), b1 != (flipped == 1)) - score(b0, b1)
             }
-            private fun score(b0: Boolean, b1: Boolean): Double {
-                val x = if (b0) 1 else 0
-                val y = if (b1) 1 else 0
-                return abs(2.0 * x - y - 1.0)
-            }
+            private fun score(b0: Boolean, b1: Boolean): Double =
+                abs(2.0 * (if (b0) 1 else 0) - (if (b1) 1 else 0) - 1.0)
         }
-        state.shaping.objective = abs
+        state.shaping.objective = objective
         state.shaping.shapingLambda = 1.0
-        // Current (b0=F, b1=F): |0 - 0 - 1| = 1.
-        // Flip b0 to true: |2 - 0 - 1| = 1, delta = 0.
-        // Flip b1 to true: |0 - 1 - 1| = 2, delta = +1.
+
         assertEquals(0.0, state.shapedObjectiveDelta(Move.BoolFlip(0)), 1e-9)
         assertEquals(1.0, state.shapedObjectiveDelta(Move.BoolFlip(1)), 1e-9)
     }
 
     @Test
-    fun `non-incremental non-linear objective falls through to zero shaped delta`() {
-        // A plain Objective without IncrementalObjective must yield 0.0 rather than crash or apply-revert.
+    fun `a non-incremental non-linear objective should yield a zero shaped delta`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem.bake(), Random(0))

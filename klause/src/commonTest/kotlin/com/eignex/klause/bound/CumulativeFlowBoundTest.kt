@@ -19,15 +19,14 @@ class CumulativeFlowBoundTest {
         )
 
     @Test
-    fun `feasible cumulative is not flagged`() {
+    fun `flow bound should not flag a feasible cumulative`() {
         val p = problem(2, 5, longArrayOf(2, 2), longArrayOf(1, 1), capacity = 2)
         assertTrue(!CumulativeFlowBound(p).isInfeasible(PropagationSession(p)))
     }
 
     @Test
-    fun `detects a release-deadline window infeasibility`() {
-        // Two unit tasks both pinned to start 0, length 2, capacity 1: forced full overlap ⇒ the
-        // [0,2) window must hold 4 work at rate ≤ 1 into capacity·width = 2 ⇒ preemptively infeasible.
+    fun `flow bound should detect a release-deadline window infeasibility`() {
+        // Two tasks pinned to start 0 with length 2 put 4 work into a capacity-2 window.
         val p = Problem(
             0,
             2,
@@ -38,39 +37,10 @@ class CumulativeFlowBoundTest {
     }
 
     @Test
-    fun `over-subscription yields a well-formed nogood`() {
+    fun `flow bound should explain over-subscription with a well-formed nogood`() {
         val p = problem(3, 3, longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), capacity = 1)
         val clause = CumulativeFlowBound(p).explain(PropagationSession(p))
-        assertTrue(clause != null && clause.isNotEmpty(), "expected a non-empty flow explanation")
-        assertTrue(clause.all { it >= 0 }, "every literal must be a well-formed atom")
-    }
-
-    /** Brute force: does any start assignment keep every time point within capacity? */
-    private fun feasible(
-        n: Int,
-        mins: IntArray,
-        maxs: IntArray,
-        durations: LongArray,
-        resources: LongArray,
-        capacity: Long,
-    ): Boolean {
-        val start = IntArray(n)
-        fun rec(i: Int): Boolean {
-            if (i == n) {
-                val horizon = (0 until n).maxOf { start[it] + durations[it] }
-                for (t in 0 until horizon) {
-                    var load = 0L
-                    for (k in 0 until n) if (start[k] <= t && t < start[k] + durations[k]) load += resources[k]
-                    if (load > capacity) return false
-                }
-                return true
-            }
-            for (s in mins[i]..maxs[i]) {
-                start[i] = s
-                if (rec(i + 1)) return true
-            }
-            return false
-        }
-        return rec(0)
+        assertTrue(clause != null && clause.isNotEmpty())
+        assertTrue(clause.all { it >= 0 })
     }
 }

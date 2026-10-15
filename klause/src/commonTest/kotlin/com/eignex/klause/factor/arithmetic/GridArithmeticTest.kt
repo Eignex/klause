@@ -23,20 +23,30 @@ import kotlin.test.assertTrue
 
 class GridArithmeticTest {
     @Test
-    fun `product rounding preserves independent input and output grids`() {
-        val relation = GridProduct(GridCoordinate(0, -1.0, 1.0, 5), GridCoordinate(1, -1.0, 1.0, 5),
-            GridCoordinate(2, 0.0, 1.0, 5))
+    fun `product rounding should preserve independent input and output grids`() {
+        val relation = GridProduct(
+            GridCoordinate(0, -1.0, 1.0, 5),
+            GridCoordinate(1, -1.0, 1.0, 5),
+            GridCoordinate(2, 0.0, 1.0, 5),
+        )
 
         assertEquals(1L, relation.image { 1L })
         assertNull(relation.image { if (it == 0) 1L else 3L })
     }
 
     @Test
-    fun `square filtering retains domain holes through retracted output pins`() {
-        val relation = GridProduct(GridCoordinate(0, -2.0, 2.0, 5), GridCoordinate(0, -2.0, 2.0, 5),
-            GridCoordinate(1, 0.0, 4.0, 5))
-        val problem = Problem(0, 2, arrayOf(IntDomain(0, 4).excludeValue(0), IntDomain(0, 4)),
-            arrayOf<Factor>(relation))
+    fun `square filtering should retain domain holes through retracted output pins`() {
+        val relation = GridProduct(
+            GridCoordinate(0, -2.0, 2.0, 5),
+            GridCoordinate(0, -2.0, 2.0, 5),
+            GridCoordinate(1, 0.0, 4.0, 5),
+        )
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 4).excludeValue(0), IntDomain(0, 4)),
+            arrayOf<Factor>(relation),
+        )
         val session = PropagationSession(problem)
         session.seed(Assumptions.None)
 
@@ -48,7 +58,7 @@ class GridArithmeticTest {
     }
 
     @Test
-    fun `grid power result aliases retain only rounded fixed points`() {
+    fun `grid power result aliases should retain only rounded fixed points`() {
         val coordinate = GridCoordinate(0, -2.0, 2.0, 5)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 4)), arrayOf<Factor>(GridPower(coordinate, 2, coordinate)))
 
@@ -59,12 +69,15 @@ class GridArithmeticTest {
     }
 
     @Test
-    fun `grid arithmetic move deltas replace every aliased role`() {
+    fun `grid arithmetic move deltas should replace every aliased role`() {
         val coordinate = GridCoordinate(0, -2.0, 2.0, 5)
         val output = GridCoordinate(1, 0.0, 4.0, 5)
-        for (factor in listOf<Factor>(GridProduct(coordinate, coordinate, output),
-            GridProduct(coordinate, coordinate, coordinate), GridPower(coordinate, 3, output),
-            GridPower(coordinate, 2, coordinate))) {
+        for (factor in listOf<Factor>(
+            GridProduct(coordinate, coordinate, output),
+            GridProduct(coordinate, coordinate, coordinate),
+            GridPower(coordinate, 3, output),
+            GridPower(coordinate, 2, coordinate),
+        )) {
             val problem = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(factor))
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
             for ((old, target) in listOf(0L to 2L, 1L to 3L, 4L to 1L)) {
@@ -84,7 +97,7 @@ class GridArithmeticTest {
     }
 
     @Test
-    fun `large grid inverse repairs retain both square roots without scanning the grid`() {
+    fun `large grid inverse repairs should retain both square roots without scanning the grid`() {
         val input = GridCoordinate(0, -1.0, 1.0, 1024)
         val output = GridCoordinate(1, 1.0, 1.0, 1)
         for (relation in listOf<Factor>(GridProduct(input, input, output), GridPower(input, 2, output))) {
@@ -104,9 +117,12 @@ class GridArithmeticTest {
     }
 
     @Test
-    fun `grid remapping retains each coordinate range and operation`() {
-        val relation = GridProduct(GridCoordinate(0, -2.0, 2.0, 5), GridCoordinate(1, 0.0, 1.0, 3),
-            GridCoordinate(2, -2.0, 2.0, 7))
+    fun `grid remapping should retain each coordinate range and operation`() {
+        val relation = GridProduct(
+            GridCoordinate(0, -2.0, 2.0, 5),
+            GridCoordinate(1, 0.0, 1.0, 3),
+            GridCoordinate(2, -2.0, 2.0, 7),
+        )
         val mapping = VarRemap(intArrayOf(), intArrayOf(3, 3, 4))
         val remapped = relation.remap(mapping) as GridProduct
 

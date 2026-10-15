@@ -40,29 +40,62 @@ import kotlin.test.assertSame
 
 class OpenWitnessTest {
     @Test
-    fun `real absolute value checks the exact source magnitude before publication`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(RealAbs(0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-2.0, 0.0), realUpper = doubleArrayOf(2.0, 2.0))
+    fun `real absolute value should check the exact source magnitude before publication`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(RealAbs(0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
+        )
         val third = BigFraction.ofLong(3).reciprocal()
-        val valid = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(-third.toDouble(), third.toDouble()),
-            exactReals = listOf(third.negated(), third))
-        val relaxed = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(0.0, 1.0),
-            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE))
+        val valid = Sample(
+            BooleanArray(0),
+            LongArray(0),
+            reals = doubleArrayOf(-third.toDouble(), third.toDouble()),
+            exactReals = listOf(third.negated(), third),
+        )
+        val relaxed = Sample(
+            BooleanArray(0),
+            LongArray(0),
+            reals = doubleArrayOf(0.0, 1.0),
+            exactReals = listOf(BigFraction.ZERO, BigFraction.ONE),
+        )
 
         assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(source, valid))
         assertIs<Verification.Rejected>(verifyOpenWitness(source, relaxed))
     }
 
     @Test
-    fun `native publication metadata cannot rescue an invalid exact row witness`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(ExactSearchRow.of(intArrayOf(Term.ofRealVar(0)),
-            listOf(BigFraction.ofLong(3)), LinearOp.EQ, BigFraction.ONE)), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `native publication metadata should not rescue an invalid exact row witness`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                ExactSearchRow.of(
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ofLong(3)),
+                    LinearOp.EQ,
+                    BigFraction.ONE,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val binding = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
-        val sample = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(0.0),
-            exactReals = listOf(BigFraction.ZERO))
+        val sample = Sample(
+            BooleanArray(0),
+            LongArray(0),
+            reals = doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO),
+        )
         sample.witnessCertificate = EvidenceCertificate.published(
-            CompletedEnginePublication.Witness(binding, sample, null))
+            CompletedEnginePublication.Witness(binding, sample, null),
+        )
 
         val checked = openWitnessVerifier(source, null).verify(Candidate(sample, null))
 
@@ -70,36 +103,76 @@ class OpenWitnessTest {
     }
 
     @Test
-    fun `ordinary theory workers publish the retained source runtime`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `ordinary theory workers should publish the retained source runtime`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val request = OpenTheoryRequest(source)
 
-        val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request,
-            TheoryParams(openWorkLimit = 1000, maxFlips = 0), FiniteEngine.MIXED, 1))
+        val result = assertIs<OpenTheoryExecution.Satisfy>(
+            OpenTheoryPipeline.execute(
+                request,
+                TheoryParams(openWorkLimit = 1000, maxFlips = 0),
+                FiniteEngine.MIXED,
+                1,
+            ),
+        )
 
         val assignment = assertIs<OpenTheoryResult.Sat>(result.result).assignment
         val sample = assertIs<OpenTheoryAssignment.Sampled>(assignment).sample
         val publication = assertIs<CompletedEnginePublication.Witness>(
-            assertNotNull(sample.witnessCertificate).publication)
+            assertNotNull(sample.witnessCertificate).publication,
+        )
         assertSame(request.preparedPlan, publication.invocation.preparedPlan)
         assertEquals(BigFraction.ofLong(3).reciprocal(), assertNotNull(publication.sample.exactReals).single())
         assertNull(publication.value)
-        assertEquals(SourceEvidenceCheck.Checked,
-            publication.invocation.checkWitness(publication.sample, Cancellation.Never))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            publication.invocation.checkWitness(publication.sample, Cancellation.Never),
+        )
     }
 
     @Test
-    fun `theory conversion retains its actual invocation and execution value`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `theory conversion should keep its invocation and execution value`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-        val invocation = EngineInvocation(source.prepareExecutionPlan(objective),
-            ModelIdentity.of(source, objective), objective)
+        val invocation = EngineInvocation(
+            source.prepareExecutionPlan(objective),
+            ModelIdentity.of(source, objective),
+            objective,
+        )
         val third = BigFraction.ofLong(3).reciprocal()
-        val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0),
-            reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third)))
+        val assignment = OpenTheoryAssignment.Sampled(
+            Sample(
+                BooleanArray(0),
+                LongArray(0),
+                reals = doubleArrayOf(third.toDouble()),
+                exactReals = listOf(third),
+            ),
+        )
 
         val sample = assignment.toSample(source, invocation)
 
@@ -111,7 +184,7 @@ class OpenWitnessTest {
     }
 
     @Test
-    fun `theory conversion without a runtime withholds its certificate`() {
+    fun `theory conversion without a runtime should withhold its certificate`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val assignment = OpenTheoryAssignment.Sampled(Sample(BooleanArray(0), LongArray(0)))
 
@@ -121,7 +194,7 @@ class OpenWitnessTest {
     }
 
     @Test
-    fun `theory conversion rejects another source invocation`() {
+    fun `theory conversion should reject another source invocation`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val foreign = Problem(0, 0, emptyArray(), emptyArray())
         val originalPlan = source.prepareExecutionPlan()
@@ -139,13 +212,16 @@ class OpenWitnessTest {
     }
 
     @Test
-    fun `a copied mixed theory witness retains its assignment and exact exchanged objective`() {
+    fun `a copied mixed theory witness should keep its assignment and exact exchanged objective`() {
         val wide = parseBigInt("9223372036854775808")
         val third = BigFraction.ofLong(3).reciprocal()
         val source = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(
-                longArrayOf(0), longArrayOf(0), Bits(1).also { it.set(0) }, Bits(1).also { it.set(0) },
+                longArrayOf(0),
+                longArrayOf(0),
+                Bits(1).also { it.set(0) },
+                Bits(1).also { it.set(0) },
             ),
             factors = emptyArray(),
             numRealVars = 1,
@@ -175,7 +251,7 @@ class OpenWitnessTest {
     }
 
     @Test
-    fun `a wide theory witness is explicitly projected into local search windows`() {
+    fun `a wide theory witness should be explicitly projected into local search windows`() {
         val wide = parseBigInt("9223372036854775808")
         val witness = Sample(BooleanArray(0), LongArray(0), exactInts = listOf(wide, bigIntOf(10) - wide))
         val runtime = EngineInvocation(model.prepareExecutionPlan(), ModelIdentity.of(model))
@@ -210,21 +286,22 @@ class OpenWitnessTest {
     private fun sample(x0: Long, x1: Long) = Sample(BooleanArray(0), longArrayOf(x0, x1))
 
     @Test
-    fun `a point satisfying every factor is a witness`() {
+    fun `a point satisfying every factor should be a witness`() {
         assertNull(refuteOpenWitness(model, sample(3, 7)))
     }
 
     @Test
-    fun `a point violating a factor is refuted`() {
+    fun `a point violating a factor should be refuted`() {
         assertNotNull(refuteOpenWitness(model, sample(3, 8)))
     }
 
     @Test
-    fun `a point outside a declared side is refuted`() {
+    fun `a point outside a declared side should be refuted`() {
         assertNotNull(refuteOpenWitness(model, sample(-1, 11)))
     }
+
     @Test
-    fun `a copied witness from another model is rejected by the source verifier`() {
+    fun `a copied witness from another model should be rejected by the source verifier`() {
         val candidate = sample(3, 7)
         val foreign = model.withFactors(model.factors)
         val runtime = EngineInvocation(foreign.prepareExecutionPlan(), ModelIdentity.of(foreign))
@@ -237,15 +314,26 @@ class OpenWitnessTest {
     }
 
     @Test
-    fun `exact real coordinates must satisfy strict reification and source bounds`() {
+    fun `exact real coordinates should satisfy strict reification and source bounds`() {
         val source = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
-            factors = arrayOf(ReifiedRealLinear(
-                aux = 0, vars = intArrayOf(), intCoeffs = doubleArrayOf(),
-                realVars = intArrayOf(0), realCoeffs = doubleArrayOf(1.0),
-                op = LinearOp.LE, bound = 1.0, strict = true,
-            )),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf(
+                ReifiedRealLinear(
+                    aux = 0,
+                    vars = intArrayOf(),
+                    intCoeffs = doubleArrayOf(),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.LE,
+                    bound = 1.0,
+                    strict = true,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
         )
         val cases = listOf(
             Triple(true, BigFraction.ONE, false),
@@ -255,8 +343,10 @@ class OpenWitnessTest {
         )
         for ((truth, value, accepted) in cases) {
             val point = Sample(
-                booleanArrayOf(truth), LongArray(0),
-                reals = doubleArrayOf(value.toDouble()), exactReals = listOf(value),
+                booleanArrayOf(truth),
+                LongArray(0),
+                reals = doubleArrayOf(value.toDouble()),
+                exactReals = listOf(value),
             )
             val verdict = openWitnessVerifier(source, null).verify(Candidate(point, null))
 
@@ -265,10 +355,15 @@ class OpenWitnessTest {
     }
 
     @Test
-    fun `missing exact real coordinates leave an open witness indeterminate`() {
+    fun `missing exact real coordinates should leave an open witness indeterminate`() {
         val source = Problem(
-            numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray(),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
         )
         val point = Sample(BooleanArray(0), LongArray(0), reals = doubleArrayOf(1.0))
 

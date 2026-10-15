@@ -7,7 +7,7 @@ import kotlin.test.assertFailsWith
 
 class PolynomialRealFormulaTest {
     @Test
-    fun `separately built deep equal structures compare without call stack recursion`() {
+    fun `separately built deep equal formulas should compare without call stack recursion`() {
         var first: PolynomialRealFormula = PolynomialRealFormula.BooleanVariable(SourceBoolId(0))
         var second: PolynomialRealFormula = PolynomialRealFormula.BooleanVariable(SourceBoolId(0))
         repeat(1000) {
@@ -20,12 +20,13 @@ class PolynomialRealFormulaTest {
     }
 
     @Test
-    fun `formula remaps preserve Boolean polarity and strict real relations`() {
+    fun `formula remaps should preserve Boolean polarity and strict real relations`() {
         val input = PolynomialRealFormula.Or(
             listOf(
                 PolynomialRealFormula.Not(PolynomialRealFormula.BooleanVariable(SourceBoolId(0))),
                 PolynomialRealFormula.Atom(
-                    PolynomialExpression.Variable(SourceRealId(0)), PolynomialRelation.LT,
+                    PolynomialExpression.Variable(SourceRealId(0)),
+                    PolynomialRelation.LT,
                     PolynomialExpression.Constant.of(bigIntOf(-2)),
                 ),
             ),
@@ -39,7 +40,8 @@ class PolynomialRealFormulaTest {
                 listOf(
                     PolynomialRealFormula.Not(PolynomialRealFormula.BooleanVariable(SourceBoolId(3))),
                     PolynomialRealFormula.Atom(
-                        PolynomialExpression.Variable(SourceRealId(5)), PolynomialRelation.LT,
+                        PolynomialExpression.Variable(SourceRealId(5)),
+                        PolynomialRelation.LT,
                         PolynomialExpression.Constant.of(bigIntOf(-2)),
                     ),
                 ),
@@ -49,22 +51,30 @@ class PolynomialRealFormulaTest {
     }
 
     @Test
-    fun `selection remaps retain result guard and branch aliases`() {
+    fun `selection remaps should retain result guard and branch aliases`() {
         val zero = PolynomialExpression.Variable(SourceRealId(0))
-        val source = PolynomialSelection(SourceRealId(0),
+        val source = PolynomialSelection(
+            SourceRealId(0),
             PolynomialRealFormula.BooleanVariable(SourceBoolId(0)),
-            PolynomialExpression.Variable(SourceRealId(1)), PolynomialExpression.Power(zero, 2))
+            PolynomialExpression.Variable(SourceRealId(1)),
+            PolynomialExpression.Power(zero, 2),
+        )
 
         val mapped = source.remap(VarRemap(intArrayOf(2), intArrayOf(), intArrayOf(3, 4)))
 
-        assertEquals(PolynomialSelection(SourceRealId(3),
-            PolynomialRealFormula.BooleanVariable(SourceBoolId(2)),
-            PolynomialExpression.Variable(SourceRealId(4)),
-            PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(3)), 2)), mapped)
+        assertEquals(
+            PolynomialSelection(
+                SourceRealId(3),
+                PolynomialRealFormula.BooleanVariable(SourceBoolId(2)),
+                PolynomialExpression.Variable(SourceRealId(4)),
+                PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(3)), 2),
+            ),
+            mapped,
+        )
     }
 
     @Test
-    fun `formula storage is independent of caller operand mutations`() {
+    fun `formula storage should be independent of caller operand mutations`() {
         val variable = PolynomialRealFormula.BooleanVariable(SourceBoolId(0))
         val operands = mutableListOf<PolynomialRealFormula>(variable, variable)
         val conjunction = PolynomialRealFormula.And(operands)
@@ -79,24 +89,37 @@ class PolynomialRealFormulaTest {
     }
 
     @Test
-    fun `removing a referenced polynomial Boolean is rejected`() {
+    fun `removing a referenced polynomial Boolean should be rejected`() {
         val input = PolynomialRealFormula.BooleanVariable(SourceBoolId(0))
 
         assertFailsWith<IllegalArgumentException> { input.remap(VarRemap(intArrayOf(-1), intArrayOf())) }
     }
 
     @Test
-    fun `source variable count validation rejects out of range identities`() {
+    fun `source variable count validation should reject out of range identities`() {
         val cases = listOf(
             PolynomialRealFormula.BooleanVariable(SourceBoolId(1)),
-            PolynomialSelection(SourceRealId(1), PolynomialRealFormula.Constant(true),
-                PolynomialExpression.Constant.of(bigIntOf(0)), PolynomialExpression.Constant.of(bigIntOf(1))),
-            PolynomialSelection(SourceRealId(0), PolynomialRealFormula.BooleanVariable(SourceBoolId(1)),
-                PolynomialExpression.Constant.of(bigIntOf(0)), PolynomialExpression.Constant.of(bigIntOf(1))),
-            PolynomialSelection(SourceRealId(0), PolynomialRealFormula.Constant(false),
-                PolynomialExpression.Variable(SourceRealId(1)), PolynomialExpression.Constant.of(bigIntOf(1))),
+            PolynomialSelection(
+                SourceRealId(1),
+                PolynomialRealFormula.Constant(true),
+                PolynomialExpression.Constant.of(bigIntOf(0)),
+                PolynomialExpression.Constant.of(bigIntOf(1)),
+            ),
+            PolynomialSelection(
+                SourceRealId(0),
+                PolynomialRealFormula.BooleanVariable(SourceBoolId(1)),
+                PolynomialExpression.Constant.of(bigIntOf(0)),
+                PolynomialExpression.Constant.of(bigIntOf(1)),
+            ),
+            PolynomialSelection(
+                SourceRealId(0),
+                PolynomialRealFormula.Constant(false),
+                PolynomialExpression.Variable(SourceRealId(1)),
+                PolynomialExpression.Constant.of(bigIntOf(1)),
+            ),
             PolynomialRealFormula.Atom(
-                PolynomialExpression.Variable(SourceRealId(1)), PolynomialRelation.NE,
+                PolynomialExpression.Variable(SourceRealId(1)),
+                PolynomialRelation.NE,
                 PolynomialExpression.Constant.of(bigIntOf(0)),
             ),
         )

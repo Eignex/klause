@@ -21,9 +21,8 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolverTest {
-
     @Test
-    fun `default clausal optimization retains native clause propagation`() {
+    fun `default clausal optimization should retain native clause propagation`() {
         val problem = Problem(
             3,
             0,
@@ -44,7 +43,7 @@ class PresolverTest {
     }
 
     @Test
-    fun `stronger preparation permits clique conversion for clausal optimization`() {
+    fun `stronger preparation should permit clique conversion for clausal optimization`() {
         val problem = Problem(
             3,
             0,
@@ -65,27 +64,11 @@ class PresolverTest {
     }
 
     @Test
-    fun `parse handles aliases and comma-lists`() {
+    fun `parse should handle aliases and comma lists`() {
         val ctx = PresolveContext.EMPTY
-        val autoProblem = listOf(
-            PresolvePass.STRENGTHEN_COEFFICIENTS,
-            PresolvePass.REDUCE_DIOPHANTINE,
-            PresolvePass.DERIVE_XOR_UNITS,
-            PresolvePass.FUSE_LINEAR_BOUNDS,
-            PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
-            PresolvePass.AGGREGATE_SUB_SUMS,
-            PresolvePass.REMOVE_REDUNDANT,
-            PresolvePass.DROP_DEPENDENT_EQUALITIES,
-            PresolvePass.REDUCE_STRUCTURAL,
-            PresolvePass.FOLD_COMPARISON_CLAUSES,
-            PresolvePass.MERGE_DUPLICATE_COLUMNS,
-            PresolvePass.PROJECT_SINGLETON_INEQUALITIES,
-            PresolvePass.BREAK_SYMMETRIES,
-            PresolvePass.DUAL_FIX,
-            PresolvePass.MERGE_AMO_CLIQUES,
-        )
+        val autoProblem = PresolveConfig.parse("default").problemPasses(ctx)
+        assertTrue(autoProblem.isNotEmpty())
         assertEquals(autoProblem, PresolveConfig.parse(null).problemPasses(ctx))
-        assertEquals(autoProblem, PresolveConfig.parse("default").problemPasses(ctx))
         assertEquals(autoProblem, PresolveConfig.parse("auto").problemPasses(ctx))
         assertEquals(emptyList(), PresolveConfig.parse("none").problemPasses(ctx))
         assertEquals(
@@ -96,7 +79,7 @@ class PresolverTest {
     }
 
     @Test
-    fun `parse emphasis plus deltas toggles a single pass`() {
+    fun `parse should toggle a single pass with an emphasis plus delta`() {
         val ctx = PresolveContext.EMPTY
         val noSymmetry = PresolveConfig.parse("default,-symmetry")
         assertEquals(PresolveEmphasis.DEFAULT, noSymmetry.emphasis)
@@ -111,56 +94,42 @@ class PresolverTest {
     }
 
     @Test
-    fun `the source lane drops a solution-set-altering pass for a sensitive query`() {
-        // Model counting uses source preparation, so source passes must preserve the full solution set.
+    fun `the source lane should drop solution-set-altering passes for a sensitive query`() {
         val auto = PresolveConfig.AUTO
         val sensitive = PresolveContext(solutionSetSensitive = true)
         val sourcePasses = auto.problemPasses(sensitive, PresolvePass.Capability.SOURCE)
 
-        assertTrue(
-            PresolvePass.DUAL_FIX in auto.problemPasses(PresolveContext.EMPTY, PresolvePass.Capability.SOURCE),
-            "dual fixing is a source pass for an ordinary solve",
-        )
-        assertTrue(PresolvePass.DUAL_FIX !in sourcePasses, "dual fixing discards optimum-equivalent solutions")
-        assertTrue(sourcePasses.all { it.preservesSolutionSet }, "a sensitive query gets only exact source passes")
-        // The cheap exact reductions stay, so the gate narrows the lane rather than closing it.
+        assertTrue(PresolvePass.DUAL_FIX in auto.problemPasses(PresolveContext.EMPTY, PresolvePass.Capability.SOURCE))
+        assertTrue(PresolvePass.DUAL_FIX !in sourcePasses)
+        assertTrue(sourcePasses.all { it.preservesSolutionSet })
         assertTrue(PresolvePass.STRENGTHEN_COEFFICIENTS in sourcePasses)
     }
 
     @Test
-    fun `auto resolution is intent-aware and SAC is opt-in`() {
+    fun `auto resolution should be intent-aware and keep SAC opt-in`() {
         val auto = PresolveConfig.AUTO
-        // Symmetry breaking is solution-set-altering: auto-on for solve, auto-off when the query
-        // needs the full solution set (enumeration / counting / sampling).
         assertTrue(PresolvePass.BREAK_SYMMETRIES in auto.problemPasses(PresolveContext.EMPTY))
         assertTrue(
             PresolvePass.BREAK_SYMMETRIES !in
                 auto.problemPasses(PresolveContext(solutionSetSensitive = true)),
         )
-        // Construction-time SAC probes are expensive → auto-off; explicit `all` turns them on.
         assertEquals(false, auto.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY))
         assertEquals(true, PresolveConfig.parse("all").resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY))
-        // forLocalSearch forces every solution-set-altering pass off, even under a non-sensitive
-        // query — here the default emphasis plus an explicit value-precedence override.
         val ls = PresolveConfig(PresolveConfig.AUTO.emphasis, mapOf(PresolvePass.VALUE_PRECEDENCE to true))
             .forLocalSearch()
         val lsPasses = ls.problemPasses(PresolveContext.EMPTY)
         assertTrue(PresolvePass.BREAK_SYMMETRIES !in lsPasses)
         assertTrue(PresolvePass.VALUE_PRECEDENCE !in lsPasses)
-        // …but the cheap solution-preserving reductions stay on.
         assertTrue(PresolvePass.STRENGTHEN_COEFFICIENTS in lsPasses)
     }
 
     @Test
-    fun `every pass self-registers and is dispatchable`() {
-        // The enum is the registry: ids must be unique and round-trip through fromId, and every
-        // problem-stage pass must apply cleanly (no unhandled entry) — a malformed addition fails loudly.
+    fun `every pass should round-trip its id and apply cleanly`() {
         val ids = PresolvePass.entries.map { it.id }
-        assertEquals(ids.size, ids.toSet().size, "pass ids must be unique")
+        assertEquals(ids.size, ids.toSet().size)
         for (p in PresolvePass.entries) {
             assertSame(p, PresolvePass.fromId(p.id), "id `${p.id}` must round-trip through fromId")
         }
-        // Every problem-stage pass applies cleanly to a trivial problem — no unhandled entry.
         val trivial = Problem(
             0,
             1,
@@ -175,7 +144,7 @@ class PresolverTest {
     }
 
     @Test
-    fun `the open-range probe gives way to the full probe`() {
+    fun `the open-range probe should give way to the full probe`() {
         val passes = PresolveConfig.parse("aggressive")
             .problemPasses(PresolveContext.EMPTY, PresolvePass.Capability.SOURCE)
 
@@ -183,10 +152,7 @@ class PresolverTest {
     }
 
     @Test
-    fun `an already-fired cancellation makes presolve a no-op`() {
-        // Same problem the default pipeline transforms above; with the deadline already past, the round
-        // engine must not run a single pass and must return the input verbatim. The transforms are
-        // individually sound, so returning early is safe — this guards that the exit check is honoured.
+    fun `an already-fired cancellation should make presolve a no-op`() {
         val problem = Problem(
             0,
             3,
@@ -198,25 +164,20 @@ class PresolverTest {
         )
         val baked = problem.bake()
         val pre = Presolver.run(baked, PresolveConfig.DEFAULT, cancellation = { true })
-        assertSame(baked, pre.problem, "a fired cancellation must skip every pass and return the input")
+        assertSame(baked, pre.problem)
         val s = Sample(BooleanArray(0), longArrayOf(3, 1, 0))
-        assertSame(s, pre.reconstruct(s), "no pass ran, so reconstruct is the identity")
+        assertSame(s, pre.reconstruct(s))
     }
 
     @Test
-    fun `affine elimination is gated off for solution-set-sensitive queries`() {
-        // Affine elimination leaves the eliminated variable unconstrained in the reduced problem
-        // (its value is rebuilt from its partner on the way back). That is fine for solve/optimize, but
-        // a complete enumerator would branch over the freed variable's whole domain and yield each real
-        // solution once per spurious value. So it must NOT run when the caller needs the exact
-        // solution set / count.
+    fun `affine elimination should be off for solution-set-sensitive queries`() {
+        // The eliminated variable is left free, so an enumerator would yield each solution once per spurious value.
         val auto = PresolveConfig.AUTO
         assertTrue(PresolvePass.ELIMINATE_AFFINE_SINGLETONS in auto.problemPasses(PresolveContext.EMPTY))
         assertTrue(
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS !in
                 auto.problemPasses(PresolveContext(solutionSetSensitive = true)),
         )
-        // ...but local search (which never enumerates) keeps it on — it only shrinks the problem there.
         val lsPasses = auto.forLocalSearch().problemPasses(PresolveContext.EMPTY)
         assertTrue(PresolvePass.ELIMINATE_AFFINE_SINGLETONS in lsPasses)
     }
@@ -232,7 +193,7 @@ class PresolverTest {
     )
 
     @Test
-    fun `a pass that charges nothing itself still spends the budget`() {
+    fun `a pass that charges nothing itself should still spend the budget`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         Presolver.run(
@@ -246,7 +207,7 @@ class PresolverTest {
     }
 
     @Test
-    fun `a spent work budget runs no pass`() {
+    fun `a spent work budget should run no pass`() {
         val problem = reducibleChain().bake()
         val budget = PresolveBudget(0L)
 

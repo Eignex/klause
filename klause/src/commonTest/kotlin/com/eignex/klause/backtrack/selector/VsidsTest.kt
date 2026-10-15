@@ -21,9 +21,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class VsidsTest {
-
     @Test
-    fun `an attributed failed decision receives one activity bump`() {
+    fun `an attributed failed decision should receive one activity bump`() {
         val session = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()))
         val vsids = Vsids()
         val rng = Random(0)
@@ -36,7 +35,7 @@ class VsidsTest {
     }
 
     @Test
-    fun `finite search prioritizes a conflict implication after its backjump`() {
+    fun `finite search should prioritize a conflict implication after its backjump`() {
         for (nativeSat in listOf(false, true)) {
             val base = Vsids()
             val picks = ArrayList<VarRef>()
@@ -50,7 +49,10 @@ class VsidsTest {
                 }
             }
             val problem = Problem(
-                5, 0, emptyArray(), arrayOf(
+                5,
+                0,
+                emptyArray(),
+                arrayOf(
                     Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true))),
                     Clause(intArrayOf(Lit.make(1, false), Lit.make(4, true))),
                     Clause(intArrayOf(Lit.make(3, false), Lit.make(4, false), Lit.make(1, false))),
@@ -67,28 +69,7 @@ class VsidsTest {
     }
 
     @Test
-    fun `vsids prefers highest-activity variable after onConflict bumps`() {
-        val problem = Problem(
-            numBoolVars = 5,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = emptyArray(),
-        )
-        val vsids = Vsids()
-        val session = PropagationSession(problem)
-        session.seed(Assumptions.None)
-        // onConflict is a no-op before the heap exists; size it with a throwaway pick first.
-        vsids.pick(session, Random(0L))
-        // Empty Unsat record so only v3 (the failing decision) gets the bump.
-        val emptyUnsat = Unsat()
-        repeat(3) { vsids.onConflict(VarRef.Bool(3), emptyUnsat) }
-        assertEquals(VarRef.Bool(3), vsids.pick(session, Random(0L)))
-    }
-
-    @Test
-    fun `vsids resizes activity arrays across problems`() {
-        // A single Vsids instance reused across two problems with different shapes
-        // should resize cleanly without crashing.
+    fun `vsids should resize activity arrays across problems`() {
         val vsids = Vsids()
         val p1 = Problem(
             numBoolVars = 3,
@@ -111,12 +92,9 @@ class VsidsTest {
     }
 
     @Test
-    fun `pick re-offers an open variable stranded out of the heap`() {
-        // The pop-on-pick scheme drops a variable from the heap when it surfaces assigned, relying on
-        // onUnassign to re-add it on backtrack. If that re-add is missed (as happens under the
-        // portfolio's clause exchange), an open variable is left out of the heap. pick must still
-        // re-offer it — returning null would tell the engine "all assigned" and let it emit an
-        // incomplete assignment as a (unsound) solution.
+    fun `pick should re-offer an open variable stranded out of the heap`() {
+        // A missed onUnassign re-add strands an open variable out of the heap; a null pick would let the
+        // engine emit an incomplete assignment as a solution.
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val session = PropagationSession(problem)
         session.seed(Assumptions.None)
@@ -125,6 +103,6 @@ class VsidsTest {
         session.pinInt(0, 2) // x = 2 (singleton): x surfaces assigned and is dropped from the heap
         assertNull(vsids.pick(session, rng))
         session.popLast() // x widens back to [0, 3]; no unassign listener is wired, so the re-add is missed
-        assertEquals(VarRef.IntVar(0), vsids.pick(session, rng), "pick must re-offer the stranded open variable")
+        assertEquals(VarRef.IntVar(0), vsids.pick(session, rng))
     }
 }

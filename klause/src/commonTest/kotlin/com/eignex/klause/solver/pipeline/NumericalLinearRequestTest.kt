@@ -20,11 +20,13 @@ import kotlin.test.assertTrue
 
 class NumericalLinearRequestTest {
     @Test
-    fun `source fixed integer guards retain exact tiny numerical optima`() {
+    fun `source fixed integer guards should keep exact tiny numerical optima`() {
         for (trigger in listOf(0L, 1L)) {
-            val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1e-20\nRHS\n RHS R 1e-20\n" +
-                "BOUNDS\n FX B I $trigger\n LO B X 0\nINDICATORS\n IF R I $trigger\nENDATA\n")
+            val compiled = Mps.parse(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1e-20\nRHS\n RHS R 1e-20\n" +
+                    "BOUNDS\n FX B I $trigger\n LO B X 0\nINDICATORS\n IF R I $trigger\nENDATA\n",
+            )
                 .toExactSourceProblem()
 
             val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
@@ -36,11 +38,13 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `open integer guards retain the inactive regions around their trigger`() {
+    fun `open integer guards should keep the inactive regions around their trigger`() {
         for ((bounds, trigger) in listOf("LI B I 0" to 0L, "FR B I" to 0L, "LI B I 1" to 1L)) {
-            val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 2\n" +
-                "BOUNDS\n $bounds\n LO B X 0\nINDICATORS\n IF R I $trigger\nENDATA\n").toExactSourceProblem()
+            val compiled = Mps.parse(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 2\n" +
+                    "BOUNDS\n $bounds\n LO B X 0\nINDICATORS\n IF R I $trigger\nENDATA\n",
+            ).toExactSourceProblem()
 
             val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
 
@@ -52,10 +56,12 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `conditional integer conflicts require exhaustive numerical coverage`() {
-        val compiled = Mps.parse("ROWS\n N COST\n G R0\n G R1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R0 1 R1 1\nRHS\n RHS R0 1 R1 1\n" +
-            "BOUNDS\n BV B I\n FX B X 0\nINDICATORS\n IF R0 I 0\n IF R1 I 1\nENDATA\n").toExactSourceProblem()
+    fun `conditional integer conflicts should require exhaustive numerical coverage`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R0\n G R1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R0 1 R1 1\nRHS\n RHS R0 1 R1 1\n" +
+                "BOUNDS\n BV B I\n FX B X 0\nINDICATORS\n IF R0 I 0\n IF R1 I 1\nENDATA\n",
+        ).toExactSourceProblem()
         val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
 
         val complete = request.solve()
@@ -64,10 +70,12 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `an unvisited conditional integer branch cannot supply a refutation`() {
-        val compiled = Mps.parse("ROWS\n N COST\n G R0\n G R1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R0 1 R1 1\nRHS\n RHS R0 1 R1 1\n" +
-            "BOUNDS\n BV B I\n FX B X 0\nINDICATORS\n IF R0 I 0\n IF R1 I 1\nENDATA\n").toExactSourceProblem()
+    fun `an unvisited conditional integer branch should not supply a refutation`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R0\n G R1\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R0 1 R1 1\nRHS\n RHS R0 1 R1 1\n" +
+                "BOUNDS\n BV B I\n FX B X 0\nINDICATORS\n IF R0 I 0\n IF R1 I 1\nENDATA\n",
+        ).toExactSourceProblem()
 
         val stopped = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
             .solve(TheoryParams(maxDecisions = 0))
@@ -77,23 +85,29 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `a numerical ray preserves a source fixed integer guard`() {
-        val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 0\n M1 'MARKER' 'INTEND'\n X COST -1 R 1\nRHS\n RHS R 2\n" +
-            "BOUNDS\n FX B I 1\n LO B X 0\nINDICATORS\n IF R I 1\nENDATA\n").toExactSourceProblem()
+    fun `a numerical ray should preserve a source fixed integer guard`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST -1 R 1\nRHS\n RHS R 2\n" +
+                "BOUNDS\n FX B I 1\n LO B X 0\nINDICATORS\n IF R I 1\nENDATA\n",
+        ).toExactSourceProblem()
 
         val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
 
         val ray = assertIs<SourceClaim.Ray>(assertNotNull(result.terminal).claim)
         assertEquals(1L, ray.sample.intValue(0))
-        assertEquals(BigFraction.ZERO,
-            ray.direction[SourceCoordinate(SourceCoordinate.Kind.Integer, 0)] ?: BigFraction.ZERO)
+        assertEquals(
+            BigFraction.ZERO,
+            ray.direction[SourceCoordinate(SourceCoordinate.Kind.Integer, 0)] ?: BigFraction.ZERO,
+        )
     }
 
     @Test
-    fun `an unprojectable nonzero source coefficient declines without numerical work`() {
-        val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1e-400\n" +
-            "RHS\n RHS R 0.1\nBOUNDS\n UP B X 1\nENDATA\n").toExactSourceProblem()
+    fun `an unprojectable nonzero source coefficient should decline without numerical work`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1e-400\n" +
+                "RHS\n RHS R 0.1\nBOUNDS\n UP B X 1\nENDATA\n",
+        ).toExactSourceProblem()
         val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
 
         val result = request.solve()
@@ -107,10 +121,12 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `source fixed indicators retain numerical bound closure and original declarations`() {
-        val compiled = Mps.parse("ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 2\n" +
-            "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n").toExactSourceProblem()
+    fun `source fixed indicators should keep numerical bound closure and source declarations`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 2\n" +
+                "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n",
+        ).toExactSourceProblem()
         val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
 
         val route = assertIs<SourceProblemRoute.Finite>(request.finiteRoute())
@@ -121,10 +137,12 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `a source fixed indicator can retain a numerical routing refutation`() {
-        val compiled = Mps.parse("ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R -1\n" +
-            "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n").toExactSourceProblem()
+    fun `a source fixed indicator should keep a numerical routing refutation`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n X COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R -1\n" +
+                "BOUNDS\n FX B I 1\n LI B X 0\nINDICATORS\n IF R I 1\nENDATA\n",
+        ).toExactSourceProblem()
 
         val route = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).finiteRoute()
 
@@ -132,9 +150,11 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `a one sided integer attains a finite numerical optimum beside a free real`() {
-        val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 1 R 1\n M1 'MARKER' 'INTEND'\n X R 1\nBOUNDS\n LI B I 0\n FR B X\nENDATA\n")
+    fun `a one sided integer should attain a finite numerical optimum beside a free real`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 1 R 1\n M1 'MARKER' 'INTEND'\n X R 1\nBOUNDS\n LI B I 0\n FR B X\nENDATA\n",
+        )
             .toExactSourceProblem()
         val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
 
@@ -150,10 +170,12 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `free and one sided integers retain exhaustive fractional splits`() {
+    fun `free and one sided integers should keep exhaustive fractional splits`() {
         for (bounds in listOf("LI B I 0", "FR B I")) {
-            val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-                " I COST 1 R 2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 1\nBOUNDS\n $bounds\nENDATA\n")
+            val compiled = Mps.parse(
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 1 R 2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 1\nBOUNDS\n $bounds\nENDATA\n",
+            )
                 .toExactSourceProblem()
 
             val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
@@ -165,13 +187,18 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `an upper only integer retains maximization sense and its attained optimum`() {
-        val compiled = Mps.parse("OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n FR B I\n UI B I 2\nENDATA\n")
+    fun `an upper only integer should keep maximization sense and its attained optimum`() {
+        val compiled = Mps.parse(
+            "OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n FR B I\n UI B I 2\nENDATA\n",
+        )
             .toExactSourceProblem()
 
-        val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
-            compiled.maximize).solve()
+        val result = NumericalLinearRequest(
+            compiled.model,
+            compiled.objective?.toLinearObjective(),
+            compiled.maximize,
+        ).solve()
 
         val optimal = assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
         assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), optimal.value)
@@ -179,9 +206,11 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `wide source bounds retain their original attained integer coordinate`() {
-        val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n LI B I 9223372036854775808\nENDATA\n")
+    fun `wide source bounds should keep their attained integer coordinate`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n LI B I 9223372036854775808\nENDATA\n",
+        )
             .toExactSourceProblem()
 
         val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
@@ -192,24 +221,12 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `a free integer equality beyond Long retains its numerical attained coordinate`() {
-        val compiled = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 9223372036854775808\n" +
-            "BOUNDS\n FR B I\nENDATA\n").toExactSourceProblem()
-        val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
-
-        val result = request.solve()
-
-        val optimal = assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
-        assertEquals("9223372036854775808", optimal.sample.exactIntValue(0).toString())
-        assertNull(request.finiteRoute())
-    }
-
-    @Test
-    fun `an unbounded relaxation cannot override integer infeasibility`() {
-        val compiled = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I R 2\n M1 'MARKER' 'INTEND'\n X COST 1\nRHS\n RHS R 1\n" +
-            "BOUNDS\n FR B I\n FR B X\nENDATA\n").toExactSourceProblem()
+    fun `an unbounded relaxation should not override integer infeasibility`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I R 2\n M1 'MARKER' 'INTEND'\n X COST 1\nRHS\n RHS R 1\n" +
+                "BOUNDS\n FR B I\n FR B X\nENDATA\n",
+        ).toExactSourceProblem()
 
         val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
 
@@ -218,10 +235,12 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `a numerical MIP ray retains an integral feasible base`() {
-        val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I R 1\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\n" +
-            "BOUNDS\n LI B I 0\n FR B X\nENDATA\n").toExactSourceProblem()
+    fun `a numerical MIP ray should keep an integral feasible base`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I R 1\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\n" +
+                "BOUNDS\n LI B I 0\n FR B X\nENDATA\n",
+        ).toExactSourceProblem()
 
         val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
 
@@ -230,23 +249,13 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `cancellation withholds numerical terminal authority`() {
-        val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA\n").toExactSourceProblem()
-
-        val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve(
-            TheoryParams(cancellation = Cancellation { true }))
-
-        assertNull(result.terminal)
-        assertEquals(TerminationReason.Cancelled, result.reason)
-    }
-
-    @Test
-    fun `interruption after a numerical witness retains progress without terminal authority`() {
+    fun `interruption after a numerical witness should keep progress without terminal authority`() {
         val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA\n").toExactSourceProblem()
         var cancelled = false
 
         val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve(
-            TheoryParams(cancellation = Cancellation { cancelled })) { _, _ -> cancelled = true }
+            TheoryParams(cancellation = Cancellation { cancelled }),
+        ) { _, _ -> cancelled = true }
 
         assertNotNull(result.incumbent)
         assertEquals(BigFraction.ZERO, result.value)
@@ -255,13 +264,16 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `an incomplete integer split retains only its checked root bound`() {
-        val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
-            " I COST 1 R 2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 1\nBOUNDS\n LI B I 0\nENDATA\n")
+    fun `an incomplete integer split should keep only its checked root bound`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 1 R 2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 1\nBOUNDS\n LI B I 0\nENDATA\n",
+        )
             .toExactSourceProblem()
 
         val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve(
-            TheoryParams(maxLeaves = 1))
+            TheoryParams(maxLeaves = 1),
+        )
 
         assertNull(result.terminal)
         val bound = assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim)
@@ -270,11 +282,12 @@ class NumericalLinearRequestTest {
     }
 
     @Test
-    fun `an exhausted numerical traversal cannot claim infeasibility`() {
+    fun `an exhausted numerical traversal should not claim infeasibility`() {
         val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA\n").toExactSourceProblem()
 
         val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve(
-            TheoryParams(maxLeaves = 0))
+            TheoryParams(maxLeaves = 0),
+        )
 
         assertNull(result.terminal)
         assertEquals(TerminationReason.BudgetExhausted, result.reason)

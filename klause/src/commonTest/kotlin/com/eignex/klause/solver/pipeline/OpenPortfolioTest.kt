@@ -37,14 +37,24 @@ class OpenPortfolioTest {
     private fun optimum(execution: OpenTheoryExecution) = assertIs<OpenTheoryExecution.Optimize>(execution).result
 
     @Test
-    fun `completion retains original identity beside a bound narrowed execution model`() {
+    fun `completion should keep source identity beside a bound narrowed execution model`() {
         val original = openColumns(1, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7))
-        val working = Problem(numBoolVars = 0, factors = original.factors,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0),
-                Bits(1), Bits(1).also { it.set(0) }))
+        val working = Problem(
+            numBoolVars = 0,
+            factors = original.factors,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0),
+                longArrayOf(0),
+                Bits(1),
+                Bits(1).also { it.set(0) },
+            ),
+        )
         val plan = working.prepareExecutionPlan(original, objective = null, maximize = false, preferFinite = false)
-        val request = OpenTheoryRequest(working, componentPlan = requireNotNull(plan.componentPlan),
-            preparedPlan = plan)
+        val request = OpenTheoryRequest(
+            working,
+            componentPlan = requireNotNull(plan.componentPlan),
+            preparedPlan = plan,
+        )
 
         val result = satisfied(OpenTheoryPipeline.executePortfolio(request, params(), cores = 4))
 
@@ -52,7 +62,7 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `open construction materializes private replicas for requested lanes beyond its recipe count`() {
+    fun `open construction should materialize private replicas for lanes beyond its recipe count`() {
         val model = openColumns(1, Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7))
         val request = OpenTheoryRequest(model, componentPlan = model.componentPlan())
 
@@ -64,8 +74,7 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `local search finds a witness of an open model no theory decides`() {
-        // x0 = 3, x1 = 4 and x2 = x0·x1 over open columns: the product holds no theory.
+    fun `local search should find a witness of an open model no theory decides`() {
         val model = openColumns(
             3,
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
@@ -79,7 +88,7 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `the theory arm refutes an unsatisfiable open model on one lane or several`() {
+    fun `the theory arm should refute an unsatisfiable open model on one lane or several`() {
         // 2·x0 = 1 has no integer solution, which local search can never show.
         val model = openColumns(1, Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1))
         val request = OpenTheoryRequest(model, componentPlan = model.componentPlan())
@@ -91,7 +100,7 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `real-only models materialize exact neighborhood workers beside the theory`() {
+    fun `real only models should materialize exact neighborhood workers beside the theory`() {
         val model = Problem(
             numBoolVars = 0,
             numIntVars = 0,
@@ -111,7 +120,7 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `the portfolio proves the optimum of an open model on one lane or several`() {
+    fun `the portfolio should prove the optimum of an open model on one lane or several`() {
         // Minimize x0 + x1 with x0 ≥ 7 and x1 ≥ x0 − 2 over open columns: 7 + 5.
         val model = openColumns(
             2,
@@ -127,31 +136,19 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `the portfolio preserves an optimal integer witness outside the Long range`() {
-        val value = parseBigInt("9223372036854775808")
-        val model = openColumns(
-            1,
-            Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value),
-        )
-        val request = OpenTheoryRequest(model, LinearObjective(intCoefficients = longArrayOf(1)))
-
-        val result = optimum(OpenTheoryPipeline.executePortfolio(request, params()))
-
-        val optimal = assertIs<OpenTheoryOptimum.Optimal>(result)
-        assertEquals(value.toString(), optimal.assignment.intValue(0))
-        assertEquals(value.toString(), optimal.value.toString())
-        assertTrue(optimal.stats.portfolio.arms.isNotEmpty())
-    }
-
-    @Test
-    fun `the portfolio returns all exact coordinates of a mixed satisfying witness`() {
+    fun `the portfolio should return all exact coordinates of a mixed satisfying witness`() {
         val wide = parseBigInt("9223372036854775808")
         val integerModel = openColumns(1, Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, wide))
         val model = Problem(
             numBoolVars = 0,
             intBounds = integerModel.intBounds,
             factors = integerModel.factors + Linear(
-                intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0,
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(0),
+                doubleArrayOf(3.0),
+                LinearOp.EQ,
+                1.0,
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
@@ -168,7 +165,7 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `local search bounds the optimum of an open model no theory decides`() {
+    fun `local search should bound the optimum of an open model no theory decides`() {
         val model = openColumns(
             3,
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),

@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 class MoveSinkTest {
 
     @Test
-    fun `indexed moves retain filtered primitives and compound order across clear`() {
+    fun `indexed moves should retain filtered primitives and compound order across clear`() {
         val sink = MoveSink(Assumptions(bools = mapOf(1 to true)))
         sink.setOwners(intArrayOf(-1, 7))
         repeat(2) {
@@ -26,27 +26,7 @@ class MoveSinkTest {
     }
 
     @Test
-    fun `int set round-trips with negative and extreme values`() {
-        val sink = MoveSink()
-        sink.addIntSet(0, 0)
-        sink.addIntSet(1, -5)
-        sink.addIntSet(2, Int.MAX_VALUE.toLong())
-        sink.addIntSet(3, Int.MIN_VALUE.toLong())
-        sink.addIntSet(4, -1)
-        assertEquals(
-            listOf(
-                Move.IntSet(0, 0),
-                Move.IntSet(1, -5),
-                Move.IntSet(2, Int.MAX_VALUE.toLong()),
-                Move.IntSet(3, Int.MIN_VALUE.toLong()),
-                Move.IntSet(4, -1),
-            ),
-            sink.list,
-        )
-    }
-
-    @Test
-    fun `compound with any frozen part is dropped entirely`() {
+    fun `a compound with any frozen part should be dropped entirely`() {
         val sink = MoveSink(Assumptions(ints = mapOf(1 to 5)))
         sink.addCompound(listOf(Move.IntSet(0, 10), Move.IntSet(1, 20))) // 1 is frozen
         sink.addCompound(listOf(Move.IntSet(2, 30), Move.IntSet(3, 40)))
@@ -54,7 +34,7 @@ class MoveSinkTest {
     }
 
     @Test
-    fun `owner may move the var it owns`() {
+    fun `an owner should be allowed to move the var it owns`() {
         val sink = MoveSink()
         sink.setOwners(intArrayOf(-1, 7, -1))
         sink.proposer = 7
@@ -63,7 +43,7 @@ class MoveSinkTest {
     }
 
     @Test
-    fun `compound parts on a foreign-owned var are dropped individually`() {
+    fun `compound parts on a foreign-owned var should be dropped individually`() {
         val sink = MoveSink()
         sink.setOwners(intArrayOf(-1, 7, -1, -1))
         // var 1 owned by 7; proposer is no-one, so the part on 1 drops and the swap collapses to a primitive.

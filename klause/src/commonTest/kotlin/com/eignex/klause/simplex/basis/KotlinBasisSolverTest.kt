@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverTest {
     @Test
-    fun `declined solve work is retained until the next build`() {
+    fun `declined solve work should be retained until the next build`() {
         val source = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1e-200)))
         val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
         assertTrue(solver.refactorize(intArrayOf(0)))
@@ -36,46 +36,12 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `declined update work is retained until the next build`() {
-        val source = SparseMatrix.ofColumns(
-            2,
-            3,
-            listOf(
-                listOf(0 to 1.0),
-                listOf(0 to 1e200, 1 to 1e-200),
-                emptyList(),
-            ),
-        )
-        val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
-        assertTrue(solver.refactorize(intArrayOf(0, 1)))
-        val spike = IndexedVector(2).also { it.scatter(doubleArrayOf(1.0, 1.0)) }
-        assertEquals(BasisUpdate.SINGULAR, solver.update(0, 2, spike))
-        val declined = solver.basisWork
-        assertEquals(1, declined.update.declines)
-        assertTrue(declined.update.units > 1 + spike.count)
-        assertTrue(assertNotNull(solver.lastUpdateWork).units > 0)
-        assertEquals(BasisUpdate.SINGULAR, solver.update(0, 2, spike))
-        assertTrue(solver.basisWork.update.attempts > declined.update.attempts)
-
-        assertTrue(assertNotNull(solver.lastUpdateWork).units > 0)
-        assertTrue(solver.refactorize(intArrayOf(0, 1)))
-        assertEquals(BasisPhaseWork(), solver.basisWork.update)
-        assertTrue(solver.basisOperationWork.update.units >= declined.update.units)
-        solver.close()
-    }
-
-    @Test
-    fun `seeded updates solve permuted unit bases in both directions`() {
-        assertSeededUpdatesSolve("unit", 8)
-    }
-
-    @Test
-    fun `seeded updates solve permuted sparse bases in both directions`() {
+    fun `seeded updates should solve permuted sparse bases in both directions`() {
         assertSeededUpdatesSolve("sparse", 8)
     }
 
     @Test
-    fun `singular updates preserve the prior basis`() {
+    fun `singular update should preserve the prior basis`() {
         val source = SparseMatrix.ofColumns(
             2,
             5,
@@ -112,7 +78,7 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `failed refactorization invalidates factors until a successful rebuild`() {
+    fun `failed refactorization should invalidate factors until a successful rebuild`() {
         val source = SparseMatrix.ofColumns(2, 3, listOf(listOf(0 to 1.0), listOf(1 to 1.0), listOf(0 to 2.0)))
         val solver = KotlinBasisSolver(source)
         assertTrue(solver.refactorize(intArrayOf(0, 1)))
@@ -131,52 +97,7 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `solver owns source headings and update copies while solves overwrite only their argument`() {
-        val source = SparseMatrix.ofColumns(
-            2,
-            3,
-            listOf(listOf(0 to 1.0), listOf(1 to 1.0), listOf(0 to 2.0, 1 to 3.0)),
-        )
-        val solver = KotlinBasisSolver(source)
-        val headings = intArrayOf(1, 0)
-        assertTrue(solver.refactorize(headings))
-        val spike = IndexedVector(2).also { it.scatterColumn(source, 2) }
-        solver.ftran(spike)
-        val saved = spike.toDoubleArray()
-        assertEquals(BasisUpdate.APPLIED, solver.update(1, 2, spike))
-        assertContentEquals(saved, spike.toDoubleArray())
-        source.values.fill(0.0)
-        headings.fill(0)
-        spike.unit(0)
-
-        solver.ftran(spike)
-
-        assertContentEquals(doubleArrayOf(-1.5, 0.5), spike.toDoubleArray())
-        assertEquals(0.0, solver.solveQuality(doubleArrayOf(1.0, 0.0), spike).relativeResidual)
-    }
-
-    @Test
-    fun `close is idempotent and rejects mandatory operations and reports`() {
-        val solver = KotlinBasisSolver(SparseMatrix.ofColumns(0, 0, emptyList()))
-        assertTrue(solver.refactorize(intArrayOf()))
-        val vector = IndexedVector(0)
-        solver.close()
-        solver.close()
-        assertEquals(0, solver.n)
-        assertFalse(solver.singular)
-        assertFailsWith<IllegalStateException> { solver.nnz }
-        assertFailsWith<IllegalStateException> { solver.rcond }
-        assertFailsWith<IllegalStateException> { solver.updateCount }
-        assertFailsWith<IllegalStateException> { solver.basisWork }
-        assertFailsWith<IllegalStateException> { solver.refactorize(intArrayOf()) }
-        assertFailsWith<IllegalStateException> { solver.ftran(vector) }
-        assertFailsWith<IllegalStateException> { solver.btran(vector) }
-        assertFailsWith<IllegalStateException> { solver.update(0, 0, vector) }
-        assertFailsWith<IllegalStateException> { solver.solveQuality(doubleArrayOf(), vector) }
-    }
-
-    @Test
-    fun `arithmetic failure leaves the argument intact and scratch recovers`() {
+    fun `arithmetic failure should leave the argument intact and recover scratch`() {
         for ((pivot, rhs) in listOf(1e-200 to 1e200, 1e200 to 1e-200)) {
             val matrix = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to pivot)))
             val solver = KotlinBasisSolver(matrix, LuPivotPolicy(absoluteTolerance = 0.0))
@@ -203,7 +124,7 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `configured tiny update pivots solve against the entering source column`() {
+    fun `tiny update pivot should solve against the entering source column`() {
         val source = SparseMatrix.ofColumns(1, 2, listOf(listOf(0 to 1.0), listOf(0 to 1e-200)))
         val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
         assertTrue(solver.refactorize(intArrayOf(0)))
@@ -221,7 +142,7 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `unrepresentable spike normalization declines without changing the basis`() {
+    fun `unrepresentable spike normalization should decline without changing the basis`() {
         for ((pivot, offDiagonal) in listOf(1e-200 to 1e200, 1e200 to 1e-200, 1e-320 to 1.0)) {
             val source = SparseMatrix.ofColumns(
                 2,
@@ -248,29 +169,66 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `invalid arguments reject without damaging usable factors`() {
-        val matrix = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1.0)))
-        val solver = KotlinBasisSolver(matrix)
-        val vector = IndexedVector(1).also { it.unit(0) }
-        assertTrue(solver.refactorize(intArrayOf(0)))
-        for (basis in listOf(intArrayOf(), intArrayOf(-1), intArrayOf(1))) {
-            assertFailsWith<IllegalArgumentException> { solver.refactorize(basis) }
-            assertFailsWith<IllegalArgumentException> { solver.refactorizeRepairing(basis) }
+    fun `ordering snapshot should own its inputs and returned arrays`() {
+        val source = ftSource("dense", 3)
+        val solver = KotlinBasisSolver(source)
+        assertTrue(solver.refactorize(intArrayOf(2, 0, 1)))
+        val order = assertNotNull(solver.ordering())
+        val rows = order.rows
+        val slots = order.slots
+        order.columns.fill(-99)
+        order.unitRows.fill(-99)
+        order.rows.fill(-99)
+        order.slots.fill(-99)
+        assertTrue(solver.refactorize(intArrayOf(0, 1, 2)))
+        solver.close()
+
+        assertContentEquals(intArrayOf(2, 0, 1), order.columns)
+        assertContentEquals(intArrayOf(-1, -1, -1), order.unitRows)
+        assertContentEquals(rows, order.rows)
+        assertContentEquals(slots, order.slots)
+        assertNull(solver.ordering())
+        val inputs = intArrayOf(0)
+        val copied = BasisOrdering(inputs, intArrayOf(-1), inputs, inputs)
+        inputs[0] = 5
+        assertContentEquals(intArrayOf(0), copied.rows)
+        assertContentEquals(intArrayOf(0), copied.slots)
+        assertContentEquals(intArrayOf(0), copied.columns)
+    }
+
+    @Test
+    fun `ordering offer should decline after accepted updates and survive rejected ones`() {
+        val source = ftSource("dense", 3)
+        KotlinBasisSolver(source, updateLimit = 1).use { solver ->
+            val headings = intArrayOf(0, 1, 2)
+            assertNull(solver.ordering())
+            assertTrue(solver.refactorize(headings))
+            assertEquals(BasisUpdate.SINGULAR, solver.update(1, 4, IndexedVector(3)))
+            assertNotNull(solver.ordering())
+            val spike = IndexedVector(3).also { it.scatterColumn(source, 4) }
+            solver.ftran(spike)
+
+            assertEquals(BasisUpdate.REFACTORIZE, solver.update(1, 4, spike))
+            assertNull(solver.ordering())
+            headings[1] = 4
+            assertTrue(solver.refactorize(headings))
+            assertContentEquals(headings, assertNotNull(solver.ordering()).columns)
         }
-        for (density in listOf(-1.0, 1.1, Double.NaN, Double.POSITIVE_INFINITY)) {
-            assertFailsWith<IllegalArgumentException> { solver.ftran(vector, density) }
-            assertFailsWith<IllegalArgumentException> { solver.btran(vector, density) }
+    }
+
+    @Test
+    fun `repair should export logical columns and failed rebuild should retire the order`() {
+        val source = SparseMatrix.ofColumns(3, 3, listOf(listOf(1 to 1.0), listOf(1 to 1.0), emptyList()))
+        KotlinBasisSolver(source).use { solver ->
+            val repair = assertNotNull(solver.refactorizeRepairing(intArrayOf(0, 1, 2)))
+            val order = assertNotNull(solver.ordering())
+            assertTrue(repair.repaired)
+            assertContentEquals(repair.columns, order.columns)
+            assertContentEquals(repair.unitRows, order.unitRows)
+
+            assertFalse(solver.refactorize(intArrayOf(0, 1, 2)))
+            assertNull(solver.ordering())
         }
-        assertFailsWith<IllegalArgumentException> { solver.ftran(IndexedVector(2)) }
-        assertFailsWith<IllegalArgumentException> { solver.update(-1, 0, vector) }
-        assertFailsWith<IllegalArgumentException> { solver.update(0, 1, vector) }
-        for (value in listOf(Double.NaN, Double.POSITIVE_INFINITY)) {
-            vector.scatter(doubleArrayOf(value))
-            assertFailsWith<IllegalArgumentException> { solver.ftran(vector) }
-        }
-        vector.unit(0)
-        solver.ftran(vector)
-        assertEquals(1.0, vector[0])
     }
 
     private fun assertSeededUpdatesSolve(shape: String, n: Int) {

@@ -28,11 +28,26 @@ import kotlin.test.assertTrue
 
 class FiniteExactNeighborhoodTest {
     @Test
-    fun `pinned mixed products retain exact source checks during real repairs`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(3, 3)),
-            arrayOf(RealProduct(0, 0, 1, 0.0, 1.0), Linear(intArrayOf(), doubleArrayOf(),
-                intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)),
-            numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 3.0)).bake()
+    fun `pinned mixed products should keep exact source checks during real repairs`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(3, 3)),
+            arrayOf(
+                RealProduct(0, 0, 1, 0.0, 1.0),
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 3.0),
+        ).bake()
         val point = assertNotNull(source.fixedDiscreteSample())
 
         for (adaptive in listOf(false, true)) {
@@ -46,12 +61,28 @@ class FiniteExactNeighborhoodTest {
             assertNull(witness.witnessCertificate)
         }
     }
+
     @Test
-    fun `bound real repairs publish their actual containing invocation`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(3, 3)),
-            arrayOf(RealProduct(0, 0, 1, 0.0, 1.0), Linear(intArrayOf(), doubleArrayOf(),
-                intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)),
-            numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 3.0)).bake()
+    fun `bound real repairs should publish their containing invocation`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(3, 3)),
+            arrayOf(
+                RealProduct(0, 0, 1, 0.0, 1.0),
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 3.0),
+        ).bake()
         val point = assertNotNull(source.fixedDiscreteSample())
         val binding = EngineInvocation(source.prepareExecutionPlan(preferFinite = true), ModelIdentity.of(source))
         val worker = finiteExactNeighborhoodWorker(source, point, null, null, false, 17, 0)
@@ -67,13 +98,25 @@ class FiniteExactNeighborhoodTest {
     }
 
     @Test
-    fun `finite mixed portfolios retain fractional cost improvements across integer branches`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+    fun `finite mixed portfolios should keep fractional cost improvements across integer branches`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
             arrayOf(Linear(longArrayOf(-1), intArrayOf(0), doubleArrayOf(3.0), intArrayOf(0), LinearOp.EQ, 0)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        ).bake()
         val objective = LinearObjective(constant = 1L shl 62, realCoefficients = doubleArrayOf(-1.0))
-        val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP,
-            engine = EngineMix.BACKTRACK, seed = 17, lpCeiling = LpConfig.OFF)
+        val scenario = PortfolioScenario(
+            cores = 1,
+            arms = 1,
+            kind = Kind.COP,
+            engine = EngineMix.BACKTRACK,
+            seed = 17,
+            lpCeiling = LpConfig.OFF,
+        )
         val executor = FinitePipeline.portfolioExecutor(source, scenario, objective, null, null, null)
 
         val result = executor.use { it.minimize() }
@@ -82,5 +125,4 @@ class FiniteExactNeighborhoodTest {
         assertEquals(2L, sample.intValue(0))
         assertEquals("2/3", sample.exactReals?.single().toString())
     }
-
 }

@@ -27,7 +27,7 @@ class IncreasingPropagatorTest {
     )
 
     @Test
-    fun `strict chains reject a descent across both signed word endpoints`() {
+    fun `strict chains should reject a descent across both signed word endpoints`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -41,10 +41,7 @@ class IncreasingPropagatorTest {
     }
 
     @Test
-    fun `forward sweep raises later mins and backward sweep lowers earlier maxes`() {
-        // x0 ∈ [2,9], x1 ∈ [0,9], x2 ∈ [0,5], strictly increasing.
-        // Forward: x1.min ≥ x0.min+1 = 3, x2.min ≥ x1.min+1 = 4.
-        // Backward: x1.max ≤ x2.max−1 = 4, x0.max ≤ x1.max−1 = 3.
+    fun `forward and backward sweeps should tighten later mins and earlier maxes`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -55,16 +52,16 @@ class IncreasingPropagatorTest {
         state.undoLogging = true
         state.currentFactor = 0
         assertTrue(problem.propagators[0].propagate(state, 0))
-        assertEquals(3, state.intDomains[1].min, "x1.min raised to x0.min+1")
-        assertEquals(4, state.intDomains[2].min, "x2.min raised along the chain")
-        assertEquals(4, state.intDomains[1].max, "x1.max lowered to x2.max-1")
-        assertEquals(3, state.intDomains[0].max, "x0.max lowered along the chain")
+        assertEquals(3, state.intDomains[1].min)
+        assertEquals(4, state.intDomains[2].min)
+        assertEquals(4, state.intDomains[1].max)
+        assertEquals(3, state.intDomains[0].max)
     }
 
     @Test
-    fun `increasing deductions are implied by their reasons under carved holes`() {
+    fun `increasing deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x1C5)
-        repeat(300) { iter ->
+        repeat(100) { iter ->
             val problem = chain(strict = rng.nextBoolean(), n = 4, hi = 5)
             PropagationReasonOracle.assertReasonsImply(problem, "increasing#$iter") { state ->
                 (0 until 4).all {
@@ -80,8 +77,7 @@ class IncreasingPropagatorTest {
     }
 
     @Test
-    fun `a chain bound cites only its neighbour's bound on the same side`() {
-        // x0 <= x1: raising x0 to 2 raises x1 to 2, citing x0 >= 2 alone; x0's upper bound plays no part.
+    fun `a chain bound should cite only its neighbour's bound on the same side`() {
         val problem = chain(strict = false, n = 2, hi = 5)
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true

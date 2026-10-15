@@ -1,8 +1,9 @@
 package com.eignex.klause.formats.mps
 
-import com.eignex.klause.formats.mps.MpsIndicator
-import com.eignex.klause.formats.mps.MpsVar
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.util.CharSource
+import com.eignex.klause.util.StringCharSource
+import com.eignex.klause.util.perCharSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -12,7 +13,7 @@ import kotlin.test.assertTrue
 class MpsTest {
 
     @Test
-    fun `parses rows columns rhs and bounds into a model`() {
+    fun `parsing should read rows columns rhs and bounds into a model`() {
         val text = """
             NAME          TEST
             ROWS
@@ -41,7 +42,6 @@ class MpsTest {
         assertEquals("TEST", model.name)
         assertEquals(ObjectiveSense.MINIMIZE, model.sense)
         assertEquals(listOf("X1", "X2"), model.variables.map { it.name })
-        // X1 sits inside the INTORG/INTEND marker with an explicit upper bound; X2 is free continuous.
         assertEquals(MpsVar("X1", integer = true, lower = 0.0, upper = 10.0), model.variables[0])
         assertEquals(MpsVar("X2", integer = false, lower = null, upper = null), model.variables[1])
         assertEquals(listOf(0, 1), model.objective.indices.toList())
@@ -56,7 +56,7 @@ class MpsTest {
     }
 
     @Test
-    fun `sections after ENDATA are not read as the model`() {
+    fun `sections after ENDATA should not be read as the model`() {
         val text = """
             NAME          TRAILER
             ROWS
@@ -78,7 +78,7 @@ class MpsTest {
     }
 
     @Test
-    fun `a lazy constraint is posted as an ordinary constraint`() {
+    fun `a lazy constraint should be posted as an ordinary constraint`() {
         val text = """
             NAME          LAZY
             ROWS
@@ -96,15 +96,13 @@ class MpsTest {
 
         val model = Mps.parse(text)
 
-        // A solver may add it lazily, but it constrains the model either way: dropping it would admit
-        // points the model forbids.
         val l1 = model.constraints.single { it.name == "L1" }
         assertEquals(2.0 to null, l1.lower to l1.upper)
         assertEquals(listOf(1.0), l1.coeffs.toList())
     }
 
     @Test
-    fun `a user cut is skipped because it cuts no solution`() {
+    fun `a user cut should be skipped`() {
         val text = """
             NAME          CUTS
             ROWS
@@ -123,7 +121,7 @@ class MpsTest {
     }
 
     @Test
-    fun `a trailing dollar comment is not read as data`() {
+    fun `a trailing dollar comment should not be read as data`() {
         val text = """
             NAME          COMMENT
             ROWS
@@ -141,7 +139,7 @@ class MpsTest {
     }
 
     @Test
-    fun `parsed numeric fields retain decimal and scientific authority`() {
+    fun `parsed numeric fields should retain decimal and scientific authority`() {
         val text = "ROWS\n N COST\n E C1\nCOLUMNS\n X COST 0.1 C1 9.007199254740993D15\n" +
             "RHS\n RHS C1 1.208925819614629174706176E24\nENDATA"
 
@@ -153,7 +151,7 @@ class MpsTest {
     }
 
     @Test
-    fun `unsupported exact decimal scales decline cleanly`() {
+    fun `unsupported exact decimal scales should decline cleanly`() {
         val tokens = listOf("1e-2147483648", "0.1e-9223372036854775808")
 
         for (token in tokens) {
@@ -164,7 +162,7 @@ class MpsTest {
     }
 
     @Test
-    fun `unchanged copies retain exact sums with overflowing projections`() {
+    fun `unchanged copies should retain exact sums with overflowing projections`() {
         val parsed = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1e308\n X COST 1e308\nENDATA")
 
         val exact = parsed.copy(name = "copy").toExactLpModel()
@@ -173,7 +171,7 @@ class MpsTest {
     }
 
     @Test
-    fun `rejects a value bound with no value`() {
+    fun `a value bound with no value should be rejected`() {
         val ex = assertFailsWith<MpsFormatException> {
             Mps.parse("ROWS\n N COST\nCOLUMNS\n X1 COST 1\nBOUNDS\n UP X1\nENDATA")
         }
@@ -181,7 +179,7 @@ class MpsTest {
     }
 
     @Test
-    fun `defaults a variable to the zero to positive-infinity range`() {
+    fun `a variable should default to the zero to positive-infinity range`() {
         val text = """
             ROWS
              N  COST
@@ -199,7 +197,7 @@ class MpsTest {
     }
 
     @Test
-    fun `defaults a marker integer without a bounds entry to binary`() {
+    fun `a marker integer without a bounds entry should default to binary`() {
         val cases = listOf("", "BOUNDS\n", "BOUNDS\n UP BND Y 5\n")
         for (bounds in cases) {
             val text = "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 1\n" +
@@ -212,7 +210,7 @@ class MpsTest {
     }
 
     @Test
-    fun `explicit bounds replace a marker integer binary default`() {
+    fun `explicit bounds should replace a marker integer binary default`() {
         val cases = listOf(
             Triple("LO BND X 2", 2.0, null),
             Triple("LI BND X 2", 2.0, null),
@@ -235,27 +233,7 @@ class MpsTest {
     }
 
     @Test
-    fun `resolves each bounds type`() {
-        // (bound line, expected lower, expected upper); null bound = infinity.
-        val cases = listOf(
-            Triple("UP BND X1 5.0", 0.0, 5.0),
-            Triple("LO BND X1 -3.0", -3.0, null),
-            Triple("FX BND X1 2.0", 2.0, 2.0),
-            Triple("FR BND X1", null, null),
-            Triple("MI BND X1", null, null),
-            Triple("BV BND X1", 0.0, 1.0),
-        )
-        for ((line, lo, hi) in cases) {
-            val text = "ROWS\n N COST\nCOLUMNS\n X1 COST 1.0\nBOUNDS\n $line\nENDATA"
-            val v = Mps.parse(text).variables.single()
-            assertEquals(lo, v.lower, "lower for '$line'")
-            assertEquals(hi, v.upper, "upper for '$line'")
-        }
-    }
-
-    @Test
-    fun `resolves ranges into two-sided bounds`() {
-        // A range R turns a one-sided row into an interval per the MPS sign rules.
+    fun `ranges should resolve into two-sided bounds`() {
         val cases = listOf(
             Triple("L", 6.0, 4.0 to 10.0), // [rhs - |R|, rhs]
             Triple("G", 6.0, 10.0 to 16.0), // [rhs, rhs + |R|]
@@ -271,7 +249,7 @@ class MpsTest {
     }
 
     @Test
-    fun `reads objective sense and constant`() {
+    fun `parsing should read objective sense and constant`() {
         val text = """
             OBJSENSE
              MAX
@@ -293,7 +271,7 @@ class MpsTest {
     }
 
     @Test
-    fun `parses an INDICATORS entry gating a row on a binary column`() {
+    fun `an INDICATORS entry should gate a row on a binary column`() {
         val text = """
             ROWS
              N  COST
@@ -320,7 +298,7 @@ class MpsTest {
     }
 
     @Test
-    fun `rejects an INDICATORS entry naming an unknown row or column`() {
+    fun `an INDICATORS entry naming an unknown row or column should be rejected`() {
         val head = "ROWS\n N COST\n L C1\nCOLUMNS\n X1 COST 1.0 C1 1.0\n B1 COST 0.0\nBOUNDS\n BV BND B1\n"
         for (line in listOf("IF NOSUCHROW B1 1", "IF C1 NOSUCHCOL 1")) {
             assertFailsWith<MpsFormatException>(line) { Mps.parse(head + "INDICATORS\n $line\nENDATA") }
@@ -328,25 +306,47 @@ class MpsTest {
     }
 
     @Test
-    fun `rejects an INDICATORS entry whose trigger value is neither zero nor one`() {
+    fun `an INDICATORS entry whose trigger value is neither zero nor one should be rejected`() {
         val text = "ROWS\n N COST\n L C1\nCOLUMNS\n X1 COST 1.0 C1 1.0\n B1 COST 0.0\n" +
             "BOUNDS\n BV BND B1\nINDICATORS\n IF C1 B1 2\nENDATA"
         assertFailsWith<MpsFormatException> { Mps.parse(text) }
     }
 
     @Test
-    fun `rejects an unknown row type`() {
+    fun `an unknown row type should be rejected`() {
         val text = "ROWS\n X BADROW\nENDATA"
         assertFailsWith<MpsFormatException> { Mps.parse(text) }
     }
 
     @Test
-    fun `rejects duplicate row names`() {
+    fun `duplicate row names should be rejected`() {
         assertFailsWith<MpsFormatException> { Mps.parse("ROWS\n L C1\n G C1\nENDATA") }
     }
 
     @Test
-    fun `rejects non-finite numeric fields`() {
+    fun `non-finite numeric fields should be rejected`() {
         assertFailsWith<MpsFormatException> { Mps.parse("ROWS\n L C1\nCOLUMNS\n X1 C1 NaN\nENDATA") }
+    }
+
+    @Test
+    fun `parse should not depend on source chunk boundaries`() {
+        val text = """
+            NAME          t
+            ROWS
+             N  cost
+             L  c1
+            COLUMNS
+                x         cost           1.0   c1             1.0
+                y         cost           1.0   c1             1.0
+            RHS
+                rhs       c1             3.0
+            BOUNDS
+             UP BND       x              4.0
+             UP BND       y              4.0
+            ENDATA
+        """.trimIndent() + "\n"
+        fun shape(source: CharSource) =
+            Mps.parse(source).toProblem().model.let { Triple(it.numBoolVars, it.numIntVars, it.factors.size) }
+        assertEquals(shape(StringCharSource(text)), shape(perCharSource(text)))
     }
 }

@@ -16,14 +16,18 @@ import kotlin.test.assertTrue
 
 class Xcsp3SelectionTest {
     @Test
-    fun `nested conditional extrema retain native definitions`() {
-        val parsed = Xcsp3.parse("""
+    fun `nested conditional extrema should retain native definitions`() {
+        val parsed = Xcsp3.parse(
+            """
             <instance><variables><var id="x">0..1</var><var id="y">0..1</var></variables>
             <constraints><intension>eq(if(gt(x,0),max(y,x),min(y,x)),1)</intension></constraints></instance>
-        """.trimIndent())
+            """.trimIndent(),
+        )
 
-        val sample = assertIs<SolveResult.Sat>(BacktrackSolver(parsed.problem.bake())
-            .solve(BacktrackParams(randomSeed = 0))).assignment
+        val sample = assertIs<SolveResult.Sat>(
+            BacktrackSolver(parsed.problem.bake())
+                .solve(BacktrackParams(randomSeed = 0)),
+        ).assignment
 
         assertEquals(2, parsed.problem.factors.filterIsInstance<ArrayMinMax>().size)
         assertEquals(1, parsed.problem.factors.filterIsInstance<Element>().size)
@@ -31,16 +35,20 @@ class Xcsp3SelectionTest {
     }
 
     @Test
-    fun `standard and legacy vector offsets select the same source entry`() {
+    fun `standard and legacy vector offsets should select the same source entry`() {
         for ((parent, list) in listOf("" to "startIndex=\"-2\"", "startIndex=\"-2\"" to "")) {
-            val parsed = Xcsp3.parse("""
+            val parsed = Xcsp3.parse(
+                """
                 <instance><variables><var id="i">-3..0</var><var id="v">9</var></variables><constraints>
                 <element $parent><list $list>4 9</list><index>i</index><value>v</value></element>
                 </constraints></instance>
-            """.trimIndent())
+                """.trimIndent(),
+            )
 
-            val sample = assertIs<SolveResult.Sat>(BacktrackSolver(parsed.problem.bake())
-                .solve(BacktrackParams(randomSeed = 0))).assignment
+            val sample = assertIs<SolveResult.Sat>(
+                BacktrackSolver(parsed.problem.bake())
+                    .solve(BacktrackParams(randomSeed = 0)),
+            ).assignment
 
             assertEquals(-2, parsed.problem.factors.filterIsInstance<Element>().single().indexOffset)
             assertEquals(-1L, sample.intValue(parsed.intVarNames.getValue("i")))
@@ -48,18 +56,30 @@ class Xcsp3SelectionTest {
     }
 
     @Test
-    fun `constant matrix selection prevents a column from aliasing another row`() {
-        for ((matrix, invalidRow, invalidColumn) in listOf(Triple("(4,9)(9,4)", 2L, 5L),
-                Triple("(4)(9,4)", 2L, 4L))) {
-            val parsed = Xcsp3.parse("""
+    fun `constant matrix selection should prevent a column from aliasing another row`() {
+        for ((matrix, invalidRow, invalidColumn) in listOf(
+            Triple("(4,9)(9,4)", 2L, 5L),
+            Triple("(4)(9,4)", 2L, 4L),
+        )) {
+            val parsed = Xcsp3.parse(
+                """
                 <instance><variables><var id="i">2..3</var><var id="j">2..5</var><var id="v">9</var></variables>
                 <constraints><element startRowIndex="2" startColIndex="3"><matrix>$matrix</matrix>
                 <index>i j</index><value>v</value></element></constraints></instance>
-            """.trimIndent())
+                """.trimIndent(),
+            )
             val solver = BacktrackSolver(parsed.problem.bake())
 
-            val invalid = solver.solve(BacktrackParams(assumptions = Assumptions(ints = mapOf(
-                parsed.intVarNames.getValue("i") to invalidRow, parsed.intVarNames.getValue("j") to invalidColumn))))
+            val invalid = solver.solve(
+                BacktrackParams(
+                    assumptions = Assumptions(
+                        ints = mapOf(
+                            parsed.intVarNames.getValue("i") to invalidRow,
+                            parsed.intVarNames.getValue("j") to invalidColumn,
+                        ),
+                    ),
+                ),
+            )
 
             assertIs<SolveResult.Unsat>(invalid)
             assertIs<SolveResult.Sat>(solver.solve(BacktrackParams(randomSeed = 0)))
@@ -69,16 +89,20 @@ class Xcsp3SelectionTest {
     }
 
     @Test
-    fun `indexed extrema constrain the source index without requiring a condition`() {
+    fun `indexed extrema should constrain the source index without requiring a condition`() {
         for (operation in listOf("minimum", "maximum")) {
-            val parsed = Xcsp3.parse("""
+            val parsed = Xcsp3.parse(
+                """
                 <instance><variables><var id="x">1</var><var id="y">2</var><var id="i">-2..0</var></variables>
                 <constraints><$operation><list startIndex="-2">x y x</list><index>i</index></$operation>
                 </constraints></instance>
-            """.trimIndent())
+                """.trimIndent(),
+            )
 
-            val sample = assertIs<SolveResult.Sat>(BacktrackSolver(parsed.problem.bake())
-                .solve(BacktrackParams(randomSeed = 0))).assignment
+            val sample = assertIs<SolveResult.Sat>(
+                BacktrackSolver(parsed.problem.bake())
+                    .solve(BacktrackParams(randomSeed = 0)),
+            ).assignment
 
             val index = sample.intValue(parsed.intVarNames.getValue("i"))
             assertEquals(if (operation == "maximum") 2L else 1L, listOf(1L, 2L, 1L)[(index + 2).toInt()])
@@ -88,14 +112,16 @@ class Xcsp3SelectionTest {
     }
 
     @Test
-    fun `ranked selection declines rather than ignoring the requested occurrence`() {
+    fun `ranked selection should decline rather than ignore the requested occurrence`() {
         for (rank in listOf("first", "last")) {
             assertFailsWith<UnsupportedXcsp3Exception> {
-                Xcsp3.parse("""
+                Xcsp3.parse(
+                    """
                     <instance><variables><var id="i">0..1</var><var id="v">4</var></variables>
                     <constraints><element><list>4 4</list><index rank="$rank">i</index><value>v</value></element>
                     </constraints></instance>
-                """.trimIndent())
+                    """.trimIndent(),
+                )
             }
         }
     }

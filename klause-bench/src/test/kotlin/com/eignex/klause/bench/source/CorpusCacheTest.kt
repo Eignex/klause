@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class CorpusCacheTest {
 
     @Test
-    fun `enforce evicts the least recently used collection first`() {
+    fun `enforce should evict the least recently used collection first`() {
         val root = Files.createTempDirectory("corpuscache").toFile()
         try {
             listOf("old" to 1L, "mid" to 2L, "new" to 3L).forEach { (id, usedAt) ->
@@ -30,7 +30,7 @@ class CorpusCacheTest {
     }
 
     @Test
-    fun `enforce never evicts a collection used in the current run`() {
+    fun `enforce should never evict a collection used in the current run`() {
         val root = Files.createTempDirectory("corpuscache").toFile()
         try {
             listOf("pinned" to 1L, "idle" to 2L).forEach { (id, usedAt) ->
@@ -49,7 +49,7 @@ class CorpusCacheTest {
     }
 
     @Test
-    fun `enforce evicts nothing while the cache is under its cap`() {
+    fun `enforce should evict nothing while the cache is under its cap`() {
         val root = Files.createTempDirectory("corpuscache").toFile()
         try {
             collection(root, "a")
@@ -65,7 +65,7 @@ class CorpusCacheTest {
     }
 
     @Test
-    fun `an interrupted eviction is not a present collection and the next enforce removes it`() {
+    fun `an interrupted eviction should not count as present and the next enforce should remove it`() {
         val root = Files.createTempDirectory("corpuscache").toFile()
         try {
             File(root, ".trash/gone.1/fam").mkdirs()
@@ -82,7 +82,7 @@ class CorpusCacheTest {
     }
 
     @Test
-    fun `parseCapBytes reads zero and off as no cap`() {
+    fun `parseCapBytes should read zero and off as no cap`() {
         assertNull(CorpusCache.parseCapBytes("0"))
         assertNull(CorpusCache.parseCapBytes("off"))
     }

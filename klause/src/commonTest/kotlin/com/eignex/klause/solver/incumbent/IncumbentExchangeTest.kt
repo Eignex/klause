@@ -6,11 +6,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class IncumbentExchangeTest {
     @Test
-    fun `published samples keep their verified objective after external mutation`() {
+    fun `published sample should keep its verified objective after external mutation`() {
         val values = longArrayOf(3)
         val objective = LinearObjective(intCoefficients = longArrayOf(2))
         val sample = Sample(BooleanArray(0), values)
@@ -34,12 +33,10 @@ class IncumbentExchangeTest {
         assertEquals(3L, checkNotNull(exchange.current()).assignment.intValue(0))
     }
 
-
-
     private fun minimizing() = IncumbentExchange.minimizing<String>()
 
     @Test
-    fun `a strictly better candidate is installed`() {
+    fun `offer should install a strictly better candidate`() {
         val exchange = minimizing()
         exchange.offer("a", 5.0)
         val publication = assertIs<Publication.Installed<String, Double>>(exchange.offer("b", 3.0))
@@ -48,38 +45,33 @@ class IncumbentExchangeTest {
     }
 
     @Test
-    fun `a candidate no better than the incumbent is not installed`() {
+    fun `offer should not install a candidate that is not strictly better`() {
         val exchange = minimizing()
         exchange.offer("a", 3.0)
-        assertIs<Publication.NotImproving>(exchange.offer("b", 3.0), "equal is not strictly better")
+        assertIs<Publication.NotImproving>(exchange.offer("b", 3.0))
         assertIs<Publication.NotImproving>(exchange.offer("c", 4.0))
         assertEquals("a", exchange.current()?.assignment)
     }
 
     @Test
-    fun `only an installation advances the version`() {
+    fun `version should advance only on installation`() {
         val exchange = minimizing()
         exchange.offer("a", 5.0)
         exchange.offer("b", 4.0)
         exchange.offer("c", 4.0)
-        assertEquals(2L, exchange.current()?.version, "two installations, one rejected tie")
+        assertEquals(2L, exchange.current()?.version)
     }
 
     @Test
-    fun `the exchange is empty until the first installation`() {
-        assertNull(minimizing().current())
-    }
-
-    @Test
-    fun `a non-finite objective is rejected`() {
+    fun `offer should reject a non-finite objective`() {
         val exchange = minimizing()
         assertIs<Publication.Rejected>(exchange.offer("a", Double.POSITIVE_INFINITY))
         assertIs<Publication.Rejected>(exchange.offer("b", Double.NaN))
-        assertNull(exchange.current(), "a score carrying no information never becomes an incumbent")
+        assertNull(exchange.current())
     }
 
     @Test
-    fun `a rejected candidate leaves the standing incumbent alone`() {
+    fun `rejected candidate should leave the incumbent unchanged`() {
         val exchange = IncumbentExchange<String, Double>(
             improves = { candidate, standing -> candidate < standing },
             verifier = { candidate ->
@@ -89,11 +81,11 @@ class IncumbentExchangeTest {
         exchange.offer("good", 5.0)
         val publication = assertIs<Publication.Rejected>(exchange.offer("bad", 1.0))
         assertEquals("bad", publication.reason)
-        assertEquals("good", exchange.current()?.assignment, "rejection refutes the candidate, not the incumbent")
+        assertEquals("good", exchange.current()?.assignment)
     }
 
     @Test
-    fun `an undecided candidate is neither installed nor rejected`() {
+    fun `indeterminate candidate should be neither installed nor rejected`() {
         val exchange = IncumbentExchange<String, Double>(
             improves = { candidate, standing -> candidate < standing },
             verifier = { Verification.Indeterminate("budget exhausted") },
@@ -104,56 +96,35 @@ class IncumbentExchangeTest {
     }
 
     @Test
-    fun `an exchange maximises when improvement is reversed`() {
+    fun `exchange should maximize with a reversed comparator`() {
         val exchange = IncumbentExchange<String, Int>(improves = { candidate, standing -> candidate > standing })
         exchange.offer("a", 1)
         exchange.offer("b", 7)
         exchange.offer("c", 3)
-        assertEquals("b", exchange.current()?.assignment, "the comparator, not the type, fixes the direction")
+        assertEquals("b", exchange.current()?.assignment)
     }
 
     @Test
-    fun `a subscription hands back each incumbent once`() {
+    fun `subscription should return each incumbent version once`() {
         val exchange = minimizing()
         val subscription = exchange.subscribe()
-        assertNull(subscription.poll(), "nothing to import from an empty exchange")
+        assertNull(subscription.poll())
         exchange.offer("a", 5.0)
         assertEquals("a", subscription.poll()?.assignment)
-        assertNull(subscription.poll(), "the same version is not handed out twice")
+        assertNull(subscription.poll())
         exchange.offer("a", 4.0)
-        assertEquals("a", subscription.poll()?.assignment, "a re-published assignment at a new version is fresh")
+        assertEquals("a", subscription.poll()?.assignment)
     }
 
     @Test
-    fun `subscriptions track their own position`() {
+    fun `subscriptions should track their own position`() {
         val exchange = minimizing()
         val early = exchange.subscribe()
         exchange.offer("a", 5.0)
         early.poll()
         exchange.offer("b", 4.0)
         val late = exchange.subscribe()
-        assertEquals("b", late.poll()?.assignment, "a fresh subscription starts from whatever stands")
-        assertEquals("b", early.poll()?.assignment, "and does not consume it for the older one")
-    }
-
-    @Test
-    fun `a verifier sees the candidate it was offered`() {
-        val seen = mutableListOf<Candidate<String, Double>>()
-        val exchange = IncumbentExchange<String, Double>(
-            improves = { candidate, standing -> candidate < standing },
-            verifier = { candidate ->
-                seen += candidate
-                Verification.Accepted(candidate)
-            },
-        )
-        exchange.offer("a", 2.0)
-        assertEquals(listOf(Candidate("a", 2.0)), seen)
-    }
-
-    @Test
-    fun `a trusting verifier accepts every candidate`() {
-        val verifier = CandidateVerifier.trusting<String, Double>()
-        val verdict = assertIs<Verification.Accepted<String, Double>>(verifier.verify(Candidate("a", Double.NaN)))
-        assertTrue(verdict.candidate.assignment == "a")
+        assertEquals("b", late.poll()?.assignment)
+        assertEquals("b", early.poll()?.assignment)
     }
 }

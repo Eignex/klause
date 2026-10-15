@@ -3,15 +3,15 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,12 +36,17 @@ class TheoryCompletionTest {
     )
 
     @Test
-    fun `completion preserves a pinned integer beyond Long`() {
+    fun `completion should preserve a pinned integer beyond Long`() {
         val wide = parseBigInt("9223372036854775808")
         val open = Bits(1).also { it.set(0) }
-        val source = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, wide)), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, wide)),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val completion = TheoryCompletion(source, TheoryParams())
         val candidate = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(wide))
 
@@ -52,7 +57,7 @@ class TheoryCompletionTest {
     }
 
     @Test
-    fun `candidate retries share their native check allowance`() {
+    fun `candidate retries should share their native check allowance`() {
         val completion = TheoryCompletion(Problem(0, 0, emptyArray(), emptyArray()), TheoryParams(maxLeaves = 1))
         val candidate = Sample(booleanArrayOf(), longArrayOf())
 
@@ -67,7 +72,7 @@ class TheoryCompletionTest {
     }
 
     @Test
-    fun `a candidate over strict rows completes to an exact point strictly inside them`() {
+    fun `candidate over strict rows should complete to an exact point strictly inside them`() {
         val candidate = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
 
         val completion = TheoryCompletion(model, TheoryParams()).complete(candidate, Cancellation.Never)
@@ -77,16 +82,35 @@ class TheoryCompletionTest {
     }
 
     @Test
-    fun `a pinned Boolean completion preserves strict source rows`() {
-        val guarded = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+    fun `pinned Boolean completion should preserve strict source rows`() {
+        val guarded = Problem(
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             numRealVars = 1,
             realLower = model.realLower,
             realUpper = model.realUpper,
             factors = arrayOf(
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.GE, 1.0)))
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    0.0,
+                ),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    1.0,
+                ),
+            ),
+        )
         val candidate = Sample(booleanArrayOf(false), LongArray(0), doubleArrayOf(0.0))
 
         val completion = TheoryCompletion(guarded, TheoryParams()).complete(candidate, Cancellation.Never)
@@ -98,16 +122,35 @@ class TheoryCompletionTest {
     }
 
     @Test
-    fun `an inconsistent pinned Boolean completion is refuted`() {
-        val guarded = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+    fun `inconsistent pinned Boolean completion should be refuted`() {
+        val guarded = Problem(
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             numRealVars = 1,
             realLower = model.realLower,
             realUpper = model.realUpper,
             factors = arrayOf(
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                    doubleArrayOf(1.0), LinearOp.GE, 1.0)))
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    0.0,
+                ),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    1.0,
+                ),
+            ),
+        )
         val candidate = Sample(booleanArrayOf(true), LongArray(0), doubleArrayOf(0.0))
 
         val completion = TheoryCompletion(guarded, TheoryParams()).complete(candidate, Cancellation.Never)

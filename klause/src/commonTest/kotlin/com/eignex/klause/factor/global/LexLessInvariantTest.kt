@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class LexLessInvariantTest {
 
     @Test
-    fun `repair moves restore violated strict lex at first decided position`() {
+    fun `repair moves should restore violated strict lex at the first decided position`() {
         val factor = LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)
         val problem = Problem(
             numBoolVars = 0,
@@ -24,7 +24,6 @@ class LexLessInvariantTest {
             factors = arrayOf<Factor>(factor),
         )
         val state = LocalSearchState(problem.bake(), Random(0))
-        // xs = [3, 1], ys = [2, 4]. Violation at k=0 (xs[0]=3 > ys[0]=2).
         state.assignment.setInt(0, 3)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 2)
@@ -33,20 +32,13 @@ class LexLessInvariantTest {
         assertTrue(state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
         state.factors[0].proposeRepairMoves(state, 0, sink)
-        // Expect a move lowering xs[0] to ≤ 1 (strict ≤ b-1 = 1) and/or raising ys[0] to ≥ 4.
         val intSets = sink.list.filterIsInstance<IntSet>()
-        assertTrue(
-            intSets.any { it.varId == 0 && it.newValue == 1L },
-            "expected IntSet(xs[0]=1) in $intSets",
-        )
-        assertTrue(
-            intSets.any { it.varId == 2 && it.newValue == 4L },
-            "expected IntSet(ys[0]=4) in $intSets",
-        )
+        assertTrue(intSets.any { it.varId == 0 && it.newValue == 1L }, "$intSets")
+        assertTrue(intSets.any { it.varId == 2 && it.newValue == 4L }, "$intSets")
     }
 
     @Test
-    fun `repair adds swap compound when both opposites fit domains`() {
+    fun `repair should add a swap compound when both opposites fit domains`() {
         val factor = LexLess(intArrayOf(0), intArrayOf(1), strict = true)
         val problem = Problem(
             numBoolVars = 0,
@@ -69,12 +61,12 @@ class LexLessInvariantTest {
                     IntSet(1, 4),
                 )
             },
-            "expected swap Compound(IntSet(0,2), IntSet(1,4)) in $compounds",
+            "$compounds",
         )
     }
 
     @Test
-    fun `repair steps a lowered x across a hole to the next present value`() {
+    fun `repair should step a lowered x across a hole to the next present value`() {
         val factor = LexLess(intArrayOf(0), intArrayOf(1), strict = true)
         val problem = Problem(
             numBoolVars = 0,
@@ -91,7 +83,7 @@ class LexLessInvariantTest {
         state.factors[0].proposeRepairMoves(state, 0, sink)
 
         val xTargets = sink.list.filterIsInstance<IntSet>().filter { it.varId == 0 }.map { it.newValue }
-        assertTrue(2L in xTargets, "expected the step below 4 to skip the hole at 3 in $xTargets")
-        assertTrue(3L !in xTargets, "a repair must never target the hole at 3: $xTargets")
+        assertTrue(2L in xTargets, "$xTargets")
+        assertTrue(3L !in xTargets, "$xTargets")
     }
 }

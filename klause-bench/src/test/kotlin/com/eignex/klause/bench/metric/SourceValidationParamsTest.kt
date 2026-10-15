@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class SourceValidationParamsTest {
     @Test
-    fun `source checking is opt in`() {
+    fun `source checking should be opt in`() {
         val params = SourceValidationParams(SolverInvocation.Settings(params = listOf("seed=7")))
 
         assertFalse(params.requested)
@@ -16,7 +16,7 @@ class SourceValidationParamsTest {
     }
 
     @Test
-    fun `source checking does not forward its flag to the solver`() {
+    fun `source checking should not forward its flag to the solver`() {
         val settings = SolverInvocation.Settings(params = listOf("source-validation=true", "bt-arm=satOptimized"))
 
         val params = SourceValidationParams(settings)
@@ -27,7 +27,7 @@ class SourceValidationParamsTest {
     }
 
     @Test
-    fun `an invalid source checking flag is rejected`() {
+    fun `an invalid source checking flag should be rejected`() {
         assertFailsWith<IllegalArgumentException> {
             SourceValidationParams(SolverInvocation.Settings(params = listOf("source-validation=maybe")))
         }

@@ -12,7 +12,7 @@ class QuadraticCertificationTest {
     private val checker = QuadraticCertification()
 
     @Test
-    fun `cross coefficients retain their literal product value`() {
+    fun `cross coefficients should retain their literal product value`() {
         val model = QuadraticModel(listOf(q(0), q(0)), listOf(listOf(q(2), q(3)), listOf(q(3), q(4))))
 
         val value = checker.evaluate(model, listOf(q(2), q(5)))
@@ -21,7 +21,7 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `stationarity and convexity certify an attained rational optimum`() {
+    fun `stationarity and convexity should certify an attained rational optimum`() {
         val model = QuadraticModel(listOf(q(-1)), listOf(listOf(q(2))))
 
         val bound = checker.bound(model, QuadraticStationaryCertificate(listOf(q(1) * q(2).reciprocal()), emptyList()))
@@ -31,9 +31,10 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `a dual bound does not require a feasible stationary anchor`() {
+    fun `dual bound should not require a feasible stationary anchor`() {
         val model = QuadraticModel(
-            listOf(q(0)), listOf(listOf(q(2))),
+            listOf(q(0)),
+            listOf(listOf(q(2))),
             rows = listOf(QuadraticRow(listOf(q(-1)), q(-2), QuadraticRowRelation.LE)),
         )
 
@@ -44,7 +45,7 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `wrong dual multiplier cannot certify a stationary point`() {
+    fun `wrong dual multiplier should not certify a stationary point`() {
         val model = QuadraticModel(listOf(q(-1)), listOf(listOf(q(2))))
 
         val bound = checker.bound(model, QuadraticStationaryCertificate(listOf(q(1)), emptyList()))
@@ -53,9 +54,10 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `negative inequality multipliers cannot certify a lower bound`() {
+    fun `negative inequality multipliers should not certify a lower bound`() {
         val model = QuadraticModel(
-            listOf(q(1)), listOf(listOf(q(0))),
+            listOf(q(1)),
+            listOf(listOf(q(0))),
             rows = listOf(QuadraticRow(listOf(q(1)), q(0), QuadraticRowRelation.LE)),
         )
 
@@ -63,30 +65,31 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `a nonconvex stationary point cannot certify a global bound`() {
+    fun `nonconvex stationary point should not certify a global bound`() {
         val model = QuadraticModel(listOf(q(0)), listOf(listOf(q(-2))))
 
         assertNull(checker.bound(model, QuadraticStationaryCertificate(listOf(q(0)), emptyList())))
     }
 
     @Test
-    fun `zero diagonal with a nonzero cross term is not positive semidefinite`() {
+    fun `zero diagonal with a nonzero cross term should not be positive semidefinite`() {
         val model = QuadraticModel(listOf(q(0), q(0)), listOf(listOf(q(0), q(1)), listOf(q(1), q(0))))
 
         assertEquals(false, checker.positiveSemidefinite(model))
     }
 
     @Test
-    fun `rank deficient convex objective retains a global certificate`() {
+    fun `rank deficient convex objective should retain a global certificate`() {
         val model = QuadraticModel(listOf(q(0), q(0)), listOf(listOf(q(2), q(2)), listOf(q(2), q(2))))
 
         assertNotNull(checker.bound(model, QuadraticStationaryCertificate(listOf(q(1), q(-1)), emptyList())))
     }
 
     @Test
-    fun `strict source boundary separates unattained infimum from optimum`() {
+    fun `strict source boundary should separate an unattained infimum from an optimum`() {
         val model = QuadraticModel(
-            listOf(q(0)), listOf(listOf(q(2))),
+            listOf(q(0)),
+            listOf(listOf(q(2))),
             rows = listOf(QuadraticRow(listOf(q(-1)), q(0), QuadraticRowRelation.LT)),
         )
         val bound = assertNotNull(checker.bound(model, QuadraticStationaryCertificate(listOf(q(0)), listOf(q(0)))))
@@ -98,9 +101,10 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `strict complementarity certifies a linear unattained infimum`() {
+    fun `strict complementarity should certify a linear unattained infimum`() {
         val model = QuadraticModel(
-            listOf(q(1)), listOf(listOf(q(0))),
+            listOf(q(1)),
+            listOf(listOf(q(0))),
             rows = listOf(QuadraticRow(listOf(q(-1)), q(0), QuadraticRowRelation.LT)),
         )
         val bound = assertNotNull(checker.bound(model, QuadraticStationaryCertificate(listOf(q(0)), listOf(q(1)))))
@@ -109,9 +113,10 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `an infeasible approach path cannot establish infimum`() {
+    fun `infeasible approach path should not establish an infimum`() {
         val model = QuadraticModel(
-            listOf(q(0)), listOf(listOf(q(2))),
+            listOf(q(0)),
+            listOf(listOf(q(2))),
             rows = listOf(QuadraticRow(listOf(q(-1)), q(0), QuadraticRowRelation.LT)),
         )
         val bound = assertNotNull(checker.bound(model, QuadraticStationaryCertificate(listOf(q(0)), listOf(q(0)))))
@@ -120,9 +125,10 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `another feasible minimizer prevents a false nonattainment claim`() {
+    fun `another feasible minimizer should prevent a false nonattainment claim`() {
         val model = QuadraticModel(
-            listOf(q(0)), listOf(listOf(q(0))),
+            listOf(q(0)),
+            listOf(listOf(q(0))),
             rows = listOf(QuadraticRow(listOf(q(-1)), q(0), QuadraticRowRelation.LT)),
         )
         val bound = assertNotNull(checker.bound(model, QuadraticStationaryCertificate(listOf(q(0)), listOf(q(0)))))
@@ -131,9 +137,10 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `feasible improving recession ray certifies unboundedness`() {
+    fun `feasible improving recession ray should certify unboundedness`() {
         val model = QuadraticModel(
-            listOf(q(-1)), listOf(listOf(q(0))),
+            listOf(q(-1)),
+            listOf(listOf(q(0))),
             rows = listOf(QuadraticRow(listOf(q(-1)), q(0), QuadraticRowRelation.LT)),
         )
 
@@ -141,16 +148,17 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `negative curvature recession ray certifies nonconvex unboundedness`() {
+    fun `negative curvature recession ray should certify nonconvex unboundedness`() {
         val model = QuadraticModel(listOf(q(0)), listOf(listOf(q(-2))))
 
         assertNotNull(checker.unbounded(model, listOf(q(0)), listOf(q(1))))
     }
 
     @Test
-    fun `improving direction blocked by a source row cannot certify unboundedness`() {
+    fun `improving direction blocked by a source row should not certify unboundedness`() {
         val model = QuadraticModel(
-            listOf(q(-1)), listOf(listOf(q(0))),
+            listOf(q(-1)),
+            listOf(listOf(q(0))),
             rows = listOf(QuadraticRow(listOf(q(1)), q(2), QuadraticRowRelation.LE)),
         )
 
@@ -158,14 +166,14 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `positive curvature cannot certify unlimited improvement`() {
+    fun `positive curvature should not certify unlimited improvement`() {
         val model = QuadraticModel(listOf(q(-1)), listOf(listOf(q(2))))
 
         assertNull(checker.unbounded(model, listOf(q(0)), listOf(q(1))))
     }
 
     @Test
-    fun `exhausted work allowance stops before certificate checking`() {
+    fun `exhausted work allowance should stop before certificate checking`() {
         val model = QuadraticModel(listOf(q(0)), listOf(listOf(q(2))))
         val limited = QuadraticCertification(QuadraticControl(maximumWork = 0))
 
@@ -177,7 +185,7 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `cancelled invocation cannot publish a certificate`() {
+    fun `cancelled invocation should not publish a certificate`() {
         val model = QuadraticModel(listOf(q(0)), listOf(listOf(q(2))))
         val cancelled = QuadraticCertification(QuadraticControl(Cancellation { true }))
 
@@ -189,7 +197,7 @@ class QuadraticCertificationTest {
     }
 
     @Test
-    fun `matrix allocation cap declines instead of truncating the objective`() {
+    fun `matrix allocation cap should decline instead of truncating the objective`() {
         val model = QuadraticModel(listOf(q(0)), listOf(listOf(q(2))))
         val limited = QuadraticCertification(QuadraticControl(maximumMatrixCells = 0))
 

@@ -35,7 +35,6 @@ class HermiteFormTest {
         assertTrue(det == BIG_ONE || det == -BIG_ONE, "V must be unimodular, det was $det")
     }
 
-    /** `det` by fraction-free Gaussian elimination — only used to assert unimodularity (`±1`). */
     private fun determinant(m: Array<Array<BigInt>>): BigInt {
         val n = m.size
         if (n == 0) return BIG_ONE
@@ -62,33 +61,31 @@ class HermiteFormTest {
     }
 
     @Test
-    fun `a two by two matrix factorises with a unimodular transform`() {
+    fun `two by two matrix should factorise with a unimodular transform`() {
         form(longArrayOf(2, 3), longArrayOf(4, 5))
     }
 
     @Test
-    fun `the pivot entry is made positive`() {
+    fun `hermite form should make the pivot entry positive`() {
         val f = form(longArrayOf(-4, 6))
         assertTrue(f.h[0][0] > BIG_ZERO, "pivot must be positive, was ${f.h[0][0]}")
     }
 
     @Test
-    fun `a gcd row reduces to the gcd`() {
+    fun `gcd row should reduce to the gcd`() {
         // The first row's entries have gcd 2, which the column Euclid step must expose as the pivot.
         val f = form(longArrayOf(6, 10, 14))
         assertEquals(bigIntOf(2), f.h[0][0])
     }
 
     @Test
-    fun `a zero row leaves the remaining columns to later pivots`() {
+    fun `zero row should leave the remaining columns to later pivots`() {
         val f = form(longArrayOf(0, 0), longArrayOf(2, 3))
-        assertEquals(BIG_ONE, f.h[1][0], "row 1 pivots at the gcd of 2 and 3")
+        assertEquals(BIG_ONE, f.h[1][0])
     }
 
     @Test
-    fun `intermediate coefficients stay bounded on an adversarial matrix`() {
-        // The column-Euclidean form is the version cited for intermediate coefficient explosion, so the
-        // growth is measured rather than assumed: a dense matrix of coprime-ish entries is its bad case.
+    fun `hermite form should keep coefficients bounded on an adversarial matrix`() {
         val n = 8
         val primes = longArrayOf(1000003, 999983, 1000033, 999979, 1000037, 999961, 1000039, 999959)
         val m = List(n) { i ->
@@ -101,10 +98,7 @@ class HermiteFormTest {
         var widest = 0
         for (row in f.h) for (e in row.value) widest = maxOf(widest, e.abs().toString().length)
         for (i in 0 until n) for (j in 0 until n) widest = maxOf(widest, f.v[i, j].abs().toString().length)
-        // Measured: 18 digits out of 7-digit inputs. The pivot-smallest rule plus the canonical
-        // reduction hold growth to roughly 2.5x here, so this form is not the blow-up its reputation
-        // suggests on this shape. The ceiling is generous but fails loudly if it is ever swapped for one
-        // that does explode.
+        // 7-digit inputs reach 18 digits; the ceiling leaves room but catches an exploding form.
         assertTrue(widest < 40, "widest entry was $widest digits")
     }
 }

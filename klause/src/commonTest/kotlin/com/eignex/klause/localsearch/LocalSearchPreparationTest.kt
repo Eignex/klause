@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 
 class LocalSearchPreparationTest {
     @Test
-    fun `another arm completes shared preparation without repeating completed factors`() {
+    fun `another arm should complete shared preparation without repeating completed factors`() {
         var expired = false
         val visits = IntArray(512)
         val factors = Array<Factor>(visits.size) { fid ->
@@ -50,15 +50,17 @@ class LocalSearchPreparationTest {
     }
 
     @Test
-    fun `repeated coordinates dispatch one invariant update per move`() {
+    fun `repeated coordinates should dispatch one invariant update per move`() {
         val variants = listOf(Move.BoolFlip(0), Move.IntSet(0, 1L), Move.RealSet(0, 1.0))
         for (move in variants) {
             var updates = 0
             val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
             val factor = object : Factor by clause, Invariant {
                 override val variables = MixedVars(
-                    spanInts = intArrayOf(0, 0), boundInts = intArrayOf(0),
-                    boolVars = intArrayOf(0, 0), reals = intArrayOf(0, 0),
+                    spanInts = intArrayOf(0, 0),
+                    boundInts = intArrayOf(0),
+                    boolVars = intArrayOf(0, 0),
+                    reals = intArrayOf(0, 0),
                 )
 
                 override val boolVars: IntArray get() = variables.boolVars
@@ -80,8 +82,13 @@ class LocalSearchPreparationTest {
                 }
             }
             val problem = Problem(
-                1, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(factor),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+                1,
+                1,
+                arrayOf(IntDomain(0, 1)),
+                arrayOf<Factor>(factor),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(1.0),
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
             state.recompute()
@@ -93,7 +100,7 @@ class LocalSearchPreparationTest {
     }
 
     @Test
-    fun `completed indexes preserve factor order and exclude inert invariants`() {
+    fun `completed indexes should preserve factor order and exclude inert invariants`() {
         val clause = Clause(intArrayOf(Lit.make(0, true)))
         val problem = Problem(
             numBoolVars = 1,

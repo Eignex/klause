@@ -18,28 +18,40 @@ import kotlin.test.assertIs
 
 class PolynomialFormulaTest {
     @Test
-    fun `private selections preserve shared Boolean branch correlation`() {
-        val source = SmtLibPolynomial.parse("""
+    fun `private selections should preserve shared Boolean branch correlation`() {
+        val source = SmtLibPolynomial.parse(
+            """
             (declare-const x Real) (declare-const b Bool)
             (assert (= (ite b (* x x) 3) 4))
             (assert (= (ite b 5 (* x x)) 4))
-        """.trimIndent())
+            """.trimIndent(),
+        )
         val fixed = mapOf(0 to BigFraction.ofLong(2), 1 to BigFraction.ofLong(4), 2 to BigFraction.ofLong(4))
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
-            condition = PolynomialCondition(lower = fixed, upper = fixed))
+        val result = solveQfNra(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            condition = PolynomialCondition(lower = fixed, upper = fixed),
+        )
 
         assertIs<QfNraResult.Unsatisfiable>(result)
     }
 
     @Test
-    fun `selection invocations retract Boolean pins between exact completions`() {
-        val source = SmtLibPolynomial.parse("""
+    fun `selection invocations should retract Boolean pins between exact completions`() {
+        val source = SmtLibPolynomial.parse(
+            """
             (declare-const x Real) (declare-const r Real) (declare-const b Bool)
             (assert (= r (ite b (* x x) 3)))
-        """.trimIndent())
-        val invocation = PolynomialTheoryService(source.formula, source.boolCount, source.realCount,
-            mapOf(0 to BigFraction.ofLong(2))).invocation()
+            """.trimIndent(),
+        )
+        val invocation = PolynomialTheoryService(
+            source.formula,
+            source.boolCount,
+            source.realCount,
+            mapOf(0 to BigFraction.ofLong(2)),
+        ).invocation()
 
         try {
             for ((branch, expected) in listOf(true to 4L, false to 3L, true to 4L)) {
@@ -55,10 +67,13 @@ class PolynomialFormulaTest {
     }
 
     @Test
-    fun `cancelled private selection encoding exposes no partial normalized formula`() {
-        val source = PolynomialSelection(SourceRealId(0),
+    fun `cancelled private selection encoding should expose no partial normalized formula`() {
+        val source = PolynomialSelection(
+            SourceRealId(0),
             PolynomialRealFormula.BooleanVariable(SourceBoolId(0)),
-            PolynomialExpression.Constant.of(bigIntOf(1)), PolynomialExpression.Constant.of(bigIntOf(2)))
+            PolynomialExpression.Constant.of(bigIntOf(1)),
+            PolynomialExpression.Constant.of(bigIntOf(2)),
+        )
         val arithmetic = PolynomialArithmetic(Cancellation { true })
 
         assertFailsWith<PolynomialInterrupted> { PolynomialFormula.normalize(source, arithmetic) }

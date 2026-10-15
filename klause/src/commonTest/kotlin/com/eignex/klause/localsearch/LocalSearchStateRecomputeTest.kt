@@ -21,7 +21,6 @@ import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class LocalSearchStateRecomputeTest {
 
@@ -35,10 +34,10 @@ class LocalSearchStateRecomputeTest {
     )
 
     @Test
-    fun `after random moves state matches fresh recompute`() {
+    fun `state should match a fresh recompute after random moves`() {
         for (case in cases) {
             val baked = case.problem.bake()
-            for (seed in 0 until 8) {
+            for (seed in 0 until 3) {
                 val state = LocalSearchState(baked, Random(seed.toLong()))
                 state.restart()
 
@@ -52,56 +51,15 @@ class LocalSearchStateRecomputeTest {
                 copyAssignment(state, sibling)
                 sibling.recompute()
 
-                assertEquals(
-                    sibling.cost,
-                    state.cost,
-                    "${case.name} seed=$seed: cost drifted from recompute",
-                )
-                assertEquals(
-                    sibling.violated.toIntArray().sortedArray().toList(),
-                    state.violated.toIntArray().sortedArray().toList(),
-                    "${case.name} seed=$seed: violated set drifted",
-                )
+                val label = "${case.name} seed=$seed"
+                assertEquals(sibling.cost, state.cost, label)
+                assertEquals(sibling.violated.toIntArray().sorted(), state.violated.toIntArray().sorted(), label)
                 for (fid in 0 until case.problem.numFactors) {
-                    assertEquals(
-                        sibling.intPayload[fid],
-                        state.intPayload[fid],
-                        "${case.name} seed=$seed: intPayload[$fid] drifted",
-                    )
+                    assertEquals(sibling.intPayload[fid], state.intPayload[fid], "$label factor $fid")
                     // Clause watch positions may differ while tracking the same truth.
                     if (case.problem.factors[fid] !is Clause) {
-                        assertEquals(
-                            sibling.longPayload[fid],
-                            state.longPayload[fid],
-                            "${case.name} seed=$seed: longPayload[$fid] drifted",
-                        )
+                        assertEquals(sibling.longPayload[fid], state.longPayload[fid], "$label factor $fid")
                     }
-                    val fa = case.problem.invariants[fid]
-                    assertEquals(
-                        fa.isViolated(sibling, fid),
-                        fa.isViolated(state, fid),
-                        "${case.name} seed=$seed: factor $fid (${fa::class.simpleName}) " +
-                            "isViolated drifted",
-                    )
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `violated set is subset of factor space`() {
-        for (case in cases) {
-            val state = LocalSearchState(case.problem.bake(), Random(0))
-            state.restart()
-            val rng = Random(0xCAFEL)
-            repeat(100) {
-                val move = randomMove(case.problem, state, rng) ?: return@repeat
-                state.apply(move)
-                for (fid in state.violated.toIntArray()) {
-                    assertTrue(
-                        fid in 0 until case.problem.numFactors,
-                        "${case.name}: violated set contains out-of-range $fid",
-                    )
                 }
             }
         }

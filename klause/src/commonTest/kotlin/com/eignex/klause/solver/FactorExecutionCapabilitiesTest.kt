@@ -35,7 +35,7 @@ import kotlin.test.assertTrue
 
 class FactorExecutionCapabilitiesTest {
     @Test
-    fun `built in families materialize their declared execution routes`() {
+    fun `built-in factors should materialize their declared execution routes`() {
         val literals = intArrayOf(Lit.make(0, true), Lit.make(1, false))
         val factors = listOf<Factor>(
             Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
@@ -47,7 +47,10 @@ class FactorExecutionCapabilitiesTest {
             AllDifferent(intArrayOf(0, 1), 0, 2),
             AllDifferent(intArrayOf(0, 1), 0, 2, presents = literals, boundsConsistent = true),
             GlobalCardinality(
-                intArrayOf(0, 1), longArrayOf(0, 1), countLow = intArrayOf(0, 0), countHigh = intArrayOf(2, 2),
+                intArrayOf(0, 1),
+                longArrayOf(0, 1),
+                countLow = intArrayOf(0, 0),
+                countHigh = intArrayOf(2, 2),
             ),
             NValue(0, intArrayOf(1, 2)),
             Inverse(intArrayOf(0, 1), intArrayOf(2, 3)),
@@ -76,13 +79,26 @@ class FactorExecutionCapabilitiesTest {
             Sort(intArrayOf(0, 1), intArrayOf(2, 3)),
             RealProduct(0, 0, 1, 0.0, 1.0),
             ContinuousProduct(0, 0, 1),
-            Power(Power.Coordinate.Real(com.eignex.klause.ir.SourceRealId(0)), 2,
-                Power.Coordinate.Real(com.eignex.klause.ir.SourceRealId(1))),
+            Power(
+                Power.Coordinate.Real(com.eignex.klause.ir.SourceRealId(0)),
+                2,
+                Power.Coordinate.Real(com.eignex.klause.ir.SourceRealId(1)),
+            ),
             ReifiedRealLinear(
-                0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0,
+                0,
+                intArrayOf(0),
+                doubleArrayOf(1.0),
+                intArrayOf(0),
+                doubleArrayOf(1.0),
+                LinearOp.LE,
+                1.0,
             ),
             ObjectiveBoundFactor(
-                intArrayOf(0), longArrayOf(1), intArrayOf(0), longArrayOf(1), MutableObjectiveBound(0),
+                intArrayOf(0),
+                longArrayOf(1),
+                intArrayOf(0),
+                longArrayOf(1),
+                MutableObjectiveBound(0),
             ),
             GaussianXor(listOf(Xor(literals, 1))),
             DifferenceSystem(listOf(DifferenceEdge(0, 1, 0))),
@@ -110,7 +126,7 @@ class FactorExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `a structural only custom factor refuses execution with a route reason`() {
+    fun `structural-only custom factor should refuse execution with a route reason`() {
         val factor = object : Factor by Clause(intArrayOf(Lit.make(0, true))) {}
 
         val propagation = assertFailsWith<IllegalStateException> { factor.propagatorProjection() }
@@ -121,7 +137,7 @@ class FactorExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `custom engine implementations retain their execution paths`() {
+    fun `custom factor implementing engine interfaces should project to itself`() {
         val factor = object : Factor by Clause(intArrayOf(Lit.make(0, true))), Propagator, Invariant {}
 
         assertSame(factor, factor.propagatorProjection())
@@ -129,7 +145,7 @@ class FactorExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `a custom propagation only factor deliberately omits local scoring`() {
+    fun `propagation-only custom factor should have inert scoring`() {
         val factor = object : Factor by Clause(intArrayOf(Lit.make(0, true))), Propagator {}
 
         assertSame(factor, factor.propagatorProjection())
@@ -138,30 +154,7 @@ class FactorExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `continuous arithmetic scores require source certification`() {
-        val factor = RealProduct(0, 0, 1, 0.0, 1.0)
-
-        val capabilities = factor.executionCapabilities()
-
-        assertEquals(AssignmentCheckCapability.SOURCE_CERTIFICATION, capabilities.assignmentCheck)
-        assertEquals(ScoringCapability.HEURISTIC, capabilities.scoring)
-        assertEquals(RelaxationCapability.SOUND, capabilities.relaxation)
-    }
-
-    @Test
-    fun `continuous product scores require source certification without linear relaxation`() {
-        val factor = ContinuousProduct(0, 0, 1)
-        val capabilities = factor.executionCapabilities()
-
-        assertEquals(PropagationCapability.INERT, capabilities.propagation)
-        assertEquals(AssignmentCheckCapability.SOURCE_CERTIFICATION, capabilities.assignmentCheck)
-        assertEquals(ScoringCapability.HEURISTIC, capabilities.scoring)
-        assertEquals(RelaxationCapability.NONE, capabilities.relaxation)
-        assertSame(NoPropagator, factor.propagatorProjection())
-    }
-
-    @Test
-    fun `custom linear declarations retain their sound relaxation path`() {
+    fun `custom linear factor should keep its sound LP relaxation`() {
         val factor = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1) {}
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(factor))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))

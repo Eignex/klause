@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class DoubleBoundedReductionTest {
 
     @Test
-    fun `the transformed rows preserve every source activity through recovery`() {
+    fun `reduction should preserve every source activity through recovery`() {
         val original = listOf(
             row(longArrayOf(2, 3), -100, 100),
             row(longArrayOf(1, -1), -100, 100),
@@ -31,7 +31,7 @@ class DoubleBoundedReductionTest {
     }
 
     @Test
-    fun `a cancelled reduction does not return a partial transform`() {
+    fun `cancelled reduction should not return a partial transform`() {
         assertNull(doubleBoundedReduction(listOf(row(longArrayOf(1, 1), 0, 2)), 2, Cancellation { true }))
     }
 

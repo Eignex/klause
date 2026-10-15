@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 
 class CompareRecordsTest {
     @Test
-    fun `saved record tools compare exact objectives in either direction`() {
+    fun `saved record tools should compare exact objectives in either direction`() {
         val tools = File("tools").takeIf { it.isDirectory } ?: File("klause-bench/tools")
         val script = """
             import sys

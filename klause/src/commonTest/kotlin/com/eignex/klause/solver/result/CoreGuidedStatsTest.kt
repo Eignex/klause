@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 
 class CoreGuidedStatsTest {
     @Test
-    fun `copying core observations retains resource limits`() {
+    fun `copy should keep resource limits`() {
         val stats = CoreGuidedStats(2L, 4, bigIntOf(3), workLimit = 5_000L, activeMillisLimit = 2_000L)
 
         val copied = stats.copy(cores = 3L, largestCore = 5, lowerBound = bigIntOf(7))

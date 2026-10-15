@@ -8,6 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
@@ -15,21 +16,32 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class RepairChainsTest {
 
     @Test
-    fun `clause repair ranking includes maintained Boolean consequences`() {
-        val problem = Problem(5, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(4, true))),
-            Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
-        ))
-        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
-        )))
+    fun `clause repair ranking should include maintained Boolean consequences`() {
+        val problem = Problem(
+            5,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(4, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+            ),
+        )
+        val sweep = assertNotNull(
+            DefinitionalSweep.infer(
+                problem,
+                boolFolds = listOf(
+                    BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+                ),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.invariants = sweep.network(0, 5)
         sweep.sweep(state.assignment, state.rootDomains)
@@ -44,7 +56,7 @@ class RepairChainsTest {
     }
 
     @Test
-    fun `chain repair scoring matches clause deltas after real moves`() {
+    fun `chain repair scoring should match clause deltas after real moves`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -74,7 +86,7 @@ class RepairChainsTest {
     }
 
     @Test
-    fun `successive chain proposals restore activity and factor degrees`() {
+    fun `successive chain proposals should restore activity and factor degrees`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -111,7 +123,7 @@ class RepairChainsTest {
     }
 
     @Test
-    fun `chain primitives step across a hole and keep the endpoints`() {
+    fun `chain primitives should step across a hole and keep the endpoints`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -130,5 +142,59 @@ class RepairChainsTest {
 
         val xTargets = sink.list.filterIsInstance<Move.IntSet>().filter { it.varId == 0 }.map { it.newValue }
         assertEquals(setOf(0L, 2L, 5L, 6L), xTargets.toSet(), "the step below 4 must skip the hole at 3")
+    }
+
+    private fun chainProblem(): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 2,
+        intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+        factors = arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
+        ),
+    )
+
+    private fun stateAt(
+        problem: Problem,
+        vals: IntArray,
+        assumptions: Assumptions = Assumptions.None,
+    ): LocalSearchState {
+        val state = LocalSearchState(problem.bake(), Random(7), assumptions)
+        for (i in vals.indices) state.assignment.setInt(i, vals[i].toLong())
+        state.recompute()
+        return state
+    }
+
+    @Test
+    fun `builder should grow the directed two-step chain and leave the state untouched`() {
+        val state = stateAt(chainProblem(), intArrayOf(0, 2))
+        assertEquals(2L, state.cost, "fixture must start at cost 2 (F0 degree)")
+        val costBefore = state.cost
+        val stepBefore = state.step
+        val sink = MoveSink()
+
+        val emitted = state.proposeRepairChains(seedFactor = 0, maxDepth = 4, firstMoveCap = 4, sink = sink)
+
+        assertTrue(emitted >= 1, "the F0 repair must seed at least one chain (got $emitted)")
+        val expected = listOf(Move.IntSet(0, 2), Move.IntSet(1, 0))
+        val chain = sink.list.filterIsInstance<Move.Compound>().firstOrNull { it.parts == expected }
+        assertTrue(chain != null, "the directed repair chain $expected must be emitted (got ${sink.list})")
+        assertEquals(costBefore, state.cost, "cost must be restored")
+        assertEquals(stepBefore, state.step, "step must be restored")
+        assertEquals(0, state.assignment.intValue(0), "x0 must be restored")
+        assertEquals(2, state.assignment.intValue(1), "x1 must be restored")
+        state.apply(chain)
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `reused chain pools should respect a newly frozen variable`() {
+        val state = stateAt(chainProblem(), intArrayOf(0, 2))
+        state.proposeRepairChains(seedFactor = 0, maxDepth = 4, firstMoveCap = 4, sink = MoveSink())
+        state.assumptions = Assumptions(ints = mapOf(1 to 2))
+
+        val emitted = state.proposeRepairChains(seedFactor = 0, maxDepth = 4, firstMoveCap = 4, sink = MoveSink())
+
+        assertEquals(0, emitted)
     }
 }

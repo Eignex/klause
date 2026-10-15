@@ -9,7 +9,7 @@ import kotlin.test.assertFalse
 class BacktrackCatalogTest {
 
     @Test
-    fun `clausal satisfaction leads with its clause only proof recipe`() {
+    fun `clausal satisfaction should lead with its clause only proof recipe`() {
         val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.Sat)
 
         val recipes = BacktrackCatalog.ranked(Kind.CSP, facts)
@@ -18,7 +18,7 @@ class BacktrackCatalogTest {
     }
 
     @Test
-    fun `clausal optimization keeps the SAT guard first`() {
+    fun `clausal optimization should keep the SAT guard first`() {
         val facts = ProblemFacts.assumed(Kind.COP, ProblemClass.Sat)
 
         val recipes = BacktrackCatalog.ranked(Kind.COP, facts)
@@ -27,7 +27,7 @@ class BacktrackCatalogTest {
     }
 
     @Test
-    fun `non clausal models exclude clause only recipes`() {
+    fun `non clausal models should exclude clause only recipes`() {
         for (problemClass in listOf(ProblemClass.PseudoBoolean, ProblemClass.FiniteCp, ProblemClass.Continuous)) {
             val facts = ProblemFacts.assumed(Kind.CSP, problemClass)
 
@@ -38,15 +38,14 @@ class BacktrackCatalogTest {
     }
 
     @Test
-    fun `each arm builds by label with a matching label`() {
-        // Guards the BacktrackArm.label <-> produced config label lockstep the LP arms rely on.
+    fun `each arm should build by label with a matching label`() {
         for (label in BacktrackCatalog.labels(Kind.COP)) {
-            assertEquals(label, BacktrackCatalog.byLabel(label).label, "arm '$label' must build by label")
+            assertEquals(label, BacktrackCatalog.byLabel(label).label, label)
         }
     }
 
     @Test
-    fun `byLabel rejects an unknown arm`() {
+    fun `byLabel should reject an unknown arm`() {
         assertFailsWith<IllegalStateException> { BacktrackCatalog.byLabel("no-such-arm") }
     }
 }

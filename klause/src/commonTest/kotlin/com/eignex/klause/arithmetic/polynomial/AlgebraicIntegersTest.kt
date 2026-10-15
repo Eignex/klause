@@ -13,7 +13,7 @@ class AlgebraicIntegersTest {
     private val arithmetic = AlgebraicArithmetic()
 
     @Test
-    fun `negative irrational ceiling uses exact root order`() {
+    fun `negative irrational ceiling should use exact root order`() {
         val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).first()
 
         val ceiling = arithmetic.ceilInteger(value)
@@ -22,7 +22,7 @@ class AlgebraicIntegersTest {
     }
 
     @Test
-    fun `wide rational ceiling preserves every integer bit`() {
+    fun `wide rational ceiling should preserve every integer bit`() {
         val value = arithmetic.rational(BigFraction.of(parseBigInt("18014398509481987"), bigIntOf(2)))
 
         val ceiling = arithmetic.ceilInteger(value)
@@ -31,9 +31,10 @@ class AlgebraicIntegersTest {
     }
 
     @Test
-    fun `integer root remains integral with a nonpoint isolating interval`() {
+    fun `integer root should remain integral with a nonpoint isolating interval`() {
         val value = AlgebraicReal(
-            RationalPolynomial.of(-9, 0, 1), 2,
+            RationalPolynomial.of(-9, 0, 1),
+            2,
             RationalInterval(BigFraction.ofLong(2), BigFraction.ofLong(4)),
         )
 
@@ -43,7 +44,7 @@ class AlgebraicIntegersTest {
     }
 
     @Test
-    fun `irrational root has no exact integer value`() {
+    fun `irrational root should have no exact integer value`() {
         val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
 
         val integer = arithmetic.exactInteger(value)
@@ -52,7 +53,7 @@ class AlgebraicIntegersTest {
     }
 
     @Test
-    fun `cancelled integer extraction publishes no result`() {
+    fun `cancelled integer extraction should publish no result`() {
         val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val cancelled = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
 

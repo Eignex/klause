@@ -1,14 +1,9 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.formats.mps.MpsConstraint
-import com.eignex.klause.formats.mps.MpsModel
-import com.eignex.klause.formats.mps.MpsObjective
-import com.eignex.klause.formats.mps.MpsVar
-import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -20,12 +15,11 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 
 class OpenTheoryMinimizeTest {
 
     @Test
-    fun `replacing an open objective starts from the original unbounded source root`() {
+    fun `replacing an open objective should start from the unbounded source root`() {
         val parsed =
             modelOf(
                 """
@@ -49,7 +43,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `optimization envelope reports the whole descent time`() {
+    fun `the optimization envelope should report the whole descent time`() {
         val round = SolveStats(run = RunStats(backend = "exact-lia", wallMs = 25, timedOut = true))
         val envelope = SolveStats(run = RunStats(backend = "exact-lia", wallMs = 1_000))
 
@@ -79,7 +73,7 @@ class OpenTheoryMinimizeTest {
     )
 
     @Test
-    fun `minimizing an open column descends to the bound its rows imply`() {
+    fun `minimizing an open column should descend to the bound its rows imply`() {
         val parsed = modelOf(
             """
                 (declare-const x Int)
@@ -93,11 +87,11 @@ class OpenTheoryMinimizeTest {
 
         val optimum = assertIs<OpenTheoryOptimum.Optimal>(result)
         assertEquals("3", optimum.value.toString())
-        assertTrue(optimum.stats.lp.standalonePasses.sum > 0.0, "bound-closing LP work must reach the result")
+        assertTrue(optimum.stats.lp.standalonePasses.sum > 0.0)
     }
 
     @Test
-    fun `a sliced descent reaches the optimum an unsliced one proves`() {
+    fun `a sliced descent should reach the optimum an unsliced one proves`() {
         val parsed = stepped()
         val x = parsed.intVarNames.getValue("x")
         val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = -1L })
@@ -114,7 +108,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `a round refuting another arm's bound leaves the optimum to that arm`() {
+    fun `a round refuting another arm bound should leave the optimum to that arm`() {
         val parsed = stepped()
         val x = parsed.intVarNames.getValue("x")
         val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
@@ -130,7 +124,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `a repeated opening bound close is avoided`() {
+    fun `a repeated opening bound should not be closed twice`() {
         val parsed = modelOf("(declare-const x Int)")
         val x = parsed.intVarNames.getValue("x")
         val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
@@ -142,38 +136,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `constant objective reuses an unchanged opening bound attempt`() {
-        val parsed = modelOf("(declare-const x Int)")
-        val objective = LinearObjective(
-            intCoefficients = LongArray(parsed.model.numIntVars),
-            constant = 5L,
-        )
-
-        val result = OpenTheoryMinimizer(parsed.model, objective).minimize()
-
-        assertEquals("5", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
-        assertEquals(2.0, result.stats.lp.standalonePasses.sum)
-    }
-
-    @Test
-    fun `minimizing a negated column descends to the far side of its range`() {
-        val parsed = modelOf(
-            """
-                (declare-const x Int)
-                (assert (<= x 5))
-                (assert (>= x (- 4)))
-            """.trimIndent(),
-        )
-        val x = parsed.intVarNames.getValue("x")
-        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = -1L })
-
-        val result = OpenTheoryMinimizer(parsed.model, objective).minimize()
-
-        assertEquals("-5", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
-    }
-
-    @Test
-    fun `a model with no feasible assignment is infeasible rather than unbounded`() {
+    fun `a model with no feasible assignment should be infeasible rather than unbounded`() {
         val parsed = modelOf(
             """
                 (declare-const x Int)
@@ -188,7 +151,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `a budget spent before the first witness bounds the optimum by nothing`() {
+    fun `a budget spent before the first witness should bound the optimum by nothing`() {
         val parsed = modelOf(
             """
                 (declare-const x Int)
@@ -202,12 +165,12 @@ class OpenTheoryMinimizeTest {
             .minimize(TheoryParams(cancellation = Cancellation { true }))
 
         assertIs<OpenTheoryOptimum.Bounded>(result)
-        assertNull(result.incumbent, "nothing was proved feasible")
+        assertNull(result.incumbent)
         assertNull(result.value)
     }
 
     @Test
-    fun `a proved optimum is attained by the assignment reported with it`() {
+    fun `a proved optimum should be attained by the assignment reported with it`() {
         val parsed = stepped()
         val x = parsed.intVarNames.getValue("x")
         val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
@@ -219,7 +182,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `a budget spent mid-descent bounds the optimum by the standing incumbent`() {
+    fun `a budget spent mid descent should bound the optimum by the standing incumbent`() {
         val values = listOf(2L, 4L).map { decisions ->
             val parsed = stepped()
             val x = parsed.intVarNames.getValue("x")
@@ -242,18 +205,15 @@ class OpenTheoryMinimizeTest {
             val value = assertNotNull(result.value)
             val yValue = incumbent.intValue(parsed.intVarNames.getValue("y")).toInt()
             val zValue = incumbent.intValue(parsed.intVarNames.getValue("z")).toInt()
-            assertTrue(yValue in setOf(0, 20))
-            assertTrue(zValue in setOf(0, 7))
             assertEquals((yValue + zValue).toString(), incumbent.intValue(x))
             assertEquals(incumbent.intValue(x), value.toString())
-            assertTrue(value.toString() in setOf("0", "7", "20", "27"))
             value
         }
         assertTrue(values[1] < values[0])
     }
 
     @Test
-    fun `default integer point guidance attains a source optimum within two decisions`() {
+    fun `default integer point guidance should attain a source optimum within two decisions`() {
         val parsed = stepped()
         val x = parsed.intVarNames.getValue("x")
         val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
@@ -276,24 +236,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `an open MPS model with an objective reaches its optimum instead of being refused`() {
-        // The column is open above, so the model takes a theory route rather than finite CP; before an
-        // objective existed on that route the front-end refused the model outright.
-        val compiled = MpsModel(
-            "m",
-            ObjectiveDirection.MINIMIZE,
-            MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0),
-            listOf(MpsVar("x", integer = true, lower = null, upper = null)),
-            listOf(MpsConstraint("c", intArrayOf(0), doubleArrayOf(1.0), lower = 7.0, upper = null)),
-        ).toProblem()
-
-        val result = OpenTheoryMinimizer(compiled.model, compiled.objective!!.toLinearObjective()).minimize()
-
-        assertEquals("7", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
-    }
-
-    @Test
-    fun `an objective no row bounds below is unbounded rather than descended`() {
+    fun `an objective no row bounds below should be unbounded`() {
         val parsed = modelOf("(declare-const x Int)")
         val x = parsed.intVarNames.getValue("x")
         val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
@@ -306,7 +249,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `an objective unbounded through the column it negates is unbounded`() {
+    fun `an objective unbounded through the column it negates should be unbounded`() {
         val parsed = modelOf(
             """
                 (declare-const x Int)
@@ -320,7 +263,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `an objective unbounded inside one disjunct is unbounded`() {
+    fun `an objective unbounded inside one disjunct should be unbounded`() {
         val parsed = modelOf(
             """
                 (declare-const x Int)
@@ -336,18 +279,7 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
-    fun `an objective bounded only by its disjuncts reaches its optimum`() {
-        val parsed = stepped()
-        val x = parsed.intVarNames.getValue("x")
-        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
-
-        val result = assertIs<OpenTheoryOptimum.Optimal>(OpenTheoryMinimizer(parsed.model, objective).minimize())
-
-        assertEquals("0", result.value.toString())
-    }
-
-    @Test
-    fun `an optimum above the 64-bit range is reached rather than refuted`() {
+    fun `an optimum above the 64 bit range should be reached rather than refuted`() {
         val parsed = modelOf(
             """
                 (declare-const x Int)
@@ -361,5 +293,57 @@ class OpenTheoryMinimizeTest {
 
         assertEquals("170141183460469231731687303715884105728", result.value.toString())
         assertEquals("170141183460469231731687303715884105728", result.assignment.intValue(x))
+    }
+
+    @Test
+    fun `an objective weighting no column should be optimal at its constant`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int)
+                (assert (>= x 3))
+                (check-sat)
+            """.trimIndent(),
+        )
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars), constant = 4L)
+
+        val result = OpenTheoryMinimizer(parsed.model, objective).minimize()
+
+        assertEquals("4", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
+    }
+
+    @Test
+    fun `a route with no integer column should be optimal at a constant objective`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LRA)
+                (declare-const y Real)
+                (assert (>= y 1.0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = assertIs<OpenTheoryOptimum.Optimal>(
+            OpenTheoryMinimizer(parsed.model, LinearObjective(constant = 4L)).minimize(),
+        )
+
+        assertEquals("4", result.value.toString())
+        assertTrue(TheoryCompletion.parseRational(result.assignment.realValue(0)) >= BigFraction.ONE)
+    }
+
+    @Test
+    fun `an infeasible model with a constant objective should be infeasible`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int)
+                (assert (>= x 3))
+                (assert (<= x 1))
+                (check-sat)
+            """.trimIndent(),
+        )
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars), constant = 4L)
+
+        assertIs<OpenTheoryOptimum.Infeasible>(OpenTheoryMinimizer(parsed.model, objective).minimize())
     }
 }

@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 
 class SmtAlgebraicValueTest {
     @Test
-    fun `rational defining coefficients render the same exact selected real root`() {
+    fun `rational defining coefficients should render the same exact selected real root`() {
         val coefficients = listOf(
             BigFraction.of(bigIntOf(-2), bigIntOf(3)),
             BigFraction.ZERO,
@@ -23,7 +23,7 @@ class SmtAlgebraicValueTest {
     }
 
     @Test
-    fun `root coefficients preserve integers beyond machine precision`() {
+    fun `root coefficients should preserve integers beyond machine precision`() {
         val coefficient = parseBigInt("123456789012345678901234567890")
 
         val value = smtPolynomialRoot(
@@ -35,7 +35,7 @@ class SmtAlgebraicValueTest {
     }
 
     @Test
-    fun `source symbol rendering preserves spaces and numeric identities`() {
+    fun `source symbol rendering should preserve spaces and numeric identities`() {
         for ((source, expected) in listOf("source x" to "|source x|", "2" to "|2|")) {
             assertEquals(expected, smtSourceSymbol(source))
         }

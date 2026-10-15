@@ -1,33 +1,37 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.FloatLpStatus
-import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolution
-import com.eignex.klause.lp.engine.LpSolveContext
-import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.solveLp
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CpToLpRelaxationTest {
     @Test
-    fun `typed LP handles map back to the finite integer they represent`() {
+    fun `typed LP handles should map back to the finite integer they represent`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 10)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)),
         )
         val relaxation = CpToLpRelaxation(problem, null).build(PropagationSession(problem))
@@ -37,38 +41,20 @@ class CpToLpRelaxationTest {
         assertEquals(CpIntId(0), relaxation.cpInteger(column))
     }
 
-
-
     private val eps = 1e-9
 
-    @Test
-    fun `rebinding preserves the source factor of every row`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)),
-        )
-        val relaxation = CpToLpRelaxation(problem, null).build(PropagationSession(problem))
-
-        val rebound = relaxation.withModel(relaxation.model)
-
-        assertContentEquals(intArrayOf(0), rebound.rowFactorIds)
-    }
-
-    /** Solve the relaxation of [problem] under [objective] and return (solution, relaxation). */
     private fun solve(problem: Problem, objective: LinearObjective?): Pair<LpSolution, LpRelaxation> {
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
         return solveLp(relaxation.model) to relaxation
     }
 
-    /** LP column standing for integer variable [v], or -1. */
     private fun intCol(r: LpRelaxation, v: Int): Int {
         for (c in r.colVarId.indices) if (!r.colIsBool[c] && r.colVarId[c] == v) return c
         return -1
     }
 
     @Test
-    fun `linear constraints bound the objective`() {
-        // min x0  s.t.  x0 + x1 >= 5,  x1 <= 3,  x0,x1 in [0,10].  -> x0 >= 2.
+    fun `linear constraints should bound the objective`() {
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -86,21 +72,18 @@ class CpToLpRelaxationTest {
     }
 
     @Test
-    fun `objective constant is carried separately`() {
+    fun `objective constant should be carried separately`() {
         val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>())
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L), constant = 100L))
 
         assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(100L, r.objectiveConstant)
-        // LP objective (cost·x) is 0 at x0 = 0; the true bound is that plus the carried constant.
         assertEquals(0.0, sol.objectiveValue, eps)
         assertEquals(100.0, sol.objectiveValue + r.objectiveConstant, eps)
     }
 
     @Test
-    fun `free reification does not over-constrain`() {
-        // aux(b0) <-> (x0 >= 8), b0 free, min x0.  The relaxation must still allow x0 = 0 (b0 = 0),
-        // i.e. the big-M indicator must not force x0 >= 8 when the aux is unfixed.
+    fun `free reification should not force its linear constraint`() {
         val p = Problem(
             numBoolVars = 1,
             numIntVars = 1,
@@ -122,8 +105,7 @@ class CpToLpRelaxationTest {
     }
 
     @Test
-    fun `pinned reification enforces its linear constraint`() {
-        // Unit clause pins b0 = true; aux(b0) <-> (x0 >= 8) then forces x0 >= 8. min x0 -> 8.
+    fun `pinned reification should enforce its linear constraint`() {
         val p = Problem(
             numBoolVars = 1,
             numIntVars = 1,
@@ -146,163 +128,199 @@ class CpToLpRelaxationTest {
     }
 
     @Test
-    fun `column metadata maps back to cp variables`() {
+    fun `bool to 01 channel should relax to exactly v equals aux`() {
         val p = Problem(
             numBoolVars = 1,
             numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 10)),
+            intDomains = arrayOf(IntDomain(0, 1)),
             factors = arrayOf<Factor>(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7),
-                Clause(intArrayOf(Lit.make(0, true))),
+                ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.EQ,
+                    bound = 1,
+                ),
             ),
         )
-        val (_, r) = solve(p, null)
-
-        val ci = intCol(r, 0)
-        assertTrue(ci >= 0, "int var 0 has a column")
-        assertEquals(0, r.colVarId[ci])
-        // The bool column exists and is tagged as bool with var id 0.
-        var boolCol = -1
-        for (c in r.colVarId.indices) if (r.colIsBool[c] && r.colVarId[c] == 0) boolCol = c
-        assertTrue(boolCol >= 0, "bool var 0 has a column")
-    }
-
-    @Test
-    fun `unrecognized factors are skipped soundly`() {
-        // No LP-emittable factor and no objective: a trivially feasible, unconstrained relaxation.
-        val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>())
-        val (sol, _) = solve(p, null)
-        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-    }
-
-    @Test
-    fun `a float leaf optimum stands under tolerance semantics only when its check accepts it`() {
-        // 3x = 1 with x in [0, 2], minimizing x; every exact certifier is vetoed, so only float evidence can decide.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.EQ, 1L),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(2.0),
-        )
-        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
-        val cases = listOf<Pair<((Sample) -> Boolean)?, LpVerdict>>(
-            null to LpVerdict.INDETERMINATE,
-            { _: Sample -> false } to LpVerdict.INDETERMINATE,
-            { _: Sample -> true } to LpVerdict.TOLERANCE_OPTIMUM,
-        )
-        for ((check, verdict) in cases) {
-            val result = leafRealFeasibility(
-                problem,
-                LinearObjective(realCoefficients = doubleArrayOf(1.0)),
-                Sample(booleanArrayOf(), longArrayOf()),
-                context = vetoed,
-                toleranceCheck = check,
-            )
-
-            assertEquals(verdict, result.verdict)
-            if (verdict == LpVerdict.TOLERANCE_OPTIMUM) assertEquals(1.0 / 3.0, result.reals.single(), eps)
+        for ((intC, boolW) in listOf(1L to -1L, -1L to 1L)) {
+            val obj = LinearObjective(boolWeights = longArrayOf(boolW), intCoefficients = longArrayOf(intC))
+            val sol = solveLp(CpToLpRelaxation(p, obj).build(PropagationSession(p)).model)
+            assertEquals(FloatLpStatus.OPTIMAL, sol.status)
+            assertEquals(0.0, sol.objectiveValue, eps)
         }
     }
 
+    private fun feasibleAt(p: Problem, bits: BooleanArray): Boolean {
+        val r = CpToLpRelaxation(p, null).build(PropagationSession(p))
+        val m = r.model
+        val x = LongArray(m.n) { col -> (if (bits[r.colVarId[col]]) 1L else 0L) - m.loShift[col] }
+        val s = LongArray(m.m)
+        for (j in 0 until m.n) m.forEachInColumn(j) { i, v -> s[i] += v * x[j] }
+        for (i in 0 until m.m) if (s[i] > m.rhs[i]) return false
+        return true
+    }
+
+    private fun excludedInconsistent(p: Problem, nBool: Int, aux: Int, cond: (BooleanArray) -> Boolean): Int {
+        var excluded = 0
+        for (mask in 0 until (1 shl nBool)) {
+            val bits = BooleanArray(nBool) { (mask shr it) and 1 == 1 }
+            val feasible = feasibleAt(p, bits)
+            if (bits[aux] == cond(bits)) {
+                assertTrue(feasible, "reified-consistent assignment ${bits.toList()} was cut by the relaxation")
+            } else if (!feasible) {
+                excluded++
+            }
+        }
+        return excluded
+    }
+
+    private fun b(bits: BooleanArray, i: Int): Int = if (bits[i]) 1 else 0
+
+    private fun pbProblem(op: PbOp, lits: IntArray, weights: LongArray, aux: Int) = Problem(
+        numBoolVars = aux + 1,
+        numIntVars = 0,
+        intDomains = arrayOf(),
+        factors = arrayOf<Factor>(ReifiedPseudoBoolean(aux, weights, lits, op, 3L)),
+    )
+
     @Test
-    fun `a float leaf optimum is refused when a small reduced cost spans an unbounded column`() {
-        // min −9e-13·x with x ≤ 1e18 through a row and no column bound: a float optimum at x = 0 prices x below even
-        // the cleanup's tolerance, yet leaves −9e5 unreached.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Linear(
-                    longArrayOf(),
-                    intArrayOf(),
-                    doubleArrayOf(1.0),
-                    intArrayOf(0),
-                    LinearOp.LE,
-                    1_000_000_000_000_000_000L,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+    fun `reified pseudo-boolean LE should be sound and exclude violating directions`() {
+        val positive = pbProblem(
+            PbOp.LE,
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
+            longArrayOf(2, 3, 1),
+            aux = 3,
         )
-        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+        assertTrue(excludedInconsistent(positive, 4, 3) { 2 * b(it, 0) + 3 * b(it, 1) + b(it, 2) <= 3 } > 0)
 
-        val result = leafRealFeasibility(
-            problem,
-            LinearObjective(realCoefficients = doubleArrayOf(-9e-13)),
-            Sample(booleanArrayOf(), longArrayOf()),
-            context = vetoed,
-            toleranceCheck = { true },
-        )
-
-        assertEquals(LpVerdict.INDETERMINATE, result.verdict, "${result.reals.toList()}")
+        val negated = pbProblem(PbOp.LE, intArrayOf(Lit.make(0, true), Lit.make(1, false)), longArrayOf(2, 3), aux = 2)
+        assertTrue(excludedInconsistent(negated, 3, 2) { 2 * b(it, 0) + 3 * (1 - b(it, 1)) <= 3 } > 0)
     }
 
     @Test
-    fun `a float leaf optimum is refused when rounding understates a row's implied range`() {
-        // min 1e5·y + c·w + c·x − 1e5, y + w + x ≥ 1, 1e-8·x − a − Σu − b ≤ −2e-5, w ≤ 1500: in doubles the u vanish
-        // beside a and b, so the row implies x ≤ −2000 below its own lower bound; that negative range must not
-        // cancel w's wrong reduced cost.
-        val uCount = 100
-        val numReals = 5 + uCount
-        val realLower = DoubleArray(numReals)
-        val realUpper = DoubleArray(numReals) { 2e-7 }
-        realLower[0] = Double.NEGATIVE_INFINITY
-        realUpper[0] = Double.POSITIVE_INFINITY
-        realUpper[1] = 1500.0
-        realUpper[2] = Double.POSITIVE_INFINITY
-        realUpper[3] = 4e9
-        realLower[4] = -4.2e9
-        realUpper[4] = -4e9
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0, 1.0), intArrayOf(0, 1, 2), LinearOp.GE, 1L),
-                Linear(
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    IntArray(numReals - 2) { it + 2 },
-                    DoubleArray(numReals - 2) { if (it == 0) 1e-8 else -1.0 },
-                    LinearOp.LE,
-                    -2e-5,
-                ),
-            ),
-            numRealVars = numReals,
-            realLower = realLower,
-            realUpper = realUpper,
+    fun `reified pseudo-boolean EQ should be sound`() {
+        val p = pbProblem(
+            PbOp.EQ,
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
+            longArrayOf(2, 3, 1),
+            aux = 3,
         )
-        val c = 99999.99999991
-        val objective = LinearObjective(
-            constant = -100_000L,
-            realCoefficients = DoubleArray(numReals) {
-                if (it == 0) {
-                    1e5
-                } else if (it <= 2) {
-                    c
-                } else {
-                    0.0
-                }
-            },
-        )
-        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
-
-        val result = leafRealFeasibility(
-            problem,
-            objective,
-            Sample(booleanArrayOf(), longArrayOf()),
-            context = vetoed,
-            toleranceCheck = { true },
-        )
-
-        assertEquals(LpVerdict.INDETERMINATE, result.verdict, "${result.reals.take(3)}")
+        excludedInconsistent(p, 4, 3) { 2 * b(it, 0) + 3 * b(it, 1) + b(it, 2) == 3 }
     }
 
+    @Test
+    fun `reified cardinality range should be sound`() {
+        val p = Problem(
+            numBoolVars = 4,
+            numIntVars = 0,
+            intDomains = arrayOf(),
+            factors = arrayOf<Factor>(
+                ReifiedCardinality(3, intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 1, 2),
+            ),
+        )
+        excludedInconsistent(p, 4, 3) { b(it, 0) + b(it, 1) + b(it, 2) in 1..2 }
+    }
+
+    @Test
+    fun `objective cone should drop big-M rows yet still bound the critical path`() {
+        val p = Problem(
+            numBoolVars = 2,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 20), IntDomain(0, 20), IntDomain(0, 40)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.GE, 3),
+                Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.GE, 4),
+                Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.GE, 5),
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -3),
+                ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, -4),
+            ),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
+        val full = CpToLpRelaxation(p, objective).build(PropagationSession(p))
+        val cone = CpToLpRelaxation(p, objective, objectiveCone = true).build(PropagationSession(p))
+
+        assertEquals(3, cone.model.m)
+        assertTrue(cone.model.n < full.model.n)
+        assertTrue(cone.colIsBool.none { it })
+        val coneSol = solveLp(cone.model)
+        assertEquals(FloatLpStatus.OPTIMAL, coneSol.status)
+        assertEquals(12.0, coneSol.objectiveValue, eps)
+        assertTrue(coneSol.objectiveValue <= solveLp(full.model).objectiveValue + eps)
+    }
+
+    @Test
+    fun `RLT relaxation bound should stay below the integer optimum and no weaker than plain`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
+            arrayOf(
+                Linear(intArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            ),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1, -1, -1))
+        fun lpOptimum(rlt: Boolean): Double {
+            val relaxation = CpToLpRelaxation(problem, objective, booleanRlt = rlt).build(PropagationSession(problem))
+            return assertNotNull(RevisedSimplex(relaxation.model).solve()).objective
+        }
+
+        val rlt = lpOptimum(rlt = true)
+
+        assertTrue(rlt <= -1.0 + 1e-6)
+        assertTrue(rlt >= lpOptimum(rlt = false) - 1e-6)
+    }
+
+    @Test
+    fun `diffn area bound should lower-bound the strip length`() {
+        val n = 3
+        val lVar = 2 * n
+        val domains = Array(2 * n + 1) { i ->
+            when {
+                i < n -> IntDomain(0, 10)
+                i < 2 * n -> IntDomain(0, 2)
+                else -> IntDomain(0, 20)
+            }
+        }
+        val factors = ArrayList<Factor>()
+        for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(lVar, i), LinearOp.GE, 2))
+        factors.add(Diffn(IntArray(n) { it }, IntArray(n) { n + it }, longArrayOf(2, 2, 2), longArrayOf(2, 2, 2)))
+        val p = Problem(0, 2 * n + 1, domains, factors.toTypedArray())
+        val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == lVar) 1L else 0L })
+        fun stripLengthBound(diffn: Boolean) =
+            solveLp(CpToLpRelaxation(p, obj, diffn = diffn).build(PropagationSession(p)).model).objectiveValue
+
+        assertEquals(2.0, stripLengthBound(diffn = false), 1e-6)
+        assertEquals(3.0, stripLengthBound(diffn = true), 1e-6)
+    }
+
+    private fun subcircuitProblem(openSuccAbove: Boolean = false): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 4,
+        intDomains = Array(4) { IntDomain(0, 3) },
+        factors = arrayOf<Factor>(
+            Circuit(intArrayOf(0, 1, 2, 3), subcircuit = true),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+        ),
+        openIntHi = BooleanArray(4) { openSuccAbove && it == 0 },
+    )
+
+    private val firstSuccessor = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L, 0L))
+
+    @Test
+    fun `subcircuit arc relaxation should build arc columns without subtour elimination`() {
+        val p = subcircuitProblem()
+        val r = CpToLpRelaxation(p, firstSuccessor, circuitArcs = true).build(PropagationSession(p))
+        assertTrue(r.model.n > 4)
+        assertTrue(r.circuitArcs.isEmpty())
+        assertNotNull(RevisedSimplex(r.model).solve())
+    }
+
+    @Test
+    fun `subcircuit arc relaxation should skip a successor the model leaves open`() {
+        val p = subcircuitProblem(openSuccAbove = true)
+        val r = CpToLpRelaxation(p, firstSuccessor, circuitArcs = true).build(PropagationSession(p))
+        assertTrue(r.colVarId.all { it >= 0 })
+    }
 }

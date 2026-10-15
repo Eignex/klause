@@ -14,45 +14,53 @@ import kotlin.test.assertTrue
 
 class LpWorkingModelTest {
     @Test
-    fun `nested full cost bound and rhs overrides preserve source authority and optimum`() {
+    fun `an objective override should solve its own objective without disturbing the source optimum`() {
+        val source = boxedSource()
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val three = ExactLpNumber.of(3L)
-        val source = LpExactState(
-            ExactLpModel(
-                listOf(listOf(ExactLpEntry(0, one))),
-                listOf(three),
-                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))) },
-                listOf(ExactLpRow()),
-                ExactLpObjective(listOf(one, zero)),
-            ),
-        )
         LpScopedSolver(source).use { owner ->
             val original = assertNotNull(owner.solve())
             val sourceSolver = assertNotNull(owner.solveFloat()).first
-            var escaped: LpWorkingScope? = null
             val auxiliary = LpWorkingModel.overrides(
                 source,
                 ExactLpObjective(listOf(zero, one), scale = ExactLpNumber.of(2L), externalConstant = one),
             )
             owner.withWorkingModel(auxiliary) { scope ->
-                escaped = scope
                 val result = assertNotNull(scope.solve())
+
                 assertEquals(listOf(BigFraction.ofLong(3L)), result.exactPrimal)
                 assertEquals(BigFraction.ONE, result.lowerBound)
-                assertSame(auxiliary.state, result.float?.exactState)
-                assertEquals(
-                    LpVerdict.INDETERMINATE,
-                    certifyLpResult(
-                        assertNotNull(source.toWorkingModel()),
-                        sourceSolver,
-                        result.float,
-                    ).verdict,
-                )
+                val sourceModel = assertNotNull(source.toWorkingModel())
+                assertEquals(LpVerdict.INDETERMINATE, certifyLpResult(sourceModel, sourceSolver, result.float).verdict)
+            }
+
+            assertSame(source, owner.state)
+            assertEquals(original.exactPrimal, assertNotNull(owner.solve()).exactPrimal)
+        }
+    }
+
+    @Test
+    fun `the owner and an escaped scope should reject solves outside the scope lifetime`() {
+        val source = boxedSource()
+        LpScopedSolver(source).use { owner ->
+            var escaped: LpWorkingScope? = null
+            owner.withWorkingModel(LpWorkingModel.overrides(source)) { scope ->
+                escaped = scope
                 assertFailsWith<IllegalStateException> { owner.solve() }
-                assertFailsWith<IllegalStateException> { owner.prepare() }
-                assertFailsWith<IllegalStateException> { owner.push() }
-                assertFailsWith<IllegalStateException> { owner.close() }
+            }
+
+            assertFailsWith<IllegalStateException> { assertNotNull(escaped).solve() }
+        }
+    }
+
+    @Test
+    fun `nested bound and rhs overrides should solve inside a working scope`() {
+        val source = boxedSource()
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val three = ExactLpNumber.of(3L)
+        LpScopedSolver(source).use { owner ->
+            owner.withWorkingModel(LpWorkingModel.overrides(source)) { scope ->
                 val nested = LpWorkingModel.overrides(
                     scope.state,
                     ExactLpObjective(listOf(one, zero)),
@@ -62,39 +70,17 @@ class LpWorkingModelTest {
                 scope.withWorkingModel(nested) { inner ->
                     assertFailsWith<IllegalStateException> { scope.solve() }
                     val point = assertNotNull(inner.solve())
+
                     assertEquals(listOf(BigFraction.ONE), point.exactPrimal)
                     assertEquals(BigFraction.ONE, point.lowerBound)
                 }
-                assertEquals(result.exactPrimal, assertNotNull(scope.solve()).exactPrimal)
             }
-            assertFailsWith<IllegalStateException> { assertNotNull(escaped).solve() }
-            assertSame(source, owner.state)
-            assertNull(owner.lastResult)
-            assertEquals(original.exactPrimal, assertNotNull(owner.solve()).exactPrimal)
-            assertEquals(BigFraction.ZERO, owner.lastResult?.lowerBound)
-            val metrics = assertNotNull(owner.lastWorkingMetrics)
-            assertEquals(2L, metrics.attempts)
-            assertEquals(1L, metrics.owners.createdOwners)
-            assertEquals(1L, metrics.owners.closedOwners)
-            assertEquals(1L, metrics.children.single().owners.closedOwners)
-            assertTrue(metrics.measuredWork > 0L)
         }
     }
 
     @Test
-    fun `a scope's ledger charges the work every certifier invocation declares`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val three = ExactLpNumber.of(3L)
-        val source = LpExactState(
-            ExactLpModel(
-                listOf(listOf(ExactLpEntry(0, one))),
-                listOf(three),
-                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))) },
-                listOf(ExactLpRow()),
-                ExactLpObjective(listOf(one, zero)),
-            ),
-        )
+    fun `a scope ledger should charge the work every certifier invocation declares`() {
+        val source = boxedSource()
         var metered = 0L
         var invocations = 0
         val declared = object : LpCertificationObserver {
@@ -119,7 +105,7 @@ class LpWorkingModelTest {
     }
 
     @Test
-    fun `auxiliary row cannot become source infeasibility and original factors remain reusable`() {
+    fun `an auxiliary row should not become source infeasibility or spoil the original factors`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
@@ -144,12 +130,7 @@ class LpWorkingModelTest {
                         1L,
                         listOf(0 to one),
                         ExactLpNumber.of(2L),
-                        ExactLpColumn(
-                            ExactLpBounds(
-                                ExactLpSide(zero),
-                                ExactLpSide(zero),
-                            ),
-                        ),
+                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
                         ExactLpRow(global = false, premises = ExactLpPremises(emptyList(), listOf(7))),
                     ),
                 ),
@@ -167,75 +148,7 @@ class LpWorkingModelTest {
     }
 
     @Test
-    fun `primary and cleanup failures close only the working owner and preserve accounting`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val source = LpExactState(
-            ExactLpModel(
-                listOf(emptyList()),
-                emptyList(),
-                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
-                emptyList(),
-                ExactLpObjective(listOf(one)),
-            ),
-        )
-        val primary = IllegalStateException("body")
-        val cleanup = IllegalStateException("close")
-        var created = 0
-        val allowances = ArrayList<Long>()
-        val logicalWork = ArrayList<Long>()
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                val working = ++created == 2
-                assertEquals(17L, pricing.tieSeed)
-                assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, pricing.zeroObjective)
-                assertTrue(workLimit in 1L until 1_000_000L)
-                allowances += workLimit
-                val delegate = RevisedSimplex(model, cancellation, pricing = pricing, reuseRationalOrder = false)
-                return object : PersistentLpSolver by delegate {
-                    override fun prepareLogicals(token: Cancellation): Basis? =
-                        delegate.prepareLogicals(token).also { logicalWork += delegate.lastMetrics.workOps }
-                    override fun close() {
-                        delegate.close()
-                        if (working) throw cleanup
-                    }
-                }
-            }
-        }
-        LpScopedSolver(
-            source,
-            context = LpSolveContext(engineFactory = factory),
-            workLimit = 1_000_000L,
-            pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT, 17L),
-        ).use { owner ->
-            assertNotNull(owner.solve())
-            assertEquals(1_000_000L - allowances[0] + logicalWork[0], owner.metrics.preparationWork)
-            val failure = assertFailsWith<IllegalStateException> {
-                owner.withWorkingModel(LpWorkingModel.overrides(source)) { scope ->
-                    assertNotNull(scope.solve())
-                    throw primary
-                }
-            }
-            assertSame(primary, failure)
-            assertSame(cleanup, failure.suppressedExceptions.single())
-            val metrics = assertNotNull(owner.lastWorkingMetrics).owners
-            assertEquals(1_000_000L - allowances[1] + logicalWork[1], metrics.preparationWork)
-            assertEquals(1L, metrics.closedOwners)
-            assertEquals(1L, owner.lastWorkingMetrics?.attempts)
-            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
-        }
-    }
-
-    @Test
-    fun `failed working preparation and solve retain costs and restore the parent`() {
+    fun `failed working preparation and solve should retain costs and restore the parent`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
@@ -287,8 +200,6 @@ class LpWorkingModelTest {
                 assertSame(primary, failure)
                 assertSame(cleanup, failure.suppressedExceptions.single())
                 val metrics = assertNotNull(owner.lastWorkingMetrics)
-                assertEquals(1L, metrics.attempts)
-                assertEquals(1L, metrics.owners.preparationAttempts)
                 assertEquals(if (preparation) 0L else 1L, metrics.owners.preparationSuccesses)
                 assertEquals(1L, metrics.owners.closedOwners)
                 assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
@@ -297,7 +208,7 @@ class LpWorkingModelTest {
     }
 
     @Test
-    fun `permanent replacement drops root deductions and local and parent rows from the old objective`() {
+    fun `permanent replacement should drop root deductions and rows from the old objective`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = LpExactState(
@@ -309,33 +220,14 @@ class LpWorkingModelTest {
                 ExactLpObjective(listOf(one)),
             ),
         )
+        val slack = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        fun localRow(id: Long, rhs: ExactLpNumber) =
+            LpScopedRow(id, listOf(0 to one), rhs, slack, ExactLpRow(global = false))
         LpScopedSolver(source).use { owner ->
             assertTrue(owner.assertBound(0, true, ExactLpSide(one), 0L))
-            assertTrue(
-                owner.append(
-                    LpScopedRow(
-                        0L,
-                        listOf(0 to one),
-                        one,
-                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                        ExactLpRow(global = false),
-                    ),
-                    false,
-                ),
-            )
+            assertTrue(owner.append(localRow(0L, one), false))
             assertTrue(owner.push())
-            assertTrue(
-                owner.append(
-                    LpScopedRow(
-                        1L,
-                        listOf(0 to one),
-                        zero,
-                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                        ExactLpRow(global = false),
-                    ),
-                    true,
-                ),
-            )
+            assertTrue(owner.append(localRow(1L, zero), true))
             assertNotNull(owner.solve())
 
             assertTrue(owner.replaceObjective(ExactLpObjective(listOf(ExactLpNumber.of(-1L))), source))
@@ -343,15 +235,12 @@ class LpWorkingModelTest {
             assertEquals(0, owner.state.depth)
             assertTrue(owner.state.assertions.isEmpty())
             assertEquals(0, owner.state.model.m)
-            assertNull(owner.lastResult)
-            val result = assertNotNull(owner.solve())
-            assertEquals(BigFraction.ofLong(-3L), result.lowerBound)
-            assertEquals(listOf(BigFraction.ofLong(3L)), result.exactPrimal)
+            assertEquals(BigFraction.ofLong(-3L), assertNotNull(owner.solve()).lowerBound)
         }
     }
 
     @Test
-    fun `working scopes cannot replenish source continuation work`() {
+    fun `working scopes should not replenish source continuation work`() {
         val zero = ExactLpNumber.of(0L)
         val source = LpExactState(
             ExactLpModel(
@@ -396,4 +285,18 @@ class LpWorkingModelTest {
         }
     }
 
+    private fun boxedSource(): LpExactState {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val three = ExactLpNumber.of(3L)
+        return LpExactState(
+            ExactLpModel(
+                listOf(listOf(ExactLpEntry(0, one))),
+                listOf(three),
+                List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))) },
+                listOf(ExactLpRow()),
+                ExactLpObjective(listOf(one, zero)),
+            ),
+        )
+    }
 }

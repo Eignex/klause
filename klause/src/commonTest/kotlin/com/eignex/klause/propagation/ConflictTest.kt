@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 
 class ConflictTest {
     @Test
-    fun `factor core extraction follows remapped learned reasons`() {
+    fun `factor core extraction should follow remapped learned reasons`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,

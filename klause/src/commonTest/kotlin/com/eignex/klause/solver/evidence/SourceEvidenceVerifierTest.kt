@@ -13,14 +13,19 @@ import kotlin.test.assertIs
 class SourceEvidenceVerifierTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val revision = SourceRevision("original-source-sha256", "exact-affine-v1")
-    private val scope = SourceScope(revision, objective = SourceObjective("source-objective-sha256",
-        ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(
+        revision,
+        objective = SourceObjective(
+            "source-objective-sha256",
+            ObjectiveSense.MINIMIZE,
+        ),
+    )
     private val lower = SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)
     private val premises = mapOf("lower" to SourcePremise(lower))
     private val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
 
     @Test
-    fun `integer premise pins retain their captured source values`() {
+    fun `integer premise pins should retain their captured source values`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val pins = mutableMapOf(integer to BigFraction.ONE)
         val premise = SourcePremise(lower, emptyMap(), pins)
@@ -31,33 +36,42 @@ class SourceEvidenceVerifierTest {
     }
 
     @Test
-    fun `integer premise pins require integral declared integer coordinates`() {
+    fun `integer premise pins should require integral declared integer coordinates`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val invalid = listOf(mapOf(x to BigFraction.ONE),
+        val invalid = listOf(
+            mapOf(x to BigFraction.ONE),
             mapOf(integer to BigFraction.ofLong(2).reciprocal()),
-            mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 99) to BigFraction.ONE))
+            mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 99) to BigFraction.ONE),
+        )
 
         for (pins in invalid) {
             assertFailsWith<IllegalArgumentException> {
-                SourceProofContext(scope, setOf(x, integer),
-                    mapOf("guarded" to SourcePremise(lower, emptyMap(), pins)))
+                SourceProofContext(
+                    scope,
+                    setOf(x, integer),
+                    mapOf("guarded" to SourcePremise(lower, emptyMap(), pins)),
+                )
             }
         }
     }
 
     @Test
-    fun `an integer guarded premise cannot establish an unconditioned bound`() {
+    fun `an integer guarded premise should not establish an unconditioned bound`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val guarded = SourcePremise(lower, emptyMap(), mapOf(integer to BigFraction.ONE))
-        val context = SourceProofContext(scope, setOf(x, integer), mapOf("guarded" to guarded),
-            mapOf(x to BigFraction.ONE))
+        val context = SourceProofContext(
+            scope,
+            setOf(x, integer),
+            mapOf("guarded" to guarded),
+            mapOf(x to BigFraction.ONE),
+        )
         val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("guarded"))
 
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `exhaustive integer branches establish only their own conditional premises`() {
+    fun `exhaustive integer branches should establish only their own conditional premises`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val rows = mapOf(
             "zero" to SourcePremise(lower, emptyMap(), mapOf(integer to BigFraction.ZERO)),
@@ -66,19 +80,34 @@ class SourceEvidenceVerifierTest {
             "high" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ONE)),
         )
         val context = SourceProofContext(scope, setOf(x, integer), rows, mapOf(x to BigFraction.ONE))
-        val proof = SourceDerivation.IntegerSplit(integer, BigFraction.ZERO,
-            SourceDerivation.Premise("zero"), SourceDerivation.Premise("one"))
-        val wrong = SourceDerivation.IntegerSplit(integer, BigFraction.ZERO,
-            SourceDerivation.Premise("one"), SourceDerivation.Premise("zero"))
+        val proof = SourceDerivation.IntegerSplit(
+            integer,
+            BigFraction.ZERO,
+            SourceDerivation.Premise("zero"),
+            SourceDerivation.Premise("one"),
+        )
+        val wrong = SourceDerivation.IntegerSplit(
+            integer,
+            BigFraction.ZERO,
+            SourceDerivation.Premise("one"),
+            SourceDerivation.Premise("zero"),
+        )
 
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), proof)))
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), wrong)))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), proof),
+            ),
+        )
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), wrong),
+            ),
+        )
     }
 
     @Test
-    fun `singleton integer bounds establish a guard after exact integer rounding`() {
+    fun `singleton integer bounds should establish a guard after exact integer rounding`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         for ((rhs, strict) in listOf(BigFraction.ofLong(2).reciprocal() to false, BigFraction.ONE to true)) {
             val rows = mapOf(
@@ -87,31 +116,40 @@ class SourceEvidenceVerifierTest {
                 "high" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), rhs, strict)),
             )
             val context = SourceProofContext(scope, setOf(x, integer), rows, mapOf(x to BigFraction.ONE))
-            val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE),
-                SourceDerivation.Premise("guarded"))
+            val evidence = SourceEvidence(
+                scope,
+                SourceClaim.Bound(BigFraction.ONE),
+                SourceDerivation.Premise("guarded"),
+            )
 
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
         }
     }
 
     @Test
-    fun `conditional rows cannot establish their own integer guards`() {
+    fun `conditional rows should not establish their own integer guards`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val pin = mapOf(integer to BigFraction.ZERO)
         val rows = mapOf(
             "guarded" to SourcePremise(lower, emptyMap(), pin),
             "low" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "high" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO),
-                emptyMap(), pin),
+            "high" to SourcePremise(
+                SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ZERO),
+                emptyMap(),
+                pin,
+            ),
         )
         val context = SourceProofContext(scope, setOf(x, integer), rows, mapOf(x to BigFraction.ONE))
 
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("guarded"))))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("guarded")),
+            ),
+        )
     }
 
     @Test
-    fun `stopping integer guard establishment withholds proof authority`() {
+    fun `stopping integer guard establishment should withhold proof authority`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val rows = mapOf(
             "guarded" to SourcePremise(lower, emptyMap(), mapOf(integer to BigFraction.ZERO)),
@@ -123,20 +161,21 @@ class SourceEvidenceVerifierTest {
 
         val checked = SourceEvidenceVerifier(context).verify(
             SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("guarded")),
-            Cancellation { ++polls > 6 })
+            Cancellation { ++polls > 6 },
+        )
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }
 
     @Test
-    fun `a cited original row proves a bound in original objective units`() {
+    fun `a cited original row should prove a bound in original objective units`() {
         val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("lower"))
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `stale foreign and changed invocation scopes are rejected`() {
+    fun `stale foreign and changed invocation scopes should be rejected`() {
         val scopes = listOf(
             scope.copy(revision = revision.copy(identity = "stale")),
             scope.copy(revision = revision.copy(semantics = "tolerance")),
@@ -152,121 +191,175 @@ class SourceEvidenceVerifierTest {
     }
 
     @Test
-    fun `an unrelated source row cannot establish a bound`() {
-        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ofLong(2)),
-            SourceDerivation.Premise("lower"))
+    fun `an unrelated source row should not establish a bound`() {
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Bound(BigFraction.ofLong(2)),
+            SourceDerivation.Premise("lower"),
+        )
 
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `an engine result without a derivation withholds proof coverage`() {
-        val evidence = SourceEvidence(scope, SourceClaim.Refutation,
-            SourceDerivation.Unavailable("CAD coverage not captured"))
+    fun `an engine result without a derivation should withhold proof coverage`() {
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Refutation,
+            SourceDerivation.Unavailable("CAD coverage not captured"),
+        )
 
         assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `negative multipliers cannot reverse an inequality`() {
-        val proof = SourceDerivation.Combination(listOf(
-            SourceDerivation.Combination.Term(BigFraction.MINUS_ONE, SourceDerivation.Premise("lower")),
-        ))
+    fun `negative multipliers should not reverse an inequality`() {
+        val proof = SourceDerivation.Combination(
+            listOf(
+                SourceDerivation.Combination.Term(BigFraction.MINUS_ONE, SourceDerivation.Premise("lower")),
+            ),
+        )
         val evidence = SourceEvidence(scope, SourceClaim.Refutation, proof)
 
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `an exact Farkas combination refutes original premises`() {
+    fun `an exact Farkas combination should refute original premises`() {
         val upper = SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO)
         val context = SourceProofContext(scope, setOf(x), premises + ("upper" to SourcePremise(upper)))
-        val proof = SourceDerivation.Combination(listOf(
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("upper")),
-        ))
-
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof),
-        ))
-    }
-
-    @Test
-    fun `zero weight does not preserve strict contradiction`() {
-        val context = SourceProofContext(scope, emptySet(), mapOf(
-            "strict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO, strict = true)),
-        ))
-        val proof = SourceDerivation.Combination(listOf(
-            SourceDerivation.Combination.Term(BigFraction.ZERO, SourceDerivation.Premise("strict")),
-        ))
-
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof),
-        ))
-    }
-
-    @Test
-    fun `Boolean coverage checks both guarded source branches`() {
-        val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val impossible = SourceInequality(emptyMap(), BigFraction.MINUS_ONE)
-        val context = SourceProofContext(scope, setOf(b), mapOf(
-            "false" to SourcePremise(impossible, mapOf(0 to false)),
-            "true" to SourcePremise(impossible, mapOf(0 to true)),
-        ))
-        val proof = SourceDerivation.BooleanSplit(0, SourceDerivation.Premise("false"),
-            SourceDerivation.Premise("true"))
-
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof),
-        ))
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof.copy(whenTrue = SourceDerivation.Premise("false"))),
-        ))
-    }
-
-    @Test
-    fun `an unfinished branch withholds whole source refutation`() {
-        val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val context = SourceProofContext(scope, setOf(b), mapOf(
-            "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
-        ))
-        val proof = SourceDerivation.BooleanSplit(
-            0, SourceDerivation.Premise("false"), SourceDerivation.Unavailable("unfinished branch"),
+        val proof = SourceDerivation.Combination(
+            listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("upper")),
+            ),
         )
 
-        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof),
-        ))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Refutation, proof),
+            ),
+        )
     }
 
     @Test
-    fun `integer coverage includes adjacent integral alternatives`() {
+    fun `zero weight should not preserve strict contradiction`() {
+        val context = SourceProofContext(
+            scope,
+            emptySet(),
+            mapOf(
+                "strict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO, strict = true)),
+            ),
+        )
+        val proof = SourceDerivation.Combination(
+            listOf(
+                SourceDerivation.Combination.Term(BigFraction.ZERO, SourceDerivation.Premise("strict")),
+            ),
+        )
+
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Refutation, proof),
+            ),
+        )
+    }
+
+    @Test
+    fun `Boolean coverage should check both guarded source branches`() {
+        val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val impossible = SourceInequality(emptyMap(), BigFraction.MINUS_ONE)
+        val context = SourceProofContext(
+            scope,
+            setOf(b),
+            mapOf(
+                "false" to SourcePremise(impossible, mapOf(0 to false)),
+                "true" to SourcePremise(impossible, mapOf(0 to true)),
+            ),
+        )
+        val proof = SourceDerivation.BooleanSplit(
+            0,
+            SourceDerivation.Premise("false"),
+            SourceDerivation.Premise("true"),
+        )
+
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Refutation, proof),
+            ),
+        )
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Refutation, proof.copy(whenTrue = SourceDerivation.Premise("false"))),
+            ),
+        )
+    }
+
+    @Test
+    fun `an unfinished branch should withhold whole source refutation`() {
+        val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val context = SourceProofContext(
+            scope,
+            setOf(b),
+            mapOf(
+                "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
+            ),
+        )
+        val proof = SourceDerivation.BooleanSplit(
+            0,
+            SourceDerivation.Premise("false"),
+            SourceDerivation.Unavailable("unfinished branch"),
+        )
+
+        assertIs<SourceEvidenceCheck.Unavailable>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Refutation, proof),
+            ),
+        )
+    }
+
+    @Test
+    fun `integer coverage should include adjacent integral alternatives`() {
         val i = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val half = BigFraction.of(bigIntOf(1), bigIntOf(2))
-        val context = SourceProofContext(scope, setOf(i), mapOf(
-            "lower" to SourcePremise(SourceInequality(mapOf(i to BigFraction.MINUS_ONE), half.negated())),
-            "upper" to SourcePremise(SourceInequality(mapOf(i to BigFraction.ONE), half)),
-        ))
-        val below = SourceDerivation.Combination(listOf(
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(i, upper = true)),
-        ))
-        val above = SourceDerivation.Combination(listOf(
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("upper")),
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(i, upper = false)),
-        ))
+        val context = SourceProofContext(
+            scope,
+            setOf(i),
+            mapOf(
+                "lower" to SourcePremise(SourceInequality(mapOf(i to BigFraction.MINUS_ONE), half.negated())),
+                "upper" to SourcePremise(SourceInequality(mapOf(i to BigFraction.ONE), half)),
+            ),
+        )
+        val below = SourceDerivation.Combination(
+            listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(i, upper = true)),
+            ),
+        )
+        val above = SourceDerivation.Combination(
+            listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("upper")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(i, upper = false)),
+            ),
+        )
         val proof = SourceDerivation.IntegerSplit(i, BigFraction.ZERO, below, above)
 
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof),
-        ))
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof.copy(threshold = half)),
-        ))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Refutation, proof),
+            ),
+        )
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Refutation, proof.copy(threshold = half)),
+            ),
+        )
     }
 
     @Test
-    fun `imported bounds are rechecked against original source premises`() {
+    fun `imported bounds should be rechecked against original source premises`() {
         val claim = SourceClaim.Bound(BigFraction.ofLong(2))
         val imported = SourceEvidence(scope, claim, SourceDerivation.Premise("lower"))
         val evidence = SourceEvidence(scope, claim, SourceDerivation.Import(imported))
@@ -275,51 +368,64 @@ class SourceEvidenceVerifierTest {
     }
 
     @Test
-    fun `a neighborhood bound cannot be imported into a weaker invocation`() {
+    fun `a neighborhood bound should not be imported into a weaker invocation`() {
         val neighborhood = scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ofLong(2))))
         val claim = SourceClaim.Bound(BigFraction.ofLong(2))
         val imported = SourceEvidence(neighborhood, claim, SourceDerivation.Assumption(x, upper = false))
 
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, claim, SourceDerivation.Import(imported)),
-        ))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, claim, SourceDerivation.Import(imported)),
+            ),
+        )
     }
 
     @Test
-    fun `a justified unconditional bound can enter a stronger invocation`() {
+    fun `a justified unconditional bound should enter a stronger invocation`() {
         val conditioned = scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ofLong(2))))
         val context = SourceProofContext(conditioned, setOf(x), premises, mapOf(x to BigFraction.ONE))
         val claim = SourceClaim.Bound(BigFraction.ONE)
         val imported = SourceEvidence(scope, claim, SourceDerivation.Premise("lower"))
 
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
-            SourceEvidence(conditioned, claim, SourceDerivation.Import(imported)),
-        ))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(conditioned, claim, SourceDerivation.Import(imported)),
+            ),
+        )
     }
 
     @Test
-    fun `an unsupported source checker cannot certify a point or ray`() {
+    fun `an unsupported source checker should not certify a point or ray`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val claims = listOf(
             SourceClaim.Witness(sample) to SourceDerivation.SourceWitness,
             SourceClaim.Ray(sample, mapOf(x to BigFraction.MINUS_ONE)) to SourceDerivation.SourceRay,
         )
 
-        for ((claim, proof) in claims) assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, claim, proof),
-        ))
+        for ((claim, proof) in claims) {
+            assertIs<SourceEvidenceCheck.Unavailable>(
+                SourceEvidenceVerifier(context).verify(
+                    SourceEvidence(scope, claim, proof),
+                ),
+            )
+        }
     }
 
     @Test
-    fun `cancelled verification cannot publish checked proof coverage`() {
+    fun `cancelled verification should not publish checked proof coverage`() {
         val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("lower"))
 
-        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(evidence,
-            Cancellation { true }))
+        assertIs<SourceEvidenceCheck.Unavailable>(
+            SourceEvidenceVerifier(context).verify(
+                evidence,
+                Cancellation { true },
+            ),
+        )
     }
 
     @Test
-    fun `proof traversal cannot reset its containing allowance through imports`() {
+    fun `proof traversal should not reset its containing allowance through imports`() {
         val claim = SourceClaim.Bound(BigFraction.ONE)
         var evidence = SourceEvidence(scope, claim, SourceDerivation.Premise("lower"))
         repeat(5) { evidence = SourceEvidence(scope, claim, SourceDerivation.Import(evidence)) }
@@ -328,116 +434,173 @@ class SourceEvidenceVerifierTest {
     }
 
     @Test
-    fun `optimality requires the witness objective to equal the checked bound`() {
-        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
-            exactReals = listOf(BigFraction.ofLong(2)))
+    fun `optimality should require the witness objective to equal the checked bound`() {
+        val sample = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(2.0),
+            exactReals = listOf(BigFraction.ofLong(2)),
+        )
         val checker = LinearSourceSemanticsChecker(setOf(x), premises.values.toList(), mapOf(x to BigFraction.ONE))
-        val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE),
-            semanticsChecker = checker)
+        val context = SourceProofContext(
+            scope,
+            setOf(x),
+            premises,
+            mapOf(x to BigFraction.ONE),
+            semanticsChecker = checker,
+        )
         val claim = SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE))
         val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("lower"))
 
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, claim, proof),
-        ))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, claim, proof),
+            ),
+        )
     }
 
     @Test
-    fun `an attained original source bound certifies optimality`() {
+    fun `an attained original source bound should certify optimality`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val checker = LinearSourceSemanticsChecker(setOf(x), premises.values.toList(), mapOf(x to BigFraction.ONE))
-        val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE),
-            semanticsChecker = checker)
+        val context = SourceProofContext(
+            scope,
+            setOf(x),
+            premises,
+            mapOf(x to BigFraction.ONE),
+            semanticsChecker = checker,
+        )
         val claim = SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE))
         val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("lower"))
 
-        assertEquals(SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(context).verify(SourceEvidence(scope, claim, proof)))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context).verify(SourceEvidence(scope, claim, proof)),
+        )
     }
 
     @Test
-    fun `an unattained limit requires approach and nonattainment derivations`() {
-        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(2.0),
-            exactReals = listOf(BigFraction.ofLong(2)))
+    fun `an unattained limit should require approach and nonattainment derivations`() {
+        val sample = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(2.0),
+            exactReals = listOf(BigFraction.ofLong(2)),
+        )
         val claim = SourceClaim.Limit(sample, SourceValue.Rational(BigFraction.ONE))
 
-        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, claim, SourceDerivation.Premise("lower")),
-        ))
+        assertIs<SourceEvidenceCheck.Unavailable>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, claim, SourceDerivation.Premise("lower")),
+            ),
+        )
     }
 
     @Test
-    fun `a malformed Boolean coverage coordinate is rejected`() {
-        val proof = SourceDerivation.BooleanSplit(-1, SourceDerivation.Premise("lower"),
-            SourceDerivation.Premise("lower"))
+    fun `a malformed Boolean coverage coordinate should be rejected`() {
+        val proof = SourceDerivation.BooleanSplit(
+            -1,
+            SourceDerivation.Premise("lower"),
+            SourceDerivation.Premise("lower"),
+        )
 
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof),
-        ))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, SourceClaim.Refutation, proof),
+            ),
+        )
     }
 
     @Test
-    fun `a checked conditional refutation justifies a source Boolean clause`() {
+    fun `a checked conditional refutation should justify a source Boolean clause`() {
         val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val context = SourceProofContext(scope, setOf(b), mapOf(
-            "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
-        ))
+        val context = SourceProofContext(
+            scope,
+            setOf(b),
+            mapOf(
+                "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
+            ),
+        )
         val conditional = scope.copy(condition = SourceCondition(bools = mapOf(0 to false)))
         val refutation = SourceEvidence(conditional, SourceClaim.Refutation, SourceDerivation.Premise("false"))
-        val evidence = SourceEvidence(scope, SourceClaim.Clause(mapOf(0 to true)),
-            SourceDerivation.Discharge(refutation))
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Clause(mapOf(0 to true)),
+            SourceDerivation.Discharge(refutation),
+        )
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `clause discharge cannot hide a numeric neighborhood restriction`() {
+    fun `clause discharge should not hide a numeric neighborhood restriction`() {
         val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val context = SourceProofContext(scope, setOf(b, x), mapOf(
-            "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
-        ))
-        val conditional = scope.copy(condition = SourceCondition(
-            bools = mapOf(0 to false), lower = mapOf(x to BigFraction.ONE),
-        ))
+        val context = SourceProofContext(
+            scope,
+            setOf(b, x),
+            mapOf(
+                "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
+            ),
+        )
+        val conditional = scope.copy(
+            condition = SourceCondition(
+                bools = mapOf(0 to false),
+                lower = mapOf(x to BigFraction.ONE),
+            ),
+        )
         val refutation = SourceEvidence(conditional, SourceClaim.Refutation, SourceDerivation.Premise("false"))
-        val evidence = SourceEvidence(scope, SourceClaim.Clause(mapOf(0 to true)),
-            SourceDerivation.Discharge(refutation))
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Clause(mapOf(0 to true)),
+            SourceDerivation.Discharge(refutation),
+        )
 
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `an imported forged source clause is rejected`() {
+    fun `an imported forged source clause should be rejected`() {
         val b = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val context = SourceProofContext(scope, setOf(b), mapOf(
-            "true" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ONE), mapOf(0 to true)),
-        ))
+        val context = SourceProofContext(
+            scope,
+            setOf(b),
+            mapOf(
+                "true" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ONE), mapOf(0 to true)),
+            ),
+        )
         val conditional = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
         val refutation = SourceEvidence(conditional, SourceClaim.Refutation, SourceDerivation.Premise("true"))
         val clause = SourceClaim.Clause(mapOf(0 to false))
         val imported = SourceEvidence(scope, clause, SourceDerivation.Discharge(refutation))
 
-        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
-            SourceEvidence(scope, clause, SourceDerivation.Import(imported)),
-        ))
+        assertIs<SourceEvidenceCheck.Rejected>(
+            SourceEvidenceVerifier(context).verify(
+                SourceEvidence(scope, clause, SourceDerivation.Import(imported)),
+            ),
+        )
     }
 
     @Test
-    fun `an absent affine objective cannot be interpreted as a constant objective`() {
+    fun `an absent affine objective should not be interpreted as a constant objective`() {
         val context = SourceProofContext(scope, setOf(x), emptyMap())
-        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ZERO),
-            SourceDerivation.Combination(emptyList()))
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Bound(BigFraction.ZERO),
+            SourceDerivation.Combination(emptyList()),
+        )
 
         assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `an explicitly declared constant affine objective admits its constant bound`() {
+    fun `an explicitly declared constant affine objective should admit its constant bound`() {
         val context = SourceProofContext(scope, setOf(x), emptyMap(), objective = emptyMap())
-        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ZERO),
-            SourceDerivation.Combination(emptyList()))
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Bound(BigFraction.ZERO),
+            SourceDerivation.Combination(emptyList()),
+        )
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
     }
-
 }

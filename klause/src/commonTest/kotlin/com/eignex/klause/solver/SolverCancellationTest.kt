@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class SolverCancellationTest {
     @Test
-    fun `a weaker invocation cannot replace a bound lifetime scope`() {
+    fun `withCancellation should not replace a lifetime cancellation`() {
         for (params in listOf<SolverParams>(BacktrackParams(), LocalSearchParams())) {
             val bound = params.withLifetimeCancellation(Cancellation { true })
                 .withCancellation(Cancellation.Never)
@@ -25,7 +25,7 @@ class SolverCancellationTest {
     }
 
     @Test
-    fun `ordinary construction cancellation is not a lifetime allowance`() {
+    fun `constructor cancellation should not be a lifetime cancellation`() {
         val token = BacktrackParams(cancellation = Cancellation { true }).cancellation
 
         assertTrue(token())

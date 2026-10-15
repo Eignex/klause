@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class AxisEditsTest {
 
     @Test
-    fun `tokens parse bare plus minus and scoped forms`() {
+    fun `tokens should parse bare plus minus and scoped forms`() {
         val tokens = AxisEdits.tokens("break, +frontier, cbls.-violated")
         assertEquals(3, tokens.size)
         assertNull(tokens[0].selector)
@@ -27,7 +27,7 @@ class AxisEditsTest {
     }
 
     @Test
-    fun `plus and minus add and remove against the current sources`() {
+    fun `plus and minus should add and remove against the current sources`() {
         val current = MoveSourceCatalog.parse("violated,frontier")
         val edited = AxisEdits.applySources(current, AxisEdits.tokens("-violated,+argmin"))
         assertEquals(
@@ -37,7 +37,7 @@ class AxisEditsTest {
     }
 
     @Test
-    fun `mixing a force-exactly list with plus-minus is rejected`() {
+    fun `mixing a force-exactly list with plus-minus should be rejected`() {
         val current = MoveSourceCatalog.parse("violated")
         assertFailsWith<IllegalArgumentException> {
             AxisEdits.applySources(current, AxisEdits.tokens("frontier,+argmin"))
@@ -45,7 +45,7 @@ class AxisEditsTest {
     }
 
     @Test
-    fun `recipe axis edits rewrite both the satisfy and optimize strategies`() {
+    fun `recipe axis edits should rewrite both the satisfy and optimize strategies`() {
         val recipe = LocalSearchCatalog.byLabel("cbls/fixed")
         assertTrue(recipe.optimizeStrategy != null, "the cbls arm carries an optimize strategy")
 

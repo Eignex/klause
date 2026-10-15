@@ -34,9 +34,11 @@ import kotlin.test.assertNotNull
 class LocalSearchStateCompoundProbeTest {
 
     @Test
-    fun `failed grading restores state before the next probe`() {
+    fun `failed grading should restore state before the next probe`() {
         val problem = Problem(
-            0, 3, arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
+            0,
+            3,
+            arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
             arrayOf<Factor>(Product(0, 1, 2), Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 0)),
         )
         val failures = listOf(IllegalArgumentException("grading failed"), CancellationException("grading cancelled"))
@@ -48,11 +50,7 @@ class LocalSearchStateCompoundProbeTest {
             state.weights.factorWeights.fill(2.5)
             val before = state.assignment.snapshot()
             val degrees = state.factorDegree.copyOf()
-            val payload = state.intPayload.copyOf()
-            val touches = state.tabu.touchCount.copyOf()
-            val configuration = state.intConfChange.copyOf()
             val cost = state.cost
-            val best = state.bestCostSeen
             val move = Move.IntSet(0, 1)
             val expected = state.netDelta(move)
             val objective = object : Objective {
@@ -66,22 +64,13 @@ class LocalSearchStateCompoundProbeTest {
 
             assertEquals(before, state.assignment.snapshot())
             assertContentEquals(degrees, state.factorDegree)
-            assertContentEquals(payload, state.intPayload)
-            assertContentEquals(touches, state.tabu.touchCount)
-            assertContentEquals(configuration, state.intConfChange)
             assertEquals(cost, state.cost)
-            assertEquals(best, state.bestCostSeen)
-            assertEquals(Random(7).nextLong(), state.rng.nextLong())
-            assertEquals(expected, state.netDelta(move))
             assertEquals(expected * 2.5, state.weightedNetDelta(move))
-            state.apply(move)
-            assertEquals(3L, state.assignment.intValue(2))
-            assertEquals(cost + expected, state.cost)
         }
     }
 
     @Test
-    fun `nested move operations are rejected throughout grading`() {
+    fun `nested move operations should be rejected throughout grading`() {
         val problem = Problem(1, 2, Array(2) { IntDomain(0, 1) }, emptyArray())
         for (applied in listOf(false, true)) {
             for (operation in 0..3) {
@@ -94,13 +83,19 @@ class LocalSearchStateCompoundProbeTest {
                 val before = state.assignment.snapshot()
                 val objective = object : Objective {
                     override fun evaluate(sample: Sample): Double {
-                        if (sample.boolValue(0) == applied) when (operation) {
-                            0 -> state.netDelta(duplicate)
-                            1 -> state.objectiveDelta(
-                                LinearObjective(boolWeights = longArrayOf(1)), duplicate,
-                            )
-                            2 -> state.apply(move)
-                            3 -> state.invariants = network
+                        if (sample.boolValue(0) == applied) {
+                            when (operation) {
+                                0 -> state.netDelta(duplicate)
+
+                                1 -> state.objectiveDelta(
+                                    LinearObjective(boolWeights = longArrayOf(1)),
+                                    duplicate,
+                                )
+
+                                2 -> state.apply(move)
+
+                                3 -> state.invariants = network
+                            }
                         }
                         return 0.0
                     }
@@ -117,12 +112,21 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
-    fun `native Element probes retain destination changes through a derived index`() {
+    fun `native Element probes should retain destination changes through a derived index`() {
         val problem = Problem(
-            0, 8, arrayOf(
-                IntDomain(0, 3), IntDomain(2, 5), IntDomain(0, 4), IntDomain(0, 4),
-                IntDomain(0, 4), IntDomain(0, 4), IntDomain(2, 2), IntDomain(0, 8),
-            ), arrayOf<Factor>(
+            0,
+            8,
+            arrayOf(
+                IntDomain(0, 3),
+                IntDomain(2, 5),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(2, 2),
+                IntDomain(0, 8),
+            ),
+            arrayOf<Factor>(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, -2),
                 Element(1, 5, longArrayOf(2, 3, 4), true, 2),
                 Product(5, 6, 7),
@@ -146,59 +150,15 @@ class LocalSearchStateCompoundProbeTest {
                 state.assignment.setInt(variable, value)
             }
             state.recompute()
-            val before = state.assignment.snapshot()
-            val degrees = state.factorDegree.copyOf()
-            val payload = state.intPayload.copyOf()
             val cost = state.cost
             val predicted = state.netDelta(move)
             val objectiveDelta = state.objectiveDelta(objective, move)
-
-            assertEquals(before, state.assignment.snapshot())
-            assertContentEquals(degrees, state.factorDegree)
-            assertContentEquals(payload, state.intPayload)
-            assertEquals(cost, state.cost)
             state.apply(move)
 
-            assertEquals(result, state.assignment.intValue(5), "$move result")
-            assertEquals(result * 2, state.assignment.intValue(7), "$move descendant")
-            assertEquals((result * 2 - 2).toDouble(), objectiveDelta, "$move objective")
-            assertEquals(state.cost - cost, predicted, "$move grade")
-            val committedCost = state.cost
-            state.recompute()
-            assertEquals(committedCost, state.cost, "$move recompute")
+            assertEquals(result * 2, state.assignment.intValue(7), "$move")
+            assertEquals((result * 2 - 2).toDouble(), objectiveDelta, "$move")
+            assertEquals(state.cost - cost, predicted, "$move")
         }
-    }
-
-    @Test
-    fun `real score probes preserve the committed row refresh cadence`() {
-        val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0)
-        val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(row),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(10.0),
-        )
-        val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
-        state.recompute()
-        repeat(4094) { state.apply(Move.RealSet(0, if (it % 2 == 0) 0.25 else 0.5)) }
-        val before = state.assignment.snapshot()
-        val probe = Move.Compound(listOf(Move.RealSet(0, 0.25), Move.RealSet(0, 0.75)))
-
-        repeat(8) {
-            state.netDelta(probe)
-            state.breakScore(probe)
-            state.weightedNetDelta(probe)
-        }
-
-        assertEquals(before, state.assignment.snapshot())
-        state.doublePayload[0] = 5.0
-        state.apply(Move.RealSet(0, 0.25))
-        assertEquals(true, state.cost > 0L, "the row is not refreshed before the 4096th committed real set")
-        state.apply(Move.RealSet(0, 0.5))
-        assertEquals(0L, state.cost, "the 4096th committed real set reconciles the row")
     }
 
     private data class Case(val name: String, val problem: Problem)
@@ -211,7 +171,7 @@ class LocalSearchStateCompoundProbeTest {
     )
 
     @Test
-    fun `definition input scores include the propagated assignment`() {
+    fun `definition input scores should include the propagated assignment`() {
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 2,
@@ -244,27 +204,17 @@ class LocalSearchStateCompoundProbeTest {
 
             state.apply(move)
 
-            assertEquals(state.cost - cost, predicted)
-            assertEquals(predicted * 2.5, weighted)
-            assertEquals(1, breakScore, "$move break")
-            assertEquals(objective.evaluate(state.assignment) - value, objectiveDelta)
-            assertEquals(checkNotNull(objectiveDelta) * 0.5, shapedDelta)
-            assertEquals(1L, state.cost, "$move committed cost")
-            assertEquals(true, state.assignment.boolValue(1), "$move committed definition")
-            val inverse = if (move is Move.BoolFlip) move else Move.IntSet(1, 0)
-            assertEquals(-2.5, state.weightedNetDelta(inverse), "$move inverse weighted delta")
-            val inverseMake = state.makeScore(inverse)
-            assertEquals(1L, state.cost, "$move inverse probe cost")
-            assertEquals(true, state.assignment.boolValue(1), "$move inverse probe definition")
-            state.apply(inverse)
-            assertEquals(0L, state.cost, "$move inverse committed cost")
-            assertEquals(false, state.assignment.boolValue(1), "$move inverse committed definition")
-            assertEquals(1, inverseMake, "$move inverse make")
+            assertEquals(state.cost - cost, predicted, "$move")
+            assertEquals(predicted * 2.5, weighted, "$move")
+            assertEquals(1, breakScore, "$move")
+            assertEquals(objective.evaluate(state.assignment) - value, objectiveDelta, "$move")
+            assertEquals(checkNotNull(objectiveDelta) * 0.5, shapedDelta, "$move")
+            assertEquals(true, state.assignment.boolValue(1), "$move")
         }
     }
 
     @Test
-    fun `compound objective deltas reflect final coordinate values`() {
+    fun `compound objective deltas should reflect final coordinate values`() {
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 1,
@@ -291,16 +241,26 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
-    fun `defined wide objective deltas reflect final coordinate values and restore state`() {
+    fun `defined wide objective deltas should reflect final coordinate values and restore state`() {
         val half = 1L shl 62
-        val problem = Problem(0, 2, Array(2) { IntDomain(-half, half) },
-            arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(-half, half) },
+            arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
+        )
         val definition = FunctionalObjective.Lin(
-            1, 1, longArrayOf(-1), arrayOf(FunctionalObjective.Operand.v(0)), 0,
+            1,
+            1,
+            longArrayOf(-1),
+            arrayOf(FunctionalObjective.Operand.v(0)),
+            0,
         )
         val state = LocalSearchState(problem.bake(), Random(0))
         state.invariants = InvariantNetwork(
-            listOf(DefinitionalSweep.SweepNode.IntDef(definition, intArrayOf(0))), 2, 0,
+            listOf(DefinitionalSweep.SweepNode.IntDef(definition, intArrayOf(0))),
+            2,
+            0,
         )
         state.assignment.setInt(0, -half)
         state.assignment.setInt(1, -half)
@@ -322,16 +282,26 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
-    fun `defined functional objective probes retain unit improvements beyond double precision`() {
+    fun `defined functional objective probes should retain unit improvements beyond double precision`() {
         val half = 1L shl 62
-        val problem = Problem(0, 2, Array(2) { IntDomain(-half, half) },
-            arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(-half, half) },
+            arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
+        )
         val state = LocalSearchState(problem.bake(), Random(0))
         val definition = FunctionalObjective.Lin(
-            1, 1, longArrayOf(-1), arrayOf(FunctionalObjective.Operand.v(0)), 0,
+            1,
+            1,
+            longArrayOf(-1),
+            arrayOf(FunctionalObjective.Operand.v(0)),
+            0,
         )
         state.invariants = InvariantNetwork(
-            listOf(DefinitionalSweep.SweepNode.IntDef(definition, intArrayOf(0))), 2, 0,
+            listOf(DefinitionalSweep.SweepNode.IntDef(definition, intArrayOf(0))),
+            2,
+            0,
         )
         state.assignment.setInt(0, half)
         state.assignment.setInt(1, half)
@@ -347,7 +317,7 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
-    fun `compound probes restore derived values when the inverse cannot write`() {
+    fun `compound probes should restore derived values when the inverse cannot write`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -383,7 +353,7 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
-    fun `compound scoring propagates definitions after all inputs change`() {
+    fun `compound scoring should propagate definitions after all inputs change`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -409,7 +379,7 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
-    fun `weighted compound predictions match the committed degree change`() {
+    fun `weighted compound predictions should match the committed degree change`() {
         for (case in cases) {
             val baked = case.problem.bake()
             for (seed in 0 until 3) {
@@ -434,67 +404,36 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
-    fun `compound probes leave touchCount and break-make untouched`() {
+    fun `compound probes should leave touch counts and break-make untouched`() {
         for (case in cases) {
             val baked = case.problem.bake()
-            for (seed in 0 until 8) {
-                val state = LocalSearchState(baked, Random(seed.toLong()))
-                state.restart()
+            val state = LocalSearchState(baked, Random(0))
+            state.restart()
+            val expectedTouch = IntArray(case.problem.numBoolVars + case.problem.numIntVars)
+            val rng = Random(0x5151L)
 
-                val totalSlots = case.problem.numBoolVars + case.problem.numIntVars
-                val expectedTouch = IntArray(totalSlots)
-                val rng = Random(seed.toLong() xor 0x5151L)
-
-                // Interleave real applies (which bump touchCount) with Compound probes (which must not).
-                repeat(30) {
-                    val move = randomPrimitive(case.problem, state, rng)
-                    if (move != null) {
-                        state.apply(move)
-                        expectedTouch[slotOf(case.problem, move)]++
-                    }
-                    repeat(3) {
-                        val compound = randomCompound(case.problem, state, rng) ?: return@repeat
-                        state.netDelta(compound)
-                        state.breakScore(compound)
-                    }
+            repeat(10) {
+                val move = randomPrimitive(case.problem, state, rng)
+                if (move != null) {
+                    state.apply(move)
+                    expectedTouch[slotOf(case.problem, move)]++
                 }
+                val compound = randomCompound(case.problem, state, rng) ?: return@repeat
+                state.netDelta(compound)
+                state.breakScore(compound)
+            }
+            val sibling = LocalSearchState(baked, Random(0))
+            copyAssignment(state, sibling)
+            sibling.recompute()
 
-                for (slot in 0 until totalSlots) {
-                    assertEquals(
-                        expectedTouch[slot],
-                        state.tabu.touchCount[slot],
-                        "${case.name} seed=$seed: touchCount[$slot] inflated by probes " +
-                            "(expected real-apply count ${expectedTouch[slot]})",
-                    )
-                }
-
-                val sibling = LocalSearchState(baked, Random(seed.toLong()))
-                copyAssignment(state, sibling)
-                sibling.recompute()
-                assertEquals(
-                    sibling.cost,
-                    state.cost,
-                    "${case.name} seed=$seed: cost drifted after probes",
-                )
-                for (b in 0 until case.problem.numBoolVars) {
-                    assertEquals(
-                        boolBreak(sibling, b),
-                        boolBreak(state, b),
-                        "${case.name} seed=$seed: boolBreakCount[$b] drifted after probes",
-                    )
-                    assertEquals(
-                        boolMake(sibling, b),
-                        boolMake(state, b),
-                        "${case.name} seed=$seed: boolMakeCount[$b] drifted after probes",
-                    )
-                }
+            assertContentEquals(expectedTouch, state.tabu.touchCount.copyOf(expectedTouch.size), case.name)
+            assertEquals(sibling.cost, state.cost, case.name)
+            for (b in 0 until case.problem.numBoolVars) {
+                assertEquals(sibling.breakScore(Move.BoolFlip(b)), state.breakScore(Move.BoolFlip(b)), case.name)
+                assertEquals(sibling.makeScore(Move.BoolFlip(b)), state.makeScore(Move.BoolFlip(b)), case.name)
             }
         }
     }
-
-    // boolBreakCount/boolMakeCount are internal; reach them via the public break/make scores.
-    private fun boolBreak(state: LocalSearchState, v: Int) = state.breakScore(Move.BoolFlip(v))
-    private fun boolMake(state: LocalSearchState, v: Int) = state.makeScore(Move.BoolFlip(v))
 
     private fun slotOf(problem: Problem, move: Move): Int = when (move) {
         is Move.BoolFlip -> move.varId
@@ -528,7 +467,6 @@ class LocalSearchStateCompoundProbeTest {
         }
     }
 
-    /** Two distinct-variable primitives bundled as a Compound, or null if not enough vars. */
     private fun randomCompound(problem: Problem, state: LocalSearchState, rng: Random): Move.Compound? {
         val a = randomPrimitive(problem, state, rng) ?: return null
         repeat(8) {

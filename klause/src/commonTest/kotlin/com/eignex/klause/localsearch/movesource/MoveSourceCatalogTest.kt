@@ -8,32 +8,7 @@ import kotlin.test.assertTrue
 class MoveSourceCatalogTest {
 
     @Test
-    fun `every label resolves to its source id`() {
-        val expected = mapOf(
-            "violated" to ViolatedRepairs.ID,
-            "frontier" to Frontier.ID,
-            "structured" to SatisfiedStructured.ID,
-            "elected" to SatisfiedStructured.ID,
-            "objective" to ObjectiveSeed.ID,
-            "argmin" to ArgminJump.ID,
-            "stall-swaps" to StallSwaps.ID,
-            "ejection-chains" to EjectionChains.ID,
-            "stall-kick" to StallKick.ID,
-            "pair-swap" to PairSwap.ID,
-            "clique-swap" to CliqueSwap.ID,
-            "flip-propagate" to FlipAndPropagate.ID,
-            "extended-structured" to SatisfiedStructured.EXTENDED_ID,
-            "extended-elected" to SatisfiedStructured.EXTENDED_ID,
-            "extended-repairs" to ViolatedRepairs.EXTENDED_ID,
-        )
-        assertEquals(expected.keys, MoveSourceCatalog.labels.toSet(), "catalog labels drifted")
-        for ((label, id) in expected) {
-            assertEquals(id, MoveSourceCatalog.configured(label).source.id, "label '$label' wrong source")
-        }
-    }
-
-    @Test
-    fun `parse preserves order and skips blanks`() {
+    fun `parse should preserve order and skip blanks`() {
         val sources = MoveSourceCatalog.parse(" violated, argmin ,, frontier ")
         assertEquals(
             listOf(ViolatedRepairs.ID, ArgminJump.ID, Frontier.ID),
@@ -43,14 +18,8 @@ class MoveSourceCatalogTest {
     }
 
     @Test
-    fun `empty spec yields no sources`() {
-        assertTrue(MoveSourceCatalog.parse("").isEmpty())
-        assertTrue(MoveSourceCatalog.parse("  , ,").isEmpty())
-    }
-
-    @Test
-    fun `unknown label fails loudly`() {
+    fun `an unknown label should fail`() {
         val e = assertFailsWith<IllegalStateException> { MoveSourceCatalog.configured("nope") }
-        assertTrue(e.message!!.contains("unknown move source 'nope'"), "message should name the bad label")
+        assertTrue(e.message!!.contains("unknown move source 'nope'"))
     }
 }

@@ -17,12 +17,24 @@ import kotlin.test.assertNull
 
 class CompletedMoveEvaluationTest {
     @Test
-    fun `completion admits only the ranked and exploratory proposals`() {
+    fun `completion should admit only the ranked and exploratory proposals`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
-            arrayOf<Factor>(Linear(intArrayOf(0, 1, 2), doubleArrayOf(1.0, 1.0, 1.0),
-                intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
+            arrayOf<Factor>(
+                Linear(
+                    intArrayOf(0, 1, 2),
+                    doubleArrayOf(1.0, 1.0, 1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.assignment.setReal(0, 1.0)
@@ -30,12 +42,15 @@ class CompletedMoveEvaluationTest {
         val initial = state.assignment.snapshot()
         var calls = 0
         val evaluation = CompletedMoveEvaluation(
-            state, LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(10.0)),
-            Cancellation.Never, mayAttempt = { true },
+            state,
+            LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(10.0)),
+            Cancellation.Never,
+            mayAttempt = { true },
             complete = { candidate ->
                 calls++
                 Completion.Witness(candidate.copy(reals = doubleArrayOf(0.0)))
-            }, current = { initial },
+            },
+            current = { initial },
         )
         evaluation.begin()
         val sink = MoveSink()
@@ -60,10 +75,15 @@ class CompletedMoveEvaluationTest {
     }
 
     @Test
-    fun `ordinary finite completion preserves the selected move and random draws`() {
+    fun `ordinary finite completion should preserve the selected move and random draws`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 1) }, emptyArray(),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val baseline = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         val evaluated = LocalSearchState(LocalSearchModel.open(problem), Random(3))
@@ -78,8 +98,15 @@ class CompletedMoveEvaluationTest {
         val initial = evaluated.assignment.snapshot()
         var calls = 0
         val evaluation = CompletedMoveEvaluation(
-            evaluated, objective, Cancellation.Never, mayAttempt = { true },
-            complete = { candidate -> calls++; Completion.Witness(candidate) }, current = { initial },
+            evaluated,
+            objective,
+            Cancellation.Never,
+            mayAttempt = { true },
+            complete = { candidate ->
+                calls++
+                Completion.Witness(candidate)
+            },
+            current = { initial },
         )
         val expected = Cbls(pairSwapCap = 0, satisfiedSampleCount = 0).pickMove(baseline)
 
@@ -93,14 +120,18 @@ class CompletedMoveEvaluationTest {
     }
 
     @Test
-    fun `an exact finite violation declines a numerical completion proposal`() {
+    fun `an exact finite violation should decline a numerical completion proposal`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
             arrayOf<Factor>(
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
             ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.assignment.setReal(0, 1.0)
@@ -108,8 +139,14 @@ class CompletedMoveEvaluationTest {
         val initial = state.assignment.snapshot()
         var calls = 0
         val evaluation = CompletedMoveEvaluation(
-            state, LinearObjective(intCoefficients = longArrayOf(1)), Cancellation.Never,
-            mayAttempt = { true }, complete = { candidate -> calls++; Completion.Witness(candidate) },
+            state,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            Cancellation.Never,
+            mayAttempt = { true },
+            complete = { candidate ->
+                calls++
+                Completion.Witness(candidate)
+            },
             current = { initial },
         )
 
@@ -122,21 +159,30 @@ class CompletedMoveEvaluationTest {
     }
 
     @Test
-    fun `real guesses do not displace finite completion proposals`() {
+    fun `real guesses should not displace finite completion proposals`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.recompute()
         val initial = state.assignment.snapshot()
         val pins = mutableListOf<Long>()
         val evaluation = CompletedMoveEvaluation(
-            state, LinearObjective(intCoefficients = longArrayOf(1)), Cancellation.Never,
-            mayAttempt = { true }, complete = { candidate ->
+            state,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            Cancellation.Never,
+            mayAttempt = { true },
+            complete = { candidate ->
                 pins += candidate.intValue(0)
                 Completion.Witness(candidate)
-            }, current = { initial },
+            },
+            current = { initial },
         )
         val finite = Move.IntSet(0, 1)
         val real = Move.RealSet(0, 1.0)
@@ -151,18 +197,29 @@ class CompletedMoveEvaluationTest {
     }
 
     @Test
-    fun `unchanged incumbents reuse completed proposals across sampled picks`() {
+    fun `unchanged incumbents should reuse completed proposals across sampled picks`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 2)), emptyArray(),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.recompute()
         var initial = state.assignment.snapshot()
         var calls = 0
         val evaluation = CompletedMoveEvaluation(
-            state, LinearObjective(intCoefficients = longArrayOf(1)), Cancellation.Never,
-            mayAttempt = { true }, complete = { candidate -> calls++; Completion.Witness(candidate) },
+            state,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            Cancellation.Never,
+            mayAttempt = { true },
+            complete = { candidate ->
+                calls++
+                Completion.Witness(candidate)
+            },
             current = { initial },
         )
         val move = Move.IntSet(0, 1)
@@ -182,18 +239,27 @@ class CompletedMoveEvaluationTest {
     }
 
     @Test
-    fun `a throwing completion leaves the live assignment unchanged`() {
+    fun `a throwing completion should leave the live assignment unchanged`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.assignment.setReal(0, 1.0)
         state.recompute()
         val initial = state.assignment.snapshot()
         val evaluation = CompletedMoveEvaluation(
-            state, LinearObjective(intCoefficients = longArrayOf(1)), Cancellation.Never,
-            mayAttempt = { true }, complete = { error("failed completion") }, current = { initial },
+            state,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            Cancellation.Never,
+            mayAttempt = { true },
+            complete = { error("failed completion") },
+            current = { initial },
         )
 
         assertFailsWith<IllegalStateException> { evaluation.attempt(Move.IntSet(0, 1)) }

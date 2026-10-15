@@ -32,8 +32,6 @@ class SharedCutPoolTest {
     private fun relax(obj: LinearObjective): LpRelaxation =
         CpToLpRelaxation(problem, obj).build(PropagationSession(problem))
 
-    /** A worker's [CutSharing] view over a local pool + relaxation — what [LpEngine] provides in
-     *  production, inlined here so the test drives [PoolCutExchange] without a full engine. */
     private fun sharing(local: CutPool, rel: LpRelaxation) = object : CutSharing {
         override fun exportGlobalCuts(): List<SharedCut> =
             local.cuts().mapNotNull { if (it.global) SharedCut.fromCut(it, rel) else null }
@@ -44,7 +42,7 @@ class SharedCutPoolTest {
     }
 
     @Test
-    fun `a global cut published by one arm reaches another arm`() {
+    fun `a global cut published by one arm should reach another arm`() {
         val rA = relax(LinearObjective(intCoefficients = longArrayOf(1, 0, 0)))
         val rB = relax(LinearObjective(intCoefficients = longArrayOf(0, 0, 1)))
         val pool = SharedCutPool()
@@ -52,21 +50,20 @@ class SharedCutPoolTest {
         val localA = CutPool().apply {
             add(Cut(intArrayOf(rA.intColOf[0], rA.intColOf[1]), longArrayOf(1, 1), Relation.LE, 1, global = true))
         }
-        PoolCutExchange(pool).exchange(sharing(localA, rA)) // arm A publishes
+        PoolCutExchange(pool).exchange(sharing(localA, rA))
 
         val localB = CutPool()
-        PoolCutExchange(pool).exchange(sharing(localB, rB)) // arm B imports
+        PoolCutExchange(pool).exchange(sharing(localB, rB))
 
-        assertEquals(1, localB.size, "arm B should receive arm A's cut")
+        assertEquals(1, localB.size)
         val imported = localB.cuts().single()
-        // Same inequality over CP variables, re-mapped onto B's columns.
         assertEquals(setOf(0, 1), imported.cols.map { rB.colVarId[it] }.toSet())
         assertEquals(Relation.LE, imported.rel)
         assertEquals(1, imported.rhs)
     }
 
     @Test
-    fun `re-exchange imports nothing new and the pool de-duplicates`() {
+    fun `re-exchange should import nothing new and the pool should de-duplicate`() {
         val r = relax(LinearObjective(intCoefficients = longArrayOf(1, 0, 0)))
         val pool = SharedCutPool()
         val localA = CutPool().apply {
@@ -74,19 +71,19 @@ class SharedCutPoolTest {
         }
         val exA = PoolCutExchange(pool)
         exA.exchange(sharing(localA, r))
-        exA.exchange(sharing(localA, r)) // second pass must not re-publish (seen-set + pool key de-dup)
+        exA.exchange(sharing(localA, r))
 
         val localB = CutPool()
         val exB = PoolCutExchange(pool)
         exB.exchange(sharing(localB, r))
         val afterFirst = localB.size
-        exB.exchange(sharing(localB, r)) // cursor advanced ⇒ nothing new
-        assertEquals(afterFirst, localB.size, "a second exchange imports nothing new")
+        exB.exchange(sharing(localB, r))
+        assertEquals(afterFirst, localB.size)
         assertEquals(1, afterFirst)
     }
 
     @Test
-    fun `pool drains since a cursor and ignores duplicate keys`() {
+    fun `pool should drain since a cursor and ignore duplicate keys`() {
         val pool = SharedCutPool()
         val r = relax(LinearObjective(intCoefficients = longArrayOf(1, 1, 1)))
         val a = assertNotNull(
@@ -94,7 +91,7 @@ class SharedCutPoolTest {
         )
         val aGain = assertNotNull(
             SharedCut.fromCut(Cut(intArrayOf(1, 0), longArrayOf(1, 1), Relation.LE, 2, global = true), r),
-        ) // same inequality ⇒ same key
+        )
         val b = assertNotNull(
             SharedCut.fromCut(Cut(intArrayOf(0, 2), longArrayOf(2, 1), Relation.LE, 3, global = true), r),
         )
@@ -102,8 +99,8 @@ class SharedCutPoolTest {
         pool.publish(listOf(b), origin = 4)
 
         val first = pool.drainSince(0)
-        assertEquals(2, first.cuts.size, "duplicate key dropped")
-        assertContentEquals(intArrayOf(3, 4), first.origins, "each cut names the arm that published it")
-        assertTrue(pool.drainSince(first.cursor).cuts.isEmpty(), "nothing new past the cursor")
+        assertEquals(2, first.cuts.size)
+        assertContentEquals(intArrayOf(3, 4), first.origins)
+        assertTrue(pool.drainSince(first.cursor).cuts.isEmpty())
     }
 }

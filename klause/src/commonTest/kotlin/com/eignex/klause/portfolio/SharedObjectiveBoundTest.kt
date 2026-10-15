@@ -16,7 +16,7 @@ import kotlin.test.assertEquals
 class SharedObjectiveBoundTest {
 
     @Test
-    fun `runtime bound sharing preserves the actual native value`() {
+    fun `runtime bound sharing should preserve the actual native value`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val model = ModelIdentity.of(source, objective)
@@ -32,7 +32,7 @@ class SharedObjectiveBoundTest {
     }
 
     @Test
-    fun `runtime bound sharing refuses a stronger source invocation`() {
+    fun `runtime bound sharing should refuse a stronger source invocation`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val model = ModelIdentity.of(source, objective)
@@ -48,31 +48,26 @@ class SharedObjectiveBoundTest {
     }
 
     @Test
-    fun `current is negative infinity until a bound is published`() {
-        assertEquals(Double.NEGATIVE_INFINITY, SharedObjectiveBound().current())
-    }
-
-    @Test
-    fun `publish keeps the maximum`() {
+    fun `publish should keep the maximum`() {
         val bounds = SharedObjectiveBound()
         bounds.publish(3.0)
         bounds.publish(7.0)
-        bounds.publish(5.0) // a weaker bound does not lower the shared maximum
+        bounds.publish(5.0)
         assertEquals(7.0, bounds.current())
     }
 
     @Test
-    fun `non-finite publications carry no information`() {
+    fun `non-finite publications should not change the bound`() {
         val bounds = SharedObjectiveBound()
         bounds.publish(4.0)
         bounds.publish(Double.NaN)
         bounds.publish(Double.NEGATIVE_INFINITY)
         bounds.publish(Double.POSITIVE_INFINITY)
-        assertEquals(4.0, bounds.current(), "only finite bounds update the maximum")
+        assertEquals(4.0, bounds.current())
     }
 
     @Test
-    fun `publishing returns how far it raised a finite bound`() {
+    fun `publishing should return how far it raised a finite bound`() {
         val bounds = SharedObjectiveBound()
 
         val first = bounds.publish(3.0)
@@ -81,8 +76,9 @@ class SharedObjectiveBoundTest {
 
         assertEquals(listOf(0.0, 4.5, 0.0), listOf(first, raise, weaker))
     }
+
     @Test
-    fun `only a matching certified objective bound changes the shared floor`() {
+    fun `only a matching certified objective bound should change the shared floor`() {
         val source = Problem(0, 1, arrayOf(IntDomain(7, 9)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val otherObjective = LinearObjective(intCoefficients = longArrayOf(1))

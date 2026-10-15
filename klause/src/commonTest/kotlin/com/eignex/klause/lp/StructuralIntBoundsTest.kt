@@ -17,7 +17,7 @@ class StructuralIntBoundsTest {
     )
 
     @Test
-    fun `equalities that determine a column bound it on both sides`() {
+    fun `determining equalities should bound a column on both sides`() {
         // x + y = 10 and x - y = 4 leave x and y unbounded row by row, and together fix x = 7, y = 3.
         val rows = listOf(
             row(0 to 1L, 1 to 1L, op = LinearOp.EQ, bound = 10L),
@@ -33,15 +33,15 @@ class StructuralIntBoundsTest {
     }
 
     @Test
-    fun `an underdetermined equality leaves its columns open`() {
+    fun `underdetermined equality should leave its columns open`() {
         // x + y = 10 alone admits every integer x, so neither column takes a bound.
         val rows = listOf(row(0 to 1L, 1 to 1L, op = LinearOp.EQ, bound = 10L))
 
         val bounds = assertNotNull(structuralIntBounds(2, rows))
 
         for (v in 0..1) {
-            assertNull(bounds.lo[v], "column $v keeps no lower bound")
-            assertNull(bounds.hi[v], "column $v keeps no upper bound")
+            assertNull(bounds.lo[v], "column $v")
+            assertNull(bounds.hi[v], "column $v")
         }
     }
 }

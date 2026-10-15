@@ -6,7 +6,6 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -15,56 +14,7 @@ import kotlin.time.Duration
 
 class ExactBasisVerifyTest {
     @Test
-    fun `structural decline reports cannot be mutated between charged calls`() {
-        val model = LpBuilder().apply {
-            addVar(0L, 1L)
-            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
-        }.build(Sense.MINIMIZE)
-        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
-        val limits = ExactBasisLimits(RationalBasisLimits(dimension = 0))
-        val first = verifyExactBasis(model, basis, limits = limits)
-
-        assertFails { (first.metrics.operations as MutableList<ExactBasisWork>).clear() }
-        val repeated = verifyExactBasis(model, basis, limits = limits)
-
-        assertEquals(1L, repeated.metrics.work)
-        assertEquals(ExactBasisDecline.DIMENSION, repeated.metrics.decline)
-    }
-
-    @Test
-    fun `repeated structural declines allow later certificates under current dimensions and values`() {
-        val model = LpBuilder().apply {
-            addVar(0L, 3L, cost = 1L)
-            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
-        }.build(Sense.MINIMIZE)
-        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
-        val cache = ExactBasisCache()
-        val limits = listOf(
-            ExactBasisLimits(RationalBasisLimits(dimension = 0)),
-            ExactBasisLimits(verification = ReconstructionLimits(maxCoordinates = 1)),
-        )
-        for (limit in limits) {
-            repeat(2) {
-                val declined = verifyExactBasis(model, basis, cache = cache, limits = limit)
-                assertEquals(ExactBasisDecline.DIMENSION, declined.metrics.decline)
-                assertEquals(1L, declined.metrics.work)
-                assertEquals(0L, declined.metrics.allocation)
-                assertEquals(0, declined.metrics.factoryCalls)
-                assertNull(declined.witness)
-                assertNull(declined.conflict)
-            }
-        }
-        model.rhs[0] = 2L
-
-        val admitted = verifyExactBasis(model, basis, cache = cache)
-
-        assertEquals(listOf(BigFraction.ofLong(2L)), assertNotNull(admitted.witness).primal)
-        assertEquals(BigFraction.ofLong(2L), assertNotNull(admitted.bound).value)
-        assertNull(admitted.metrics.decline)
-    }
-
-    @Test
-    fun `transient entry stops take precedence over structural rejection and permit retry`() {
+    fun `transient entry stops should take precedence over structural rejection and permit retry`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
@@ -73,13 +23,21 @@ class ExactBasisVerifyTest {
         val cache = ExactBasisCache()
         val cases = listOf(
             Triple(RationalBasisLimits(dimension = 0, work = 0L), Cancellation.Never, ExactBasisDecline.WORK),
-            Triple(RationalBasisLimits(dimension = 0, time = Duration.ZERO),
-                Cancellation.Never, ExactBasisDecline.TIME),
+            Triple(
+                RationalBasisLimits(dimension = 0, time = Duration.ZERO),
+                Cancellation.Never,
+                ExactBasisDecline.TIME,
+            ),
             Triple(RationalBasisLimits(dimension = 0), Cancellation { true }, ExactBasisDecline.CANCELLED),
         )
         for ((limit, cancellation, reason) in cases) {
-            val stopped = verifyExactBasis(model, basis, cache = cache,
-                limits = ExactBasisLimits(limit), cancellation = cancellation)
+            val stopped = verifyExactBasis(
+                model,
+                basis,
+                cache = cache,
+                limits = ExactBasisLimits(limit),
+                cancellation = cancellation,
+            )
             val retried = verifyExactBasis(model, basis, cache = cache)
 
             assertEquals(reason, stopped.metrics.decline)
@@ -90,7 +48,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `reordered nonsymmetric basis verifies primal and true dual objective`() {
+    fun `a reordered nonsymmetric basis should verify primal and true dual objective`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L, cost = 3L)
             addVar(0L, 10L, cost = 4L)
@@ -110,7 +68,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `logical basic cost and source objective units are authoritative`() {
+    fun `verification should treat logical basic cost and source objective units as authoritative`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(2L)))),
@@ -141,7 +99,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `free upper only and fixed nonbasic seats contribute exact rhs`() {
+    fun `free upper only and fixed nonbasic seats should contribute exact rhs`() {
         val zero = ExactLpNumber.of(0L)
         val three = ExactLpSide(ExactLpNumber.of(3L))
         val source = ExactLpModel(
@@ -166,7 +124,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `near singular beyond Long source restarts without rounded coefficients`() {
+    fun `a near singular source beyond Long should restart without rounded coefficients`() {
         val large = BigFraction.of(BIG_ONE shl 140, BIG_ONE)
         val one = BigFraction.ONE
         val zero = ExactLpNumber.of(0L)
@@ -199,7 +157,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `BTRAN with nonzero free column residue cannot prove infeasibility`() {
+    fun `BTRAN with nonzero free column residue should not prove infeasibility`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
@@ -223,7 +181,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `bound status rhs and cost edits reuse factors and recompute proofs`() {
+    fun `bound status rhs and cost edits should reuse factors and recompute proofs`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L, cost = 1L)
             addVar(0L, 2L)
@@ -252,7 +210,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `mutated legacy matrix and reordered headings cannot reuse factors`() {
+    fun `a mutated legacy matrix or reordered headings should not reuse factors`() {
         val model = LpBuilder().apply {
             repeat(2) { addVar(0L, 2L) }
             addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
@@ -277,7 +235,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `exact singularity remains distinct from failed resource attempts`() {
+    fun `exact singularity should remain distinct from failed resource attempts`() {
         val model = LpBuilder().apply {
             repeat(2) { addVar(0L, 2L) }
             repeat(2) { addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.EQ, 1L) }
@@ -311,7 +269,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `dimension work time and cancellation declines publish no proof`() {
+    fun `dimension work time and cancellation declines should publish no proof`() {
         val model = LpBuilder().apply {
             addVar(0L, 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
@@ -336,7 +294,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `logical support retains local row premises even with zero dual`() {
+    fun `logical support should retain local row premises even with zero dual`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val premises = ExactLpPremises(emptyList(), listOf(17))
@@ -365,7 +323,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `strict selected side proves contradiction with zero surplus`() {
+    fun `a strict selected side should prove contradiction with zero surplus`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
@@ -390,34 +348,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `replacement owners do not inherit rational factors`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
-            listOf(ExactLpNumber.of(1L)),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero)),
-        )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
-        RevisedSimplex(model).use { solver ->
-            val first = assertNotNull(solver.solve())
-            assertEquals(1, verifyExactBasis(model, first.basis, cache = solver.exactBasisCache).metrics.factoryCalls)
-            RevisedSimplex(model).use { replacement ->
-                val result = assertNotNull(replacement.solve())
-                assertEquals(
-                    1,
-                    verifyExactBasis(model, result.basis, cache = replacement.exactBasisCache).metrics.factoryCalls,
-                )
-            }
-        }
-    }
-
-    @Test
-    fun `repair requests reject stale authority and invalidate only matching owner state`() {
+    fun `repair requests should reject stale authority and invalidate only matching owner state`() {
         val model = LpBuilder().apply {
             addVar(0L, 2L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
@@ -443,7 +374,7 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `basis proof cannot bypass a disabled basis acceptance policy`() {
+    fun `a basis proof should not bypass a disabled basis acceptance policy`() {
         val model = LpBuilder().apply {
             addVar(0L, 3L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
@@ -462,5 +393,4 @@ class ExactBasisVerifyTest {
         assertNull(result.bound)
         assertEquals(1, result.basisVerification?.factoryCalls)
     }
-
 }

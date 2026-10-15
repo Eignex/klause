@@ -32,16 +32,34 @@ import kotlin.test.assertTrue
 
 class ContinuousProductEncoderTest {
     @Test
-    fun `retained product completions retract each finite choice guard`() {
-        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val source = Problem(2, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
-            realLower = doubleArrayOf(0.0, 0.5, 0.0), realUpper = doubleArrayOf(1.0, 0.5, 1.0))
-        val replacement = FactorProjectionProviders(encoder = EncoderProvider { view, target ->
-            val selected = BuiltInEncoderProvider.select(view, target)
-            if (view !is ContinuousProduct || target != EncodingTarget.LINEAR) selected
-            else Encoder(EncoderSupport.EQUIVALENT) { projected, encoding -> selected.install(projected, encoding) }
-        })
+    fun `retained product completions should retract each finite choice guard`() {
+        val factor = ContinuousProduct(
+            0,
+            1,
+            2,
+            0,
+            doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+        )
+        val source = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf(factor),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 0.5, 0.0),
+            realUpper = doubleArrayOf(1.0, 0.5, 1.0),
+        )
+        val replacement = FactorProjectionProviders(
+            encoder = EncoderProvider { view, target ->
+                val selected = BuiltInEncoderProvider.select(view, target)
+                if (view !is ContinuousProduct || target != EncodingTarget.LINEAR) {
+                    selected
+                } else {
+                    Encoder(EncoderSupport.EQUIVALENT) { projected, encoding -> selected.install(projected, encoding) }
+                }
+            },
+        )
         for (providers in listOf(FactorProjectionProviders.Default, replacement)) {
             LeafRealSolver(source.bake(providers), null).use { owner ->
                 val first = owner.solve(Sample(booleanArrayOf(true, false), longArrayOf()))
@@ -49,19 +67,34 @@ class ContinuousProductEncoderTest {
                 val restored = owner.solve(Sample(booleanArrayOf(true, false), longArrayOf()))
 
                 assertEquals(BigFraction.ofLong(16).reciprocal(), assertNotNull(first.exactReals)[2])
-                assertEquals(BigFraction.ofLong(3) * BigFraction.ofLong(16).reciprocal(),
-                    assertNotNull(second.exactReals)[2])
+                assertEquals(
+                    BigFraction.ofLong(3) * BigFraction.ofLong(16).reciprocal(),
+                    assertNotNull(second.exactReals)[2],
+                )
                 assertEquals(first.exactReals, restored.exactReals)
             }
         }
     }
 
     @Test
-    fun `finite product guards enforce the complete operand choice relation`() {
-        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val source = Problem(2, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
-            realLower = doubleArrayOf(0.0, 0.5, 0.0), realUpper = doubleArrayOf(1.0, 0.5, 1.0))
+    fun `finite product guards should enforce the complete operand choice relation`() {
+        val factor = ContinuousProduct(
+            0,
+            1,
+            2,
+            0,
+            doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+        )
+        val source = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf(factor),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 0.5, 0.0),
+            realUpper = doubleArrayOf(1.0, 0.5, 1.0),
+        )
         for (guards in listOf(booleanArrayOf(false, false), booleanArrayOf(true, true))) {
             val point = Sample(guards, longArrayOf())
 
@@ -72,11 +105,24 @@ class ContinuousProductEncoderTest {
     }
 
     @Test
-    fun `zero numerical product violation still requires exact choice completion`() {
-        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val source = Problem(2, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
-            realLower = doubleArrayOf(0.0, 0.5, 0.0), realUpper = doubleArrayOf(1.0, 0.5, 1.0))
+    fun `zero numerical product violation should still require exact choice completion`() {
+        val factor = ContinuousProduct(
+            0,
+            1,
+            2,
+            0,
+            doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+        )
+        val source = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf(factor),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 0.5, 0.0),
+            realUpper = doubleArrayOf(1.0, 0.5, 1.0),
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
         val input = 0.125 + 1e-12
         state.assignment.setBool(0, true)
@@ -86,9 +132,11 @@ class ContinuousProductEncoderTest {
         state.assignment.setReal(2, input * 0.5)
         state.recompute()
         val candidate = state.assignment.snapshot()
-        val claimed = candidate.copy(exactReals = listOf(input, 0.5, input * 0.5).map {
-            requireNotNull(BigFraction.ofDouble(it))
-        })
+        val claimed = candidate.copy(
+            exactReals = listOf(input, 0.5, input * 0.5).map {
+                requireNotNull(BigFraction.ofDouble(it))
+            },
+        )
 
         val completion = LeafRealCompletion(source, null).complete(candidate, Cancellation.Never)
 
@@ -101,11 +149,24 @@ class ContinuousProductEncoderTest {
     }
 
     @Test
-    fun `polynomial choices preserve source guard equivalence across queries`() {
-        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
-            intArrayOf(Lit.make(0, true), Lit.make(0, false)))
-        val source = Problem(1, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
-            realLower = doubleArrayOf(0.125, 0.5, 0.0625), realUpper = doubleArrayOf(0.125, 0.5, 0.0625))
+    fun `polynomial choices should preserve source guard equivalence across queries`() {
+        val factor = ContinuousProduct(
+            0,
+            1,
+            2,
+            0,
+            doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(0, false)),
+        )
+        val source = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf(factor),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.125, 0.5, 0.0625),
+            realUpper = doubleArrayOf(0.125, 0.5, 0.0625),
+        )
         val model = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
         model.service.invocation().use { owner ->
             assertIs<QfNraResult.Satisfiable>(owner.check(PolynomialCondition(bools = mapOf(0 to true))))
@@ -115,11 +176,18 @@ class ContinuousProductEncoderTest {
     }
 
     @Test
-    fun `aliased product coefficients require an exact representable completion`() {
+    fun `aliased product coefficients should require an exact representable completion`() {
         for ((value, complete) in listOf(0.125 to true, 0.1 to false)) {
             val factor = ContinuousProduct(0, 1, 1, 0, doubleArrayOf(value), intArrayOf(Lit.make(0, true)))
-            val source = Problem(1, 0, emptyArray(), arrayOf(factor), numRealVars = 2,
-                realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+            val source = Problem(
+                1,
+                0,
+                emptyArray(),
+                arrayOf(factor),
+                numRealVars = 2,
+                realLower = doubleArrayOf(0.0, 0.0),
+                realUpper = doubleArrayOf(1.0, 1.0),
+            )
 
             val selected = FactorProjectionProviders.Default.prepare(source)
 
@@ -129,11 +197,24 @@ class ContinuousProductEncoderTest {
     }
 
     @Test
-    fun `cancelled product installation does not retain a partial choice cover`() {
-        val factor = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.125, 0.375),
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val source = Problem(2, 0, emptyArray(), arrayOf(factor), numRealVars = 3,
-            realLower = DoubleArray(3), realUpper = DoubleArray(3) { 1.0 })
+    fun `cancelled product installation should not retain a partial choice cover`() {
+        val factor = ContinuousProduct(
+            0,
+            1,
+            2,
+            0,
+            doubleArrayOf(0.125, 0.375),
+            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+        )
+        val source = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf(factor),
+            numRealVars = 3,
+            realLower = DoubleArray(3),
+            realUpper = DoubleArray(3) { 1.0 },
+        )
         val selected = FactorProjectionProviders.Default.prepare(source)
         var work = 0L
         val stopped = object : Cancellation {

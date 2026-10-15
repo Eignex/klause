@@ -22,12 +22,20 @@ import kotlin.test.assertTrue
 class ResumableOpenTheoryTest {
 
     @Test
-    fun `mixed point guidance retains finite holes`() {
+    fun `mixed point guidance should keep finite holes`() {
         val holes = assertNotNull(IntDomain(0, 2).excludeValues(longArrayOf(1)))
-        val source = Problem(0, 1, arrayOf(holes), arrayOf<Factor>(
-            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
-            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
-        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val source = Problem(
+            0,
+            1,
+            arrayOf(holes),
+            arrayOf<Factor>(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val request = OpenTheoryRequest(source).withPresolve(PresolveConfig.NONE)
 
         val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request)).result
@@ -36,12 +44,20 @@ class ResumableOpenTheoryTest {
     }
 
     @Test
-    fun `mixed point guidance retains finite global enforcement`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(
-            AllDifferent(intArrayOf(0, 1), 0, 3),
-            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
-            Linear(intArrayOf(1), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
-        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+    fun `mixed point guidance should keep finite global enforcement`() {
+        val source = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            arrayOf<Factor>(
+                AllDifferent(intArrayOf(0, 1), 0, 3),
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+                Linear(intArrayOf(1), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val request = OpenTheoryRequest(source).withPresolve(PresolveConfig.NONE)
 
         val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request)).result
@@ -83,7 +99,7 @@ class ResumableOpenTheoryTest {
     }
 
     @Test
-    fun `a sliced search reaches a satisfiable verdict across several slices`() {
+    fun `sliced search should reach a satisfiable verdict across several slices`() {
         val (result, slices) = sliced(chain(8, total = 20))
 
         assertIs<OpenTheoryResult.Sat>(result)
@@ -91,7 +107,7 @@ class ResumableOpenTheoryTest {
     }
 
     @Test
-    fun `closing a paused search retains its learned progress exactly once`() {
+    fun `closing a paused search should keep its learned progress exactly once`() {
         // b_i ⇔ x_i ≥ 5 over open x_i, every pair summing to at most 9, and two clauses each wanting one b true.
         val n = 4
         val open = Bits(n).also { bits -> for (v in 0 until n) bits.set(v) }

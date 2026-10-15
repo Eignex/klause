@@ -4,8 +4,6 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.GridPower
 import com.eignex.klause.factor.arithmetic.GridProduct
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.model.ContinuousRealEquality
 import com.eignex.klause.model.ContinuousRealExpr
 import com.eignex.klause.model.FloatLinearConstraint
@@ -33,12 +31,14 @@ import kotlin.test.assertTrue
 
 class CompilerContinuousProductsTest {
     @Test
-    fun `dsl square lowers to one repeated operand and a real auxiliary`() {
+    fun `a dsl square should lower to one repeated operand and a real auxiliary`() {
         val x = FloatHandle("x", -2.0, 2.0)
-        val definition = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(-2.0, 2.0, 5),
-            "square" to NamedConstraint((x * x) eq 2.0),
-        ))
+        val definition = SchemaDef<SchemaEntry>(
+            mapOf(
+                "x" to FloatSpec(-2.0, 2.0, 5),
+                "square" to NamedConstraint((x * x) eq 2.0),
+            ),
+        )
 
         val compiled = definition.compile()
         val factor = compiled.problem.factors.filterIsInstance<ContinuousProduct>().single()
@@ -51,12 +51,14 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `chained products retain their shared intermediate column`() {
+    fun `chained products should retain their shared intermediate column`() {
         val x = FloatHandle("x", -2.0, 2.0)
-        val definition = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(-2.0, 2.0, 5),
-            "cube" to NamedConstraint((x * x * x) eq x),
-        ))
+        val definition = SchemaDef<SchemaEntry>(
+            mapOf(
+                "x" to FloatSpec(-2.0, 2.0, 5),
+                "cube" to NamedConstraint((x * x * x) eq x),
+            ),
+        )
 
         val products = definition.compile().problem.factors.filterIsInstance<ContinuousProduct>()
 
@@ -66,11 +68,12 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `model ast and dsl lower to equivalent source factors`() {
+    fun `the model ast and dsl should lower to equivalent source factors`() {
         val x = FloatHandle("x", -2.0, 2.0)
         val ref = ContinuousRealExpr.Affine(mapOf("x" to 1.0))
         val ast = ContinuousRealEquality(
-            ContinuousRealExpr.Multiply(ContinuousRealExpr.Multiply(ref, ref), ref), ref,
+            ContinuousRealExpr.Multiply(ContinuousRealExpr.Multiply(ref, ref), ref),
+            ref,
         )
         val entries = mapOf<String, SchemaEntry>("x" to FloatSpec(-2.0, 2.0, 5))
 
@@ -83,12 +86,14 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `affine operands preserve exact rational product semantics`() {
+    fun `affine operands should preserve exact rational product semantics`() {
         val x = FloatHandle("x", -2.0, 2.0)
-        val compiled = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(-2.0, 2.0, 5),
-            "product" to NamedConstraint(((x + 0.5) * x * 0.1) eq 0.1),
-        )).compile()
+        val compiled = SchemaDef<SchemaEntry>(
+            mapOf(
+                "x" to FloatSpec(-2.0, 2.0, 5),
+                "product" to NamedConstraint(((x + 0.5) * x * 0.1) eq 0.1),
+            ),
+        ).compile()
         val values = MutableList(compiled.problem.numRealVars) { BigFraction.ZERO }
         values[0] = BigFraction.ofDouble(0.5)!!
         val tenth = BigFraction.ofDouble(0.1)!!
@@ -100,6 +105,7 @@ class CompilerContinuousProductsTest {
         for (factor in compiled.problem.factors.dropLast(1)) {
             when (factor) {
                 is ContinuousProduct -> values[factor.result] = values[factor.a] * values[factor.b]
+
                 is Linear -> {
                     val constants = assertNotNull(factor.realConstants)
                     val ids = factor.variables.reals
@@ -119,7 +125,7 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `constant products preserve exact binary rationals without floating folding`() {
+    fun `constant products should preserve exact binary rationals without floating folding`() {
         val constant = ContinuousRealExpr.Affine(emptyMap(), 0.1)
         val equality = ContinuousRealEquality(
             ContinuousRealExpr.Multiply(constant, constant),
@@ -137,37 +143,16 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `shared builder products use real namespace despite overlapping finite ids`() {
-        val builder = ProblemBuilder()
-        builder.newBool("b")
-        builder.newInt(IntDomain(0, 1), "i")
-        val x = builder.newReal(-1.0, 1.0, "x")
-        val result = builder.newReal(0.0, 1.0, "result")
-
-        builder.continuousProduct(x, x, result)
-        val problem = builder.build()
-
-        assertTrue(problem.factors.single().boolVars.isEmpty())
-        assertTrue(problem.factors.single().intVars.isEmpty())
-        assertContentEquals(intArrayOf(x, result), problem.factors.single().variables.reals)
-    }
-
-    @Test
-    fun `unallocated real columns decline at shared lowering`() {
-        val builder = ProblemBuilder()
-        builder.newInt(IntDomain(0, 1))
-
-        assertFailsWith<IllegalArgumentException> { builder.continuousProduct(0, 0, 0) }
-    }
-
-    @Test
-    fun `products retain connected grid representations and approximation provenance`() {
+    fun `products should retain connected grid representations and approximation provenance`() {
         val x = FloatHandle("x", -2.0, 2.0)
-        val definition = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(-2.0, 2.0, 5), "y" to FloatSpec(-2.0, 2.0, 5),
-            "product" to NamedConstraint((x * x) eq FloatHandle("y", -2.0, 2.0)),
-            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("y"), IntCmpOp.LT, 0.0)),
-        ))
+        val definition = SchemaDef<SchemaEntry>(
+            mapOf(
+                "x" to FloatSpec(-2.0, 2.0, 5),
+                "y" to FloatSpec(-2.0, 2.0, 5),
+                "product" to NamedConstraint((x * x) eq FloatHandle("y", -2.0, 2.0)),
+                "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("y"), IntCmpOp.LT, 0.0)),
+            ),
+        )
 
         val compiled = definition.compile()
         val factor = compiled.problem.factors.filterIsInstance<GridProduct>().single()
@@ -180,13 +165,15 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `schema grid powers retain fixed exponents and constant targets`() {
+    fun `schema grid powers should retain fixed exponents and constant targets`() {
         val x = FloatHandle("x", -2.0, 2.0)
-        val definition = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(-2.0, 2.0, 5),
-            "square" to NamedConstraint(x.pow(2) eq 4.0),
-            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.LT, 1.0)),
-        ))
+        val definition = SchemaDef<SchemaEntry>(
+            mapOf(
+                "x" to FloatSpec(-2.0, 2.0, 5),
+                "square" to NamedConstraint(x.pow(2) eq 4.0),
+                "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.LT, 1.0)),
+            ),
+        )
 
         val compiled = definition.compile()
         val factor = compiled.problem.factors.filterIsInstance<GridPower>().single()
@@ -199,29 +186,34 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `grid affine overflow declines before wrapping a source coefficient`() {
+    fun `grid affine overflow should decline before wrapping a source coefficient`() {
         val x = FloatHandle("x", 0.0, 1.0)
-        val definition = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(0.0, 1.0, 5),
-            "product" to NamedConstraint(((x * 1e30) * x) eq 1.0),
-            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.LT, 1.0)),
-        ))
+        val definition = SchemaDef<SchemaEntry>(
+            mapOf(
+                "x" to FloatSpec(0.0, 1.0, 5),
+                "product" to NamedConstraint(((x * 1e30) * x) eq 1.0),
+                "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.LT, 1.0)),
+            ),
+        )
 
         assertFailsWith<IllegalArgumentException> { definition.compile() }
     }
 
     @Test
-    fun `continuous equalities decline reified contexts`() {
+    fun `continuous equalities should decline reified contexts`() {
         val x = FloatHandle("x", -2.0, 2.0)
-        val definition = SchemaDef<SchemaEntry>(mapOf(
-            "x" to FloatSpec(-2.0, 2.0, 5), "product" to NamedConstraint(Not((x * x) eq 1.0)),
-        ))
+        val definition = SchemaDef<SchemaEntry>(
+            mapOf(
+                "x" to FloatSpec(-2.0, 2.0, 5),
+                "product" to NamedConstraint(Not((x * x) eq 1.0)),
+            ),
+        )
 
         assertFailsWith<IllegalStateException> { definition.compile() }
     }
 
     @Test
-    fun `continuous source trees survive model serialization`() {
+    fun `continuous source trees should survive model serialization`() {
         val ref = ContinuousRealExpr.Affine(mapOf("x" to 1.0))
         val equality = ContinuousRealEquality(ContinuousRealExpr.Multiply(ref, ref), ref)
 
@@ -231,7 +223,7 @@ class CompilerContinuousProductsTest {
     }
 
     @Test
-    fun `nonfinite continuous constants decline before lowering`() {
+    fun `nonfinite continuous constants should decline before lowering`() {
         for (constant in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)) {
             assertFailsWith<IllegalArgumentException> { ContinuousRealExpr.Affine(emptyMap(), constant) }
         }

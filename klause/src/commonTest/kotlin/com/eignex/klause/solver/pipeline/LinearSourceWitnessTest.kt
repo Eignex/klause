@@ -21,21 +21,37 @@ import kotlin.test.assertIs
 
 class LinearSourceWitnessTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-    private val scope = SourceScope(SourceRevision("source-witness", "exact-affine"),
-        objective = SourceObjective("cost", ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(
+        SourceRevision("source-witness", "exact-affine"),
+        objective = SourceObjective("cost", ObjectiveSense.MINIMIZE),
+    )
 
     @Test
-    fun `an IR witness attestation cannot admit a strict source closure endpoint`() {
-        val weak = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `an IR witness attestation should not admit a strict source closure endpoint`() {
+        val weak = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val result = RationalTheoryDescent(weak, objective, TheoryParams()).use {
             it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
         }
         val sample = assertIs<MinimizeResult.Optimal>(result).sample
-        val source = SourceProofContext(scope, setOf(real), mapOf("positive" to SourcePremise(
-            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true))),
-            mapOf(real to BigFraction.ONE))
+        val source = SourceProofContext(
+            scope,
+            setOf(real),
+            mapOf(
+                "positive" to SourcePremise(
+                    SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
 
         val checked = source.linearWitnessVerifier(Cancellation.Never).verify(Candidate(sample, 0.0))
 
@@ -43,24 +59,39 @@ class LinearSourceWitnessTest {
     }
 
     @Test
-    fun `source Boolean values select the guarded witness requirements`() {
+    fun `source Boolean values should select the guarded witness requirements`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val source = SourceProofContext(scope, setOf(bool, real), mapOf("positive" to SourcePremise(
-            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
-            mapOf(0 to false))), mapOf(real to BigFraction.ONE))
+        val source = SourceProofContext(
+            scope,
+            setOf(bool, real),
+            mapOf(
+                "positive" to SourcePremise(
+                    SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+                    mapOf(0 to false),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
         for (value in listOf(false, true)) {
-            val sample = Sample(booleanArrayOf(value), longArrayOf(), doubleArrayOf(0.0),
-                exactReals = listOf(BigFraction.ZERO))
+            val sample = Sample(
+                booleanArrayOf(value),
+                longArrayOf(),
+                doubleArrayOf(0.0),
+                exactReals = listOf(BigFraction.ZERO),
+            )
 
             val checked = source.linearWitnessVerifier(Cancellation.Never).verify(Candidate(sample, 0.0))
 
-            if (value) assertIs<Verification.Accepted<Sample, Double?>>(checked)
-            else assertIs<Verification.Rejected>(checked)
+            if (value) {
+                assertIs<Verification.Accepted<Sample, Double?>>(checked)
+            } else {
+                assertIs<Verification.Rejected>(checked)
+            }
         }
     }
 
     @Test
-    fun `cancelled original witness checking stays indeterminate`() {
+    fun `cancelled witness checking should stay indeterminate`() {
         val source = SourceProofContext(scope, emptySet(), emptyMap(), emptyMap())
         val sample = Sample(booleanArrayOf(), longArrayOf())
 

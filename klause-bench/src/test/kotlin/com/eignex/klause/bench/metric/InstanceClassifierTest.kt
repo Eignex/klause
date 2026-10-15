@@ -7,21 +7,21 @@ import kotlin.test.assertTrue
 
 class InstanceClassifierTest {
     @Test
-    fun `a minizinc model with a global constraint is global`() {
+    fun `a minizinc model with a global constraint should classify as global`() {
         val f = InstanceClassifier.fromSource(Format.MINIZINC, "var 1..9: x;\nconstraint all_different([x]);")
         assertEquals("global", f.structure)
-        assertTrue(f.numGlobal >= 1, "counts the global use")
+        assertTrue(f.numGlobal >= 1)
     }
 
     @Test
-    fun `a bool-dominated minizinc model is pseudo-boolean`() {
+    fun `a bool-dominated minizinc model should classify as pseudo-boolean`() {
         val f = InstanceClassifier.fromSource(Format.MINIZINC, "var bool: a;\nvar bool: b;\nconstraint a \\/ b;")
-        assertTrue(f.boolHeavy, "more bool than int decls")
+        assertTrue(f.boolHeavy)
         assertEquals("pseudo-boolean", f.structure)
     }
 
     @Test
-    fun `an xcsp3 instance with allDifferent is global`() {
+    fun `an xcsp3 instance with allDifferent should classify as global`() {
         val f = InstanceClassifier.fromSource(
             Format.XCSP3,
             "<instance><constraints><allDifferent>x1 x2 x3</allDifferent></constraints></instance>",
@@ -31,14 +31,14 @@ class InstanceClassifierTest {
     }
 
     @Test
-    fun `a dimacs cnf is sat`() {
+    fun `a dimacs cnf should classify as sat`() {
         val f = InstanceClassifier.fromSource(Format.DIMACS, "p cnf 2 1\n1 -2 0\n")
         assertEquals("sat", f.structure)
         assertTrue(f.boolHeavy)
     }
 
     @Test
-    fun `an smtlib instance reports its declared logic`() {
+    fun `an smtlib instance should report its declared logic`() {
         val f = InstanceClassifier.fromSource(
             Format.SMTLIB,
             "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (>= x 0))\n(check-sat)",
@@ -47,25 +47,25 @@ class InstanceClassifierTest {
     }
 
     @Test
-    fun `an smtlib instance with no set-logic reports a blank logic`() {
+    fun `an smtlib instance without set-logic should report a blank logic`() {
         val f = InstanceClassifier.fromSource(Format.SMTLIB, "(declare-fun x () Int)\n(check-sat)")
         assertEquals("", f.logic)
     }
 
     @Test
-    fun `an mps instance with an INTORG marker is a MIP`() {
+    fun `an mps instance with an INTORG marker should classify as MIP`() {
         val f = InstanceClassifier.fromSource(Format.MPS, "MARKER\n    M1 'MARKER' 'INTORG'\n")
         assertEquals("MIP", f.logic)
     }
 
     @Test
-    fun `an mps instance with no marker is an LP`() {
+    fun `an mps instance without markers should classify as LP`() {
         val f = InstanceClassifier.fromSource(Format.MPS, "ROWS\n N obj\nCOLUMNS\n")
         assertEquals("LP", f.logic)
     }
 
     @Test
-    fun `themes name what an instance asks of the solver`() {
+    fun `themes should name what an instance asks of the solver`() {
         fun themes(format: Format, text: String) = InstanceClassifier.fromSource(format, text).themes
 
         assertEquals(
@@ -84,7 +84,7 @@ class InstanceClassifierTest {
     }
 
     @Test
-    fun `an mps model with columns outside its integer markers has linear reals`() {
+    fun `an mps model with columns outside its integer markers should have linear reals`() {
         val mixed = """
             NAME m
             ROWS

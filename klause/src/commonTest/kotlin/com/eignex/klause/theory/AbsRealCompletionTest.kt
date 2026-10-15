@@ -23,11 +23,19 @@ import kotlin.test.assertTrue
 
 class AbsRealCompletionTest {
     @Test
-    fun `real absolute value completion shares conditioned mixed product encodings`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(-1, 1)), arrayOf(
-            RealProduct(0, 0, 2, -2.0, 2.0), RealAbs(0, 1),
-        ), numRealVars = 3, realLower = doubleArrayOf(-2.0, 1.0, -1.0),
-            realUpper = doubleArrayOf(2.0, 1.0, -1.0))
+    fun `real absolute value completion should share conditioned mixed product encodings`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-1, 1)),
+            arrayOf(
+                RealProduct(0, 0, 2, -2.0, 2.0),
+                RealAbs(0, 1),
+            ),
+            numRealVars = 3,
+            realLower = doubleArrayOf(-2.0, 1.0, -1.0),
+            realUpper = doubleArrayOf(2.0, 1.0, -1.0),
+        )
 
         val result = BacktrackSolver(source.bake()).solve()
 
@@ -40,11 +48,19 @@ class AbsRealCompletionTest {
     }
 
     @Test
-    fun `local search real absolute value completion refutes only the proposed discrete point`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(-1, 1)), arrayOf(
-            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
-            RealAbs(0, 1),
-        ), numRealVars = 2, realLower = doubleArrayOf(-2.0, 1.0), realUpper = doubleArrayOf(2.0, 1.0))
+    fun `local search real absolute value completion should refute only the proposed discrete point`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-1, 1)),
+            arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+                RealAbs(0, 1),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 1.0),
+            realUpper = doubleArrayOf(2.0, 1.0),
+        )
         val completion = LeafRealCompletion(source, null)
 
         val refuted = completion.complete(Sample(BooleanArray(0), longArrayOf(0)), Cancellation.Never)
@@ -57,17 +73,27 @@ class AbsRealCompletionTest {
     }
 
     @Test
-    fun `finite real completion enforces the complete magnitude under fixed integer coordinates`() {
+    fun `finite real completion should enforce the complete magnitude under fixed integer coordinates`() {
         for (integer in listOf(-1L, 0L, 1L)) {
-            val source = Problem(0, 1, arrayOf(IntDomain(integer, integer)), arrayOf(
-                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
-                RealAbs(0, 1),
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
-            ), numRealVars = 2, realLower = doubleArrayOf(-2.0, 0.0), realUpper = doubleArrayOf(2.0, 2.0))
+            val source = Problem(
+                0,
+                1,
+                arrayOf(IntDomain(integer, integer)),
+                arrayOf(
+                    Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+                    RealAbs(0, 1),
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+                ),
+                numRealVars = 2,
+                realLower = doubleArrayOf(-2.0, 0.0),
+                realUpper = doubleArrayOf(2.0, 2.0),
+            )
 
             val result = BacktrackSolver(source.bake()).solve()
 
-            if (integer == 0L) assertIs<SolveResult.Unsat>(result) else {
+            if (integer == 0L) {
+                assertIs<SolveResult.Unsat>(result)
+            } else {
                 val witness = assertIs<SolveResult.Sat>(result).assignment
                 val coordinates = assertNotNull(witness.exactReals)
                 assertEquals(BigFraction.ofLong(integer), coordinates[0])
@@ -77,9 +103,16 @@ class AbsRealCompletionTest {
     }
 
     @Test
-    fun `finite real completion searches private signs instead of accepting an arbitrary relaxation point`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(RealAbs(0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-2.0, 1.0), realUpper = doubleArrayOf(2.0, 1.0))
+    fun `finite real completion should search private signs instead of accepting an arbitrary relaxation point`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(RealAbs(0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 1.0),
+            realUpper = doubleArrayOf(2.0, 1.0),
+        )
 
         val result = BacktrackSolver(source.bake()).solve()
 
@@ -90,9 +123,16 @@ class AbsRealCompletionTest {
     }
 
     @Test
-    fun `real absolute value completion retains the caller allowance and discards interrupted scopes`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(RealAbs(0, 1)), numRealVars = 2,
-            realLower = doubleArrayOf(-2.0, 1.0), realUpper = doubleArrayOf(2.0, 1.0))
+    fun `real absolute value completion should retain the caller allowance and discard interrupted scopes`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(RealAbs(0, 1)),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 1.0),
+            realUpper = doubleArrayOf(2.0, 1.0),
+        )
         val completion = AbsRealCompletion(source)
         var charged = 0L
         val stop = object : Cancellation {

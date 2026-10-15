@@ -8,7 +8,7 @@ import kotlin.test.assertNotEquals
 
 class NormalizedSmtTermTest {
     @Test
-    fun `rational multiples reconstruct the original expression exactly`() {
+    fun `rational multiples should reconstruct the original expression exactly`() {
         val half = BigFraction.ofLong(2).reciprocal()
         val source = mapOf(7 to half, 2 to BigFraction.ofLong(-3), 4 to BigFraction.ZERO)
         val point = mapOf(2 to BigFraction.ofLong(5), 7 to BigFraction.ofLong(-4))
@@ -29,7 +29,7 @@ class NormalizedSmtTermTest {
     }
 
     @Test
-    fun `fixed offsets reconstruct source activity and transformed thresholds`() {
+    fun `fixed offsets should reconstruct source activity and transformed thresholds`() {
         val expression = mapOf(0 to BigFraction.ofLong(-2), 1 to BigFraction.ofLong(3))
         val fixed = mapOf(1 to FixedSmtColumn(BigFraction.ofLong(4), SearchAtomPremise.All(emptyList())))
 
@@ -41,7 +41,7 @@ class NormalizedSmtTermTest {
     }
 
     @Test
-    fun `all fixed and zero expressions retain their exact constant`() {
+    fun `all fixed and zero expressions should retain their exact constant`() {
         val fixed = mapOf(0 to FixedSmtColumn(BigFraction.ofLong(3), SearchAtomPremise.All(emptyList())))
         for (coefficient in listOf(BigFraction.ZERO, BigFraction.ofLong(-2))) {
             val term = normalizeSmtTerm(mapOf(0 to coefficient), fixed)
@@ -52,7 +52,7 @@ class NormalizedSmtTermTest {
     }
 
     @Test
-    fun `source identities and unequal exact ratios do not share`() {
+    fun `source identities and unequal exact ratios should not share`() {
         val half = BigFraction.ofLong(2).reciprocal()
         val reference = normalizeSmtTerm(mapOf(0 to BigFraction.ONE, 1 to half))
         val nearby = BigFraction.ofLong(1L shl 54).reciprocal() + half

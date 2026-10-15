@@ -25,7 +25,6 @@ class AggregationMirSeparatorTest {
         return cuts to r
     }
 
-    /** Σ coeffs·x ⟨op⟩ bound holds for the integer assignment [x]. */
     private fun satisfies(f: Linear, x: IntArray): Boolean {
         var s = 0L
         for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * x[f.vars[i]]
@@ -40,11 +39,9 @@ class AggregationMirSeparatorTest {
     private fun cutHolds(cut: Cut, rel: LpRelaxation, x: IntArray): Boolean {
         var s = 0L
         for (k in cut.cols.indices) s += cut.coeffs[k] * x[rel.colVarId[cut.cols[k]]]
-        return s <= cut.rhs // separator emits only LE cuts
+        return s <= cut.rhs
     }
 
-    /** Brute-force every integer point of the box, asserting each emitted cut holds at every point that
-     *  satisfies all Linear factors. */
     private fun assertCutsValid(p: Problem, cuts: List<Cut>, rel: LpRelaxation) {
         val lins = p.factors.filterIsInstance<Linear>()
         val x = IntArray(p.numIntVars)
@@ -70,9 +67,8 @@ class AggregationMirSeparatorTest {
     }
 
     @Test
-    fun `single row half cut separates and stays valid`() {
-        // 2x + 2y ≤ 3 over [0,3]: the LP maximum of x+y is 1.5 (x=y=0.75), but every integer point has
-        // x+y ≤ 1. The {0,½} cut ⌊2/2⌋x + ⌊2/2⌋y ≤ ⌊3/2⌋ = (x+y ≤ 1) separates it.
+    fun `single row half cut should separate and stay valid`() {
+        // 2x + 2y <= 3: the LP reaches x + y = 1.5 while every integer point has x + y <= 1.
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -81,15 +77,13 @@ class AggregationMirSeparatorTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(-1L, -1L))
         val (cuts, rel) = separate(p, obj) ?: error("LP should solve")
-        assertTrue(cuts.isNotEmpty(), "expected a separating {0,½} cut")
+        assertTrue(cuts.isNotEmpty())
         assertCutsValid(p, cuts, rel)
     }
 
     @Test
-    fun `a column the model leaves open below yields no half cut`() {
-        // The same separating row, but x's lower endpoint is one the finite lane invented. The rounding
-        // needs the shift y = x − lo to be nonnegative and the cut is published globally, so a shift by
-        // an invented endpoint cannot be taken.
+    fun `half cut should not be derived over a column open below`() {
+        // The rounding shift x - lo must not lean on an invented endpoint for a global cut.
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -99,7 +93,6 @@ class AggregationMirSeparatorTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(-1L, -1L))
         val (cuts, _) = separate(p, obj) ?: error("LP should solve")
-        assertTrue(cuts.isEmpty(), "an invented lower endpoint must not become the aggregation shift")
+        assertTrue(cuts.isEmpty())
     }
-
 }

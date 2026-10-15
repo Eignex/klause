@@ -22,14 +22,13 @@ class DisjunctiveInvariantTest {
     }
 
     @Test
-    fun `overlap counts as violation`() {
+    fun `overlap should count as violation`() {
         val problem = threeUnitTasks()
         val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 2)
         state.recompute()
-        assertTrue(state.cost > 0, "tasks at the same time should violate disjunctive")
+        assertTrue(state.cost > 0)
     }
-
 }

@@ -25,7 +25,6 @@ class IncumbentCandidatesTest {
 
     private val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
 
-    /** `b0`, plus `x0 + x1 ≤ 4` over two `[0, 5]` columns. */
     private fun problem(numRealVars: Int = 0) = Problem(
         numBoolVars = 1,
         numIntVars = 2,
@@ -49,31 +48,31 @@ class IncumbentCandidatesTest {
         verifier(problem).verify(Candidate(sample, objectiveValue))
 
     @Test
-    fun `a proposal the composed model satisfies is accepted`() {
+    fun `a proposal the composed model satisfies should be accepted`() {
         val proposal = sample(b0 = true, x0 = 1, x1 = 2)
         val accepted = assertIs<Verification.Accepted<Sample, Double>>(verify(problem(), proposal))
         assertEquals(3.0, accepted.candidate.objective)
     }
 
     @Test
-    fun `a proposal an integer factor refutes is rejected`() {
+    fun `a proposal an integer factor refutes should be rejected`() {
         val rejected = assertIs<Verification.Rejected>(verify(problem(), sample(b0 = true, x0 = 3, x1 = 3)))
         assertTrue(rejected.reason.startsWith("int "), rejected.reason)
     }
 
     @Test
-    fun `a proposal a Boolean factor refutes is rejected`() {
+    fun `a proposal a Boolean factor refutes should be rejected`() {
         val rejected = assertIs<Verification.Rejected>(verify(problem(), sample(b0 = false, x0 = 1, x1 = 2)))
         assertEquals("bool 0 = false conflicts", rejected.reason)
     }
 
     @Test
-    fun `a value outside its declared domain is rejected`() {
+    fun `a value outside its declared domain should be rejected`() {
         assertIs<Verification.Rejected>(verify(problem(), sample(b0 = true, x0 = 9, x1 = 0)))
     }
 
     @Test
-    fun `an objective the assignment does not carry is rejected`() {
+    fun `an objective the assignment does not carry should be rejected`() {
         val rejected = assertIs<Verification.Rejected>(
             verify(problem(), sample(b0 = true, x0 = 1, x1 = 2), objectiveValue = -100.0),
         )
@@ -81,29 +80,33 @@ class IncumbentCandidatesTest {
     }
 
     @Test
-    fun `an assignment that does not cover every discrete variable is rejected`() {
+    fun `an assignment missing a discrete variable should be rejected`() {
         val short = Sample(booleanArrayOf(true), longArrayOf(1), DoubleArray(0))
         assertIs<Verification.Rejected>(verify(problem(), short, objectiveValue = objective.evaluate(short)))
     }
 
     @Test
-    fun `a cancelled fixpoint leaves the proposal undecided`() {
+    fun `a cancelled fixpoint should leave the proposal undecided`() {
         val verdict = verifier(problem(), Cancellation { true })
             .verify(Candidate(sample(b0 = true, x0 = 1, x1 = 2), 3.0))
         assertIs<Verification.Indeterminate>(verdict, "an unfinished fixpoint decides nothing either way")
     }
 
     @Test
-    fun `proposal verification rejects a value outside caller assumptions`() {
+    fun `proposal verification should reject a value outside caller assumptions`() {
         val proposal = sample(b0 = true, x0 = 1, x1 = 2)
-        val verifier = ComposedSampleVerifier(problem(), objective, Cancellation.Never,
-            assumptions = Assumptions(ints = mapOf(0 to 2L)))
+        val verifier = ComposedSampleVerifier(
+            problem(),
+            objective,
+            Cancellation.Never,
+            assumptions = Assumptions(ints = mapOf(0 to 2L)),
+        )
 
         assertIs<Verification.Rejected>(verifier.verify(Candidate(proposal, 3.0)))
     }
 
     @Test
-    fun `proposal verification charges propagation for accepted and rejected assignments`() {
+    fun `proposal verification should charge propagation for accepted and rejected assignments`() {
         for (x0 in listOf(1L, 3L)) {
             var work = 0L
             val proposal = sample(b0 = true, x0 = x0, x1 = 2)
@@ -116,7 +119,7 @@ class IncumbentCandidatesTest {
     }
 
     @Test
-    fun `a proposal without certified real values is rejected`() {
+    fun `a proposal without certified real values should be rejected`() {
         val withReals = problem(numRealVars = 1)
         assertIs<Verification.Rejected>(verify(withReals, sample(b0 = true, x0 = 1, x1 = 2)))
         assertIs<Verification.Rejected>(
@@ -132,7 +135,7 @@ class IncumbentCandidatesTest {
     }
 
     @Test
-    fun `a non-finite objective never becomes an incumbent`() {
+    fun `a non-finite objective should never become an incumbent`() {
         val exchange = minimizingSampleExchange(problem())
         assertIs<Publication.Rejected>(
             exchange.offer(sample(b0 = true, x0 = 1, x1 = 2), SourceObjectiveScore(Double.NaN)),
@@ -141,7 +144,7 @@ class IncumbentCandidatesTest {
     }
 
     @Test
-    fun `only a strict improvement installs`() {
+    fun `only a strict improvement should install`() {
         val exchange = minimizingSampleExchange(problem())
         assertIs<Publication.Installed<Sample, SourceObjectiveScore>>(
             exchange.offer(sample(true, 1, 2), SourceObjectiveScore(3.0)),
@@ -151,11 +154,11 @@ class IncumbentCandidatesTest {
         val better = assertIs<Publication.Installed<Sample, SourceObjectiveScore>>(
             exchange.offer(sample(true, 0, 1), SourceObjectiveScore(1.0)),
         )
-        assertEquals(2L, better.incumbent.version, "two installations over four offers")
+        assertEquals(2L, better.incumbent.version)
     }
 
     @Test
-    fun `exact improvement replaces an incumbent with the same displayed score`() {
+    fun `exact improvement should replace an incumbent with the same displayed score`() {
         val exchange = minimizingSampleExchange(problem())
         val display = -9_007_199_254_740_992.0
         val first = SourceObjectiveScore(display, BigFraction.ofLong(-9_007_199_254_740_992L))
@@ -170,7 +173,7 @@ class IncumbentCandidatesTest {
     }
 
     @Test
-    fun `exact incumbent bound encloses a rational beyond one floating point step`() {
+    fun `exact incumbent bound should enclose a rational beyond one floating point step`() {
         val exact = BigFraction.of(
             bigIntOf(16_003_601_413_338_437L),
             bigIntOf(17_309_130_200_826_847L),
@@ -181,7 +184,7 @@ class IncumbentCandidatesTest {
     }
 
     @Test
-    fun `exact incumbent score ignores an overflowed reported objective`() {
+    fun `exact incumbent score should ignore an overflowed reported objective`() {
         val exact = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ofLong(Long.MAX_VALUE)
         val score = SourceObjectiveScore(-2.0, exact)
 
@@ -190,7 +193,7 @@ class IncumbentCandidatesTest {
     }
 
     @Test
-    fun `a float incumbent stands only when the tolerance check accepts it`() {
+    fun `a float incumbent should stand only when the tolerance check accepts it`() {
         for ((real, installed) in listOf(0.5 to true, 0.9 to false)) {
             val exchange = minimizingSampleExchange(problem(numRealVars = 1)) { it.reals.single() <= 0.75 }
             val float = sample(b0 = true, x0 = 1, x1 = 2, reals = doubleArrayOf(real))

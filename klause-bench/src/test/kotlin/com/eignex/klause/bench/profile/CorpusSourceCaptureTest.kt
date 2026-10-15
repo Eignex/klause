@@ -15,7 +15,7 @@ import kotlinx.serialization.json.put
 
 class CorpusSourceCaptureTest {
     @Test
-    fun `exact catalog identities resolve without fetching or parsing source models`() {
+    fun `exact catalog identities should resolve without fetching or parsing source models`() {
         val input = CorpusSourceCapture.decode(request("smtlib-qfnra", "family/input")).single()
 
         assertEquals("smtlib-qfnra", input.suite)
@@ -24,7 +24,7 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
-    fun `unknown transformed and traversal identities cannot enter source capture`() {
+    fun `unknown transformed and traversal identities should not enter source capture`() {
         for ((suite, problem) in listOf("unknown" to "input", "miplib2017-csp" to "input",
             "smtlib-qfnra" to "../input", "smtlib-qfnra" to "family//input",
             "smtlib-qfnra" to "family\\input", "smtlib-qfnra" to "/input")) {
@@ -35,7 +35,7 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
-    fun `every original source needs a full nonnull hash and unique identity`() {
+    fun `every original source should need a full nonnull hash and unique identity`() {
         for (encoded in listOf(request(hash = ""), request(hash = "A".repeat(64)), request(copies = 2),
             "a".repeat(CorpusSourceCapture.MAX_REQUEST_BYTES * 2))) {
             assertFailsWith<IllegalArgumentException> { CorpusSourceCapture.decode(encoded) }
@@ -43,7 +43,7 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
-    fun `extra fields and duplicate JSON keys cannot alter source requests`() {
+    fun `extra fields and duplicate JSON keys should not alter source requests`() {
         val canonical = Base64.getDecoder().decode(request()).decodeToString()
         for (text in listOf(canonical.replace("\"cases\":", "\"cases\":[],\"cases\":"),
             canonical.replace("\"cases\":", "\"solve\":true,\"cases\":"))) {
@@ -54,7 +54,7 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
-    fun `owned source worker exit status and raw output remain distinct`() {
+    fun `owned source worker exit status and raw output should remain distinct`() {
         for (exit in listOf(0, 7)) {
             val out = Files.createTempDirectory("source-worker-test-").toFile()
             try {
@@ -73,7 +73,7 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
-    fun `worker overflow retains a bounded prefix and stops the owned group`() {
+    fun `worker overflow should retain a bounded prefix and stop the owned group`() {
         val out = Files.createTempDirectory("source-overflow-test-").toFile()
         try {
             val command = listOf("/usr/bin/setsid", "/bin/sh", "-c", "yes x")
@@ -89,7 +89,7 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
-    fun `a containing interruption closes the worker before returning`() {
+    fun `a containing interruption should close the worker before returning`() {
         val out = Files.createTempDirectory("source-stop-test-").toFile()
         try {
             Thread.currentThread().interrupt()
@@ -107,7 +107,7 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
-    fun `failed group cleanup retains the process receipt and releases its registration`() {
+    fun `failed group cleanup should retain the process receipt and release its registration`() {
         val out = Files.createTempDirectory("source-cleanup-failure-test-").toFile()
         try {
             assertFailsWith<IllegalStateException> {
@@ -127,7 +127,7 @@ class CorpusSourceCaptureTest {
     }
 
     @Test
-    fun `interruption during cleanup is restored after durable retirement receipts`() {
+    fun `interruption during cleanup should be restored after durable retirement receipts`() {
         val out = Files.createTempDirectory("source-cleanup-stop-test-").toFile()
         try {
             assertFailsWith<IllegalStateException> {

@@ -29,8 +29,7 @@ class RootPropagationTest {
         r as? PropagationResult.Implied ?: fail("expected Implied, got $r")
 
     @Test
-    fun `a model that states bounds alone propagates over the range they close`() {
-        // x + y <= 3 over x, y in [0, 10] declared as bounds, with no value set stated for either.
+    fun `a model stating bounds alone should propagate over the range they close`() {
         val p = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(10, 10), null, null),
@@ -41,12 +40,12 @@ class RootPropagationTest {
 
         val r = implied(p.propagate())
 
-        assertEquals(3L, r.intMaxOrNullCompat(0), "the bound closes the range the row prunes against")
+        assertEquals(3L, r.intMaxOrNullCompat(0))
         assertEquals(3L, r.intMaxOrNullCompat(1))
     }
 
     @Test
-    fun `a clause conflict reports the factors that forced its false literals`() {
+    fun `a clause conflict should report the factors that forced its false literals`() {
         val p = boolProblem(
             3,
             intArrayOf(lit(0, true)),
@@ -61,15 +60,14 @@ class RootPropagationTest {
     }
 
     @Test
-    fun `Implied result is disjoint from input assumptions`() {
+    fun `an Implied result should be disjoint from input assumptions`() {
         val p = boolProblem(2, intArrayOf(lit(0, false), lit(1, true)))
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
         assertEquals(mapOf(1 to true), r.bools)
     }
 
     @Test
-    fun `exactlyOne with two-literal cascade pins via Cardinality and Clause together`() {
-        // exactlyOne(x0, x1), and (!x0 v x2). Pin x1=false → x0 must be true → x2 must be true.
+    fun `exactlyOne and a clause should cascade pins together`() {
         val p = Problem(
             numBoolVars = 3,
             numIntVars = 0,

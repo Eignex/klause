@@ -7,28 +7,26 @@ import kotlin.test.assertTrue
 class DecisionLevelRestartTest {
 
     @Test
-    fun `restarts when recent decision levels run deeper than the long-run average`() {
+    fun `restart should fire when recent decision levels run deeper than the long-run average`() {
         val dl = DecisionLevelRestart(window = 4, ratio = 1.0)
-        // Steady shallow conflicts: recent and global averages match, so no restart.
-        repeat(20) { assertFalse(dl.recordConflict(decisionLevel = 5), "steady depth must not restart") }
-        // The search starts conflicting much deeper: the recent window outruns the long-run average.
+        repeat(20) { assertFalse(dl.recordConflict(decisionLevel = 5)) }
         var fired = false
         repeat(5) { if (dl.recordConflict(decisionLevel = 50)) fired = true }
-        assertTrue(fired, "sustained deep conflicts must force a restart")
+        assertTrue(fired)
     }
 
     @Test
-    fun `does not restart before the recent window is full`() {
+    fun `restart should not fire before the recent window is full`() {
         val dl = DecisionLevelRestart(window = 8, ratio = 1.0)
-        repeat(7) { assertFalse(dl.recordConflict(decisionLevel = 100), "must not restart on a cold window") }
+        repeat(7) { assertFalse(dl.recordConflict(decisionLevel = 100)) }
     }
 
     @Test
-    fun `clearing the window defers the next restart until it refills`() {
+    fun `clearing the window should defer the next restart until it refills`() {
         val dl = DecisionLevelRestart(window = 4, ratio = 1.0)
         repeat(20) { dl.recordConflict(decisionLevel = 5) }
-        assertTrue(dl.recordConflict(decisionLevel = 50), "warmed window with a deep conflict restarts")
+        assertTrue(dl.recordConflict(decisionLevel = 50))
         dl.clearWindow()
-        repeat(3) { assertFalse(dl.recordConflict(decisionLevel = 50), "cleared window must refill first") }
+        repeat(3) { assertFalse(dl.recordConflict(decisionLevel = 50)) }
     }
 }

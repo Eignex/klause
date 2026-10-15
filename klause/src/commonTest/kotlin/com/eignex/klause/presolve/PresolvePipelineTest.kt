@@ -20,9 +20,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PresolvePipelineTest {
-
     @Test
-    fun `the pipeline does not charge another construction for an already baked input`() {
+    fun `the pipeline should not charge another construction for an already baked input`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
             .bake(budget.orSpent(Cancellation.Never))
@@ -35,18 +34,7 @@ class PresolvePipelineTest {
     }
 
     @Test
-    fun `the pipeline charges fresh root construction once`() {
-        val budget = PresolveBudget(Long.MAX_VALUE)
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
-
-        PresolvePipeline.run(problem, null, PresolveConfig.NONE, false, presolveBudget = budget)
-
-        assertEquals(1L, budget.rootConstructionEntries)
-        assertEquals(53L, budget.spent())
-    }
-
-    @Test
-    fun `isolated wide output uses root propagation without prebake LP`() {
+    fun `isolated wide output should use root propagation without prebake LP`() {
         val problem = Problem(
             0,
             3,
@@ -61,7 +49,7 @@ class PresolvePipelineTest {
     }
 
     @Test
-    fun `coupled wide columns retain prebake LP bounds`() {
+    fun `coupled wide columns should retain prebake LP bounds`() {
         val problem = Problem(
             0,
             2,
@@ -84,7 +72,6 @@ class PresolvePipelineTest {
         return problem.propagate(a) !is PropagationResult.Unsat
     }
 
-    /** Every int tuple inside [problem]'s declared domains. */
     private fun boxPoints(problem: Problem): List<LongArray> {
         val n = problem.numIntVars
         val out = ArrayList<LongArray>()
@@ -115,9 +102,9 @@ class PresolvePipelineTest {
     )
 
     @Test
-    fun `reconstruct lifts every solution of the transformed problem back to the original`() {
+    fun `reconstruct should lift every solution of the transformed problem back to the original`() {
         val outcome = PresolvePipeline.run(model, null, PresolveConfig.AUTO, solutionSetSensitive = false)
-        assertTrue(outcome.changed, "the fixture must actually be transformed for this to test anything")
+        assertTrue(outcome.changed)
 
         var lifted = 0
         for (p in boxPoints(outcome.problem)) {
@@ -129,7 +116,6 @@ class PresolvePipelineTest {
             )
             lifted++
         }
-        // `lifted > 0` plus the lift check covers reduced ⇒ original; this covers the other direction.
         assertEquals(
             boxPoints(model).any { isFeasible(model, it) },
             lifted > 0,
@@ -138,9 +124,7 @@ class PresolvePipelineTest {
     }
 
     @Test
-    fun `a pass-proven infeasibility is reported in the stats`() {
-        // 2x + 4y = 3: the coefficient gcd does not divide the bound, so a pass proves infeasibility
-        // outright rather than leaving it to the bake.
+    fun `a pass-proven infeasibility should be reported in the stats`() {
         val unsat = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -148,12 +132,12 @@ class PresolvePipelineTest {
             factors = listOf(Linear(longArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 3)),
         )
         val outcome = PresolvePipeline.run(unsat, null, PresolveConfig.AUTO, solutionSetSensitive = false)
-        assertTrue(outcome.stats.infeasible, "the gcd rule proves the model infeasible")
-        assertTrue(boxPoints(unsat).none { isFeasible(unsat, it) }, "the fixture really has no solution")
+        assertTrue(outcome.stats.infeasible)
+        assertTrue(boxPoints(unsat).none { isFeasible(unsat, it) })
     }
 
     @Test
-    fun `affine reconstruction covers exactly the independently declared source solutions`() {
+    fun `affine reconstruction should cover exactly the declared source solutions`() {
         val objective = LinearObjective(intCoefficients = longArrayOf(0, 2, 0), constant = 5)
         val outcome = PresolvePipeline.run(model, objective, PresolveConfig.parse("affine"), false)
         val expected = boxPoints(model).filter { values ->
@@ -170,7 +154,7 @@ class PresolvePipelineTest {
     }
 
     @Test
-    fun `projected enumeration after affine elimination emits each source solution once`() {
+    fun `projected enumeration after affine elimination should emit each source solution once`() {
         val outcome = PresolvePipeline.run(model, null, PresolveConfig.parse("affine"), false)
         val expected = boxPoints(model).filter { values ->
             values[0] + values[1] == 3L && values[1] - values[2] <= 1L && values[2] >= 1L

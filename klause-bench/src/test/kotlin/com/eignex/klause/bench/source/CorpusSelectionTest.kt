@@ -12,14 +12,14 @@ import kotlin.test.assertTrue
 class CorpusSelectionTest {
 
     @Test
-    fun `interleave spreads across families`() {
+    fun `interleave should spread across families`() {
         val a = listOf("a1", "a2", "a3")
         val b = listOf("b1", "b2")
         assertEquals(listOf("a1", "b1", "a2", "b2", "a3"), CorpusSelection.interleave(listOf(a, b)))
     }
 
     @Test
-    fun `pickPrimaryMzn prefers exact then model then non-mznc prefix`() {
+    fun `pickPrimaryMzn should prefer exact then model then non-mznc prefix`() {
         fun f(n: String) = File("$n.mzn")
         assertEquals(
             "queens.mzn",
@@ -46,7 +46,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `equal-priority primary models are independent of directory enumeration`() {
+    fun `equal-priority primary models should be independent of directory enumeration`() {
         val candidates = listOf(File("bacp-9.mzn"), File("bacp-19.mzn"))
 
         val forward = CorpusSelection.pickPrimaryMzn("bacp", candidates)
@@ -57,7 +57,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `data-free challenge keys distinguish the selected model within a family`() {
+    fun `data-free challenge keys should distinguish the selected model within a family`() {
         val root = Files.createTempDirectory("mznmodels").toFile()
         try {
             File(root, "2011/bacp").mkdirs()
@@ -78,7 +78,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `per-family cap then interleave then overall cap`() {
+    fun `selection should apply per-family cap then interleave then overall cap`() {
         val all = (1..4).map { Discovered("famA/$it", "famA/m.mzn", "famA/$it.dzn") } +
             (1..4).map { Discovered("famB/$it", "famB/m.mzn", "famB/$it.dzn") }
         val sel = CorpusSelection.applySelection(all, Selection(perFamily = 2, maxInstances = 3))
@@ -88,7 +88,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `seeded sampling is deterministic`() {
+    fun `seeded sampling should be deterministic`() {
         val all = (1..10).map { Discovered("fam/$it", "fam/m.mzn") }
         val a = CorpusSelection.applySelection(all, Selection(perFamily = 3, sampleSeed = 42))
         val b = CorpusSelection.applySelection(all, Selection(perFamily = 3, sampleSeed = 42))
@@ -97,7 +97,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `MznChallenge layout pairs dzn with primary model across nested dirs`() {
+    fun `MznChallenge layout should pair dzn with the primary model across nested dirs`() {
         val root = Files.createTempDirectory("mznsel").toFile()
         try {
             File(root, "alpha").mkdirs()
@@ -108,7 +108,7 @@ class CorpusSelectionTest {
             File(root, "alpha/data/i2.dzn").writeText("n=2;")
             val found = Layout.MznChallenge().discover(root).sortedBy { it.name }
             assertEquals(2, found.size)
-            assertTrue(found.all { it.mznRelPath == "alpha/alpha.mzn" }, "should pick the canonical model")
+            assertTrue(found.all { it.mznRelPath == "alpha/alpha.mzn" })
             assertEquals(listOf("alpha/data/i1", "alpha/data/i2"), found.map { it.name })
             assertTrue(found[0].dznRelPath!!.endsWith("i1.dzn"))
         } finally {
@@ -117,7 +117,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `MznChallenge layout pairs json data like dzn`() {
+    fun `MznChallenge layout should pair json data like dzn`() {
         val root = Files.createTempDirectory("mznjson").toFile()
         try {
             File(root, "accap").mkdirs()
@@ -135,15 +135,13 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `MznChallengeAllYears layout year-prefixes families so a repeated name doesn't collide`() {
+    fun `MznChallengeAllYears layout should year-prefix families so a repeated name does not collide`() {
         val root = Files.createTempDirectory("mznyears").toFile()
         try {
             File(root, "2013/black-hole").mkdirs()
             File(root, "2013/black-hole/black-hole.mzn").writeText("% 2013 model")
             File(root, "2025/black-hole").mkdirs()
             File(root, "2025/black-hole/black-hole.mzn").writeText("% 2025 model")
-            // A non-year directory (the archive's README/.gitignore live alongside the year dirs)
-            // is not mistaken for a challenge year.
             File(root, "not-a-year").mkdirs()
             val found = Layout.MznChallengeAllYears().discover(root).sortedBy { it.name }
             assertEquals(listOf("2013/black-hole/black-hole", "2025/black-hole/black-hole"), found.map { it.name })
@@ -154,7 +152,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `MznChallengeAllYears excludes model-only 2026 families before capping`() {
+    fun `MznChallengeAllYears should exclude model-only 2026 families before capping`() {
         val root = Files.createTempDirectory("mznyears").toFile()
         try {
             File(root, "2026/atp-stage2").mkdirs()
@@ -173,7 +171,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `MznChallenge layout includes 2026 families with instance data`() {
+    fun `MznChallenge layout should include 2026 families with instance data`() {
         val root = Files.createTempDirectory("mznyears").toFile()
         try {
             File(root, "2026/atp-stage2").mkdirs()
@@ -190,7 +188,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `MznChallenge layout excludes the incompatible 2010 depot placement family`() {
+    fun `MznChallenge layout should exclude the incompatible 2010 depot placement family`() {
         val root = Files.createTempDirectory("mznyears").toFile()
         try {
             File(root, "2010/depot_placement").mkdirs()
@@ -209,7 +207,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `compatibility discovery retains depot identities for compiler classification`() {
+    fun `compatibility discovery should retain depot identities for compiler classification`() {
         val root = Files.createTempDirectory("mzncompat").toFile()
         try {
             File(root, "2010/depot_placement").mkdirs()
@@ -225,7 +223,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `Flat layout groups by familyOf so per-family samples across series`() {
+    fun `Flat layout should group by familyOf so per-family samples across series`() {
         val root = Files.createTempDirectory("xcspsel").toFile()
         try {
             File(root, "COP").mkdirs()
@@ -236,7 +234,6 @@ class CorpusSelectionTest {
                 "CVRP-A-n32-k5_c22",
             ).forEach { File(root, "COP/$it.xml").writeText("<instance/>") }
             val found = Layout.Flat("COP", "xml", familyOf = { it.substringBefore('-') }).discover(root)
-            // Every parameterization keeps its full name, but families collapse to the series prefix.
             assertEquals("AircraftAssemblyLine", found.first { it.name.startsWith("Aircraft") }.family)
             val sampled = CorpusSelection.applySelection(found, Selection(perFamily = 1))
             assertEquals(listOf("AircraftAssemblyLine", "BinPacking", "CVRP"), sampled.map { it.family })
@@ -246,7 +243,7 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `Flat layout finds a compressed instance and names it without the suffix`() {
+    fun `Flat layout should find a compressed instance and name it without the suffix`() {
         val root = Files.createTempDirectory("zstsel").toFile()
         try {
             File(root, "PB24/fam").mkdirs()
@@ -261,21 +258,19 @@ class CorpusSelectionTest {
         }
     }
 
-    // Balanced selection: (format, name) items; family = name prefix, group = format.
     private fun items(format: String, count: Int) = (1..count).map { format to "$format$it/x" }
     private val family = { item: Pair<String, String> -> item.second.substringBefore('/') }
     private val byFormat = { item: Pair<String, String> -> item.first as Any }
 
     @Test
-    fun `balance splits the cap evenly across the groups present`() {
-        // The 'mzn' format has far more families, so a family-global cap would crowd the others out.
+    fun `balance should split the cap evenly across the groups present`() {
         val all = items("mzn", 10) + items("xcsp", 3) + items("sat", 3)
         val out = CorpusSelection.applyBalancedBy(all, Selection(maxInstances = 6), family, byFormat)
         assertEquals(mapOf("mzn" to 2, "xcsp" to 2, "sat" to 2), out.groupingBy { it.first }.eachCount())
     }
 
     @Test
-    fun `balance water-fills a short group's surplus into groups with room`() {
+    fun `balance should water-fill a short group surplus into groups with room`() {
         val all = items("big", 10) + items("small", 1)
         val out = CorpusSelection.applyBalancedBy(all, Selection(maxInstances = 6), family, byFormat)
         // Even share is 3/3, but 'small' can only supply 1, so 'big' absorbs the surplus to 5.
@@ -284,14 +279,14 @@ class CorpusSelectionTest {
     }
 
     @Test
-    fun `balance without a cap keeps every group in full`() {
+    fun `balance without a cap should keep every group in full`() {
         val all = items("big", 10) + items("small", 1)
         val out = CorpusSelection.applyBalancedBy(all, Selection(), family, byFormat)
         assertEquals(11, out.size)
     }
 
     @Test
-    fun `FlatMzn layout discovers self-contained models with family from first path component`() {
+    fun `FlatMzn layout should discover self-contained models with family from the first path component`() {
         val root = Files.createTempDirectory("flatsel").toFile()
         try {
             File(root, "unit/globals").mkdirs()

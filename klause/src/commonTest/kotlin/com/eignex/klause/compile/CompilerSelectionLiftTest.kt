@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 
 class CompilerSelectionLiftTest {
     @Test
-    fun `reified extrema preserve both truth values`() {
+    fun `reified extrema should preserve both truth values`() {
         class S : VariableSchema() {
             val b by boolVar()
             val x by intVar(0, 2)
@@ -43,7 +43,7 @@ class CompilerSelectionLiftTest {
     }
 
     @Test
-    fun `optional defaults retain their selection inside an extremum`() {
+    fun `optional defaults should retain their selection inside an extremum`() {
         class S : VariableSchema() {
             val x by optIntVar(1, 3)
             val relation by constraint { min(x.valueOr(2), IntLit(3)) eq 2 }
@@ -54,8 +54,12 @@ class CompilerSelectionLiftTest {
         val presence = compiled.boolVarIdByName.getValue("x__present")
 
         for (present in listOf(false, true)) {
-            val result = solver.solve(BacktrackParams(randomSeed = 0,
-                assumptions = Assumptions(bools = mapOf(presence to present))))
+            val result = solver.solve(
+                BacktrackParams(
+                    randomSeed = 0,
+                    assumptions = Assumptions(bools = mapOf(presence to present)),
+                ),
+            )
 
             val sample = assertIs<SolveResult.Sat>(result).assignment
             assertEquals(if (present) 2L else null, compiled.decode(schema.x, sample))
@@ -65,7 +69,7 @@ class CompilerSelectionLiftTest {
     }
 
     @Test
-    fun `nested extrema retain repeated operands and their native relations`() {
+    fun `nested extrema should retain repeated operands and their native relations`() {
         class S : VariableSchema() {
             val x by intVar(0, 2)
             val y by intVar(0, 2)
@@ -80,7 +84,7 @@ class CompilerSelectionLiftTest {
     }
 
     @Test
-    fun `affine selection retains ordered entries and excludes invalid indexes`() {
+    fun `affine selection should retain ordered entries and exclude invalid indexes`() {
         class S : VariableSchema() {
             val i by intVar(-1, 2)
             val x by intVar(2, 2)
@@ -93,15 +97,19 @@ class CompilerSelectionLiftTest {
         assertEquals(0, selection.indexOffset)
         assertEquals(compiled.intVarIdByName.getValue("x").toLong(), selection.arr[1])
         for (index in listOf(-1L, 0L, 2L)) {
-            assertIs<SolveResult.Unsat>(solver.solve(BacktrackParams(
-                assumptions = Assumptions(ints = mapOf(compiled.intVarIdByName.getValue("i") to index)),
-            )))
+            assertIs<SolveResult.Unsat>(
+                solver.solve(
+                    BacktrackParams(
+                        assumptions = Assumptions(ints = mapOf(compiled.intVarIdByName.getValue("i") to index)),
+                    ),
+                ),
+            )
         }
         assertIs<SolveResult.Sat>(solver.solve(BacktrackParams(randomSeed = 0)))
     }
 
     @Test
-    fun `negated conditional selection follows both condition values`() {
+    fun `negated conditional selection should follow both condition values`() {
         class S : VariableSchema() {
             val b by boolVar()
             val x by intVar(0, 1)

@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 
 class ExactNraAssignmentTest {
     @Test
-    fun `exact witnesses retain coordinates after caller buffer mutation`() {
+    fun `exact witnesses should retain coordinates after caller buffer mutation`() {
         val arithmetic = AlgebraicArithmetic(PolynomialArithmetic())
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val bools = booleanArrayOf(true)
@@ -28,7 +28,7 @@ class ExactNraAssignmentTest {
     }
 
     @Test
-    fun `retained irrational coordinates reconstruct in a fresh arithmetic context`() {
+    fun `retained irrational coordinates should reconstruct in a fresh arithmetic context`() {
         val original = AlgebraicArithmetic(PolynomialArithmetic())
         val assignment = ExactNraAssignment(
             BooleanArray(0),

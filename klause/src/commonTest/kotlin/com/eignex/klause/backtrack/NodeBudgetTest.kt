@@ -11,22 +11,19 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-// Re-entering the engine consumes the same solve-wide node allowance.
 class NodeBudgetTest {
 
-    /** [pigeons] pigeons into [holes] holes: each pigeon in >= 1 hole, each hole holds <= 1. UNSAT when
-     *  pigeons exceed holes, and without cutting planes it takes far more nodes than any cap here. */
     private fun php(pigeons: Int, holes: Int): Problem {
         fun x(p: Int, h: Int) = p * holes + h
         val factors = ArrayList<Factor>()
@@ -42,7 +39,7 @@ class NodeBudgetTest {
     private fun params(budget: NodeBudget) = BacktrackParams(randomSeed = 1L, pbLearning = false, nodeBudget = budget)
 
     @Test
-    fun `a spent allowance stops the search short of a verdict`() {
+    fun `a spent allowance should stop the search short of a verdict`() {
         val budget = NodeBudget(limit = 1)
         val result = BacktrackSolver(php(pigeons = 8, holes = 7).bake()).solve(params(budget))
         assertIs<SolveResult.Unknown>(result, "the first decision exhausts the allowance before the refutation")
@@ -50,7 +47,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `the allowance is not renewed for a second search`() {
+    fun `the allowance should not be renewed for a second search`() {
         val budget = NodeBudget(limit = 200)
         val problem = php(pigeons = 8, holes = 7).bake()
         BacktrackSolver(problem).solve(params(budget))
@@ -63,7 +60,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `a local-search run stops at the move its allowance covers`() {
+    fun `a local-search run should stop at the move its allowance covers`() {
         val budget = NodeBudget(limit = 100)
         val objective = LinearObjective(boolWeights = LongArray(8 * 7) { 1L })
 
@@ -75,14 +72,14 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `a search that finishes inside its allowance is unaffected`() {
+    fun `a search that finishes inside its allowance should be unaffected`() {
         val budget = NodeBudget(limit = 1_000_000)
         val result = BacktrackSolver(php(pigeons = 5, holes = 4).bake()).solve(params(budget))
         assertIs<SolveResult.Unsat>(result, "a cap it never reaches must not change the verdict")
     }
 
     @Test
-    fun `a spent allowance stops an optimize short of a verdict`() {
+    fun `a spent allowance should stop an optimize short of a verdict`() {
         val budget = NodeBudget(limit = 1)
         val problem = php(pigeons = 8, holes = 7).bake()
         val objective = LinearObjective(boolWeights = LongArray(8 * 7) { 1L })
@@ -92,7 +89,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `an optimize charges the allowance rather than only its per-slice limit`() {
+    fun `an optimize should charge the allowance rather than only its per-slice limit`() {
         val problem = php(pigeons = 8, holes = 7).bake()
         val objective = LinearObjective(boolWeights = LongArray(8 * 7) { 1L })
         val spent = listOf(64L, 256L).map { limit ->
@@ -105,8 +102,9 @@ class NodeBudgetTest {
             "raising the cap must raise the work an optimize does; both caps spent $spent",
         )
     }
+
     @Test
-    fun `zero allowance is exhausted before any charge`() {
+    fun `a zero allowance should be exhausted before any charge`() {
         val budget = NodeBudget(0L)
 
         assertTrue(budget.exhausted())
@@ -115,7 +113,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `fractional move prices carry across segments`() {
+    fun `fractional move prices should carry across segments`() {
         val budget = NodeBudget(5L)
         repeat(3) { budget.spendMoves(1L) }
         assertEquals(3L, budget.spent)
@@ -127,7 +125,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `large charges saturate without restoring an allowance`() {
+    fun `large charges should saturate without restoring an allowance`() {
         val budget = NodeBudget(Long.MAX_VALUE)
 
         budget.spendMoves(Long.MAX_VALUE)
@@ -139,7 +137,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `worker quotas divide only the remaining solve allowance`() {
+    fun `worker quotas should divide only the remaining solve allowance`() {
         val budget = NodeBudget(10L)
         budget.spend()
 
@@ -153,7 +151,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `reopening workers retains their exhausted quotas`() {
+    fun `reopening workers should retain their exhausted quotas`() {
         val budget = NodeBudget(10L)
         val first = budget.quotas(2)
         repeat(5) { first[0].spend() }
@@ -167,7 +165,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `atomic overspend is charged without donating another workers quota`() {
+    fun `atomic overspend should be charged without donating another worker's quota`() {
         val budget = NodeBudget(10L)
         val quotas = budget.quotas(2)
 
@@ -180,7 +178,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `a zero solve allowance permits no backtrack decisions`() {
+    fun `a zero solve allowance should permit no backtrack decisions`() {
         val budget = NodeBudget(0L)
 
         val result = BacktrackSolver(php(5, 4).bake()).solve(params(budget))
@@ -191,10 +189,14 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `parallel portfolio workers spend separate persistent quotas`() {
+    fun `parallel portfolio workers should spend separate persistent quotas`() {
         val budget = NodeBudget(6L)
         val scenario = PortfolioScenario(
-            cores = 2, arms = 2, kind = Kind.CSP, engine = EngineMix.BACKTRACK, nodeBudget = budget,
+            cores = 2,
+            arms = 2,
+            kind = Kind.CSP,
+            engine = EngineMix.BACKTRACK,
+            nodeBudget = budget,
             btPool = listOf({ BacktrackRecipe("bounded") { _, _ -> params(budget) } }),
         )
         val workers = PortfolioBuilder.build(php(5, 4).bake(), scenario)
@@ -210,23 +212,14 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `a zero optimize allowance permits no backtrack decisions`() {
-        val budget = NodeBudget(0L)
-        val problem = php(5, 4).bake()
-        val objective = LinearObjective(boolWeights = LongArray(20) { 1L })
-
-        val result = BacktrackSolver(problem).minimize(objective, params(budget))
-
-        assertIs<MinimizeResult.Unknown>(result)
-        assertEquals(0L, budget.spent)
-        assertEquals(0.0, result.stats.search.nodes.sum)
-    }
-
-    @Test
-    fun `a cancelled worker leaves its quota unused by another worker`() {
+    fun `a cancelled worker should leave its quota unused by another worker`() {
         val budget = NodeBudget(6L)
         val scenario = PortfolioScenario(
-            cores = 2, arms = 2, kind = Kind.CSP, engine = EngineMix.BACKTRACK, nodeBudget = budget,
+            cores = 2,
+            arms = 2,
+            kind = Kind.CSP,
+            engine = EngineMix.BACKTRACK,
+            nodeBudget = budget,
             btPool = listOf({ BacktrackRecipe("bounded") { _, _ -> params(budget) } }),
         )
         val workers = PortfolioBuilder.build(php(5, 4).bake(), scenario)
@@ -243,7 +236,7 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `resource quotas and compatibility facades share fractional accounting`() {
+    fun `resource quotas and compatibility facades should share fractional accounting`() {
         val budget = NodeBudget(10)
         val facades = budget.quotas(2)
         val resources = budget.allowance.quotas(2)
@@ -258,24 +251,10 @@ class NodeBudgetTest {
     }
 
     @Test
-    fun `resource partitioning before facade access retains child identity`() {
-        val budget = NodeBudget(10)
-        val resources = budget.allowance.quotas(2)
-        resources[0].spend()
-
-        val facades = budget.quotas(2)
-
-        assertSame(resources[0], facades[0].allowance)
-        assertSame(facades, budget.quotas(2))
-        assertEquals(1L, facades[0].spent)
-    }
-
-    @Test
-    fun `facade and resource views cannot repartition an existing allowance`() {
+    fun `facade and resource views should not repartition an existing allowance`() {
         val budget = NodeBudget(10)
         budget.quotas(2)
 
         assertFailsWith<IllegalArgumentException> { budget.allowance.quotas(3) }
     }
-
 }

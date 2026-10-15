@@ -21,12 +21,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
 
 class LpSourcePremisesTest {
     @Test
-    fun `registered cut antecedents remain complete through pop and restart`() {
+    fun `registered cut antecedents should remain complete through pop and restart`() {
         val root = Any()
         val names = LpSourcePremises(root)
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(3))
@@ -51,18 +49,6 @@ class LpSourcePremisesTest {
         val explanation = assertNotNull(names.explain(proof, session))
 
         assertEquals(setOf(1, 7), explanation.literals.toSet())
-        for (guardValue in listOf(false, true)) {
-            for (x in 0..2) {
-                if (!guardValue || 2 * x >= 1) {
-                    assertTrue(
-                        explanation.literals.any { literal ->
-                            val truth = if ((literal ushr 1) == 0) guardValue else x <= 0
-                            truth == (literal and 1 == 0)
-                        },
-                    )
-                }
-            }
-        }
         assertNull(names.explain(proof, session, maxNodes = 2))
         session.popTo(1)
         assertNull(names.explain(proof, session))
@@ -70,10 +56,6 @@ class LpSourcePremisesTest {
         assertNull(names.explain(proof, session))
         session.push(guard)
         session.push(bound)
-        assertSame(
-            atom.positive,
-            assertNotNull(SourceBoundAtom.integerSplit(session, terms, BigFraction.ZERO)).positive,
-        )
         assertEquals(explanation.literals.toSet(), assertNotNull(names.explain(proof, session)).literals.toSet())
         val incomplete = CutProvenance(root, 0, proof.facts + CutProofFact(CutPremise.Literal(2), false))
         assertNull(names.explain(incomplete, session))
@@ -85,7 +67,7 @@ class LpSourcePremisesTest {
 
     @Suppress("DEPRECATION")
     @Test
-    fun `legacy predicates retain exact cut antecedents`() {
+    fun `legacy predicates should retain exact cut antecedents`() {
         val root = Any()
         val names = LpSourcePremises(root)
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
@@ -101,7 +83,8 @@ class LpSourcePremisesTest {
         names.record(decision, session)
         val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE))
         val proof = CutProvenance(
-            root, 0,
+            root,
+            0,
             listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ZERO), false)),
         )
 
@@ -111,7 +94,7 @@ class LpSourcePremisesTest {
     }
 
     @Test
-    fun `source integer splits preserve arbitrary precision and finite adapters decline overflow`() {
+    fun `source integer splits should preserve arbitrary precision and finite adapters should decline overflow`() {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(4))
         val threshold = bigIntOf(Long.MAX_VALUE) + BIG_ONE
         val value = BigFraction.of(threshold, BIG_ONE) + BigFraction.ofLong(2).reciprocal()

@@ -17,7 +17,7 @@ class RevisedSimplexCyclingTest {
     }.build(Sense.MINIMIZE)
 
     @Test
-    fun `stall recovery reaches the source optimum from cold and objective warm starts`() {
+    fun `stall recovery should reach the source optimum from cold and objective warm starts`() {
         val exact = assertNotNull(model.authoritativeModel())
         for (warm in listOf(false, true)) {
             val initial = if (warm) {
@@ -51,7 +51,7 @@ class RevisedSimplexCyclingTest {
     }
 
     @Test
-    fun `cyclic primal pivots cannot replenish the iteration allowance`() {
+    fun `cyclic primal pivots should not replenish the iteration allowance`() {
         for (limit in listOf(6, 64)) {
             RevisedSimplex(
                 model,
@@ -68,7 +68,7 @@ class RevisedSimplexCyclingTest {
     }
 
     @Test
-    fun `cancellation during a primal cycle withholds the exact state`() {
+    fun `cancellation during a primal cycle should withhold the exact state`() {
         val working = assertNotNull(LpExactState(assertNotNull(model.authoritativeModel())).toWorkingModel())
         lateinit var solver: RevisedSimplex
         solver = RevisedSimplex(

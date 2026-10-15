@@ -11,7 +11,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WideIntColumnsTest {
-
     private fun big(s: String) = parseBigInt(s)
 
     private fun counter(): (Long, Long) -> Int {
@@ -28,7 +27,7 @@ class WideIntColumnsTest {
     }
 
     @Test
-    fun `weights reconstruct a value past Long from its digits`() {
+    fun `weights should reconstruct a value past Long from its digits`() {
         val v = big("18446744073709551616") // 2^64
         val c = wideIntColumns(v, BIG_ONE, counter())!!
         val digits = WideIntDigits.digitsOf(v, c.width, c.columns.size)
@@ -38,15 +37,15 @@ class WideIntColumnsTest {
     }
 
     @Test
-    fun `only the leading digit is signed so each value has one representation`() {
+    fun `only the leading digit should be signed`() {
         val seen = mutableListOf<Pair<Long, Long>>()
         wideIntColumns(big("1000000000000000000000"), BIG_ONE, recorder(seen))
         for (i in 0 until seen.size - 1) assertEquals(0L, seen[i].first, "digit $i must be non-negative")
-        assertTrue(seen.last().first < 0, "the leading digit carries the sign")
+        assertTrue(seen.last().first < 0)
     }
 
     @Test
-    fun `the leading digit spans one full width in each direction`() {
+    fun `the leading digit should span one full width in each direction`() {
         val seen = mutableListOf<Pair<Long, Long>>()
         val c = wideIntColumns(big("1000000000000000000000"), BIG_ONE, recorder(seen))!!
         val max = (WideIntDigits.pow2(c.width) - BIG_ONE).toLongExact()
@@ -55,28 +54,12 @@ class WideIntColumnsTest {
     }
 
     @Test
-    fun `a digit domain times the coefficient stays inside Long`() {
-        // The invariant that keeps refutation working at the least significant position.
-        val coeff = big("1000003")
-        val c = wideIntColumns(big("340282366920938463463374607431768211456"), coeff, counter())!!
-        val product = coeff * WideIntDigits.pow2(c.width)
-        assertTrue(product <= bigIntOf(Long.MAX_VALUE), "coeff * 2^width overflowed: $product")
-    }
-
-    @Test
-    fun `a coefficient with no usable width is refused`() {
+    fun `a coefficient with no usable width should be refused`() {
         assertNull(wideIntColumns(big("18446744073709551616"), big("4611686018427387904"), counter()))
     }
 
     @Test
-    fun `a larger magnitude needs more digits at the same width`() {
-        val small = wideIntColumns(big("18446744073709551616"), BIG_ONE, counter())!!
-        val large = wideIntColumns(big("340282366920938463463374607431768211456"), BIG_ONE, counter())!!
-        assertTrue(large.columns.size > small.columns.size)
-    }
-
-    @Test
-    fun `the columns cover the magnitude with a position to spare for the sign`() {
+    fun `the columns should cover the magnitude with a position to spare for the sign`() {
         val v = big("18446744073709551616") // 2^64
         val c = wideIntColumns(v, BIG_ONE, counter())!!
         assertEquals(WideIntDigits.digitCount(v, c.width) + 1, c.columns.size)

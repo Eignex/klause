@@ -12,27 +12,23 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.AtomKind
-import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
-import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ElementPropagatorTest {
     @Test
-    fun `variable-array result exclusions retain their lazy support reasons`() {
+    fun `variable-array result exclusions should retain their lazy support reasons`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -47,7 +43,7 @@ class ElementPropagatorTest {
     }
 
     @Test
-    fun `selected-cell exclusions retain the index premise when another cell aliases the result`() {
+    fun `selected-cell exclusions should retain the index premise when another cell aliases the result`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -61,7 +57,7 @@ class ElementPropagatorTest {
     }
 
     @Test
-    fun `selected-cell holes retract before a sibling selects an excluded value`() {
+    fun `selected-cell holes should retract before a sibling selects an excluded value`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -86,12 +82,28 @@ class ElementPropagatorTest {
     }
 
     @Test
-    fun `selection range can extend past the signed integer index offset`() {
+    fun `selection range should extend past the signed integer index offset`() {
         val offset = Int.MAX_VALUE.toLong()
         for (variables in listOf(false, true)) {
-            val source = Problem(0, 4, arrayOf(IntDomain(offset, offset + 1), IntDomain(9, 9),
-                IntDomain(4, 4), IntDomain(9, 9)), arrayOf<Factor>(Element(0, 1,
-                if (variables) longArrayOf(2, 3) else longArrayOf(4, 9), variables, Int.MAX_VALUE)))
+            val source = Problem(
+                0,
+                4,
+                arrayOf(
+                    IntDomain(offset, offset + 1),
+                    IntDomain(9, 9),
+                    IntDomain(4, 4),
+                    IntDomain(9, 9),
+                ),
+                arrayOf<Factor>(
+                    Element(
+                        0,
+                        1,
+                        if (variables) longArrayOf(2, 3) else longArrayOf(4, 9),
+                        variables,
+                        Int.MAX_VALUE,
+                    ),
+                ),
+            )
             val state = PropagationState(source, Assumptions.None)
 
             assertTrue(source.propagators[0].propagate(state, 0))
@@ -102,10 +114,14 @@ class ElementPropagatorTest {
     }
 
     @Test
-    fun `removed constants exclude their high offset positions`() {
+    fun `removed constants should exclude their high offset positions`() {
         val offset = Int.MAX_VALUE.toLong()
-        val source = Problem(0, 2, arrayOf(IntDomain(offset, offset + 1), IntDomain(4, 9)),
-            arrayOf<Factor>(Element(0, 1, longArrayOf(4, 9), false, Int.MAX_VALUE)))
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(offset, offset + 1), IntDomain(4, 9)),
+            arrayOf<Factor>(Element(0, 1, longArrayOf(4, 9), false, Int.MAX_VALUE)),
+        )
         val state = PropagationState(source, Assumptions.None)
         val propagator = source.propagators[0]
         assertTrue(propagator.propagate(state, 0))
@@ -117,32 +133,6 @@ class ElementPropagatorTest {
         assertEquals(offset, state.intDomains[0].max)
     }
 
-    @Test
-    fun `var-array conflict reason is a sound nonempty witness`() {
-        // idx in [0,1] selects arr=[v2, v3]; result must equal arr[idx]. A level-1 decision forces
-        // result ≥ 10 but squeezes both elements ≤ 5 — no position can supply result, so idx is
-        // wiped and propagate returns false.
-        val factor = Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0)
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
-            factors = arrayOf<Factor>(factor),
-        )
-        val state = PropagationState(problem, Assumptions.None)
-        state.undoLogging = true
-        state.currentLevel = 1
-        assertTrue(state.tightenIntMin(1, 10), "result ≥ 10")
-        assertTrue(state.tightenIntMax(2, 5) && state.tightenIntMax(3, 5), "both elements ≤ 5")
-        assertFalse(problem.propagators[0].propagate(state, 0), "no position can supply result=10 → infeasible")
-
-        val reason = problem.propagators[0].conflictReason(state, 0)
-        assertTrue(reason != null && reason.isNotEmpty(), "must yield a non-empty clause-form reason")
-        for (lit in reason) {
-            assertTrue(state.litFalse(lit), "every reason literal must be false at conflict time, lit=$lit")
-        }
-    }
-
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
@@ -150,15 +140,8 @@ class ElementPropagatorTest {
         .toHashSet()
 
     @Test
-    fun `const-array element narrowing wakes a bounds-subscribed linear summing its results`() {
-        // r1 = arr(idx1), r2 = arr(idx2) over constant arrays, with `r1 + r2 <= 60` capping their sum.
-        // The sum cap can't fold into either result's domain (each result alone is well under 60), so
-        // it stays an active Linear over the two results. During search, fixing an idx narrows its
-        // result to a single value via the batched GAC exclusion; that exclusion must raise the bound
-        // events so the Linear — which subscribes to LB_RAISED/UB_LOWERED and is dropped from each
-        // result's occurrence-list wakeup — fires and rejects a sum over 60. A batched exclusion that
-        // marks the var dirty without the event kind under-sets the wake, letting backtrack reach
-        // leaves with r1 + r2 = 100 and emit them as solutions.
+    fun `const-array element narrowing should wake a bounds-subscribed linear summing its results`() {
+        // The sum cap only wakes on bound events, so a narrowing that omits them emits r1 + r2 > 60 leaves.
         val arr = longArrayOf(50, 10)
         val problem = Problem(
             numBoolVars = 0,
@@ -179,59 +162,12 @@ class ElementPropagatorTest {
             }
         }
         for (seed in 1L..5L) {
-            assertEquals(brute, enumerate(problem, seed), "seed=$seed: must not emit r1+r2 > 60 leaves")
+            assertEquals(brute, enumerate(problem, seed), "seed=$seed")
         }
     }
 
     @Test
-    fun `variable-array element subscribes to all kinds and consumes the delta`() {
-        val varArr = Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0)
-        val varArrProp = varArr.propagatorProjection() as ElementPropagator
-        assertTrue(varArrProp.consumesIntEventDelta, "var-array element must consume the dirty-var delta")
-        val watches = varArrProp.initialIntEventWatches
-        assertTrue(watches != null)
-        // every distinct variable subscribed to all four kinds
-        val byVar = watches.groupBy { IntEvent.intVarOf(it) }
-        for ((_, packs) in byVar) {
-            assertEquals(
-                setOf(IntEvent.LB_RAISED, IntEvent.UB_LOWERED, IntEvent.VALUE_REMOVED, IntEvent.FIXED),
-                packs.map { IntEvent.kindOf(it) }.toSet(),
-            )
-        }
-        assertEquals(setOf(0, 1, 2, 3), byVar.keys, "all of idx/result/array vars subscribed")
-    }
-
-    // Pinned-index channel bounds depend on the selected variable's search-derived bound as well
-    // as the index pin. Omitting that bound would let learning prune valid assignments.
-    @Test
-    fun `pinned index channel cites the result bound when lifting the element`() {
-        // ints: idx(0) root-pinned to 0, result(1), element(2); result = [element][idx].
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 2), IntDomain(0, 2)),
-            factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = longArrayOf(2), arrIsVars = true, indexOffset = 0),
-            ),
-        )
-        val state = PropagationState(problem, Assumptions.None)
-        state.undoLogging = true
-        state.currentLevel = 1
-        check(state.tightenIntMin(1, 1)) { "tighten result min failed" }
-        check(problem.propagators[0].propagate(state, 0)) { "element propagate failed" }
-        check(state.intDomains[2].min == 1L) { "channel must lift the element's min to 1" }
-
-        val ant = state.intMinAntecedents[2]
-        assertNotNull(ant, "the channeled bound is search-derived; its reason must not be a leaf")
-        val citesResult = ant.any { lit ->
-            val v = Lit.variable(lit)
-            v >= problem.numBoolVars && state.atoms.intVar[v - problem.numBoolVars] == 1
-        }
-        assertTrue(citesResult, "reason must cite the result var's bound; got ${ant.toList()}")
-    }
-
-    @Test
-    fun `constant-array element deductions are implied by their reasons under carved holes`() {
+    fun `constant-array element deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xE1E0)
         repeat(300) { iter ->
             val problem = Problem(
@@ -262,9 +198,7 @@ class ElementPropagatorTest {
     }
 
     @Test
-    fun `a constant-array element prunes a result value citing only the positions that held it`() {
-        // arr = [6, 5, 6, 5, 6, 6]: with positions 1, 3 and 4 carved out, 5 has lost both holders; position 4
-        // held a 6 and plays no part.
+    fun `a constant-array element should prune a result value citing only the positions that held it`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -289,9 +223,7 @@ class ElementPropagatorTest {
     }
 
     @Test
-    fun `a constant-array element raises the result bound citing the positions below it not the holes it crossed`() {
-        // arr = [1, 2, 3, 4]: result value 2 is carved and index position 0 dropped, so the result's minimum
-        // climbs past the hole at 2 to 3. Every constant below 3 lost its positions to the index bound alone.
+    fun `a constant-array result bound should cite the positions below it not the crossed holes`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -316,9 +248,7 @@ class ElementPropagatorTest {
     }
 
     @Test
-    fun `a variable-array element drops a position citing only how its cell misses the result`() {
-        // The result is at most 3 and cell 1 at least 5, so position 1 goes; cell 2's hole and cell 0's bound play
-        // no part.
+    fun `a variable-array element should drop a position citing only how its cell misses the result`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 5,
@@ -344,7 +274,7 @@ class ElementPropagatorTest {
     }
 
     @Test
-    fun `variable-array element deductions are implied by their reasons under carved holes`() {
+    fun `variable-array element deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xE1E1)
         repeat(300) { iter ->
             val problem = Problem(

@@ -2,25 +2,27 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.propagation.Assumptions
-import kotlin.random.Random
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-// The candidate cap bounds the quadratic implication-graph allocation on Boolean-heavy models.
 class ImplicitSeedingTest {
 
     @Test
-    fun `suspended implicit seeding preserves pins and publishes owners after every global`() {
+    fun `suspended implicit seeding should preserve pins and publish owners after every global`() {
         val problem = Problem(
-            0, 5, Array(5) { IntDomain(0, 2) },
+            0,
+            5,
+            Array(5) { IntDomain(0, 2) },
             arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1), 0, 3),
                 AllDifferent(intArrayOf(0, 1, 2), 0, 3),
@@ -44,7 +46,6 @@ class ImplicitSeedingTest {
         assertTrue(state.moveSink.list.isEmpty())
     }
 
-    /** Two independent implications `x0 -> x1` and `x2 -> x3`, each via a binary clause. */
     private fun twoForksProblem(): Problem = Problem(
         numBoolVars = 4,
         numIntVars = 0,
@@ -56,18 +57,62 @@ class ImplicitSeedingTest {
     )
 
     @Test
-    fun `probing past the candidate cap harvests no implications`() {
-        // Cap 1 probes only x0, so its forced literal is recorded but x2 (id past the cap) is never
-        // pinned and contributes no edges — the bound that keeps a Boolean-heavy build off the heap.
+    fun `probing past the candidate cap should harvest no implications`() {
         val graph = ImplicitSeeding(twoForksProblem(), maxImplicationCandidates = 1).implicationGraph
         assertTrue(Lit.make(1, true) in graph[Lit.make(0, true)], "x0 within the cap is probed")
         assertTrue(graph[Lit.make(2, true)].isEmpty(), "x2 past the cap is never probed")
     }
 
+    private fun row(a: Int, b: Int) = AllDifferent(vars = intArrayOf(a, b), domainMin = 0, domainSize = 2)
+
+    private fun latinSquare(): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 4,
+        intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
+        factors = arrayOf<Factor>(row(0, 1), row(2, 3), row(0, 2), row(1, 3)),
+    )
+
     @Test
-    fun `a cap covering every variable harvests all implications`() {
-        val graph = ImplicitSeeding(twoForksProblem(), maxImplicationCandidates = 4).implicationGraph
-        assertTrue(Lit.make(1, true) in graph[Lit.make(0, true)], "x0 -> x1 harvested")
-        assertTrue(Lit.make(3, true) in graph[Lit.make(2, true)], "x2 -> x3 harvested once the cap reaches x2")
+    fun `the implicit seed set should be scope-disjoint`() {
+        val problem = latinSquare()
+        val state = LocalSearchState(problem.bake(), Random(1))
+        val owned = HashSet<Int>()
+        for (fid in state.seeding.implicitSeedFactors) {
+            for (v in problem.factors[fid].intVars) {
+                assertTrue(owned.add(v), "seed factors must not share var $v")
+            }
+        }
+        assertTrue(state.seeding.implicitSeedFactors.isNotEmpty(), "at least one all-different must be seeded")
+    }
+
+    @Test
+    fun `only the owner should move an owned var`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
+        )
+        val state = LocalSearchState(problem.bake(), Random(5))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+        state.seedImplicitFeasible()
+        state.recompute()
+        assertTrue(state.cost == 0L, "seeding leaves the all-different satisfied")
+
+        // A generic add (no proposing factor) on an owned var is filtered out of the neighbourhood.
+        val generic = MoveSink()
+        generic.setOwners(state.seeding.ownerInt)
+        generic.addIntSet(0, 2)
+        assertTrue(generic.list.isEmpty())
+
+        // The owner's own structure-preserving moves on the same vars survive the filter.
+        val owned = MoveSink()
+        owned.setOwners(state.seeding.ownerInt)
+        owned.proposer = 0
+        state.factors[0].proposeStructuredMoves(state, 0, owned)
+        assertTrue(owned.list.isNotEmpty())
     }
 }

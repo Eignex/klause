@@ -25,7 +25,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class RedundantConstraintsTest {
-
     private fun isFeasible(problem: Problem, ints: LongArray): Boolean {
         var a = Assumptions.None
         for (v in 0 until problem.numIntVars) a = a.withInt(v, ints[v])
@@ -68,7 +67,7 @@ class RedundantConstraintsTest {
         Linear(IntArray(vc.size / 2) { vc[2 * it + 1] }, IntArray(vc.size / 2) { vc[2 * it] }, LinearOp.LE, b)
 
     @Test
-    fun `a declared knapsack implied by a clique is dropped without finite domains`() {
+    fun `a declared knapsack implied by a clique should be dropped without finite domains`() {
         val source = PseudoBoolean(longArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 7)
         val model = Problem(
             3,
@@ -83,7 +82,7 @@ class RedundantConstraintsTest {
     }
 
     @Test
-    fun `a clique cover counts every repeated literal coefficient`() {
+    fun `a clique cover should count every repeated literal coefficient`() {
         val model = Problem(
             2,
             0,
@@ -100,8 +99,7 @@ class RedundantConstraintsTest {
     }
 
     @Test
-    fun `negated-equivalent inequalities are deduplicated`() {
-        // x + y <= 3 and -x - y >= -3 are the same half-space; one survives.
+    fun `negated-equivalent inequalities should be deduplicated`() {
         val problem = Problem(
             0,
             2,
@@ -114,21 +112,18 @@ class RedundantConstraintsTest {
         val factorsBefore = problem.factors
         val out = checkPreserved("negated-equiv", problem, expectDrop = true)
         assertEquals(1, out.factors.size)
-        assertTrue(out.factors.single() in factorsBefore, "a surviving original is kept verbatim")
+        assertTrue(out.factors.single() in factorsBefore)
     }
 
     @Test
-    fun `proportional rows match standalone via GCD normalization`() {
-        // x+y<=2 and 2x+2y<=4 are the same constraint. GCD-reducing inside the pass buckets them even
-        // without strengthen running first, so the duplicate drops.
+    fun `proportional rows should be deduplicated via GCD normalization`() {
         val problem = Problem(0, 2, dom(2, 3), listOf(le(2, 0, 1, 1, 1), le(4, 0, 2, 1, 2)))
         val out = checkPreserved("proportional-dup", problem, expectDrop = true)
         assertEquals(1, out.factors.size)
     }
 
     @Test
-    fun `a subset-dominated row is dropped over what the source states`() {
-        // x+y<=2 implies x+y+z<=5 because z<=3 — the phase-3 argument, reached with no finite projection.
+    fun `a subset-dominated source row should be dropped`() {
         val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(5, 0, 1, 1, 1, 2, 1)))
 
         val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
@@ -137,9 +132,7 @@ class RedundantConstraintsTest {
     }
 
     @Test
-    fun `a row whose extra term the source leaves open is not dominated`() {
-        // The same pair, except nothing bounds z above: its extra activity is unbounded, so the wider
-        // row is not implied and dropping it would lose solutions.
+    fun `a row whose extra term is open should not be dominated`() {
         val openHi = Bits(3).also { it.set(2) }
         val problem = Problem(
             numBoolVars = 0,
@@ -154,22 +147,19 @@ class RedundantConstraintsTest {
 
         val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
 
-        assertTrue(delta.droppedIndices.isEmpty(), "an open extra term cannot justify a drop")
+        assertTrue(delta.droppedIndices.isEmpty())
     }
 
     @Test
-    fun `a zero coefficient carries no support and never divides by zero`() {
-        // 0·x + y <= 2 has a zero coeff on x: its genuine support is {y}, a strict subset of x+y<=5's.
-        // y<=2 and x<=3 give x+y<=5, so the larger row drops. A zero coeff must stay out of the support
-        // map: the dominance ratio check would otherwise compute cb % 0 and crash.
+    fun `a zero coefficient should carry no support`() {
+        // A zero coefficient in the support map would make the dominance ratio check divide by zero.
         val problem = Problem(0, 2, dom(2, 3), listOf(le(2, 0, 0, 1, 1), le(5, 0, 1, 1, 1)))
         val out = checkPreserved("zero-coeff-subset", problem, expectDrop = true)
         assertEquals(1, out.factors.size)
     }
 
     @Test
-    fun `variable-subset row is kept when extra activity exceeds the slack`() {
-        // x+y<=2 does NOT imply x+y+z<=3 (z can be 3, sum 5 > 3), so nothing drops — soundness guard.
+    fun `a variable-subset row should be kept when extra activity exceeds the slack`() {
         val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(3, 0, 1, 1, 1, 2, 1)))
         checkPreserved("subset-not-dominated", problem, expectDrop = false)
     }
@@ -201,9 +191,8 @@ class RedundantConstraintsTest {
     }
 
     @Test
-    fun `weighted knapsack implied by a partial clique cover is dropped`() {
-        // 5*b0 + 2*b1 + 2*b2 <= 7 with AMO(b1,b2): clique-aware activity = 5 + max(2,2) = 7 <= 7, so the
-        // knapsack holds for every clique-respecting assignment and is redundant.
+    fun `a weighted knapsack implied by a partial clique cover should be dropped`() {
+        // Clique-aware activity is 5 + max(2, 2) = 7.
         val problem = Problem(
             3,
             0,
@@ -217,9 +206,8 @@ class RedundantConstraintsTest {
     }
 
     @Test
-    fun `knapsack not implied by the clique is kept`() {
-        // 5*b0 + 2*b1 + 2*b2 <= 6 with AMO(b1,b2): clique-aware activity = 5 + 2 = 7 > 6, so the
-        // knapsack genuinely forbids (b0,b1) = (1,1) and must be kept — soundness guard.
+    fun `a knapsack not implied by the clique should be kept`() {
+        // Clique-aware activity is 5 + 2 = 7 > 6.
         val problem = Problem(
             3,
             0,
@@ -233,8 +221,7 @@ class RedundantConstraintsTest {
     }
 
     @Test
-    fun `all-different over overlapping domains is kept`() {
-        // x0, x1 both in [0,1] can collide, so all-different is a real constraint — not dropped.
+    fun `an all-different over overlapping domains should be kept`() {
         val problem = Problem(
             0,
             2,

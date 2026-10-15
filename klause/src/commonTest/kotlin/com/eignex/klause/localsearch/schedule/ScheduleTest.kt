@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class ScheduleTest {
 
     @Test
-    fun `geometric cools by the rate each step and floors at the minimum`() {
+    fun `geometric should cool by the rate each step and floor at the minimum`() {
         val s = Geometric(initialTemperature = 100.0, coolingRate = 0.5, minTemperature = 1.0, maxTemperature = 100.0)
         assertEquals(100.0, s.temperature, 1e-9)
         s.step()
@@ -20,7 +20,7 @@ class ScheduleTest {
     }
 
     @Test
-    fun `reheat raises the temperature and is capped at the ceiling`() {
+    fun `reheat should raise the temperature up to the ceiling`() {
         val s = Geometric(initialTemperature = 100.0, coolingRate = 0.5, minTemperature = 1.0, maxTemperature = 100.0)
         s.step()
         s.step()
@@ -33,7 +33,7 @@ class ScheduleTest {
     }
 
     @Test
-    fun `adaptive cooling cools faster when acceptance is above target`() {
+    fun `adaptive cooling should cool faster when acceptance is above target`() {
         val s = AdaptiveCooling(
             initialTemperature = 1.0,
             targetAcceptance = 0.4,
@@ -57,7 +57,7 @@ class ScheduleTest {
     }
 
     @Test
-    fun `adaptive cooling cools slower when acceptance is below target`() {
+    fun `adaptive cooling should cool slower when acceptance is below target`() {
         val s = AdaptiveCooling(
             initialTemperature = 1.0,
             targetAcceptance = 0.4,
@@ -81,7 +81,7 @@ class ScheduleTest {
     }
 
     @Test
-    fun `adaptive cooling reset restores the start rate and temperature`() {
+    fun `adaptive cooling reset should restore the start rate and temperature`() {
         val s = AdaptiveCooling(
             initialTemperature = 2.0,
             initialRate = 0.95,
@@ -108,7 +108,7 @@ class ScheduleTest {
     }
 
     @Test
-    fun `reheating reset clears its counter and resets the base`() {
+    fun `reheating reset should clear its counter and reset the base`() {
         val base = Geometric(
             initialTemperature = 100.0,
             coolingRate = 0.5,
@@ -126,7 +126,7 @@ class ScheduleTest {
     }
 
     @Test
-    fun `degenerate temperature bounds are rejected`() {
+    fun `degenerate temperature bounds should be rejected`() {
         assertFailsWith<IllegalArgumentException> { Geometric(initialTemperature = -1.0) }
         assertFailsWith<IllegalArgumentException> {
             Geometric(initialTemperature = 1.0, minTemperature = 2.0, maxTemperature = 1.0)

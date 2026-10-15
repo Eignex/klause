@@ -12,8 +12,7 @@ import kotlin.test.assertEquals
 class ActivityBasedSearchTest {
 
     @Test
-    fun `ABS scores vars by activity over domain size`() {
-        // 3 unpinned vars; bump var 2's activity heavily; pick should return var 2.
+    fun `ABS should score vars by activity over domain size`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -22,7 +21,6 @@ class ActivityBasedSearchTest {
         )
         val session = PropagationSession(problem)
         val abs = ActivityBasedSearch()
-        // One pick to size the activity arrays before bumping.
         abs.pick(session, Random(0L))
         repeat(10) {
             abs.onPropagation(implied(intKeys = intArrayOf(2)))
@@ -37,7 +35,7 @@ class ActivityBasedSearchTest {
     }
 
     @Test
-    fun `ABS reset-on-restart clears state`() {
+    fun `ABS reset-on-restart should clear state`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -50,18 +48,14 @@ class ActivityBasedSearchTest {
         abs.onPropagation(implied(intKeys = intArrayOf(1)))
         assertEquals(VarRef.IntVar(1), abs.pick(session, Random(0L)))
         abs.onRestart()
-        // After restart, activity is reset → ties broken by id → var 0 wins.
         assertEquals(VarRef.IntVar(0), abs.pick(session, Random(0L)))
     }
 
-    private fun implied(boolKeys: IntArray = IntArray(0), intKeys: IntArray = IntArray(0)): PropagationResult.Implied {
-        // Internal ctor is module-scoped; commonTest sits in the same module so we can
-        // call it directly. Aligned-length boolValues / intValues required.
-        return PropagationResult.Implied(
+    private fun implied(boolKeys: IntArray = IntArray(0), intKeys: IntArray = IntArray(0)): PropagationResult.Implied =
+        PropagationResult.Implied(
             boolKeys,
             BooleanArray(boolKeys.size),
             intKeys,
             LongArray(intKeys.size),
         )
-    }
 }

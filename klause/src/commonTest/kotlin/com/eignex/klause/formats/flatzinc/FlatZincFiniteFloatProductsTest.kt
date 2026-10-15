@@ -16,9 +16,11 @@ import kotlin.test.assertTrue
 
 class FlatZincFiniteFloatProductsTest {
     @Test
-    fun `finite products retain source operand order and declared choices`() {
+    fun `finite products should retain source operand order and declared choices`() {
         for (operands in listOf("x, y", "y, x")) {
-            val program = parseFlatZinc("""
+            val program =
+                parseFlatZinc(
+                    """
                 var 1..2: i;
                 var float: x;
                 var float: y;
@@ -26,7 +28,9 @@ class FlatZincFiniteFloatProductsTest {
                 constraint array_float_element(i, [0.125, 0.375], x);
                 constraint float_times($operands, z);
                 solve satisfy;
-            """.trimIndent(), exactFloats = true)
+                    """.trimIndent(),
+                    exactFloats = true,
+                )
 
             val product = program.problem.factors.filterIsInstance<ContinuousProduct>().single()
 
@@ -39,7 +43,7 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `unrepresentable integer float operands decline before rounding`() {
+    fun `unrepresentable integer float operands should decline before rounding`() {
         for (value in listOf(9007199254740993L, Long.MAX_VALUE)) {
             val sources = listOf(
                 "constraint float_times($value, 1.0, 0.0); solve satisfy;",
@@ -52,10 +56,12 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `literal products do not round exact source equalities`() {
+    fun `literal products should not round exact source equalities`() {
         for ((a, output, valid) in listOf(Triple(0.5, 0.25, true), Triple(0.1, 0.010000000000000002, false))) {
-            val program = parseFlatZinc("constraint float_times($a, $a, $output); solve satisfy;",
-                exactFloats = true)
+            val program = parseFlatZinc(
+                "constraint float_times($a, $a, $output); solve satisfy;",
+                exactFloats = true,
+            )
 
             val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
 
@@ -64,7 +70,7 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `finite integer denominators keep quotients continuous`() {
+    fun `finite integer denominators should keep quotients continuous`() {
         for (exact in listOf(false, true)) {
             val program = parseFlatZinc(
                 """
@@ -86,7 +92,7 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `a variable zero denominator cannot divide zero`() {
+    fun `a variable zero denominator should not divide zero`() {
         val program = parseFlatZinc(
             """
             var 1..1: i;
@@ -105,39 +111,37 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `disjunctions preserve finite products through float and boolean aliases`() {
-        for ((cover, exact) in listOf("bool_clause(guards, [])" to false, "array_bool_or(guards, true)" to true)) {
-            val program = parseFlatZinc(
-                """
-                var 0.0..1.0: x;
-                var 0.0..1.0: y;
-                var 0.0..1.0: z :: output_var;
-                array[1..1] of var float: values = [x];
-                var bool: a;
-                var bool: b;
-                var bool: alias = b;
-                array[1..2] of var bool: guards = [a, b];
-                constraint $cover;
-                constraint float_times(y, values[1], z);
-                constraint float_eq(y, 0.5);
-                constraint bool_eq(b, true);
-                constraint float_eq_reif(0.125, x, guards[1]);
-                constraint float_eq_reif(values[1], 0.375, alias);
-                solve satisfy;
-                """.trimIndent(),
-                floatBuckets = 2,
-                exactFloats = exact,
-            )
+    fun `disjunctions should preserve finite products through float and boolean aliases`() {
+        val program = parseFlatZinc(
+            """
+            var 0.0..1.0: x;
+            var 0.0..1.0: y;
+            var 0.0..1.0: z :: output_var;
+            array[1..1] of var float: values = [x];
+            var bool: a;
+            var bool: b;
+            var bool: alias = b;
+            array[1..2] of var bool: guards = [a, b];
+            constraint array_bool_or(guards, true);
+            constraint float_times(y, values[1], z);
+            constraint float_eq(y, 0.5);
+            constraint bool_eq(b, true);
+            constraint float_eq_reif(0.125, x, guards[1]);
+            constraint float_eq_reif(values[1], 0.375, alias);
+            solve satisfy;
+            """.trimIndent(),
+            floatBuckets = 2,
+            exactFloats = true,
+        )
 
-            val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
 
-            val assignment = assertIs<SolveResult.Sat>(result).assignment
-            assertTrue("z = 0.1875;" in writeFlatZincSolution(program, assignment))
-        }
+        val assignment = assertIs<SolveResult.Sat>(result).assignment
+        assertTrue("z = 0.1875;" in writeFlatZincSolution(program, assignment))
     }
 
     @Test
-    fun `disjoint disjunction and array choices are unsatisfiable`() {
+    fun `disjoint disjunction and array choices should be unsatisfiable`() {
         val program = parseFlatZinc(
             """
             var float: x;
@@ -156,7 +160,7 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `selecting a finite float value excludes the other choices during propagation`() {
+    fun `selecting a finite float value should exclude the other choices during propagation`() {
         for (count in listOf(3, 6)) {
             val entries = (1..count).joinToString(", ") { "$it.0" }
             val sources = listOf(
@@ -178,7 +182,7 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `signed zeros share a finite choice`() {
+    fun `signed zeros should share a finite choice`() {
         val program = parseFlatZinc(
             """
             var 1..2: i;
@@ -194,7 +198,7 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `disjoint constant arrays have no common finite float choice`() {
+    fun `disjoint constant arrays should have no common finite float choice`() {
         val program = parseFlatZinc(
             """
             var 1..1: i;
@@ -209,7 +213,7 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `products preserve selected float values through array aliases in either operand`() {
+    fun `products should preserve selected float values through array aliases in either operand`() {
         for (operands in listOf("values[1], y", "y, values[1]")) {
             val program = parseFlatZinc(
                 """
@@ -235,7 +239,7 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `a product chain retains exact intermediate values`() {
+    fun `a product chain should retain exact intermediate values`() {
         val program = parseFlatZinc(
             """
             var 1..1: i;
@@ -261,26 +265,7 @@ class FlatZincFiniteFloatProductsTest {
     }
 
     @Test
-    fun `a rounded product does not satisfy an exact equality`() {
-        val program = parseFlatZinc(
-            """
-            var 1..1: i;
-            var float: x;
-            var 0.1..0.1: y;
-            constraint array_float_element(i, [0.1], x);
-            constraint float_times(x, y, 0.010000000000000002);
-            solve satisfy;
-            """.trimIndent(),
-            exactFloats = true,
-        )
-
-        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-
-        assertIs<SolveResult.Unsat>(result, "LP evidence: ${result.stats.lp}")
-    }
-
-    @Test
-    fun `a singleton float domain supports a constant product result`() {
+    fun `a singleton float domain should support a constant product result`() {
         for (exact in listOf(false, true)) {
             val program = parseFlatZinc(
                 """

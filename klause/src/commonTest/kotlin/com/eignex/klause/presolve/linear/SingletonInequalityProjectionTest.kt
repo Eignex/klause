@@ -17,8 +17,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SingletonInequalityProjectionTest {
-
-    /** `x + y <= 10` with `x` only there, declared `lo..9` and open below when [openBelow] is set. */
     private fun sourceModel(openBelow: Boolean) = Problem(
         numBoolVars = 0,
         numIntVars = 2,
@@ -28,7 +26,7 @@ class SingletonInequalityProjectionTest {
     )
 
     @Test
-    fun `the source form pins a column whose relaxing side is closed`() {
+    fun `source projection should pin a column whose relaxing side is closed`() {
         val delta = SingletonInequalityProjection.projectSource(sourceModel(openBelow = false), emptySet())
         val ints = longArrayOf(0, 8)
 
@@ -40,19 +38,19 @@ class SingletonInequalityProjectionTest {
     }
 
     @Test
-    fun `the source form drops the row of a column free on its relaxing side`() {
+    fun `source projection should drop the row of a column free on its relaxing side`() {
         val delta = SingletonInequalityProjection.projectSource(sourceModel(openBelow = true), emptySet())
         val ints = longArrayOf(0, 15)
 
         delta.rebuild.rebuildInto(BooleanArray(0), ints)
 
         assertEquals(listOf(0), delta.droppedIndices.toList())
-        assertTrue(delta.addedFactors.isEmpty(), "x can always absorb the row, so nothing remains of it")
+        assertTrue(delta.addedFactors.isEmpty())
         assertEquals(-5L, ints[0], "x + 15 <= 10")
     }
 
     @Test
-    fun `a declared singleton inequality reconstructs its projected variable`() {
+    fun `a declared singleton inequality should reconstruct its projected variable`() {
         val source = Linear(longArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 10)
         val factor = object : Factor by source, Propagator by source.propagatorProjection() {}
         val model = problem(arrayOf(IntDomain(0, 5), IntDomain(0, 20)), factor)
@@ -75,7 +73,7 @@ class SingletonInequalityProjectionTest {
     }
 
     @Test
-    fun `leaves objective variables in place`() {
+    fun `projection should leave objective variables in place`() {
         val p = problem(
             arrayOf(IntDomain(0, 5), IntDomain(0, 20)),
             Linear(longArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 10),
@@ -84,17 +82,15 @@ class SingletonInequalityProjectionTest {
     }
 
     @Test
-    fun `does not project a variable used by another constraint`() {
-        // x (var 0) appears in both inequalities ⇒ not a singleton column.
+    fun `a variable used by another constraint should not be projected`() {
         val p = problem(
             arrayOf(IntDomain(0, 5), IntDomain(0, 20), IntDomain(0, 20)),
             Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10),
             Linear(longArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 10),
         )
         val d = SingletonInequalityProjection.project(p, emptySet())
-        // Only the pure singletons y (var1) and z (var2) are projected; both survivors are still on x.
         assertEquals(listOf(listOf(0), listOf(0)), d.addedFactors.map { (it as Linear).vars.toList() })
         val rebuilt = d.reconstruct!!(Sample(bools = BooleanArray(0), ints = longArrayOf(4, 6, 6)))
-        assertEquals(4L, rebuilt.ints[0], "x must not be pinned by the projection")
+        assertEquals(4L, rebuilt.ints[0])
     }
 }

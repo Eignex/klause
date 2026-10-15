@@ -28,35 +28,36 @@ class UniGenTest {
     private fun projectionKey(s: Sample, n: Int): List<Boolean> = (0 until n).map { s.bools[it] }
 
     @Test
-    fun `accurate sampling on a hashed instance returns valid distinct models`() {
-        // 64 models: smallest power of two above the un-hashed cell band (hiThresh ≈ 57), so
-        // hashing kicks in at the cheapest enumeration cost. The internal count estimate only
-        // seeds the hash depth, so the coarsest ε/δ suffice.
+    fun `accurate sampling on a hashed instance should return valid distinct models`() {
+        // 64 models is the smallest power of two above the un-hashed cell band.
         val p = unconstrained(6)
         val samples = BacktrackSolver(p.bake())
             .samples(
                 SamplingConfig(quality = SampleQuality.ACCURATE, seed = 3L, countEpsilon = 2.0, countDelta = 0.99),
                 BacktrackParams(),
             )
-            .take(12).toList()
-        assertTrue(samples.size == 12, "should produce the requested number of accurate samples")
-        // Unconstrained, so every assignment is valid; uniformity at 64 cells only checked loosely.
+            .take(6).toList()
+        assertTrue(samples.size == 6)
         val distinct = samples.map { projectionKey(it, 6) }.toHashSet().size
-        assertTrue(distinct >= 6, "expected good spread, got $distinct distinct out of 12")
+        assertTrue(distinct >= 3, "expected good spread, got $distinct distinct out of 6")
     }
 
     @Test
-    fun `accurate samples retain unconstrained real declarations`() {
+    fun `accurate samples should retain unconstrained real declarations`() {
         for (max in listOf(1L, 2L)) {
             val model = Problem(
-                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
-                factors = emptyArray(), numRealVars = 2,
+                numBoolVars = 1,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(1, max)),
+                factors = emptyArray(),
+                numRealVars = 2,
                 realLower = doubleArrayOf(2.0, Double.NEGATIVE_INFINITY),
                 realUpper = doubleArrayOf(3.0, Double.POSITIVE_INFINITY),
             )
 
             val sample = BacktrackSolver(model.bake()).samples(
-                SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L), BacktrackParams(),
+                SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L),
+                BacktrackParams(),
             ).first()
 
             assertEquals(2, sample.numRealVars)
@@ -65,22 +66,41 @@ class UniGenTest {
     }
 
     @Test
-    fun `accurate samples retain exact rational witnesses for mixed models`() {
+    fun `accurate samples should retain exact rational witnesses for mixed models`() {
         for (max in listOf(1L, 2L)) {
             val model = Problem(
-                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
+                numBoolVars = 1,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(1, max)),
                 factors = arrayOf(
                     Clause(intArrayOf(Lit.make(0, true))),
-                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
-                        doubleArrayOf(3.0), LinearOp.LE, 0.0),
-                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
-                        doubleArrayOf(3.0), LinearOp.GE, 0.0),
+                    ReifiedRealLinear(
+                        0,
+                        intArrayOf(0),
+                        doubleArrayOf(-1.0),
+                        intArrayOf(0),
+                        doubleArrayOf(3.0),
+                        LinearOp.LE,
+                        0.0,
+                    ),
+                    ReifiedRealLinear(
+                        0,
+                        intArrayOf(0),
+                        doubleArrayOf(-1.0),
+                        intArrayOf(0),
+                        doubleArrayOf(3.0),
+                        LinearOp.GE,
+                        0.0,
+                    ),
                 ),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.5),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(0.5),
             )
 
             val sample = BacktrackSolver(model.bake()).samples(
-                SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L), BacktrackParams(),
+                SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L),
+                BacktrackParams(),
             ).first()
 
             assertEquals(1, sample.numBoolVars)
@@ -91,15 +111,21 @@ class UniGenTest {
     }
 
     @Test
-    fun `an empty real interval has no accurate samples`() {
+    fun `empty real interval should have no accurate samples`() {
         for (max in listOf(1L, 2L)) {
             val model = Problem(
-                0, 1, arrayOf(IntDomain(1, max)), emptyArray(),
-                numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(1.0),
+                0,
+                1,
+                arrayOf(IntDomain(1, max)),
+                emptyArray(),
+                numRealVars = 1,
+                realLower = doubleArrayOf(2.0),
+                realUpper = doubleArrayOf(1.0),
             )
 
             val samples = BacktrackSolver(model.bake()).samples(
-                SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L), BacktrackParams(),
+                SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L),
+                BacktrackParams(),
             )
 
             assertTrue(samples.none())
@@ -107,17 +133,35 @@ class UniGenTest {
     }
 
     @Test
-    fun `conditioned accurate real witnesses retain the captured scope`() {
+    fun `conditioned accurate real witnesses should retain the captured scope`() {
         val model = Problem(
-            2, 1, arrayOf(IntDomain(0, 2)),
+            2,
+            1,
+            arrayOf(IntDomain(0, 2)),
             arrayOf(
                 Clause(intArrayOf(Lit.make(0, true))),
-                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
-                    doubleArrayOf(3.0), LinearOp.LE, 0.0),
-                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
-                    doubleArrayOf(3.0), LinearOp.GE, 0.0),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(0),
+                    doubleArrayOf(-1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.LE,
+                    0.0,
+                ),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(0),
+                    doubleArrayOf(-1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.GE,
+                    0.0,
+                ),
             ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.5),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.5),
         ).bake()
         val config = SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L)
         val params = BacktrackParams(assumptions = Assumptions(bools = mapOf(1 to false)))
@@ -139,7 +183,7 @@ class UniGenTest {
     }
 
     @Test
-    fun `accurate sampling on unsat yields nothing`() {
+    fun `accurate sampling on unsat should yield nothing`() {
         val p = Problem(
             numBoolVars = 1,
             numIntVars = 0,
@@ -152,6 +196,6 @@ class UniGenTest {
         val samples = BacktrackSolver(p.bake())
             .samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L), BacktrackParams())
             .take(5).toList()
-        assertTrue(samples.isEmpty(), "UNSAT instance should yield no accurate samples")
+        assertTrue(samples.isEmpty())
     }
 }

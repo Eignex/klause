@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class FlatZincIntegerFloatImagesTest {
     @Test
-    fun `rounded derived bounds use the grid and decline exact mode`() {
+    fun `rounded derived bounds should use the grid and decline exact mode`() {
         val source = """
             var {50, 100, 200}: n;
             var 50.0..200.0: raw;
@@ -34,7 +34,7 @@ class FlatZincIntegerFloatImagesTest {
     }
 
     @Test
-    fun `scaled integer products retain values through array aliases`() {
+    fun `scaled integer products should retain values through array aliases`() {
         for (exact in listOf(false, true)) {
             val program = parseFlatZinc(
                 """
@@ -65,7 +65,7 @@ class FlatZincIntegerFloatImagesTest {
     }
 
     @Test
-    fun `scaled products do not round the integer times the source scale`() {
+    fun `scaled products should not round the integer times the source scale`() {
         val program = parseFlatZinc(
             """
             var 3..3: n;

@@ -71,7 +71,7 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a sweep visits distinct heads before its budget expires`() {
+    fun `a sweep should visit distinct heads before its budget expires`() {
         val rows = (0..64).map { row(it, (it + 1) % 65, it, 0L) } +
             (1..64).map { row(64 + it, it, 0, -1L) }
         val problem = problemOf(numBools = 129, numInts = 65, rows = rows)
@@ -85,7 +85,7 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `closed heads do not consume the refutation budget`() {
+    fun `closed heads should not consume the refutation budget`() {
         val rows = (0..64).map { row(it, (it + 1) % 65, it, 0L) } + row(65, 64, 0, -1L)
         val problem = problemOf(numBools = 66, numInts = 65, rows = rows)
         val state = stateOf(problem)
@@ -98,7 +98,7 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a deferred head is visited after a decision without new graph assertions`() {
+    fun `a deferred head should be visited after a decision without new graph assertions`() {
         val rows = (1..64).map { row(it - 1, it, 0, 0L) } + row(64, 0, 64, -1L)
         val problem = problemOf(numBools = 65, numInts = 65, rows = rows, domains = boxed(65, 2L))
         val state = stateOf(problem, Lit.make(64, true))
@@ -116,7 +116,7 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a deferred head survives an assertion in an unrelated component`() {
+    fun `a deferred head should survive an assertion in an unrelated component`() {
         val rows = (0..64).map { row(it, 65, it, if (it == 64) 0L else 2L) } +
             row(65, 0, 65, -1L) + (1..64).map { row(65 + it, it, 0, 0L) } + row(130, 66, 67, 0L)
         val problem = problemOf(numBools = 131, numInts = 68, rows = rows)
@@ -136,9 +136,12 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a sibling revisits an implication released by rollback at the same decision depth`() {
-        val problem = problemOf(numBools = 4, numInts = 5,
-            rows = listOf(row(0, 1, 0, -1L), row(1, 2, 1, -1L), row(2, 0, 2, -1L), row(3, 3, 4, 0L)))
+    fun `a sibling should revisit an implication released by rollback at the same depth`() {
+        val problem = problemOf(
+            numBools = 4,
+            numInts = 5,
+            rows = listOf(row(0, 1, 0, -1L), row(1, 2, 1, -1L), row(2, 0, 2, -1L), row(3, 3, 4, 0L)),
+        )
         val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true))
         state.levelToDecisionVar.add(0)
         val root = state.mark()
@@ -160,12 +163,12 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `two asserted rows refute the third before it is decided citing only the rows that forced it`() {
+    fun `two asserted rows should refute the third citing only the rows that forced it`() {
         val problem = triangle()
         val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true))
         assertTrue(runSystem(problem, state))
-        assertEquals(false, state.boolValues[2], "closing the cycle is refuted ahead of the decision")
-        val antecedents = assertNotNull(state.boolAntecedents[2], "the pin must carry its forcing clause")
+        assertEquals(false, state.boolValues[2])
+        val antecedents = assertNotNull(state.boolAntecedents[2])
         assertEquals(
             setOf(Lit.make(0, false), Lit.make(1, false)),
             antecedents.toSet(),
@@ -174,7 +177,7 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a fully asserted negative cycle is a conflict naming every row on the cycle`() {
+    fun `a fully asserted negative cycle should conflict naming every row on the cycle`() {
         val problem = triangle()
         val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
         assertFalse(runSystem(problem, state))
@@ -184,16 +187,16 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a false aux asserts the row's negation`() {
+    fun `a false aux should assert the row's negation`() {
         // `¬(x1 − x0 ≤ −5)` is `x1 − x0 ≥ −4`, which the second row's `x1 − x0 ≤ −9` contradicts.
         val problem = problemOf(numBools = 2, numInts = 2, rows = listOf(row(0, 1, 0, -5L), row(1, 1, 0, -9L)))
         val state = stateOf(problem, Lit.make(0, false))
         assertTrue(runSystem(problem, state))
-        assertEquals(false, state.boolValues[1], "the false branch of a reified difference constrains too")
+        assertEquals(false, state.boolValues[1])
     }
 
     @Test
-    fun `a range at the unbounded-search clamp refutes nothing`() {
+    fun `a range at the unbounded-search clamp should refute nothing`() {
         // The two sides sum past Long. A wrapped sum reads as a hugely negative distance, which would
         // refute every row in the model — the false-UNSAT shape this fold has to refuse outright.
         val clamp = 1L shl 62
@@ -205,14 +208,11 @@ class DifferenceSystemPropagatorTest {
         )
         val state = stateOf(problem)
         assertTrue(runSystem(problem, state))
-        assertEquals(null, state.boolValues[0], "a range that cannot be summed decides nothing")
+        assertEquals(null, state.boolValues[0])
     }
 
     @Test
-    fun `a route reaching the constant node through a model row still refutes citing both segments`() {
-        // y >= 10 holds only through the row a <= y and a's own range; x <= 5 likewise through b. Neither
-        // endpoint is bounded itself, so the refuting route runs y -> a -> zero -> b -> x: it reaches the
-        // constant node through model rows rather than from the endpoints directly.
+    fun `a route through a model row to the constant node should refute citing both segments`() {
         val rows = listOf(
             ReifiedLinear(1, longArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0L), // aux1: a - y <= 0
             ReifiedLinear(2, longArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0L), // aux2: x - b <= 0
@@ -227,8 +227,8 @@ class DifferenceSystemPropagatorTest {
         val problem = problemOf(numBools = 3, numInts = 4, rows = rows, domains = domains)
         val state = stateOf(problem, Lit.make(1, true), Lit.make(2, true))
         assertTrue(runSystem(problem, state))
-        assertEquals(false, state.boolValues[0], "y >= 10 and x <= 5 leave y - x >= 5, refuting the row")
-        val antecedents = assertNotNull(state.boolAntecedents[0], "the pin must carry its forcing clause")
+        assertEquals(false, state.boolValues[0])
+        val antecedents = assertNotNull(state.boolAntecedents[0])
         assertEquals(
             setOf(Lit.make(1, false), Lit.make(2, false)),
             antecedents.toSet(),
@@ -237,14 +237,13 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `two states sharing one propagator keep separate systems`() {
-        // One propagator instance backs every arm of a portfolio, so its graph must not be shared.
+    fun `two states sharing one propagator should keep separate systems`() {
         val problem = triangle()
         val id = systemId(problem)
         val decided = stateOf(problem, Lit.make(0, true), Lit.make(1, true))
         assertTrue(problem.propagators[id].propagate(decided, id))
         val fresh = stateOf(problem, Lit.make(0, true))
         assertTrue(problem.propagators[id].propagate(fresh, id))
-        assertEquals(null, fresh.boolValues[2], "the second state must not inherit the first's edges")
+        assertEquals(null, fresh.boolValues[2])
     }
 }

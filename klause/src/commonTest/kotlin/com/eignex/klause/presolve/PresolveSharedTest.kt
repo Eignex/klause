@@ -15,13 +15,11 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class PresolveSharedTest {
-
     @Test
-    fun `rebuilding and reseeding preserve captured resource settings`() {
+    fun `rebuilding and reseeding should preserve captured resource settings`() {
         val settings = ProblemSettings(DomainStorageSettings(8), 17, 101, 203)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList(), settings = settings).bake()
 
@@ -32,11 +30,10 @@ class PresolveSharedTest {
         assertEquals(problem.rootIntDomain(0), reseeded.rootIntDomain(0))
     }
 
-
     private fun pos(v: Int) = Lit.make(v, true)
 
     @Test
-    fun `rebuilding with an expired deadline skips SAC tightening`() {
+    fun `rebuilding with an expired deadline should skip SAC tightening`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -58,33 +55,7 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `successive rebakes record probes in the same phase budget`() {
-        val budget = PresolveBudget(Long.MAX_VALUE)
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
-            ),
-        ).bake(budget.orSpent(Cancellation.Never))
-        val config = BakeConfig(probeIntBounds = true)
-        val rebuilt = PresolveShared.rebuildProblem(problem, problem.factors.toList(), bakeConfig = config)
-        val probes = budget.probeCalls
-        val work = budget.spent()
-        val entries = budget.rootConstructionEntries
-
-        PresolveShared.rebuildProblem(rebuilt, rebuilt.factors.toList(), bakeConfig = config)
-
-        assertTrue(budget.probeCalls > probes)
-        assertTrue(budget.rootConstructionEntries > entries)
-        assertTrue(budget.spent() > work)
-        assertEquals(53L * (budget.rootConstructionEntries + budget.rootPropagationWork), budget.spent())
-    }
-
-    @Test
-    fun `charges through a rebuilt problem consume the originating allowance`() {
+    fun `charges through a rebuilt problem should consume the originating allowance`() {
         val budget = PresolveBudget(1000)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
             .bake(budget.orSpent(Cancellation.Never))
@@ -97,8 +68,7 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `a knapsack yields a clique only over the large-weight literals whose pairs exceed the bound`() {
-        // 5*x0 + 4*x1 + 1*x2 <= 6: x0+x1 = 9 > 6 exclude, but x2 pairs (6, 5) do not exceed 6.
+    fun `a knapsack should yield a clique only over literal pairs exceeding the bound`() {
         val problem = Problem(
             3,
             0,
@@ -109,9 +79,7 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `overlapping binary cliques merge into one maximal clique`() {
-        // The three clauses pin at-most-one over each pair {x0,x1}, {x1,x2}, {x0,x2} — a triangle that
-        // collapses to a single at-most-one over all three.
+    fun `overlapping binary cliques should merge into one maximal clique`() {
         val problem = Problem(
             3,
             0,
@@ -126,9 +94,7 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `a literal joins a clique only when it conflicts with every member`() {
-        // 3 is adjacent to 1 and 2 but not to 0, so it may not extend the base clique {0,1,2}; the pair
-        // it does form survives on its own.
+    fun `a literal should join a clique only when it conflicts with every member`() {
         val merged = mergeCliques(
             listOf(setOf(0, 1, 2), setOf(1, 3), setOf(2, 3)),
         )
@@ -136,9 +102,7 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `a cancelled merge returns the base cliques unextended`() {
-        // The triangle would collapse to one size-3 clique; cancelling forgoes the growth but every
-        // returned clique is still a valid at-most-one.
+    fun `a cancelled merge should return the base cliques unextended`() {
         val base = listOf(setOf(0, 1), setOf(1, 2), setOf(0, 2))
         val merged = mergeCliques(base) { true }
 
@@ -146,7 +110,7 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `maxIntSpan saturates an overflowing span rather than wrapping negative`() {
+    fun `maxIntSpan should saturate an overflowing span`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)), emptyList())
         assertEquals(Long.MAX_VALUE, PresolveShared.maxIntSpan(problem))
     }

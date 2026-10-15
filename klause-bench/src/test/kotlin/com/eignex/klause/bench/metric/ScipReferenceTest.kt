@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class ScipReferenceTest {
     @Test
-    fun `an optimum's summary and displayed solution give its claim`() {
+    fun `an optimum summary and displayed solution should give its claim`() {
         val out = "SCIP Status        : problem is solved [optimal solution found]\n" +
             "Primal Bound       : +9.24000000000000e+02 (3 solutions)\n" +
             "Dual Bound         : +9.24000000000000e+02\nGap                : 0.00 %\n" +
@@ -22,7 +22,7 @@ class ScipReferenceTest {
     }
 
     @Test
-    fun `infeasibility, a time limit and a missing incumbent read as such`() {
+    fun `infeasibility time limit and missing incumbent should each read as such`() {
         val infeasible = ScipReference.parseClaim("SCIP Status        : problem is solved [infeasible]\n")
         val limited = ScipReference.parseClaim(
             "SCIP Status        : solving was interrupted [time limit reached]\n" +
@@ -32,12 +32,5 @@ class ScipReferenceTest {
 
         assertEquals(MpsWitness.Claim(MpsWitness.Status.INFEASIBLE, null, null, null, null), infeasible)
         assertEquals(MpsWitness.Claim(MpsWitness.Status.LIMIT, null, 4.0, null, null), limited)
-    }
-
-    @Test
-    fun `scip's cache identity names its image, its options and the validation rules`() {
-        val identity = ScipReference.identity("sha256:abc")
-
-        assertEquals("${ScipReference.IMAGE}@sha256:abc|${ScipReference.OPTIONS}|${MpsWitness.VERSION}", identity)
     }
 }

@@ -13,7 +13,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SatClauseDbTest {
-
     private fun pos(v: Int) = Lit.make(v, true)
     private fun neg(v: Int) = Lit.make(v, false)
 
@@ -21,8 +20,7 @@ class SatClauseDbTest {
         SatClauseDb.build(Problem(numBool, 0, emptyArray(), factors), objectiveBoolVars)
 
     @Test
-    fun `a variable touched by a non-clause factor is ineligible`() {
-        // b0 is also in a cardinality, which no SAT pass can reconstruct through; b2 stays clause-only.
+    fun `a variable touched by a non-clause factor should be ineligible`() {
         val d = db(
             3,
             listOf(
@@ -30,30 +28,29 @@ class SatClauseDbTest {
                 Cardinality(intArrayOf(pos(0), pos(1)), min = 1, max = 1),
             ),
         )
-        assertFalse(d.eligible[0], "a variable a non-clause factor mentions must not be eliminable")
-        assertFalse(d.eligible[1], "the cardinality's other variable is equally unreachable")
-        assertTrue(d.eligible[2], "an untouched clause-only variable stays eligible")
+        assertFalse(d.eligible[0])
+        assertFalse(d.eligible[1])
+        assertTrue(d.eligible[2])
     }
 
     @Test
-    fun `a tautological clause never enters a slot and is dropped by the delta`() {
-        // (b0 ∨ !b0) is always true: no slot is created for it and the delta retires the input factor.
+    fun `a tautological clause should never enter a slot and should be dropped by the delta`() {
         val d = db(2, listOf(Clause(intArrayOf(pos(0), neg(0))), Clause(intArrayOf(pos(1)))))
-        assertEquals(1, d.slotCount, "only the non-tautological clause takes a slot")
-        assertEquals(1, d.origin(0), "the surviving slot points at input factor 1")
-        assertContentEquals(intArrayOf(0), d.toDelta(null).droppedIndices, "the tautology is dropped")
+        assertEquals(1, d.slotCount)
+        assertEquals(1, d.origin(0))
+        assertContentEquals(intArrayOf(0), d.toDelta(null).droppedIndices)
     }
 
     @Test
-    fun `the delta drops consumed inputs and adds surviving derived clauses`() {
+    fun `the delta should drop consumed inputs and add surviving derived clauses`() {
         val d = db(3, listOf(Clause(intArrayOf(pos(0), pos(1))), Clause(intArrayOf(neg(0), pos(2)))))
         d.remove(0)
         val derived = d.add(intArrayOf(pos(1), pos(2)))
-        assertNull(d.clause(0), "a removed slot reads back as absent")
-        assertEquals(-1, d.origin(derived), "a derived clause has no input origin")
+        assertNull(d.clause(0))
+        assertEquals(-1, d.origin(derived))
 
         val delta = d.toDelta(null)
-        assertContentEquals(intArrayOf(0), delta.droppedIndices, "only the consumed input is dropped")
+        assertContentEquals(intArrayOf(0), delta.droppedIndices)
         assertContentEquals(
             listOf(listOf(pos(1), pos(2))),
             delta.addedFactors.map { (it as Clause).literals.toList() },
@@ -61,9 +58,9 @@ class SatClauseDbTest {
     }
 
     @Test
-    fun `a derived clause removed before the delta contributes nothing`() {
+    fun `a derived clause removed before the delta should contribute nothing`() {
         val d = db(2, listOf(Clause(intArrayOf(pos(0), pos(1)))))
         d.remove(d.add(intArrayOf(neg(0))))
-        assertTrue(d.toDelta(null).isEmpty, "an added-then-removed clause leaves the delta empty")
+        assertTrue(d.toDelta(null).isEmpty)
     }
 }

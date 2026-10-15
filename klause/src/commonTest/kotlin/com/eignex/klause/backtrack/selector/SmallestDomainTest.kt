@@ -12,8 +12,7 @@ import kotlin.test.assertEquals
 class SmallestDomainTest {
 
     @Test
-    fun `smallest domain discriminates between wide domains past int saturation`() {
-        // Both domains saturate Int-typed size at Int.MAX_VALUE; the Long count still orders them.
+    fun `smallest domain should discriminate between wide domains past int saturation`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -26,9 +25,7 @@ class SmallestDomainTest {
     }
 
     @Test
-    fun `first-fail still orders a column whose bounds span more than a Long can count`() {
-        // The full-width column holds the most values of any domain; a count that wrapped would
-        // make it look like the smallest and invert the first-fail order.
+    fun `first-fail should order a column whose span exceeds a Long`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,

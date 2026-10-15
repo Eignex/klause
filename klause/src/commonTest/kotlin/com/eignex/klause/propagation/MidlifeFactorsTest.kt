@@ -12,8 +12,7 @@ import kotlin.test.assertNull
 
 class MidlifeFactorsTest {
 
-    // Three int vars, each 0..10. A fresh array per call — Problem construction folds root deductions
-    // into the domains it is given, so sharing one array across builds would cross-contaminate.
+    // Fresh array per call: Problem construction folds root deductions into the domains it is given.
     private fun domains() = arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10))
 
     private fun leq(coeffs: IntArray, vars: IntArray, bound: Int) = Linear(coeffs, vars, LinearOp.LE, bound)
@@ -21,7 +20,6 @@ class MidlifeFactorsTest {
     private fun intBounds(state: PropagationState) =
         (0 until state.problem.numIntVars).map { state.intDomains[it].min to state.intDomains[it].max }
 
-    /** Bake [factors] from scratch (non-incremental) and read the resulting int bounds. */
     private fun freshBounds(factors: List<Factor>): List<Pair<Long, Long>> {
         val state = PropagationState(Problem(0, 3, domains(), factors), Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))
@@ -29,7 +27,7 @@ class MidlifeFactorsTest {
     }
 
     @Test
-    fun `a chain of mid-life factors propagates transitively like a fresh build`() {
+    fun `a chain of mid-life factors should propagate transitively like a fresh build`() {
         val base = leq(intArrayOf(1), intArrayOf(0), 5) // x0 <= 5
         val g = leq(intArrayOf(1, -1), intArrayOf(1, 0), 0) // x1 <= x0
         val h = leq(intArrayOf(1, -1), intArrayOf(2, 1), 0) // x2 <= x1
@@ -41,11 +39,11 @@ class MidlifeFactorsTest {
         assertNull(state.runToFixpoint(allFactors = true))
 
         assertEquals(freshBounds(listOf(base, g, h)), intBounds(state))
-        assertEquals(5, state.intDomains[2].max) // x2 tightened through the whole chain
+        assertEquals(5, state.intDomains[2].max)
     }
 
     @Test
-    fun `a tombstoned mid-life factor does not propagate`() {
+    fun `a tombstoned mid-life factor should not propagate`() {
         val added = leq(intArrayOf(1), intArrayOf(0), 5) // x0 <= 5, never allowed to fire
 
         val state = PropagationState(Problem(0, 3, domains(), emptyList()), Assumptions.None, incremental = true)
@@ -55,7 +53,6 @@ class MidlifeFactorsTest {
         assertNull(state.runToFixpoint(allFactors = true))
 
         assertEquals(freshBounds(emptyList()), intBounds(state))
-        assertEquals(10, state.intDomains[0].max) // untouched — the tombstoned factor stayed inert
+        assertEquals(10, state.intDomains[0].max)
     }
-
 }

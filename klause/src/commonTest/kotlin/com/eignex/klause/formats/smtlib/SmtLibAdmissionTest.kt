@@ -1,13 +1,17 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialSelection
+import com.eignex.klause.ir.QuadraticCoefficient
+import com.eignex.klause.ir.QuadraticObjectiveTerm
+import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -18,6 +22,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,7 +31,7 @@ import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
     @Test
-    fun `an unrelated open linear integer preserves a bounded mixed product source`() {
+    fun `an unrelated open linear integer should preserve a bounded mixed product source`() {
         val input = SmtLibAdmission.parse(
             "(declare-const n Int) (declare-const q Int) (declare-const x Real) (declare-const y Real) " +
                 "(assert (and (>= n 1) (<= n 2) (>= q 0) (= x 2) (= y 4))) " +
@@ -44,15 +49,20 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `polynomial fallback retains numeric selection guards and ordered branches`() {
+    fun `polynomial fallback should retain numeric selection guards and ordered branches`() {
         for (sort in listOf("Real", "Int")) {
-            val input = SmtLibAdmission.parse("""
+            val input = SmtLibAdmission.parse(
+                """
                 (declare-const x $sort) (declare-const b Bool)
                 (define-fun selected () $sort (ite b (* x x) 3))
                 (assert (= selected 4)) (check-sat)
-            """.trimIndent())
-            val formula = if (sort == "Real") assertIs<SmtLibInput.Polynomial>(input).problem.formula
-                else assertIs<SmtLibInput.NonlinearInteger>(input).problem.formula
+                """.trimIndent(),
+            )
+            val formula = if (sort == "Real") {
+                assertIs<SmtLibInput.Polynomial>(input).problem.formula
+            } else {
+                assertIs<SmtLibInput.NonlinearInteger>(input).problem.formula
+            }
 
             val selection = assertIs<PolynomialRealFormula.And>(formula).operands
                 .filterIsInstance<PolynomialSelection>().single()
@@ -65,7 +75,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `proved operand bounds retain native products and finite distinctness before lowering`() {
+    fun `proved operand bounds should retain native products and finite distinctness before lowering`() {
         val input = SmtLibAdmission.parse(
             "(declare-const n Int) (declare-const m Int) (declare-const k Int) " +
                 "(declare-const x Real) (declare-const y Real) " +
@@ -85,7 +95,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `genuine open nonlinear integers retain the original exact source`() {
+    fun `genuine open nonlinear integers should retain the original exact source`() {
         val input = SmtLibAdmission.parse(
             "(declare-const n Int) (declare-const x Real) (declare-const y Real) " +
                 "(assert (>= n 0)) (assert (= x 2)) (assert (= (* (to_real n) x) y)) (check-sat)",
@@ -98,7 +108,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `cancellation during nonlinear bound closure withholds source admission`() {
+    fun `cancellation during nonlinear bound closure should withhold source admission`() {
         var work = 0L
         val stop = object : Cancellation {
             override fun isCancelled(): Boolean = work > 0
@@ -108,14 +118,15 @@ class SmtLibAdmissionTest {
         val input = SmtLibAdmission.parse(
             "(declare-const n Int) (declare-const m Int) (declare-const x Real) " +
                 "(assert (and (>= m 0) (<= m 1) (= n (+ m 1)))) " +
-                "(assert (= (* (to_real n) x) 4)) (check-sat)", cancellation = stop,
+                "(assert (= (* (to_real n) x) 4)) (check-sat)",
+            cancellation = stop,
         )
 
         assertEquals(SmtLibInput.Interrupted, input)
     }
 
     @Test
-    fun `unused helper arguments retain their log domains`() {
+    fun `unused helper arguments should retain their log domains`() {
         val input = SmtLibAdmission.parse(
             "(define-fun f ((x Real)) Real 1) (assert (= (f (log 0)) 1)) (check-sat)",
         )
@@ -127,7 +138,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `unused let bindings retain their log domains`() {
+    fun `unused let bindings should retain their log domains`() {
         val input = SmtLibAdmission.parse("(assert (let ((x (log 0))) true)) (check-sat)")
 
         val source = assertIs<SmtLibInput.Transcendental>(input).problem
@@ -137,7 +148,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `inactive conditional branches do not require unused binding domains`() {
+    fun `inactive conditional branches should not require unused binding domains`() {
         val input = SmtLibAdmission.parse(
             "(declare-const b Bool) (assert b) (assert (ite b true (let ((x (log 0))) true))) (check-sat)",
         )
@@ -149,7 +160,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `linear sources retain one streaming parse`() {
+    fun `linear sources should retain one streaming parse`() {
         var opens = 0
 
         val input = SmtLibAdmission.parse({
@@ -162,7 +173,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `unused real helpers retain one linear streaming parse`() {
+    fun `unused real helpers should retain one linear streaming parse`() {
         for (definition in listOf(
             "(define-fun f ((x Real)) Real (+ x 1))",
             "(define-fun f ((x Real)) Real (* x x))",
@@ -182,7 +193,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `unused helper definitions retain lexical sort validation`() {
+    fun `unused helper definitions should retain lexical sort validation`() {
         for (definition in listOf(
             "(define-fun f ((x Real)) Bool (+ x 1))",
             "(define-fun f ((x Real)) Real (> x 1))",
@@ -195,7 +206,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `nested and zero arity helper references retain lexical fallback`() {
+    fun `nested and zero arity helper references should retain lexical fallback`() {
         for ((definition, assertion) in listOf(
             "(define-fun f ((y Real)) Real (+ y 1))" to "(= (f x) 2)",
             "(define-fun f ((y Real)) Real (+ y 1)) (define-fun g ((y Real)) Real (f y))" to
@@ -216,7 +227,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `unused nonlinear helpers preserve nonincremental session rejection`() {
+    fun `unused nonlinear helpers should preserve nonincremental session rejection`() {
         for (suffix in listOf("(check-sat) (check-sat)", "(check-sat) (assert (= x 2))")) {
             assertFailsWith<UnsupportedSmtException> {
                 SmtLibAdmission.parse(
@@ -228,7 +239,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `cancellation after source exhaustion withholds unused helper admission`() {
+    fun `cancellation after source exhaustion should withhold unused helper admission`() {
         var exhausted = false
         var opens = 0
         val cancellation = Cancellation { exhausted }
@@ -252,7 +263,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `polynomial fallback closes its rejected source before reopening`() {
+    fun `polynomial fallback should close its rejected source before reopening`() {
         val text = "(declare-const x Real) (assert (= (* x x) 2)) (check-sat)"
         var opens = 0
         var firstClosed = false
@@ -263,7 +274,9 @@ class SmtLibAdmissionTest {
                 val source = StringCharSource(text)
                 object : CharSource, AutoCloseable {
                     override fun next(): String? = source.next()
-                    override fun close() { firstClosed = true }
+                    override fun close() {
+                        firstClosed = true
+                    }
                 }
             } else {
                 assertTrue(firstClosed)
@@ -276,7 +289,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `fallback drains a source without a close contract before reopening`() {
+    fun `fallback should drain a source without a close contract before reopening`() {
         var opens = 0
         var firstExhausted = false
 
@@ -301,7 +314,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `pre cancelled admission does not open a source`() {
+    fun `pre cancelled admission should not open a source`() {
         val input = SmtLibAdmission.parse(
             { error("cancelled admission must not open a source") },
             cancellation = Cancellation { true },
@@ -311,7 +324,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `interrupted admission closes its source without retrying`() {
+    fun `interrupted admission should close its source without retrying`() {
         var stopped = false
         var closed = false
         var opens = 0
@@ -324,7 +337,9 @@ class SmtLibAdmissionTest {
                         stopped = true
                         return "(declare-const x Real)"
                     }
-                    override fun close() { closed = true }
+                    override fun close() {
+                        closed = true
+                    }
                 }
             },
             cancellation = Cancellation { stopped },
@@ -336,7 +351,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `interrupted admission does not drain a non closeable tail`() {
+    fun `interrupted admission should not drain a non closeable tail`() {
         var reads = 0
         var stopped = false
         var opens = 0
@@ -361,7 +376,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `work exhaustion in lexical fallback closes the source without publishing metadata`() {
+    fun `work exhaustion in lexical fallback should close the source without publishing metadata`() {
         var opens = 0
         var closes = 0
         var charged = 0L
@@ -379,7 +394,9 @@ class SmtLibAdmissionTest {
                 )
                 object : CharSource, AutoCloseable {
                     override fun next(): String? = source.next()
-                    override fun close() { closes++ }
+                    override fun close() {
+                        closes++
+                    }
                 }
             },
             cancellation = cancellation,
@@ -392,7 +409,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `lexical fallback rejects an assertion using a later helper`() {
+    fun `lexical fallback should reject an assertion using a later helper`() {
         assertFailsWith<UnsupportedSmtException> {
             SmtLibAdmission.parse(
                 "(assert (= (f 1) 1)) (define-fun f ((x Real)) Real x) (check-sat)",
@@ -401,7 +418,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `integer helper sources retain the linear route`() {
+    fun `integer helper sources should retain the linear route`() {
         val input = SmtLibAdmission.parse(
             "(declare-const x Int) (define-fun f ((y Int)) Int (+ y 1)) (assert (= (f x) 2)) (check-sat)",
         )
@@ -410,7 +427,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `integer helper sorts without integer declarations retain linear admission`() {
+    fun `integer helper sorts without integer declarations should retain linear admission`() {
         val input = SmtLibAdmission.parse(
             "(define-fun f ((n Int)) Int (+ n 1)) (declare-const x Real) " +
                 "(assert (= x (to_real (f 2)))) (check-sat)",
@@ -420,7 +437,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `nonlinear mixed integer sources retain their integer coordinate semantics`() {
+    fun `nonlinear mixed integer sources should retain their integer coordinate semantics`() {
         val input = SmtLibAdmission.parse(
             "(declare-const x Real) (declare-const n Int) (assert (= (* x x) (to_real n))) (check-sat)",
         )
@@ -429,8 +446,9 @@ class SmtLibAdmissionTest {
         assertEquals(mapOf("n" to 0), source.intVarNames)
         assertEquals(mapOf("x" to 0), source.realVarNames)
     }
+
     @Test
-    fun `nonlinear finite sessions reject source changes after a satisfaction query`() {
+    fun `nonlinear finite sessions should reject source changes after a satisfaction query`() {
         val declaration = "(declare-const n Int) (assert (<= 1 n 3)) "
         val suffixes = listOf(
             "(assert (= (* n n) 4)) (check-sat) (assert (= n 3))",
@@ -444,7 +462,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `bounded nonlinear sources do not reinterpret signed numeral symbols`() {
+    fun `bounded nonlinear sources should not reinterpret signed numeral symbols`() {
         val source = "(declare-const x Int) (declare-const y Int) " +
             "(assert (and (<= 1 x 3) (<= 1 y 3) (= (* x y) -2)))"
 
@@ -452,7 +470,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `nonlinear assertion scope excludes later source declarations`() {
+    fun `nonlinear assertion scope should exclude later source declarations`() {
         val source = "(assert (= (* x y) 6)) (declare-const x Int) (declare-const y Int) " +
             "(assert (and (<= 1 x 3) (<= 1 y 3)))"
 
@@ -460,7 +478,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `nonlinear declarations preserve canonical quoted name identity`() {
+    fun `nonlinear declarations should preserve canonical quoted name identity`() {
         val source = "(declare-const x Int) (declare-const |x| Int) " +
             "(assert (and (<= 1 x 3) (<= 1 |x| 3) (= (* x |x|) 6)))"
 
@@ -468,7 +486,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `function admission preserves original declaration identities`() {
+    fun `function admission should preserve original declaration identities`() {
         val input = SmtLibAdmission.parse(
             "(declare-const i Int) (declare-const y Real) (assert (= y (exp (to_real i)))) (check-sat)",
         )
@@ -480,7 +498,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `lexical helpers preserve original function equations`() {
+    fun `lexical helpers should preserve original function equations`() {
         val input = SmtLibAdmission.parse(
             "(declare-const x Real) (define-fun f ((t Real)) Real (exp t)) (assert (= (f x) 2)) (check-sat)",
         )
@@ -492,7 +510,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `numeric conditionals keep inactive log branches outside the source domain`() {
+    fun `numeric conditionals should keep inactive log branches outside the source domain`() {
         val input = SmtLibAdmission.parse(
             "(declare-const b Bool) (assert b) (assert (= (ite b 1 (log 0)) 1)) (check-sat)",
         )
@@ -504,19 +522,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `Boolean conditionals preserve selected branch domain semantics`() {
-        val input = SmtLibAdmission.parse(
-            "(declare-const b Bool) (assert b) (assert (ite b true (= (log 0) 1))) (check-sat)",
-        )
-        val source = assertIs<SmtLibInput.Transcendental>(input).problem
-
-        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK).result
-
-        assertTrue(assertIs<OpenTheoryResult.Sat>(result).assignment.boolValue(0))
-    }
-
-    @Test
-    fun `Boolean simplification cannot erase a required function domain`() {
+    fun `Boolean simplification should not erase a required function domain`() {
         val input = SmtLibAdmission.parse("(assert (or true (= (log 0) 1))) (check-sat)")
         val source = assertIs<SmtLibInput.Transcendental>(input).problem
 
@@ -526,7 +532,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `zero powers retain their original function domain`() {
+    fun `zero powers should retain their original function domain`() {
         val input = SmtLibAdmission.parse("(assert (= (^ (log 0) 0) 1)) (check-sat)")
         val source = assertIs<SmtLibInput.Transcendental>(input).problem
 
@@ -536,7 +542,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `function names shadowed by polynomial helpers keep polynomial source authority`() {
+    fun `function names shadowed by polynomial helpers should keep polynomial source authority`() {
         val input = SmtLibAdmission.parse(
             "(define-fun exp ((t Real)) Real (* t t)) (declare-const x Real) (assert (= (exp x) 2)) (check-sat)",
         )
@@ -545,7 +551,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `source objectives are retained when exact function optimization is unavailable`() {
+    fun `source objectives should be retained when exact function optimization is unavailable`() {
         val input = SmtLibAdmission.parse(
             "(declare-const x Real) (assert (> (exp x) 0)) (minimize (* x x)) (check-sat)",
         )
@@ -558,7 +564,7 @@ class SmtLibAdmissionTest {
     }
 
     @Test
-    fun `function source assumptions retain original Boolean correlation`() {
+    fun `function source assumptions should retain original Boolean correlation`() {
         val input = SmtLibAdmission.parse(
             "(declare-const b Bool) (declare-const x Real) (assert (= (exp x) 2)) (check-sat-assuming (b))",
         )
@@ -569,4 +575,32 @@ class SmtLibAdmissionTest {
         assertTrue(assertIs<OpenTheoryResult.Sat>(result).assignment.boolValue(0))
     }
 
+    @Test
+    fun `mixed polynomial objective admission should preserve exact source coefficients and direction`() {
+        for ((sense, zeroSquare) in ObjectiveSense.entries.flatMap { sense -> listOf(sense to false, sense to true) }) {
+            val direction = if (sense == ObjectiveSense.MINIMIZE) "minimize" else "maximize"
+            val term = if (zeroSquare) "(+ (/ y 10) (* 0 x x))" else "(/ y 10)"
+            val text = """
+                (declare-const i Int) (declare-const x Real) (declare-const y Real)
+                (assert (and (>= i 0) (<= i 1))) (assert (= x 1))
+                (assert (= (* (to_real i) x) y))
+                ($direction (+ (/ 7 3) $term)) (check-sat)
+            """.trimIndent()
+
+            val captured = assertIs<SmtLibInput.Quadratic>(SmtLibAdmission.parse(text))
+
+            assertIs<SmtLibInput.NonlinearInteger>(captured.source)
+            assertEquals(sense, captured.sense)
+            assertEquals(QuadraticCoefficient.of(bigIntOf(7), bigIntOf(3)), captured.objective.constant)
+            assertEquals(
+                listOf(
+                    QuadraticObjectiveTerm(
+                        QuadraticCoefficient.of(bigIntOf(1), bigIntOf(10)),
+                        QuadraticVariable.Real(SourceRealId(1)),
+                    ),
+                ),
+                captured.objective.terms,
+            )
+        }
+    }
 }

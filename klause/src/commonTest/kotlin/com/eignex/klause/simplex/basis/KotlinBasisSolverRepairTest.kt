@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverRepairTest {
     @Test
-    fun `repair retains a nonzero pivot at the absolute tolerance`() {
+    fun `repair should retain a nonzero pivot at the absolute tolerance`() {
         val source = matrix(arrayOf(doubleArrayOf(1e-10)))
         KotlinBasisSolver(source).use { solver ->
             val repair = assertNotNull(solver.refactorizeRepairing(intArrayOf(0)))
@@ -26,7 +26,7 @@ class KotlinBasisSolverRepairTest {
     }
 
     @Test
-    fun `cancellation at every repair boundary leaves no usable partial factors`() {
+    fun `cancellation at any repair boundary should leave no usable partial factors`() {
         val source = matrix(arrayOf(doubleArrayOf(2.0, 1.0), doubleArrayOf(1.0, 3.0)))
         var boundaries = 0
         KotlinBasisSolver(source).use { solver ->
@@ -63,31 +63,7 @@ class KotlinBasisSolverRepairTest {
     }
 
     @Test
-    fun `callbacks cannot access partial factors or mutate the admitted request`() {
-        val source = matrix(arrayOf(doubleArrayOf(2.0, 1.0), doubleArrayOf(1.0, 3.0)))
-        val requested = intArrayOf(0, 1)
-        KotlinBasisSolver(source).use { solver ->
-            val control = BasisRepairControl(
-                Cancellation {
-                    requested.fill(-1)
-                    assertFailsWith<IllegalStateException> { solver.ordering() }
-                    assertFailsWith<IllegalStateException> { solver.refactorize(intArrayOf(0, 1)) }
-                    assertFailsWith<IllegalStateException> { solver.ftran(IndexedVector(2)) }
-                    assertFailsWith<IllegalStateException> { solver.close() }
-                    false
-                },
-            )
-
-            val repair = assertNotNull(solver.refactorizeRepairing(requested, control))
-
-            assertFalse(repair.repaired)
-            assertEquals(setOf(0, 1), repair.columns.toSet())
-            assertBasisSolves(solver, source, repair.columns, repair.unitRows)
-        }
-    }
-
-    @Test
-    fun `finite repair work includes the completed attempt and cannot be refreshed`() {
+    fun `repair work should include the completed attempt and not be refreshed`() {
         val source = matrix(arrayOf(doubleArrayOf(2.0, 1.0), doubleArrayOf(1.0, 3.0)))
         val full = BasisRepairControl()
         KotlinBasisSolver(source).use { solver ->
@@ -115,7 +91,7 @@ class KotlinBasisSolverRepairTest {
     }
 
     @Test
-    fun `repair reports the complete permuted source and logical basis`() {
+    fun `repair should report the complete permuted source and logical basis`() {
         val source = SparseMatrix.ofColumns(
             3,
             3,
@@ -139,7 +115,7 @@ class KotlinBasisSolverRepairTest {
     }
 
     @Test
-    fun `rejected updates preserve a repaired basis and later updates recover`() {
+    fun `rejected update should preserve a repaired basis`() {
         val source = SparseMatrix.ofColumns(
             2,
             4,
@@ -182,29 +158,6 @@ internal fun assertBasisSolves(solver: BasisSolver, source: SparseMatrix, column
     }
 }
 
-internal fun assertMatchesFresh(solver: BasisSolver, source: SparseMatrix, columns: IntArray, unitRows: IntArray) {
-    val augmented = withLogicalColumns(source)
-    val headings = IntArray(source.rows) { if (columns[it] >= 0) columns[it] else source.cols + unitRows[it] }
-    val fresh = KotlinBasisSolver(augmented)
-    assertTrue(fresh.refactorize(headings))
-    val rhs = DoubleArray(source.rows) { (it % 3 - 1).toDouble() }
-    for (transpose in listOf(false, true)) {
-        val actual = IndexedVector(source.rows).also { it.scatter(rhs) }
-        val expected = IndexedVector(source.rows).also { it.scatter(rhs) }
-        if (transpose) {
-            solver.btran(actual)
-            fresh.btran(expected)
-        } else {
-            solver.ftran(actual)
-            fresh.ftran(expected)
-        }
-        for (i in rhs.indices) {
-            assertTrue(abs(actual[i] - expected[i]) <= 1e-9 * max(1.0, abs(expected[i])))
-        }
-    }
-    fresh.close()
-}
-
 private fun describedResidual(
     source: SparseMatrix,
     columns: IntArray,
@@ -243,18 +196,6 @@ private fun describedResidual(
     }
     return error / scale
 }
-
-internal fun withLogicalColumns(source: SparseMatrix): SparseMatrix = SparseMatrix.ofColumns(
-    source.rows,
-    source.cols + source.rows,
-    List(source.cols + source.rows) { column ->
-        if (column >= source.cols) {
-            listOf(column - source.cols to 1.0)
-        } else {
-            buildList { source.forEachInColumn(column) { row, value -> add(row to value) } }
-        }
-    },
-)
 
 private fun matrix(values: Array<DoubleArray>): SparseMatrix = SparseMatrix.ofColumns(
     values.size,

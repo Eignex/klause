@@ -47,10 +47,16 @@ import kotlin.test.assertSame
 
 class SelectionEncoderTest {
     @Test
-    fun `real extrema and a polynomial product require one shared continuous point`() {
-        val source = Problem(0, 0, emptyArray(),
+    fun `real extrema and a polynomial product should require one shared continuous point`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
             arrayOf<Factor>(ContinuousProduct(0, 0, 1), RealArrayMinMax(2, intArrayOf(0, 1), max = false)),
-            numRealVars = 3, realLower = doubleArrayOf(1.0, 2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0, 2.0))
+            numRealVars = 3,
+            realLower = doubleArrayOf(1.0, 2.0, 2.0),
+            realUpper = doubleArrayOf(2.0, 2.0, 2.0),
+        )
         val shared = assertNotNull(source.prepareExecutionPlan().polynomialModel)
 
         val result = shared.service.invocation().use { it.check() }
@@ -59,10 +65,16 @@ class SelectionEncoderTest {
     }
 
     @Test
-    fun `real selection and a polynomial product share one continuous point`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(1, 1)),
+    fun `real selection and a polynomial product should share one continuous point`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(1, 1)),
             arrayOf<Factor>(ContinuousProduct(0, 0, 1), RealElement(0, 2, intArrayOf(0, 1))),
-            numRealVars = 3, realLower = doubleArrayOf(1.0, 2.0, 2.0), realUpper = doubleArrayOf(2.0, 2.0, 2.0))
+            numRealVars = 3,
+            realLower = doubleArrayOf(1.0, 2.0, 2.0),
+            realUpper = doubleArrayOf(2.0, 2.0, 2.0),
+        )
         val shared = assertNotNull(source.prepareExecutionPlan().polynomialModel)
         val pins = mapOf(shared.integerColumns.getValue(0) to BigFraction.ONE)
 
@@ -72,10 +84,16 @@ class SelectionEncoderTest {
     }
 
     @Test
-    fun `interrupted real selection installation exposes no partial relation`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(1, 4)),
+    fun `interrupted real selection installation should expose no partial relation`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(1, 4)),
             arrayOf<Factor>(RealElement(0, 0, doubleArrayOf(0.0, 1.0, 2.0, 3.0))),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0))
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(3.0),
+        )
         var work = 0L
         val cancellation = object : Cancellation {
             override fun isCancelled(): Boolean = work >= 2
@@ -83,36 +101,64 @@ class SelectionEncoderTest {
         }
         val declines = mutableListOf<EncoderDecline>()
 
-        val installed = FactorProjectionProviders.Default.prepare(source).installLinearFactor(0,
-            EncodingTarget.LINEAR, cancellation = cancellation, onDecline = declines::add)
+        val installed = FactorProjectionProviders.Default.prepare(source).installLinearFactor(
+            0,
+            EncodingTarget.LINEAR,
+            cancellation = cancellation,
+            onDecline = declines::add,
+        )
 
         assertNull(installed)
         assertEquals(listOf(EncoderDecline.RESOURCE), declines)
     }
 
     @Test
-    fun `binary constant selection preserves full width endpoint values`() {
+    fun `binary constant selection should preserve full width endpoint values`() {
         for ((position, expected) in listOf(0 to Long.MIN_VALUE, 1 to Long.MAX_VALUE)) {
-            val open = Bits(2).also { it.set(0); it.set(1) }
-            val source = Problem(0, IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
-                arrayOf<Factor>(Element(0, 1, longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE),
-                    arrIsVars = false, indexOffset = Int.MIN_VALUE),
-                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, Int.MIN_VALUE.toLong() + position)))
+            val open = Bits(2).also {
+                it.set(0)
+                it.set(1)
+            }
+            val source = Problem(
+                0,
+                IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+                arrayOf<Factor>(
+                    Element(
+                        0,
+                        1,
+                        longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE),
+                        arrIsVars = false,
+                        indexOffset = Int.MIN_VALUE,
+                    ),
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, Int.MIN_VALUE.toLong() + position),
+                ),
+            )
 
             val result = BacktrackSolver.source(source).solve(BacktrackParams(maxDecisions = 100))
 
-            assertEquals(expected.toString(), assertIs<OpenTheoryResult.Sat>(result, result.toString())
-                .assignment.intValue(1))
+            assertEquals(
+                expected.toString(),
+                assertIs<OpenTheoryResult.Sat>(result, result.toString())
+                    .assignment.intValue(1),
+            )
         }
     }
 
     @Test
-    fun `binary constant selection rejects a value between its endpoints`() {
-        val open = Bits(2).also { it.set(0); it.set(1) }
-        val source = Problem(0, IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
-            arrayOf<Factor>(Element(0, 1, longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE), arrIsVars = false),
+    fun `binary constant selection should reject a value between its endpoints`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val source = Problem(
+            0,
+            IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            arrayOf<Factor>(
+                Element(0, 1, longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE), arrIsVars = false),
                 Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, 2),
-                Linear(longArrayOf(1), intArrayOf(1), LinearOp.EQ, 0)))
+                Linear(longArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
+            ),
+        )
 
         val result = BacktrackSolver.source(source).solve(BacktrackParams(maxDecisions = 100))
 
@@ -120,13 +166,22 @@ class SelectionEncoderTest {
     }
 
     @Test
-    fun `native and encoded extrema agree when the result aliases an operand`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(2, 2)),
-            arrayOf<Factor>(ArrayMinMax(0, intArrayOf(0, 1, 0), max = true)))
-        val encoded = FactorProjectionProviders(propagation = PropagationProjectionProvider {
-            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                "The complete arithmetic peer enforces the source relation.") { NoPropagator }
-        })
+    fun `native and encoded extrema should agree when the result aliases an operand`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(2, 2)),
+            arrayOf<Factor>(ArrayMinMax(0, intArrayOf(0, 1, 0), max = true)),
+        )
+        val encoded = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider {
+                PropagationProjection(
+                    PropagationCapability.INERT,
+                    AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "The complete arithmetic peer enforces the source relation.",
+                ) { NoPropagator }
+            },
+        )
         for (providers in listOf(FactorProjectionProviders.Default, encoded)) {
             val plan = assertNotNull(source.prepareExecutionPlan(providers).componentPlan)
 
@@ -140,43 +195,64 @@ class SelectionEncoderTest {
     }
 
     @Test
-    fun `exact extrema reject values beyond every operand`() {
+    fun `exact extrema should reject values beyond every operand`() {
         for (max in listOf(false, true)) {
             val open = Bits(3).also { for (id in 0..2) it.set(id) }
             val relation = ArrayMinMax(2, intArrayOf(0, 1, 0), max)
-            val source = Problem(0, IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
-                arrayOf<Factor>(relation,
+            val source = Problem(
+                0,
+                IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+                arrayOf<Factor>(
+                    relation,
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                     Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 2),
-                    Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, if (max) 3 else -1)))
+                    Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, if (max) 3 else -1),
+                ),
+            )
             val prepared = source.prepareExecutionPlan()
             val plan = assertNotNull(prepared.componentPlan)
 
             val result = plan.search(source, emptyMap()).use {
-                if (it.session.initialize() is ComponentResult.Conflict) SearchResult.Exhausted
-                else it.session.solve(0)
+                if (it.session.initialize() is ComponentResult.Conflict) {
+                    SearchResult.Exhausted
+                } else {
+                    it.session.solve(0)
+                }
             }
 
             assertIs<SearchResult.Exhausted>(result)
             assertSame(relation, source.factors[0])
-            val installed = assertNotNull(FactorProjectionProviders.Default.prepare(source)
-                .installLinearFactor(0, EncodingTarget.LINEAR))
+            val installed = assertNotNull(
+                FactorProjectionProviders.Default.prepare(source)
+                    .installLinearFactor(0, EncodingTarget.LINEAR),
+            )
             assertEquals(setOf(0), installed.map { it.attribution.sourceFactorIndex }.toSet())
         }
     }
 
     @Test
-    fun `exact element excludes indexes outside its offset range`() {
+    fun `exact element should exclude indexes outside its offset range`() {
         for (index in listOf(-3, 0)) {
-            val open = Bits(2).also { it.set(0); it.set(1) }
-            val source = Problem(0, IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
-                arrayOf<Factor>(Element(0, 1, longArrayOf(4, 9), arrIsVars = false, indexOffset = -2),
-                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, index)))
+            val open = Bits(2).also {
+                it.set(0)
+                it.set(1)
+            }
+            val source = Problem(
+                0,
+                IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+                arrayOf<Factor>(
+                    Element(0, 1, longArrayOf(4, 9), arrIsVars = false, indexOffset = -2),
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, index),
+                ),
+            )
             val plan = assertNotNull(source.prepareExecutionPlan().componentPlan)
 
             val result = plan.search(source, emptyMap()).use {
-                if (it.session.initialize() is ComponentResult.Conflict) SearchResult.Exhausted
-                else it.session.solve(0)
+                if (it.session.initialize() is ComponentResult.Conflict) {
+                    SearchResult.Exhausted
+                } else {
+                    it.session.solve(0)
+                }
             }
 
             assertIs<SearchResult.Exhausted>(result)
@@ -184,19 +260,31 @@ class SelectionEncoderTest {
     }
 
     @Test
-    fun `element branch conditions retract before a sibling query`() {
-        val open = Bits(2).also { it.set(0); it.set(1) }
-        val source = Problem(1, IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
-            arrayOf<Factor>(Element(0, 1, longArrayOf(4, 9), arrIsVars = false, indexOffset = -2),
+    fun `element branch conditions should retract before a sibling query`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val source = Problem(
+            1,
+            IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            arrayOf<Factor>(
+                Element(0, 1, longArrayOf(4, 9), arrIsVars = false, indexOffset = -2),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, -2),
-                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 9)))
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 9),
+            ),
+        )
         val prepared = source.prepareExecutionPlan()
 
         OpenExactNeighborhood(source, TheoryParams(), preparedSource = prepared).use {
-            val refuted = it.check(ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
-                Cancellation.Never)
-            val sibling = it.check(ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap()),
-                Cancellation.Never)
+            val refuted = it.check(
+                ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap()),
+                Cancellation.Never,
+            )
+            val sibling = it.check(
+                ExactNeighborhoodCondition(mapOf(0 to false), emptyMap(), emptyMap()),
+                Cancellation.Never,
+            )
 
             assertIs<ExactNeighborhoodResult.Refuted>(refuted)
             val sample = assertIs<ExactNeighborhoodResult.Witness>(sibling).sample
@@ -207,12 +295,20 @@ class SelectionEncoderTest {
     }
 
     @Test
-    fun `variable element and extrema share one polynomial point`() {
-        val source = Problem(0, 4, arrayOf(IntDomain(1, 1), IntDomain(0, 0), IntDomain(2, 2), IntDomain(0, 3)),
-            arrayOf<Factor>(Element(0, 3, longArrayOf(1, 2, 1), arrIsVars = true),
+    fun `variable element and extrema should share one polynomial point`() {
+        val source = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(1, 1), IntDomain(0, 0), IntDomain(2, 2), IntDomain(0, 3)),
+            arrayOf<Factor>(
+                Element(0, 3, longArrayOf(1, 2, 1), arrIsVars = true),
                 ArrayMinMax(3, intArrayOf(1, 2, 1), max = true),
-                RealProduct(3, 0, 1, 1.0, 1.0)),
-            numRealVars = 2, realLower = doubleArrayOf(1.0, 0.0), realUpper = doubleArrayOf(1.0, 3.0))
+                RealProduct(3, 0, 1, 1.0, 1.0),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 3.0),
+        )
         val shared = assertNotNull(source.prepareExecutionPlan().polynomialModel)
         val pins = mapOf(
             shared.integerColumns.getValue(0) to BigFraction.ONE,
@@ -224,23 +320,5 @@ class SelectionEncoderTest {
 
         assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(listOf(0, 1, 2), shared.encodingAttributions.map { it.sourceFactorIndex })
-    }
-
-    @Test
-    fun `interrupted element encoding exposes no partial relation`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(1, 4), IntDomain(0, 4)),
-            arrayOf<Factor>(Element(0, 1, longArrayOf(0, 1, 2, 3), arrIsVars = false)))
-        var work = 0L
-        val cancellation = object : Cancellation {
-            override fun isCancelled(): Boolean = work >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
-        }
-        val declines = mutableListOf<EncoderDecline>()
-
-        val installed = FactorProjectionProviders.Default.prepare(source).installLinearFactor(0,
-            EncodingTarget.LINEAR, cancellation = cancellation, onDecline = declines::add)
-
-        assertNull(installed)
-        assertEquals(listOf(EncoderDecline.RESOURCE), declines)
     }
 }

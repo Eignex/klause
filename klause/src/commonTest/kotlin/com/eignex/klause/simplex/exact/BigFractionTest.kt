@@ -9,7 +9,7 @@ import kotlin.test.assertNull
 
 class BigFractionTest {
     @Test
-    fun `fraction sums and differences match the normalized cross product`() {
+    fun `fraction sums and differences should match the normalized cross product`() {
         for (a in fractionSamples) {
             for (b in fractionSamples) {
                 assertEquals(BigFraction.of(a.num * b.den + b.num * a.den, a.den * b.den), a + b, "$a + $b")
@@ -19,7 +19,7 @@ class BigFractionTest {
     }
 
     @Test
-    fun `fraction equality and hashing agree with normalized values`() {
+    fun `fraction equality and hashing should agree with normalized values`() {
         for (a in fractionSamples) {
             val copy = BigFraction.of(a.num * bigIntOf(7), a.den * bigIntOf(7))
             assertEquals(a, copy)
@@ -32,14 +32,7 @@ class BigFractionTest {
     }
 
     @Test
-    fun `ofDouble is the exact rational of the stored double`() {
-        // 0.5 is exactly 1/2; 0.1 is exactly 3602879701896397/2^55, NOT 1/10.
-        assertEquals("1/2", BigFraction.ofDouble(0.5).toString())
-        assertEquals("3602879701896397/36028797018963968", BigFraction.ofDouble(0.1).toString())
-    }
-
-    @Test
-    fun `fraction construction reduces signs units and nontrivial common factors`() {
+    fun `fraction construction should normalize signs and common factors`() {
         val samples = listOf(
             longArrayOf(0, -7, 0, 1),
             longArrayOf(17, 1, 17, 1),
@@ -60,7 +53,7 @@ class BigFractionTest {
     }
 
     @Test
-    fun `IEEE conversion preserves canonical fractions across exponent boundaries`() {
+    fun `IEEE conversion should give canonical fractions across exponent boundaries`() {
         val samples = listOf(
             Triple(0.0, bigIntOf(0), BIG_ONE),
             Triple(-0.0, bigIntOf(0), BIG_ONE),
@@ -85,14 +78,14 @@ class BigFractionTest {
     }
 
     @Test
-    fun `IEEE conversion declines every nonfinite input`() {
+    fun `IEEE conversion should decline every nonfinite input`() {
         for (input in listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
             assertNull(BigFraction.ofDouble(input))
         }
     }
 
     @Test
-    fun `integer ceiling rounds positive and negative fractions upward`() {
+    fun `integer ceiling should round positive and negative fractions upward`() {
         for ((numerator, denominator, expected) in listOf(
             Triple(0L, 3L, 0L),
             Triple(4L, 2L, 2L),

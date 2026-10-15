@@ -17,7 +17,7 @@ import kotlin.test.assertNull
 class TheorySearchComponentTest {
 
     @Test
-    fun `theory check reads shared integer bounds without a CP domain`() {
+    fun `theory check should read shared integer bounds without a CP domain`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
@@ -43,7 +43,7 @@ class TheorySearchComponentTest {
     }
 
     @Test
-    fun `adapter refutes a complete shared Boolean assignment during propagation`() {
+    fun `adapter should refute a complete shared Boolean assignment during propagation`() {
         val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
@@ -65,7 +65,7 @@ class TheorySearchComponentTest {
     }
 
     @Test
-    fun `undecided batch checks can retry without publishing a witness`() {
+    fun `undecided batch checks should retry without publishing a witness`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
@@ -89,7 +89,7 @@ class TheorySearchComponentTest {
     }
 
     @Test
-    fun `semantic bound changes invalidate cached batch assignments`() {
+    fun `semantic bound changes should invalidate cached batch assignments`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
@@ -112,7 +112,7 @@ class TheorySearchComponentTest {
     }
 
     @Test
-    fun `retraction clears batch assignments before checking the restored conditions`() {
+    fun `retraction should clear batch assignments before checking the restored conditions`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
@@ -135,5 +135,4 @@ class TheorySearchComponentTest {
         assertIs<ComponentCheck.Feasible>(session.check())
         assertEquals(10L, session.model().valueOf<Long>(component))
     }
-
 }

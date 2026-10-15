@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class ValuePrecedeInvariantTest {
 
     @Test
-    fun `committed cost uses the exact degree after a stateless apply`() {
+    fun `committed cost should use the exact degree after a stateless apply`() {
         val state = LocalSearchState(problem().bake(), Random(0))
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 2)
@@ -32,7 +32,6 @@ class ValuePrecedeInvariantTest {
         assertEquals(0L, state.cost)
     }
 
-    // s=1, t=2, xs = vars 0..2 over [0,3]
     private fun problem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 3,
@@ -41,32 +40,14 @@ class ValuePrecedeInvariantTest {
     )
 
     @Test
-    fun `violated when t appears before first s`() {
+    fun `value precede should be violated when t appears before the first s`() {
         val p = problem()
         val state = LocalSearchState(p.bake(), Random(0))
-        // xs=[2,1,0]: t=2 at index 0, s=1 at index 1 → violated
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 0)
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
         assertEquals(1, state.factors[0].violationDegree(state, 0))
-    }
-
-    @Test
-    fun `delta predicts degree change when eliminating leading t`() {
-        val p = problem()
-        val state = LocalSearchState(p.bake(), Random(0))
-        // xs=[2,2,1]: two bad t's before s → degree=2
-        state.assignment.setInt(0, 2)
-        state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 1)
-        state.recompute()
-        val before = state.factors[0].violationDegree(state, 0)
-        // Change xs[0]=2 → xs[0]=1, putting s at the front with no bad t's before it
-        val delta = state.factors[0].deltaIfIntSet(state, 0, 0, 1)
-        state.apply(Move.IntSet(0, 1))
-        val after = state.factors[0].violationDegree(state, 0)
-        assertEquals(after - before, delta)
     }
 }

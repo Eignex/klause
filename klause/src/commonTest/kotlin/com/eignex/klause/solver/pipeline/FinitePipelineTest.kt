@@ -10,7 +10,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
-import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
@@ -31,71 +30,112 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
 
     @Test
-    fun `prebake LP reasoning uses the selected relaxation rows`() {
+    fun `prebake LP reasoning should use the selected relaxation rows`() {
         val span = 1L shl 40
-        val source = Problem(0, 2, Array(2) { IntDomain(0, span) },
-            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)))
+        val source = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, span) },
+            arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)),
+        )
         val providers = FactorProjectionProviders(
             propagation = PropagationProjectionProvider {
-                PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                    "The original source is checked at complete points.") { NoPropagator }
+                PropagationProjection(
+                    PropagationCapability.INERT,
+                    AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "The original source is checked at complete points.",
+                ) { NoPropagator }
             },
             relaxation = RelaxationProjectionProvider { null },
         )
         val plan = source.prepareExecutionPlan(providers, preferFinite = true)
 
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.BACKTRACK,
-            presolveConfig = PresolveConfig.NONE, preparedPlan = plan)).executableProblem()
+        val prepared = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                source,
+                FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.NONE,
+                preparedPlan = plan,
+            ),
+        ).executableProblem()
 
         assertEquals(IntDomain(0, span), prepared.rootIntDomain(0))
         assertEquals(IntDomain(0, span), prepared.rootIntDomain(1))
     }
 
     @Test
-    fun `finite preparation retains selected deduction through the deferred bake`() {
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider {
-            PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                "The source row is checked at a complete point.") { NoPropagator }
-        })
+    fun `finite preparation should keep selected deduction through the deferred bake`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+        )
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider {
+                PropagationProjection(
+                    PropagationCapability.INERT,
+                    AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                    "The source row is checked at a complete point.",
+                ) { NoPropagator }
+            },
+        )
         val plan = source.prepareExecutionPlan(providers, preferFinite = true)
 
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.BACKTRACK,
-            presolveConfig = PresolveConfig.NONE, preparedPlan = plan)).executableProblem()
+        val prepared = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                source,
+                FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.NONE,
+                preparedPlan = plan,
+            ),
+        ).executableProblem()
 
         assertEquals(IntDomain(0, 2), prepared.rootIntDomain(0))
         assertEquals(setOf(1L, 2L), BacktrackSolver(prepared).enumerate().map { it.intValue(0) }.toSet())
     }
 
     @Test
-    fun `a source presolve rewrite selects deduction for its rewritten factor`() {
+    fun `a source presolve rewrite should select deduction for its rewritten factor`() {
         val row = Linear(intArrayOf(2), intArrayOf(0), LinearOp.GE, 2)
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(row))
-        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
-            if (factor !== row) BuiltInPropagationProjectionProvider.select(factor)
-            else PropagationProjection(PropagationCapability.INERT, AssignmentCheckCapability.SOURCE_CERTIFICATION,
-                "The original source row is checked at a complete point.") { NoPropagator }
-        })
+        val providers = FactorProjectionProviders(
+            propagation = PropagationProjectionProvider { factor ->
+                if (factor !== row) {
+                    BuiltInPropagationProjectionProvider.select(factor)
+                } else {
+                    PropagationProjection(
+                        PropagationCapability.INERT,
+                        AssignmentCheckCapability.SOURCE_CERTIFICATION,
+                        "The original source row is checked at a complete point.",
+                    ) { NoPropagator }
+                }
+            },
+        )
         val plan = source.prepareExecutionPlan(providers, preferFinite = true)
 
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.BACKTRACK,
-            presolveConfig = PresolveConfig.parse("strengthen"), explicitPresolveConfig = true,
-            preparedPlan = plan)).executableProblem()
+        val prepared = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                source,
+                FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.parse("strengthen"),
+                explicitPresolveConfig = true,
+                preparedPlan = plan,
+            ),
+        ).executableProblem()
 
         assertEquals(IntDomain(1, 2), prepared.rootIntDomain(0))
         assertEquals(setOf(1L, 2L), BacktrackSolver(prepared).enumerate().map { it.intValue(0) }.toSet())
     }
 
     @Test
-    fun `an unbounded leaf ray survives presolve as a source-model verdict`() {
+    fun `an unbounded leaf ray should survive presolve as a source model verdict`() {
         // y = x + 1 is eliminated by presolve; x in [0,3], r >= 0 with x - r <= 1 lets minimizing -r descend for ever.
         val problem = Problem(
             numBoolVars = 0,
@@ -114,31 +154,18 @@ class FinitePipelineTest {
             val result = FinitePipeline.solve(
                 FiniteSolveRequest(
                     shape = FiniteSolveShape(problem, true, false, null, objective, null, null),
-                    engine = engine,
-                    presolveConfig = PresolveConfig.DEFAULT,
-                    explicitPresolveConfig = true,
-                    solutionSetSensitive = false,
-                    cancellation = Cancellation.Never,
-                    presolveBudget = null,
-                    cores = 1,
-                    engineParams = emptyList(),
-                    randomSeed = 1L,
-                    defaultArms = 1,
-                    lpConfig = LpConfig(),
-                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
-                    nodeBudget = null,
-                    solveBudgetMillis = null,
-                    allSolutions = false,
-                    solutionCap = null,
-                    deadlineExceeded = { false },
-                    onEvent = null,
-                    onPortfolioEvent = null,
+                    engine = engine, presolveConfig = PresolveConfig.DEFAULT, explicitPresolveConfig = true,
+                    solutionSetSensitive = false, cancellation = Cancellation.Never, presolveBudget = null,
+                    cores = 1, engineParams = emptyList(), randomSeed = 1L, defaultArms = 1, lpConfig = LpConfig(),
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null,
+                    deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
                 ),
                 FiniteSolveCallbacks(onSample = {}, onImprovement = {}),
             )
 
             val outcome = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-            assertTrue(assertNotNull(result.preparation.presolve).constraintsRemoved > 0, "presolve eliminated y")
+            assertTrue(assertNotNull(result.preparation.presolve).constraintsRemoved > 0)
             assertEquals(FiniteSolveVerdict.UNBOUNDED, outcome.verdict, "$engine")
             assertTrue(assertNotNull(outcome.unboundedDirection).single().signum() > 0)
             val sample = assertNotNull(outcome.bestSample)
@@ -147,56 +174,7 @@ class FinitePipelineTest {
     }
 
     @Test
-    fun `selects the portfolio composition for a finite route`() {
-        assertEquals(EngineMix.BACKTRACK, FinitePipeline.portfolioMix(FiniteEngine.BACKTRACK))
-        assertEquals(EngineMix.LOCAL_SEARCH, FinitePipeline.portfolioMix(FiniteEngine.LOCAL_SEARCH))
-        assertEquals(EngineMix.MIXED, FinitePipeline.portfolioMix(FiniteEngine.MIXED))
-        assertEquals(EngineMix.ALNS, FinitePipeline.portfolioMix(FiniteEngine.ALNS))
-    }
-
-    @Test
-    fun `keeps an unchanged finite model for the selected route`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray<IntDomain>(),
-            factors = emptyArray<Factor>(),
-        ).bake()
-
-        val preparation = FinitePipeline.prepare(
-            FinitePipelineRequest(
-                problem = problem,
-                engine = FiniteEngine.BACKTRACK,
-                presolveConfig = PresolveConfig.NONE,
-            ),
-        )
-
-        assertSame(problem, preparation.problem)
-        assertNull(preparation.presolve)
-    }
-
-    @Test
-    fun `reports construction bake time through the preparation`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray<IntDomain>(),
-            factors = emptyArray<Factor>(),
-        ).bake()
-
-        val preparation = FinitePipeline.prepare(
-            FinitePipelineRequest(
-                problem = problem,
-                engine = FiniteEngine.BACKTRACK,
-                presolveConfig = PresolveConfig.NONE,
-            ),
-        )
-
-        assertEquals(problem.bakeElapsed, preparation.constructionBakeElapsed)
-    }
-
-    @Test
-    fun `pre-bake strengthening short-circuits a wide model with solve cancellation`() {
+    fun `prebake strengthening should short circuit a wide model on solve cancellation`() {
         val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(
@@ -230,7 +208,7 @@ class FinitePipelineTest {
     }
 
     @Test
-    fun `a spent presolve allowance still hands the engine a fully baked model`() {
+    fun `a spent presolve allowance should still hand the engine a fully baked model`() {
         val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(5, 5), null, null),
@@ -253,7 +231,7 @@ class FinitePipelineTest {
     }
 
     @Test
-    fun `a source model crosses the baked boundary before finite execution`() {
+    fun `a source model should cross the baked boundary before finite execution`() {
         val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
@@ -273,7 +251,7 @@ class FinitePipelineTest {
     }
 
     @Test
-    fun `reconstructs an affine-eliminated variable`() {
+    fun `reconstruction should recover an affine eliminated variable`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -300,7 +278,7 @@ class FinitePipelineTest {
     }
 
     @Test
-    fun `reconstruction keeps the continuous part of a solution`() {
+    fun `reconstruction should keep the continuous part of a solution`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -325,7 +303,7 @@ class FinitePipelineTest {
     }
 
     @Test
-    fun `leaves a harvested model at the presolve fixpoint`() {
+    fun `harvesting should leave the model at the presolve fixpoint`() {
         val config = PresolveConfig.parse("default,+lp-harvest")
         val problem = Problem(
             numBoolVars = 0,

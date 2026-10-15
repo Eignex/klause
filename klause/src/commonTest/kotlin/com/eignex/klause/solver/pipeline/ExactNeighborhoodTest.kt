@@ -16,17 +16,28 @@ import kotlin.test.assertTrue
 
 class ExactNeighborhoodTest {
     @Test
-    fun `root Boolean copying resumes without checking a partial center`() {
+    fun `root Boolean copying should resume without checking a partial center`() {
         val visited = ArrayList<Int>()
         val conditions = ArrayList<ExactNeighborhoodCondition>()
-        val search = ExactNeighborhood(3, emptyList(), ExactNeighborhoodCompletion { condition, _ ->
-            conditions += condition
-            ExactNeighborhoodResult.Refuted
-        }, coordinateValues = { emptyList() }, maximumMoves = 1,
-            prepareBooleanCenter = { true }, rootBooleanValue = { variable ->
+        val search = ExactNeighborhood(
+            3,
+            emptyList(),
+            ExactNeighborhoodCompletion { condition, _ ->
+                conditions += condition
+                ExactNeighborhoodResult.Refuted
+            },
+            coordinateValues = { emptyList() },
+            maximumMoves = 1,
+            prepareBooleanCenter = { true },
+            rootBooleanValue = { variable ->
                 visited += variable
-                when (variable) { 0 -> true; 1 -> false; else -> null }
-            })
+                when (variable) {
+                    0 -> true
+                    1 -> false
+                    else -> null
+                }
+            },
+        )
 
         assertFalse(search.advance(Cancellation.Never, 1))
         assertTrue(conditions.isEmpty())
@@ -38,14 +49,24 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `cancellation withholds a partially copied Boolean center`() {
+    fun `cancellation should withhold a partially copied Boolean center`() {
         var cancelled = false
         var checks = 0
-        val search = ExactNeighborhood(2, emptyList(), ExactNeighborhoodCompletion { _, _ ->
-            checks++
-            ExactNeighborhoodResult.Refuted
-        }, coordinateValues = { emptyList() }, maximumMoves = 1,
-            prepareBooleanCenter = { true }, rootBooleanValue = { cancelled = true; true })
+        val search = ExactNeighborhood(
+            2,
+            emptyList(),
+            ExactNeighborhoodCompletion { _, _ ->
+                checks++
+                ExactNeighborhoodResult.Refuted
+            },
+            coordinateValues = { emptyList() },
+            maximumMoves = 1,
+            prepareBooleanCenter = { true },
+            rootBooleanValue = {
+                cancelled = true
+                true
+            },
+        )
 
         assertFalse(search.advance(Cancellation { cancelled }, 10))
 
@@ -55,13 +76,20 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `Boolean center preparation cannot exceed the instruction allowance`() {
+    fun `Boolean center preparation should not exceed the instruction allowance`() {
         var checks = 0
-        val search = ExactNeighborhood(2, emptyList(), ExactNeighborhoodCompletion { _, _ ->
-            checks++
-            ExactNeighborhoodResult.Refuted
-        }, coordinateValues = { emptyList() }, maximumInstructions = 1,
-            prepareBooleanCenter = { true }, rootBooleanValue = { true })
+        val search = ExactNeighborhood(
+            2,
+            emptyList(),
+            ExactNeighborhoodCompletion { _, _ ->
+                checks++
+                ExactNeighborhoodResult.Refuted
+            },
+            coordinateValues = { emptyList() },
+            maximumInstructions = 1,
+            prepareBooleanCenter = { true },
+            rootBooleanValue = { true },
+        )
 
         assertTrue(search.advance(Cancellation.Never, 10))
 
@@ -71,13 +99,19 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `declined root preparation retains incomplete move accounting`() {
+    fun `declined root preparation should keep incomplete move accounting`() {
         var checks = 0
-        val search = ExactNeighborhood(1, emptyList(), ExactNeighborhoodCompletion { _, _ ->
-            checks++
-            ExactNeighborhoodResult.Refuted
-        }, coordinateValues = { emptyList() }, maximumMoves = 1,
-            prepareBooleanCenter = { false })
+        val search = ExactNeighborhood(
+            1,
+            emptyList(),
+            ExactNeighborhoodCompletion { _, _ ->
+                checks++
+                ExactNeighborhoodResult.Refuted
+            },
+            coordinateValues = { emptyList() },
+            maximumMoves = 1,
+            prepareBooleanCenter = { false },
+        )
 
         assertTrue(search.advance(Cancellation.Never, 10))
 
@@ -87,10 +121,14 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `a refuted neighborhood does not refute the source`() {
-        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO),
+    fun `a refuted neighborhood should not refute the source`() {
+        val search = ExactNeighborhood(
+            0,
+            listOf(BigFraction.ZERO),
             ExactNeighborhoodCompletion { _, _ -> ExactNeighborhoodResult.Refuted },
-            coordinateValues = { emptyList() }, maximumMoves = 3)
+            coordinateValues = { emptyList() },
+            maximumMoves = 3,
+        )
 
         search.advance(Cancellation.Never, 3)
 
@@ -99,12 +137,18 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `a zero move allowance never invokes completion`() {
+    fun `a zero move allowance should never invoke completion`() {
         var checks = 0
-        val search = ExactNeighborhood(0, emptyList(), ExactNeighborhoodCompletion { _, _ ->
-            checks++
-            ExactNeighborhoodResult.Refuted
-        }, coordinateValues = { emptyList() }, nodeBudget = NodeBudget(0).allowance)
+        val search = ExactNeighborhood(
+            0,
+            emptyList(),
+            ExactNeighborhoodCompletion { _, _ ->
+                checks++
+                ExactNeighborhoodResult.Refuted
+            },
+            coordinateValues = { emptyList() },
+            nodeBudget = NodeBudget(0).allowance,
+        )
 
         search.advance(Cancellation.Never, 10)
 
@@ -113,12 +157,18 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `failed coordinate repairs widen retained search windows across slices`() {
+    fun `failed coordinate repairs should widen retained search windows across slices`() {
         val windows = ArrayList<ExactNeighborhoodCondition>()
-        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { query, _ ->
-            windows += query
-            ExactNeighborhoodResult.Refuted
-        }, coordinateValues = { emptyList() }, maximumMoves = 8)
+        val search = ExactNeighborhood(
+            0,
+            listOf(BigFraction.ZERO),
+            ExactNeighborhoodCompletion { query, _ ->
+                windows += query
+                ExactNeighborhoodResult.Refuted
+            },
+            coordinateValues = { emptyList() },
+            maximumMoves = 8,
+        )
 
         search.advance(Cancellation.Never, 3)
         search.advance(Cancellation.Never, 5)
@@ -129,19 +179,30 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `heuristic optimization retains exact improvements without optimum authority`() {
+    fun `heuristic optimization should keep exact improvements without optimum authority`() {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val cutoffs = ArrayList<BigFraction?>()
         var checks = 0L
-        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { query, _ ->
-            cutoffs += query.cutoff
-            ExactNeighborhoodResult.Witness(Sample(booleanArrayOf(), longArrayOf(10 - checks++)))
-        }, objective, coordinateValues = { listOf(BigFraction.ofLong(it.intValue(0))) }, maximumMoves = 3)
+        val search = ExactNeighborhood(
+            0,
+            listOf(BigFraction.ZERO),
+            ExactNeighborhoodCompletion { query, _ ->
+                cutoffs += query.cutoff
+                ExactNeighborhoodResult.Witness(Sample(booleanArrayOf(), longArrayOf(10 - checks++)))
+            },
+            objective,
+            coordinateValues = { listOf(BigFraction.ofLong(it.intValue(0))) },
+            maximumMoves = 3,
+        )
 
         search.advance(Cancellation.Never, 3)
 
         assertEquals(listOf(null, BigFraction.ofLong(10), BigFraction.ofLong(9)), cutoffs)
-        assertEquals(8.0, assertIs<MinimizeResult.BestFound>(
-            search.minimizeResult(TerminationReason.BudgetExhausted)).objective)
+        assertEquals(
+            8.0,
+            assertIs<MinimizeResult.BestFound>(
+                search.minimizeResult(TerminationReason.BudgetExhausted),
+            ).objective,
+        )
     }
 }

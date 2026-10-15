@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 class LastConflictTest {
 
     @Test
-    fun `last-conflict prioritises the failing variable on the next pick`() {
+    fun `last-conflict should prioritise the failing variable on the next pick`() {
         val problem = Problem(
             numBoolVars = 5,
             numIntVars = 0,
@@ -33,7 +33,7 @@ class LastConflictTest {
     }
 
     @Test
-    fun `last-conflict clears its pending var on successful commit`() {
+    fun `last-conflict should clear its pending var on a successful commit`() {
         val problem = Problem(
             numBoolVars = 5,
             numIntVars = 0,

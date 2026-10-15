@@ -14,7 +14,7 @@ import kotlin.test.assertIs
 class ClausePropagatorTest {
 
     @Test
-    fun `two of three false forces last to true`() {
+    fun `clause with two of three literals false should force the last to true`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -30,7 +30,7 @@ class ClausePropagatorTest {
     }
 
     @Test
-    fun `all literals false yields conflict`() {
+    fun `clause with all literals false should yield conflict`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -42,5 +42,4 @@ class ClausePropagatorTest {
         val r = problem.propagate(Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false)))
         assertIs<PropagationResult.Unsat>(r)
     }
-
 }

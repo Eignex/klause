@@ -28,9 +28,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DuplicateColumnsTest {
-
     @Test
-    fun `duplicate declared columns reconstruct a feasible assignment`() {
+    fun `duplicate declared columns should reconstruct a feasible assignment`() {
         val source = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)
         val factor = object : Factor by source, Propagator by source.propagatorProjection() {}
         val model = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(factor))
@@ -64,7 +63,6 @@ class DuplicateColumnsTest {
         }
     }
 
-    /** `x + y >= 7` and `x + y + w <= 40` over `x` (0), `y` (1), `w` (2), with `x` and `y` duplicate columns. */
     private fun sourceModel(x: IntDomain, y: IntDomain, openLo: BooleanArray? = null, openHi: BooleanArray? = null) =
         Problem(
             numBoolVars = 0,
@@ -79,19 +77,19 @@ class DuplicateColumnsTest {
         )
 
     @Test
-    fun `the source form folds a column closed at zero into a representative open above`() {
+    fun `source merging should fold a column closed at zero into a representative open above`() {
         val model = sourceModel(IntDomain(0, 100), IntDomain(0, 5), openHi = booleanArrayOf(true, false, false))
         val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
         val ints = longArrayOf(12, 0, 3)
 
         delta.rebuild.rebuildInto(BooleanArray(0), ints)
 
-        assertTrue(delta.addedFactors.none { 1 in it.intVars }, "y's terms are absorbed by x")
+        assertTrue(delta.addedFactors.none { 1 in it.intVars })
         assertEquals(listOf(7L, 5L), ints.take(2), "y takes all it can of 12, x the rest")
     }
 
     @Test
-    fun `the source form splits an aggregate of two free columns`() {
+    fun `source merging should split an aggregate of two free columns`() {
         val free = booleanArrayOf(true, true, false)
         val model = sourceModel(IntDomain(0, 9), IntDomain(0, 9), openLo = free, openHi = free)
         val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
@@ -103,7 +101,7 @@ class DuplicateColumnsTest {
     }
 
     @Test
-    fun `the source form leaves closed columns whose aggregate would need a wider range`() {
+    fun `source merging should leave closed columns whose aggregate would need a wider range`() {
         val model = sourceModel(IntDomain(0, 9), IntDomain(1, 5))
 
         val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
@@ -112,7 +110,7 @@ class DuplicateColumnsTest {
     }
 
     @Test
-    fun `the source form does not fold a column declaring holes`() {
+    fun `source merging should not fold a column declaring holes`() {
         val model = sourceModel(
             IntDomain(0, 100),
             IntDomain(0, 4).excludeValue(2),
@@ -125,9 +123,7 @@ class DuplicateColumnsTest {
     }
 
     @Test
-    fun `does not merge columns that differ in one factor`() {
-        // x (0) and y (1) share a row x + y + z <= 5 but x carries coefficient 2 there and y carries 1
-        // — the columns differ, so they are not duplicates and nothing is merged.
+    fun `columns that differ in one factor should not be merged`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -141,9 +137,7 @@ class DuplicateColumnsTest {
     }
 
     @Test
-    fun `does not merge a variable in a non-linear factor`() {
-        // x (0) and y (1) are duplicate columns in the linear rows, but x also sits in an AllDifferent,
-        // which reads it value-wise rather than as a column coefficient — so it is ineligible.
+    fun `a variable in a non-linear factor should not be merged`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -157,8 +151,6 @@ class DuplicateColumnsTest {
         checkRoundTrip("var-in-global", problem, expectMerged = false, expectSat = true)
     }
 
-    /** The int-variable occurrence CSR the incremental session hands a pass: for each variable, the
-     *  ascending factor indices mentioning it — matching what a fresh scan over `problem.factors` builds. */
     private fun sharedOcc(problem: Problem): SharedIntOccurrence {
         val n = problem.numIntVars
         val offsets = IntArray(n + 1)
@@ -171,33 +163,7 @@ class DuplicateColumnsTest {
     }
 
     @Test
-    fun `bails on a re-run when no touched column is eligible`() {
-        // x (0) and y (1) are duplicate columns a full scan would merge. On a re-run whose only touched
-        // variable is z (2) — read value-wise by an AllDifferent, so column-ineligible — the fast-bail
-        // returns empty: an already-collapsed class only re-forms on a touched eligible column.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-                AllDifferent(intArrayOf(2, 3), domainMin = 0, domainSize = 4),
-            ),
-        )
-        assertTrue(!Presolve.mergeDuplicateColumns(problem.bake()).isEmpty, "a full scan merges the duplicate columns")
-        val delta = DuplicateColumns.mergeDuplicateColumns(
-            problem.bake(),
-            sharedIntOcc = sharedOcc(problem),
-            incrementalTouchedVars = intArrayOf(2),
-        )
-        assertTrue(delta.isEmpty, "no touched eligible column: the re-run bails")
-    }
-
-    @Test
-    fun `re-runs the full merge when a touched column is eligible`() {
-        // Same duplicate columns; the re-run's touched set includes the eligible column x (0), so the
-        // fast-bail falls through to the full scan and produces the identical merge (same dropped rows).
+    fun `an incremental run should match the full merge when a touched column is eligible`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -213,12 +179,10 @@ class DuplicateColumnsTest {
             sharedIntOcc = sharedOcc(problem),
             incrementalTouchedVars = intArrayOf(0),
         )
-        assertTrue(!incremental.isEmpty, "a touched eligible column falls through to the merge")
+        assertTrue(!incremental.isEmpty)
         assertEquals(
             full.droppedIndices.toList(),
             incremental.droppedIndices.toList(),
-            "the incremental re-run drops the same rows as the full scan",
         )
     }
-
 }

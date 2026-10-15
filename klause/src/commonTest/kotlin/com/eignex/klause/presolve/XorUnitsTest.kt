@@ -20,7 +20,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class XorUnitsTest {
-
     private fun units(problem: Problem): List<Int> =
         problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }.map { it.literals[0] }
 
@@ -30,8 +29,7 @@ class XorUnitsTest {
     }
 
     @Test
-    fun `elimination across rows derives a unit no single xor shows`() {
-        // x0 ⊕ x1 = 0 and x0 ⊕ x1 ⊕ x2 = 1: neither row is a unit, but their sum forces x2 = true.
+    fun `elimination across rows should derive a unit no single xor shows`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -42,12 +40,11 @@ class XorUnitsTest {
             ),
         )
         val out = derived(problem)
-        assertEquals(listOf(Lit.make(2, true)), units(out), "the cross-row residue forces x2 = true")
+        assertEquals(listOf(Lit.make(2, true)), units(out))
     }
 
     @Test
-    fun `a contradictory system refutes the model`() {
-        // x0 = true and x0 = false reduce to 0 = 1.
+    fun `a contradictory xor system should refute the model`() {
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 0,
@@ -62,7 +59,7 @@ class XorUnitsTest {
     }
 
     @Test
-    fun `an equality's parity forces its 0-1 column whatever form its coefficients take`() {
+    fun `an equality parity should force its 0-1 column whatever form its coefficients take`() {
         val wideOdd = parseBigInt("18446744073709551617")
         val wideEven = parseBigInt("36893488147419103232")
         val cases = listOf(
@@ -87,7 +84,6 @@ class XorUnitsTest {
         }
     }
 
-    /** `rows` over 0/1 columns `x0..`, each row `Σ xᵢ + 2·y = rhs` with its own integer `y` open both ways. */
     private fun parityRows(numBinaries: Int, vararg rows: Pair<IntArray, Long>): Problem {
         val numInts = numBinaries + rows.size
         return Problem(
@@ -110,8 +106,7 @@ class XorUnitsTest {
     }
 
     @Test
-    fun `parities of separate integer equalities combine`() {
-        // x0 + x1 is odd and x1 is even, so x0 = 1 and x1 = 0, though neither row alone fixes x0.
+    fun `parities of separate integer equalities should combine`() {
         val problem = parityRows(2, intArrayOf(0, 1) to 1L, intArrayOf(1) to 4L)
 
         val bounds = assertNotNull(XorUnits.deriveXorUnits(problem).bounds)
@@ -120,7 +115,7 @@ class XorUnitsTest {
     }
 
     @Test
-    fun `an odd coefficient on a column wider than 0-1 contributes no parity`() {
+    fun `an odd coefficient on a column wider than 0-1 should contribute no parity`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -132,14 +127,14 @@ class XorUnitsTest {
     }
 
     @Test
-    fun `integer equalities with contradictory parities refute the model`() {
+    fun `integer equalities with contradictory parities should refute the model`() {
         val problem = parityRows(1, intArrayOf(0) to 1L, intArrayOf(0) to 2L)
 
         assertTrue(XorUnits.deriveXorUnits(problem).infeasible)
     }
 
     @Test
-    fun `the pass reaches a fixpoint instead of re-adding present units`() {
+    fun `xor unit derivation should not re-add present units`() {
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 0,
@@ -153,9 +148,7 @@ class XorUnitsTest {
         assertEquals(
             setOf(Lit.make(0, true), Lit.make(1, true)),
             units(once).toSet(),
-            "first run forces both variables",
         )
-        assertTrue(Presolve.deriveXorUnits(once.bake()).isEmpty, "re-running adds no duplicate units")
+        assertTrue(Presolve.deriveXorUnits(once.bake()).isEmpty)
     }
-
 }

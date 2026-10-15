@@ -23,14 +23,18 @@ import kotlin.test.assertNull
 
 class SharedPoolsTest {
     @Test
-    fun `a checked restricted witness can supply a containing query cutoff`() {
+    fun `a checked restricted witness should supply a containing query cutoff`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val model = ModelIdentity.of(source, objective)
         val plan = source.prepareExecutionPlan(objective)
         val consumer = EngineInvocation(plan, model, objective)
-        val producer = EngineInvocation(plan, model, objective,
-            sourceAssumptions = Assumptions(ints = mapOf(0 to 3L)))
+        val producer = EngineInvocation(
+            plan,
+            model,
+            objective,
+            sourceAssumptions = Assumptions(ints = mapOf(0 to 3L)),
+        )
         val sample = Sample(booleanArrayOf(), longArrayOf(3))
         val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(producer, sample, 3.0))
         val exchange = IncumbentExchange.minimizing<Sample>()
@@ -43,14 +47,18 @@ class SharedPoolsTest {
     }
 
     @Test
-    fun `a native witness violating the containing query cannot supply a cutoff`() {
+    fun `a native witness violating the containing query should not supply a cutoff`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val model = ModelIdentity.of(source, objective)
         val plan = source.prepareExecutionPlan(objective)
         val producer = EngineInvocation(plan, model, objective)
-        val consumer = EngineInvocation(plan, model, objective,
-            sourceAssumptions = Assumptions(ints = mapOf(0 to 2L)))
+        val consumer = EngineInvocation(
+            plan,
+            model,
+            objective,
+            sourceAssumptions = Assumptions(ints = mapOf(0 to 2L)),
+        )
         val sample = Sample(booleanArrayOf(), longArrayOf(3))
         val certificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(producer, sample, 3.0))
         val exchange = IncumbentExchange.minimizing<Sample>()
@@ -63,13 +71,19 @@ class SharedPoolsTest {
     }
 
     @Test
-    fun `actual backtrack incumbents use the containing runtime admission`() {
-        val problem = Problem(1, 0, emptyArray(),
-            arrayOf(Cardinality(intArrayOf(Lit.make(0, true)), min = 1, max = 1))).bake()
+    fun `backtrack incumbents should use the containing runtime admission`() {
+        val problem = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf(Cardinality(intArrayOf(Lit.make(0, true)), min = 1, max = 1)),
+        ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(7))
-        val worker = PortfolioBuilder.build(problem,
+        val worker = PortfolioBuilder.build(
+            problem,
             PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.BACKTRACK),
-            objective = objective).single()
+            objective = objective,
+        ).single()
         val exchange = requireNotNull(worker.sharedPools?.solutions)
 
         worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
@@ -78,7 +92,7 @@ class SharedPoolsTest {
     }
 
     @Test
-    fun `an unverified or foreign incumbent cannot supply a pruning cutoff`() {
+    fun `an unverified or foreign incumbent should not supply a pruning cutoff`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
         val foreignSource = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
@@ -93,23 +107,33 @@ class SharedPoolsTest {
         val foreignCertificate = EvidenceCertificate.published(CompletedEnginePublication.Witness(foreign, sample, 7.0))
 
         assertIs<Publication.Indeterminate>(pools.offerSolution(model, sample, 7.0, null))
-        assertIs<Publication.Rejected>(pools.offerSolution(
-            other, sample, 7.0, foreignCertificate, invocation,
-        ))
+        assertIs<Publication.Rejected>(
+            pools.offerSolution(
+                other,
+                sample,
+                7.0,
+                foreignCertificate,
+                invocation,
+            ),
+        )
         assertNull(exchange.current())
         pools.offerSolution(model, sample, 7.0, certificate, invocation)
 
         assertEquals(7.0, exchange.current()?.objective)
     }
+
     @Test
-    fun `direct engine publications pass the built-in pool source checker`() {
+    fun `direct engine publications should pass the built-in pool source checker`() {
         val problem = Problem(
-            numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(),
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
             factors = arrayOf(Cardinality(intArrayOf(Lit.make(0, true)), min = 1, max = 1)),
         ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(7))
         val worker = PortfolioBuilder.build(
-            problem, PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.BACKTRACK),
+            problem,
+            PortfolioScenario(cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.BACKTRACK),
             objective = objective,
         ).single()
 
@@ -120,7 +144,8 @@ class SharedPoolsTest {
             val invocation = EngineInvocation(problem.prepareExecutionPlan(objective), model, objective)
             val falsePoint = Sample(booleanArrayOf(false), LongArray(0))
             val certificate = EvidenceCertificate.published(
-                CompletedEnginePublication.Witness(invocation, falsePoint, 0.0))
+                CompletedEnginePublication.Witness(invocation, falsePoint, 0.0),
+            )
             val rejected = pools.offerSolution(model, falsePoint, 0.0, certificate, invocation)
             assertIs<Publication.Rejected>(rejected)
             assertNull(exchange.current())

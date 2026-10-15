@@ -12,7 +12,7 @@ import kotlin.time.TestTimeSource
 
 class ConditionedQueryScopeTest {
     @Test
-    fun `a condition captures caller buffers before nested queries`() {
+    fun `a condition should capture caller buffers before nested queries`() {
         val pins = mutableMapOf(0 to true)
         val bounds = mutableMapOf(0 to BigFraction.ONE)
         val scope = ConditionedQueryScope(Cancellation.Never)
@@ -20,8 +20,10 @@ class ConditionedQueryScopeTest {
         scope.withCondition(ExactNeighborhoodCondition(pins, bounds, emptyMap()), Cancellation.Never) { outer ->
             pins[0] = false
             bounds.clear()
-            scope.withCondition(ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ONE)),
-                Cancellation.Never) { nested ->
+            scope.withCondition(
+                ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ONE)),
+                Cancellation.Never,
+            ) { nested ->
                 assertEquals(2, nested.size)
                 assertEquals(true, nested.first().bools[0])
                 assertEquals(BigFraction.ONE, nested.first().lower[0])
@@ -31,7 +33,7 @@ class ConditionedQueryScopeTest {
     }
 
     @Test
-    fun `a failed query retracts its conditions and invocation stop`() {
+    fun `a failed query should retract its conditions and invocation stop`() {
         val scope = ConditionedQueryScope(Cancellation.Never)
         val condition = ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap())
         assertFailsWith<IllegalArgumentException> {
@@ -49,7 +51,7 @@ class ConditionedQueryScopeTest {
     }
 
     @Test
-    fun `an expired query deadline retracts before a sibling invocation`() {
+    fun `an expired query deadline should retract before a sibling invocation`() {
         val clock = TestTimeSource()
         val scope = ConditionedQueryScope(Cancellation.until(clock.markNow() + 10.seconds))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
@@ -67,7 +69,7 @@ class ConditionedQueryScopeTest {
     }
 
     @Test
-    fun `a sibling deadline cannot renew the containing deadline`() {
+    fun `a sibling deadline should not renew the containing deadline`() {
         val clock = TestTimeSource()
         val deadline = clock.markNow() + 2.seconds
         val scope = ConditionedQueryScope(Cancellation.until(deadline))
@@ -81,7 +83,7 @@ class ConditionedQueryScopeTest {
     }
 
     @Test
-    fun `closing a query owner stops native work and rejects another query`() {
+    fun `closing a query owner should stop native work and reject another query`() {
         val scope = ConditionedQueryScope(Cancellation.Never)
 
         scope.close()

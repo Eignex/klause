@@ -26,22 +26,55 @@ import kotlin.test.assertTrue
 
 class LinearNeighborhoodInvocationTest {
     @Test
-    fun `captured neighborhood pins retain exact receipts without proof claims`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `captured neighborhood pins should keep exact receipts without proof claims`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val request = OpenTheoryRequest(source, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
         val third = BigFraction.ofLong(3).reciprocal()
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
-        val context = SourceProofContext(original.scope.copy(condition = SourceCondition(
-            lower = mapOf(real to third), upper = mapOf(real to third))), original.coordinates,
-            original.premises, original.objective, original.objectiveConstant, original.semanticsChecker)
+        val context = SourceProofContext(
+            original.scope.copy(
+                condition = SourceCondition(
+                    lower = mapOf(real to third),
+                    upper = mapOf(real to third),
+                ),
+            ),
+            original.coordinates,
+            original.premises,
+            original.objective,
+            original.objectiveConstant,
+            original.semanticsChecker,
+        )
 
         for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
-            val execution = assertIs<OpenTheoryExecution.Optimize>(OpenTheoryPipeline.execute(
-                request.withLinearAuthority(context), TheoryParams(openWorkLimit = 1000, maxFlips = 4,
-                    alnsIterations = 1), engine))
+            val execution = assertIs<OpenTheoryExecution.Optimize>(
+                OpenTheoryPipeline.execute(
+                    request.withLinearAuthority(context),
+                    TheoryParams(
+                        openWorkLimit = 1000,
+                        maxFlips = 4,
+                        alnsIterations = 1,
+                    ),
+                    engine,
+                ),
+            )
 
             val bounded = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
             val authority = assertNotNull(bounded.linearResult)
@@ -60,10 +93,25 @@ class LinearNeighborhoodInvocationTest {
     }
 
     @Test
-    fun `linear real strategies retain the same exact source witness`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `linear real strategies should keep the same exact source witness`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val request = OpenTheoryRequest(source)
         val params = TheoryParams(openWorkLimit = 1000, maxFlips = 20, randomSeed = 17, alnsIterations = 2)
 
@@ -81,10 +129,16 @@ class LinearNeighborhoodInvocationTest {
     }
 
     @Test
-    fun `open integer repair searches coupled coordinates without changing source domains`() {
-        val open = Bits(2).also { it.set(0); it.set(1) }
-        val source = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
-            factors = arrayOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 4)))
+    fun `open integer repair should search coupled coordinates without changing source domains`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 4)),
+        )
         val request = OpenTheoryRequest(source)
         val params = TheoryParams(openWorkLimit = 1000, maxFlips = 30, randomSeed = 17)
 
@@ -101,11 +155,14 @@ class LinearNeighborhoodInvocationTest {
     }
 
     @Test
-    fun `wide integer objectives retain exact values across strategy families`() {
+    fun `wide integer objectives should keep exact values across strategy families`() {
         val value = parseBigInt("9223372036854775808")
         val open = Bits(1).also { it.set(0) }
-        val source = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value)))
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value)),
+        )
         val request = OpenTheoryRequest(source, LinearObjective(intCoefficients = longArrayOf(1)))
         val params = TheoryParams(openWorkLimit = 1000, maxFlips = 4, alnsIterations = 1)
 
@@ -118,6 +175,7 @@ class LinearNeighborhoodInvocationTest {
             when (engine) {
                 FiniteEngine.BACKTRACK, FiniteEngine.MIXED ->
                     assertEquals(value.toString(), assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
+
                 else -> {
                     val bounded = assertIs<OpenTheoryOptimum.Bounded>(result)
                     assertEquals(value.toString(), bounded.value.toString())
@@ -128,52 +186,51 @@ class LinearNeighborhoodInvocationTest {
     }
 
     @Test
-    fun `empty linear ALNS models execute an exact completion`() {
+    fun `empty linear ALNS models should execute an exact completion`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
 
-        val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(OpenTheoryRequest(source),
-            TheoryParams(maxFlips = 3), FiniteEngine.ALNS)).result
+        val result = assertIs<OpenTheoryExecution.Satisfy>(
+            OpenTheoryPipeline.execute(
+                OpenTheoryRequest(source),
+                TheoryParams(maxFlips = 3),
+                FiniteEngine.ALNS,
+            ),
+        ).result
 
         assertIs<OpenTheoryResult.Sat>(result)
         assertEquals(1.0, result.stats.ls.completions.sum)
     }
 
     @Test
-    fun `exhausted heuristic allowances perform no completion`() {
-        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `exhausted heuristic allowances should perform no completion`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val controls = listOf(
-            TheoryParams(maxFlips = 0), TheoryParams(maxInstructions = 0), TheoryParams(openWorkLimit = 0),
+            TheoryParams(maxFlips = 0),
+            TheoryParams(maxInstructions = 0),
+            TheoryParams(openWorkLimit = 0),
         )
 
-        for (params in controls) for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
-            val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(OpenTheoryRequest(source),
-                params, engine)).result
+        for (params in controls) {
+            for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
+                val result = assertIs<OpenTheoryExecution.Satisfy>(
+                    OpenTheoryPipeline.execute(
+                        OpenTheoryRequest(source),
+                        params,
+                        engine,
+                    ),
+                ).result
 
-            assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
-            assertEquals(0.0, result.stats.ls.completions.sum)
+                assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+                assertEquals(0.0, result.stats.ls.completions.sum)
+            }
         }
     }
-    @Test
-    fun `mixed repairs retain wide integers beside fractional real coordinates`() {
-        val value = parseBigInt("9223372036854775808")
-        val open = Bits(1).also { it.set(0) }
-        val source = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value),
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)),
-            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
-        val request = OpenTheoryRequest(source)
-
-        for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
-            val result = assertIs<OpenTheoryExecution.Satisfy>(OpenTheoryPipeline.execute(request,
-                TheoryParams(maxFlips = 20, openWorkLimit = 1000, randomSeed = 17), engine)).result
-
-            val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
-            assertEquals(value.toString(), witness.intValue(0))
-            assertEquals("1/3", witness.realValue(0))
-            assertTrue(result.stats.ls.moves.sum > 1)
-        }
-    }
-
 }

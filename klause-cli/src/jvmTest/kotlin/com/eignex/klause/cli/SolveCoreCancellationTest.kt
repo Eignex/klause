@@ -10,23 +10,43 @@ import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SolveCoreCancellationTest {
     @Test
-    fun `ordinary source publication cancellation preserves its original exception without terminal claims`() {
-        val model = Problem(2, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `source publication cancellation should preserve its original exception without terminal claims`() {
+        val model = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val objective = LinearObjective(boolWeights = longArrayOf(-2, -1), constant = 7)
         val solvable = openTheorySolvable(OpenTheoryRequest(model, objective), {
             renderOpenTheoryModel(emptyMap(), mapOf("a" to 0, "b" to 1), mapOf("x" to 0), it)
         })
-        val common = CommonOptions().apply { engine = "cp"; parallel = 1; randomSeed = 17; presolve = "off" }
+        val common = CommonOptions().apply {
+            engine = "cp"
+            parallel = 1
+            randomSeed = 17
+            presolve = "off"
+        }
         val expected = CancellationException("linear consumer cancelled")
         val values = mutableListOf<BigFraction>()
         var terminal = false
@@ -38,7 +58,9 @@ class SolveCoreCancellationTest {
                 if (values.size == 2) throw expected
                 return true
             }
-            override fun onVerdictContext(context: VerdictContext) { terminal = true }
+            override fun onVerdictContext(context: VerdictContext) {
+                terminal = true
+            }
             override fun onComplete(verdict: Verdict) = error("cancelled publication cannot emit a terminal claim")
         }
 
@@ -48,5 +70,4 @@ class SolveCoreCancellationTest {
         assertEquals(listOf(BigFraction.ofLong(7), BigFraction.ofLong(6)), values)
         assertFalse(terminal)
     }
-
 }

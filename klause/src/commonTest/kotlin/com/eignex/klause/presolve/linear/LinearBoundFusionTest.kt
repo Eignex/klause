@@ -21,7 +21,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LinearBoundFusionTest {
-
     private fun le(coeffs: IntArray, vars: IntArray, bound: Int) = Linear(coeffs, vars, LinearOp.LE, bound)
     private fun ge(coeffs: IntArray, vars: IntArray, bound: Int) = Linear(coeffs, vars, LinearOp.GE, bound)
 
@@ -30,52 +29,48 @@ class LinearBoundFusionTest {
     private fun equalities(p: Problem) = p.factors.filterIsInstance<Linear>().filter { it.op == LinearOp.EQ }
 
     @Test
-    fun `an upper and lower bound that meet fuse into an equality`() {
-        // x + y ≤ 5 and x + y ≥ 5 together are x + y = 5.
+    fun `an upper and lower bound that meet should fuse into an equality`() {
         val p = problem(
             le(intArrayOf(1, 1), intArrayOf(0, 1), 5),
             ge(intArrayOf(1, 1), intArrayOf(0, 1), 5),
         )
         val out = p.bake().withPassDelta(Presolve.fuseLinearBounds(p), BakeConfig.NONE)
         val eqs = equalities(out)
-        assertEquals(1, eqs.size, "the pair collapses to one equality")
+        assertEquals(1, eqs.size)
         assertEquals(5L, checkNotNull(eqs.single().integerConstants).bound)
         assertEquals(setOf(0, 1), eqs.single().vars.toSet())
-        assertTrue(out.factors.none { it is Linear && it.op == LinearOp.LE }, "the inequalities are dropped")
+        assertTrue(out.factors.none { it is Linear && it.op == LinearOp.LE })
     }
 
     @Test
-    fun `crossing bounds prove infeasibility`() {
-        // x + y ≤ 3 and x + y ≥ 5 cannot both hold.
+    fun `crossing bounds should prove infeasibility`() {
         val p = problem(
             le(intArrayOf(1, 1), intArrayOf(0, 1), 3),
             ge(intArrayOf(1, 1), intArrayOf(0, 1), 5),
         )
-        assertTrue(Presolve.fuseLinearBounds(p).infeasible, "the crossing pair is infeasible")
+        assertTrue(Presolve.fuseLinearBounds(p).infeasible)
     }
 
     @Test
-    fun `a proper interval is left untouched`() {
-        // 3 ≤ x + y ≤ 5 is a genuine range, not an equality.
+    fun `a proper interval should be left untouched`() {
         val p = problem(
             le(intArrayOf(1, 1), intArrayOf(0, 1), 5),
             ge(intArrayOf(1, 1), intArrayOf(0, 1), 3),
         )
-        assertTrue(Presolve.fuseLinearBounds(p).isEmpty, "a strict interval stays as two inequalities")
+        assertTrue(Presolve.fuseLinearBounds(p).isEmpty)
     }
 
     @Test
-    fun `an equality contradicted by a tighter inequality is infeasible`() {
-        // x + y = 5 with x + y ≤ 3 cannot hold.
+    fun `an equality contradicted by a tighter inequality should be infeasible`() {
         val p = problem(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 5),
             le(intArrayOf(1, 1), intArrayOf(0, 1), 3),
         )
-        assertTrue(Presolve.fuseLinearBounds(p).infeasible, "the equality and a tighter cap contradict")
+        assertTrue(Presolve.fuseLinearBounds(p).infeasible)
     }
 
     @Test
-    fun `wide proportional bounds fuse without narrowing their constants`() {
+    fun `wide proportional bounds should fuse without narrowing their constants`() {
         val huge = BIG_ONE shl 100
         val model = problem(
             Linear(intArrayOf(0, 1), arrayOf(huge, huge), LinearOp.LE, huge * bigIntOf(3)),
@@ -89,7 +84,7 @@ class LinearBoundFusionTest {
     }
 
     @Test
-    fun `relaxation rows support fusion without authorizing factor removal`() {
+    fun `relaxation rows should support fusion without authorizing factor removal`() {
         val source = le(intArrayOf(1), intArrayOf(0), 5)
         val relaxation = object : Factor by source {
             override val linearForm: LinearForm = LinearForm.Relaxation(source.linearRows)
@@ -108,7 +103,7 @@ class LinearBoundFusionTest {
     }
 
     @Test
-    fun `comparison alternatives cannot be used as simultaneous bounds`() {
+    fun `comparison alternatives should not be used as simultaneous bounds`() {
         val model = Problem(
             0,
             3,
@@ -122,7 +117,7 @@ class LinearBoundFusionTest {
     }
 
     @Test
-    fun `coalescing duplicate long terms can widen before fusion`() {
+    fun `coalescing duplicate long terms should widen before fusion`() {
         val source = le(intArrayOf(1), intArrayOf(0), 0)
         val upper = object : Factor by source {
             override val linearForm: LinearForm = LinearForm.Conjunction(
@@ -138,7 +133,7 @@ class LinearBoundFusionTest {
     }
 
     @Test
-    fun `orienting a minimum long bound preserves an exact contradiction`() {
+    fun `orienting a minimum long bound should preserve an exact contradiction`() {
         val model = problem(
             Linear(longArrayOf(-1), intArrayOf(0), LinearOp.LE, Long.MIN_VALUE),
             Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, Long.MAX_VALUE),

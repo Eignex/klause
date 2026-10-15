@@ -6,7 +6,7 @@ import kotlin.test.assertNotNull
 
 class ExecutionOptionsStartupTest {
     @Test
-    fun `typed settings initialize before the frontend catalog`() {
+    fun `typed settings should initialize before the frontend catalog`() {
         val parent = ExecutionOption::class.java.classLoader
         val location = ExecutionOption::class.java.protectionDomain.codeSource.location
         val name = ExecutionOption::class.java.name

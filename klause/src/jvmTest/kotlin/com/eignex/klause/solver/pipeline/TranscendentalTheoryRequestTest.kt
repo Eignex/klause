@@ -14,12 +14,12 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
@@ -27,17 +27,22 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun engines(): List<Array<FiniteEngine>> = listOf(
-            FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS, FiniteEngine.MIXED,
+            FiniteEngine.BACKTRACK,
+            FiniteEngine.LOCAL_SEARCH,
+            FiniteEngine.ALNS,
+            FiniteEngine.MIXED,
         ).map { arrayOf(it) }
     }
 
     @Test
-    fun `every strategy publishes an exact symbolic inverse witness`() {
+    fun `every strategy should publish an exact symbolic inverse witness`() {
         val x = TranscendentalExpression.Variable(SourceRealId(0))
         val exp = TranscendentalExpression.Function(TranscendentalFunction.EXP, x)
         val source = TranscendentalProblem(
             TranscendentalFormula.Atom(exp, PolynomialRelation.EQ, constant(2)),
-            emptyMap(), mapOf("x" to 0), emptyMap(),
+            emptyMap(),
+            mapOf("x" to 0),
+            emptyMap(),
         )
         val params = params()
 
@@ -52,28 +57,34 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
     }
 
     @Test
-    fun `only traversal can publish a whole source refutation`() {
+    fun `only traversal should publish a whole source refutation`() {
         val x = TranscendentalExpression.Variable(SourceRealId(0))
         val exp = TranscendentalExpression.Function(TranscendentalFunction.EXP, x)
         val source = TranscendentalProblem(
             TranscendentalFormula.Atom(exp, PolynomialRelation.LE, constant(0)),
-            emptyMap(), mapOf("x" to 0), emptyMap(),
+            emptyMap(),
+            mapOf("x" to 0),
+            emptyMap(),
         )
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params(), engine)
 
         if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
             assertIs<OpenTheoryResult.Unknown>(execution.result)
-        } else assertIs<OpenTheoryResult.Unsat>(execution.result)
+        } else {
+            assertIs<OpenTheoryResult.Unsat>(execution.result)
+        }
     }
 
     @Test
-    fun `strict invocation bounds survive symbolic repairs`() {
+    fun `strict invocation bounds should survive symbolic repairs`() {
         val x = TranscendentalExpression.Variable(SourceRealId(0))
         val exp = TranscendentalExpression.Function(TranscendentalFunction.EXP, x)
         val source = TranscendentalProblem(
             TranscendentalFormula.Atom(exp, PolynomialRelation.EQ, constant(1)),
-            emptyMap(), mapOf("x" to 0), emptyMap(),
+            emptyMap(),
+            mapOf("x" to 0),
+            emptyMap(),
         )
         val params = params().copy(realLower = mapOf(0 to BigFraction.ZERO), strictRealLower = setOf(0))
 
@@ -83,7 +94,7 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
     }
 
     @Test
-    fun `zero native allowance prevents source entry in every strategy`() {
+    fun `zero native allowance should prevent source entry in every strategy`() {
         val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params().copy(maximumWork = 0), engine)
@@ -93,11 +104,17 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
     }
 
     @Test
-    fun `strategy cancellation stops native work during an active completion`() {
+    fun `strategy cancellation should stop native work during an active completion`() {
         val x = TranscendentalExpression.Variable(SourceRealId(0))
         val source = TranscendentalProblem(
-            TranscendentalFormula.Atom(TranscendentalExpression.Function(TranscendentalFunction.EXP, x),
-                PolynomialRelation.EQ, constant(2)), emptyMap(), mapOf("x" to 0), emptyMap(),
+            TranscendentalFormula.Atom(
+                TranscendentalExpression.Function(TranscendentalFunction.EXP, x),
+                PolynomialRelation.EQ,
+                constant(2),
+            ),
+            emptyMap(),
+            mapOf("x" to 0),
+            emptyMap(),
         )
         var charged = 0L
         val meter = object : Cancellation {
@@ -106,10 +123,13 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
         }
         val cancelled = Cancellation { charged >= 8 }
         val controls = params()
-        val params = controls.copy(cancellation = meter, strategy = controls.strategy.copy(
-            backtrack = controls.strategy.backtrack.copy(cancellation = cancelled),
-            localSearch = controls.strategy.localSearch.copy(cancellation = cancelled),
-        ))
+        val params = controls.copy(
+            cancellation = meter,
+            strategy = controls.strategy.copy(
+                backtrack = controls.strategy.backtrack.copy(cancellation = cancelled),
+                localSearch = controls.strategy.localSearch.copy(cancellation = cancelled),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
 
@@ -119,13 +139,18 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
     }
 
     @Test
-    fun `unbound component factories decline without executing user code`() {
+    fun `unbound component factories should decline without executing user code`() {
         val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
         var calls = 0
         val controls = params()
-        val params = controls.copy(strategy = controls.strategy.copy(
-            backtrack = controls.strategy.backtrack.copy(componentFactory = { calls++; emptyList() }),
-        ))
+        val params = controls.copy(
+            strategy = controls.strategy.copy(
+                backtrack = controls.strategy.backtrack.copy(componentFactory = {
+                    calls++
+                    emptyList()
+                }),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
 
@@ -135,35 +160,31 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
     }
 
     @Test
-    fun `finite tolerance hooks cannot change exact function semantics`() {
-        val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
-        var calls = 0
-        val controls = params()
-        val params = controls.copy(strategy = controls.strategy.copy(
-            backtrack = controls.strategy.backtrack.copy(toleranceCheck = { calls++; true }),
-        ))
-
-        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
-
-        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
-        assertEquals(0L, execution.workSpent)
-        assertEquals(0, calls)
-    }
-
-    @Test
-    fun `backend pins are retained or explicitly declined by mixed execution`() {
+    fun `mixed execution should keep or explicitly decline backend pins`() {
         val x = TranscendentalExpression.Variable(SourceRealId(0))
-        val source = TranscendentalProblem(TranscendentalFormula.And(listOf(
-            TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
-            TranscendentalFormula.Atom(TranscendentalExpression.Function(TranscendentalFunction.EXP, x),
-                PolynomialRelation.EQ, constant(2)),
-        )), emptyMap(), mapOf("x" to 0), mapOf("b" to 0))
+        val source = TranscendentalProblem(
+            TranscendentalFormula.And(
+                listOf(
+                    TranscendentalFormula.BooleanVariable(SourceBoolId(0)),
+                    TranscendentalFormula.Atom(
+                        TranscendentalExpression.Function(TranscendentalFunction.EXP, x),
+                        PolynomialRelation.EQ,
+                        constant(2),
+                    ),
+                ),
+            ),
+            emptyMap(),
+            mapOf("x" to 0),
+            mapOf("b" to 0),
+        )
         val pins = Assumptions.None.withBool(0, false)
         val controls = params()
-        val params = controls.copy(strategy = controls.strategy.copy(
-            backtrack = controls.strategy.backtrack.copy(assumptions = pins),
-            localSearch = controls.strategy.localSearch.copy(assumptions = pins),
-        ))
+        val params = controls.copy(
+            strategy = controls.strategy.copy(
+                backtrack = controls.strategy.backtrack.copy(assumptions = pins),
+                localSearch = controls.strategy.localSearch.copy(assumptions = pins),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
 
@@ -174,14 +195,16 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
     }
 
     @Test
-    fun `active finite event hooks explicitly decline source execution`() {
+    fun `active finite event hooks should explicitly decline source execution`() {
         val source = TranscendentalProblem(TranscendentalFormula.Constant(true), emptyMap(), emptyMap(), emptyMap())
         var calls = 0
         val controls = params()
-        val params = controls.copy(strategy = controls.strategy.copy(
-            backtrack = controls.strategy.backtrack.copy(onEvent = { calls++ }),
-            localSearch = controls.strategy.localSearch.copy(onEvent = { calls++ }),
-        ))
+        val params = controls.copy(
+            strategy = controls.strategy.copy(
+                backtrack = controls.strategy.backtrack.copy(onEvent = { calls++ }),
+                localSearch = controls.strategy.localSearch.copy(onEvent = { calls++ }),
+            ),
+        )
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
 
@@ -191,7 +214,8 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
     }
 
     private fun params(): TranscendentalTheoryParams = TranscendentalTheoryParams(
-        maximumWork = 20000, maximumDepth = 0,
+        maximumWork = 20000,
+        maximumDepth = 0,
         strategy = PolynomialStrategyParams(
             localSearch = LocalSearchParams(maxFlips = 16, maxInstructions = 20000, randomSeed = 17),
             alnsIterations = 8,

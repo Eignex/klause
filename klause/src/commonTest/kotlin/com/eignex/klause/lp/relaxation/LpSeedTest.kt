@@ -14,10 +14,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class LpSeedTest {
-
     @Test
-    fun `a seed over an open model lies at the relaxation's point inside the box`() {
-        // x0 = 40 and x1 = x0 + 2 over columns open on both sides.
+    fun `lpSeed over an open model should lie at the relaxation point inside the box`() {
         val open = Bits(2).also {
             it.set(0)
             it.set(1)
@@ -39,7 +37,7 @@ class LpSeedTest {
     }
 
     @Test
-    fun `no seed is drawn where shifting a row to its box leaves 64 bits`() {
+    fun `lpSeed should return null when shifting a row to its box overflows Long`() {
         // 27300000000·x0 ≤ 0 with x0's box starting at −2^30: the shifted constant is past Long.
         val open = Bits(1).also { it.set(0) }
         val model = Problem(

@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
 
 class DifferenceRelativeBranchesTest {
     @Test
-    fun `relative splits retain both original coordinate outcomes across retraction`() {
+    fun `relative splits should retain both original coordinate outcomes across retraction`() {
         val open = Bits.full(2)
         val model = Problem(
             numBoolVars = 1,
@@ -54,15 +54,17 @@ class DifferenceRelativeBranchesTest {
             val second = assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(1))))
             assertEquals(difference, (first - second).toString())
             session.popTo(0)
-            assertEquals(session.atomLiteral(alternatives[0]),
-                session.atomLiteral(assertNotNull(brancher.nextBranch(session))[0]))
+            assertEquals(
+                session.atomLiteral(alternatives[0]),
+                session.atomLiteral(assertNotNull(brancher.nextBranch(session))[0]),
+            )
         }
         assertEquals(false, model.intBounds.hasLower(0))
         assertEquals(false, model.intBounds.hasUpper(1))
     }
 
     @Test
-    fun `registered relative bounds explain original comparison consequences`() {
+    fun `registered relative bounds should explain original comparison consequences`() {
         val open = Bits.full(2)
         val model = Problem(
             numBoolVars = 1,
@@ -83,12 +85,14 @@ class DifferenceRelativeBranchesTest {
         assertIs<ComponentResult.Consistent>(session.push(branch))
 
         assertEquals(false, session.boolValue(0))
-        assertEquals(setOf(Lit.make(0, false), assertNotNull(session.atomLiteral(branch)).xor(1)),
-            session.reasonFor(0)?.literals?.toSet())
+        assertEquals(
+            setOf(Lit.make(0, false), assertNotNull(session.atomLiteral(branch)).xor(1)),
+            session.reasonFor(0)?.literals?.toSet(),
+        )
     }
 
     @Test
-    fun `unused registered relative names impose no complementary bound at a leaf`() {
+    fun `unused registered relative names should impose no complementary bound at a leaf`() {
         val open = Bits.full(2)
         val model = Problem(
             numBoolVars = 1,
@@ -117,7 +121,7 @@ class DifferenceRelativeBranchesTest {
     }
 
     @Test
-    fun `declined relative atom capacity retains an original source witness`() {
+    fun `declined relative atom capacity should retain an original source witness`() {
         val open = Bits.full(2)
         val model = Problem(
             numBoolVars = 1,
@@ -137,17 +141,19 @@ class DifferenceRelativeBranchesTest {
     }
 
     @Test
-    fun `relative preparation declines unsafe source bounds`() {
-        val source = DifferenceFragment(listOf(
-            DifferenceEdge(0, 1, Long.MAX_VALUE),
-            DifferenceEdge(1, 0, 0),
-        ))
+    fun `relative preparation should decline unsafe source bounds`() {
+        val source = DifferenceFragment(
+            listOf(
+                DifferenceEdge(0, 1, Long.MAX_VALUE),
+                DifferenceEdge(1, 0, 0),
+            ),
+        )
 
         assertNull(DifferenceRelativeBranches.create(source, 1, Cancellation.Never))
     }
 
     @Test
-    fun `containing cancellation withholds a relative branch`() {
+    fun `containing cancellation should withhold a relative branch`() {
         var stopped = false
         val source = DifferenceFragment(listOf(DifferenceEdge(0, 1, 1), DifferenceEdge(1, 0, 0)))
         val brancher = assertNotNull(DifferenceRelativeBranches.create(source, 1, Cancellation.Never))
@@ -158,7 +164,7 @@ class DifferenceRelativeBranchesTest {
     }
 
     @Test
-    fun `closing a relative opening releases its branch proposals`() {
+    fun `closing a relative opening should release its branch proposals`() {
         val source = DifferenceFragment(listOf(DifferenceEdge(0, 1, 1), DifferenceEdge(1, 0, 0)))
         val brancher = assertNotNull(DifferenceRelativeBranches.create(source, 1, Cancellation.Never))
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))

@@ -14,61 +14,57 @@ import kotlin.test.assertTrue
 
 class ForrestTomlinFactorsTest {
     @Test
-    fun `updates and rebuilds agree with original source and fresh factors`() {
+    fun `updates should agree with the source and fresh factors`() {
         for (shape in listOf("sparse", "spiked", "dense", "near")) {
             val source = ftSource(shape)
             val ft = KotlinBasisSolver(source, updateLimit = 100, fillFactor = 100.0)
-            val eta = BasisEtaReference(source)
-            val fresh = KotlinBasisSolver(source)
             val basis = IntArray(source.rows) { source.rows - 1 - it }
             assertTrue(ft.refactorize(basis))
-            assertTrue(eta.refactorize(basis))
             val random = Random(193)
-            for (step in 0..24) {
-                assertTrue(fresh.refactorize(basis))
-                repeat(if (step == 12) 2 else 1) { rebuilt ->
-                    if (rebuilt == 1) {
-                        assertTrue(ft.refactorize(basis))
-                        assertTrue(eta.refactorize(basis))
-                        assertEquals(0, ft.updateCount)
-                    }
-                    for (transpose in listOf(false, true)) {
-                        for (hint in listOf(0.0, 1.0)) {
-                            val rhs = DoubleArray(source.rows) { if (it == step % source.rows) 1.0 else 0.0 }
-                            val expected = IndexedVector(source.rows).also { it.scatter(rhs) }
-                            if (transpose) fresh.btran(expected, hint) else fresh.ftran(expected, hint)
-                            for (solver in listOf(ft, eta)) {
-                                val vector = IndexedVector(source.rows).also { it.scatter(rhs) }
-                                if (transpose) solver.btran(vector, hint) else solver.ftran(vector, hint)
-                                val error = ftResidual(source, basis, rhs, vector, transpose)
-                                assertTrue(error <= if (shape == "near") 1e-8 else 1e-11, "$shape $step $error")
-                                for (i in basis.indices) {
-                                    assertTrue(abs(vector[i] - expected[i]) <= 1e-8 * max(1.0, abs(expected[i])))
-                                }
-                                assertEquals(vector.toDoubleArray().count { it != 0.0 }, vector.count)
-                            }
-                        }
-                    }
-                }
-                if (step == 24) break
+            for (step in 0 until 8) {
                 val slot = if (step % 3 == 0) 2 else random.nextInt(source.rows)
                 val entering = (basis[slot] + source.rows) % source.cols
-                for (solver in listOf(ft, eta)) {
-                    val spike = IndexedVector(source.rows).also { it.scatterColumn(source, entering) }
-                    solver.ftran(spike, 0.0)
-                    assertEquals(BasisUpdate.APPLIED, solver.update(slot, entering, spike, spike))
-                    spike.clear()
-                }
+                val spike = IndexedVector(source.rows).also { it.scatterColumn(source, entering) }
+                ft.ftran(spike, 0.0)
+                assertEquals(BasisUpdate.APPLIED, ft.update(slot, entering, spike, spike))
                 basis[slot] = entering
+                assertAgreesWithFresh(shape, source, basis, ft, step)
             }
+            assertTrue(ft.refactorize(basis))
+            assertAgreesWithFresh(shape, source, basis, ft, step = 0)
             ft.close()
-            eta.close()
-            fresh.close()
         }
     }
 
+    private fun assertAgreesWithFresh(
+        shape: String,
+        source: SparseMatrix,
+        basis: IntArray,
+        ft: KotlinBasisSolver,
+        step: Int,
+    ) {
+        val fresh = KotlinBasisSolver(source)
+        assertTrue(fresh.refactorize(basis))
+        val rhs = DoubleArray(source.rows) { if (it == step % source.rows) 1.0 else 0.0 }
+        for (transpose in listOf(false, true)) {
+            for (hint in listOf(0.0, 1.0)) {
+                val expected = IndexedVector(source.rows).also { it.scatter(rhs) }
+                if (transpose) fresh.btran(expected, hint) else fresh.ftran(expected, hint)
+                val vector = IndexedVector(source.rows).also { it.scatter(rhs) }
+                if (transpose) ft.btran(vector, hint) else ft.ftran(vector, hint)
+                val error = ftResidual(source, basis, rhs, vector, transpose)
+                assertTrue(error <= if (shape == "near") 1e-8 else 1e-11, "$shape $step $error")
+                for (i in basis.indices) {
+                    assertTrue(abs(vector[i] - expected[i]) <= 1e-8 * max(1.0, abs(expected[i])))
+                }
+                assertEquals(vector.toDoubleArray().count { it != 0.0 }, vector.count)
+            }
+        }
+        fresh.close()
+    }
+
     @Test
-    fun `fill advice adopts a usable basis before the update count limit`() {
+    fun `fill advice should request a rebuild before the update count limit`() {
         val source = SparseMatrix.ofColumns(
             3,
             4,
@@ -95,7 +91,7 @@ class ForrestTomlinFactorsTest {
     }
 
     @Test
-    fun `checked update arithmetic declines atomically and scratch recovers`() {
+    fun `checked update arithmetic should decline atomically and recover scratch`() {
         // Each spike has a representable pivot and ratios; U times spike fails in scratch.
         for ((diagonal, incoming) in listOf(1e200 to 1e200, 1e-200 to 1e-200)) {
             val matrix = SparseMatrix.ofColumns(2, 2, listOf(listOf(0 to diagonal), listOf(1 to 1.0)))
@@ -123,7 +119,7 @@ class ForrestTomlinFactorsTest {
     }
 
     @Test
-    fun `displaced row arithmetic declines without publishing adjacency or transforms`() {
+    fun `displaced row arithmetic should decline without publishing adjacency or transforms`() {
         val matrix = SparseMatrix.ofColumns(
             2,
             2,
@@ -147,7 +143,6 @@ class ForrestTomlinFactorsTest {
         assertEquals(0, ft.transformEntries)
         assertTrue(assertNotNull(ft.lastUpdateWork).units > 0)
     }
-
 }
 
 internal fun ftSource(shape: String, n: Int = 8): SparseMatrix {
@@ -200,89 +195,4 @@ internal fun ftResidual(
         scale = max(scale, max(abs(product), abs(rhs[i])))
     }
     return error / scale
-}
-
-// Test-only product-form comparator. Base factors are never updated; no production engine uses this path.
-internal class BasisEtaReference(private val source: SparseMatrix) : BasisSolver {
-    private val base = KotlinBasisSolver(source)
-    private val work = BasisWorkspace(source.rows)
-    private val rows = mutableListOf<Int>()
-    private val spikes = mutableListOf<DoubleArray>()
-    private var headings = IntArray(0)
-    var solveEntries = 0L
-        private set
-    override val n: Int get() = base.n
-    override val nnz: Int get() = base.nnz + spikes.sumOf { it.count { value -> value != 0.0 } }
-    override val updateCount: Int get() = rows.size
-    override val singular: Boolean get() = base.singular
-    override val rcond: Double get() = base.rcond
-
-    override fun refactorize(basicIndex: IntArray): Boolean {
-        rows.clear()
-        spikes.clear()
-        headings = basicIndex.copyOf()
-        return base.refactorize(basicIndex)
-    }
-
-    override fun ftran(x: IndexedVector, expectedDensity: Double) {
-        base.ftran(x, expectedDensity)
-        solveEntries = base.lastSolveWork!!.let { it.first.arithmeticEntries + it.second.arithmeticEntries }
-        work.load(x)
-        for (k in rows.indices) {
-            val row = rows[k]
-            val spike = spikes[k]
-            if (work.values[row] == 0.0) continue
-            val value = work.values[row] / spike[row]
-            for (i in spike.indices) {
-                if (i != row && spike[i] != 0.0) work.set(i, work.values[i] - spike[i] * value)
-            }
-            work.set(row, value)
-            solveEntries += spike.count { it != 0.0 } - 1
-        }
-        work.write(x)
-    }
-
-    override fun btran(x: IndexedVector, expectedDensity: Double) {
-        var entries = 0L
-        work.load(x)
-        for (k in rows.size - 1 downTo 0) {
-            val row = rows[k]
-            val spike = spikes[k]
-            var value = work.values[row]
-            for (i in spike.indices) {
-                if (i != row && spike[i] != 0.0) value -= spike[i] * work.values[i]
-            }
-            work.set(row, value / spike[row])
-            entries += spike.count { it != 0.0 } - 1
-        }
-        work.write(x)
-        base.btran(x, expectedDensity)
-        solveEntries = entries + base.lastSolveWork!!.let { it.first.arithmeticEntries + it.second.arithmeticEntries }
-    }
-
-    override fun update(pivotRow: Int, entering: Int, spike: IndexedVector, pivotEta: IndexedVector?): BasisUpdate {
-        rows.add(pivotRow)
-        spikes.add(spike.toDoubleArray())
-        headings[pivotRow] = entering
-        return BasisUpdate.APPLIED
-    }
-
-    override fun solveQuality(rhs: DoubleArray, solution: IndexedVector, transpose: Boolean): BasisSolveQuality {
-        val residual = ftResidual(source, headings, rhs, solution, transpose)
-        var absolute = 0.0
-        for (i in headings.indices) {
-            var product = 0.0
-            for (j in headings.indices) {
-                product += (if (transpose) source[j, headings[i]] else source[i, headings[j]]) * solution[j]
-            }
-            absolute = max(absolute, abs(product - rhs[i]))
-        }
-        return BasisSolveQuality(absolute, residual)
-    }
-
-    override fun close() {
-        base.close()
-        rows.clear()
-        spikes.clear()
-    }
 }

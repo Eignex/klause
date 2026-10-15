@@ -8,13 +8,18 @@ import kotlin.test.assertTrue
 
 class IntegerTableauCutsTest {
     @Test
-    fun `retained tableau cuts match fresh cuts through nested lower bounds and rollback`() {
+    fun `retained tableau cuts should match fresh cuts through nested lower bounds and rollback`() {
         for (ieee in listOf(false, true)) {
-            val source = assertNotNull(LpBuilder().apply {
-                val x = addVar(3L, 9L, cost = -1L)
-                if (ieee) addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.LE, 11.0)
-                else addRow(intArrayOf(x), longArrayOf(2L), Relation.LE, 11L)
-            }.build(Sense.MINIMIZE).authoritativeModel())
+            val source = assertNotNull(
+                LpBuilder().apply {
+                    val x = addVar(3L, 9L, cost = -1L)
+                    if (ieee) {
+                        addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.LE, 11.0)
+                    } else {
+                        addRow(intArrayOf(x), longArrayOf(2L), Relation.LE, 11L)
+                    }
+                }.build(Sense.MINIMIZE).authoritativeModel(),
+            )
             val trail = LpBoundTrail(source)
             assertTrue(trail.push())
             assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
@@ -29,7 +34,6 @@ class IntegerTableauCutsTest {
                 }.build(Sense.MINIMIZE)
                 val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.AT_LOWER))
                 for (mir in listOf(false, true)) {
-
                     val cuts = integerTableauCuts(model, basis, doubleArrayOf(5.5), 8, mir)
                     val expected = integerTableauCuts(fresh, basis, doubleArrayOf(5.5), 8, mir)
 
@@ -49,21 +53,27 @@ class IntegerTableauCutsTest {
     }
 
     @Test
-    fun `retained tableau cuts exclude inactive rows from their rounding proof across pop`() {
-        val source = assertNotNull(LpBuilder().apply {
-            val x = addVar(0L, 5L)
-            addRow(intArrayOf(x), longArrayOf(2L), Relation.LE, 3L)
-        }.build(Sense.MINIMIZE).authoritativeModel())
+    fun `retained tableau cuts should exclude inactive rows from their rounding proof across pop`() {
+        val source = assertNotNull(
+            LpBuilder().apply {
+                val x = addVar(0L, 5L)
+                addRow(intArrayOf(x), longArrayOf(2L), Relation.LE, 3L)
+            }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val trail = LpBoundTrail(source)
         assertTrue(trail.push())
         assertTrue(trail.suspend(setOf(0L)))
-        assertTrue(trail.append(
-            LpScopedRow(
-                1L, listOf(0 to ExactLpNumber.of(2L)), ExactLpNumber.of(5L),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+        assertTrue(
+            trail.append(
+                LpScopedRow(
+                    1L,
+                    listOf(0 to ExactLpNumber.of(2L)),
+                    ExactLpNumber.of(5L),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+                ),
+                true,
             ),
-            true,
-        ))
+        )
         for ((depth, row) in listOf(1 to 1, 0 to 0)) {
             assertTrue(trail.pop(depth))
             val model = assertNotNull(trail.state.toWorkingModel())
@@ -85,14 +95,17 @@ class IntegerTableauCutsTest {
     }
 
     @Test
-    fun `tableau candidates decline malformed basis and nonfinite primal values`() {
+    fun `tableau candidates should decline a malformed basis and nonfinite primal values`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 5L)
             addRow(intArrayOf(x), longArrayOf(2L), Relation.LE, 3L)
         }.build(Sense.MINIMIZE)
         for ((headings, primal) in listOf(
-            intArrayOf() to 1.5, intArrayOf(-1) to 1.5, intArrayOf(2) to 1.5,
-            intArrayOf(0) to Double.NaN, intArrayOf(0) to Double.POSITIVE_INFINITY,
+            intArrayOf() to 1.5,
+            intArrayOf(-1) to 1.5,
+            intArrayOf(2) to 1.5,
+            intArrayOf(0) to Double.NaN,
+            intArrayOf(0) to Double.POSITIVE_INFINITY,
         )) {
             val basis = Basis(headings, Array(model.numVars) { VarStatus.AT_LOWER })
 
@@ -101,7 +114,7 @@ class IntegerTableauCutsTest {
     }
 
     @Test
-    fun `permuted structural and slack slots produce source valid separating cuts`() {
+    fun `permuted structural and slack slots should produce source valid separating cuts`() {
         val builder = LpBuilder()
         val x = builder.addVar(0, 5)
         val y = builder.addVar(0, 2)
@@ -132,7 +145,7 @@ class IntegerTableauCutsTest {
     }
 
     @Test
-    fun `dependent candidate basis declines without producing cuts`() {
+    fun `a dependent candidate basis should decline without producing cuts`() {
         val builder = LpBuilder()
         val x = builder.addVar(0, 5)
         builder.addRow(mapOf(x to 2L), Relation.LE, 3)
@@ -146,7 +159,7 @@ class IntegerTableauCutsTest {
     }
 
     @Test
-    fun `continuous and synthetic lower bounds decline at the tableau entry point`() {
+    fun `continuous and synthetic lower bounds should decline at the tableau entry point`() {
         for (continuous in listOf(false, true)) {
             val builder = LpBuilder()
             if (continuous) builder.addRealVar(0.0, 3.0) else builder.addFreeVar(null, null)

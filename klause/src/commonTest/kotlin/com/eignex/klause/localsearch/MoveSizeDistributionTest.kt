@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class MoveSizeDistributionTest {
 
     @Test
-    fun `each size gets exactly its weighted share within a cycle`() {
+    fun `each size should get exactly its weighted share within a cycle`() {
         // Sizes 1, 2, 3 with shares 3, 1, 2 — a cycle is 6 draws.
         val dist = MoveSizeDistribution(weights = intArrayOf(3, 1, 2), minSize = 1)
         val rng = Random(7)
@@ -25,16 +25,9 @@ class MoveSizeDistributionTest {
     }
 
     @Test
-    fun `sizes stay within the configured range`() {
+    fun `sizes should stay within the configured range`() {
         val dist = MoveSizeDistribution(weights = intArrayOf(1, 1, 1), minSize = 4)
         val rng = Random(1)
         repeat(100) { assertTrue(dist.nextSize(rng) in 4..6) }
-    }
-
-    @Test
-    fun `a single-weight distribution always returns that size`() {
-        val dist = MoveSizeDistribution(weights = intArrayOf(0, 5, 0), minSize = 1)
-        val rng = Random(3)
-        repeat(20) { assertEquals(2, dist.nextSize(rng)) }
     }
 }

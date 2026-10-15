@@ -14,7 +14,7 @@ class LargestUpperBoundTest {
     private val rng = Random(1)
 
     @Test
-    fun `largest upper bound prefers the int with the highest maximum`() {
+    fun `largest upper bound should prefer the int with the highest maximum`() {
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 2,

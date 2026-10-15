@@ -13,7 +13,6 @@ import kotlin.test.assertTrue
 
 class SortInvariantTest {
 
-    // xs = vars 0..2, ys = vars 3..5
     private fun problem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 6,
@@ -22,11 +21,9 @@ class SortInvariantTest {
     )
 
     @Test
-    fun `violated when ys is not sorted xs with degree counting mismatched positions`() {
+    fun `violation degree should count positions where ys differs from sorted xs`() {
         val cases = listOf(
-            // sorted(xs)=[0,1,2], ys differs at positions 1 and 2.
             Triple(listOf(2L, 0L, 1L), listOf(0L, 2L, 1L), 2),
-            // sorted(xs)=[1,2,3], ys differs at positions 0 and 2.
             Triple(listOf(1L, 2L, 3L), listOf(3L, 2L, 1L), 2),
         )
         for ((xs, ys, degree) in cases) {
@@ -34,16 +31,15 @@ class SortInvariantTest {
             for (i in 0..2) state.assignment.setInt(i, xs[i])
             for (i in 0..2) state.assignment.setInt(3 + i, ys[i])
             state.recompute()
-            assertTrue(state.factors[0].isViolated(state, 0), "xs=$xs ys=$ys must violate sort")
+            assertTrue(state.factors[0].isViolated(state, 0), "xs=$xs ys=$ys")
             assertEquals(degree, state.factors[0].violationDegree(state, 0), "xs=$xs ys=$ys")
         }
     }
 
     @Test
-    fun `delta predicts degree change when correcting a ys entry`() {
+    fun `delta should predict degree change when correcting a ys entry`() {
         val p = problem()
         val state = LocalSearchState(p.bake(), Random(0))
-        // xs=[0,1,2], ys=[2,1,0] — all wrong
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
         state.assignment.setInt(2, 2)
@@ -52,7 +48,6 @@ class SortInvariantTest {
         state.assignment.setInt(5, 0)
         state.recompute()
         val before = state.factors[0].violationDegree(state, 0)
-        // Fix ys[0]=2 → ys[0]=0 (correct)
         val delta = state.factors[0].deltaIfIntSet(state, 0, 3, 0)
         state.apply(Move.IntSet(3, 0))
         val after = state.factors[0].violationDegree(state, 0)

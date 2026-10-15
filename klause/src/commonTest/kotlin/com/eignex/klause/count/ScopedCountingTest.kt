@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class ScopedCountingTest {
     @Test
-    fun `intersecting a probabilistic interval at one value does not prove an exact count`() {
+    fun `probabilistic interval intersected at one value should not prove an exact count`() {
         val proven = Count(6L, 5L, 7L, exact = false, confidence = 1.0)
         val approximate = Count(4L, 3L, 5L, exact = false, confidence = 0.8)
 
@@ -20,7 +20,7 @@ class ScopedCountingTest {
     }
 
     @Test
-    fun `an exhausted fallback cell proves the hybrid count exactly`() {
+    fun `exhausted fallback cell should prove the hybrid count exactly`() {
         val proven = Count(6L, 5L, 7L, exact = false, confidence = 1.0)
         val approximate = Count(6L, 6L, 6L, exact = true, confidence = 1.0)
 

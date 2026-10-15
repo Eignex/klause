@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class PseudoBooleanInvariantTest {
 
     @Test
-    fun `LE violated for weights and bound beyond Int range`() {
+    fun `LE row should be violated for weights and bound beyond Int range`() {
         val factor = PseudoBoolean(
             weights = longArrayOf(3_000_000_000L, 3_000_000_000L),
             literals = IntArray(2) { Lit.make(it, true) },
@@ -25,13 +25,13 @@ class PseudoBooleanInvariantTest {
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem.bake(), Random(0))
-        for (v in 0..1) state.assignment.setBool(v, true) // sum = 6e9 > 5e9
+        for (v in 0..1) state.assignment.setBool(v, true)
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
     }
 
     @Test
-    fun `apply eliminates GE violation and zeroes cost`() {
+    fun `apply should eliminate a GE violation and zero the cost`() {
         val factor = PseudoBoolean(
             weights = longArrayOf(2, 3),
             literals = IntArray(2) { Lit.make(it, true) },
@@ -41,17 +41,16 @@ class PseudoBooleanInvariantTest {
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setBool(0, true)
-        state.assignment.setBool(1, false) // sum=2 < 4 → violated
+        state.assignment.setBool(1, false)
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
-        state.apply(Move.BoolFlip(1)) // sum → 5 >= 4
+        state.apply(Move.BoolFlip(1))
         assertFalse(state.factors[0].isViolated(state, 0))
         assertEquals(0, state.cost)
     }
 
     @Test
-    fun `repair proposes only flips that reduce distance`() {
-        // weights=[3,2,1], bound=4. All true → sum=6 > 4. Flipping any var to false reduces sum.
+    fun `repair should propose only flips that reduce distance`() {
         val factor = PseudoBoolean(
             weights = longArrayOf(3, 2, 1),
             literals = IntArray(3) { Lit.make(it, true) },
@@ -66,7 +65,7 @@ class PseudoBooleanInvariantTest {
         val sink = MoveSink()
         state.factors[0].proposeRepairMoves(state, 0, sink)
         val proposed = sink.list.filterIsInstance<Move.BoolFlip>().map { it.varId }.toSet()
-        assertTrue(proposed.isNotEmpty(), "repair should propose flips when LE violated")
-        assertTrue(proposed.all { v -> state.assignment.boolValue(v) }, "should propose true→false flips to reduce sum")
+        assertTrue(proposed.isNotEmpty())
+        assertTrue(proposed.all { v -> state.assignment.boolValue(v) }, "$proposed")
     }
 }

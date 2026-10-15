@@ -11,7 +11,7 @@ import kotlin.test.assertNotEquals
 class BenchCacheTest {
 
     @Test
-    fun `cache reuse requires the same executed build and validation policy`() {
+    fun `cache reuse should require the same executed build and validation policy`() {
         val root = Files.createTempDirectory("benchcache").toFile()
         try {
             val model = File(root, "model.fzn").apply { writeText("solve satisfy;") }
@@ -42,7 +42,7 @@ class BenchCacheTest {
     }
 
     @Test
-    fun `settings with colliding output labels retain separate cache entries`() {
+    fun `settings with colliding output labels should retain separate cache entries`() {
         val root = Files.createTempDirectory("benchcache").toFile()
         try {
             val model = File(root, "model.fzn").apply { writeText("solve satisfy;") }
@@ -63,7 +63,7 @@ class BenchCacheTest {
     }
 
     @Test
-    fun `keyFor is the same for a plain and a compressed copy of an instance`() {
+    fun `keyFor should match for a plain and a compressed copy of an instance`() {
         val root = Files.createTempDirectory("benchcache").toFile()
         try {
             val plain = File(root, "plain/inst.opb").apply {
@@ -83,7 +83,7 @@ class BenchCacheTest {
     }
 
     @Test
-    fun `an oversized output keeps its status and objective lines and drops the model lines`() {
+    fun `an oversized output should keep status and objective lines and drop model lines`() {
         val model = "v " + "1 ".repeat(5_000_000)
         val result = SolverInvocation.Result(
             feasible = true,

@@ -32,7 +32,7 @@ class IncreasingInvariantTest {
     }
 
     @Test
-    fun `strict chains score equal signed word endpoints as violated`() {
+    fun `strict chains should score equal signed word endpoints as violated`() {
         for (endpoint in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
             val problem = Problem(
                 numBoolVars = 0,
@@ -50,7 +50,7 @@ class IncreasingInvariantTest {
     }
 
     @Test
-    fun `strict seeding refuses a successor beyond the signed word maximum`() {
+    fun `strict seeding should refuse a successor beyond the signed word maximum`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -63,20 +63,18 @@ class IncreasingInvariantTest {
     }
 
     @Test
-    fun `repair offers local snaps and a cascading compound`() {
+    fun `repair should offer local snaps and a cascading compound`() {
         val state = stateWith(strict = false, values = intArrayOf(5, 1, 3))
         val sink = MoveSink()
         state.factors[0].proposeRepairMoves(state, 0, sink)
         val intSets = sink.list.filterIsInstance<IntSet>()
-        // Local snaps at the first inversion (x0=5 > x1=1): pull x0 down to 1, or push x1 up to 5.
-        assertTrue(intSets.any { it.varId == 0 && it.newValue == 1L }, "expected IntSet(x0=1) in $intSets")
-        assertTrue(intSets.any { it.varId == 1 && it.newValue == 5L }, "expected IntSet(x1=5) in $intSets")
-        // A cascading compound re-monotonises the whole chain in one move.
-        assertTrue(sink.list.filterIsInstance<Compound>().isNotEmpty(), "expected a cascading Compound")
+        assertTrue(intSets.any { it.varId == 0 && it.newValue == 1L }, "$intSets")
+        assertTrue(intSets.any { it.varId == 1 && it.newValue == 5L }, "$intSets")
+        assertTrue(sink.list.filterIsInstance<Compound>().isNotEmpty())
     }
 
     @Test
-    fun `cascade rounds a raised value up past a hole`() {
+    fun `cascade should round a raised value up past a hole`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -100,7 +98,7 @@ class IncreasingInvariantTest {
     }
 
     @Test
-    fun `seedFeasible rounds a chain value up past a hole`() {
+    fun `seedFeasible should round a chain value up past a hole`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -112,6 +110,6 @@ class IncreasingInvariantTest {
 
         assertTrue(state.factors[0].seedFeasible(state, 0))
 
-        assertEquals(6L, state.assignment.intValue(1), "x1 must take the first present value above x0 = 4")
+        assertEquals(6L, state.assignment.intValue(1))
     }
 }

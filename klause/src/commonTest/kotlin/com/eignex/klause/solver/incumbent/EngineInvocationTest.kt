@@ -32,7 +32,7 @@ class EngineInvocationTest {
     private val model = ModelIdentity.of(Any(), objective)
 
     @Test
-    fun `runtime binding retains exact source real windows`() {
+    fun `checkWitness should accept a point inside exact real windows`() {
         val original = Problem(
             0,
             0,
@@ -62,7 +62,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `runtime binding rejects points outside exact source real windows`() {
+    fun `checkWitness should reject points outside exact real windows`() {
         val original = Problem(
             0,
             0,
@@ -96,16 +96,16 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `runtime binding checks arbitrary precision integer source restrictions`() {
+    fun `checkWitness should check wide integer source restrictions`() {
         val original = Problem(
             0,
             IntBounds.fromModelBounds(
-            longArrayOf(0),
-            longArrayOf(0),
-            Bits(1),
-            Bits(1),
-        ),
-            emptyArray()
+                longArrayOf(0),
+                longArrayOf(0),
+                Bits(1),
+                Bits(1),
+            ),
+            emptyArray(),
         )
         val wide = parseBigInt("9223372036854775808")
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
@@ -124,7 +124,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `runtime binding rejects an integer below an arbitrary precision source bound`() {
+    fun `checkWitness should reject an integer below a wide source bound`() {
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val lower = BigFraction.of(parseBigInt("9223372036854775808"), BIG_ONE)
         val binding = EngineInvocation(
@@ -141,7 +141,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `runtime binding cannot omit explicit source pins from an exact condition`() {
+    fun `invocation should reject a condition omitting explicit source pins`() {
         val assumptions = listOf(Assumptions(bools = mapOf(0 to true)), Assumptions(ints = mapOf(0 to 3L)))
 
         for (pins in assumptions) {
@@ -152,7 +152,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `runtime binding cannot capture a different exact source condition`() {
+    fun `invocation should reject a scope with a different condition`() {
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE))
         val scope = SourceScope(
@@ -166,7 +166,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `runtime binding refuses undeclared exact source coordinates`() {
+    fun `invocation should reject undeclared source coordinates`() {
         val conditions = listOf(
             SourceCondition(bools = mapOf(1 to true)),
             SourceCondition(lower = mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 1) to BigFraction.ONE)),
@@ -186,7 +186,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `runtime matching retains exact source restrictions without revision capture`() {
+    fun `matches should distinguish source conditions without a scope`() {
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE))
         val restricted = EngineInvocation(plan, model, objective, condition = condition)
@@ -197,7 +197,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `cancelled exact source condition checking withholds runtime witness admission`() {
+    fun `cancelled checkWitness should be unavailable`() {
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE))
         val binding = EngineInvocation(plan, model, objective, condition = condition)
@@ -209,7 +209,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `approximate real values cannot establish an exact runtime condition`() {
+    fun `checkWitness should be unavailable for approximate reals under an exact condition`() {
         val original = Problem(
             0,
             0,
@@ -233,7 +233,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `runtime binding retains caller pins independently of mutable assumption arrays`() {
+    fun `invocation should snapshot caller assumptions`() {
         val assumptions = Assumptions(bools = mapOf(0 to true), ints = mapOf(0 to 3L))
         val binding = EngineInvocation(plan, model, objective, assumptions)
         assumptions.boolValues[0] = false
@@ -248,7 +248,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `runtime binding cannot import another plan model objective or condition`() {
+    fun `matches should reject another plan model objective or assumptions`() {
         val binding = EngineInvocation(plan, model, objective)
         val otherObjective = LinearObjective(intCoefficients = longArrayOf(1))
         val variants = listOf(
@@ -264,7 +264,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `execution deductions remain part of runtime witness admission`() {
+    fun `checkWitness should enforce execution deductions`() {
         val point = Sample(booleanArrayOf(true), longArrayOf(3))
         val variants = listOf(
             Assumptions.None.withTightenedMin(0, 4),
@@ -280,7 +280,7 @@ class EngineInvocationTest {
     }
 
     @Test
-    fun `weaker execution assumptions cannot admit a point outside the source query`() {
+    fun `checkWitness should enforce source assumptions over weaker execution ones`() {
         val point = Sample(booleanArrayOf(false), longArrayOf(3))
         val variants = listOf(
             Assumptions(bools = mapOf(0 to true)),

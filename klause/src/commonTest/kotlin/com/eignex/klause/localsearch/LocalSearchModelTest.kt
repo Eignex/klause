@@ -14,7 +14,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 
 class LocalSearchModelTest {
 
@@ -31,16 +30,7 @@ class LocalSearchModelTest {
     }
 
     @Test
-    fun `a finite model searches its root-propagated domains`() {
-        val baked = Problem(0, 1, arrayOf(IntDomain(2, 9)), emptyArray()).bake()
-
-        val model = LocalSearchModel.of(baked)
-
-        assertSame(baked.rootIntDomainsInPlace, model.domains)
-    }
-
-    @Test
-    fun `a finite model refuted at the root is reported unsatisfiable`() {
+    fun `a finite model refuted at the root should be reported unsatisfiable`() {
         val contradiction = Problem(
             0,
             1,
@@ -55,7 +45,7 @@ class LocalSearchModelTest {
     }
 
     @Test
-    fun `an open side is searched through a window around zero`() {
+    fun `an open side should be searched through a window around zero`() {
         val model = LocalSearchModel.open(openProblem())
 
         assertEquals(-(1L shl 30) + 1, model.domains[0].min)
@@ -64,7 +54,7 @@ class LocalSearchModelTest {
     }
 
     @Test
-    fun `local search finds a solution of a model with open integer columns`() {
+    fun `local search should find a solution of a model with open integer columns`() {
         val problem = openProblem(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 7),
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),

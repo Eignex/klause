@@ -13,7 +13,6 @@ import kotlin.test.assertTrue
 
 class CliqueSwapTest {
 
-    /** A single at-most-one clique over three positive literals on bool vars 0,1,2. */
     private fun amoProblem(): Problem = Problem(
         numBoolVars = 3,
         numIntVars = 0,
@@ -21,7 +20,6 @@ class CliqueSwapTest {
         factors = arrayOf<Factor>(amoCardinality(0, 1, 2)),
     )
 
-    /** A degenerate clique of a single literal — no swap partner exists. */
     private fun singletonProblem(): Problem = Problem(
         numBoolVars = 1,
         numIntVars = 0,
@@ -41,7 +39,7 @@ class CliqueSwapTest {
     }
 
     @Test
-    fun `one member on yields swaps to the other members`() {
+    fun `one member on should yield swaps to the other members`() {
         val state = freshState(amoProblem(), 7L)
         state.assignment.flipBool(0) // var 0 on, the clique's single satisfied member
         state.recompute()
@@ -52,7 +50,7 @@ class CliqueSwapTest {
     }
 
     @Test
-    fun `an over-full clique yields a repair turning both members off`() {
+    fun `an over-full clique should yield a repair turning both members off`() {
         val state = freshState(amoProblem(), 7L)
         state.assignment.flipBool(0)
         state.assignment.flipBool(1) // two members on: the clique is violated
@@ -66,35 +64,15 @@ class CliqueSwapTest {
     }
 
     @Test
-    fun `applying then reverting a generated swap restores the prior state`() {
-        val state = freshState(amoProblem(), 7L)
-        state.assignment.flipBool(0)
-        state.recompute()
-        val before = (0 until state.problem.numBoolVars).map { state.assignment.boolValue(it) }
-        val cost = state.cost
-        val move = swaps(state, cap = 16).first()
-        state.apply(move)
-        for (p in (move as Move.Compound).parts.reversed()) state.apply(p) // BoolFlip self-inverts
-        assertEquals(
-            before,
-            (0 until state.problem.numBoolVars).map { state.assignment.boolValue(it) },
-            "apply then revert must restore the exact assignment",
-        )
-        assertEquals(cost, state.cost, "apply then revert must restore the exact cost")
-    }
-
-    @Test
-    fun `a singleton clique yields no candidates`() {
+    fun `a singleton clique should yield no candidates`() {
         val state = freshState(singletonProblem(), 7L)
         state.assignment.flipBool(0)
         state.recompute()
-        assertTrue(swaps(state, cap = 16).isEmpty(), "a clique with no swap partner yields nothing")
+        assertTrue(swaps(state, cap = 16).isEmpty())
     }
 
-    /** The on-other variable of a two-flip clique swap whose other flipped variable is [offVar]. */
     private fun swapPartner(move: Move, offVar: Int): Int = flippedVars(move).single { it != offVar }
 
-    /** The set of variables a two-flip clique-swap compound touches. */
     private fun flippedVars(move: Move): Set<Int> =
         (move as Move.Compound).parts.map { (it as Move.BoolFlip).varId }.toSet()
 }

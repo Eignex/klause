@@ -17,7 +17,6 @@ import kotlin.test.assertTrue
 
 class SearchEventTest {
 
-    /** Pigeonhole 4 pigeons / 3 holes: UNSAT, needs real search (no level-0 refutation). */
     private fun pigeonhole(): Problem {
         val pigeons = 4
         val holes = 3
@@ -34,13 +33,9 @@ class SearchEventTest {
     }
 
     @Test
-    fun `backtrack fires restart events under a tiny luby budget`() {
+    fun `backtrack should emit indexed restart events under a unit Luby base`() {
         val events = mutableListOf<SearchEvent>()
-        // The decision cap, not the UNSAT proof, bounds the test: a tiny deterministic Luby
-        // schedule redoes near-identical runs and converges only through learned clauses, so
-        // proving UNSAT here can take unbounded time. Restart events fire either way. The
-        // budget is a single decision per first run — the UNSAT proof needs more than one
-        // decision, so at least one restart always fires before it completes.
+        // The decision cap bounds the run; a unit Luby base may need very long to prove UNSAT.
         BacktrackSolver(pigeonhole().bake()).solve(
             BacktrackParams(
                 randomSeed = 1L,
@@ -52,14 +47,12 @@ class SearchEventTest {
             ),
         )
         val restarts = events.filterIsInstance<SearchEvent.Restart>()
-        assertTrue(restarts.isNotEmpty(), "expected at least one restart event, got $events")
-        // Indices count up from 1 in order.
+        assertTrue(restarts.isNotEmpty(), "got $events")
         assertEquals(List(restarts.size) { (it + 1).toLong() }, restarts.map { it.index })
     }
 
     @Test
-    fun `backtrack fires one incumbent event per improvement`() {
-        // 8 independent bools with positive weights: optimum all-false, improvements strict.
+    fun `backtrack should emit an incumbent event per improvement`() {
         val n = 8
         val problem = Problem(n, 0, emptyArray(), emptyList())
         val events = mutableListOf<SearchEvent>()
@@ -74,15 +67,14 @@ class SearchEventTest {
             ),
         ).toList()
         val incumbents = events.filterIsInstance<SearchEvent.Incumbent>()
-        assertTrue(incumbents.isNotEmpty(), "expected incumbent events, got $events")
+        assertTrue(incumbents.isNotEmpty(), "got $events")
         assertEquals(incumbents.map { it.objective }, incumbents.map { it.objective }.sortedDescending())
-        // One event per streamed improvement.
         val streamed = improvements.filterIsInstance<MinimizeResult.BestFound>().size
         assertTrue(incumbents.size >= streamed, "events $incumbents vs streamed $streamed")
     }
 
     @Test
-    fun `local search fires incumbent events while minimizing`() {
+    fun `local search should emit improving incumbent events while minimizing`() {
         val n = 8
         val problem = Problem(n, 0, emptyArray(), emptyList())
         val events = mutableListOf<SearchEvent>()
@@ -96,7 +88,7 @@ class SearchEventTest {
             ),
         )
         val incumbents = events.filterIsInstance<SearchEvent.Incumbent>()
-        assertTrue(incumbents.isNotEmpty(), "expected incumbent events, got $events")
+        assertTrue(incumbents.isNotEmpty(), "got $events")
         assertEquals(incumbents.map { it.objective }, incumbents.map { it.objective }.sortedDescending())
     }
 }

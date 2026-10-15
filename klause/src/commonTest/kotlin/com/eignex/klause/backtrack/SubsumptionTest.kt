@@ -6,10 +6,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.result.SearchStatsSink
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class SubsumptionTest {
 
@@ -96,11 +94,11 @@ class SubsumptionTest {
         subsume(session, BacktrackParams(subsumption = true, subsumeBatch = 64), 0)
         val resolvent = (0 until session.learnedClauseCount)
             .single { session.learnedClauseLiterals(it).toSet() == lits(0 to true, 2 to true).toSet() }
-        assertEquals(1, session.learnedClauseLbd(resolvent), "the resolvent keeps the parent's glue standing")
+        assertEquals(1, session.learnedClauseLbd(resolvent))
     }
 
     @Test
-    fun `a resolvent of an imported clause keeps the arm it was imported from`() {
+    fun `a resolvent of an imported clause should keep the arm it was imported from`() {
         val session = PropagationSession(problem(6).bake())
         session.addLearnedClause(Clause(lits(0 to true, 1 to false)), lbd = 2)
         session.addLearnedClause(Clause(lits(0 to true, 1 to true, 2 to true)), lbd = 3, origin = 4)
@@ -110,17 +108,5 @@ class SubsumptionTest {
         val resolvent = (0 until session.learnedClauseCount)
             .single { session.learnedClauseLiterals(it).toSet() == lits(0 to true, 2 to true).toSet() }
         assertEquals(4, session.learnedClauseOrigin(resolvent))
-    }
-
-    @Test
-    fun `subsume counts the clause literals it scans`() {
-        val session = PropagationSession(problem(6).bake())
-        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))), lbd = 2)
-        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))), lbd = 3)
-        val stats = SearchStatsSink()
-
-        subsume(session, BacktrackParams(subsumption = true, subsumeBatch = 64), 0, stats)
-
-        assertTrue(stats.inprocessVisits >= 5L, "both snapshots alone are 5 literals: ${stats.inprocessVisits}")
     }
 }

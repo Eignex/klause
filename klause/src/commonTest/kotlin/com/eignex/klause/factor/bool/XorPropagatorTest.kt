@@ -14,8 +14,7 @@ import kotlin.test.assertIs
 class XorPropagatorTest {
 
     @Test
-    fun `single unassigned var forced true to reach odd target`() {
-        // v0=true, v1=true -> pinnedParity=0; target=1 -> v2 must be true
+    fun `single unassigned var should be forced true to reach odd target`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -29,7 +28,7 @@ class XorPropagatorTest {
     }
 
     @Test
-    fun `all vars assigned with wrong parity yields conflict`() {
+    fun `all vars assigned with wrong parity should yield conflict`() {
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -39,5 +38,4 @@ class XorPropagatorTest {
         val r = problem.propagate(Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false)))
         assertIs<PropagationResult.Unsat>(r)
     }
-
 }

@@ -17,7 +17,7 @@ class PreparedSourceEvidenceTest {
     private val revision = SourceRevision("original-plan", "klause-ir-exact-v1")
 
     @Test
-    fun `prepared capture reads original declarations rather than narrowed execution bounds`() {
+    fun `prepared capture should read original declarations rather than narrowed execution bounds`() {
         val original = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
         val narrowed = Problem(0, 1, arrayOf(IntDomain(3, 9)), emptyArray())
         val plan = narrowed.prepareExecutionPlan(original, null, false, false)
@@ -26,12 +26,14 @@ class PreparedSourceEvidenceTest {
 
         val result = capture.solve(SolveResult.Sat(sample), "fixture-engine")
 
-        assertEquals(SourceEvidenceCheck.Checked,
-            assertNotNull(result.evidence).verify(SourceClaim.Witness(sample), capture.context))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            assertNotNull(result.evidence).verify(SourceClaim.Witness(sample), capture.context),
+        )
     }
 
     @Test
-    fun `prepared capture retains invocation pins and source objective direction`() {
+    fun `prepared capture should retain invocation pins and source objective direction`() {
         val original = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
         val plan = original.prepareExecutionPlan(LinearObjective(intCoefficients = longArrayOf(1)), maximize = true)
         val capture = assertNotNull(plan.sourceResultCapture(revision, Assumptions(ints = mapOf(0 to 3L)), "x"))
@@ -41,7 +43,7 @@ class PreparedSourceEvidenceTest {
     }
 
     @Test
-    fun `another source language cannot be relabelled as exact original IR`() {
+    fun `another source language should not be relabelled as exact original IR`() {
         val original = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
         val plan = original.prepareExecutionPlan()
 

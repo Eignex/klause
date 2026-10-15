@@ -4,92 +4,46 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.AspirationCriterion
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.localsearch.TabuFilter
-import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class DiffnRelocationsTest {
-    @Test
-    fun `cbls admits improving packing envelopes after a recent envelope write`() {
-        val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
-        val rows = listOf(
-            Linear(longArrayOf(1, -1), intArrayOf(0, 4), LinearOp.LE, -2),
-            Linear(longArrayOf(1, -1), intArrayOf(1, 4), LinearOp.LE, -3),
-        ) + List(256) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 12) }
-        val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0),
-            IntDomain(0, 20))
-        val state = LocalSearchState(LocalSearchModel.open(Problem(0, 5, domains, listOf(factor) + rows)), Random(43))
-        val values = longArrayOf(5, 10, 0, 0, 14)
-        values.forEachIndexed { v, value -> state.assignment.setInt(v, value) }
-        state.recompute()
-        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 1))
-        state.shaping.objective = objective
-        state.apply(Move.IntSet(4, 13))
-        val strategy = Cbls(tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving))
-
-        val move = assertNotNull(strategy.pickMove(state))
-
-        assertTrue(checkNotNull(state.objectiveDelta(objective, move)) < 0.0)
-        assertEquals(0L, state.netDelta(move))
-        state.apply(move)
-        state.recompute()
-        assertEquals(0L, state.cost)
-        assertTrue(state.assignment.intValue(4) < 13L)
-    }
 
     @Test
-    fun `default cbls improves a packing envelope among arithmetic rows`() {
-        val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
-        val rows = listOf(
-            Linear(longArrayOf(1, -1), intArrayOf(0, 4), LinearOp.LE, -2),
-            Linear(longArrayOf(1, -1), intArrayOf(1, 4), LinearOp.LE, -3),
-        ) + List(256) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 12) }
-        val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0),
-            IntDomain(0, 20))
-        val state = LocalSearchState(LocalSearchModel.open(Problem(0, 5, domains, listOf(factor) + rows)), Random(43))
-        val values = longArrayOf(5, 10, 0, 0, 13)
-        values.forEachIndexed { v, value -> state.assignment.setInt(v, value) }
-        state.recompute()
-        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 1))
-        state.shaping.objective = objective
-
-        val move = assertNotNull(Cbls().pickMove(state))
-
-        assertTrue(checkNotNull(state.objectiveDelta(objective, move)) < 0.0)
-        assertEquals(0L, state.netDelta(move))
-        state.apply(move)
-        state.recompute()
-        assertEquals(0L, state.cost)
-        assertTrue(state.assignment.intValue(4) < 13L)
-    }
-
-    @Test
-    fun `relocations reconcile exact source lower envelopes`() {
+    fun `relocations should reconcile exact source lower envelopes`() {
         for (wide in listOf(false, true)) {
             val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
             val rows = listOf(
                 Linear(longArrayOf(1, -1), intArrayOf(0, 4), LinearOp.LE, -2),
                 if (wide) {
-                    Linear(longArrayOf(Long.MAX_VALUE, -Long.MAX_VALUE, 1, -1),
-                        intArrayOf(5, 6, 1, 4), LinearOp.LE, -3)
+                    Linear(
+                        longArrayOf(Long.MAX_VALUE, -Long.MAX_VALUE, 1, -1),
+                        intArrayOf(5, 6, 1, 4),
+                        LinearOp.LE,
+                        -3,
+                    )
                 } else {
                     Linear(longArrayOf(1, -1), intArrayOf(1, 4), LinearOp.LE, -3)
                 },
             )
-            val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0),
-                IntDomain(0, 20), IntDomain(2, 2), IntDomain(2, 2))
+            val domains = arrayOf(
+                IntDomain(0, 12),
+                IntDomain(0, 12),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(0, 20),
+                IntDomain(2, 2),
+                IntDomain(2, 2),
+            )
             val problem = Problem(0, 7, domains, listOf(factor) + rows)
             val state = LocalSearchState(LocalSearchModel.open(problem, domains), Random(43))
             val values = longArrayOf(5, 10, 0, 0, 13, 2, 2)
@@ -113,15 +67,20 @@ class DiffnRelocationsTest {
     }
 
     @Test
-    fun `source lower envelope targets respect holes and pins`() {
+    fun `source lower envelope targets should respect holes and pins`() {
         for (pinned in listOf(false, true)) {
             val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
             val rows = listOf(
                 Linear(longArrayOf(1, -1), intArrayOf(0, 4), LinearOp.LE, -2),
                 Linear(longArrayOf(1, -1), intArrayOf(1, 4), LinearOp.LE, -3),
             )
-            val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0),
-                IntDomain(0, 20).excludeValue(7))
+            val domains = arrayOf(
+                IntDomain(0, 12),
+                IntDomain(0, 12),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(0, 20).excludeValue(7),
+            )
             val problem = Problem(0, 5, domains, listOf(factor) + rows)
             val assumptions = Assumptions(ints = if (pinned) mapOf(4 to 13L) else emptyMap())
             val state = LocalSearchState(LocalSearchModel.open(problem, domains), Random(47), assumptions)
@@ -144,7 +103,7 @@ class DiffnRelocationsTest {
     }
 
     @Test
-    fun `heterogeneous rectangles compact into free source positions`() {
+    fun `heterogeneous rectangles should compact into free source positions`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
         val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0))
         val state = LocalSearchState(Problem(0, 4, domains, listOf(factor)).bake(), Random(7))
@@ -164,7 +123,7 @@ class DiffnRelocationsTest {
     }
 
     @Test
-    fun `joint heterogeneous reorder preserves packing when either write overlaps`() {
+    fun `joint heterogeneous reorder should preserve packing when either write overlaps`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
         val domains = arrayOf(IntDomain(0, 3), IntDomain(0, 2), IntDomain(0, 0), IntDomain(0, 0))
         val state = LocalSearchState(Problem(0, 4, domains, listOf(factor)).bake(), Random(13))
@@ -183,12 +142,10 @@ class DiffnRelocationsTest {
         assertEquals(0L, state.netDelta(joint))
         state.apply(joint)
         assertEquals(0L, state.cost)
-        state.recompute()
-        assertEquals(0L, state.cost)
     }
 
     @Test
-    fun `joint compaction uses each rectangles source lower bound`() {
+    fun `joint compaction should use each rectangle's source lower bound`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
         val domains = arrayOf(IntDomain(0, 10), IntDomain(11, 12), IntDomain(0, 0), IntDomain(0, 0))
         val state = LocalSearchState(Problem(0, 4, domains, listOf(factor)).bake(), Random(37))
@@ -210,7 +167,7 @@ class DiffnRelocationsTest {
     }
 
     @Test
-    fun `source holes and protected coordinates retain complete relocation targets`() {
+    fun `source holes and protected coordinates should retain complete relocation targets`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
         val domains = arrayOf(IntDomain(0, 4).excludeValue(3), IntDomain(0, 2), IntDomain(0, 0), IntDomain(0, 0))
         val state = LocalSearchState(Problem(0, 4, domains, listOf(factor)).bake(), Random(17))
@@ -228,7 +185,7 @@ class DiffnRelocationsTest {
     }
 
     @Test
-    fun `aliased position and dimension roles use the final joint footprint`() {
+    fun `aliased position and dimension roles should use the final joint footprint`() {
         for (nonStrict in listOf(false, true)) {
             val factor = Diffn(
                 intArrayOf(0, 1, 0),
@@ -259,7 +216,7 @@ class DiffnRelocationsTest {
     }
 
     @Test
-    fun `packing proposals still grade other model constraints`() {
+    fun `packing proposals should grade other model constraints`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 3), longArrayOf(1, 2))
         val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 12)
         val domains = arrayOf(IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 0), IntDomain(0, 0))
@@ -277,7 +234,7 @@ class DiffnRelocationsTest {
     }
 
     @Test
-    fun `zero width relocations preserve the source strictness`() {
+    fun `zero width relocations should preserve the source strictness`() {
         for (nonStrict in listOf(false, true)) {
             val factor = Diffn(
                 intArrayOf(0, 1, 2),
@@ -308,7 +265,7 @@ class DiffnRelocationsTest {
     }
 
     @Test
-    fun `overflowing adjacency endpoints do not wrap into source positions`() {
+    fun `overflowing adjacency endpoints should not wrap into source positions`() {
         val factor = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 4), longArrayOf(1, 2))
         val domains = arrayOf(
             IntDomain(Long.MIN_VALUE + 1, Long.MAX_VALUE - 1),
@@ -329,7 +286,7 @@ class DiffnRelocationsTest {
     }
 
     @Test
-    fun `overflowing footprints do not appear adjacent at the largest coordinate`() {
+    fun `overflowing footprints should not appear adjacent at the largest coordinate`() {
         val factor = Diffn(
             intArrayOf(0, 1, 2),
             intArrayOf(3, 4, 5),

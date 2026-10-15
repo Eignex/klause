@@ -11,7 +11,7 @@ class CardinalitySearchComponentTest {
         SearchSession(listOf(CardinalitySearchComponent(cardinalities.toList())))
 
     @Test
-    fun `a lower bound equal to the literal count fixes every literal at the root`() {
+    fun `a lower bound equal to the literal count should fix every literal at the root`() {
         val session = sessionOf(Cardinality(intArrayOf(0, 2), min = 2, max = 2))
 
         assertIs<ComponentResult.Consistent>(session.initialize())
@@ -21,7 +21,7 @@ class CardinalitySearchComponentTest {
     }
 
     @Test
-    fun `an upper bound of zero falsifies every literal at the root`() {
+    fun `an upper bound of zero should falsify every literal at the root`() {
         val session = sessionOf(Cardinality(intArrayOf(0, 2), min = 0, max = 0))
 
         assertIs<ComponentResult.Consistent>(session.initialize())
@@ -31,7 +31,7 @@ class CardinalitySearchComponentTest {
     }
 
     @Test
-    fun `at most one falsifies the remaining literals once one is true`() {
+    fun `at most one should falsify the remaining literals once one is true`() {
         val session = sessionOf(Cardinality.atMostOne(intArrayOf(0, 2, 4)))
         assertIs<ComponentResult.Consistent>(session.initialize())
 
@@ -42,7 +42,7 @@ class CardinalitySearchComponentTest {
     }
 
     @Test
-    fun `a lower bound implies its last literal once the others are falsified`() {
+    fun `a lower bound should imply its last literal once the others are falsified`() {
         val session = sessionOf(Cardinality(intArrayOf(0, 2, 4), min = 1, max = 3))
         assertIs<ComponentResult.Consistent>(session.initialize())
 
@@ -53,7 +53,7 @@ class CardinalitySearchComponentTest {
     }
 
     @Test
-    fun `a literal one cardinality fixes propagates the cardinalities it wakes in turn`() {
+    fun `a literal fixed by one cardinality should propagate the cardinalities it wakes`() {
         val session = sessionOf(
             Cardinality.atMostOne(intArrayOf(0, 2)),
             Cardinality(intArrayOf(2, 4), min = 1, max = 2),
@@ -62,12 +62,12 @@ class CardinalitySearchComponentTest {
 
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
 
-        assertEquals(false, session.boolValue(1), "the at-most-one falsifies its other literal")
-        assertEquals(true, session.boolValue(2), "which leaves the lower bound one literal to satisfy it")
+        assertEquals(false, session.boolValue(1))
+        assertEquals(true, session.boolValue(2))
     }
 
     @Test
-    fun `a refuted lower bound explains itself with the literals that were falsified`() {
+    fun `a refuted lower bound should explain itself with the falsified literals`() {
         val session = sessionOf(
             Cardinality.atMostOne(intArrayOf(0, 2, 4)),
             Cardinality(intArrayOf(2, 4), min = 1, max = 2),
@@ -80,7 +80,7 @@ class CardinalitySearchComponentTest {
     }
 
     @Test
-    fun `a cardinality implies again after its literals are refalsified in another order`() {
+    fun `a cardinality should imply again after its literals are refalsified in another order`() {
         val session = sessionOf(Cardinality(intArrayOf(0, 2, 4), min = 1, max = 3))
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
@@ -94,7 +94,7 @@ class CardinalitySearchComponentTest {
     }
 
     @Test
-    fun `a negated literal counts its own truth rather than its variable's`() {
+    fun `a negated literal should count its own truth rather than its variable's`() {
         val session = sessionOf(Cardinality(intArrayOf(1, 3), min = 2, max = 2))
 
         assertIs<ComponentResult.Consistent>(session.initialize())
@@ -104,7 +104,7 @@ class CardinalitySearchComponentTest {
     }
 
     @Test
-    fun `solver refutes bounds no count over the same literals can meet`() {
+    fun `solver should refute bounds no count over the same literals can meet`() {
         val session = sessionOf(
             Cardinality(intArrayOf(0, 2, 4), min = 2, max = 3),
             Cardinality(intArrayOf(0, 2, 4), min = 0, max = 1),

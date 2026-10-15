@@ -24,19 +24,35 @@ import kotlin.test.assertIs
 
 class LinearApproachTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-    private val scope = SourceScope(SourceRevision("strict-real", "exact-affine"),
-        objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
-    private val source = SourceProofContext(scope, setOf(real), mapOf("positive" to SourcePremise(
-        SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true))),
-        mapOf(real to BigFraction.ONE)).withLinearAuthority()
+    private val scope = SourceScope(
+        SourceRevision("strict-real", "exact-affine"),
+        objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
+    )
+    private val source = SourceProofContext(
+        scope,
+        setOf(real),
+        mapOf(
+            "positive" to SourcePremise(
+                SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+            ),
+        ),
+        mapOf(real to BigFraction.ONE),
+    ).withLinearAuthority()
 
     @Test
-    fun `a strict global bound and feasible segment certify an unattained infimum`() {
+    fun `strict global bound and feasible segment should certify an unattained infimum`() {
         val base = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
-        val endpoint = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0),
-            exactReals = listOf(BigFraction.ZERO))
-        val evidence = SourceEvidence(scope, SourceClaim.Limit(base, SourceValue.Rational(BigFraction.ZERO)),
-            LinearApproach(endpoint, SourceDerivation.Premise("positive")))
+        val endpoint = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO),
+        )
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Limit(base, SourceValue.Rational(BigFraction.ZERO)),
+            LinearApproach(endpoint, SourceDerivation.Premise("positive")),
+        )
 
         val checked = SourceEvidenceVerifier(source).verify(evidence)
 
@@ -44,11 +60,18 @@ class LinearApproachTest {
     }
 
     @Test
-    fun `a closure endpoint is not an attained source optimum`() {
-        val endpoint = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0),
-            exactReals = listOf(BigFraction.ZERO))
-        val evidence = SourceEvidence(scope, SourceClaim.Optimal(endpoint, SourceValue.Rational(BigFraction.ZERO)),
-            SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("positive")))
+    fun `closure endpoint should not be an attained source optimum`() {
+        val endpoint = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO),
+        )
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Optimal(endpoint, SourceValue.Rational(BigFraction.ZERO)),
+            SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("positive")),
+        )
 
         val checked = SourceEvidenceVerifier(source).verify(evidence)
 
@@ -56,14 +79,29 @@ class LinearApproachTest {
     }
 
     @Test
-    fun `an integer approach cannot interpolate between distinct integer points`() {
+    fun `integer approach should not interpolate between distinct integer points`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val integerSource = SourceProofContext(scope, setOf(integer), mapOf("positive" to SourcePremise(
-            SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true))),
-            mapOf(integer to BigFraction.ONE)).withLinearAuthority()
-        val evidence = SourceEvidence(scope, SourceClaim.Limit(Sample(booleanArrayOf(), longArrayOf(1)),
-            SourceValue.Rational(BigFraction.ZERO)), LinearApproach(Sample(booleanArrayOf(), longArrayOf(0)),
-            SourceDerivation.Premise("positive")))
+        val integerSource = SourceProofContext(
+            scope,
+            setOf(integer),
+            mapOf(
+                "positive" to SourcePremise(
+                    SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+                ),
+            ),
+            mapOf(integer to BigFraction.ONE),
+        ).withLinearAuthority()
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Limit(
+                Sample(booleanArrayOf(), longArrayOf(1)),
+                SourceValue.Rational(BigFraction.ZERO),
+            ),
+            LinearApproach(
+                Sample(booleanArrayOf(), longArrayOf(0)),
+                SourceDerivation.Premise("positive"),
+            ),
+        )
 
         val checked = SourceEvidenceVerifier(integerSource).verify(evidence)
 
@@ -71,15 +109,26 @@ class LinearApproachTest {
     }
 
     @Test
-    fun `an approach cannot leave the invocation restrictions`() {
+    fun `approach should not leave the invocation restrictions`() {
         val restrictedScope = scope.copy(condition = SourceCondition(lower = mapOf(real to BigFraction.ONE)))
-        val restricted = SourceProofContext(restrictedScope, source.coordinates, source.premises,
-            source.objective).withLinearAuthority()
+        val restricted = SourceProofContext(
+            restrictedScope,
+            source.coordinates,
+            source.premises,
+            source.objective,
+        ).withLinearAuthority()
         val base = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
-        val endpoint = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0),
-            exactReals = listOf(BigFraction.ZERO))
-        val evidence = SourceEvidence(restrictedScope, SourceClaim.Limit(base, SourceValue.Rational(BigFraction.ZERO)),
-            LinearApproach(endpoint, SourceDerivation.Premise("positive")))
+        val endpoint = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO),
+        )
+        val evidence = SourceEvidence(
+            restrictedScope,
+            SourceClaim.Limit(base, SourceValue.Rational(BigFraction.ZERO)),
+            LinearApproach(endpoint, SourceDerivation.Premise("positive")),
+        )
 
         val checked = SourceEvidenceVerifier(restricted).verify(evidence)
 
@@ -87,12 +136,19 @@ class LinearApproachTest {
     }
 
     @Test
-    fun `cancelled approach checking withholds the limit`() {
+    fun `cancelled approach check should withhold the limit`() {
         val base = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
-        val endpoint = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0),
-            exactReals = listOf(BigFraction.ZERO))
-        val evidence = SourceEvidence(scope, SourceClaim.Limit(base, SourceValue.Rational(BigFraction.ZERO)),
-            LinearApproach(endpoint, SourceDerivation.Premise("positive")))
+        val endpoint = Sample(
+            booleanArrayOf(),
+            longArrayOf(),
+            doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO),
+        )
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Limit(base, SourceValue.Rational(BigFraction.ZERO)),
+            LinearApproach(endpoint, SourceDerivation.Premise("positive")),
+        )
 
         val checked = SourceEvidenceVerifier(source).verify(evidence, Cancellation { true })
 

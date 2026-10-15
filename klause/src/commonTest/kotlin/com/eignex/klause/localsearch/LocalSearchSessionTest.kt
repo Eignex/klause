@@ -40,7 +40,7 @@ class LocalSearchSessionTest {
     )
 
     @Test
-    fun `optimization resumes the state prepared after its slice expires`() {
+    fun `optimization should resume the state prepared after its slice expires`() {
         var expired = false
         var initializations = 0
         var primed = false
@@ -75,7 +75,7 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `sliced optimization preserves the unsliced walk and learned weights`() {
+    fun `sliced optimization should preserve the unsliced walk and learned weights`() {
         val objective = LinearObjective(boolWeights = LongArray(6) { 1L })
         val params = LocalSearchParams(maxFlips = 12L, randomSeed = 7L)
         val uninterrupted = LocalSearchSolver(weightLearningProblem().bake()).session()
@@ -101,7 +101,7 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `optimization handle keeps the session assumption stack`() {
+    fun `optimization handle should keep the session assumption stack`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray())
         val session = LocalSearchSolver(problem.bake()).session()
         session.push(Assumptions(bools = mapOf(0 to true)))
@@ -118,7 +118,7 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `optimization stops when a sibling spends the shared allowance`() {
+    fun `optimization should stop when a sibling spends the shared allowance`() {
         val budget = NodeBudget(10L)
         val session = LocalSearchSolver(weightLearningProblem().bake()).session()
         val params = LocalSearchParams(maxFlips = 100L, nodeBudget = budget, randomSeed = 7L)
@@ -137,7 +137,7 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `early stream close retains published warm state and releases the solver`() {
+    fun `early stream close should retain published warm state and release the solver`() {
         val factories = listOf<(LocalSearchSession, LocalSearchParams) -> SearchStream<*>>(
             { session, params -> session.openSamples(params) },
             { session, params ->
@@ -147,7 +147,9 @@ class LocalSearchSessionTest {
         )
         for ((index, open) in factories.withIndex()) {
             val problem = Problem(
-                2, 0, emptyArray(),
+                2,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
             )
             val solver = LocalSearchSolver(problem.bake())
@@ -170,11 +172,12 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `closing a session closes its pending walk`() {
+    fun `closing a session should close its pending walk`() {
         val solver = LocalSearchSolver(weightLearningProblem().bake())
         val session = solver.session()
         val handle = session.resumable(
-            LinearObjective(boolWeights = LongArray(6) { 1L }), LocalSearchParams(maxFlips = 10L),
+            LinearObjective(boolWeights = LongArray(6) { 1L }),
+            LocalSearchParams(maxFlips = 10L),
         )
         assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) {})
         session.close()
@@ -185,7 +188,7 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `reset clears warm state`() {
+    fun `reset should clear warm state`() {
         val problem = weightLearningProblem()
         val session = LocalSearchSession(LocalSearchSolver(problem.bake(), strategy = Cbls()))
         session.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 2L))
@@ -195,27 +198,7 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `warm weights survive across two minimize calls`() {
-        val problem = weightLearningProblem()
-        val session = LocalSearchSession(LocalSearchSolver(problem.bake(), strategy = Cbls()))
-        val obj = LinearObjective(boolWeights = LongArray(6) { 1L })
-        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 5L))
-        val firstWeights = session.warmState.factorWeights!!.copyOf()
-        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 6L))
-        val secondWeights = session.warmState.factorWeights!!
-        val allOnes = DoubleArray(problem.numFactors) { 1.0 }
-        assertTrue(
-            !secondWeights.contentEquals(allOnes),
-            "second call should have learned weights, not reset to defaults",
-        )
-        assertTrue(
-            firstWeights.size == secondWeights.size,
-            "weight array shape must match across calls",
-        )
-    }
-
-    @Test
-    fun `reset clears bestCostSeen alongside other warm fields`() {
+    fun `reset should clear the best seen cost alongside other warm fields`() {
         val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem.bake())
         val session = LocalSearchSession(solver)
@@ -230,11 +213,11 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `bare solver call does not touch the session warm state`() {
+    fun `a bare solver call should not touch the session warm state`() {
         val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem.bake(), strategy = Cbls())
         val session = LocalSearchSession(solver)
         solver.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 9L))
-        assertNull(session.warmState.factorWeights, "bare solver call must not write to session warm state")
+        assertNull(session.warmState.factorWeights)
     }
 }

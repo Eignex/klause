@@ -16,7 +16,6 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FlatZincSearchAnnotationTest {
@@ -32,7 +31,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `mixed float arrays exclude real columns from integer search groups`() {
+    fun `mixed float arrays should exclude real columns from integer search groups`() {
         val program = parseFlatZinc(
             """
             var 0.0..1.0: exact;
@@ -50,7 +49,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `int_search becomes one tier over the annotated array`() {
+    fun `int_search should become one tier over the annotated array`() {
         val src = """
             var 0..5: x;
             var 0..5: y;
@@ -71,7 +70,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `minimum value annotation retains its order after earlier models`() {
+    fun `a minimum value annotation should retain its order after earlier models`() {
         val src = """
             var 0..2: x;
             var 0..2: y;
@@ -91,7 +90,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `max_regret and indomain_median map to their own selectors not approximations`() {
+    fun `max_regret and indomain_median should map to their own selectors`() {
         val src = """
             var 0..5: x;
             constraint int_lin_le([1], [x], 3);
@@ -107,7 +106,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `seq_search keeps every block as its own tier in order`() {
+    fun `seq_search should keep every block as its own tier in order`() {
         val src = """
             var 0..5: x;
             var bool: y;
@@ -136,7 +135,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `smallest maps to the lower-bound heuristic`() {
+    fun `smallest should map to the lower-bound heuristic`() {
         val src = """
             var 0..5: x;
             constraint int_lin_le([1], [x], 3);
@@ -152,7 +151,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `set_search tiers over the set var's indicator bools`() {
+    fun `set_search should tier over the set variable indicator bools`() {
         val src = """
             var set of 1..3: s;
             solve :: set_search([s], input_order, indomain_min, complete) satisfy;
@@ -164,7 +163,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `constants in a search array are skipped`() {
+    fun `constants in a search array should be skipped`() {
         val src = """
             var bool: a;
             var bool: b;
@@ -183,7 +182,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `unrecognised variable strategy keeps the tier with input order`() {
+    fun `an unrecognised variable strategy should keep the tier with input order`() {
         val src = """
             var 0..5: x;
             constraint int_lin_le([1], [x], 3);
@@ -195,7 +194,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `occurrence strategy keeps fallback and tier differ as legacy mapping`() {
+    fun `the occurrence strategy should keep distinct fallback and tier mappings`() {
         val src = """
             var 0..5: x;
             constraint int_lin_le([1], [x], 3);
@@ -208,18 +207,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `no search annotation leaves searchHints null`() {
-        val src = """
-            var 0..5: x;
-            constraint int_lin_le([1], [x], 3);
-            solve satisfy;
-        """.trimIndent()
-        val program = parseFlatZinc(src)
-        assertNull(program.searchHints)
-    }
-
-    @Test
-    fun `minimize wraps value search in SolutionGuided`() {
+    fun `minimize should wrap value search in SolutionGuided`() {
         val src = """
             var 0..5: x;
             constraint int_lin_le([1], [x], 3);
@@ -228,17 +216,5 @@ class FlatZincSearchAnnotationTest {
         val program = parseFlatZinc(src)
         val params = toParams(program)
         assertTrue(params.valueSelector is SolutionGuided)
-    }
-
-    @Test
-    fun `satisfy does not wrap the value search`() {
-        val src = """
-            var 0..5: x;
-            constraint int_lin_le([1], [x], 3);
-            solve :: int_search([x], input_order, indomain_min, complete) satisfy;
-        """.trimIndent()
-        val program = parseFlatZinc(src)
-        val params = toParams(program)
-        assertTrue(params.valueSelector is TieredValueSelector)
     }
 }

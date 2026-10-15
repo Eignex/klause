@@ -32,7 +32,7 @@ import kotlin.test.assertTrue
 class TablePropagatorTest {
 
     @Test
-    fun `bounded unary supports constrain local search root domains`() {
+    fun `bounded unary supports should constrain local search root domains`() {
         val cases = listOf(
             Table(intArrayOf(0), longArrayOf(10, 1, 5, 5)) to listOf(1L, 5L, 10L),
             Table(intArrayOf(0), longArrayOf(1, 8), longArrayOf(3, 10)) to listOf(1L, 3L, 8L, 9L, 10L),
@@ -49,7 +49,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `sparse unary supports fold without walking their span`() {
+    fun `sparse unary supports should fold without walking their span`() {
         val problem = Problem(
             0,
             1,
@@ -66,7 +66,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `unary restrictions intersect during root propagation`() {
+    fun `unary restrictions should intersect during root propagation`() {
         val problem = Problem(
             0,
             1,
@@ -83,7 +83,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `disjoint unary supports refute the root`() {
+    fun `disjoint unary supports should refute the root`() {
         val problem = Problem(
             0,
             1,
@@ -97,7 +97,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `large unary supports remain deferred during bake`() {
+    fun `large unary supports should remain deferred during bake`() {
         val cases = listOf(
             Table(intArrayOf(0), longArrayOf(1), longArrayOf(5_000)),
             Table(intArrayOf(0), longArrayOf(Long.MIN_VALUE), longArrayOf(Long.MAX_VALUE)),
@@ -113,7 +113,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `bounded unary supports preserve Long endpoints`() {
+    fun `bounded unary supports should preserve Long endpoints`() {
         val cases = listOf(
             Triple(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE + 1),
             Triple(Long.MAX_VALUE - 2, Long.MAX_VALUE - 1, Long.MAX_VALUE),
@@ -133,7 +133,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `wide table support iteration stops at the upper Long endpoint`() {
+    fun `wide table support iteration should stop at the upper Long endpoint`() {
         for (lower in listOf(Long.MAX_VALUE, Long.MAX_VALUE - 1)) {
             val problem = Problem(
                 0,
@@ -153,10 +153,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `skipExpensiveBake defers the table's root pruning`() {
-        // Table {(0,1),(2,3)} over vars in [0..3] is GAC at the root: value 3 of var0 has no support,
-        // so a full bake tightens its max 3 -> 2. A raw problem never bakes at construction, so each state
-        // starts from the raw [0..3] domains.
+    fun `skipExpensiveBake should defer the table's root pruning`() {
         fun problem() = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -167,13 +164,12 @@ class TablePropagatorTest {
         full.runToFixpoint(allFactors = true, skipExpensiveBake = false)
         val cheap = PropagationState(problem(), Assumptions.None)
         cheap.runToFixpoint(allFactors = true, skipExpensiveBake = true)
-        assertEquals(2L, full.intDomains[0].max, "table fires: 3 unsupported, max 3 -> 2")
-        assertEquals(3L, cheap.intDomains[0].max, "expensive table skipped: domain intact")
+        assertEquals(2L, full.intDomains[0].max)
+        assertEquals(3L, cheap.intDomains[0].max)
     }
 
     @Test
-    fun `an interval column prunes to only values within the range and domain`() {
-        // Single row (a, [2..5]) with b ∈ [0..3]: b must land in [2..5] ∩ [0..3] = {2, 3}.
+    fun `an interval column should prune to values within the range and domain`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -188,7 +184,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `an empty live tuple prefix restores after conflict rollback`() {
+    fun `an empty live tuple prefix should restore after conflict rollback`() {
         for (base in listOf(0L, 5_000_000_000L)) {
             val problem = Problem(
                 numBoolVars = 0,
@@ -216,7 +212,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `duplicate ground supports leave unsupported sparse values filtered`() {
+    fun `duplicate ground supports should leave unsupported sparse values filtered`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -238,7 +234,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `interval supports preserve exact word boundaries over sparse domains`() {
+    fun `interval supports should preserve exact word boundaries over sparse domains`() {
         val ranges = listOf(0 to 0, 0 to 63, 63 to 64, 1 to 190, 64 to 127, 65 to 129)
         for ((first, last) in ranges) {
             val base = -73L
@@ -266,7 +262,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `nested table filtering restores supports after failed and sibling branches`() {
+    fun `nested table filtering should restore supports after failed and sibling branches`() {
         for (base in listOf(0L, 5_000_000_000L)) {
             val members = longArrayOf(base, base + 63, base + 64, base + 130)
             val problem = Problem(
@@ -299,7 +295,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `interval deductions across support words are implied by sparse domain reasons`() {
+    fun `interval deductions across support words should be implied by sparse domain reasons`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -319,8 +315,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `a table prune cites only what ruled out the tuples holding the removed values`() {
-        // x1 loses 1 and 3: (2, 1, 0) fell to x0 != 2 and (4, 3, 0) to x0 <= 3. x2 <= 0 ruled out no tuple.
+    fun `a table prune should cite only what ruled out the tuples holding the removed values`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -345,7 +340,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `delayed table reasons retain historical holes across sibling branches`() {
+    fun `delayed table reasons should retain historical holes across sibling branches`() {
         for (base in listOf(1L, 5_000_000_000L)) {
             val values = longArrayOf(0, base, base + 1, base + 2)
             val problem = Problem(
@@ -387,7 +382,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `table deductions are implied by their reasons under carved holes`() {
+    fun `table deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x7AB2)
         repeat(300) { iter ->
             val arity = 3
@@ -413,7 +408,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `interval table deductions are implied by their reasons under carved holes`() {
+    fun `interval table deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x7AB3)
         repeat(300) { iter ->
             val arity = 3

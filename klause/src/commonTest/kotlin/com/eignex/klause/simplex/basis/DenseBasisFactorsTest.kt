@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 class DenseBasisFactorsTest {
     @Test
-    fun `dimension boundary and off control retain sparse selection`() {
+    fun `dense selection should respect the dimension boundary and off control`() {
         for (n in 2..7) {
             val source = ftSource("dense", n)
             for (limit in listOf(0, 6)) {
@@ -26,31 +26,23 @@ class DenseBasisFactorsTest {
     }
 
     @Test
-    fun `singleton bases retain sparse construction below the dimension limit`() {
-        for (n in 1..6) {
-            val source = ftSource("unit", n)
-            KotlinBasisSolver(source).use { solver ->
-                assertTrue(solver.refactorize(IntArray(n) { n - 1 - it }))
-
-                assertEquals(0L, assertNotNull(solver.basisWork.build).denseAttempts)
-            }
-        }
-    }
-
-    @Test
-    fun `density boundary ignores explicit zeros in selected columns`() {
+    fun `density boundary should ignore explicit zeros in selected columns`() {
         for (entries in listOf(17, 18, 19)) {
-            val source = SparseMatrix.ofColumns(6, 6, List(6) { j ->
-                List(6) { i ->
-                    val distance = (i - j + 6) % 6
-                    i to when {
-                        distance == 0 -> 6.0
-                        distance == 1 -> 1.0
-                        distance == 2 && j < entries - 12 -> 1.0
-                        else -> 0.0
+            val source = SparseMatrix.ofColumns(
+                6,
+                6,
+                List(6) { j ->
+                    List(6) { i ->
+                        val distance = (i - j + 6) % 6
+                        i to when {
+                            distance == 0 -> 6.0
+                            distance == 1 -> 1.0
+                            distance == 2 && j < entries - 12 -> 1.0
+                            else -> 0.0
+                        }
                     }
-                }
-            })
+                },
+            )
             KotlinBasisSolver(source).use { solver ->
                 assertTrue(solver.refactorize(IntArray(6) { it }))
 
@@ -60,7 +52,7 @@ class DenseBasisFactorsTest {
     }
 
     @Test
-    fun `dense factors preserve both solve directions across updates and rebuilds`() {
+    fun `dense factors should solve both directions across updates and rebuilds`() {
         for (n in 2..6) {
             val source = ftSource("dense", n)
             val headings = IntArray(n) { n - 1 - it }
@@ -91,7 +83,7 @@ class DenseBasisFactorsTest {
     }
 
     @Test
-    fun `dense construction rejects overflowing and underflowing arithmetic`() {
+    fun `dense construction should reject overflowing and underflowing arithmetic`() {
         val matrices = listOf(
             arrayOf(doubleArrayOf(1e308, 1e308), doubleArrayOf(1e308, -1e308)),
             arrayOf(doubleArrayOf(1e200, 1e-200), doubleArrayOf(1e-200, 2e-200)),
@@ -110,7 +102,7 @@ class DenseBasisFactorsTest {
     }
 
     @Test
-    fun `dense arithmetic decline retries sparse pivoting and retains failed work`() {
+    fun `dense arithmetic decline should retry sparse pivoting and retain failed work`() {
         val source = SparseMatrix.ofColumns(2, 2, listOf(listOf(0 to 1.0, 1 to 1.0), listOf(0 to 1e308, 1 to -1e308)))
         val headings = intArrayOf(0, 1)
         val dense = DenseBasisFactors(source).build(headings, LuPivotPolicy())
@@ -130,7 +122,7 @@ class DenseBasisFactorsTest {
     }
 
     @Test
-    fun `failed dense rebuild invalidates factors and sparse repair returns owned headings`() {
+    fun `failed dense rebuild should invalidate factors and repair should return owned headings`() {
         val source = ftSource("dense", 3)
         KotlinBasisSolver(source).use { solver ->
             assertTrue(solver.refactorize(intArrayOf(0, 1, 2)))

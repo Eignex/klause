@@ -21,12 +21,23 @@ import kotlin.test.assertTrue
 
 class ExactRelaxationRowsTest {
     @Test
-    fun `a wide mixed row numerically certifies its original source equality`() {
+    fun `wide mixed row should certify its original source equality`() {
         val tiny = BigFraction.of(BIG_ONE, parseBigInt("100000000000000000000"))
-        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-            listOf(BigFraction.ONE, tiny), LinearOp.EQ, BigFraction.ONE + tiny)
-        val problem = Problem(0, 1, arrayOf(IntDomain(1, 1)), arrayOf<Factor>(row),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val row = ExactLinear.of(
+            intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+            listOf(BigFraction.ONE, tiny),
+            LinearOp.EQ,
+            BigFraction.ONE + tiny,
+        )
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(1, 1)),
+            arrayOf<Factor>(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val relaxation = CpToLpRelaxation(problem, null).build(RootDomains(problem))
 
         val result = solveAndCertify(relaxation.model)
@@ -38,13 +49,24 @@ class ExactRelaxationRowsTest {
     }
 
     @Test
-    fun `wide indicator activation retains both pin premises and retracts its row`() {
+    fun `wide indicator should retain both pin premises when active and retract its row otherwise`() {
         val tiny = BigFraction.of(BIG_ONE, parseBigInt("100000000000000000000"))
-        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-            listOf(BigFraction.ONE, tiny), LinearOp.GE, BigFraction.ONE)
+        val row = ExactLinear.of(
+            intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+            listOf(BigFraction.ONE, tiny),
+            LinearOp.GE,
+            BigFraction.ONE,
+        )
         val factor = LinearIndicator(1, true, row)
-        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf<Factor>(factor),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf<Factor>(factor),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val relaxer = CpToLpRelaxation(problem, null)
         val pinned = object : RelaxationDomains {
             override fun intDomain(varId: Int): IntDomain = if (varId == 1) IntDomain(1, 1) else IntDomain(0, 1)
@@ -64,13 +86,23 @@ class ExactRelaxationRowsTest {
     }
 
     @Test
-    fun `split free real columns preserve opposite exact wide coefficients`() {
+    fun `split free real columns should preserve opposite exact wide coefficients`() {
         val tiny = BigFraction.of(BIG_ONE, parseBigInt("100000000000000000000"))
-        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-            listOf(BigFraction.ONE, tiny), LinearOp.LE, BigFraction.ONE)
-        val problem = Problem(0, 1, arrayOf(IntDomain(-2, 2)), arrayOf<Factor>(row),
-            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+        val row = ExactLinear.of(
+            intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+            listOf(BigFraction.ONE, tiny),
+            LinearOp.LE,
+            BigFraction.ONE,
+        )
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(-2, 2)),
+            arrayOf<Factor>(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
 
         val relaxation = CpToLpRelaxation(problem, null).build(RootDomains(problem))
 

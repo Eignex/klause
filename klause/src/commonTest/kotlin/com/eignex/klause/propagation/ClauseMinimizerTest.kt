@@ -9,7 +9,7 @@ import kotlin.test.assertContentEquals
 class ClauseMinimizerTest {
 
     @Test
-    fun `redundancy follows the reason graph of each conflict`() {
+    fun `redundancy should follow the reason graph of each conflict`() {
         val state = PropagationState(Problem(3, 0, emptyArray(), emptyList()), Assumptions.None)
         var reason: IntArray? = intArrayOf(Lit.make(2, false))
         val graph = object : ReasonGraph {

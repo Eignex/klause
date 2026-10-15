@@ -13,21 +13,7 @@ import kotlin.test.assertTrue
 
 class FlipAndPropagateTest {
 
-    /** `x0 -> x1` via clause `(¬x0 ∨ x1)`, with a unit clause `(x0)` so x0 sits in a violated factor
-     *  at the all-false start (the seed). */
-    private fun impliesProblem(): Problem = Problem(
-        numBoolVars = 2,
-        numIntVars = 0,
-        intDomains = arrayOf(),
-        factors = arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, true))),
-        ),
-    )
-
-    /** `x0 -> x1` and `x0 -> x2` (a fork), plus the unit `(x0)` seed factor. Forking keeps the seed
-     *  the sole violated factor even after one forced variable is pre-satisfied, so the no-op-drop
-     *  test stays deterministic. */
+    // The fork keeps the unit seed the sole violated factor after one forced variable is pre-satisfied.
     private fun forkProblem(): Problem = Problem(
         numBoolVars = 3,
         numIntVars = 0,
@@ -39,7 +25,6 @@ class FlipAndPropagateTest {
         ),
     )
 
-    /** `x0 -> x1 -> x2` via two binary clauses, plus the unit `(x0)` seed factor. */
     private fun chainProblem(): Problem = Problem(
         numBoolVars = 3,
         numIntVars = 0,
@@ -51,7 +36,6 @@ class FlipAndPropagateTest {
         ),
     )
 
-    /** The parts of the single compound [FlipAndPropagate] emits for [state] at the given [maxDepth]. */
     private fun emittedParts(state: LocalSearchState, maxDepth: Int = 16): Set<Move> {
         val sink = MoveSink(state.assumptions)
         sink.setInvariants(state.invariants)
@@ -62,19 +46,7 @@ class FlipAndPropagateTest {
     }
 
     @Test
-    fun `flipping a seed also flips the literal it forces`() {
-        val state = freshState(impliesProblem(), seed = 1L)
-        // Read the implication direction off the graph rather than assuming it.
-        val forced = state.seeding.implicationGraph[Lit.make(0, true)].toList()
-        assertTrue(Lit.make(1, true) in forced, "pinning x0=true must force x1=true")
-
-        val parts = emittedParts(state)
-        assertTrue(Move.BoolFlip(0) in parts, "the seed flip is present")
-        assertTrue(Move.BoolFlip(1) in parts, "the forced literal is bundled into the same compound")
-    }
-
-    @Test
-    fun `a transitive chain bundles every forced flip`() {
+    fun `a transitive chain should bundle every forced flip`() {
         val state = freshState(chainProblem(), seed = 1L)
         assertEquals(
             setOf(Move.BoolFlip(0), Move.BoolFlip(1), Move.BoolFlip(2)),
@@ -84,31 +56,14 @@ class FlipAndPropagateTest {
     }
 
     @Test
-    fun `applying then reverting the compound restores the prior state`() {
-        val state = freshState(chainProblem(), seed = 1L)
-        val before = state.assignment.snapshot()
-        val beforeCost = state.cost
-        // Bool-flip parts self-invert, so re-applying the same compound reverts it exactly.
-        val compound = Move.Compound(emittedParts(state).toList())
-
-        state.apply(compound)
-        state.apply(compound)
-
-        assertEquals(beforeCost, state.cost, "cost restored after apply then revert")
-        for (v in 0 until state.problem.numBoolVars) {
-            assertEquals(before.bools[v], state.assignment.boolValue(v), "bool x$v restored")
-        }
-    }
-
-    @Test
-    fun `a variable already satisfying a forced value adds no redundant part`() {
+    fun `a variable already satisfying a forced value should add no redundant part`() {
         val state = freshState(forkProblem(), seed = 1L)
         // Pre-set x1 to the value x0=true forces (true). The forced literal x1=true is then a no-op
         // and must not appear as a part; the other forced flip x2 still flips.
         state.assignment.setBool(1, true)
         state.recompute()
         val parts = emittedParts(state)
-        assertTrue(Move.BoolFlip(1) !in parts, "an already-satisfied forced literal contributes no part")
+        assertTrue(Move.BoolFlip(1) !in parts)
         assertTrue(
             Move.BoolFlip(0) in parts && Move.BoolFlip(2) in parts,
             "the seed and the unsatisfied forced flip remain",

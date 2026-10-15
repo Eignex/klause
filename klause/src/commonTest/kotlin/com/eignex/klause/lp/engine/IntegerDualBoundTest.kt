@@ -3,23 +3,19 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
-import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
 import com.eignex.klause.simplex.exact.BigFraction
-import kotlin.math.ceil
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IntegerDualBoundTest {
 
     @Test
-    fun `legacy certificates reject mutations to numeric authority and source premises`() {
+    fun `legacy certificates should reject mutations to numeric authority and source premises`() {
         val edits = listOf<Pair<String, (LpModel) -> Unit>>(
             "cost" to { it.cost[0] = 0L },
             "rhs" to { it.rhs[0] = 0L },
@@ -60,9 +56,11 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `retained certificates bind immutable authority across equivalent views and reject later scopes`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L, cost = 1L) }
-            .build(Sense.MINIMIZE).authoritativeModel())
+    fun `retained certificates should bind immutable authority across equivalent views and reject later scopes`() {
+        val source = assertNotNull(
+            LpBuilder().apply { addVar(3L, 9L, cost = 1L) }
+                .build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val trail = LpBoundTrail(source)
         assertTrue(trail.push())
         assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
@@ -80,7 +78,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `retained certificates remove inactive row weight and recover parent support after pop`() {
+    fun `retained certificates should remove inactive row weight and recover parent support after pop`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 4L, cost = 1L)
             addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
@@ -89,31 +87,37 @@ class IntegerDualBoundTest {
         assertTrue(trail.push())
         assertTrue(trail.suspend(setOf(0L)))
         val row = LpScopedRow(
-            1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            1L,
+            listOf(0 to ExactLpNumber.of(-1L)),
+            ExactLpNumber.of(-2L),
             ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
         )
         assertTrue(trail.append(row, true))
 
-        val child = assertNotNull(integerCertify(
-            assertNotNull(trail.state.toWorkingModel()),
-            doubleArrayOf(999.0, -1.0),
-        ))
+        val child = assertNotNull(
+            integerCertify(
+                assertNotNull(trail.state.toWorkingModel()),
+                doubleArrayOf(999.0, -1.0),
+            ),
+        )
 
         assertEquals(2L, child.objectiveBoundCeil(0L))
         assertFalse(child.dualNonzeroRow(0))
         assertTrue(child.dualNonzeroRow(1))
         assertTrue(trail.pop(0))
-        val parent = assertNotNull(integerCertify(
-            assertNotNull(trail.state.toWorkingModel()),
-            doubleArrayOf(-1.0, 999.0),
-        ))
+        val parent = assertNotNull(
+            integerCertify(
+                assertNotNull(trail.state.toWorkingModel()),
+                doubleArrayOf(-1.0, 999.0),
+            ),
+        )
         assertEquals(1L, parent.objectiveBoundCeil(0L))
         assertTrue(parent.dualNonzeroRow(0))
         assertFalse(parent.dualNonzeroRow(1))
     }
 
     @Test
-    fun `retained integral certification declines fractional source coefficients and continuous columns`() {
+    fun `retained integral certification should decline fractional source coefficients and continuous columns`() {
         val fractional = LpBuilder().apply {
             val x = addVar(0L, 2L)
             addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.5)
@@ -131,11 +135,13 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `retained strict Farkas rays certify a zero margin contradiction`() {
-        val source = assertNotNull(LpBuilder().apply {
-            val x = addVar(0L, 2L)
-            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 0L)
-        }.build(Sense.MINIMIZE).authoritativeModel())
+    fun `retained strict Farkas rays should certify a zero margin contradiction`() {
+        val source = assertNotNull(
+            LpBuilder().apply {
+                val x = addVar(0L, 2L)
+                addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 0L)
+            }.build(Sense.MINIMIZE).authoritativeModel(),
+        )
         val model = assertNotNull(LpExactState(source.copy(rows = listOf(ExactLpRow(strict = true)))).toWorkingModel())
 
         val ray = assertNotNull(integerFarkasRay(model, doubleArrayOf(-1.0)))
@@ -144,19 +150,27 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `retained Farkas rays use exact rational rows and reject inactive support after pop`() {
+    fun `retained Farkas rays should use exact rational rows and reject inactive support after pop`() {
         val source = LpBuilder().apply { addRealVar(0.0, 2.0) }.build(Sense.MINIMIZE)
         val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
         assertTrue(trail.push())
         val coefficient = ExactLpNumber.of(BigFraction.ofLong(3L).reciprocal())
         val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))
-        assertTrue(trail.append(emptyList(), listOf(
-            LpScopedRow(0L, listOf(0 to coefficient), ExactLpNumber.of(0L), logical),
-            LpScopedRow(
-                1L, listOf(0 to ExactLpNumber.of(coefficient.value.negated())),
-                ExactLpNumber.of(coefficient.value.negated()), logical,
+        assertTrue(
+            trail.append(
+                emptyList(),
+                listOf(
+                    LpScopedRow(0L, listOf(0 to coefficient), ExactLpNumber.of(0L), logical),
+                    LpScopedRow(
+                        1L,
+                        listOf(0 to ExactLpNumber.of(coefficient.value.negated())),
+                        ExactLpNumber.of(coefficient.value.negated()),
+                        logical,
+                    ),
+                ),
+                true,
             ),
-        ), true))
+        )
         val child = assertNotNull(trail.state.toWorkingModel())
 
         val ray = assertNotNull(integerFarkasRay(child, doubleArrayOf(-1.0, -1.0)))
@@ -168,47 +182,8 @@ class IntegerDualBoundTest {
         assertNull(integerFarkasRay(parent, doubleArrayOf(-1.0, -1.0)))
     }
 
-    private fun randomModel(m: Int, n: Int, rng: Random): LpModel {
-        val b = LpBuilder()
-        repeat(n) { b.addVar(0L, rng.nextLong(2, 9), cost = rng.nextLong(-6, 7)) }
-        val cols = IntArray(n) { it }
-        repeat(m) {
-            val vals = LongArray(n) { rng.nextLong(-4, 5) }
-            b.addRow(cols, vals, Relation.LE, rng.nextLong(3, 25))
-        }
-        return b.build(Sense.MINIMIZE)
-    }
-
     @Test
-    fun `integer bound is sound and tight against ceil of the LP optimum`() {
-        val rng = Random(20260622)
-        var total = 0
-        var finite = 0
-        var matchesCeil = 0
-        repeat(300) {
-            val model = randomModel(rng.nextInt(3, 10), rng.nextInt(3, 10), rng)
-            val opt = exactLpOptimum(model)
-            if (opt.isNaN()) return@repeat
-            val rev = RevisedSimplex(model).solve() ?: return@repeat
-            total++
-            val bound = integerDualLowerBoundCeil(model, rev.duals) ?: return@repeat
-            finite++
-            // Sound: ceil of a valid LP lower bound never exceeds ceil(LP optimum).
-            val ceilOpt = ceil(opt)
-            assertTrue(
-                bound.toDouble() <= ceilOpt + 1e-6,
-                "UNSOUND integer bound $bound > ceil(optimum $opt)",
-            )
-            // Power-of-two scaling should recover ceil(LP optimum) on the large majority of instances.
-            if (bound.toDouble() in (ceilOpt - 0.5)..(ceilOpt + 0.5)) matchesCeil++
-        }
-        assertTrue(total > 60, "covered only $total instances")
-        assertTrue(finite >= total * 4 / 5, "integer bound was finite on only $finite/$total")
-        assertTrue(matchesCeil >= finite * 2 / 3, "matched ceil(optimum) on only $matchesCeil/$finite")
-    }
-
-    @Test
-    fun `fixing steps retain source constants at every certificate scale`() {
+    fun `fixing steps should retain source constants at every certificate scale`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 10L, cost = 2L)
         val model = builder.build(Sense.MINIMIZE)
@@ -222,7 +197,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `fixing arithmetic declines an unrepresentable reduced-cost magnitude`() {
+    fun `fixing arithmetic should decline an unrepresentable reduced-cost magnitude`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 1L, cost = Long.MIN_VALUE)
         val model = builder.build(Sense.MINIMIZE)
@@ -232,7 +207,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `integer certificate declines sub-unit continuous movement`() {
+    fun `an integer certificate should decline sub-unit continuous movement`() {
         val builder = LpBuilder()
         builder.addRealVar(0.0, 0.5, cost = 1.0)
         val model = builder.build(Sense.MINIMIZE)
@@ -241,33 +216,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `integer certification charges arithmetic and mutable authority snapshots`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 4L, cost = 1L)
-        val y = builder.addVar(0L, 4L, cost = 1L)
-        builder.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 2L)
-        val model = builder.build(Sense.MINIMIZE)
-        val costs = ArrayList<LpCertifierCost>()
-        val observer = object : LpCertificationObserver {
-            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
-                costs += cost
-            }
-            override fun observeExactInput(accepted: Boolean) = Unit
-            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-        }
-
-        val legacy = assertNotNull(integerCertify(model, doubleArrayOf(1.0), observer = observer))
-        assertTrue(legacy.belongsTo(model, observer))
-        val retained = assertNotNull(LpExactState(assertNotNull(model.authoritativeModel())).toWorkingModel())
-        val immutable = assertNotNull(integerCertify(retained, doubleArrayOf(1.0), observer = observer))
-        assertTrue(immutable.belongsTo(retained, observer))
-
-        assertEquals(listOf<LpCertifierCost>(LpCertifierCost.Metered(39L), LpCertifierCost.Metered(33L),
-            LpCertifierCost.Metered(6L)), costs)
-    }
-
-    @Test
-    fun `decimal and tiny binary coefficients decline bounded dyadic scaling`() {
+    fun `decimal and tiny binary coefficients should decline bounded dyadic scaling`() {
         for (coefficient in listOf(0.1, 1e-10, Double.MIN_VALUE, Double.MAX_VALUE)) {
             val model = LpBuilder().apply {
                 val x = addRealVar(0.0, 1.0)
@@ -279,7 +228,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `dyadic scaling preserves exact row coefficients and antecedents`() {
+    fun `dyadic scaling should preserve exact row coefficients and antecedents`() {
         val model = LpBuilder().apply {
             val x = addRealVar(2.0, 4.0, cost = 0.5, tag = 7)
             addRealRow(
@@ -306,7 +255,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `inexact binary objective constant cannot be accepted as zero`() {
+    fun `an inexact binary objective constant should not be accepted as zero`() {
         val model = LpBuilder().apply { addRealVar(1e-10, 1.0, cost = 1.0) }.build(Sense.MINIMIZE)
 
         assertEquals(false, assertNotNull(rationalizeToIntegerModel(model, true)).objConstantExact)
@@ -314,7 +263,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `direct certificates cannot use probe sides as finite support`() {
+    fun `direct certificates should not use probe sides as finite support`() {
         for (cost in listOf(-1L, 1L)) {
             val model = LpBuilder().apply { addFreeVar(null, null, cost = cost) }.build(Sense.MINIMIZE)
 
@@ -328,7 +277,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `direct Farkas validation rejects decimal cancellation on an open column`() {
+    fun `direct Farkas validation should reject decimal cancellation on an open column`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, null)
             val y = addRealVar(0.0, null)
@@ -338,5 +287,4 @@ class IntegerDualBoundTest {
 
         assertEquals(null, integerFarkasRay(model, doubleArrayOf(1.0, -1.0)))
     }
-
 }

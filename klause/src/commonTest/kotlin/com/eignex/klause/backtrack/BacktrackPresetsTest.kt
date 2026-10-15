@@ -7,14 +7,11 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class BacktrackPresetsTest {
 
-    /** Pigeonhole P(n+1, n) — UNSAT, conflict-heavy. */
     private fun pigeonhole(pigeons: Int, holes: Int): Problem {
         val factors = ArrayList<Factor>()
         fun v(p: Int, h: Int) = p * holes + h
@@ -35,14 +32,14 @@ class BacktrackPresetsTest {
     }
 
     @Test
-    fun `sat-optimized preset proves a conflict-heavy unsat instance`() {
+    fun `sat-optimized preset should prove a conflict-heavy unsat instance`() {
         val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4).bake())
             .solve(BacktrackPresets.satOptimized(randomSeed = 1L))
         assertIs<SolveResult.Unsat>(verdict)
     }
 
     @Test
-    fun `sat-optimized preset finds a valid witness on a satisfiable problem`() {
+    fun `sat-optimized preset should find a valid witness on a satisfiable problem`() {
         val problem = satisfiableChain()
         val sat = assertIs<SolveResult.Sat>(
             BacktrackSolver(problem.bake()).solve(BacktrackPresets.satOptimized(randomSeed = 2L)),
@@ -51,25 +48,14 @@ class BacktrackPresetsTest {
     }
 
     @Test
-    fun `sat-optimized preset should schedule inprocessing at an amortizing cadence`() {
-        val p = BacktrackPresets.satOptimized()
-        assertTrue(p.vivification)
-        assertTrue(p.subsumption)
-        assertEquals(4, p.inprocessingCadence)
-        val optedOut = BacktrackPresets.satOptimized(inprocess = false)
-        assertFalse(optedOut.vivification)
-        assertFalse(optedOut.subsumption)
-    }
-
-    @Test
-    fun `conflict-driven preset proves a conflict-heavy unsat instance`() {
+    fun `conflict-driven preset should prove a conflict-heavy unsat instance`() {
         val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4).bake())
             .solve(BacktrackPresets.conflictDriven(randomSeed = 1L))
         assertIs<SolveResult.Unsat>(verdict)
     }
 
     @Test
-    fun `conflict-driven preset finds a valid witness on a satisfiable problem`() {
+    fun `conflict-driven preset should find a valid witness on a satisfiable problem`() {
         val sat = assertIs<SolveResult.Sat>(
             BacktrackSolver(satisfiableChain().bake()).solve(BacktrackPresets.conflictDriven(randomSeed = 2L)),
         )

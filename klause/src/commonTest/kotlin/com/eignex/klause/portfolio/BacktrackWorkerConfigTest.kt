@@ -46,7 +46,7 @@ class BacktrackWorkerConfigTest {
     )
 
     @Test
-    fun `an arm earns cut uses only when it runs a cut separator`() {
+    fun `an arm should earn cut uses only when it runs a cut separator`() {
         val cases = listOf(
             "lp-aggressive" to true,
             "lp-default" to false,
@@ -67,7 +67,7 @@ class BacktrackWorkerConfigTest {
     }
 
     @Test
-    fun `an optimizing arm earns the signal of every pool it shares through`() {
+    fun `an optimizing arm should earn the signal of every pool it shares through`() {
         val signals = signalsOf(
             BacktrackCatalog.byLabel("lp-aggressive"),
             LinearObjective(boolWeights = longArrayOf(1L, 2L, 3L)),
@@ -78,14 +78,14 @@ class BacktrackWorkerConfigTest {
     }
 
     @Test
-    fun `a satisfying arm earns no objective floor or bound uses`() {
+    fun `a satisfying arm should earn no objective floor or bound uses`() {
         val signals = signalsOf(BacktrackCatalog.byLabel("conflictDriven"), objective = null, allPools())
 
         assertEquals(SEARCH_SIGNALS + Signal.ClauseUses, signals)
     }
 
     @Test
-    fun `a materialized arm records the clause traffic of its search`() {
+    fun `a materialized arm should record the clause traffic of its search`() {
         val problem = Problem(
             numBoolVars = 6,
             numIntVars = 0,

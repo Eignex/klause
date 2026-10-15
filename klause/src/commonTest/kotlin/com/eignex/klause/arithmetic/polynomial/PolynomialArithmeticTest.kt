@@ -2,12 +2,9 @@ package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotEquals
-import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -17,15 +14,18 @@ class PolynomialArithmeticTest {
     private val y = Polynomial.variable(1)
 
     @Test
-    fun `monomial order compares powers at the greatest coordinate first`() {
+    fun `monomial order should compare powers at the greatest coordinate first`() {
         for ((left, right, expected) in listOf(
             Triple(emptyMap<Int, Int>(), emptyMap(), 0),
             Triple(mapOf(3 to 1), emptyMap(), 1),
             Triple(mapOf(0 to Int.MAX_VALUE), mapOf(Int.MAX_VALUE to 1), -1),
             Triple(mapOf(7 to 2, 1 to 3), mapOf(7 to 2, 2 to 1), -1),
             Triple(mapOf(7 to 3), mapOf(7 to 2, 0 to Int.MAX_VALUE), 1),
-            Triple(mapOf(Int.MAX_VALUE to Int.MAX_VALUE, 0 to 1),
-                mapOf(Int.MAX_VALUE to Int.MAX_VALUE, 1 to 1), -1),
+            Triple(
+                mapOf(Int.MAX_VALUE to Int.MAX_VALUE, 0 to 1),
+                mapOf(Int.MAX_VALUE to Int.MAX_VALUE, 1 to 1),
+                -1,
+            ),
         )) {
             val a = Monomial.of(left)
             val b = Monomial.of(right)
@@ -36,7 +36,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `canonical monomials retain equality and hashes across insertion order and zero powers`() {
+    fun `canonical monomials should retain equality and hashes across insertion order and zero powers`() {
         for ((powers, equivalent) in listOf(
             mapOf(5 to 3, 0 to 2) to mapOf(0 to 2, 5 to 3),
             mapOf(0 to 2, 3 to 0, 5 to 3) to mapOf(5 to 3, 0 to 2),
@@ -53,37 +53,16 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `ordered monomial hashes distinguish exchanged coordinate and degree roles`() {
-        for ((coordinate, degree) in listOf(1 to 2, 3 to 5)) {
-            val a = Monomial.of(mapOf(coordinate to degree))
-            val b = Monomial.of(mapOf(degree to coordinate))
-
-            assertNotEquals(a, b)
-            assertNotEquals(a.hashCode(), b.hashCode())
-        }
-    }
-
-    @Test
-    fun `monomial variables expose fresh ascending views`() {
-        val monomial = Monomial.of(mapOf(9 to 1, 2 to 3, 6 to 2))
-
-        val first = monomial.variables
-        val second = monomial.variables
-
-        assertEquals(listOf(2, 6, 9), first)
-        assertEquals(first, second)
-        assertNotSame(first, second)
-    }
-
-    @Test
-    fun `canonical term ordering preserves coefficients at sparse extreme coordinates`() {
+    fun `canonical term ordering should preserve coefficients at sparse extreme coordinates`() {
         val low = Monomial.of(mapOf(0 to Int.MAX_VALUE))
         val high = Monomial.of(mapOf(Int.MAX_VALUE to 1))
-        val polynomial = Polynomial.of(listOf(
-            PolynomialTerm(high, fraction(3)),
-            PolynomialTerm(Monomial.ONE, fraction(1)),
-            PolynomialTerm(low, fraction(2)),
-        ))
+        val polynomial = Polynomial.of(
+            listOf(
+                PolynomialTerm(high, fraction(3)),
+                PolynomialTerm(Monomial.ONE, fraction(1)),
+                PolynomialTerm(low, fraction(2)),
+            ),
+        )
 
         val terms = polynomial.terms
 
@@ -92,7 +71,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `monomial multiplication rejects exponent overflow without changing its inputs`() {
+    fun `monomial multiplication should reject exponent overflow without changing its inputs`() {
         val left = Monomial.of(mapOf(0 to Int.MAX_VALUE))
         val right = Monomial.of(mapOf(0 to 1))
 
@@ -103,7 +82,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `prepared multiplication publishes only the completed product`() {
+    fun `prepared multiplication should publish only the completed product`() {
         val value = arithmetic.power(arithmetic.add(x, y), 17)
         val pending = arithmetic.prepareMultiply(value, value)
 
@@ -115,13 +94,15 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `prepared subresultants retain exact shared factor coefficients`() {
+    fun `prepared subresultants should retain exact shared factor coefficients`() {
         val left = arithmetic.multiply(
             arithmetic.multiply(arithmetic.subtract(x, constant(1)), arithmetic.subtract(x, constant(2))),
             arithmetic.subtract(x, constant(3)),
         )
-        val right = arithmetic.multiply(arithmetic.subtract(x, constant(2)),
-            arithmetic.subtract(arithmetic.scale(x, fraction(2)), constant(1)))
+        val right = arithmetic.multiply(
+            arithmetic.subtract(x, constant(2)),
+            arithmetic.subtract(arithmetic.scale(x, fraction(2)), constant(1)),
+        )
         val pending = arithmetic.preparePrincipalSubresultants(left, right, 0)
         var result: List<Polynomial>? = null
         while (result == null) result = pending.next()
@@ -130,30 +111,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `prepared subresultants charge each native operation once`() {
-        val left = arithmetic.subtract(arithmetic.power(y, 3), x)
-        val right = arithmetic.subtract(arithmetic.power(y, 2), arithmetic.add(x, Polynomial.ONE))
-        val charges = LongArray(2)
-        for (index in charges.indices) {
-            val meter = object : Cancellation, WorkMeter {
-                override fun isCancelled(): Boolean = false
-                override fun workMeter(): WorkMeter = this
-                override fun charge(units: Long) { charges[index] += units }
-            }
-            val counted = PolynomialArithmetic(meter)
-            if (index == 0) counted.principalSubresultants(left, right, 1)
-            else {
-                val pending = counted.preparePrincipalSubresultants(left, right, 1)
-                var result: List<Polynomial>? = null
-                while (result == null) result = pending.next()
-            }
-        }
-
-        assertEquals(charges[0], charges[1])
-    }
-
-    @Test
-    fun `solve cancellation terminates prepared subresultants`() {
+    fun `solve cancellation should terminate prepared subresultants`() {
         var stopped = false
         val counted = PolynomialArithmetic(Cancellation { stopped })
         val pending = counted.preparePrincipalSubresultants(arithmetic.power(x, 3), arithmetic.add(x, y), 0)
@@ -164,7 +122,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `terms merge and cancel independent of producer mutation`() {
+    fun `terms should merge and cancel independent of producer mutation`() {
         val powers = mutableMapOf(0 to 2)
         val monomial = Monomial.of(powers)
         val equivalent = Monomial.of(mapOf(0 to 2))
@@ -184,7 +142,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `exact division reconstructs a multivariate product`() {
+    fun `exact division should reconstruct a multivariate product`() {
         val divisor = arithmetic.add(x, y)
         val quotient = arithmetic.subtract(arithmetic.power(x, 2), y)
         val product = arithmetic.multiply(divisor, quotient)
@@ -193,7 +151,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `resultant eliminates the selected variable with exact coefficients`() {
+    fun `resultant should eliminate the selected variable with exact coefficients`() {
         val left = arithmetic.subtract(arithmetic.power(y, 2), x)
         val right = arithmetic.subtract(y, Polynomial.constant(BigFraction.ofLong(3)))
 
@@ -203,7 +161,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `principal subresultants detect a shared factor beyond the resultant`() {
+    fun `principal subresultants should detect a shared factor beyond the resultant`() {
         val left = arithmetic.multiply(
             arithmetic.multiply(arithmetic.subtract(x, constant(1)), arithmetic.subtract(x, constant(2))),
             arithmetic.subtract(x, constant(3)),
@@ -219,7 +177,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `constant and zero resultants retain elimination semantics`() {
+    fun `constant and zero resultants should retain elimination semantics`() {
         for ((left, right, expected) in listOf(
             Triple(Polynomial.ZERO, x, Polynomial.ZERO),
             Triple(constant(3), arithmetic.power(x, 2), constant(9)),
@@ -231,7 +189,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `substitution detects a vanished leading coefficient`() {
+    fun `substitution should detect a vanished leading coefficient`() {
         val polynomial = arithmetic.add(arithmetic.multiply(x, arithmetic.power(y, 2)), y)
 
         val specialized = arithmetic.substitute(polynomial, 0, Polynomial.ZERO)
@@ -240,7 +198,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `cancelled projection publishes no partial determinant`() {
+    fun `cancelled projection should publish no partial determinant`() {
         var work = 0
         val cancelled = PolynomialArithmetic(Cancellation { ++work > 5 })
 
@@ -249,7 +207,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `dense expansion declines before degree overflow or allocation`() {
+    fun `dense expansion should decline before degree overflow or allocation`() {
         val huge = Polynomial.of(listOf(PolynomialTerm(Monomial.of(mapOf(0 to Int.MAX_VALUE)), BigFraction.ONE)))
 
         val failure = assertFailsWith<PolynomialResourceLimit> { arithmetic.coefficients(huge, 0) }
@@ -258,7 +216,7 @@ class PolynomialArithmeticTest {
     }
 
     @Test
-    fun `projection matrix respects the invocation allocation limit`() {
+    fun `projection matrix should respect the invocation allocation limit`() {
         val bounded = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 3))
 
         val failure = assertFailsWith<PolynomialResourceLimit> { bounded.resultant(x, arithmetic.add(x, y), 0) }

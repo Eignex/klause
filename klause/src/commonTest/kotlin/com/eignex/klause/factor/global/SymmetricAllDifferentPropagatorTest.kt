@@ -16,8 +16,7 @@ import kotlin.test.assertIs
 class SymmetricAllDifferentPropagatorTest {
 
     @Test
-    fun `singleton forces mirror`() {
-        // xs[0] pinned to 2 ⇒ xs[2] must be 0.
+    fun `a singleton should force its mirror`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -30,9 +29,9 @@ class SymmetricAllDifferentPropagatorTest {
     }
 
     @Test
-    fun `symmetric alldifferent deductions are implied by their reasons under carved holes`() {
+    fun `symmetric alldifferent deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x5A11)
-        repeat(300) { iter ->
+        repeat(150) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,

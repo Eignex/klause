@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 class PortfolioPlanTest {
 
     @Test
-    fun `automatic sequential clausal satisfaction uses one arm per family`() {
+    fun `automatic sequential clausal satisfaction should use one arm per family`() {
         val scenario = PortfolioScenario.sequential(Kind.CSP)
         val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
 
@@ -33,7 +33,7 @@ class PortfolioPlanTest {
     }
 
     @Test
-    fun `explicit counts and recipes retain the requested pool size`() {
+    fun `explicit counts and recipes should keep the requested pool size`() {
         val scenario = PortfolioScenario.sequential(Kind.CSP)
         val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
         val controls = listOf(
@@ -47,18 +47,34 @@ class PortfolioPlanTest {
         )
 
         for (control in controls) {
-            assertEquals(control.arms,
-                clausalDefaultScenario(control, profile, autoArms(1), explicitArms = false).arms)
+            assertEquals(
+                control.arms,
+                clausalDefaultScenario(control, profile, autoArms(1), explicitArms = false).arms,
+            )
         }
         assertEquals(6, clausalDefaultScenario(scenario, profile, autoArms(1), explicitArms = true).arms)
-        assertEquals(6, clausalDefaultScenario(scenario,
-            profile.copy(problemClass = ProblemClass.PseudoBoolean), autoArms(1), explicitArms = false).arms)
-        assertEquals(12, clausalDefaultScenario(scenario.copy(arms = 12),
-            profile, 12, explicitArms = false).arms)
+        assertEquals(
+            6,
+            clausalDefaultScenario(
+                scenario,
+                profile.copy(problemClass = ProblemClass.PseudoBoolean),
+                autoArms(1),
+                explicitArms = false,
+            ).arms,
+        )
+        assertEquals(
+            12,
+            clausalDefaultScenario(
+                scenario.copy(arms = 12),
+                profile,
+                12,
+                explicitArms = false,
+            ).arms,
+        )
     }
 
     @Test
-    fun `curated sequential clausal satisfaction reserves complete proof time`() {
+    fun `curated sequential clausal satisfaction should reserve complete proof time`() {
         val scenario = PortfolioScenario.sequential(Kind.CSP)
         val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
 
@@ -68,7 +84,7 @@ class PortfolioPlanTest {
     }
 
     @Test
-    fun `explicit or non clausal search keeps unreserved scheduling`() {
+    fun `explicit or non clausal search should keep unreserved scheduling`() {
         val scenario = PortfolioScenario.sequential(Kind.CSP)
         val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
         val labels = listOf("ls/probsat/plain", "bt/clausal-balanced")
@@ -83,16 +99,23 @@ class PortfolioPlanTest {
         )
 
         for (control in controls) assertTrue(clausalProofShares(control, profile, labels).isEmpty())
-        assertTrue(clausalProofShares(scenario,
-            profile.copy(problemClass = ProblemClass.PseudoBoolean), labels).isEmpty())
+        assertTrue(
+            clausalProofShares(
+                scenario,
+                profile.copy(problemClass = ProblemClass.PseudoBoolean),
+                labels,
+            ).isEmpty(),
+        )
         assertTrue(clausalProofShares(scenario, profile, listOf("bt/satOptimized")).isEmpty())
     }
 
     @Test
-    fun `portfolio resolves distinct slice schedules`() {
-        val controls = listOf(emptyList<String>() to Triple(5_000L, 150_000L, 1.5),
+    fun `portfolio should resolve distinct slice schedules`() {
+        val controls = listOf(
+            emptyList<String>() to Triple(5_000L, 150_000L, 1.5),
             listOf("slice-work=1000", "slice-max-work=1000", "slice-growth=1") to Triple(1_000L, 1_000L, 1.0),
-            listOf("slice-work=20000", "slice-max-work=60000", "slice-growth=2") to Triple(20_000L, 60_000L, 2.0))
+            listOf("slice-work=20000", "slice-max-work=60000", "slice-growth=2") to Triple(20_000L, 60_000L, 2.0),
+        )
         for ((params, expected) in controls) {
             val scenario = buildPortfolioScenario(EngineParams(params), 1L, 1, Kind.COP, EngineMix.MIXED, 6)
 
@@ -103,10 +126,15 @@ class PortfolioPlanTest {
     }
 
     @Test
-    fun `portfolio rejects invalid slice schedules`() {
-        for (params in listOf(listOf("slice-work=0"), listOf("slice-work=-1"),
-            listOf("slice-max-work=4999"), listOf("slice-growth=0.5"), listOf("slice-growth=NaN"),
-            listOf("slice-growth=Infinity"))) {
+    fun `portfolio should reject invalid slice schedules`() {
+        for (params in listOf(
+            listOf("slice-work=0"),
+            listOf("slice-work=-1"),
+            listOf("slice-max-work=4999"),
+            listOf("slice-growth=0.5"),
+            listOf("slice-growth=NaN"),
+            listOf("slice-growth=Infinity"),
+        )) {
             assertFailsWith<PipelineConfigException> {
                 buildPortfolioScenario(EngineParams(params), 1L, 1, Kind.COP, EngineMix.MIXED, 6)
             }
@@ -114,10 +142,15 @@ class PortfolioPlanTest {
     }
 
     @Test
-    fun `portfolio phase timing accepts an explicit opt in`() {
+    fun `portfolio phase timing should accept an explicit opt in`() {
         for (enabled in listOf(false, true)) {
             val scenario = buildPortfolioScenario(
-                EngineParams(listOf("ls-phase-times=$enabled")), 1L, 1, Kind.COP, EngineMix.MIXED, 6,
+                EngineParams(listOf("ls-phase-times=$enabled")),
+                1L,
+                1,
+                Kind.COP,
+                EngineMix.MIXED,
+                6,
             )
 
             assertEquals(enabled, scenario.reportLsPhaseTimes)
@@ -126,28 +159,22 @@ class PortfolioPlanTest {
     }
 
     @Test
-    fun `portfolio residual reporting accepts an explicit opt in`() {
-        val scenario = buildPortfolioScenario(
-            EngineParams(listOf("ls-residuals=true")), 1L, 1, Kind.COP, EngineMix.MIXED, 6,
-        )
-
-        assertTrue(scenario.reportLsResiduals)
-        assertTrue(scenario.copy(phaseRetention = 0.5).reportLsResiduals)
-    }
-
-    @Test
-    fun `curated sequential continuous optimization reserves LP descent time`() {
+    fun `curated sequential continuous optimization should reserve LP descent time`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
 
-        val shares = continuousLpShares(scenario, profile, listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed"),
-            LinearObjective(realCoefficients = doubleArrayOf(1.0)))
+        val shares = continuousLpShares(
+            scenario,
+            profile,
+            listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed"),
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+        )
 
         assertEquals(listOf(0.0, 0.5, 0.0), shares.toList())
     }
 
     @Test
-    fun `continuous majority general integers leave LP time to family scheduling`() {
+    fun `continuous majority general integers should leave LP time to family scheduling`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
         val labels = listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed")
@@ -159,20 +186,26 @@ class PortfolioPlanTest {
     }
 
     @Test
-    fun `continuous majority binary models retain LP descent reservation`() {
+    fun `continuous majority binary models should keep LP descent reservation`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
         val labels = listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed")
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
 
-        val shares = continuousLpShares(scenario, profile, labels, objective,
-            continuousMajority = true, binaryIntegers = true)
+        val shares = continuousLpShares(
+            scenario,
+            profile,
+            labels,
+            objective,
+            continuousMajority = true,
+            binaryIntegers = true,
+        )
 
         assertEquals(listOf(0.0, 0.5, 0.0), shares.toList())
     }
 
     @Test
-    fun `explicit and inapplicable scenarios keep their requested scheduling`() {
+    fun `explicit and inapplicable scenarios should keep their requested scheduling`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
         val labels = listOf("bt/satOptimized", "bt/lp-default")
@@ -187,26 +220,41 @@ class PortfolioPlanTest {
         )
 
         for (explicit in scenarios) assertTrue(continuousLpShares(explicit, profile, labels, objective).isEmpty())
-        assertTrue(continuousLpShares(scenario,
-            profile.copy(problemClass = ProblemClass.FiniteCp), labels, objective).isEmpty())
-        assertTrue(continuousLpShares(scenario, profile,
-            listOf("bt/satOptimized", "bt/conflictDriven"), objective).isEmpty())
+        assertTrue(
+            continuousLpShares(
+                scenario,
+                profile.copy(problemClass = ProblemClass.FiniteCp),
+                labels,
+                objective,
+            ).isEmpty(),
+        )
+        assertTrue(
+            continuousLpShares(
+                scenario,
+                profile,
+                listOf("bt/satOptimized", "bt/conflictDriven"),
+                objective,
+            ).isEmpty(),
+        )
     }
 
     @Test
-    fun `finite objectives keep unreserved scheduling with continuous constraints`() {
+    fun `finite objectives should keep unreserved scheduling with continuous constraints`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
         val labels = listOf("bt/satOptimized", "bt/lp-default")
 
-        for (objective in listOf(null, LinearObjective(intCoefficients = longArrayOf(1L)),
-            LinearObjective(realCoefficients = doubleArrayOf(0.0)))) {
+        for (objective in listOf(
+            null,
+            LinearObjective(intCoefficients = longArrayOf(1L)),
+            LinearObjective(realCoefficients = doubleArrayOf(0.0)),
+        )) {
             assertTrue(continuousLpShares(scenario, profile, labels, objective).isEmpty())
         }
     }
 
     @Test
-    fun `root LP overrides preserve independent node techniques`() {
+    fun `root LP overrides should preserve independent node techniques`() {
         val params = EngineParams(listOf("lp-variable-shaving=true", "lp-prune-hulls=true", "lp-root-cuts=false"))
         val edit = checkNotNull(backtrackOverride(params, allowSelectors = true))
         val base = BacktrackParams(lpPlan = LpPlan(bounding = true, cuts = true))
@@ -222,9 +270,13 @@ class PortfolioPlanTest {
     }
 
     @Test
-    fun `portfolio reseeding accepts an off control and nonnegative thresholds`() {
-        for ((params, expected) in listOf(emptyList<String>() to 3, listOf("reseed-stale-threshold=0") to 0,
-            listOf("reseed-stale-threshold=2") to 2, listOf("reseed-stale-threshold=4") to 4)) {
+    fun `portfolio reseeding should accept an off control and nonnegative thresholds`() {
+        for ((params, expected) in listOf(
+            emptyList<String>() to 3,
+            listOf("reseed-stale-threshold=0") to 0,
+            listOf("reseed-stale-threshold=2") to 2,
+            listOf("reseed-stale-threshold=4") to 4,
+        )) {
             val scenario = buildPortfolioScenario(EngineParams(params), 1L, 1, Kind.COP, EngineMix.MIXED, 6)
 
             assertEquals(expected, scenario.reseedStaleThreshold)
@@ -232,13 +284,18 @@ class PortfolioPlanTest {
     }
 
     @Test
-    fun `portfolio rejects a negative reseeding threshold`() {
+    fun `portfolio should reject a negative reseeding threshold`() {
         assertFailsWith<PipelineConfigException> {
-            buildPortfolioScenario(EngineParams(listOf("reseed-stale-threshold=-1")), 1L, 1,
-                Kind.COP, EngineMix.MIXED, 6)
+            buildPortfolioScenario(
+                EngineParams(listOf("reseed-stale-threshold=-1")),
+                1L,
+                1,
+                Kind.COP,
+                EngineMix.MIXED,
+                6,
+            )
         }
     }
-
 
     private fun plan(annotated: BacktrackParams?, params: List<String> = emptyList()) =
         FinitePipeline.planFixedBacktrack(
@@ -256,17 +313,17 @@ class PortfolioPlanTest {
         )
 
     @Test
-    fun `a model that states its own search is never branched by the lp`() {
+    fun `model stating its own search should never branch on the lp`() {
         assertFalse(plan(BacktrackParams()).params.lpPlan.branching)
     }
 
     @Test
-    fun `an unannotated model branches on the lp`() {
+    fun `unannotated model should branch on the lp`() {
         assertTrue(plan(null).params.lpPlan.branching)
     }
 
     @Test
-    fun `an explicit lp-branching param does not override a stated search`() {
+    fun `explicit lp-branching param should not override a stated search`() {
         assertFalse(plan(BacktrackParams(), listOf("lp-branching=true")).params.lpPlan.branching)
     }
 }

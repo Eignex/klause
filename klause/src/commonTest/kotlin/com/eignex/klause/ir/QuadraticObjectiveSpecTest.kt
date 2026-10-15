@@ -7,19 +7,19 @@ import kotlin.test.assertFailsWith
 
 class QuadraticObjectiveSpecTest {
     @Test
-    fun `source rational coefficients normalize sign and common factors`() {
+    fun `source rational coefficients should normalize sign and common factors`() {
         val coefficient = QuadraticCoefficient.of(bigIntOf(-6), bigIntOf(-8))
 
         assertEquals(QuadraticCoefficient.of(bigIntOf(3), bigIntOf(4)), coefficient)
     }
 
     @Test
-    fun `zero source denominator is rejected`() {
+    fun `a zero source denominator should be rejected`() {
         assertFailsWith<IllegalArgumentException> { QuadraticCoefficient.of(bigIntOf(1), bigIntOf(0)) }
     }
 
     @Test
-    fun `source term mutation does not change captured objective`() {
+    fun `source term mutation should not change the captured objective`() {
         val x = QuadraticVariable.Real(SourceRealId(0))
         val term = QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)
         val terms = mutableListOf(term, term)
@@ -32,14 +32,17 @@ class QuadraticObjectiveSpecTest {
     }
 
     @Test
-    fun `remapping preserves distinct source namespaces`() {
-        val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, QuadraticVariable.Bool(SourceBoolId(0))),
-            QuadraticObjectiveTerm(
-                QuadraticCoefficient.ONE,
-                QuadraticVariable.Int(SourceIntId(0)), QuadraticVariable.Real(SourceRealId(0)),
+    fun `remapping should preserve distinct source namespaces`() {
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, QuadraticVariable.Bool(SourceBoolId(0))),
+                QuadraticObjectiveTerm(
+                    QuadraticCoefficient.ONE,
+                    QuadraticVariable.Int(SourceIntId(0)),
+                    QuadraticVariable.Real(SourceRealId(0)),
+                ),
             ),
-        ))
+        )
 
         val remapped = objective.remap(VarRemap(intArrayOf(2), intArrayOf(3), intArrayOf(4)))
 
@@ -49,10 +52,12 @@ class QuadraticObjectiveSpecTest {
     }
 
     @Test
-    fun `removed objective coordinates require exact substitution before remapping`() {
-        val objective = QuadraticObjectiveSpec(listOf(
-            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, QuadraticVariable.Int(SourceIntId(0))),
-        ))
+    fun `removed objective coordinates should require exact substitution before remapping`() {
+        val objective = QuadraticObjectiveSpec(
+            listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, QuadraticVariable.Int(SourceIntId(0))),
+            ),
+        )
 
         assertFailsWith<IllegalArgumentException> { objective.remap(VarRemap(intArrayOf(), intArrayOf(-1))) }
     }

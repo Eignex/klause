@@ -8,7 +8,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExactDualsTest {
-    // Equality rows A·x = 1 over nonnegative columns costing 1 each, with every structural column basic.
     private fun squareBasis(matrix: List<DoubleArray>): Pair<LpModel, Basis> {
         val m = matrix.size
         val zero = ExactLpNumber.of(0L)
@@ -29,7 +28,7 @@ class ExactDualsTest {
     private val hilbert = List(6) { i -> DoubleArray(6) { j -> 1.0 / (i + j + 1) } }
 
     @Test
-    fun `exact duals of a basis solve its transposed system exactly`() {
+    fun `exact duals should solve the transposed basis system exactly`() {
         val cases = listOf(
             listOf(doubleArrayOf(3.0, 1.0), doubleArrayOf(1.0, 2.0)) to doubleArrayOf(0.2, 0.4),
             hilbert to DoubleArray(6),
@@ -48,7 +47,7 @@ class ExactDualsTest {
     }
 
     @Test
-    fun `exact duals decline once their duals outgrow the caps`() {
+    fun `exact duals should decline once they outgrow the caps`() {
         val (model, basis) = squareBasis(hilbert)
         val variants = listOf(
             ExactDualLimits(maxSteps = 3) to ExactDualDecline.STEPS,
@@ -63,5 +62,4 @@ class ExactDualsTest {
             assertTrue(outcome.steps <= limits.maxSteps)
         }
     }
-
 }

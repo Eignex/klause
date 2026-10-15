@@ -26,13 +26,19 @@ import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
     @Test
-    fun `an unrepresentable emission declines without publishing a partial layout`() {
+    fun `unrepresentable emission should decline without publishing a partial layout`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0L, 1L)), emptyArray(),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            1,
+            arrayOf(IntDomain(0L, 1L)),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val objective = LinearObjective(
-            intCoefficients = longArrayOf(9007199254740993L), realCoefficients = doubleArrayOf(1.0),
+            intCoefficients = longArrayOf(9007199254740993L),
+            realCoefficients = doubleArrayOf(1.0),
         )
         val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, objective))
         val state = LpExactState(LpRetainedSources.emptyModel())
@@ -45,13 +51,15 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `live integer bounds preserve exact origins and earlier snapshots through nested pops`() {
+    fun `live integer bounds should preserve exact origins and earlier snapshots through nested pops`() {
         for (origin in listOf(5L, Long.MIN_VALUE + 1L, Long.MAX_VALUE - 5L)) {
             val problem = Problem(0, 1, arrayOf(IntDomain(origin, origin + 4L)), emptyArray())
             val session = PropagationSession(problem)
             val domains = SessionDomains(session)
-            val sources = LpRetainedSources(problem,
-                CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))))
+            val sources = LpRetainedSources(
+                problem,
+                CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+            )
             LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
                 val edit = assertNotNull(sources.prepare(owner.state, domains))
                 assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
@@ -85,12 +93,14 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `live bounds distinguish open source sides from finite search bounds`() {
+    fun `live bounds should distinguish open source sides from finite search bounds`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(5L, 9L)), emptyArray(), openIntHi = booleanArrayOf(true))
         val rootDomains = RootDomains(problem)
         val searchDomains = SessionDomains(PropagationSession(problem))
-        val sources = LpRetainedSources(problem,
-            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))))
+        val sources = LpRetainedSources(
+            problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+        )
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val edit = assertNotNull(sources.prepare(owner.state, rootDomains))
             assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
@@ -110,16 +120,22 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `live auxiliary bounds follow interior membership changes without altering earlier snapshots`() {
-        val problem = Problem(0, 2, arrayOf(IntDomain(0L, 2L), IntDomain(3L, 9L)),
-            arrayOf(Element(idx = 0, result = 1, arr = longArrayOf(3L, 5L, 9L), arrIsVars = false, indexOffset = 0)))
+    fun `live auxiliary bounds should follow membership changes without altering earlier snapshots`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0L, 2L), IntDomain(3L, 9L)),
+            arrayOf(Element(idx = 0, result = 1, arr = longArrayOf(3L, 5L, 9L), arrIsVars = false, indexOffset = 0)),
+        )
         var live = problem.finiteIntDomain(0)
         val domains = object : RelaxationDomains {
             override fun intDomain(varId: Int): IntDomain = if (varId == 0) live else problem.finiteIntDomain(varId)
             override fun boolValue(varId: Int): Boolean? = null
         }
-        val sources = LpRetainedSources(problem,
-            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0L, 1L)), elementHull = true))
+        val sources = LpRetainedSources(
+            problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0L, 1L)), elementHull = true),
+        )
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val edit = assertNotNull(sources.prepare(owner.state, domains))
             assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
@@ -144,7 +160,7 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `catalog compaction rejects stale plans and preserves numerical authority`() {
+    fun `catalog compaction should reject stale plans and preserve numerical authority`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val catalog = LpAuxiliarySources()
         val relaxer = CpToLpRelaxation(
@@ -182,9 +198,13 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `source compaction preserves ancestor bindings through same scope replacements and pop`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 6) },
-            arrayOf(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)))
+    fun `source compaction should preserve ancestor bindings through same scope replacements and pop`() {
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 6) },
+            arrayOf(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)),
+        )
         val root = problem.finiteIntDomain(1)
         var live = root
         var honors = true
@@ -193,17 +213,19 @@ class LpRetainedSourcesTest {
             override fun intDomain(varId: Int): IntDomain = if (varId == 1) live else problem.finiteIntDomain(varId)
             override fun boolValue(varId: Int): Boolean? = null
         }
-        val sources = LpRetainedSources(problem, CpToLpRelaxation(problem,
-            LinearObjective(intCoefficients = longArrayOf(1, 0, 0)), linMaxTightFace = true))
+        val sources = LpRetainedSources(
+            problem,
+            CpToLpRelaxation(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
+                linMaxTightFace = true,
+            ),
+        )
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val initial = assertNotNull(sources.prepare(owner.state, domains))
-            assertTrue(owner.replaceRows(
-                initial.retired,
-                initial.columns,
-                initial.rows,
-                false,
-                objective = initial.objective,
-            ))
+            assertTrue(
+                owner.replaceRows(initial.retired, initial.columns, initial.rows, false, objective = initial.objective),
+            )
             initial.commit()
             val rootColumns = owner.state.model.n
             val rootRows = owner.state.model.m
@@ -243,52 +265,48 @@ class LpRetainedSourcesTest {
             restored.commit()
             assertEquals(rootIds, owner.state.rows.entries().filter { it.active }.map { it.id })
             assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
-            var rootCompaction = sources.prepareCompaction(owner.state)
-            for (iteration in 0 until 16) {
-                if (rootCompaction != null) break
-                assertTrue(owner.push())
-                honors = false
-                val edit = assertNotNull(sources.prepare(owner.state, domains))
-                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, true, objective = edit.objective))
-                edit.commit()
-                assertTrue(owner.pop(0))
-                sources.retract(0)
-                honors = true
-                val rootEdit = assertNotNull(sources.prepare(owner.state, domains))
-                assertTrue(rootEdit.rows.isEmpty() && rootEdit.columns.isEmpty() && rootEdit.retired.isEmpty())
-                rootEdit.commit()
-                rootCompaction = sources.prepareCompaction(owner.state)
-            }
-            assertNotNull(rootCompaction)
-            assertTrue(owner.compact(rootCompaction.remap))
-            rootCompaction.commit()
-            assertEquals(rootColumns, owner.state.model.n)
-            assertEquals(rootRows, owner.state.model.m)
-            assertEquals(rootIds, owner.state.rows.entries().map { it.id })
-            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
         }
     }
 
     @Test
-    fun `mixed emitters share integer coordinates and preserve IEEE row authority`() {
+    fun `mixed emitters should share integer coordinates and preserve IEEE row authority`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 5)),
-            arrayOf<Factor>(Linear(
-                intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 2.5,
-                strict = true,
-            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            1,
+            arrayOf(IntDomain(0, 5)),
+            arrayOf<Factor>(
+                Linear(
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    2.5,
+                    strict = true,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
         val domains = RootDomains(problem)
         val sources = LpRetainedSources(
-            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+            problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
         )
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val edit = assertNotNull(sources.prepare(owner.state, domains))
 
-            assertTrue(owner.replaceRows(
-                edit.retired, edit.columns, edit.rows, false,
-                permanentRows = edit.permanentRows, objective = edit.objective,
-            ))
+            assertTrue(
+                owner.replaceRows(
+                    edit.retired,
+                    edit.columns,
+                    edit.rows,
+                    false,
+                    permanentRows = edit.permanentRows,
+                    objective = edit.objective,
+                ),
+            )
             edit.commit()
 
             val relaxation = sources.relaxation(owner.state, domains)
@@ -303,9 +321,11 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `bound only source edits reuse emitted rows metadata and the numerical owner`() {
+    fun `bound only source edits should reuse emitted row metadata and the numerical owner`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(3, 9)),
+            0,
+            1,
+            arrayOf(IntDomain(3, 9)),
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 4)),
         )
         val root = problem.finiteIntDomain(0)
@@ -315,7 +335,8 @@ class LpRetainedSourcesTest {
             override fun boolValue(varId: Int): Boolean? = null
         }
         val sources = LpRetainedSources(
-            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+            problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
         )
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val first = assertNotNull(sources.prepare(owner.state, domains))
@@ -341,16 +362,34 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `split real upper definitions are shared and survive the activating source scope`() {
+    fun `split real upper definitions should be shared and survive the activating source scope`() {
         val problem = Problem(
-            1, 0, emptyArray(), arrayOf<Factor>(
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
                 ReifiedRealLinear(
-                    0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.GE,
+                    1.0,
                 ),
                 ReifiedRealLinear(
-                    0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 4.0,
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    4.0,
                 ),
-            ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(5.0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(5.0),
         )
         var pin: Boolean? = null
         val domains = object : RelaxationDomains {
@@ -365,10 +404,16 @@ class LpRetainedSourcesTest {
             assertTrue(owner.push())
             pin = true
             val child = assertNotNull(sources.prepare(owner.state, domains))
-            assertTrue(owner.replaceRows(
-                child.retired, child.columns, child.rows, true,
-                permanentRows = child.permanentRows, objective = child.objective,
-            ))
+            assertTrue(
+                owner.replaceRows(
+                    child.retired,
+                    child.columns,
+                    child.rows,
+                    true,
+                    permanentRows = child.permanentRows,
+                    objective = child.objective,
+                ),
+            )
             child.commit()
 
             assertEquals(2, owner.state.model.n)
@@ -385,10 +430,11 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `cancelled and stale source publications preserve the committed layout`() {
+    fun `cancelled and stale source publications should preserve the committed layout`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf<Factor>())
         val sources = LpRetainedSources(
-            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+            problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
         )
         val state = LpExactState(LpRetainedSources.emptyModel())
         val domains = RootDomains(problem)

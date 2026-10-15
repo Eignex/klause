@@ -30,9 +30,11 @@ import kotlin.test.assertTrue
 
 class AffineAbsTest {
     @Test
-    fun `finite SMT wide absolute value retains digit coordinates and the complete native relation`() {
-        val input = SmtLib.parse("(declare-const x Int) (assert (<= (- 2) x 2)) " +
-            "(assert (= (abs (* 9223372036854775808 x)) 9223372036854775808))")
+    fun `finite wide absolute value should retain digit coordinates and the native relation`() {
+        val input = SmtLib.parse(
+            "(declare-const x Int) (assert (<= (- 2) x 2)) " +
+                "(assert (= (abs (* 9223372036854775808 x)) 9223372036854775808))",
+        )
         val source = input.model
         assertNotNull(source.factors.filterIsInstance<AffineAbs>().singleOrNull())
         val operand = input.intVarNames.getValue("x")
@@ -43,9 +45,11 @@ class AffineAbsTest {
     }
 
     @Test
-    fun `wide SMT source witnesses preserve magnitudes beyond signed word coordinates`() {
-        val input = SmtLib.parse("(declare-const x Int) (assert (= x 9223372036854775808)) " +
-            "(assert (= (abs (+ 9223372036854775808 x)) 18446744073709551616))")
+    fun `wide source witnesses should preserve magnitudes beyond signed word coordinates`() {
+        val input = SmtLib.parse(
+            "(declare-const x Int) (assert (= x 9223372036854775808)) " +
+                "(assert (= (abs (+ 9223372036854775808 x)) 18446744073709551616))",
+        )
         val source = input.model
         val context = assertNotNull(source.absSourceWitnessContext(LinearObjective(), Cancellation.Never))
 
@@ -55,12 +59,14 @@ class AffineAbsTest {
         assertEquals("9223372036854775808", result.assignment.intValue(input.intVarNames.getValue("x")))
         assertTrue(assertNotNull(sample.exactInts).any { !it.fitsLong() })
         assertTrue(source.factors.filterIsInstance<AffineAbs>().single().isSatisfied(sample::exactIntValue))
-        assertEquals(SourceEvidenceCheck.Checked,
-            assertNotNull(context.semanticsChecker).witness(sample, context.scope, Cancellation.Never))
+        assertEquals(
+            SourceEvidenceCheck.Checked,
+            assertNotNull(context.semanticsChecker).witness(sample, context.scope, Cancellation.Never),
+        )
     }
 
     @Test
-    fun `affine absolute value aliases retain only nonnegative expression values`() {
+    fun `affine absolute value aliases should retain only nonnegative expression values`() {
         val expression = AbsAffineValue(mapOf(0 to parseBigInt("9223372036854775808")), BIG_ZERO)
         val source = Problem(0, 1, arrayOf(IntDomain(-2, 2)), arrayOf(AffineAbs(expression, expression)))
 
@@ -70,11 +76,19 @@ class AffineAbsTest {
     }
 
     @Test
-    fun `affine absolute value filters the magnitude of a constant outside signed word range`() {
+    fun `affine absolute value should filter the magnitude of a constant outside signed word range`() {
         val magnitude = parseBigInt("9223372036854775808")
-        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf(AffineAbs(
-            AbsAffineValue(emptyMap(), -magnitude), AbsAffineValue(mapOf(0 to magnitude), BIG_ZERO),
-        )))
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            arrayOf(
+                AffineAbs(
+                    AbsAffineValue(emptyMap(), -magnitude),
+                    AbsAffineValue(mapOf(0 to magnitude), BIG_ZERO),
+                ),
+            ),
+        )
 
         val values = BacktrackSolver(source.bake()).enumerate().map { it.intValue(0) }.toList()
 
@@ -82,9 +96,11 @@ class AffineAbsTest {
     }
 
     @Test
-    fun `affine absolute value remapping coalesces every aliased expression term`() {
-        val relation = AffineAbs(AbsAffineValue(mapOf(0 to BIG_ONE, 1 to -BIG_ONE), bigIntOf(-2)),
-            AbsAffineValue(mapOf(2 to BIG_ONE), BIG_ZERO))
+    fun `affine absolute value remapping should coalesce every aliased expression term`() {
+        val relation = AffineAbs(
+            AbsAffineValue(mapOf(0 to BIG_ONE, 1 to -BIG_ONE), bigIntOf(-2)),
+            AbsAffineValue(mapOf(2 to BIG_ONE), BIG_ZERO),
+        )
         val mapping = VarRemap(intArrayOf(), intArrayOf(0, 0, 1))
 
         val remapped = relation.remap(mapping) as AffineAbs
@@ -96,24 +112,35 @@ class AffineAbsTest {
     }
 
     @Test
-    fun `overlapping affine absolute value roles replace every occurrence in move grading`() {
+    fun `overlapping affine absolute value roles should replace every occurrence in move grading`() {
         val wide = parseBigInt("9223372036854775808")
-        val source = Problem(0, 3, Array(3) { IntDomain(-2, 2) }, arrayOf(AffineAbs(
-            AbsAffineValue(mapOf(0 to wide, 2 to BIG_ONE), BIG_ONE),
-            AbsAffineValue(mapOf(1 to wide, 2 to BIG_ONE), BIG_ONE),
-        )))
+        val source = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(-2, 2) },
+            arrayOf(
+                AffineAbs(
+                    AbsAffineValue(mapOf(0 to wide, 2 to BIG_ONE), BIG_ONE),
+                    AbsAffineValue(mapOf(1 to wide, 2 to BIG_ONE), BIG_ONE),
+                ),
+            ),
+        )
         val state = LocalSearchState(LocalSearchModel.open(source), Random(1))
-        for (variable in 0..2) for (old in -1L..1L) for (target in -1L..1L) {
-            state.assignment.setInt(variable, old)
-            state.recompute()
-            val before = state.cost
-            val delta = state.netDelta(Move.IntSet(variable, target))
-            state.apply(Move.IntSet(variable, target))
-            val committed = state.cost
-            state.recompute()
+        for (variable in 0..2) {
+            for (old in -1L..1L) {
+                for (target in -1L..1L) {
+                    state.assignment.setInt(variable, old)
+                    state.recompute()
+                    val before = state.cost
+                    val delta = state.netDelta(Move.IntSet(variable, target))
+                    state.apply(Move.IntSet(variable, target))
+                    val committed = state.cost
+                    state.recompute()
 
-            assertEquals(state.cost - before, delta)
-            assertEquals(state.cost, committed)
+                    assertEquals(state.cost - before, delta)
+                    assertEquals(state.cost, committed)
+                }
+            }
         }
     }
 }

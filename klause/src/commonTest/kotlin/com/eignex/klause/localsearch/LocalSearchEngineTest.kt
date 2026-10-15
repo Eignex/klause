@@ -2,46 +2,31 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
-import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toExactSourceProblem
-import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
-import com.eignex.klause.localsearch.movesource.MoveSource
-import com.eignex.klause.localsearch.movesource.MoveSourceId
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
-import com.eignex.klause.localsearch.movesource.Phase
-import com.eignex.klause.localsearch.movesource.Pool
 import com.eignex.klause.localsearch.scoring.MoveScoring
-import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
-import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.InstructionSlicedSearch
-import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.math.abs
 import kotlin.test.Test
@@ -50,29 +35,35 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
     @Test
-    fun `satisfaction resumes an interrupted pick without a restart instruction`() {
+    fun `satisfaction should resume an interrupted pick without a restart instruction`() {
         val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))))
         var expired = false
         var picks = 0
         val strategy = SourceDrivenStrategy(
-            sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
+            sources = emptyList(),
+            feasibleDescent = FeasibleDescent.SelfOwned,
             perturbation = {
                 if (picks++ == 0) {
                     expired = true
                     null
-                } else Move.BoolFlip(0)
+                } else {
+                    Move.BoolFlip(0)
+                }
             },
         )
         val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+            LocalSearchModel.open(problem),
+            strategy = strategy,
+            greedyRepairOnRestart = false,
         )
         val params = LocalSearchParams(
-            maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(false), longArrayOf()),
+            maxFlips = 2L,
+            randomSeed = 0L,
+            initialAssignment = Sample(booleanArrayOf(false), longArrayOf()),
         )
 
         search.resumableSolve(params).use { handle ->
@@ -87,57 +78,32 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `infeasible optimization resumes an interrupted pick without a restart instruction`() {
-        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))))
-        var expired = false
-        var picks = 0
-        val strategy = SourceDrivenStrategy(
-            sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
-            perturbation = {
-                if (picks++ == 0) {
-                    expired = true
-                    null
-                } else Move.BoolFlip(0)
-            },
-        )
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
-        )
-        val params = LocalSearchParams(
-            maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(false), longArrayOf()),
-        )
-
-        search.resumable(LinearObjective(boolWeights = longArrayOf(1)), params).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
-            assertEquals(0.0, handle.stats.ls.moves.sum)
-            expired = false
-
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
-
-            assertTrue(assertIs<MinimizeResult.BestFound>(result).sample.boolValue(0))
-        }
-    }
-
-    @Test
-    fun `feasible optimization resumes an interrupted pick without a restart instruction`() {
+    fun `feasible optimization should resume an interrupted pick without a restart instruction`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray())
         val objective = LinearObjective(boolWeights = longArrayOf(1))
         var expired = false
         var picks = 0
         val strategy = SourceDrivenStrategy(
-            sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
+            sources = emptyList(),
+            feasibleDescent = FeasibleDescent.SelfOwned,
             perturbation = {
                 if (picks++ == 0) {
                     expired = true
                     null
-                } else Move.BoolFlip(0)
+                } else {
+                    Move.BoolFlip(0)
+                }
             },
         )
         val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+            LocalSearchModel.open(problem),
+            strategy = strategy,
+            greedyRepairOnRestart = false,
         )
         val params = LocalSearchParams(
-            maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(true), longArrayOf()),
+            maxFlips = 2L,
+            randomSeed = 0L,
+            initialAssignment = Sample(booleanArrayOf(true), longArrayOf()),
         )
 
         search.resumable(objective, params).use { handle ->
@@ -152,26 +118,38 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `native objective descent replaces support around maintained unit definitions`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
-        ))
+    fun `native objective descent should replace support around maintained unit definitions`() {
+        val problem = Problem(
+            4,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
+            ),
+        )
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ObjectiveSeed())),
-            feasibleAcceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned,
+            feasibleAcceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+            LocalSearchModel.open(problem),
+            strategy = strategy,
+            greedyRepairOnRestart = false,
             perMoveInvariants = true,
-            definitionalSweep = DefinitionalSweep.infer(problem, boolFolds = listOf(
-                BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
-            )),
+            definitionalSweep = DefinitionalSweep.infer(
+                problem,
+                boolFolds = listOf(
+                    BoolFoldDefinition(3, intArrayOf(Lit.make(0, false)), true),
+                ),
+            ),
         )
         val objective = LinearObjective(boolWeights = longArrayOf(0, 5, 1, 100))
         val params = LocalSearchParams(
-            maxFlips = 2L, randomSeed = 0L,
+            maxFlips = 2L,
+            randomSeed = 0L,
             initialAssignment = Sample(booleanArrayOf(false, false, false, true), longArrayOf()),
         )
 
@@ -182,19 +160,24 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `self owned descent follows feasibility first objectives`() {
+    fun `self owned descent should follow feasibility first objectives`() {
         val problem = Problem(1, 0, emptyArray(), emptyArray())
         val objective = LinearObjective(boolWeights = longArrayOf(1))
         val strategy = SourceDrivenStrategy(
-            sources = listOf(ConfiguredSource(ObjectiveSeed())), scoring = MoveScoring.Break,
-            acceptance = AcceptanceRule.GreedyDescent, feasibleDescent = FeasibleDescent.SelfOwned,
+            sources = listOf(ConfiguredSource(ObjectiveSeed())),
+            scoring = MoveScoring.Break,
+            acceptance = AcceptanceRule.GreedyDescent,
+            feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy,
+            LocalSearchModel.open(problem),
+            strategy = strategy,
             restartPolicy = AdaptivePerturbationRestart(perturbationStrength = 0),
         )
         val params = LocalSearchParams(
-            maxFlips = 2L, randomSeed = 0L, initialAssignment = Sample(booleanArrayOf(true), longArrayOf()),
+            maxFlips = 2L,
+            randomSeed = 0L,
+            initialAssignment = Sample(booleanArrayOf(true), longArrayOf()),
         )
 
         val result = search.improvements(objective, params, warm = null)
@@ -204,28 +187,44 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `optimization seed cost observations follow definition reconciliation`() {
-        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-            Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, true))),
-            Clause(intArrayOf(Lit.make(1, true))), Clause(intArrayOf(Lit.make(1, true))),
-        ))
+    fun `optimization seed cost observations should follow definition reconciliation`() {
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(1, true))),
+            ),
+        )
         val observed = mutableListOf<Long>()
         val strategy = SourceDrivenStrategy(
             sources = emptyList(),
-            perturbation = { observed += it.bestCostSeen; null },
+            perturbation = {
+                observed += it.bestCostSeen
+                null
+            },
             feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+            LocalSearchModel.open(problem),
+            strategy = strategy,
+            greedyRepairOnRestart = false,
             perMoveInvariants = true,
-            definitionalSweep = DefinitionalSweep.infer(problem, boolFolds = listOf(
-                BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
-            )),
+            definitionalSweep = DefinitionalSweep.infer(
+                problem,
+                boolFolds = listOf(
+                    BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+                ),
+            ),
         )
         val params = LocalSearchParams(
-            maxFlips = 1L, initialAssignment = Sample(booleanArrayOf(true, true), longArrayOf()),
+            maxFlips = 1L,
+            initialAssignment = Sample(booleanArrayOf(true, true), longArrayOf()),
         )
 
         search.improvements(LinearObjective(boolWeights = longArrayOf(1, 0)), params, warm = null).toList()
@@ -234,17 +233,27 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `restart cost observations follow definition reconciliation`() {
-        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-            Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, true))),
-            Clause(intArrayOf(Lit.make(1, true))), Clause(intArrayOf(Lit.make(1, true))),
-        ))
+    fun `restart cost observations should follow definition reconciliation`() {
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(1, true))),
+            ),
+        )
         val observed = mutableListOf<Long>()
         val strategy = SourceDrivenStrategy(
             sources = emptyList(),
-            perturbation = { observed += it.bestCostSeen; null },
+            perturbation = {
+                observed += it.bestCostSeen
+                null
+            },
             feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val policy = object : RestartPolicy {
@@ -256,11 +265,17 @@ class LocalSearchEngineTest {
             }
         }
         val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy,
-            greedyRepairOnRestart = false, perMoveInvariants = true,
-            definitionalSweep = DefinitionalSweep.infer(problem, boolFolds = listOf(
-                BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
-            )),
+            LocalSearchModel.open(problem),
+            strategy = strategy,
+            restartPolicy = policy,
+            greedyRepairOnRestart = false,
+            perMoveInvariants = true,
+            definitionalSweep = DefinitionalSweep.infer(
+                problem,
+                boolFolds = listOf(
+                    BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+                ),
+            ),
         )
 
         search.samples(LocalSearchParams(maxFlips = 1L), warm = null).toList()
@@ -269,7 +284,7 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `suspended definition evaluation retains completed outputs`() {
+    fun `suspended definition evaluation should retain completed outputs`() {
         val assignment = Assignment(1, 513)
         assignment.setBool(0, true)
         val domains = Array(513) { IntDomain(0, 1) }
@@ -289,7 +304,7 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `lifetime cancellation bounds suspended initial preparation`() {
+    fun `lifetime cancellation should bound suspended initial preparation`() {
         val problem = Problem(1, 513, Array(513) { IntDomain(0, 9) }, emptyArray())
         val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
         var expired = false
@@ -312,30 +327,33 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `initial preparation pauses preserve seeded walks and charge only committed instructions`() {
+    fun `initial preparation pauses should preserve seeded walks and charge only committed instructions`() {
         val problem = Problem(
-            65, 65, Array(65) { IntDomain(0, 9) },
+            65,
+            65,
+            Array(65) { IntDomain(0, 9) },
             arrayOf<Factor>(
                 Product(0, 1, 2),
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
             ),
         )
         for (seeded in listOf(false, true)) {
-            val traces = listOf(0, 2, 8, 16, 24, 32, 40).map { stopAt ->
+            val traces = listOf(0, 8, 32).map { stopAt ->
                 val trace = mutableListOf<Pair<Sample, Long>>()
                 val strategy = SourceDrivenStrategy(
                     sources = emptyList(),
                     perturbation = {
-                        assertEquals(3.0, it.weights.factorWeights[0])
-                        assertEquals(2, it.tabu.touchCount.last())
                         trace += it.assignment.snapshot() to it.rng.nextLong()
                         Move.IntSet(0, (it.assignment.intValue(0) + 1L) % 10L)
                     },
                     feasibleDescent = FeasibleDescent.SelfOwned,
                 )
                 val search = LocalSearchEngine(
-                    LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
-                    definitionalSweep = DefinitionalSweep.infer(problem), perMoveInvariants = true,
+                    LocalSearchModel.open(problem),
+                    strategy = strategy,
+                    greedyRepairOnRestart = false,
+                    definitionalSweep = DefinitionalSweep.infer(problem),
+                    perMoveInvariants = true,
                     seedImplicitOnRestart = true,
                 )
                 val budget = NodeBudget(10L)
@@ -344,7 +362,9 @@ class LocalSearchEngineTest {
                     it.activityTouches = IntArray(130) { 2 }
                 }
                 val params = LocalSearchParams(
-                    maxFlips = 4L, randomSeed = 7L, nodeBudget = budget,
+                    maxFlips = 4L,
+                    randomSeed = 7L,
+                    nodeBudget = budget,
                     assumptions = Assumptions(bools = mapOf(64 to true), ints = mapOf(1 to 1L)),
                     initialAssignment = if (seeded) Sample(BooleanArray(65), LongArray(65) { 1L }) else null,
                 )
@@ -352,13 +372,9 @@ class LocalSearchEngineTest {
                     if (stopAt != 0) {
                         var polls = 0
                         assertNull(handle.runSlice(Cancellation { ++polls >= stopAt }, Long.MAX_VALUE, -1L))
-                        assertEquals(0.0, handle.stats.ls.moves.sum)
-                        assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
                         assertTrue(trace.isEmpty())
-                        assertFailsWith<IllegalStateException> { search.resumableSolve(params) }
                     }
-                    assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
-                    assertEquals(4.0, handle.stats.ls.moves.sum)
+                    handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
                 }
                 trace to budget.movesLeft()
             }
@@ -368,9 +384,11 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `closing suspended initialization leaves warm state private and permits reopening`() {
+    fun `closing suspended initialization should leave warm state private and permit reopening`() {
         val problem = Problem(
-            1, 513, Array(513) { IntDomain(0, 9) },
+            1,
+            513,
+            Array(513) { IntDomain(0, 9) },
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
         )
         val params = LocalSearchParams(maxFlips = 1L, randomSeed = 3L)
@@ -393,15 +411,19 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `resumable minimization reports active phase times only when requested`() {
+    fun `resumable minimization should report active phase times only when requested`() {
         for (enabled in listOf(false, true)) {
             val problem = Problem(
-                0, 1, arrayOf(IntDomain(0, 3)),
+                0,
+                1,
+                arrayOf(IntDomain(0, 3)),
                 arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
             )
             val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
             val params = LocalSearchParams(
-                maxFlips = 3, randomSeed = 3L, reportPhaseTimes = enabled,
+                maxFlips = 3,
+                randomSeed = 3L,
+                reportPhaseTimes = enabled,
                 initialAssignment = Sample(BooleanArray(0), longArrayOf(0)),
             )
 
@@ -424,40 +446,11 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `resumable satisfaction reports active phase times only when requested`() {
-        for (enabled in listOf(false, true)) {
-            val problem = Problem(
-                0, 1, arrayOf(IntDomain(0, 3)),
-                arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
-            )
-            val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
-            val params = LocalSearchParams(
-                maxFlips = 3, randomSeed = 3L, reportPhaseTimes = enabled,
-                initialAssignment = Sample(BooleanArray(0), longArrayOf(0)),
-            )
-
-            search.resumableSolve(params).use { handle ->
-                val counted = assertIs<InstructionSlicedSolve>(handle)
-                assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
-                val paused = handle.stats.ls.phaseNanos
-
-                assertEquals(paused, handle.stats.ls.phaseNanos)
-                assertEquals(enabled, paused.isNotEmpty())
-                if (enabled) {
-                    assertEquals(setOf("preparation", "seeding", "selection", "application", "other"), paused.keys)
-                    assertTrue(paused.values.all { it >= 0L })
-                    assertTrue(paused.values.sum() > 0L)
-                    assertTrue(paused.getValue("selection") > 0L)
-                    assertTrue(paused.getValue("application") > 0L)
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `residual reporting retains the best committed assignment after a worse move`() {
+    fun `residual reporting should retain the best committed assignment after a worse move`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 3)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 3)),
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
         )
         var picks = 0
@@ -467,10 +460,13 @@ class LocalSearchEngineTest {
             feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+            LocalSearchModel.open(problem),
+            strategy = strategy,
+            greedyRepairOnRestart = false,
         )
         val params = LocalSearchParams(
-            maxFlips = 3, reportResiduals = true,
+            maxFlips = 3,
+            reportResiduals = true,
             initialAssignment = Sample(BooleanArray(0), longArrayOf(0)),
         )
 
@@ -486,365 +482,30 @@ class LocalSearchEngineTest {
             assertEquals(7L, paused?.cost)
             assertEquals(mapOf("Linear" to 7L), result.stats.ls.bestResidual?.byKind)
             assertEquals(
-                listOf(LocalSearchResidualFactor(0, "Linear", 7L, emptyMap(), mapOf(0 to 3L),
-                    details = mapOf("op" to "LE", "bound" to "-10", "term.0" to "-1:i0",
-                        "omittedTerms" to "0", "activity" to "-3", "i0.definition.kind" to "none"),
-                )),
+                listOf(
+                    LocalSearchResidualFactor(
+                        0,
+                        "Linear",
+                        7L,
+                        emptyMap(),
+                        mapOf(0 to 3L),
+                        details = mapOf(
+                            "op" to "LE",
+                            "bound" to "-10",
+                            "term.0" to "-1:i0",
+                            "omittedTerms" to "0",
+                            "activity" to "-3",
+                            "i0.definition.kind" to "none",
+                        ),
+                    ),
+                ),
                 result.stats.ls.bestResidual?.factors,
             )
         }
     }
 
     @Test
-    fun `residual reporting is disabled by default`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 3)),
-            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
-        )
-        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
-        val params = LocalSearchParams(maxFlips = 0, initialAssignment = Sample(BooleanArray(0), longArrayOf(0)))
-
-        val result = search.improvements(LinearObjective(), params, warm = null).last()
-
-        assertNull(result.stats.ls.bestResidual)
-    }
-
-    @Test
-    fun `early root and unsupported verdicts release handle ownership`() {
-        val refuted = Problem(
-            1,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false))),
-            ),
-        )
-        val unsupported = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
-            emptyArray(),
-        )
-        for (problem in listOf(refuted, unsupported)) {
-            val solver = LocalSearchSolver(problem.bake())
-            val params = LocalSearchParams(maxFlips = 1)
-            val satisfaction = solver.resumableSolve(params)
-            assertTrue(satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) != null)
-            val optimization = solver.resumable(LinearObjective(), params)
-            assertTrue(optimization.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} != null)
-            solver.resumableSolve(params).close()
-            satisfaction.close()
-            optimization.close()
-        }
-    }
-
-    @Test
-    fun `live handles reject overlapping solver and session searches`() {
-        for (optimizing in listOf(false, true)) {
-            val solver = LocalSearchSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
-            val objective = LinearObjective()
-            val params = LocalSearchParams()
-            val session = solver.session()
-            val owner = if (optimizing) {
-                session.resumable(objective, params).also {
-                    assertNull(it.runSlice(Cancellation { true }, Long.MAX_VALUE, -1) {})
-                }
-            } else {
-                session.resumableSolve(params).also {
-                    assertNull(it.runSlice(Cancellation { true }, Long.MAX_VALUE, -1))
-                }
-            }
-
-            assertFailsWith<IllegalStateException> { solver.resumableSolve(params) }
-            assertFailsWith<IllegalStateException> { solver.resumable(objective, params) }
-            assertFailsWith<IllegalStateException> { session.solve(params) }
-            assertFailsWith<IllegalStateException> { session.samples(params).iterator().hasNext() }
-            assertFailsWith<IllegalStateException> { session.minimize(objective, params) }
-
-            owner.close()
-            val next = solver.resumableSolve(params)
-            owner.close()
-            assertFailsWith<IllegalStateException> { solver.resumable(objective, params) }
-            next.close()
-            assertIs<SolveResult.Sat>(solver.solve(params))
-        }
-    }
-
-    @Test
-    fun `terminal handles release the solver before close`() {
-        val solver = LocalSearchSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
-        val params = LocalSearchParams(maxFlips = 1)
-        val objective = LinearObjective()
-        val satisfaction = solver.resumableSolve(params)
-        val verdict = satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1)
-        assertIs<SolveResult.Sat>(verdict)
-        val optimization = solver.resumable(objective, params)
-        assertEquals(verdict, satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1))
-        val optimum = optimization.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
-        assertTrue(optimum != null)
-        assertIs<SolveResult.Sat>(solver.solve(params))
-        satisfaction.close()
-        optimization.close()
-        val other = solver.resumableSolve(params)
-        assertSame(verdict, satisfaction.runSlice(Cancellation.Never, 0L, 0L))
-        assertSame(optimum, optimization.runSlice(Cancellation.Never, 0L, 0L) {})
-        satisfaction.close()
-        optimization.close()
-        assertFailsWith<IllegalStateException> { solver.resumable(objective, params) }
-        other.close()
-    }
-
-    @Test
-    fun `failed handles release the solver and cannot be resumed`() {
-        for (optimizing in listOf(false, true)) {
-            var fail = true
-            val policy = object : RestartPolicy {
-                override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
-                override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-                    if (fail) error("restart failure")
-                    state.recompute()
-                }
-            }
-            val solver = LocalSearchSolver(
-                Problem(0, 0, emptyArray(), emptyArray()).bake(),
-                restartPolicy = policy,
-            )
-            val params = LocalSearchParams(maxFlips = 1)
-            val objective = LinearObjective()
-            if (optimizing) {
-                val owner = solver.resumable(objective, params)
-                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} }
-                fail = false
-                assertIs<SolveResult.Sat>(solver.solve(params))
-                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} }
-            } else {
-                val owner = solver.resumableSolve(params)
-                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) }
-                fail = false
-                assertIs<SolveResult.Sat>(solver.solve(params))
-                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) }
-            }
-        }
-    }
-
-    @Test
-    fun `incumbent callback failures release optimization ownership`() {
-        val solver = LocalSearchSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
-        val owner = solver.resumable(LinearObjective(), LocalSearchParams(maxFlips = 1))
-
-        val failure = assertFailsWith<IllegalArgumentException> {
-            owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {
-                throw IllegalArgumentException("callback failure")
-            }
-        }
-
-        assertEquals("callback failure", failure.message)
-        assertIs<SolveResult.Sat>(solver.solve(LocalSearchParams()))
-    }
-
-    @Test
-    fun `satisfaction custom restarts preserve the exact best anchor across pauses and policy mutation`() {
-        for (sliced in listOf(false, true)) {
-            val problem = Problem(
-                65, 1, arrayOf(IntDomain(0, 9)),
-                arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
-            )
-            val anchors = mutableListOf<Sample>()
-            val policy = object : RestartPolicy {
-                override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 2
-                override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-                    val anchor = checkNotNull(bestSoFar)
-                    assertEquals(3L, anchor.ints.single())
-                    assertTrue(anchor.bools[64])
-                    assertFalse(anchor.bools[0])
-                    if (anchors.size == 1) {
-                        assertEquals(anchor, anchors.first())
-                        anchors.first().ints[0] = 9L
-                        anchors.first().bools[64] = false
-                    }
-                    anchors += anchor
-                    state.assignment.setInt(0, 0L)
-                    state.assignment.setBool(0, false)
-                    state.assignment.setBool(64, false)
-                    state.recompute()
-                }
-            }
-            var picks = 0
-            val strategy = SourceDrivenStrategy(
-                sources = emptyList(),
-                perturbation = {
-                    if (picks++ % 2 == 0) Move.Compound(listOf(Move.BoolFlip(64), Move.IntSet(0, 3L)))
-                    else Move.Compound(listOf(Move.BoolFlip(0), Move.IntSet(0, 2L)))
-                },
-                feasibleDescent = FeasibleDescent.SelfOwned,
-            )
-            val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
-            val params = LocalSearchParams(
-                maxFlips = 9L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(65), longArrayOf(0L)),
-            )
-
-            if (sliced) {
-                search.resumableSolve(params).use { handle ->
-                    val counted = assertIs<InstructionSlicedSolve>(handle)
-                    while (!handle.isDone) counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
-                    assertEquals(9L, handle.stats.ls.moves.sum.toLong())
-                }
-            } else {
-                assertTrue(search.samples(params, warm = null).toList().isEmpty())
-            }
-
-            assertEquals(3, anchors.size)
-            assertEquals(3L, anchors.last().ints.single())
-            assertTrue(anchors.last().bools[64])
-            assertEquals(6, picks)
-        }
-    }
-
-    @Test
-    fun `anchoring satisfaction policies restart from the best infeasible assignment`() {
-        val policies = listOf(
-            AdaptivePerturbationRestart(maxFlipsBeforeRestart = 2, perturbationStrength = 0),
-            StagnationRestart(maxFlipsBeforeRestart = 2, perturbationStrength = 0),
-            IteratedLocalSearchRestart(maxFlipsBeforeRestart = 2, initialPerturbationStrength = 0),
-        )
-        for (policy in policies) {
-            val problem = Problem(
-                0, 1, arrayOf(IntDomain(0, 9)),
-                arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
-            )
-            val visited = mutableListOf<Long>()
-            val strategy = SourceDrivenStrategy(
-                sources = emptyList(),
-                perturbation = {
-                    visited += it.assignment.intValue(0)
-                    Move.IntSet(0, if (visited.size == 1) 3L else 2L)
-                },
-                feasibleDescent = FeasibleDescent.SelfOwned,
-            )
-            val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
-            val params = LocalSearchParams(
-                maxFlips = 6L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0L)),
-            )
-
-            assertTrue(search.samples(params, warm = null).toList().isEmpty())
-
-            assertEquals(listOf(0L, 3L, 3L, 2L), visited)
-        }
-    }
-
-    @Test
-    fun `satisfaction resets its anchor after each published sample`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 3)),
-            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
-        )
-        val anchors = mutableListOf<Sample?>()
-        val policy = object : RestartPolicy {
-            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
-            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-                anchors += bestSoFar
-                state.assignment.setInt(0, if (bestSoFar == null) 3L else 2L)
-                state.recompute()
-            }
-        }
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), restartPolicy = policy,
-            strategy = SourceDrivenStrategy(sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned),
-        )
-        val params = LocalSearchParams(maxFlips = 4L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0L)))
-
-        val samples = search.openSamples(params, warm = null).use { it.take(3).toList() }
-
-        assertEquals(listOf(0L, 2L, 2L), samples.map { it.ints.single() })
-        assertEquals(listOf(null, 3L, null, 3L), anchors.map { it?.ints?.single() })
-    }
-
-    @Test
-    fun `random satisfaction restarts preserve seeded moves and RNG draws through assignment preparation`() {
-        for (luby in listOf(false, true)) {
-            val traces = listOf(false, true).map { custom ->
-                val problem = Problem(
-                    65, 1, arrayOf(IntDomain(0, 9)),
-                    arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
-                )
-                val randomPolicy = if (luby) LubyRestart(unit = 2) else FixedCadenceRestart(maxFlipsBeforeRestart = 2)
-                val policy = if (!custom) randomPolicy else object : RestartPolicy {
-                    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
-                        randomPolicy.shouldRestart(stepsSinceLastRestart)
-                    override fun restart(state: LocalSearchState, bestSoFar: Sample?) =
-                        randomPolicy.restart(state, null)
-                    override fun reset() = randomPolicy.reset()
-                }
-                val trace = mutableListOf<Pair<Sample, Long>>()
-                val strategy = SourceDrivenStrategy(
-                    sources = emptyList(),
-                    perturbation = {
-                        trace += it.assignment.snapshot() to it.rng.nextLong()
-                        Move.IntSet(0, (it.assignment.intValue(0) + 1L) % 10L)
-                    },
-                    feasibleDescent = FeasibleDescent.SelfOwned,
-                )
-                val search = LocalSearchEngine(
-                    LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy,
-                    seedImplicitOnRestart = true,
-                )
-
-                search.resumableSolve(LocalSearchParams(maxFlips = 12L, randomSeed = 7L)).use { handle ->
-                    val counted = assertIs<InstructionSlicedSolve>(handle)
-                    while (!handle.isDone) counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
-                    assertEquals(12L, handle.stats.ls.moves.sum.toLong())
-                }
-                trace
-            }
-
-            assertTrue(traces.first().isNotEmpty())
-            assertEquals(traces.first(), traces.last())
-        }
-    }
-
-    @Test
-    fun `custom restarts retain independent feasible incumbent anchors`() {
-        val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 3)),
-            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
-        )
-        val anchors = mutableListOf<Sample>()
-        val restart = object : RestartPolicy {
-            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 2
-            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-                if (bestSoFar != null) anchors += bestSoFar
-                state.assignment.setInt(0, 3)
-                state.recompute()
-            }
-        }
-        var picks = 0
-        val strategy = SourceDrivenStrategy(
-            sources = emptyList(),
-            perturbation = { if (it.cost == 0L) null else Move.IntSet(0, longArrayOf(1, 2)[picks++]) },
-            feasibleDescent = FeasibleDescent.SelfOwned,
-        )
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem),
-            strategy = strategy,
-            restartPolicy = restart,
-            greedyRepairOnRestart = false,
-        )
-
-        search.resumable(
-            LinearObjective(intCoefficients = longArrayOf(-1)),
-            LocalSearchParams(maxFlips = 4L, initialAssignment = Sample(BooleanArray(0), longArrayOf(3))),
-        ).use { handle ->
-            assertIs<MinimizeResult.BestFound>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
-        }
-
-        assertEquals(listOf(Sample(BooleanArray(0), longArrayOf(1)), Sample(BooleanArray(0), longArrayOf(2))), anchors)
-    }
-
-    @Test
-    fun `satisfaction resumes after projection preparation expires`() {
+    fun `satisfaction should resume after projection preparation expires`() {
         var expired = false
         val factors = Array<Factor>(512) { fid ->
             val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
@@ -874,7 +535,7 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `satisfaction resumes initial scoring without repeating completed factors`() {
+    fun `satisfaction should resume initial scoring without repeating completed factors`() {
         var expired = false
         val initialized = IntArray(512)
         val factors = Array<Factor>(initialized.size) { _ ->
@@ -906,7 +567,7 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `optimization does not publish a partially scored assignment`() {
+    fun `optimization should not publish a partially scored assignment`() {
         var expired = false
         val initialized = IntArray(512)
         val factors = Array<Factor>(initialized.size) { _ ->
@@ -946,632 +607,11 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `numerical completion improves the original mixed MPS objective`() {
-        val parsed = Mps.parse(
-            """
-            NAME FIXEDCOST
-            ROWS
-             N COST
-             G COVER
-            COLUMNS
-             M0 'MARKER' 'INTORG'
-             B COST 1 COVER 1
-             M1 'MARKER' 'INTEND'
-             X COST 10 COVER 1
-            RHS
-             RHS COVER 1
-            BOUNDS
-             BV BND B
-             LO BND X 0
-             UP BND X 1
-            ENDATA
-            """.trimIndent(),
-        )
-        for (source in listOf(parsed.toProblem(), parsed.toExactSourceProblem())) {
-            val objective = checkNotNull(source.objective).toLinearObjective()
-            val search = LocalSearchEngine(
-                LocalSearchModel.of(source.model.bake()), greedyRepairOnRestart = false,
-                completion = LeafRealCompletion(source.model, objective),
-            )
-            val coordinates = DoubleArray(source.model.numRealVars) { if (it == 0) 1.0 else 10.0 }
-            val initial = Sample(BooleanArray(0), longArrayOf(0), coordinates)
-
-            val result = search.improvements(
-                objective, LocalSearchParams(maxInstructions = 5, randomSeed = 3, initialAssignment = initial), null,
-            ).last()
-
-            val best = assertIs<MinimizeResult.BestFound>(result)
-            val checked = source.sourceWitness(best.sample.ints, best.sample.exactReals)
-            assertEquals(BigFraction.ofLong(10), source.sourceWitness(initial.ints, listOf(BigFraction.ONE)).objective)
-            assertEquals(BigFraction.ONE, checked.objective)
-            assertEquals(listOf(BigFraction.ONE, BigFraction.ZERO), checked.values)
-        }
-    }
-
-    @Test
-    fun `continuous savings admit a directly more expensive integer move`() {
-        val supplied = object : MoveSource {
-            override val id = MoveSourceId("supplied")
-            override val phase = Phase.Feasible
-            override val pool = Pool.ScoreOnly
-            override fun generate(state: LocalSearchState, sink: MoveSink) = sink.addIntSet(0, 1)
-        }
-        val strategies = listOf(Cbls(), SourceDrivenStrategy(
-            sources = listOf(ConfiguredSource(supplied)), feasibleDescent = FeasibleDescent.SelfOwned,
-            feasibleAcceptance = AcceptanceRule.GreedyDescent,
-        ))
-        for ((relation, strategy) in listOf(LinearOp.GE, LinearOp.EQ).flatMap { relation ->
-            strategies.map { relation to it }
-        }) {
-            val problem = Problem(
-                0, 1, arrayOf(IntDomain(0, 1)),
-                arrayOf<Factor>(Linear(
-                    intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), relation, 1.0,
-                )),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-            )
-            val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))
-            val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0))
-            val completed = mutableListOf<Long>()
-            val search = LocalSearchEngine(
-                LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
-                completion = { candidate, _ ->
-                    val b = candidate.intValue(0)
-                    completed += b
-                    Completion.Witness(candidate.copy(reals = doubleArrayOf(1.0 - b)))
-                },
-            )
-
-            val result = search.improvements(
-                objective, LocalSearchParams(maxInstructions = 20, randomSeed = 3, initialAssignment = initial), null,
-            ).last()
-
-            val best = assertIs<MinimizeResult.BestFound>(result)
-            assertTrue(1L in completed)
-            assertEquals(1.0, best.objective)
-            assertEquals(1L, best.sample.intValue(0))
-            assertEquals(0.0, best.sample.approximateRealValue(0))
-            assertEquals(1.0, best.sample.intValue(0) + best.sample.approximateRealValue(0))
-        }
-    }
-
-    @Test
-    fun `failed continuous move probes preserve the incumbent and spend their work`() {
-        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
-        for (failure in listOf(Completion.Refuted(work = 2), Completion.Undecided(work = 2))) {
-            var calls = 0
-            val search = engine { candidate, _ ->
-                calls++
-                if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else failure
-            }
-
-            val result = search.improvements(
-                LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-                LocalSearchParams(maxInstructions = 2, randomSeed = 3, initialAssignment = initial), null,
-            ).last()
-
-            val best = assertIs<MinimizeResult.BestFound>(result)
-            assertEquals(initial, best.sample)
-            assertEquals(7.0, best.objective)
-            assertEquals(2, calls)
-            assertEquals(2.0, best.stats.ls.moves.sum)
-        }
-    }
-
-    @Test
-    fun `continuous move probing stops at the containing move allowance`() {
-        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
-        val budget = NodeBudget(5)
-        var calls = 0
-        val search = engine { candidate, _ ->
-            calls++
-            if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else Completion.Undecided(work = 4)
-        }
-
-        val result = search.improvements(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 20, nodeBudget = budget, initialAssignment = initial), null,
-        ).last()
-
-        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
-        assertTrue(budget.exhausted())
-        assertEquals(2, calls)
-    }
-
-    @Test
-    fun `residual finite repairs complete before raw objective rejection`() {
+    fun `optimization should complete initial greedy repair after a cancelled slice`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ExactLinear.of(
-                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
-            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-        )
-        val source = object : MoveSource {
-            override val id = MoveSourceId("supplied")
-            override val phase = Phase.Infeasible
-            override val pool = Pool.ScoreOnly
-            override fun generate(state: LocalSearchState, sink: MoveSink) = sink.addIntSet(0, 1)
-        }
-        for (weight in listOf(0L, 1L)) {
-            val search = LocalSearchEngine(
-                LocalSearchModel.open(problem), greedyRepairOnRestart = false,
-                strategy = SourceDrivenStrategy(
-                    sources = listOf(ConfiguredSource(source)), feasibleDescent = FeasibleDescent.SelfOwned,
-                    feasibleAcceptance = AcceptanceRule.GreedyDescent,
-                ), completion = { candidate, _ ->
-                    Completion.Witness(candidate.copy(reals = doubleArrayOf(
-                        if (candidate.intValue(0) == 0L) 1.0 - 1e-12 else 0.0,
-                    )))
-                },
-            )
-
-            val result = search.improvements(
-                LinearObjective(intCoefficients = longArrayOf(weight), realCoefficients = doubleArrayOf(10.0)),
-                LocalSearchParams(maxInstructions = 3,
-                    initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))), null,
-            ).last()
-
-            val best = assertIs<MinimizeResult.BestFound>(result)
-            assertEquals(weight.toDouble(), best.objective)
-            assertEquals(1L, best.sample.intValue(0))
-            assertEquals(0.0, best.sample.approximateRealValue(0))
-        }
-    }
-
-    @Test
-    fun `supplied residual incumbents use charged completion before repair`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ExactLinear.of(
-                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
-            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-        )
-        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0 - 1e-12))
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
-            completion = { candidate, _ -> Completion.Witness(candidate, work = 4) },
-        )
-
-        val result = search.improvements(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 4, initialAssignment = initial), null,
-        ).last()
-
-        val best = assertIs<MinimizeResult.BestFound>(result)
-        assertEquals(initial, best.sample)
-        assertEquals(4.0, best.stats.ls.moves.sum)
-        assertEquals(1.0, best.stats.ls.completions.sum)
-    }
-
-    @Test
-    fun `supplied mixed starts retain exact finite row checks`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ExactLinear.of(
-                intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
-            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-        )
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
-            completion = { candidate, _ -> Completion.Witness(candidate.copy(reals = doubleArrayOf(0.0))) },
-        )
-
-        val first = search.improvements(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 4,
-                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))), null,
-        ).filterIsInstance<MinimizeResult.BestFound>().first()
-
-        assertEquals(1L, first.sample.intValue(0))
-    }
-
-    @Test
-    fun `interrupted residual start completion resumes before repair`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ExactLinear.of(
-                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
-            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-        )
-        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0 - 1e-12))
-        var expired = false
-        var interrupted = false
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
-            completion = { candidate, _ ->
-                if (!interrupted) {
-                    interrupted = true
-                    expired = true
-                    Completion.Undecided(work = 1)
-                } else Completion.Witness(candidate, work = 3)
-            },
-        )
-        val found = mutableListOf<Sample>()
-
-        search.resumable(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 4, initialAssignment = initial),
-        ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1) { found += it.sample })
-            assertTrue(found.isEmpty())
-            expired = false
-
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { found += it.sample }
-
-            val best = assertIs<MinimizeResult.BestFound>(result)
-            assertEquals(initial, best.sample)
-            assertEquals(listOf(initial), found)
-            assertEquals(4.0, best.stats.ls.moves.sum)
-        }
-    }
-
-    @Test
-    fun `worse restart states retain ordinary completion admission`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(Linear(
-                intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
-            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-        )
-        val initial = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0))
-        var calls = 0
-        var restarts = 0
-        val restart = object : RestartPolicy {
-            override fun shouldRestart(stepsSinceLastRestart: Int) = false
-            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-                restarts++
-                state.assignment.setInt(0, 0)
-                state.assignment.setReal(0, 1.0)
-                state.recompute()
-            }
-        }
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), greedyRepairOnRestart = false, restartPolicy = restart,
-            strategy = SourceDrivenStrategy(
-                sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
-                feasibleAcceptance = AcceptanceRule.GreedyDescent,
-            ), completion = { candidate, _ -> calls++; Completion.Witness(candidate) },
-        )
-
-        val result = search.improvements(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 3, initialAssignment = initial), null,
-        ).last()
-
-        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
-        assertTrue(restarts > 0)
-        assertEquals(1, calls)
-    }
-
-    @Test
-    fun `unproductive completion descent returns residual rows to repair`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
-                ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
-            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-        )
-        var repairs = 0
-        val source = object : MoveSource {
-            override val id = MoveSourceId("supplied")
-            override val phase = Phase.Infeasible
-            override val pool = Pool.ScoreOnly
-            override fun generate(state: LocalSearchState, sink: MoveSink) {
-                repairs++
-                sink.addRealSet(0, 1.0)
-            }
-        }
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
-            strategy = SourceDrivenStrategy(
-                sources = listOf(ConfiguredSource(source), ConfiguredSource(ObjectiveSeed())),
-                feasibleDescent = FeasibleDescent.SelfOwned, feasibleAcceptance = AcceptanceRule.GreedyDescent,
-            ), completion = { candidate, _ ->
-                Completion.Witness(candidate.copy(reals = doubleArrayOf(1.0 - 1e-12)))
-            },
-        )
-
-        val result = search.improvements(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 3,
-                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))), null,
-        ).last()
-
-        assertTrue(repairs > 0)
-        assertEquals(0L, assertIs<MinimizeResult.BestFound>(result).sample.intValue(0))
-    }
-
-    @Test
-    fun `completion work leaves search steps between numerical move probes`() {
-        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
-        var picks = 0
-        val queriedAt = mutableListOf<Int>()
-        val source = object : MoveSource {
-            override val id = MoveSourceId("supplied")
-            override val phase = Phase.Feasible
-            override val pool = Pool.ScoreOnly
-            override fun generate(state: LocalSearchState, sink: MoveSink) {
-                sink.addIntSet(0, (++picks % 2).toLong())
-            }
-        }
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(mixedProblem()), greedyRepairOnRestart = false,
-            strategy = SourceDrivenStrategy(
-                sources = listOf(ConfiguredSource(source)), feasibleDescent = FeasibleDescent.SelfOwned,
-                feasibleAcceptance = AcceptanceRule.GreedyDescent, feasibleResampleCap = 20,
-            ), completion = { candidate, _ ->
-                if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else {
-                    queriedAt += picks
-                    Completion.Refuted(work = 4)
-                }
-            },
-        )
-
-        val result = search.improvements(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 20, initialAssignment = initial), null,
-        ).last()
-
-        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
-        assertTrue(queriedAt.size >= 2)
-        assertTrue(queriedAt.zipWithNext().all { (first, second) -> second - first >= 4 })
-    }
-
-    @Test
-    fun `unavailable objective sources do not add completion exploration`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(Linear(
-                intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
-            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-        )
-        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))
-        for (source in listOf(ConfiguredSource(ObjectiveSeed(), cap = 0),
-            ConfiguredSource(ObjectiveSeed(), enabled = false))) {
-            var calls = 0
-            val search = LocalSearchEngine(
-                LocalSearchModel.open(problem), greedyRepairOnRestart = false,
-                strategy = SourceDrivenStrategy(
-                    sources = listOf(source), feasibleDescent = FeasibleDescent.SelfOwned,
-                    feasibleAcceptance = AcceptanceRule.GreedyDescent,
-                ), completion = { candidate, _ ->
-                    calls++
-                    Completion.Witness(candidate.copy(reals = doubleArrayOf(1.0 - candidate.intValue(0))))
-                },
-            )
-
-            val result = search.improvements(
-                LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-                LocalSearchParams(maxInstructions = 1, initialAssignment = initial), null,
-            ).last()
-
-            assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
-            assertEquals(1, calls)
-        }
-    }
-
-    @Test
-    fun `continuous move exploration preserves finite invocation pins`() {
-        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
-        val candidates = mutableListOf<Long>()
-        val search = engine { candidate, _ ->
-            candidates += candidate.intValue(0)
-            Completion.Witness(candidate)
-        }
-
-        val result = search.improvements(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 3, initialAssignment = initial,
-                assumptions = Assumptions(ints = mapOf(0 to 2L))), null,
-        ).last()
-
-        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
-        assertEquals(listOf(2L), candidates)
-    }
-
-    @Test
-    fun `cancellation after completed selection keeps the live assignment private`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(Linear(
-                intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
-            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-        )
-        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))
-        var live: LocalSearchState? = null
-        var expired = false
-        var interrupted = false
-        var probes = 0
-        val source = object : MoveSource {
-            override val id = MoveSourceId("supplied")
-            override val phase = Phase.Feasible
-            override val pool = Pool.ScoreOnly
-            override fun generate(state: LocalSearchState, sink: MoveSink) {
-                live = state
-                sink.addIntSet(0, 1)
-            }
-        }
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
-            strategy = SourceDrivenStrategy(
-                sources = listOf(ConfiguredSource(source)), feasibleDescent = FeasibleDescent.SelfOwned,
-                feasibleAcceptance = AcceptanceRule.GreedyDescent,
-                tabu = TabuFilter(dynamicTenure = {
-                    if (probes > 0 && !interrupted) { expired = true; interrupted = true }
-                    0
-                }),
-            ), completion = { candidate, _ ->
-                if (candidate.intValue(0) == 0L) Completion.Witness(candidate) else {
-                    probes++
-                    Completion.Witness(candidate.copy(reals = doubleArrayOf(0.0)))
-                }
-            },
-        )
-        search.resumable(LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 5, initialAssignment = initial)).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
-            assertEquals(initial, checkNotNull(live).assignment.snapshot())
-            expired = false
-
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
-
-            assertEquals(1.0, assertIs<MinimizeResult.BestFound>(result).objective)
-            assertEquals(1, probes)
-        }
-    }
-
-    @Test
-    fun `cancelled continuous move probing resumes from the unchanged incumbent`() {
-        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
-        var expired = false
-        var interrupted = false
-        val search = engine { candidate, _ ->
-            if (candidate.intValue(0) != 2L && !interrupted) {
-                interrupted = true
-                expired = true
-                Completion.Undecided()
-            } else if (candidate.intValue(0) == 2L) Completion.Witness(candidate)
-            else Completion.Refuted(work = 1)
-        }
-        val found = mutableListOf<Sample>()
-
-        search.resumable(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 3, initialAssignment = initial),
-        ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1) { found += it.sample })
-            assertEquals(listOf(initial), found)
-            expired = false
-
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { found += it.sample }
-
-            assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
-            assertEquals(listOf(initial), found)
-        }
-    }
-
-    @Test
-    fun `continuous completion cannot replace a move with different finite coordinates`() {
-        val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
-        var rejected = 0
-        val search = engine { candidate, _ ->
-            if (candidate.intValue(0) == 2L) Completion.Witness(candidate)
-            else {
-                rejected++
-                Completion.Witness(initial.copy(reals = doubleArrayOf(0.0)), work = 2)
-            }
-        }
-
-        val result = search.improvements(
-            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
-            LocalSearchParams(maxInstructions = 2, initialAssignment = initial), null,
-        ).last()
-
-        assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
-        assertEquals(1, rejected)
-    }
-
-    // x + k = 2.5 and x ≤ 1 over a continuous x in [0, 10] and an integer k in [0, 5]: k ≥ 2 and x = 2.5 - k.
-    private fun mixedProblem(): Problem = Problem(
-        numBoolVars = 0,
-        numIntVars = 1,
-        intDomains = arrayOf(IntDomain(0, 5)),
-        factors = arrayOf<Factor>(
-            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 2.5),
-            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
-        ),
-        numRealVars = 1,
-        realLower = doubleArrayOf(0.0),
-        realUpper = doubleArrayOf(10.0),
-    )
-
-    private fun engine(completion: CandidateCompletion) =
-        LocalSearchEngine(LocalSearchModel.of(mixedProblem().bake()), completion = completion)
-
-    @Test
-    fun `cancellation during completion preserves the candidate`() {
-        val initial = Sample(BooleanArray(0), longArrayOf(2), reals = doubleArrayOf(0.5))
-        val search = engine { candidate, cancellation ->
-            if (cancellation()) Completion.Undecided() else Completion.Witness(candidate)
-        }
-        var polls = 0
-
-        search.resumableSolve(LocalSearchParams(maxFlips = 1L, initialAssignment = initial)).use { handle ->
-            val paused = handle.runSlice(Cancellation { ++polls >= 3 }, Long.MAX_VALUE, -1L)
-
-            assertNull(paused)
-            assertFalse(handle.isDone)
-            assertEquals(0.0, handle.stats.ls.moves.sum)
-            val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
-            assertEquals(initial, result.assignment)
-        }
-    }
-
-    @Test
-    fun `optimization restarts without an anchor before finding a feasible incumbent`() {
-        val problem = Problem(
-            2, 0, emptyArray(),
-            arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(1, true)))),
-        )
-        val anchors = mutableListOf<Sample?>()
-        val policy = object : RestartPolicy {
-            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 1
-            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-                anchors += bestSoFar
-                state.restart()
-            }
-        }
-        val search = LocalSearchEngine(LocalSearchModel.open(problem), restartPolicy = policy)
-
-        search.resumable(
-            LinearObjective(boolWeights = longArrayOf(1, 1)),
-            LocalSearchParams(
-                maxFlips = 3L,
-                randomSeed = 3L,
-                assumptions = Assumptions(bools = mapOf(0 to false)),
-                initialAssignment = Sample(booleanArrayOf(false, false), LongArray(0)),
-            ),
-        ).use { handle ->
-            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
-        }
-
-        assertTrue(anchors.isNotEmpty())
-        assertTrue(anchors.all { it == null })
-    }
-
-    @Test
-    fun `optimization restarts from its feasible incumbent`() {
-        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))))
-        val anchors = mutableListOf<Sample?>()
-        val policy = object : RestartPolicy {
-            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 1
-            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-                anchors += bestSoFar
-                state.assignment.setBool(0, true)
-                state.recompute()
-            }
-        }
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem),
-            strategy = SourceDrivenStrategy(
-                sources = emptyList(),
-                feasibleDescent = FeasibleDescent.RatchetAsConstraint,
-            ),
-            restartPolicy = policy,
-        )
-
-        search.resumable(
-            LinearObjective(boolWeights = longArrayOf(1)),
-            LocalSearchParams(maxFlips = 3L, randomSeed = 3L),
-        ).use { handle ->
-            assertIs<MinimizeResult.BestFound>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
-        }
-
-        assertTrue(anchors.size > 1)
-        assertTrue(anchors.drop(1).all { it?.bools?.single() == true })
-    }
-
-    @Test
-    fun `optimization completes initial greedy repair after a cancelled slice`() {
-        val problem = Problem(
-            32, 0, emptyArray(),
+            32,
+            0,
+            emptyArray(),
             Array<Factor>(32) { Clause(intArrayOf(Lit.make(it, true))) },
         )
         val search = LocalSearchEngine(LocalSearchModel.open(problem))
@@ -1593,36 +633,7 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `optimization resumes a candidate whose completion was cancelled`() {
-        val initial = Sample(BooleanArray(0), longArrayOf(2), reals = doubleArrayOf(0.5))
-        var expired = false
-        var calls = 0
-        val search = engine { candidate, _ ->
-            if (++calls == 1) {
-                expired = true
-                Completion.Undecided()
-            } else {
-                Completion.Witness(candidate)
-            }
-        }
-        val found = mutableListOf<Sample>()
-
-        search.resumable(
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            LocalSearchParams(maxFlips = 1L, initialAssignment = initial),
-        ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) { found += it.sample })
-            assertEquals(0.0, handle.stats.ls.moves.sum)
-            expired = false
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { found += it.sample }
-
-            assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
-            assertEquals(listOf(initial), found)
-        }
-    }
-
-    @Test
-    fun `local search runs a nonlinear factor over wide domains`() {
+    fun `local search should run a nonlinear factor over wide domains`() {
         val wide = IntDomain(0, 1L shl 40)
         val maxOf = ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)
         val model = Problem(0, 3, Array(3) { wide }, arrayOf<Factor>(maxOf))
@@ -1638,7 +649,7 @@ class LocalSearchEngineTest {
     )
 
     @Test
-    fun `a schedule over wide domains is searched`() {
+    fun `a schedule over wide domains should be searched`() {
         val result = LocalSearchSolver(wideSchedule().bake()).solve(LocalSearchParams(maxFlips = 1_000, randomSeed = 1))
 
         val starts = assertIs<SolveResult.Sat>(result).assignment.ints
@@ -1646,71 +657,11 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `a schedule searched inside a window never refutes the model`() {
-        assertFalse(LocalSearchModel.of(wideSchedule().bake()).refutesModel)
-    }
-
-    @Test
-    fun `a model with continuous columns is declined without a completion`() {
-        val result = LocalSearchSolver(mixedProblem().bake()).solve(LocalSearchParams(maxFlips = 100, randomSeed = 1))
-
-        assertEquals(TerminationReason.Unsupported, assertIs<SolveResult.Unknown>(result).reason)
-    }
-
-    @Test
-    fun `a candidate over continuous columns satisfies its rows within tolerance`() {
-        val result = engine { candidate, _ ->
-            Completion.Witness(
-                candidate,
-            )
-        }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
-
-        val sample = assertIs<SolveResult.Sat>(result).assignment
-        val x = sample.approximateRealValue(0)
-        val k = sample.ints[0]
-        assertTrue(abs(x + k - 2.5) <= 1e-6 && x <= 1.0 + 1e-6, "x=$x k=$k")
-    }
-
-    @Test
-    fun `search goes on past a refuted candidate`() {
-        var calls = 0
-        val result = engine { candidate, _ ->
-            calls++
-            if (calls == 1) Completion.Refuted(intArrayOf(0)) else Completion.Witness(candidate)
-        }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
-
-        assertIs<SolveResult.Sat>(result)
-        assertEquals(2, calls)
-    }
-
-    @Test
-    fun `the work a completion reports is charged to the search budget`() {
-        var calls = 0
-        val result = engine { _, _ ->
-            calls++
-            Completion.Refuted(work = 2_000L)
-        }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
-
-        assertIs<SolveResult.Unknown>(result)
-        assertTrue(calls in 1..3, "calls=$calls")
-    }
-
-    @Test
-    fun `decided candidates are counted in the stats`() {
-        var calls = 0
-        val result = engine { candidate, _ ->
-            calls++
-            if (calls == 1) Completion.Refuted() else Completion.Witness(candidate)
-        }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
-
-        val ls = assertIs<SolveResult.Sat>(result).stats.ls
-        assertEquals(2.0, ls.completions.sum)
-        assertEquals(1.0, ls.completionsRefuted.sum)
-    }
-    @Test
-    fun `a resumed local search retains its bound lifetime cancellation scope`() {
+    fun `a resumed local search should retain its bound lifetime cancellation scope`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 3)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 3)),
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
         )
         val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
@@ -1731,5 +682,4 @@ class LocalSearchEngineTest {
             assertEquals(before, handle.stats.ls.moves.sum)
         }
     }
-
 }

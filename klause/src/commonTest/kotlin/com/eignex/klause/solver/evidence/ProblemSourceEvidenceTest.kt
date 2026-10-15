@@ -29,46 +29,71 @@ import kotlin.test.assertNull
 
 class ProblemSourceEvidenceTest {
     private val scope = SourceScope(SourceRevision("original-ir", "klause-ir-exact-v1"))
-    private val model = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf(
-        Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
-    ))
+    private val model = Problem(
+        0,
+        1,
+        arrayOf(IntDomain(0, 3)),
+        arrayOf(
+            Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+        ),
+    )
 
     @Test
-    fun `nonaffine source evidence checks the entire original point`() {
+    fun `nonaffine source evidence should check the entire original point`() {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf(Product(0, 1, 2)))
         val context = assertNotNull(source.sourceProofContext(scope))
         val verifier = SourceEvidenceVerifier(context)
-        val accepted = SourceEvidence(scope,
-            SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(2, 3, 6))), SourceDerivation.SourceWitness)
-        val rejected = SourceEvidence(scope,
-            SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(2, 3, 5))), SourceDerivation.SourceWitness)
+        val accepted = SourceEvidence(
+            scope,
+            SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(2, 3, 6))),
+            SourceDerivation.SourceWitness,
+        )
+        val rejected = SourceEvidence(
+            scope,
+            SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(2, 3, 5))),
+            SourceDerivation.SourceWitness,
+        )
 
         assertEquals(SourceEvidenceCheck.Checked, verifier.verify(accepted))
         assertIs<SourceEvidenceCheck.Rejected>(verifier.verify(rejected))
     }
 
     @Test
-    fun `source witness checking reads the original factor constraints`() {
+    fun `source witness checking should read the original factor constraints`() {
         val context = assertNotNull(model.sourceProofContext(scope))
-        val evidence = SourceEvidence(scope, SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(1))),
-            SourceDerivation.SourceWitness)
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(1))),
+            SourceDerivation.SourceWitness,
+        )
 
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `a complete original source witness has checkable captured coordinates`() {
+    fun `a complete original source witness should have checkable captured coordinates`() {
         val context = assertNotNull(model.sourceProofContext(scope))
-        val evidence = SourceEvidence(scope, SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(2))),
-            SourceDerivation.SourceWitness)
+        val evidence = SourceEvidence(
+            scope,
+            SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(2))),
+            SourceDerivation.SourceWitness,
+        )
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
     }
 
     @Test
-    fun `an invented finite box cannot become an original source premise`() {
-        val model = Problem(0, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(100),
-            Bits(1).also { it.set(0) }, Bits(1).also { it.set(0) }), emptyArray())
+    fun `an invented finite box should not become an original source premise`() {
+        val model = Problem(
+            0,
+            IntBounds.fromModelBounds(
+                longArrayOf(0),
+                longArrayOf(100),
+                Bits(1).also { it.set(0) },
+                Bits(1).also { it.set(0) },
+            ),
+            emptyArray(),
+        )
         val context = assertNotNull(model.sourceProofContext(scope))
 
         assertFalse("int/0/lower" in context.premises)
@@ -76,14 +101,14 @@ class ProblemSourceEvidenceTest {
     }
 
     @Test
-    fun `the original IR checker cannot relabel different declared source semantics`() {
+    fun `the original IR checker should not relabel different declared source semantics`() {
         val decimal = scope.copy(revision = scope.revision.copy(semantics = "MPS-exact-decimal"))
 
         assertNull(model.sourceProofContext(decimal))
     }
 
     @Test
-    fun `invocation capture owns the explicit source pins`() {
+    fun `invocation capture should own the explicit source pins`() {
         val assumptions = Assumptions.None.withInt(0, 2)
         val condition = assumptions.sourceCondition()
         assumptions.intValues[0] = 3
@@ -93,7 +118,7 @@ class ProblemSourceEvidenceTest {
     }
 
     @Test
-    fun `an in memory witness token cannot rescue an invalid original assignment`() {
+    fun `an in memory witness token should not rescue an invalid original assignment`() {
         val context = assertNotNull(model.sourceProofContext(scope))
         val sample = Sample(booleanArrayOf(), longArrayOf(1))
         val runtime = EngineInvocation(model.prepareExecutionPlan(), ModelIdentity.of(model))
@@ -105,9 +130,16 @@ class ProblemSourceEvidenceTest {
     }
 
     @Test
-    fun `an original affine source admits exact algebraic coordinates`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(2.0))
+    fun `an original affine source should admit exact algebraic coordinates`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(1.0),
+            realUpper = doubleArrayOf(2.0),
+        )
         val context = assertNotNull(model.sourceProofContext(scope))
         val value = AlgebraicArithmetic().roots(RationalPolynomial.of(-2, 0, 1)).last()
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), algebraicReals = listOf(value))
@@ -120,9 +152,17 @@ class ProblemSourceEvidenceTest {
     }
 
     @Test
-    fun `a free original integer witness has no invented finite domain restriction`() {
-        val model = Problem(0, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(100),
-            Bits(1).also { it.set(0) }, Bits(1).also { it.set(0) }), emptyArray())
+    fun `a free original integer witness should have no invented finite domain restriction`() {
+        val model = Problem(
+            0,
+            IntBounds.fromModelBounds(
+                longArrayOf(0),
+                longArrayOf(100),
+                Bits(1).also { it.set(0) },
+                Bits(1).also { it.set(0) },
+            ),
+            emptyArray(),
+        )
         val context = assertNotNull(model.sourceProofContext(scope))
         val sample = Sample(booleanArrayOf(), longArrayOf(), exactInts = listOf(parseBigInt("9223372036854775808")))
 
@@ -134,12 +174,23 @@ class ProblemSourceEvidenceTest {
     }
 
     @Test
-    fun `an original affine source admits a checked improving recession ray`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `an original affine source should admit a checked improving recession ray`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val scoped = scope.copy(objective = SourceObjective("minus-x", ObjectiveSense.MINIMIZE))
-        val context = assertNotNull(model.sourceProofContext(scoped,
-            LinearObjective(realCoefficients = doubleArrayOf(-1.0))))
+        val context = assertNotNull(
+            model.sourceProofContext(
+                scoped,
+                LinearObjective(realCoefficients = doubleArrayOf(-1.0)),
+            ),
+        )
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
         val claim = SourceClaim.Ray(sample, mapOf(SourceCoordinate(SourceCoordinate.Kind.Real, 0) to BigFraction.ONE))
 
@@ -147,5 +198,4 @@ class ProblemSourceEvidenceTest {
 
         assertEquals(SourceEvidenceCheck.Checked, checked)
     }
-
 }

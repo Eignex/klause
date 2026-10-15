@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class MutableIntDoubleMapTest {
 
     @Test
-    fun `addTo increments from zero default and returns new value`() {
+    fun `addTo should increment from zero and return the new value`() {
         val m = MutableIntDoubleMap()
         assertEquals(1.5, m.addTo(7, 1.5))
         assertEquals(4.0, m.addTo(7, 2.5))
@@ -17,7 +17,7 @@ class MutableIntDoubleMapTest {
     }
 
     @Test
-    fun `extreme keys and zero coexist`() {
+    fun `extreme keys and zero should coexist`() {
         val m = MutableIntDoubleMap()
         m.put(Int.MIN_VALUE, 1.0)
         m.put(Int.MAX_VALUE, 2.0)
@@ -29,7 +29,7 @@ class MutableIntDoubleMapTest {
     }
 
     @Test
-    fun `remove deletes and leaves other entries findable across collisions`() {
+    fun `remove should keep other entries findable across collisions`() {
         val m = MutableIntDoubleMap(4)
         for (k in 0 until 50) m.put(k, k.toDouble())
         for (k in 0 until 50 step 3) assertTrue(m.remove(k))
@@ -44,7 +44,7 @@ class MutableIntDoubleMapTest {
     }
 
     @Test
-    fun `clear empties and the map is reusable`() {
+    fun `clear should empty the map and keep it reusable`() {
         val m = MutableIntDoubleMap()
         for (k in 0 until 30) m.put(k, k.toDouble())
         m.clear()
@@ -55,11 +55,10 @@ class MutableIntDoubleMapTest {
     }
 
     @Test
-    fun `growth preserves all entries`() {
+    fun `growth should preserve all entries`() {
         val m = MutableIntDoubleMap(8)
         for (k in 0 until 1000) m.put(k * 7, k.toDouble())
         assertEquals(1000, m.size)
         for (k in 0 until 1000) assertEquals(k.toDouble(), m.getOrDefault(k * 7, -1.0))
     }
-
 }

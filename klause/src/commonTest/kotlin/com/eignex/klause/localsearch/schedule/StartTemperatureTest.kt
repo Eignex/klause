@@ -9,7 +9,7 @@ import kotlin.test.assertFailsWith
 class StartTemperatureTest {
 
     @Test
-    fun `calibrated temperature accepts an average worsening move at the target probability`() {
+    fun `calibrated temperature should accept an average worsening move at the target probability`() {
         val deltas = doubleArrayOf(2.0, 4.0, 6.0) // mean positive = 4.0
         val target = 0.8
         val t0 = StartTemperature.calibrate(deltas, targetAcceptance = target)
@@ -20,7 +20,7 @@ class StartTemperatureTest {
     }
 
     @Test
-    fun `warm start scales the temperature down to protect the seed`() {
+    fun `warm start should scale the temperature down to protect the seed`() {
         val deltas = doubleArrayOf(4.0, 4.0)
         val cold = StartTemperature.calibrate(deltas, targetAcceptance = 0.8, warmStart = false)
         val warm = StartTemperature.calibrate(deltas, targetAcceptance = 0.8, warmStart = true, warmStartFactor = 0.25)
@@ -28,14 +28,14 @@ class StartTemperatureTest {
     }
 
     @Test
-    fun `no worsening samples falls back to the minimum temperature`() {
+    fun `calibration without worsening samples should fall back to the minimum temperature`() {
         val deltas = doubleArrayOf(-1.0, 0.0, -5.0)
         assertEquals(0.01, StartTemperature.calibrate(deltas, minTemperature = 0.01), 1e-12)
         assertEquals(0.01, StartTemperature.calibrate(doubleArrayOf(), minTemperature = 0.01), 1e-12)
     }
 
     @Test
-    fun `degenerate parameters are rejected`() {
+    fun `degenerate parameters should be rejected`() {
         assertFailsWith<IllegalArgumentException> {
             StartTemperature.calibrate(
                 doubleArrayOf(1.0),

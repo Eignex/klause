@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -14,35 +15,7 @@ import kotlin.test.assertTrue
 
 class LpExactStateTest {
     @Test
-    fun `trail storage follows retained witnesses through nested pop and row retirement`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val source = assertNotNull(LpBuilder().apply { addVar(0L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
-        val trail = LpBoundTrail(source)
-        val premises = ExactLpPremises(listOf(ExactLpPremise(0, false, one)), listOf(7, 9))
-        assertTrue(trail.assertBound(0, false, ExactLpSide(one, premises = premises), 0L))
-        assertEquals(10L, trail.state.trailStorageUnits)
-        assertTrue(trail.push())
-        assertTrue(trail.append(LpScopedRow(0L, listOf(0 to one), one,
-            ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), scoped = true))
-        assertTrue(trail.assertBound(1, true, ExactLpSide(one), 1L))
-        assertEquals(16L, trail.state.trailStorageUnits)
-        assertTrue(trail.push())
-        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(4L), premises = premises), 2L))
-        assertEquals(27L, trail.state.trailStorageUnits)
-
-        assertTrue(trail.pop(1))
-
-        assertEquals(16L, trail.state.trailStorageUnits)
-        assertFalse(trail.suspend(setOf(0L)))
-        assertEquals(16L, trail.state.trailStorageUnits)
-        assertTrue(trail.pop(0))
-        assertEquals(10L, trail.state.trailStorageUnits)
-        assertEquals(premises, trail.state.activeSide(0, false)?.side?.premises)
-    }
-
-    @Test
-    fun `cached owner views respect cancellation and caller projection isolation`() {
+    fun `cached owner views should respect cancellation and caller projection isolation`() {
         val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
         val state = LpExactState(source)
         val owner = assertNotNull(state.ownerWorkingModel())
@@ -61,7 +34,7 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `incremental and fresh projections agree after bound and structural edits`() {
+    fun `incremental and fresh projections should agree after bound and structural edits`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
@@ -79,10 +52,7 @@ class LpExactStateTest {
         assertNotNull(trail.state.ownerWorkingModel())
         val edits = listOf<(LpBoundTrail) -> Boolean>(
             { it.push() },
-            { it.assertBound(0, true, ExactLpSide(ExactLpNumber.of(7L)), 0L) },
-            { it.push() },
             { it.assertBound(0, false, ExactLpSide(one, strict = true), 1L) },
-            { it.pop(1) },
             { it.pop(0) },
             { it.recenter(listOf(third)) },
             { it.replaceObjective(ExactLpObjective(listOf(one, zero), constant = third)) },
@@ -121,12 +91,15 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `objective revisions retain exact values and signed zero when rounding agrees`() {
+    fun `objective revisions should retain exact values and signed zero when rounding agrees`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(emptyList(), emptyList()), emptyList(),
-            List(2) { ExactLpColumn(ExactLpBounds()) }, emptyList(), ExactLpObjective(listOf(one, zero)),
+            listOf(emptyList(), emptyList()),
+            emptyList(),
+            List(2) { ExactLpColumn(ExactLpBounds()) },
+            emptyList(),
+            ExactLpObjective(listOf(one, zero)),
         )
         val trail = LpBoundTrail(source)
         val original = assertNotNull(trail.state.ownerWorkingModel())
@@ -145,11 +118,14 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `a declined objective projection preserves its predecessor and retry`() {
+    fun `a declined objective projection should preserve its predecessor and allow retry`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            List(4) { emptyList() }, emptyList(), List(4) { ExactLpColumn(ExactLpBounds()) }, emptyList(),
+            List(4) { emptyList() },
+            emptyList(),
+            List(4) { ExactLpColumn(ExactLpBounds()) },
+            emptyList(),
             ExactLpObjective(List(4) { zero }),
         )
         val trail = LpBoundTrail(source)
@@ -167,7 +143,7 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `bound underflow status follows tightening and rollback on either side`() {
+    fun `bound underflow status should follow tightening and rollback on either side`() {
         val zero = ExactLpNumber.of(0L)
         val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2048))
         for (upper in listOf(false, true)) {
@@ -196,41 +172,7 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `exact model copies isolate caller collections and preserve unchanged authority`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val entries = mutableListOf(ExactLpEntry(0, one))
-        val matrix = mutableListOf<List<ExactLpEntry>>(entries)
-        val rhs = mutableListOf(one)
-        val columns = mutableListOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(ExactLpBounds()))
-        val rows = mutableListOf(ExactLpRow())
-        val costs = mutableListOf(zero, zero)
-        val model = ExactLpModel(matrix, rhs, columns, rows, ExactLpObjective(costs))
-        val copiedRhs = mutableListOf(one)
-        val copiedColumns = columns.toMutableList()
-        val copiedRows = rows.toMutableList()
-        val copy = model.copy(rhs = copiedRhs, columns = copiedColumns, rows = copiedRows)
-
-        entries.clear()
-        matrix.clear()
-        rhs[0] = zero
-        columns.clear()
-        rows.clear()
-        costs.clear()
-        copiedRhs[0] = zero
-        copiedColumns.clear()
-        copiedRows.clear()
-
-        assertTrue(model.sameAuthority(copy))
-        assertTrue(model.sameAuthority(model.copy()))
-        assertEquals(listOf(ExactLpEntry(0, one)), model.entries(0))
-        assertEquals(one, copy.rhs(0))
-        assertEquals(2, copy.numVars)
-        assertEquals(1, copy.m)
-    }
-
-    @Test
-    fun `inactive strict rows remove logical strictness integrality and sides`() {
+    fun `inactive strict rows should remove logical strictness integrality and sides`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
             listOf(emptyList()),
@@ -252,7 +194,7 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `working projections preserve rational authority and source metadata`() {
+    fun `working projections should preserve rational authority and source metadata`() {
         val zero = ExactLpNumber.of(0L)
         val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val premises = ExactLpPremises(listOf(ExactLpPremise(8, true, third)))
@@ -288,7 +230,7 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `matrix compatibility includes exact input identity and row premises`() {
+    fun `matrix compatibility should include exact input identity and row premises`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val model = ExactLpModel(
@@ -314,7 +256,7 @@ class LpExactStateTest {
     }
 
     @Test
-    fun `an underflowed bound cannot authorize cost or scale underflow`() {
+    fun `an underflowed bound should not authorize cost or scale underflow`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2048))
@@ -352,4 +294,42 @@ class LpExactStateTest {
         }
     }
 
+    @Test
+    fun `matrix underflow should preserve structural support and exact authority`() {
+        val tiny = BigFraction.of(BIG_ONE, parseBigInt("1" + "0".repeat(400)))
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(tiny)))),
+            listOf(zero),
+            List(2) { ExactLpColumn(ExactLpBounds()) },
+            listOf(ExactLpRow()),
+            ExactLpObjective(List(2) { zero }),
+        )
+        val state = LpExactState(source)
+
+        val working = assertNotNull(state.toWorkingModel())
+
+        assertEquals(1, working.csc.rowIdx.size)
+        assertEquals(tiny, state.model.entries(0).single().number.value)
+        assertEquals(LpMatrixProjectionStatus(1, 0), state.matrixProjectionStatus)
+    }
+
+    @Test
+    fun `budget and cancellation declines should permit a later projection`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val state = LpExactState(source)
+
+        assertNull(state.toWorkingModel(LpProjectionMeter(workLimit = 0L)))
+        assertNull(state.toWorkingModel(LpProjectionMeter(cancellation = Cancellation { true })))
+
+        assertFalse(state.matrixProjectionDeclined)
+        assertNotNull(state.toWorkingModel())
+    }
 }

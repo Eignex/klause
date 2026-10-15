@@ -5,19 +5,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class DecimalScalingTest {
-
     private fun scaleOf(vararg values: Double): RowScale =
         RowScaleBuilder().also { builder -> values.forEach { builder.observe(it) } }.resolve()
 
     @Test
-    fun `a row of whole values needs no multiplier`() {
+    fun `a row of whole values should need no multiplier`() {
         val scale = scaleOf(1.0, -3.0, 42.0)
 
         assertEquals(1L, assertIs<RowScale.Exact>(scale).multiplier)
     }
 
     @Test
-    fun `a decimal row takes the least common denominator of its values`() {
+    fun `a decimal row should take the least common denominator of its values`() {
         val scale = scaleOf(0.5, 0.125, 4.0)
 
         assertEquals(1000L, assertIs<RowScale.Exact>(scale).multiplier)
@@ -26,21 +25,21 @@ class DecimalScalingTest {
     }
 
     @Test
-    fun `a value finer than a millionth keeps a whole coefficient`() {
+    fun `a value finer than a millionth should keep a whole coefficient`() {
         val scale = scaleOf(1e-7, 1.0)
 
-        assertEquals(1L, scale.scale(1e-7), "a term the row states may not scale to nothing")
+        assertEquals(1L, scale.scale(1e-7))
     }
 
     @Test
-    fun `a value printed at full double precision is rounded rather than restated`() {
+    fun `a value printed at full double precision should be rounded`() {
         val scale = scaleOf(-0.0214054799999994)
 
         assertIs<RowScale.Rounded>(scale)
     }
 
     @Test
-    fun `a row wider than any single multiplier is unrepresentable`() {
+    fun `a row wider than any single multiplier should be unrepresentable`() {
         val scale = scaleOf(1e16, 1e-3)
 
         assertEquals(1L, (scale as RowScale.Unrepresentable).multiplier)

@@ -1,0 +1,168 @@
+package com.eignex.klause.solver.search
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+
+class SearchLearningTest {
+    @Test
+    fun `learned clause should imply its last unfalsified literal`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+
+        assertEquals(true, session.boolValue(2))
+    }
+
+    @Test
+    fun `learned clause should conflict when propagation falsifies every literal`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(0, 3)))
+
+        val result = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(1)))
+
+        assertEquals(setOf(0, 3), result.explanation?.literals?.toSet())
+    }
+
+    @Test
+    fun `learned clause should imply again after its watches are refalsified in another order`() {
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        session.popTo(0)
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+
+        assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
+    fun `learned unit clause should be reimplied after the level that learned it is retracted`() {
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+        session.learn(SearchExplanation(intArrayOf(0)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        session.popTo(0)
+        assertEquals(null, session.boolValue(0))
+
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
+    fun `permuted explanation should not enter the database twice`() {
+        val session = SearchSession(emptyList())
+
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(2, 0)))
+
+        assertEquals(1, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `restart reduction over the learned database cap should keep glue clauses`() {
+        listOf(0 to 1, 1 to 2).forEach { (glueLbd, expectedCount) ->
+            val session = SearchSession(
+                emptyList(),
+                learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = glueLbd),
+            )
+            session.learn(SearchExplanation(intArrayOf(0, 2)))
+            session.learn(SearchExplanation(intArrayOf(4, 6)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+
+            assertIs<ComponentResult.Consistent>(session.restart())
+
+            assertEquals(expectedCount, session.learnedClauseCount, "glueLbd=$glueLbd")
+        }
+    }
+
+    @Test
+    fun `learned clause telemetry should record a reduction at its restart boundary`() {
+        val session = SearchSession(
+            emptyList(),
+            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
+        )
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(4, 6)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertIs<ComponentResult.Consistent>(session.restart())
+
+        val stats = session.learnedClauseStats()
+        assertEquals(2L, stats.learned)
+        assertEquals(1L, stats.restarts)
+        assertEquals(1L, stats.reductions)
+        assertEquals(1L, stats.dropped)
+        assertEquals(1L, stats.retained)
+        assertEquals(2L, stats.peakRetained)
+    }
+
+    @Test
+    fun `glue should count the distinct learned clauses spanning at most two levels`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(6, 8)))
+        session.learn(SearchExplanation(intArrayOf(6, 8)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
+
+        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+
+        assertEquals(1L, session.glueClauseCount)
+    }
+
+    @Test
+    fun `root fixings should count only the Booleans assigned below every decision`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+
+        assertEquals(1, session.rootFixedCount)
+    }
+
+    @Test
+    fun `reduction should keep the oldest clause when LBDs tie`() {
+        val session = SearchSession(
+            emptyList(),
+            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
+        )
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(4, 6)))
+        session.learn(SearchExplanation(intArrayOf(8, 10)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        assertIs<ComponentResult.Consistent>(session.restart())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `reduction should prefer lower LBD over insertion order`() {
+        listOf(3, 10).forEach { levels ->
+            val session = SearchSession(
+                emptyList(),
+                learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
+            )
+            for (variable in 0 until levels) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(variable * 2)))
+            }
+            session.learn(SearchExplanation(IntArray(levels) { it * 2 }))
+            session.learn(SearchExplanation(intArrayOf(levels * 2, (levels + 1) * 2)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentResult.Consistent>(session.restart())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(levels * 2 + 1)))
+
+            assertEquals(true, session.boolValue(levels + 1), "levels=$levels")
+        }
+    }
+}

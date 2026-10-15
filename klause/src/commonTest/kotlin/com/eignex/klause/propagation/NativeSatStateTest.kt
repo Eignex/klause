@@ -1,0 +1,173 @@
+package com.eignex.klause.propagation
+
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class NativeSatStateTest {
+    private fun session(numVars: Int, vararg clauses: IntArray): PropagationSession = PropagationSession(
+        Problem(
+            numBoolVars = numVars,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = clauses.map<IntArray, Factor> { Clause(it) }.toTypedArray(),
+        ),
+        nativeSat = true,
+    )
+
+    private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
+
+    @Test
+    fun `a root learned reason should remain in the conflict core after compaction`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 2)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true))), 1, permanent = true)
+        session.forgetLearnedClauses { index, _ -> index != 0 }
+
+        val conflict = assertIs<PropagationResult.Unsat>(session.pinBool(0, false))
+
+        assertEquals(setOf(1), conflict.conflictFactors.toSet())
+    }
+
+    @Test
+    fun `surviving clauses should propagate after repeated reductions and additions`() {
+        val session = session(8, or(6, true, 7, true))
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))), 3)
+        session.addLearnedClause(Clause(or(0, true, 5, true)), 2)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true), Lit.make(5, true))), 3)
+        session.forgetLearnedClauses { index, _ -> index != 1 }
+        session.addLearnedClause(Clause(or(0, true, 3, true)), 2)
+        session.forgetLearnedClauses { index, _ -> index != 0 }
+        session.pinBool(3, false)
+
+        session.pinBool(4, false)
+
+        assertEquals(true, session.boolValue(0))
+        assertEquals(true, session.boolValue(5))
+    }
+
+    @Test
+    fun `learned watch scans should find an open prefix after backtracking`() {
+        val session = session(7, or(5, true, 6, true))
+        session.addLearnedClause(Clause(IntArray(5) { Lit.make(it, true) }), 3)
+        session.pinBool(0, false)
+        session.pinBool(1, false)
+        session.popToLevel(0)
+        session.pinBool(4, false)
+        session.pinBool(2, false)
+        session.pinBool(3, false)
+
+        session.pinBool(0, false)
+
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `opposite pins after undo should propagate opposite deductions`() {
+        val session = session(2, or(0, false, 1, true), or(0, true, 1, false))
+        session.pinBool(0, true)
+        assertEquals(true, session.boolValue(1))
+        session.popToLevel(0)
+
+        session.pinBool(0, false)
+
+        assertEquals(false, session.boolValue(1))
+        session.popToLevel(0)
+        session.pinBool(0, true)
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `relocated watches should propagate after backtracking`() {
+        val session = session(3, intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
+
+        session.pinBool(0, false)
+        session.pinBool(1, false)
+        assertEquals(true, session.boolValue(2))
+        session.popToLevel(0)
+        session.pinBool(2, false)
+        session.pinBool(1, false)
+
+        assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
+    fun `a learned unit should propagate when its deepest premise is reassigned`() {
+        val session = session(4, or(0, true, 1, true))
+        session.pinBool(0, true)
+        session.pinBool(1, true)
+        session.pinBool(2, true)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false), Lit.make(3, true))), 2)
+        session.popToLevel(1)
+
+        session.pinBool(2, true)
+
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
+    fun `a conflicting learned clause should propagate after deeper premises retract`() {
+        val session = session(4, or(0, true, 1, true))
+        session.pinBool(0, true)
+        session.pinBool(1, true)
+        session.pinBool(2, true)
+        session.pinBool(3, false)
+        assertIs<PropagationResult.Unsat>(
+            session.addLearnedClause(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false), Lit.make(3, true))),
+                3,
+            ),
+        )
+        session.popToLevel(2)
+
+        session.pinBool(2, true)
+
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
+    fun `forget should renumber survivors and preserve their propagation`() {
+        val session = session(4, intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), lbd = 2) // index 0 — kept
+        session.addLearnedClause(Clause(or(2, true, 3, true)), lbd = 2) // index 1 — dropped
+        session.addLearnedClause(Clause(or(0, true, 2, true)), lbd = 2) // index 2 — kept
+        session.addLearnedClause(Clause(or(1, true, 3, true)), lbd = 2) // index 3 — dropped
+        assertEquals(4, session.learnedClauseCount)
+
+        session.forgetLearnedClauses { idx, _ -> idx % 2 == 0 }
+        assertEquals(2, session.learnedClauseCount)
+
+        session.pinBool(0, false)
+        assertTrue(session.boolValue(1) == true)
+        assertTrue(session.boolValue(2) == true)
+    }
+
+    @Test
+    fun `a dropped clause should not propagate`() {
+        val session = session(4, intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), lbd = 2) // index 0 — kept
+        session.addLearnedClause(Clause(or(2, true, 3, true)), lbd = 2) // index 1 — dropped
+
+        session.forgetLearnedClauses { idx, _ -> idx == 0 }
+        assertEquals(1, session.learnedClauseCount)
+
+        session.pinBool(0, true)
+        session.pinBool(2, false)
+        assertNull(session.boolValue(3))
+    }
+
+    @Test
+    fun `glue export should read native learned clause literals`() {
+        val session = session(3, intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        session.addLearnedClause(Clause(or(0, false, 1, true)), lbd = 2)
+        session.addLearnedClause(Clause(or(1, false, 2, true)), lbd = 8) // above the glue LBD cap
+        val glue = session.exportGlueClauses(maxLbd = 2, maxLen = 8)
+        assertEquals(1, glue.size)
+    }
+}

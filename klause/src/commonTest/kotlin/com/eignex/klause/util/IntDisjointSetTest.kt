@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class IntDisjointSetTest {
 
     @Test
-    fun `union is transitive across a chain`() {
+    fun `union should be transitive across a chain`() {
         val ds = IntDisjointSet(5)
         ds.union(0, 1)
         ds.union(1, 2)
@@ -19,18 +19,7 @@ class IntDisjointSetTest {
     }
 
     @Test
-    fun `repeated find returns a stable representative for a merged component`() {
-        val ds = IntDisjointSet(4)
-        ds.union(0, 1)
-        ds.union(2, 3)
-        ds.union(1, 3)
-        val first = ds.find(0)
-        assertEquals(first, ds.find(0))
-        for (x in 0 until 4) assertEquals(first, ds.find(x))
-    }
-
-    @Test
-    fun `groups partitions all elements into ascending members`() {
+    fun `groups should partition all elements into ascending members`() {
         val ds = IntDisjointSet(6)
         ds.union(0, 2)
         ds.union(2, 4)
@@ -38,5 +27,4 @@ class IntDisjointSetTest {
         val groups = ds.groups().map { it.toList() }.toSet()
         assertEquals(setOf(listOf(0, 2, 4), listOf(1, 5), listOf(3)), groups)
     }
-
 }

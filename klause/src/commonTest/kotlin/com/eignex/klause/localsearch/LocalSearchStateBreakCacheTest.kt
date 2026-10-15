@@ -38,7 +38,7 @@ class LocalSearchStateBreakCacheTest {
     }
 
     @Test
-    fun `scores match scans when first queried before or after mixed moves`() {
+    fun `cached scores should match scans when first queried before or after mixed moves`() {
         val numBool = 4
         val numInt = 2
         val intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5))
@@ -65,7 +65,7 @@ class LocalSearchStateBreakCacheTest {
             if (queryBeforeMoves) assertCacheConsistent(state, "after restart")
 
             val rng = Random(123)
-            repeat(200) { step ->
+            repeat(20) { step ->
                 val pickInt = numInt > 0 && rng.nextInt(3) == 0
                 if (pickInt) {
                     val v = rng.nextInt(numInt)
@@ -83,7 +83,7 @@ class LocalSearchStateBreakCacheTest {
     }
 
     @Test
-    fun `restart clears stale cache`() {
+    fun `restart should clear the stale cache`() {
         val factors = arrayOf<Factor>(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
         )

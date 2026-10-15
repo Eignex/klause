@@ -11,8 +11,7 @@ import kotlin.test.assertEquals
 
 class DiffnInvariantTest {
 
-    // Delta probing and incremental apply share the affected-pair formula; a separate full recount
-    // prevents their agreeing on the same incorrect delta.
+    // Probing and apply share the affected-pair formula, so only a full recount can catch a shared error.
     private fun assertDeltaMatchesRecompute(
         numIntVars: Int,
         domains: Array<IntDomain>,
@@ -37,7 +36,7 @@ class DiffnInvariantTest {
     }
 
     @Test
-    fun `deltaIfIntSet matches full recompute - constant sizes`() {
+    fun `deltaIfIntSet should match full recompute with constant sizes`() {
         assertDeltaMatchesRecompute(
             numIntVars = 8,
             domains = Array(8) { IntDomain(0, 4) },
@@ -54,8 +53,7 @@ class DiffnInvariantTest {
     }
 
     @Test
-    fun `deltaIfIntSet matches full recompute - variable sizes`() {
-        // Positions in ids 0..7 (domain [0,4]); widths in 8..11, heights in 12..15 ([1,3]).
+    fun `deltaIfIntSet should match full recompute with variable sizes`() {
         val domains = Array(16) { if (it < 8) IntDomain(0, 4) else IntDomain(1, 3) }
         assertDeltaMatchesRecompute(
             numIntVars = 16,
@@ -69,7 +67,7 @@ class DiffnInvariantTest {
                 heightVars = intArrayOf(12, 13, 14, 15),
             ),
             probeVars = IntArray(16) { it },
-            valueRange = 1..3, // within both the position [0,4] and size [1,3] domains
+            valueRange = 1..3,
             seed = 13,
         )
     }

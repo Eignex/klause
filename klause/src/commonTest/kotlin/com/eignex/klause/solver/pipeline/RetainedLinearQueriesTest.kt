@@ -14,19 +14,27 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RetainedLinearQueriesTest {
     @Test
-    fun `generated center preparation preserves cancellation and one root opening`() {
+    fun `generated center preparation should preserve cancellation and one root opening`() {
         val source = Problem(1, 0, emptyArray(), emptyArray())
         var openings = 0
-        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("root",
-            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
+        val registration = PreparedSearchRegistration(
+            source,
+            ExecutionComponentDescriptor(
+                "root",
+                ComponentResponsibility.BOOLEAN,
+                emptyList(),
+                emptyList(),
+                emptyList(),
+            ),
+        ) {
             openings++
             listOf(object : SearchComponent {
                 override fun initialize(context: SearchContext): ComponentResult = context.publish(Lit.make(0, true))
@@ -50,20 +58,30 @@ class RetainedLinearQueriesTest {
     }
 
     @Test
-    fun `failed root initialization preserves its failure and releases every peer`() {
+    fun `failed root initialization should preserve its failure and release every peer`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
         val primary = IllegalArgumentException("initialization")
         val cleanup = IllegalStateException("cleanup")
         val closed = ArrayList<Int>()
-        val registration = PreparedSearchRegistration(source, ExecutionComponentDescriptor("peers",
-            ComponentResponsibility.BOOLEAN, emptyList(), emptyList(), emptyList())) {
-            List(2) { index -> object : SearchComponent, AutoCloseable {
-                override fun initialize(context: SearchContext): ComponentResult = throw primary
-                override fun close() {
-                    closed += index
-                    if (index == 1) throw cleanup
+        val registration = PreparedSearchRegistration(
+            source,
+            ExecutionComponentDescriptor(
+                "peers",
+                ComponentResponsibility.BOOLEAN,
+                emptyList(),
+                emptyList(),
+                emptyList(),
+            ),
+        ) {
+            List(2) { index ->
+                object : SearchComponent, AutoCloseable {
+                    override fun initialize(context: SearchContext): ComponentResult = throw primary
+                    override fun close() {
+                        closed += index
+                        if (index == 1) throw cleanup
+                    }
                 }
-            } }
+            }
         }
         val prepared = PreparedSearchRegistrations(source, listOf(registration))
         val queries = RetainedLinearQueries(source, TheoryParams(), null) { stop, _ ->
@@ -81,18 +99,37 @@ class RetainedLinearQueriesTest {
     }
 
     @Test
-    fun `a refuted bound leaves a sibling exact source witness available`() {
-        val model = Problem(0, 0, emptyArray(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0)), numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+    fun `refuted bound should leave a sibling exact source witness available`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(
+                Linear(
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    1.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
         val plan = model.componentPlan()
         val queries = RetainedLinearQueries(model, TheoryParams(), null) { stop, _ ->
             plan.search(model, emptyMap(), cancellation = stop)
         }
 
         queries.use {
-            assertIs<ExactNeighborhoodResult.Refuted>(it.check(
-                ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)), Cancellation.Never))
+            assertIs<ExactNeighborhoodResult.Refuted>(
+                it.check(
+                    ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ZERO)),
+                    Cancellation.Never,
+                ),
+            )
             val result = it.check(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never)
 
             val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
@@ -101,9 +138,16 @@ class RetainedLinearQueriesTest {
     }
 
     @Test
-    fun `an incomplete query leaves no sibling bounds`() {
-        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `incomplete query should leave no sibling bounds`() {
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val plan = model.componentPlan()
         val queries = RetainedLinearQueries(model, TheoryParams(), null) { stop, _ ->
             plan.search(model, emptyMap(), cancellation = stop)
@@ -127,7 +171,7 @@ class RetainedLinearQueriesTest {
     }
 
     @Test
-    fun `empty source queries cannot renew their native check allowance`() {
+    fun `empty source queries should not renew their native check allowance`() {
         val model = Problem(0, 0, emptyArray(), emptyArray())
         val plan = model.componentPlan()
         val queries = RetainedLinearQueries(model, TheoryParams(maxLeaves = 1), null) { stop, _ ->

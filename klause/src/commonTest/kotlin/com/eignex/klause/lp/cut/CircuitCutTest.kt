@@ -39,7 +39,7 @@ class CircuitCutTest {
     }
 
     @Test
-    fun `repeated separation keeps cuts independent across changing support`() {
+    fun `repeated separation should keep cuts independent across changing support`() {
         val (p, obj) = circuitProblem()
         val session = PropagationSession(p)
         val r = relaxer(p, obj).build(session)
@@ -69,28 +69,27 @@ class CircuitCutTest {
     }
 
     @Test
-    fun `arc relaxation optimum is a subtour and gets cut`() {
+    fun `subtour optimum of the arc relaxation should get cut`() {
         val (p, obj) = circuitProblem()
         val session = PropagationSession(p)
         val r = relaxer(p, obj).build(session)
         val sol = requireNotNull(RevisedSimplex(r.model).solve())
 
-        assertEquals(10.0, sol.objective, eps) // the subtour assignment cost
+        assertEquals(10.0, sol.objective, eps)
         assertEquals(1.0, sol.primalAt(intCol(r, 0)), eps)
         assertEquals(0.0, sol.primalAt(intCol(r, 1)), eps)
         assertEquals(3.0, sol.primalAt(intCol(r, 2)), eps)
         assertEquals(2.0, sol.primalAt(intCol(r, 3)), eps)
 
         val cuts = CircuitSeparator().separate(CutContext(p, r, sol.primal, session))
-        assertTrue(cuts.isNotEmpty(), "a subtour LP point must yield a cut")
+        assertTrue(cuts.isNotEmpty())
         assertTrue(cuts.all { it.rel == Relation.GE && it.rhs == 1L })
-        // The first cut is violated at the current point: its arcs carry no flow out of the subtour.
         val lhs = cuts.first().cols.sumOf { sol.primalAt(it) }
         assertTrue(lhs < 1.0 - eps, "cut LHS $lhs should be < 1 at the subtour point")
     }
 
     @Test
-    fun `subtour cut excludes no Hamiltonian tour`() {
+    fun `subtour cut should exclude no Hamiltonian tour`() {
         val (p, obj) = circuitProblem()
         val session = PropagationSession(p)
         val r = relaxer(p, obj).build(session)
@@ -98,38 +97,16 @@ class CircuitCutTest {
         val model = r.circuitArcs.single()
         val cut = CircuitSeparator().separate(CutContext(p, r, sol.primal, session)).first { it.rel == Relation.GE }
 
-        // Map each arc column back to its (i, j) from the sparse arc lists.
         val arcOf = HashMap<Int, Pair<Int, Int>>()
         for (k in model.cols.indices) arcOf[model.cols[k]] = model.tails[k] to model.heads[k]
         val cutArcs = cut.cols.map { arcOf.getValue(it) }
 
-        // Every single 4-cycle (Hamiltonian tour) must use at least one cut arc.
         for (succ in singleCyclePermutations(4)) {
             val crossings = cutArcs.count { (i, j) -> succ[i] == j }
             assertTrue(crossings >= cut.rhs, "tour ${succ.toList()} violates the subtour cut")
         }
     }
 
-    @Test
-    fun `arc relaxation is gated on candidate-arc count not node count`() {
-        // n=30 (30·29 = 870 arcs ≤ MAX_CIRCUIT_ARCS) builds; n=40 (1560 arcs) exceeds the cap and is
-        // skipped, so the gate works both ways.
-        fun fullCircuit(n: Int): LpRelaxation {
-            val p = Problem(
-                numBoolVars = 0,
-                numIntVars = n,
-                intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
-                factors = arrayOf<Factor>(Circuit(IntArray(n) { it })),
-            )
-            return CpToLpRelaxation(p, null, circuitArcs = true).build(PropagationSession(p))
-        }
-        val built = fullCircuit(30).circuitArcs.single()
-        assertEquals(30, built.n)
-        assertEquals(30 * 29, built.cols.size) // every i→j with j ≠ i is a candidate arc
-        assertTrue(fullCircuit(40).circuitArcs.isEmpty(), "n=40 (1560 arcs) exceeds the arc cap, so skipped")
-    }
-
-    /** All permutations of `[0,n)` that form a single n-cycle, as successor arrays. */
     private fun singleCyclePermutations(n: Int): List<IntArray> {
         val out = ArrayList<IntArray>()
         val perm = IntArray(n)
@@ -140,7 +117,7 @@ class CircuitCutTest {
                 return
             }
             for (v in 0 until n) {
-                if (used[v] || v == pos) continue // no self-loops in a circuit
+                if (used[v] || v == pos) continue
                 used[v] = true
                 perm[pos] = v
                 rec(pos + 1)

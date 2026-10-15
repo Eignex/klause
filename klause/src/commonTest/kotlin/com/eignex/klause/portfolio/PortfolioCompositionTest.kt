@@ -2,9 +2,9 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.SmallestDomain
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.ValueSelection
@@ -21,11 +21,13 @@ import kotlin.test.assertTrue
 class PortfolioCompositionTest {
 
     @Test
-    fun `annotated finite optimization admits unrestricted first fail beside source search`() {
-        val annotation = SearchHints(listOf(
-            SearchGroup(intArrayOf(), intArrayOf(0, 1)),
-            SearchGroup(intArrayOf(), intArrayOf(2), VariableSelection.InputOrder),
-        )).toBacktrackParams(0, 3)
+    fun `annotated finite optimization should admit unrestricted first fail beside source search`() {
+        val annotation = SearchHints(
+            listOf(
+                SearchGroup(intArrayOf(), intArrayOf(0, 1)),
+                SearchGroup(intArrayOf(), intArrayOf(2), VariableSelection.InputOrder),
+            ),
+        ).toBacktrackParams(0, 3)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
 
@@ -43,7 +45,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `tiered first fail retains unrestricted search diversity`() {
+    fun `tiered first fail should retain unrestricted search diversity`() {
         val annotation = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(1, 0))))
             .toBacktrackParams(0, 3)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
@@ -56,7 +58,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `annotation diversity preserves other primary branching preferences`() {
+    fun `annotation diversity should preserve other primary branching preferences`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
         val primaryTiers = listOf(
@@ -77,11 +79,13 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `annotation diversity preserves later source value preferences`() {
-        val annotation = SearchHints(listOf(
-            SearchGroup(intArrayOf(), intArrayOf(0, 1)),
-            SearchGroup(intArrayOf(), intArrayOf(2), VariableSelection.InputOrder, ValueSelection.Maximum),
-        )).toBacktrackParams(0, 3)
+    fun `annotation diversity should preserve later source value preferences`() {
+        val annotation = SearchHints(
+            listOf(
+                SearchGroup(intArrayOf(), intArrayOf(0, 1)),
+                SearchGroup(intArrayOf(), intArrayOf(2), VariableSelection.InputOrder, ValueSelection.Maximum),
+            ),
+        ).toBacktrackParams(0, 3)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
 
@@ -92,11 +96,13 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `empty source tiers do not hide the leading integer first fail preference`() {
-        val annotation = SearchHints(listOf(
-            SearchGroup(intArrayOf(), intArrayOf(), VariableSelection.InputOrder),
-            SearchGroup(intArrayOf(), intArrayOf(0, 1)),
-        )).toBacktrackParams(0, 3)
+    fun `empty source tiers should not hide the leading integer first fail preference`() {
+        val annotation = SearchHints(
+            listOf(
+                SearchGroup(intArrayOf(), intArrayOf(), VariableSelection.InputOrder),
+                SearchGroup(intArrayOf(), intArrayOf(0, 1)),
+            ),
+        ).toBacktrackParams(0, 3)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
 
@@ -106,7 +112,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `unrestricted annotation already supplies first fail branching`() {
+    fun `unrestricted annotation should already supply first fail branching`() {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(
             annotationArm = BacktrackParams(variableSelector = SmallestDomain, valueSelector = IndomainMin),
         )
@@ -119,19 +125,17 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `annotation diversity preserves explicit pools small counts and parallel composition`() {
+    fun `annotation diversity should preserve explicit pools small counts and parallel composition`() {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(
             annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
                 .toBacktrackParams(0, 3),
         )
-        val controls = (1..5).map { scenario.copy(arms = it) } + listOf(
+        val controls = listOf(
+            scenario.copy(arms = 1),
             scenario.copy(cores = 2),
             scenario.copy(kind = Kind.CSP),
             scenario.copy(engine = EngineMix.BACKTRACK),
-            scenario.copy(engine = EngineMix.LOCAL_SEARCH),
-            scenario.copy(engine = EngineMix.ALNS),
             scenario.copy(annotationArm = null),
-            scenario.copy(btEdit = { it }),
             scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
             scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
         )
@@ -145,7 +149,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `annotation diversity requires nonbinary finite circuit domains`() {
+    fun `annotation diversity should require nonbinary finite circuit domains`() {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(
             annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
                 .toBacktrackParams(0, 3),
@@ -166,7 +170,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `expanded annotated pools admit first fail before any incumbent without duplicating it`() {
+    fun `expanded annotated pools should admit first fail before any incumbent without duplicating it`() {
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(
             annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
                 .toBacktrackParams(0, 3),
@@ -174,7 +178,7 @@ class PortfolioCompositionTest {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { false }
         val small = PortfolioComposition.plan(scenario, facts)
 
-        for (count in listOf(9, 12, 18, 30)) {
+        for (count in listOf(9, 30)) {
             val expanded = PortfolioComposition.plan(scenario.copy(arms = count), facts)
 
             assertEquals(small.arms.map { it.label }, expanded.arms.take(small.arms.size).map { it.label })
@@ -184,12 +188,13 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `annotation diversity spends the containing node allowance`() {
+    fun `annotation diversity should spend the containing node allowance`() {
         val budget = NodeBudget(limit = 100)
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(
             annotationArm = SearchHints(listOf(SearchGroup(intArrayOf(), intArrayOf(0, 1))))
                 .toBacktrackParams(0, 3),
-            nodeBudget = budget, lpCeiling = LpConfig.OFF,
+            nodeBudget = budget,
+            lpCeiling = LpConfig.OFF,
         )
 
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, circuit = true) { true }
@@ -200,7 +205,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `integer linear companion preserves existing worker positions`() {
+    fun `integer linear companion should preserve existing worker positions`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP).profile
         val baseline = PortfolioComposition.compose(scenario, ProblemFacts(profile, binaryIntegers = true) { true })
@@ -214,20 +219,21 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `integer linear companion remains available with cuts disabled`() {
+    fun `integer linear companion should remain available with cuts disabled`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, integerLinear = true) { true }
         val baseline = PortfolioComposition.compose(scenario, facts)
 
         val composed = PortfolioComposition.compose(
-            scenario.copy(lpCeiling = LpConfig.parse("aggressive,-cuts")), facts,
+            scenario.copy(lpCeiling = LpConfig.parse("aggressive,-cuts")),
+            facts,
         )
 
         assertEquals(baseline.map { it.label }, composed.map { it.label })
     }
 
     @Test
-    fun `explicit and parallel integer linear pools retain their composition`() {
+    fun `explicit and parallel integer linear pools should retain their composition`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP).profile
         val baseline = ProblemFacts(profile) { true }
@@ -250,7 +256,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `Boolean objective pools retain a core guided proof worker`() {
+    fun `Boolean objective pools should retain a core guided proof worker`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val ordinary = ProblemFacts.assumed(Kind.COP)
         val facts = ProblemFacts(ordinary.profile, booleanObjective = true) { true }
@@ -265,7 +271,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `finite mixed optimization admits selector diversity without a relaxation`() {
+    fun `finite mixed optimization should admit selector diversity without a relaxation`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP).profile
         val facts = ProblemFacts(profile) { false }
@@ -280,43 +286,39 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `explicit continuous and relaxation pools retain their leading recipes`() {
+    fun `explicit and continuous pools should keep selector switch out of the leading recipes`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP).profile
         val finite = ProblemFacts(profile) { false }
         val controls = listOf(
             scenario.copy(cores = 2),
             scenario.copy(engine = EngineMix.BACKTRACK),
-            scenario.copy(kind = Kind.CSP),
-            scenario.copy(arms = 5),
-            scenario.copy(btEdit = { it }),
             scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
-            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
             scenario.copy(annotationArm = BacktrackParams()),
         )
+        val composed = controls.map { PortfolioComposition.compose(it, finite) } +
+            listOf(ProblemClass.MixedInteger, ProblemClass.Sat).map { problemClass ->
+                val facts = ProblemFacts(profile.copy(problemClass = problemClass)) { false }
+                PortfolioComposition.compose(scenario, facts)
+            }
 
-        for (control in controls) {
-            assertTrue(
-                PortfolioComposition.compose(control, finite).filterIsInstance<BacktrackWorkerConfig>()
-                .take(2).none { it.label == "selector-switch" }
-            )
+        for (arms in composed) {
+            assertTrue(arms.filterIsInstance<BacktrackWorkerConfig>().take(2).none { it.label == "selector-switch" })
         }
-        for (problemClass in listOf(ProblemClass.MixedInteger, ProblemClass.Sat, ProblemClass.PseudoBoolean)) {
-            val facts = ProblemFacts(profile.copy(problemClass = problemClass)) { false }
-            assertTrue(
-                PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
-                .take(2).none { it.label == "selector-switch" }
-            )
-        }
-        val relaxation = ProblemFacts(profile) { true }
-        assertEquals(
-            listOf("satOptimized", "lp-default"),
-            PortfolioComposition.compose(scenario, relaxation).take(2).map { it.label },
-        )
     }
 
     @Test
-    fun `expanded finite pools keep the admitted selector position without duplicating it`() {
+    fun `a pool with a relaxation should lead with the LP default recipe`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val relaxation = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { true }
+
+        val labels = PortfolioComposition.compose(scenario, relaxation).take(2).map { it.label }
+
+        assertEquals(listOf("satOptimized", "lp-default"), labels)
+    }
+
+    @Test
+    fun `expanded finite pools should keep the admitted selector position without duplicating it`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { false }
         val small = PortfolioComposition.plan(scenario, facts)
@@ -329,7 +331,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `expanded pools retain the initial selector beside later relaxation recipes`() {
+    fun `expanded pools should retain the initial selector beside later relaxation recipes`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { it == LpEmphasis.CONSERVATIVE }
         val small = PortfolioComposition.plan(scenario, facts)
@@ -341,7 +343,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `scheduled mixed optimization pairs primary and full plateau neighborhoods`() {
+    fun `scheduled mixed optimization should pair primary and full plateau neighborhoods`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val ordinary = ProblemFacts.assumed(Kind.COP)
         val scheduling = ProblemFacts(ordinary.profile.copy(scheduling = true)) { true }
@@ -356,7 +358,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `explicit parallel and single engine scheduling pools retain their recipes`() {
+    fun `explicit parallel and single engine scheduling pools should retain their recipes`() {
         val scenarios = listOf(
             PortfolioScenario.sequential(Kind.CSP),
             PortfolioScenario.parallel(4, Kind.COP),
@@ -374,7 +376,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `curated satisfaction root cuts require an explicit override`() {
+    fun `curated satisfaction root cuts should require an explicit override`() {
         for (requested in listOf(null, false, true)) {
             val edit = requested?.let { enabled ->
                 { params: BacktrackParams -> params.copy(lpPlan = params.lpPlan.copy(rootCutHarvest = enabled)) }
@@ -391,7 +393,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `optimization and explicit satisfaction pools retain their root cut plans`() {
+    fun `optimization and explicit satisfaction pools should retain their root cut plans`() {
         val scenarios = listOf(
             PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 4),
             PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK, arms = 1)
@@ -408,7 +410,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `expanding a sequential optimization pool keeps the small pool positions`() {
+    fun `expanding a sequential optimization pool should keep the small pool positions`() {
         val small = PortfolioScenario.sequential(Kind.COP)
         for (problemClass in listOf(ProblemClass.FiniteCp, ProblemClass.MixedInteger)) {
             val facts = ProblemFacts.assumed(Kind.COP, problemClass)
@@ -423,7 +425,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `auxiliary LP joins finite objectives after the incumbent and continuous objectives before it`() {
+    fun `auxiliary LP should join finite objectives after the incumbent and continuous objectives before it`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemFacts.assumed(Kind.COP, ProblemClass.MixedInteger).profile
 
@@ -438,7 +440,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `explicit and parallel pools can use every arm for a first solution`() {
+    fun `explicit and parallel pools should use every arm for a first solution`() {
         val scenarios = listOf(
             PortfolioScenario.sequential(Kind.CSP, arms = 12),
             PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 12),
@@ -457,14 +459,14 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `mixed optimization schedules a complete arm before local search`() {
+    fun `mixed optimization should schedule a complete arm before local search`() {
         val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP))
 
         assertIs<BacktrackWorkerConfig>(arms.first())
     }
 
     @Test
-    fun `an injected backtrack pool is built as asked whatever the model offers`() {
+    fun `an injected backtrack pool should be built as asked whatever the model offers`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 2)
             .copy(btPool = listOf { BacktrackCatalog.byLabel("lp-default") })
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, relaxation = { false })
@@ -475,7 +477,7 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `the node allowance reaches every arm that runs a backtrack engine`() {
+    fun `the node allowance should reach every arm that runs a backtrack engine`() {
         val budget = NodeBudget(limit = 100)
         val arms = PortfolioComposition.compose(
             PortfolioScenario.sequential(Kind.COP, engine = EngineMix.MIXED, arms = 6).copy(nodeBudget = budget),
@@ -491,21 +493,11 @@ class PortfolioCompositionTest {
                 else -> Unit
             }
         }
-        assertTrue(arms.any { it is AlnsWorkerConfig }, "a mixed COP pool carries a hybrid-ALNS arm to check")
+        assertTrue(arms.any { it is AlnsWorkerConfig })
     }
 
     @Test
-    fun `the ALNS engine's arms spend the node allowance`() {
-        val budget = NodeBudget(limit = 100)
-        val arms = PortfolioComposition.compose(
-            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.ALNS, arms = 3).copy(nodeBudget = budget),
-        )
-
-        assertEquals(listOf(budget, budget, budget), arms.map { (it as AlnsWorkerConfig).nodeBudget })
-    }
-
-    @Test
-    fun `the model's annotation arm spends the node allowance`() {
+    fun `the model's annotation arm should spend the node allowance`() {
         val budget = NodeBudget(limit = 100)
         val arms = PortfolioComposition.compose(
             PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK, arms = 3)

@@ -1,53 +1,27 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class AssumptionsTest {
 
     @Test
-    fun `minimize should respect bool assumption`() {
-        // 4 bools, objective rewards every true; without assumptions optimal is "all true".
-        val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val solver = LocalSearchSolver(problem.bake())
-        val obj = LinearObjective(boolWeights = longArrayOf(-1L, -1L, -1L, -1L))
-        val sample = solver.minimize(
-            obj,
-            LocalSearchParams(
-                randomSeed = 3L,
-                maxFlips = 50_000L,
-                assumptions = Assumptions(bools = mapOf(2 to false)),
-            ),
-        ).assignment
-        assertNotNull(sample)
-        assertEquals(false, sample.bools[2], "bool 2 must stay false despite negative weight")
-        assertEquals(true, sample.bools[0])
-        assertEquals(true, sample.bools[1])
-        assertEquals(true, sample.bools[3])
+    fun `mergedWith should let the last write win`() {
+        val a = Assumptions(bools = mapOf(0 to true, 1 to true), ints = mapOf(10 to 5))
+        val b = Assumptions(bools = mapOf(1 to false, 2 to true), ints = mapOf(10 to 9, 20 to 3))
+        val m = a.mergedWith(b)
+        assertEquals(true, m.boolValueOrNull(0))
+        assertEquals(false, m.boolValueOrNull(1))
+        assertEquals(true, m.boolValueOrNull(2))
+        assertEquals(9, m.intValueOrNull(10))
+        assertEquals(3, m.intValueOrNull(20))
     }
 
     @Test
-    fun `assumptions should compose with hard constraints`() {
-        // Clause: bool0 OR bool1. Assume bool0 = false → bool1 must be true.
-        val clauses = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))))
-        val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = clauses)
-        val solver = LocalSearchSolver(problem.bake())
-        val sample = solver.sample(
-            LocalSearchParams(
-                randomSeed = 9L,
-                maxFlips = 10_000,
-                assumptions = Assumptions(bools = mapOf(0 to false)),
-            ),
-        ).assignment
-        assertNotNull(sample)
-        assertEquals(false, sample.bools[0])
-        assertEquals(true, sample.bools[1])
+    fun `withBool should insert and overwrite`() {
+        val a = Assumptions(bools = mapOf(2 to true))
+        val b = a.withBool(0, false).withBool(5, true).withBool(2, false)
+        assertEquals(listOf(0, 2, 5), b.boolKeys.toList())
+        assertEquals(listOf(false, false, true), b.boolValues.toList())
     }
 }

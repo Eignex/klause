@@ -22,9 +22,13 @@ import kotlin.test.assertTrue
 
 class ExecutionCapabilitiesTest {
     @Test
-    fun `finite counting selects complete cells independently of sampling backend`() {
-        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-            arrayOf(AllDifferent(intArrayOf(0, 1), 0, 3)))
+    fun `finite counting should select complete cells independently of sampling backend`() {
+        val source = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf(AllDifferent(intArrayOf(0, 1), 0, 3)),
+        )
         val plan = source.prepareExecutionPlan(preferFinite = true)
 
         val admission = plan.capabilities.admission(FiniteEngine.LOCAL_SEARCH, ExecutionOperation.EXACT_COUNT)
@@ -38,10 +42,12 @@ class ExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `native source completion does not invent a counting surface`() {
-        val source = assertIs<SmtLibInput.Polynomial>(SmtLibAdmission.parse(
-            "(declare-const x Real) (assert (= (* x x) 2))",
-        )).problem
+    fun `native source completion should not invent a counting surface`() {
+        val source = assertIs<SmtLibInput.Polynomial>(
+            SmtLibAdmission.parse(
+                "(declare-const x Real) (assert (= (* x x) 2))",
+            ),
+        ).problem
         val plan = source.prepareExecutionPlan()
 
         val admission = plan.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.EXACT_COUNT)
@@ -52,18 +58,28 @@ class ExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `unsupported open polynomial ownership remains distinct from exhausted arithmetic work`() {
+    fun `unsupported open polynomial ownership should stay distinct from exhausted arithmetic work`() {
         val open = Bits(1).also { it.set(0) }
-        val source = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
-            factors = arrayOf(ContinuousProduct(0, 0, 0)), numRealVars = 1,
-            realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
-        val supported = assertIs<SmtLibInput.Polynomial>(SmtLibAdmission.parse(
-            "(declare-const x Real) (assert (= (* x x) 2))",
-        )).problem.pipelineRequest()
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),
+            factors = arrayOf(ContinuousProduct(0, 0, 0)),
+            numRealVars = 1,
+            realLower = doubleArrayOf(1.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val supported = assertIs<SmtLibInput.Polynomial>(
+            SmtLibAdmission.parse(
+                "(declare-const x Real) (assert (= (* x x) 2))",
+            ),
+        ).problem.pipelineRequest()
 
         val unsupported = source.prepareExecutionPlan().capabilities.admission(FiniteEngine.BACKTRACK)
-        val exhausted = OpenTheoryPipeline.execute(supported, PolynomialTheoryParams(maximumWork = 0),
-            FiniteEngine.BACKTRACK).result
+        val exhausted = OpenTheoryPipeline.execute(
+            supported,
+            PolynomialTheoryParams(maximumWork = 0),
+            FiniteEngine.BACKTRACK,
+        ).result
 
         assertFalse(unsupported.runnable)
         assertTrue(unsupported.declines.any { it.preparation == PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER })
@@ -72,7 +88,7 @@ class ExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `operation binding retains immutable original source ownership and direction`() {
+    fun `operation binding should keep immutable source ownership and direction`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
         val plan = source.prepareExecutionPlan(preferFinite = true)
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
@@ -91,9 +107,16 @@ class ExecutionCapabilitiesTest {
     }
 
     @Test
-    fun `affine polynomial admission consumes the installed exact objective bridge`() {
-        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 0)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `affine polynomial admission should consume the installed exact objective bridge`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf(ContinuousProduct(0, 0, 0)),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
         val plan = source.prepareExecutionPlan(LinearObjective(realCoefficients = doubleArrayOf(1.0)))
 
         val satisfaction = plan.capabilities.admission(FiniteEngine.BACKTRACK)
@@ -101,20 +124,29 @@ class ExecutionCapabilitiesTest {
 
         assertTrue(satisfaction.runnable)
         assertTrue(optimization.runnable)
-        val execution = OpenTheoryPipeline.optimize(source.pipelineRequest(),
-            LinearObjective(realCoefficients = doubleArrayOf(1.0)), PolynomialTheoryParams(maximumWork = 0),
-            FiniteEngine.BACKTRACK)
+        val execution = OpenTheoryPipeline.optimize(
+            source.pipelineRequest(),
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            PolynomialTheoryParams(maximumWork = 0),
+            FiniteEngine.BACKTRACK,
+        )
         val stopped = assertIs<com.eignex.klause.solver.result.QuadraticOptimizationResult.Unknown>(execution.result)
         assertEquals(TerminationReason.BudgetExhausted, stopped.reason)
     }
+
     @Test
-    fun `polynomial invocation pins do not change prepared source admission or later witnesses`() {
-        val source = assertIs<SmtLibInput.Polynomial>(SmtLibAdmission.parse(
-            "(declare-const x Real) (declare-const b Bool) (assert (= (* x x) 2)) (assert b)",
-        )).problem
+    fun `polynomial invocation pins should not change prepared source admission or later witnesses`() {
+        val source = assertIs<SmtLibInput.Polynomial>(
+            SmtLibAdmission.parse(
+                "(declare-const x Real) (declare-const b Bool) (assert (= (* x x) 2)) (assert b)",
+            ),
+        ).problem
         val request = source.pipelineRequest()
-        val scoped = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
-            assumptions = Assumptions.None.withBool(0, false)))
+        val scoped = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                assumptions = Assumptions.None.withBool(0, false),
+            ),
+        )
 
         val rejected = OpenTheoryPipeline.execute(request, scoped, FiniteEngine.BACKTRACK).result
         val fresh = OpenTheoryPipeline.execute(request, engine = FiniteEngine.BACKTRACK).result
@@ -124,5 +156,4 @@ class ExecutionCapabilitiesTest {
         assertSame(source, request.preparedPlan.originalSource)
         assertTrue(request.preparedPlan.capabilities.admission(FiniteEngine.BACKTRACK).runnable)
     }
-
 }

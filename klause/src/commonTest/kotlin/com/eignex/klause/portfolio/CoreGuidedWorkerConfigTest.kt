@@ -23,9 +23,11 @@ import kotlin.test.assertNull
 
 class CoreGuidedWorkerConfigTest {
     @Test
-    fun `catalog worker retains a completed core bound across cancellation`() {
+    fun `catalog worker should retain a completed core bound across cancellation`() {
         val source = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
                 Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
@@ -63,7 +65,7 @@ class CoreGuidedWorkerConfigTest {
     }
 
     @Test
-    fun `rounded wide completion cannot certify a scalar source bound`() {
+    fun `rounded wide completion should not certify a scalar source bound`() {
         val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
         val problem = source.bake()
         val objective = LinearObjective(longArrayOf(9_007_199_254_740_995L))
@@ -85,7 +87,7 @@ class CoreGuidedWorkerConfigTest {
     }
 
     @Test
-    fun `exact scalar completion certifies its source bound`() {
+    fun `exact scalar completion should certify its source bound`() {
         val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))))
         val problem = source.bake()
         val objective = LinearObjective(longArrayOf(5))

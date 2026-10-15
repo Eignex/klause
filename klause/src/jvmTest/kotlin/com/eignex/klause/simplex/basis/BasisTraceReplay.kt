@@ -93,8 +93,7 @@ internal object BasisTraceReplay {
         var freshSolver: BasisSolver? = null
         try {
             preparedSolver = factory(matrix)
-            // The rebuild is deliberately not built through [factory]: a replay that injects a faulty
-            // solver must not be able to corrupt the basis it is checked against.
+            // Not built through [factory], so an injected faulty solver cannot corrupt its own check.
             freshSolver = KotlinBasisSolver(matrix, denseDimensionLimit = 0)
             return Arm(solver, preparedSolver, freshSolver, trace, bean, nanos, bytes)
         } catch (failure: Throwable) {
@@ -259,9 +258,7 @@ internal object BasisTraceReplay {
             checkFreshBasis(index)
         }
 
-        // Rebuilding the accepted basis with the same right-hand side measures drift, rather than
-        // providing an independent feasibility oracle. Threshold partial pivoting can decline a basis
-        // accepted by update's absolute pivot test; that decline measures conditioning, not rank.
+        // Threshold pivoting can decline a basis update accepted; that measures conditioning, not rank.
         private fun checkFreshBasis(index: Int) {
             val basis = headings ?: return
             val columns = IntArray(basis.size) { headingColumn(basis[it], trace.sourceColumns) }

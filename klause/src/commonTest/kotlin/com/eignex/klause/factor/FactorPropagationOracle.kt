@@ -15,27 +15,9 @@ import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Enumerates declared assignments before baking and checks propagation against satisfying ones.
- * An optional semantic predicate independently checks local-search invariants on the entire space.
- * [assertSound] forbids pruning supported values; [assertGac] also requires pruning unsupported ones.
- */
 object FactorPropagationOracle {
 
     fun assertSound(problem: Problem, label: String = "factor", satisfies: ((Sample) -> Boolean)? = null) {
-        checkSound(problem, label, satisfies)
-    }
-
-    /**
-     * The ground truth a soundness check ran against: [samples] is empty exactly when the problem
-     * is unsatisfiable, in which case [result] is [PropagationResult.Unsat]; otherwise [result] is
-     * [PropagationResult.Implied].
-     */
-    private class SoundnessCheck(val samples: List<Sample>, val result: PropagationResult)
-
-    /** [assertSound]'s checks, handing the enumeration and propagation back so [assertGac] adds its
-     *  own on the same data instead of brute-enumerating the space a second time. */
-    private fun checkSound(problem: Problem, label: String, satisfies: ((Sample) -> Boolean)?): SoundnessCheck {
         val samples = enumerateSat(problem, label, satisfies)
         val result = problem.propagate()
         if (samples.isEmpty()) {
@@ -43,14 +25,13 @@ object FactorPropagationOracle {
                 result is PropagationResult.Unsat,
                 "$label: propagate returned $result but brute found zero satisfying assignments",
             )
-            return SoundnessCheck(samples, result)
+            return
         }
         assertTrue(
             result is PropagationResult.Implied,
             "$label: propagate returned Unsat but brute found ${samples.size} satisfying assignments",
         )
 
-        // Bool pins
         result.forEachBool { v, b ->
             for (s in samples) {
                 assertEquals(
@@ -60,7 +41,6 @@ object FactorPropagationOracle {
                 )
             }
         }
-        // Int pins
         result.forEachInt { v, value ->
             for (s in samples) {
                 assertEquals(
@@ -70,7 +50,6 @@ object FactorPropagationOracle {
                 )
             }
         }
-        // Bound tightenings
         result.forEachIntMin { v, lo ->
             for (s in samples) {
                 assertTrue(
@@ -87,7 +66,6 @@ object FactorPropagationOracle {
                 )
             }
         }
-        // Interior holes
         result.forEachIntHole { v, value ->
             for (s in samples) {
                 assertTrue(
@@ -96,58 +74,8 @@ object FactorPropagationOracle {
                 )
             }
         }
-        return SoundnessCheck(samples, result)
     }
 
-    fun assertGac(problem: Problem, label: String = "factor", satisfies: ((Sample) -> Boolean)? = null) {
-        val check = checkSound(problem, label, satisfies)
-        val samples = check.samples
-        if (samples.isEmpty()) return
-        val result = check.result as PropagationResult.Implied
-
-        // For each bool var, every supported value must remain allowed by propagation.
-        for (v in 0 until problem.numBoolVars) {
-            val pinned = result.boolValueOrNull(v)
-            for (b in listOf(false, true)) {
-                val supported = samples.any { it.bools[v] == b }
-                if (!supported && pinned == null) {
-                    fail("$label: GAC violation — bool $v=$b has no satisfying assignment but is not pruned")
-                }
-                if (supported && pinned != null && pinned != b) {
-                    // Caught by assertSound, but keep the message localized.
-                    fail("$label: GAC violation — bool $v=$b supported but propagator pinned $pinned")
-                }
-            }
-        }
-        // For each int var, every supported value must remain allowed by propagation.
-        for (v in 0 until problem.numIntVars) {
-            val pinned = result.intValueOrNull(v)
-            val orig = problem.finiteIntDomain(v)
-            for (index in 0 until orig.values.size) {
-                val value = orig.values.valueAt(index)
-                val supported = samples.any { it.ints[v] == value }
-                val allowed = isAllowed(result, problem, v, value, pinned)
-                if (supported && !allowed) {
-                    fail("$label: GAC violation — int $v=$value supported but ruled out by propagator")
-                }
-                if (!supported && allowed) {
-                    fail("$label: GAC violation — int $v=$value unsupported but not pruned")
-                }
-            }
-        }
-    }
-
-    private fun isAllowed(r: PropagationResult.Implied, problem: Problem, v: Int, value: Long, pinned: Long?): Boolean {
-        if (pinned != null) return pinned == value
-        val lo = r.intMinOrNullCompat(v) ?: problem.finiteIntDomain(v).min
-        val hi = r.intMaxOrNullCompat(v) ?: problem.finiteIntDomain(v).max
-        if (value < lo || value > hi) return false
-        var hole = false
-        r.forEachIntHole { id, k -> if (id == v && k == value) hole = true }
-        return !hole
-    }
-
-    /** Enumerate declared finite assignments without consulting an engine projection. */
     fun sourceAssignments(problem: Problem): Sequence<Sample> {
         require(problem !is BakedProblem) { "Pass the original source Problem, before root domains are folded." }
         require(problem.numRealVars == 0) { "The oracle requires a finite Boolean/integer assignment space." }
@@ -182,7 +110,6 @@ object FactorPropagationOracle {
         }
     }
 
-    /** Compare complete CP acceptance with independent source semantics, including rejected assignments. */
     fun assertCompleteChecks(problem: Problem, label: String, satisfies: (Sample) -> Boolean) {
         val session = PropagationSession(problem)
         for (sample in sourceAssignments(problem)) {
@@ -194,7 +121,6 @@ object FactorPropagationOracle {
         }
     }
 
-    /** Compare invariant satisfaction and its uncompressed small score with an independent degree. */
     fun assertScoring(problem: Problem, label: String, degree: (Sample) -> Int) {
         require(problem.numFactors == 1) { "Scoring oracle requires one source factor." }
         val assignments = sourceAssignments(problem)
@@ -207,7 +133,6 @@ object FactorPropagationOracle {
         }
     }
 
-    /** Compare predicted and committed single-variable move scores with independent source degrees. */
     fun assertMoveScoring(problem: Problem, label: String, degree: (Sample) -> Int) {
         require(problem.numFactors == 1) { "Move scoring oracle requires one source factor." }
         val assignments = sourceAssignments(problem)
@@ -251,7 +176,8 @@ object FactorPropagationOracle {
         val domains = problem.finiteIntDomains()
         // Projection checks use declarations so deductions cannot hide rejected assignments.
         return LocalSearchState(
-            LocalSearchModel.open(problem, domains), Random(0L),
+            LocalSearchModel.open(problem, domains),
+            Random(0L),
             projection = LocalSearchProblem(problem, domains),
         )
     }
@@ -283,6 +209,4 @@ object FactorPropagationOracle {
         }
         return samples
     }
-
-    private fun fail(msg: String): Nothing = throw AssertionError(msg)
 }

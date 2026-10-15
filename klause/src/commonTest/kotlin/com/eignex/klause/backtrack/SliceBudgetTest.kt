@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class SliceBudgetTest {
 
     @Test
-    fun `remaining native LP allowance accounts for fractional work and decisions`() {
+    fun `remaining native LP allowance should account for fractional work and decisions`() {
         var nodes = 0L
         var work = 0L
         val slice = SliceBudget({ nodes }, { work })
@@ -22,7 +22,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `native LP allowance saturates without wrapping`() {
+    fun `native LP allowance should saturate without wrapping`() {
         val slice = SliceBudget({ 0L }, { 0L })
         slice.begin(Long.MAX_VALUE, Long.MAX_VALUE)
 
@@ -30,7 +30,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `unbounded slices supply no native LP cap`() {
+    fun `unbounded slices should supply no native LP cap`() {
         val slice = SliceBudget({ 0L }, { 0L })
         slice.begin(Long.MAX_VALUE, -1L)
 
@@ -38,7 +38,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `repaid debt reduces the native LP allowance`() {
+    fun `repaid debt should reduce the native LP allowance`() {
         var work = 0L
         val slice = SliceBudget({ 0L }, { work })
         slice.begin(Long.MAX_VALUE, 1L)
@@ -51,7 +51,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `search inherits preparation charges and overspend`() {
+    fun `search should inherit preparation charges and overspend`() {
         var work = 0L
         val preparation = SliceBudget({ 0L }, { 0L }, { work })
         preparation.begin(Long.MAX_VALUE, 2L)
@@ -70,7 +70,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `search inherits fractional preparation charges`() {
+    fun `search should inherit fractional preparation charges`() {
         var work = PROPAGATION_WORK_PER_NODE - 1L
         val preparation = SliceBudget({ 0L }, { 0L }, { work })
         preparation.begin(Long.MAX_VALUE, 1L)
@@ -85,7 +85,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `vivification probes spend the slice at their own rate`() {
+    fun `vivification probes should spend the slice at their own rate`() {
         val search = SearchStatsSink()
         val slice = SliceBudget({ search.searchWork }, { 0L })
         slice.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 10L)
@@ -98,7 +98,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `subsumption visits spend the slice at their own rate`() {
+    fun `subsumption visits should spend the slice at their own rate`() {
         val search = SearchStatsSink()
         val slice = SliceBudget({ search.searchWork }, { 0L })
         slice.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 10L)
@@ -111,7 +111,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `a work-bounded slice also ends at its time`() {
+    fun `a work-bounded slice should also end at its time`() {
         val search = SearchStatsSink()
         val slice = SliceBudget({ search.searchWork }, { 0L })
 
@@ -121,7 +121,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `propagation work spends the slice without adding decisions`() {
+    fun `propagation work should spend the slice without adding decisions`() {
         var work = 0L
         val slice = SliceBudget({ 0L }, { 0L }, { work })
         slice.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 2L)
@@ -134,7 +134,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `fractional propagation charges carry across slices`() {
+    fun `fractional propagation charges should carry across slices`() {
         var work = 0L
         val slice = SliceBudget({ 0L }, { 0L }, { work })
         slice.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 1L)
@@ -150,7 +150,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `propagation overspend is repaid without losing the remaining allowance`() {
+    fun `propagation overspend should be repaid without losing the remaining allowance`() {
         var work = 0L
         val slice = SliceBudget({ 0L }, { 0L }, { work })
         slice.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 2L)
@@ -166,7 +166,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `nested search repays overspend only through its owning budget`() {
+    fun `nested search should repay overspend only through its owning budget`() {
         var nodes = 0L
         val owner = SliceBudget({ nodes }, { 0L })
         val nested = SliceBudget({ nodes }, { 0L }, ownsWorkDebt = false)
@@ -186,7 +186,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `nested propagation charges only work within its current slice`() {
+    fun `nested propagation should charge only work within its current slice`() {
         var work = 5L * PROPAGATION_WORK_PER_NODE
         val owner = SliceBudget({ 0L }, { 0L }, { work })
         val nested = SliceBudget({ 0L }, { 0L }, { work }, ownsWorkDebt = false)
@@ -204,7 +204,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `settling the same overspend twice repays it only once`() {
+    fun `settling the same overspend twice should repay it only once`() {
         var nodes = 0L
         val slice = SliceBudget({ nodes }, { 0L })
         slice.begin(Long.MAX_VALUE, 2L)
@@ -219,7 +219,7 @@ class SliceBudgetTest {
     }
 
     @Test
-    fun `a large offered slice cannot wrap its end`() {
+    fun `a large offered slice should not wrap its end`() {
         var nodes = Long.MAX_VALUE - 10L
         val slice = SliceBudget({ nodes }, { 0L })
 
@@ -229,5 +229,4 @@ class SliceBudgetTest {
         assertFalse(slice.expired())
         assertEquals(Long.MAX_VALUE - 1L, slice.remainingNodes())
     }
-
 }

@@ -15,12 +15,10 @@ import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.Sample
 import kotlin.test.assertTrue
 
-/**
- * Checks that every deduction's recorded reason entails it on all satisfying assignments.
- * [narrow] tightens at decision level 1, then factor 0 propagates. A failed propagation checks
- * the conflict clause instead, because an omitted premise can make learning prune solutions.
- */
 object PropagationReasonOracle {
+
+    // narrow tightens at decision level 1 before factor 0 propagates; a failed propagation checks the
+    // conflict clause instead, since an omitted premise there lets learning prune solutions.
 
     fun assertReasonsImply(problem: Problem, label: String, narrow: (PropagationState) -> Boolean) {
         val state = PropagationState(problem, Assumptions.None)

@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 
 class QuadraticTraversalCursorTest {
     @Test
-    fun `decision slices complete every pending finite candidate exactly once`() {
+    fun `decision slices should complete every pending finite candidate exactly once`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake()
         val completed = mutableListOf<Long>()
         val sink = SolveStatsSink("quadratic").also { it.start() }
@@ -39,7 +39,7 @@ class QuadraticTraversalCursorTest {
     }
 
     @Test
-    fun `native completion overspend pauses before another finite assignment`() {
+    fun `native completion overspend should pause before another finite assignment`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()).bake()
         var native = 0L
         val completed = mutableListOf<Long>()
@@ -70,7 +70,7 @@ class QuadraticTraversalCursorTest {
     }
 
     @Test
-    fun `closing traversal discards a pending candidate and rejects resumption`() {
+    fun `closing traversal should discard a pending candidate and reject resumption`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()).bake()
         val sink = SolveStatsSink("quadratic").also { it.start() }
         val cursor = QuadraticTraversalCursor(source, BacktrackParams(), sink, { 0 }) { _, _ ->

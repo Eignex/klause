@@ -25,18 +25,20 @@ class PostDifferenceSystemTest {
         ReifiedLinear(aux, longArrayOf(1, -1), intArrayOf(hi, lo), LinearOp.LE, bound)
 
     @Test
-    fun `a model with reified difference rows gains one system factor and keeps the rows it reads`() {
+    fun `reified difference rows should gain one system factor and keep the rows it reads`() {
         val problem = problemOf(reified(0, 1, 0, -1L), reified(1, 2, 1, -1L))
         val posted = problem.withDifferenceSystem()
         assertEquals(problem.factors.size + 1, posted.factors.size)
         assertTrue(posted.factors.last() is DifferenceSystem)
-        assertEquals(2, posted.factors.count { it is ReifiedLinear }, "the system is redundant with them")
+        assertEquals(2, posted.factors.count { it is ReifiedLinear })
     }
 
     @Test
-    fun `unary guarded bounds retain their original propagators without a joint system`() {
+    fun `unary guarded bounds should retain their original propagators without a joint system`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 10)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.LE, 5L)),
         ).bake()
 
@@ -44,10 +46,12 @@ class PostDifferenceSystemTest {
     }
 
     @Test
-    fun `declared fixed endpoints leave guarded rows with their original propagators`() {
+    fun `declared fixed endpoints should leave guarded rows with their original propagators`() {
         for (fixed in listOf(0L, 1L, 5L)) {
             val problem = Problem(
-                1, 2, arrayOf(IntDomain(0, 10), IntDomain(fixed, fixed)),
+                1,
+                2,
+                arrayOf(IntDomain(0, 10), IntDomain(fixed, fixed)),
                 arrayOf(reified(0, 0, 1, 0L)),
             ).bake()
 
@@ -56,7 +60,7 @@ class PostDifferenceSystemTest {
     }
 
     @Test
-    fun `root propagated fixed endpoints leave guarded rows with their original propagators`() {
+    fun `root-propagated fixed endpoints should leave guarded rows with their original propagators`() {
         val problem = problemOf(
             reified(0, 1, 0, 0L),
             Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1L),
@@ -67,7 +71,7 @@ class PostDifferenceSystemTest {
     }
 
     @Test
-    fun `unconditional differences between unfixed columns retain a graph for unary guards`() {
+    fun `unconditional differences between unfixed columns should retain a graph for unary guards`() {
         val problem = problemOf(
             reified(0, 0, 2, 5L),
             Linear(longArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, -1L),
@@ -78,9 +82,7 @@ class PostDifferenceSystemTest {
     }
 
     @Test
-    fun `a model with over-heavy declared ranges keeps its guarded difference system`() {
-        // The range edges are redundant with CP's domains, so the joint graph drops only those it cannot
-        // represent and still refutes guarded model rows from the remaining graph.
+    fun `a model with over-heavy declared ranges should keep its guarded difference system`() {
         val clamp = 1L shl 62
         val problem = Problem(
             numBoolVars = 4,
@@ -90,5 +92,4 @@ class PostDifferenceSystemTest {
         ).bake()
         assertTrue(problem.withDifferenceSystem().factors.last() is DifferenceSystem)
     }
-
 }

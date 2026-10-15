@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 
 class ExactLpInputAdapterTest {
     @Test
-    fun `theory adapter retains wide rows and IEEE source bounds`() {
+    fun `theory adapter should retain wide rows and IEEE source bounds`() {
         val wide = BIG_ONE shl 80
         val model = Problem(
             numBoolVars = 0,
@@ -43,7 +43,7 @@ class ExactLpInputAdapterTest {
     }
 
     @Test
-    fun `strict activated theory rows retain their source premise`() {
+    fun `strict activated theory rows should retain their source premise`() {
         val row = ReifiedRealLinear(
             aux = 0,
             vars = intArrayOf(),
@@ -72,7 +72,7 @@ class ExactLpInputAdapterTest {
     }
 
     @Test
-    fun `native exact adapter retains one third and projected equal bounds`() {
+    fun `native exact adapter should retain one third and projected equal bounds`() {
         val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         val one = ExactLpSourceNumber(BigFraction.ONE)
         val next = ExactLpSourceNumber(BigFraction.ONE + BigFraction.of(BIG_ONE, BIG_ONE shl 54))
@@ -96,7 +96,7 @@ class ExactLpInputAdapterTest {
     }
 
     @Test
-    fun `compatible activated row keeps the asserted literal premise`() {
+    fun `compatible activated row should keep the asserted literal premise`() {
         val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0L), longArrayOf(10L), null, null),

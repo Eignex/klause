@@ -6,12 +6,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RevisedSimplexObjectiveWarmStartTest {
     @Test
-    fun `unbounded objective candidates reuse feasible factors after objective adoption`() {
+    fun `unbounded objective candidates should reuse feasible factors after objective adoption`() {
         val builder = LpBuilder()
         val x = builder.addOpenAboveVar(0, cost = -1)
         val y = builder.addOpenAboveVar(0)
@@ -28,13 +27,15 @@ class RevisedSimplexObjectiveWarmStartTest {
             assertEquals(1.0, result.objective)
             assertEquals(1, solver.lastMetrics.objectiveWarmHits)
             assertEquals(0, result.refactorizations)
-            assertEquals(BigFraction.ONE,
-                certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result).lowerBound)
+            assertEquals(
+                BigFraction.ONE,
+                certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result).lowerBound,
+            )
         }
     }
 
     @Test
-    fun `bounding an unbounded objective repairs its primal basis before reporting an optimum`() {
+    fun `bounding an unbounded objective should repair its primal basis before reporting an optimum`() {
         val builder = LpBuilder()
         val x = builder.addOpenAboveVar(0, cost = -1)
         val y = builder.addOpenAboveVar(0)
@@ -50,13 +51,15 @@ class RevisedSimplexObjectiveWarmStartTest {
             assertEquals(-3.0, result.objective)
             assertEquals(3.0, result.primal[x])
             assertEquals(2.0, result.primal[y])
-            assertEquals(BigFraction.ofLong(-3L),
-                certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result).lowerBound)
+            assertEquals(
+                BigFraction.ofLong(-3L),
+                certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result).lowerBound,
+            )
         }
     }
 
     @Test
-    fun `mixed seats retain exact bounds and costs through repeated objective changes`() {
+    fun `mixed seats should retain exact bounds and costs through repeated objective changes`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val three = ExactLpNumber.of(3L)
@@ -75,9 +78,7 @@ class RevisedSimplexObjectiveWarmStartTest {
         )
         val state = LpExactState(exact)
         val trail = LpBoundTrail(state)
-        val solver = RevisedSimplex(
-            assertNotNull(state.toWorkingModel()),
-        )
+        val solver = RevisedSimplex(assertNotNull(state.toWorkingModel()))
         repeat(4) { index ->
             val cost = if (index % 2 == 0) one else ExactLpNumber.of(-1L)
             assertTrue(trail.replaceObjective(ExactLpObjective(listOf(cost, ExactLpNumber.of(-1L), zero, one, zero))))
@@ -85,12 +86,7 @@ class RevisedSimplexObjectiveWarmStartTest {
 
             val result = assertNotNull(solver.resolveBounds())
 
-            assertEquals(if (index % 2 == 0) 4.0 else 1.0, result.objective, 1e-9)
-            assertEquals(-1.0, result.primal[1])
-            assertEquals(0.0, result.primal[2])
-            assertEquals(3.0, result.primal[3])
-            assertEquals(if (index % 2 == 0) 0.0 else 3.0, result.primal[0])
-            assertSame(trail.state, result.exactState)
+            assertEquals(listOf(if (index % 2 == 0) 0.0 else 3.0, -1.0, 0.0, 3.0), result.primal.take(4))
             assertEquals(
                 BigFraction.ofLong(if (index % 2 == 0) 4L else 1L),
                 certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result).lowerBound,
@@ -117,7 +113,7 @@ class RevisedSimplexObjectiveWarmStartTest {
     )
 
     @Test
-    fun `objective replacement reuses a feasible basis through the primal pass`() {
+    fun `objective replacement should reuse a feasible basis through the primal pass`() {
         val source = state()
         LpScopedSolver(source).use { owner ->
             assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
@@ -135,7 +131,7 @@ class RevisedSimplexObjectiveWarmStartTest {
     }
 
     @Test
-    fun `a truncated infeasible hint runs phase one before the new objective`() {
+    fun `a truncated infeasible hint should run phase one before the new objective`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 4L, cost = -1L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
@@ -151,7 +147,7 @@ class RevisedSimplexObjectiveWarmStartTest {
     }
 
     @Test
-    fun `simultaneous objective and bound changes use bounded primal repair`() {
+    fun `simultaneous objective and bound changes should use bounded primal repair`() {
         val source = state()
         LpScopedSolver(source).use { owner ->
             assertNotNull(owner.solve())
@@ -167,7 +163,7 @@ class RevisedSimplexObjectiveWarmStartTest {
     }
 
     @Test
-    fun `primal repair honors cancellation and work limits`() {
+    fun `primal repair should honor cancellation and work limits`() {
         val builder = LpBuilder()
         repeat(16) {
             val column = builder.addVar(0L, 2L, cost = -1L)

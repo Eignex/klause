@@ -12,8 +12,8 @@ import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -45,14 +45,17 @@ class LocalSearchEnginePublicationTest {
     private val params = LocalSearchParams(maxFlips = 1L, randomSeed = 7L, initialAssignment = invalid)
 
     @Test
-    fun `zero score does not publish an invalid propagation only candidate`() {
+    fun `zero score should not publish an invalid propagation only candidate`() {
         for (operation in listOf("solve", "minimize", "sample", "alns")) {
             val solver = LocalSearchSolver(source.bake(), greedyRepairOnRestart = false)
 
             when (operation) {
                 "solve" -> assertIs<SolveResult.Unknown>(solver.solve(params))
+
                 "minimize" -> assertIs<MinimizeResult.Unknown>(solver.minimize(objective, params))
+
                 "sample" -> assertTrue(solver.samples(params).toList().isEmpty())
+
                 "alns" -> assertIs<MinimizeResult.Unknown>(
                     Alns(inner = solver, maxIterations = 0).minimize(objective, params),
                 )
@@ -61,7 +64,7 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `a valid propagation only candidate remains publishable`() {
+    fun `a valid propagation only candidate should remain publishable`() {
         for (operation in listOf("solve", "minimize", "sample")) {
             val solver = LocalSearchSolver(source.bake(), greedyRepairOnRestart = false)
             val pinned = params.copy(initialAssignment = valid)
@@ -77,7 +80,7 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `candidate rejection permits a valid restart alternative`() {
+    fun `candidate rejection should permit a valid restart alternative`() {
         val restart = object : RestartPolicy {
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
@@ -94,7 +97,7 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `candidate checks preserve scoped assumptions without retaining rejection`() {
+    fun `candidate checks should preserve scoped assumptions without retaining rejection`() {
         val solver = LocalSearchSolver(source.bake(), greedyRepairOnRestart = false)
         val invalidScope = params.copy(assumptions = Assumptions(bools = mapOf(1 to true)))
         assertIs<SolveResult.Unknown>(solver.solve(invalidScope))
@@ -106,10 +109,11 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `uncovered constraints are checked before caller completion`() {
+    fun `uncovered constraints should be checked before caller completion`() {
         var calls = 0
         val solver = LocalSearchSolver(
-            source.bake(), greedyRepairOnRestart = false,
+            source.bake(),
+            greedyRepairOnRestart = false,
             completion = CandidateCompletion { point, _ ->
                 calls++
                 Completion.Witness(point)
@@ -123,9 +127,10 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `completion cannot replace verified discrete coordinates`() {
+    fun `completion should not replace verified discrete coordinates`() {
         val solver = LocalSearchSolver(
-            source.bake(), greedyRepairOnRestart = false,
+            source.bake(),
+            greedyRepairOnRestart = false,
             completion = CandidateCompletion { _, _ -> Completion.Witness(invalid) },
         )
 
@@ -135,10 +140,11 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `cancellation from a completion hook withholds its witness`() {
+    fun `cancellation from a completion hook should withhold its witness`() {
         var cancelled = false
         val solver = LocalSearchSolver(
-            source.bake(), greedyRepairOnRestart = false,
+            source.bake(),
+            greedyRepairOnRestart = false,
             completion = CandidateCompletion { point, _ ->
                 cancelled = true
                 Completion.Witness(point)
@@ -151,17 +157,26 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `finite source checks preserve exact real completion`() {
+    fun `finite source checks should preserve exact real completion`() {
         val problem = Problem(
-            2, 0, emptyArray(), arrayOf<Factor>(factor), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            2,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(factor),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         ).bake()
         val exact = BigFraction.of(bigIntOf(1), bigIntOf(3))
         val completed = Sample(
-            booleanArrayOf(true, true), LongArray(0), doubleArrayOf(exact.toDouble()), exactReals = listOf(exact),
+            booleanArrayOf(true, true),
+            LongArray(0),
+            doubleArrayOf(exact.toDouble()),
+            exactReals = listOf(exact),
         )
         val solver = LocalSearchSolver(
-            problem, greedyRepairOnRestart = false,
+            problem,
+            greedyRepairOnRestart = false,
             completion = CandidateCompletion { _, _ -> Completion.Witness(completed) },
         )
 
@@ -171,7 +186,7 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `cancellation during full assignment checking withholds the witness`() {
+    fun `cancellation during full assignment checking should withhold the witness`() {
         var cancelled = false
         val interrupting = object : Factor by factor, Propagator {
             override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -189,7 +204,7 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `a cancelled candidate check resumes without publishing partial state`() {
+    fun `a cancelled candidate check should resume without publishing partial state`() {
         var cancelled = false
         var interrupt = true
         val interrupting = object : Factor by factor, Propagator {
@@ -214,7 +229,7 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `standalone and portfolio enforce the same propagation only source`() {
+    fun `standalone and portfolio should enforce the same propagation only source`() {
         val problem = source.bake()
         val solver = LocalSearchSolver(problem, greedyRepairOnRestart = false)
         val worker = PortfolioWorker.of("ls", 0, solver.session(), params.copy(initialAssignment = valid))
@@ -229,19 +244,34 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `an uncovered continuous constraint explicitly declines execution`() {
-        val real = object : Factor by Linear(
-            intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0,
-        ), Propagator {}
+    fun `an uncovered continuous constraint should explicitly decline execution`() {
+        val real = object :
+            Factor by Linear(
+                intArrayOf(),
+                doubleArrayOf(),
+                intArrayOf(0),
+                doubleArrayOf(1.0),
+                LinearOp.LE,
+                1.0,
+            ),
+            Propagator {}
         val problem = Problem(
-            0, 0, emptyArray(), arrayOf<Factor>(real), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(real),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         ).bake()
         var completed = false
-        val solver = LocalSearchSolver(problem, completion = CandidateCompletion { point, _ ->
-            completed = true
-            Completion.Witness(point)
-        })
+        val solver = LocalSearchSolver(
+            problem,
+            completion = CandidateCompletion { point, _ ->
+                completed = true
+                Completion.Witness(point)
+            },
+        )
 
         val result = solver.solve(LocalSearchParams(maxFlips = 1L, randomSeed = 7L))
 
@@ -250,7 +280,7 @@ class LocalSearchEnginePublicationTest {
     }
 
     @Test
-    fun `covered custom invariants do not invoke publication propagation`() {
+    fun `covered custom invariants should not invoke publication propagation`() {
         var fullChecks = 0
         val covered = object : Factor by factor, Propagator, Invariant {
             override fun propagate(state: PropagationState, factorId: Int): Boolean {

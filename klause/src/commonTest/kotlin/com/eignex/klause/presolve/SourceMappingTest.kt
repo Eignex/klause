@@ -7,9 +7,9 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
 
 class SourceMappingTest {
     @Test
-    fun `composition reconstructs in reverse elimination order`() {
+    fun `composition should reconstruct in reverse elimination order`() {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 9) }, emptyArray())
         val middle = source.withFactors(emptyArray())
         val target = middle.withFactors(emptyArray())
@@ -55,7 +55,7 @@ class SourceMappingTest {
     }
 
     @Test
-    fun `a chain rejects an unrelated middle model with the same shape`() {
+    fun `a chain should reject an unrelated middle model with the same shape`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray())
         val middle = source.withFactors(emptyArray())
         val unrelated = source.withFactors(emptyArray())
@@ -66,7 +66,7 @@ class SourceMappingTest {
     }
 
     @Test
-    fun `reconstruction rejects a witness associated with another reduced model`() {
+    fun `reconstruction should reject a witness associated with another reduced model`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray())
         val target = source.withFactors(emptyArray())
         val mapping = SourceMapping(source, target, TransformationGuarantees.IDENTITY)
@@ -77,7 +77,7 @@ class SourceMappingTest {
     }
 
     @Test
-    fun `objective adjustments compose from reduced units into source units`() {
+    fun `objective adjustments should compose from reduced units into source units`() {
         val first = ObjectiveAdjustment(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.ofLong(3))
         val second = ObjectiveAdjustment(BigFraction.of(bigIntOf(5), bigIntOf(3)), BigFraction.ofLong(7))
 
@@ -91,12 +91,12 @@ class SourceMappingTest {
     }
 
     @Test
-    fun `objective adjustments cannot reverse minimization order`() {
+    fun `objective adjustments should not reverse minimization order`() {
         assertFailsWith<IllegalArgumentException> { ObjectiveAdjustment(BigFraction.ofLong(-1)) }
     }
 
     @Test
-    fun `objective verification rejects an inconsistent adjustment`() {
+    fun `objective verification should reject an inconsistent adjustment`() {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
         val mapping = SourceMapping(
             model,
@@ -112,7 +112,7 @@ class SourceMappingTest {
     }
 
     @Test
-    fun `sensitive queries refuse multiplicity changing explicit overrides`() {
+    fun `sensitive queries should refuse multiplicity-changing explicit overrides`() {
         val config = PresolveConfig.parse("all")
         val context = PresolveContext(solutionSetSensitive = true)
 
@@ -123,7 +123,7 @@ class SourceMappingTest {
     }
 
     @Test
-    fun `satisfiability only reductions do not claim projected source coverage`() {
+    fun `satisfiability-only reductions should not claim projected source coverage`() {
         val affine = PresolvePass.ELIMINATE_AFFINE_SINGLETONS.guarantees
         val bve = PresolvePass.ELIMINATE_BOOL_VARS.guarantees
 
@@ -136,12 +136,20 @@ class SourceMappingTest {
     }
 
     @Test
-    fun `source mapping reconstructs arbitrary precision coordinates without a finite projection`() {
+    fun `source mapping should reconstruct arbitrary precision coordinates without a finite projection`() {
         val source = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(
-                LongArray(2), LongArray(2),
-                Bits(2).also { it.set(0); it.set(1) }, Bits(2).also { it.set(0); it.set(1) },
+                LongArray(2),
+                LongArray(2),
+                Bits(2).also {
+                    it.set(0)
+                    it.set(1)
+                },
+                Bits(2).also {
+                    it.set(0)
+                    it.set(1)
+                },
             ),
             factors = arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)),
         )
@@ -158,7 +166,7 @@ class SourceMappingTest {
     }
 
     @Test
-    fun `reconstruction cannot promote a reduced witness certificate into source authority`() {
+    fun `reconstruction should not promote a reduced witness certificate into source authority`() {
         val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray())
         val target = source.withFactors(emptyArray())
         val mapping = SourceMapping(source, target, TransformationGuarantees.IDENTITY)

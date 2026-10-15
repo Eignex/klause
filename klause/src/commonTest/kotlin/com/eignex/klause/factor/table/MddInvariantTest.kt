@@ -15,14 +15,14 @@ import kotlin.test.assertTrue
 
 class MddInvariantTest {
 
-    /** MDD accepting exactly (1,2) and (2,1) over a 2-symbol alphabet. */
+    // Accepts exactly (1, 2) and (2, 1).
     private fun mddFactor(): Factor = Mdd(
         seq = intArrayOf(0, 1),
         numStatesPerLayer = intArrayOf(1, 2, 1),
         layerStarts = intArrayOf(0, 6, 12),
         transitions = longArrayOf(
-            0, 1, 0, 0, 2, 1, // layer 0: s0 --1--> s0; s0 --2--> s1
-            0, 2, 0, 1, 1, 0, // layer 1: s0 --2--> term; s1 --1--> term
+            0, 1, 0, 0, 2, 1,
+            0, 2, 0, 1, 1, 0,
         ),
         initial = 0,
         accepting = intArrayOf(0),
@@ -30,9 +30,7 @@ class MddInvariantTest {
     )
 
     @Test
-    fun `cost-MDD seed sets the cost var to an edge weight beyond Int range`() {
-        // A single accepted path (symbol 1) whose edge weight is 3e9. seedFeasible sums the path weight
-        // in Long and assigns it to the cost variable, so a weight past 2^31 lands intact.
+    fun `cost-MDD seed should set the cost var to an edge weight beyond Int range`() {
         val factor = Mdd(
             seq = intArrayOf(0),
             numStatesPerLayer = intArrayOf(1, 1),
@@ -45,12 +43,12 @@ class MddInvariantTest {
         )
         val problem = Problem(0, 2, arrayOf(IntDomain(1, 1), IntDomain(0, 5_000_000_000L)), arrayOf(factor))
         val state = LocalSearchState(problem.bake(), Random(0))
-        assertTrue(state.factors[0].seedFeasible(state, 0), "the single accepted path must seed")
+        assertTrue(state.factors[0].seedFeasible(state, 0))
         assertEquals(3_000_000_000L, state.assignment.intValue(1))
     }
 
     @Test
-    fun `incremental degree and delta match a full recompute over a stream of moves`() {
+    fun `incremental degree and delta should match a full recompute over a stream of moves`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -69,20 +67,20 @@ class MddInvariantTest {
             val predicted = state.factors[0].deltaIfIntSet(state, 0, v, nv)
             state.apply(Move.IntSet(v, nv))
             val after = state.factors[0].violationDegree(state, 0)
-            assertEquals(after - before, predicted, "step $step: incremental delta mismatch")
+            assertEquals(after - before, predicted, "step $step")
             val fresh = LocalSearchState(problem.bake(), Random(0))
             for (k in 0 until 2) fresh.assignment.setInt(k, state.assignment.intValue(k))
             fresh.recompute()
             assertEquals(
                 fresh.factors[0].violationDegree(fresh, 0),
                 state.factors[0].violationDegree(state, 0),
-                "step $step: maintained degree drifted from a full recompute",
+                "step $step",
             )
         }
     }
 
     @Test
-    fun `DP-optimal repair moves reach an accepted path`() {
+    fun `DP-optimal repair moves should reach an accepted path`() {
         fun seeded(): LocalSearchState {
             val problem = Problem(
                 numBoolVars = 0,
@@ -91,7 +89,7 @@ class MddInvariantTest {
                 factors = arrayOf(mddFactor()),
             )
             val state = LocalSearchState(problem.bake(), Random(0))
-            state.assignment.setInt(0, 1) // (1,1) is rejected
+            state.assignment.setInt(0, 1)
             state.assignment.setInt(1, 1)
             state.recompute()
             return state
@@ -100,15 +98,14 @@ class MddInvariantTest {
         assertTrue(state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
         state.factors[0].proposeExtendedRepairMoves(state, 0, sink)
-        assertTrue(sink.list.isNotEmpty(), "extended repair must propose moves")
+        assertTrue(sink.list.isNotEmpty())
         val check = seeded()
         for (m in sink.list) check.apply(m)
-        assertFalse(check.factors[0].isViolated(check, 0), "applying the DP-optimal repair must reach an accepted path")
+        assertFalse(check.factors[0].isViolated(check, 0))
     }
 
     @Test
-    fun `a cost mdd word is violated until its cost equals the path weight`() {
-        // Symbol 1 weighs 2 and symbol 2 weighs 4.
+    fun `a cost mdd word should be violated until its cost equals the path weight`() {
         val factor = Mdd(
             seq = intArrayOf(0),
             numStatesPerLayer = intArrayOf(1, 1),
@@ -132,5 +129,4 @@ class MddInvariantTest {
         assertTrue(offBefore)
         assertEquals(-invariant.violationDegree(state, 0), delta)
     }
-
 }

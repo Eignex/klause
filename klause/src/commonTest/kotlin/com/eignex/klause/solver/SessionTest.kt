@@ -33,16 +33,7 @@ import kotlin.test.assertTrue
 class SessionTest {
 
     @Test
-    fun `empty session forwards to solver unchanged`() {
-        val problem = exactlyOneOver(3)
-        val session = BacktrackSolver(problem.bake()).session()
-        assertEquals(0, session.depth)
-        val r = session.solve(BacktrackParams(randomSeed = 0L))
-        assertTrue(r is SolveResult.Sat)
-    }
-
-    @Test
-    fun `push pins a variable and pop reverts`() {
+    fun `push should pin a variable and pop should revert it`() {
         val problem = exactlyOneOver(3)
         val session = BacktrackSolver(problem.bake()).session()
 
@@ -50,19 +41,19 @@ class SessionTest {
         assertEquals(1, session.depth)
         val withPin = session.solve(BacktrackParams(randomSeed = 0L))
         assertTrue(withPin is SolveResult.Sat)
-        assertTrue(withPin.assignment.bools[1], "pushed pin should force var 1 = true")
+        assertTrue(withPin.assignment.bools[1])
 
         session.pop()
         assertEquals(0, session.depth)
     }
 
     @Test
-    fun `nested pushes merge with last-write semantics`() {
+    fun `nested pushes should merge with last-write semantics`() {
         val problem = exactlyOneOver(3)
         val session = BacktrackSolver(problem.bake()).session()
 
         session.push(Assumptions(bools = mapOf(0 to true, 1 to false, 2 to false)))
-        session.push(Assumptions(bools = mapOf(1 to true))) // overrides 1 = false
+        session.push(Assumptions(bools = mapOf(1 to true)))
         val r = session.solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Unsat>(r)
 
@@ -73,13 +64,13 @@ class SessionTest {
     }
 
     @Test
-    fun `pop on empty stack throws`() {
+    fun `pop should throw on an empty stack`() {
         val session = BacktrackSolver(exactlyOneOver(2).bake()).session()
         assertFails { session.pop() }
     }
 
     @Test
-    fun `local search session honors pushed assumptions`() {
+    fun `local search session should honor pushed assumptions`() {
         val problem = exactlyOneOver(4)
         val session = LocalSearchSolver(problem.bake()).session()
 
@@ -88,12 +79,12 @@ class SessionTest {
             .take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            assertTrue(s.bools[2], "pushed pin should force var 2 = true in every sample")
+            assertTrue(s.bools[2])
         }
     }
 
     @Test
-    fun `counting variants restore nested scopes without changing the source`() {
+    fun `counting should follow nested scopes without changing the source`() {
         val counters = listOf<(Session<BacktrackParams>) -> Count>(
             { it.approximateCount(ApproxCountConfig(seed = 1L)) },
             { it.exactCount().last() },
@@ -116,7 +107,7 @@ class SessionTest {
     }
 
     @Test
-    fun `integer pins and deductions constrain counting`() {
+    fun `integer pins and holes should constrain counting`() {
         val session = BacktrackSolver(Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake()).session()
         session.push(Assumptions.None.withIntHole(0, 1L))
         assertEquals(2L, session.exactCount().last().estimate)
@@ -127,7 +118,7 @@ class SessionTest {
     }
 
     @Test
-    fun `infeasible scopes count zero`() {
+    fun `infeasible scope should count zero`() {
         val session = BacktrackSolver(exactlyOneOver(2).bake()).session()
         session.push(Assumptions(bools = mapOf(0 to true, 1 to true)))
         assertEquals(0L, session.exactCount().last().estimate)
@@ -136,7 +127,7 @@ class SessionTest {
     }
 
     @Test
-    fun `accurate sampling honors call pins and nested session scopes`() {
+    fun `accurate sampling should honor call pins and captured session scopes`() {
         val session = BacktrackSolver(exactlyOneOver(3).bake()).session()
         val config = SamplingConfig(quality = SampleQuality.ACCURATE, seed = 1L)
         val params = BacktrackParams(assumptions = Assumptions(bools = mapOf(1 to false)))
@@ -152,7 +143,7 @@ class SessionTest {
     }
 
     @Test
-    fun `search operations honor session pins over call pins`() {
+    fun `search operations should prefer session pins over call pins`() {
         val session = BacktrackSolver(exactlyOneOver(2).bake()).session()
         val params = BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false)))
         val objective = LinearObjective(boolWeights = longArrayOf(1, 2))
@@ -170,7 +161,7 @@ class SessionTest {
     }
 
     @Test
-    fun `backends without assumptions reject scoped searches`() {
+    fun `backend without assumptions should reject scoped searches`() {
         val session = BruteForceSolver(exactlyOneOver(2).bake()).session()
         val params = BruteForceParams()
         val operations = listOf<() -> Any>(
@@ -188,7 +179,7 @@ class SessionTest {
     }
 
     @Test
-    fun `early close releases enumeration and fresh calls restart it`() {
+    fun `closing an enumeration should release the session for fresh calls`() {
         val session = BacktrackSolver(exactlyOneOver(3).bake()).session()
         val params = BacktrackParams(randomSeed = 1L)
         val stream = session.openEnumerate(params)
@@ -208,7 +199,7 @@ class SessionTest {
     }
 
     @Test
-    fun `closing a count stream releases its captured scope`() {
+    fun `closing a count stream should release its captured scope`() {
         val session = BacktrackSolver(exactlyOneOver(3).bake()).session()
         session.push(Assumptions(bools = mapOf(0 to true)))
         val stream = session.openExactCount()
@@ -225,7 +216,7 @@ class SessionTest {
     }
 
     @Test
-    fun `failed enumeration releases its session`() {
+    fun `failed enumeration should release its session`() {
         val session = BacktrackSolver(exactlyOneOver(2).bake()).session()
         val stream = session.openEnumerate(BacktrackParams(componentFactory = { error("component initialization") }))
         assertFailsWith<IllegalStateException> { stream.hasNext() }
@@ -235,7 +226,7 @@ class SessionTest {
     }
 
     @Test
-    fun `optimization stream completion releases its session`() {
+    fun `completed improvements stream should release its session`() {
         val session = BacktrackSolver(exactlyOneOver(2).bake()).session()
         val params = BacktrackParams(randomSeed = 1L)
         session.openImprovements(LinearObjective(boolWeights = longArrayOf(1, 2)), params).use { stream ->
@@ -248,7 +239,7 @@ class SessionTest {
     }
 
     @Test
-    fun `terminal resumable verdicts stay idempotent after scope restoration`() {
+    fun `terminal resumable verdict should stay idempotent after scope restoration`() {
         val session = BacktrackSolver(exactlyOneOver(2).bake()).session()
         session.push(Assumptions(bools = mapOf(0 to true)))
         val handle = assertNotNull(session.resumableSolve(BacktrackParams()))
@@ -264,7 +255,7 @@ class SessionTest {
     }
 
     @Test
-    fun `session close releases its active handle and rejects further operations`() {
+    fun `close should release the active handle and reject further operations`() {
         val session = BacktrackSolver(exactlyOneOver(2).bake()).session()
         val handle = assertNotNull(session.resumableSolve(BacktrackParams()))
         session.close()

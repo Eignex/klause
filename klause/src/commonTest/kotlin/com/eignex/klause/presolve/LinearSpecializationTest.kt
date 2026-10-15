@@ -16,7 +16,7 @@ import kotlin.test.assertNull
 
 class LinearSpecializationTest {
     @Test
-    fun `a Boolean row exceeding the kernel activity range is left unspecialized`() {
+    fun `a Boolean row exceeding the kernel activity range should be left unspecialized`() {
         val literals = intArrayOf(Lit.make(0, true), Lit.make(1, true))
         val factor = object : Factor by Clause(literals) {
             override val linearForm: LinearForm = LinearForm.Conjunction(
@@ -28,7 +28,7 @@ class LinearSpecializationTest {
     }
 
     @Test
-    fun `an exact declared disequality retains its comparison`() {
+    fun `an exact declared disequality should retain its comparison`() {
         val source = Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.NE, 3)
         val factor = object : Factor by source {
             override val linearForm: LinearForm = LinearForm.Conjunction(
@@ -44,7 +44,7 @@ class LinearSpecializationTest {
     }
 
     @Test
-    fun `partial and multi-row declarations do not authorize single-row replacement`() {
+    fun `partial and multi-row declarations should not authorize single-row replacement`() {
         val source = Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3)
         for (form in listOf(
             LinearForm.Relaxation(source.linearRows),
@@ -61,7 +61,7 @@ class LinearSpecializationTest {
     }
 
     @Test
-    fun `an undecided activator does not authorize unconditional replacement`() {
+    fun `an undecided activator should not authorize unconditional replacement`() {
         val factor = object : Factor by ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3) {}
 
         assertNull(factor.equivalentLinear())

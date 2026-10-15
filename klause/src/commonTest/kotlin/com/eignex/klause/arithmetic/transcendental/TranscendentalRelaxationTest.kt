@@ -6,7 +6,7 @@ import kotlin.test.assertTrue
 
 class TranscendentalRelaxationTest {
     @Test
-    fun `exponential lower line remains valid on the negative tangent factor`() {
+    fun `exponential lower line should remain valid on the negative tangent factor`() {
         val arithmetic = TranscendentalArithmetic()
         val line = arithmetic.expRelaxation(RationalEnclosure(q(-2), q(2)), q(0), 4)
 
@@ -18,7 +18,7 @@ class TranscendentalRelaxationTest {
     }
 
     @Test
-    fun `log tangent and chord retain the declared positive interval`() {
+    fun `log tangent and chord should retain the declared positive interval`() {
         val arithmetic = TranscendentalArithmetic()
         val line = arithmetic.logRelaxation(RationalEnclosure(q(1), q(4)), q(2), 4)
 

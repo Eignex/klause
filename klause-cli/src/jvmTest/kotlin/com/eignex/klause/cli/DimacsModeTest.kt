@@ -30,7 +30,7 @@ class DimacsModeTest {
     }.absolutePath
 
     @Test
-    fun `native conflict coverage is printed separately from open theory coverage`() {
+    fun `native conflict coverage should be printed separately from open theory coverage`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),
             ca = ConflictAnalysisStats(notApplicable = SumResult(3.0), nonAsserting = SumResult(2.0)),
@@ -43,7 +43,7 @@ class DimacsModeTest {
     }
 
     @Test
-    fun `a satisfiable cnf prints s SATISFIABLE with a full signed model line`() {
+    fun `a satisfiable cnf should print s SATISFIABLE with a full signed model line`() {
         val out = capture { main(arrayOf(cnf("p cnf 2 2\n1 2 0\n-1 0\n"))) }
         assertTrue("s SATISFIABLE" in out, out)
         val model = out.lines().first { it.startsWith("v ") }.removePrefix("v ").trim().split(" ")
@@ -52,14 +52,14 @@ class DimacsModeTest {
     }
 
     @Test
-    fun `a contradictory cnf prints s UNSATISFIABLE`() {
+    fun `a contradictory cnf should print s UNSATISFIABLE`() {
         val out = capture { main(arrayOf(cnf("p cnf 1 2\n1 0\n-1 0\n"))) }
         assertTrue("s UNSATISFIABLE" in out, out)
         assertTrue("SATISFIABLE" !in out.replace("UNSATISFIABLE", ""), out)
     }
 
     @Test
-    fun `the statistics block prints the solutions count and search counters as c comments`() {
+    fun `the statistics block should print the solutions count and search counters as c comments`() {
         val out = capture { main(arrayOf("-s", cnf("p cnf 2 2\n1 2 0\n-1 0\n"))) }
         assertTrue("s SATISFIABLE" in out, out)
         assertTrue(out.lines().any { it.startsWith("v ") }, out)
@@ -74,7 +74,7 @@ class DimacsModeTest {
     }
 
     @Test
-    fun `the cnf extension and the explicit format both route to the DIMACS front-end`() {
+    fun `the cnf extension and the explicit format should both route to the DIMACS front-end`() {
         val path = cnf("p cnf 1 1\n1 0\n")
         val byExt = capture { main(arrayOf(path)) }
         val byFormat = capture { main(arrayOf("--format", "dimacs", path)) }

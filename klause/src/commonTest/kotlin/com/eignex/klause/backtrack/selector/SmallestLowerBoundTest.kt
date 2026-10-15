@@ -14,7 +14,7 @@ class SmallestLowerBoundTest {
     private val rng = Random(1)
 
     @Test
-    fun `smallest lower bound prefers the int with the lowest minimum`() {
+    fun `smallest lower bound should prefer the int with the lowest minimum`() {
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 2,
@@ -22,7 +22,6 @@ class SmallestLowerBoundTest {
             factors = arrayOf<Factor>(),
         )
         val session = PropagationSession(problem)
-        // Free bool counts as minimum 0; int 1's minimum of -3 undercuts it.
         assertEquals(VarRef.IntVar(1), SmallestLowerBound.pick(session, rng))
     }
 }

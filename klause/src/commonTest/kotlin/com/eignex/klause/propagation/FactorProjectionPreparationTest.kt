@@ -13,10 +13,11 @@ import kotlin.test.assertTrue
 
 class FactorProjectionPreparationTest {
     @Test
-    fun `shared table preparation respects holes in another factor's domains`() {
+    fun `shared table preparation should respect holes in another factor's domains`() {
         val relation = longArrayOf(0, 0, 1, 1, 2, 2)
         val problem = Problem(
-            0, 4,
+            0,
+            4,
             arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2).excludeValue(1), IntDomain(0, 2)),
             arrayOf<Factor>(Table(intArrayOf(0, 1), relation), Table(intArrayOf(2, 3), relation)),
         )
@@ -36,12 +37,14 @@ class FactorProjectionPreparationTest {
     }
 
     @Test
-    fun `shared diagram structure preserves different acceptance languages`() {
+    fun `shared diagram structure should preserve different acceptance languages`() {
         val transitions = longArrayOf(0, 0, 0, 1, 1, 1)
         val starts = intArrayOf(0, 6)
         val states = intArrayOf(2, 2)
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 1) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             arrayOf<Factor>(
                 Mdd(intArrayOf(0), states, starts, transitions, 0, intArrayOf(0), 3),
                 Mdd(intArrayOf(1), states, starts, transitions, 1, intArrayOf(1), 3),
@@ -58,9 +61,15 @@ class FactorProjectionPreparationTest {
     }
 
     @Test
-    fun `diagram value remapping prepares indexes for the renamed symbols`() {
+    fun `diagram value remapping should prepare indexes for the renamed symbols`() {
         val original = Mdd(
-            intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 3), longArrayOf(0, 0, 0), 0, intArrayOf(0), 3,
+            intArrayOf(0),
+            intArrayOf(1, 1),
+            intArrayOf(0, 3),
+            longArrayOf(0, 0, 0),
+            0,
+            intArrayOf(0),
+            3,
         )
         val renamed = original.remapValues { it + 1 }.remap(VarRemap(intArrayOf(), intArrayOf(1)))
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(original, renamed))

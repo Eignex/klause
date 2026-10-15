@@ -24,14 +24,23 @@ class LinearAuthorityInvocationTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-    private val scope = SourceScope(SourceRevision("conditioned-linear", "exact-affine"),
-        objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+    private val scope = SourceScope(
+        SourceRevision("conditioned-linear", "exact-affine"),
+        objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
+    )
 
     @Test
-    fun `integer strict positivity reaches an attained integer minimum`() {
-        val source = SourceProofContext(scope, setOf(integer), mapOf("positive" to SourcePremise(
-            SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true))),
-            mapOf(integer to BigFraction.ONE))
+    fun `integer strict positivity should reach an attained integer minimum`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(integer),
+            mapOf(
+                "positive" to SourcePremise(
+                    SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+                ),
+            ),
+            mapOf(integer to BigFraction.ONE),
+        )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
             it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
@@ -42,12 +51,28 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `a source optimum requires both guarded Boolean branches`() {
-        val source = SourceProofContext(scope, setOf(bool, real), mapOf(
-            "false" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.MINUS_ONE), mapOf(0 to false)),
-            "true" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.ZERO), mapOf(0 to true))), mapOf(real to BigFraction.ONE))
+    fun `a source optimum should require both guarded Boolean branches`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(bool, real),
+            mapOf(
+                "false" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.MINUS_ONE,
+                    ),
+                    mapOf(0 to false),
+                ),
+                "true" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.ZERO,
+                    ),
+                    mapOf(0 to true),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
             it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
@@ -58,12 +83,28 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `incomplete branch coverage retains the incumbent without a global optimum`() {
-        val source = SourceProofContext(scope, setOf(bool, real), mapOf(
-            "false" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.MINUS_ONE), mapOf(0 to false)),
-            "true" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.ZERO), mapOf(0 to true))), mapOf(real to BigFraction.ONE))
+    fun `incomplete branch coverage should keep the incumbent without a global optimum`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(bool, real),
+            mapOf(
+                "false" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.MINUS_ONE,
+                    ),
+                    mapOf(0 to false),
+                ),
+                "true" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.ZERO,
+                    ),
+                    mapOf(0 to true),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
 
         val result = LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 1)).use {
             it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
@@ -75,11 +116,22 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `an infeasible guarded branch contributes its checked refutation to global coverage`() {
-        val source = SourceProofContext(scope, setOf(bool, real), mapOf(
-            "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
-            "true" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.ZERO), mapOf(0 to true))), mapOf(real to BigFraction.ONE))
+    fun `an infeasible guarded branch should contribute its checked refutation to global coverage`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(bool, real),
+            mapOf(
+                "false" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE), mapOf(0 to false)),
+                "true" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.ZERO,
+                    ),
+                    mapOf(0 to true),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
             it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
@@ -89,12 +141,29 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `an attained sibling at the global limit establishes attainment`() {
-        val source = SourceProofContext(scope, setOf(bool, real), mapOf(
-            "false" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.ZERO, strict = true), mapOf(0 to false)),
-            "true" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.ZERO), mapOf(0 to true))), mapOf(real to BigFraction.ONE))
+    fun `an attained sibling at the global limit should establish attainment`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(bool, real),
+            mapOf(
+                "false" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.ZERO,
+                        strict = true,
+                    ),
+                    mapOf(0 to false),
+                ),
+                "true" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.ZERO,
+                    ),
+                    mapOf(0 to true),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
             it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
@@ -104,12 +173,29 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `strict branch coverage and one approach establish a global unattained limit`() {
-        val source = SourceProofContext(scope, setOf(bool, real), mapOf(
-            "false" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.ZERO, strict = true), mapOf(0 to false)),
-            "true" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.MINUS_ONE), mapOf(0 to true))), mapOf(real to BigFraction.ONE))
+    fun `strict branch coverage and one approach should establish a global unattained limit`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(bool, real),
+            mapOf(
+                "false" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.ZERO,
+                        strict = true,
+                    ),
+                    mapOf(0 to false),
+                ),
+                "true" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.MINUS_ONE,
+                    ),
+                    mapOf(0 to true),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
             it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
@@ -120,7 +206,7 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `cancelled invocation preserves an accepted external incumbent`() {
+    fun `a cancelled invocation should preserve an accepted external incumbent`() {
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         var stop = false
@@ -140,10 +226,17 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
-    fun `cancellation after acceptance retains a checked global bound`() {
-        val source = SourceProofContext(scope, setOf(real), mapOf("lower" to SourcePremise(
-            SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))),
-            mapOf(real to BigFraction.ONE))
+    fun `cancellation after acceptance should keep a checked global bound`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(real),
+            mapOf(
+                "lower" to SourcePremise(
+                    SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+                ),
+            ),
+            mapOf(real to BigFraction.ONE),
+        )
         var stop = false
         val invocation = LinearAuthorityInvocation(source, TheoryParams())
 
@@ -157,11 +250,19 @@ class LinearAuthorityInvocationTest {
         val bound = assertIs<SourceClaim.Bound>(assertNotNull(result?.bound).claim)
         assertEquals(SourceValue.Rational(BigFraction.ONE), bound.value)
     }
+
     @Test
-    fun `closing a paused traversal retains its checked root bound and incumbent`() {
-        val source = SourceProofContext(scope, setOf(integer), mapOf("positive" to SourcePremise(
-            SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true))),
-            mapOf(integer to BigFraction.ONE))
+    fun `closing a paused traversal should keep its checked root bound and incumbent`() {
+        val source = SourceProofContext(
+            scope,
+            setOf(integer),
+            mapOf(
+                "positive" to SourcePremise(
+                    SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+                ),
+            ),
+            mapOf(integer to BigFraction.ONE),
+        )
         val invocation = LinearAuthorityInvocation(source, TheoryParams())
 
         val paused = invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
@@ -175,5 +276,4 @@ class LinearAuthorityInvocationTest {
         assertEquals(SourceValue.Rational(BigFraction.ZERO), bound.value)
         assertEquals(TerminationReason.Cancelled, snapshot.reason)
     }
-
 }

@@ -8,27 +8,24 @@ import kotlin.test.assertTrue
 class IntHashSetTest {
 
     @Test
-    fun `every query on a never-populated set is safe and it stays usable after`() {
-        // Exercises the lazy-backing size-0 fast paths: every query must be safe before the first
-        // add (the backing arrays are still zero-length).
+    fun `never populated set should answer every query and stay usable`() {
         val s = IntHashSet()
         assertFalse(s.contains(0))
         assertFalse(s.contains(Int.MIN_VALUE))
-        assertFalse(s.remove(7), "remove on a never-populated set is a no-op")
+        assertFalse(s.remove(7))
         assertEquals(0, s.toIntArray().size)
         var visits = 0
         s.forEach { visits++ }
         assertEquals(0, visits)
         s.clear()
         assertTrue(s.isEmpty())
-        // After all that, the set is still fully functional.
         assertTrue(s.add(7))
         assertTrue(s.contains(7))
         assertEquals(1, s.size)
     }
 
     @Test
-    fun `add reports novelty and dedupes`() {
+    fun `add should report novelty and deduplicate`() {
         val s = IntHashSet()
         assertTrue(s.add(5))
         assertFalse(s.add(5))
@@ -40,7 +37,7 @@ class IntHashSetTest {
     }
 
     @Test
-    fun `extreme members and zero coexist`() {
+    fun `extreme members and zero should coexist`() {
         val s = IntHashSet()
         s.add(Int.MIN_VALUE)
         s.add(Int.MAX_VALUE)
@@ -52,19 +49,19 @@ class IntHashSetTest {
     }
 
     @Test
-    fun `remove deletes and survivors remain findable across collisions`() {
+    fun `remove should keep survivors findable across collisions`() {
         val s = IntHashSet(4)
         for (k in 0 until 50) s.add(k)
         for (k in 0 until 50 step 2) assertTrue(s.remove(k))
         for (k in 0 until 50) {
             if (k % 2 == 0) assertFalse(s.contains(k), "removed $k") else assertTrue(s.contains(k), "survivor $k")
         }
-        assertFalse(s.remove(0), "already-removed returns false")
+        assertFalse(s.remove(0))
         assertEquals(25, s.size)
     }
 
     @Test
-    fun `clear empties and the set is reusable`() {
+    fun `clear should empty the set and keep it reusable`() {
         val s = IntHashSet()
         for (k in 0 until 30) s.add(k)
         s.clear()
@@ -76,7 +73,7 @@ class IntHashSetTest {
     }
 
     @Test
-    fun `forEach visits every member exactly once`() {
+    fun `forEach should visit every member exactly once`() {
         val s = IntHashSet()
         val expected = HashSet<Int>()
         for (k in -20..20) {
@@ -89,11 +86,10 @@ class IntHashSetTest {
     }
 
     @Test
-    fun `growth preserves all members`() {
+    fun `growth should preserve all members`() {
         val s = IntHashSet(8)
         for (k in 0 until 1000) s.add(k * 13)
         assertEquals(1000, s.size)
         for (k in 0 until 1000) assertTrue(s.contains(k * 13))
     }
-
 }

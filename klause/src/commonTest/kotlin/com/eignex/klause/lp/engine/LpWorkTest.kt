@@ -6,7 +6,7 @@ import kotlin.test.assertFailsWith
 
 class LpWorkTest {
     @Test
-    fun `completed work saturates through both addition overloads`() {
+    fun `completed work should saturate through both addition overloads`() {
         for (increment in listOf(0L, 1L, 2L, Long.MAX_VALUE)) {
             val work = LpWork()
             work.add(Long.MAX_VALUE - 1)
@@ -19,7 +19,7 @@ class LpWorkTest {
     }
 
     @Test
-    fun `reset starts ordinary accounting after saturation`() {
+    fun `reset should start ordinary accounting after saturation`() {
         val work = LpWork()
         work.add(Long.MAX_VALUE)
         work.add(10)
@@ -32,7 +32,7 @@ class LpWorkTest {
     }
 
     @Test
-    fun `negative charges cannot replenish spent work`() {
+    fun `negative charges should not replenish spent work`() {
         val work = LpWork()
         work.add(3)
 

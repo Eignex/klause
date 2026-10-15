@@ -11,7 +11,7 @@ class ClaspReferenceTest {
     private val cmd = listOf("docker", "run", "clasp")
 
     @Test
-    fun `reference objectives preserve arbitrary integer precision`() {
+    fun `reference objectives should preserve arbitrary integer precision`() {
         for (value in listOf("9007199254740993", "9223372036854775808")) {
             val result = ClaspReference.parse("o $value\ns OPTIMUM FOUND\n", elapsedMs = 10, cmd = cmd)
 
@@ -21,7 +21,7 @@ class ClaspReferenceTest {
     }
 
     @Test
-    fun `optimum found is a proven feasible optimum with the last o cost`() {
+    fun `optimum found should be a proven optimum with the last o cost`() {
         val r = ClaspReference.parse("o 9\no 4\ns OPTIMUM FOUND\n", elapsedMs = 1_200, cmd = cmd)
         assertEquals(true, r.feasible)
         assertTrue(r.proven)
@@ -30,17 +30,15 @@ class ClaspReferenceTest {
     }
 
     @Test
-    fun `a decision satisfiable is a proven SAT witness`() {
-        // No `o` lines ⇒ clasp is deciding satisfiability; a complete solver's model proves SAT.
+    fun `a decision satisfiable should be a proven SAT witness`() {
         val r = ClaspReference.parse("s SATISFIABLE\n", elapsedMs = 300, cmd = cmd)
         assertEquals(true, r.feasible)
         assertTrue(r.proven)
-        assertNull(r.objective, "a pure SAT witness carries no objective")
+        assertNull(r.objective)
     }
 
     @Test
-    fun `an optimisation incumbent is feasible but not proven optimal`() {
-        // `o` lines with a non-OPTIMUM status ⇒ found an incumbent but timed out before proving optimum.
+    fun `an optimisation incumbent should be feasible but not proven optimal`() {
         val r = ClaspReference.parse("o 7\ns SATISFIABLE\n", elapsedMs = 10_000, cmd = cmd)
         assertEquals(true, r.feasible)
         assertFalse(r.proven)
@@ -48,34 +46,34 @@ class ClaspReferenceTest {
     }
 
     @Test
-    fun `unsatisfiable is a proof of infeasibility`() {
+    fun `unsatisfiable should be a proof of infeasibility`() {
         val r = ClaspReference.parse("s UNSATISFIABLE\n", elapsedMs = 50, cmd = cmd)
         assertEquals(false, r.feasible)
         assertTrue(r.proven)
     }
 
     @Test
-    fun `unknown or timeout is undecided`() {
+    fun `unknown or timeout should be undecided`() {
         val r = ClaspReference.parse("s UNKNOWN\n", elapsedMs = 10_000, cmd = cmd)
         assertNull(r.feasible)
         assertFalse(r.proven)
     }
 
     @Test
-    fun `opb gains the problem line when absent`() {
+    fun `opb should gain the problem line when absent`() {
         val opb = "* a comment\nmin: 1 x1 +2 x2 +3 x3 ;\n+1 x1 +1 x2 >= 1 ;\n+1 x2 +1 x3 >= 1 ;\n"
         val out = ClaspReference.opbWithProblemLine(opb)
         assertEquals("* #variable= 3 #constraint= 2", out.lineSequence().first())
     }
 
     @Test
-    fun `opb with an existing problem line is unchanged`() {
+    fun `opb with an existing problem line should be unchanged`() {
         val opb = "* #variable= 2 #constraint= 1\nmin: 1 x1 +1 x2 ;\n+1 x1 +1 x2 >= 1 ;\n"
         assertEquals(opb, ClaspReference.opbWithProblemLine(opb))
     }
 
     @Test
-    fun `opb drops the problem-line fields clasp does not read`() {
+    fun `opb should drop the problem-line fields clasp does not read`() {
         val opb = "* #variable= 2 #constraint= 1 #equal= 0 intsize= 5 #soft= 1 mincost= 1 maxcost= 1 sumcost= 1\n" +
             "+1 x1 +1 x2 >= 1 ;\n"
         assertEquals(
@@ -85,7 +83,7 @@ class ClaspReferenceTest {
     }
 
     @Test
-    fun `a new-format wcnf gets a problem line and hard clauses at the top weight`() {
+    fun `a new-format wcnf should get a problem line and hard clauses at the top weight`() {
         val wcnf = "c two soft, one hard\nh 1 2 0\n3 -1 0\n4 -2 0\n"
 
         val out = ClaspReference.wcnfWithProblemLine(wcnf)
@@ -94,14 +92,14 @@ class ClaspReferenceTest {
     }
 
     @Test
-    fun `a classic wcnf passes unchanged`() {
+    fun `a classic wcnf should pass unchanged`() {
         val wcnf = "p wcnf 2 2 9\n9 1 2 0\n3 -1 0\n"
 
         assertEquals(wcnf, ClaspReference.wcnfWithProblemLine(wcnf))
     }
 
     @Test
-    fun `a SATLIB trailer after the formula is not passed on as an empty clause`() {
+    fun `a SATLIB trailer should not be passed on as an empty clause`() {
         val text = ClaspReference.ClaspInput.of(Format.DIMACS) { "p cnf 2 1\n1 2 0\n%\n0\n".reader().buffered() }.text()
 
         assertEquals("p cnf 2 1\n1 2 0\n", text)

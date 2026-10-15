@@ -28,9 +28,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class DominatedVariablesTest {
-
     @Test
-    fun `a declared Boolean inequality permits a safe pure-literal fixing`() {
+    fun `a declared Boolean inequality should permit a safe pure-literal fixing`() {
         val source = PseudoBoolean(longArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, false)), PbOp.LE, 3)
         val factor = object : Factor by source, Propagator by source.propagatorProjection() {}
         val model = Problem(2, 0, emptyArray(), listOf(factor)).bake()
@@ -47,7 +46,6 @@ class DominatedVariablesTest {
         return problem.propagate(a) !is PropagationResult.Unsat
     }
 
-    /** Minimum of `Σ coeffs·x` over the feasible assignments of [problem], or `null` if infeasible. */
     private fun minObjective(problem: Problem, coeffs: Map<Int, Long>): Long? {
         val n = problem.numIntVars
         val ints = LongArray(n) { problem.finiteIntDomain(it).min }
@@ -90,10 +88,7 @@ class DominatedVariablesTest {
     }
 
     @Test
-    fun `a variable that is neither up- nor down-safe is left free`() {
-        // x0 appears with +coeff in both a ≤ row (lowering safe) and a ≥ row (raising safe) ⇒ neither
-        // direction is globally safe, so x0 is not pinned. x1 / x2 sit only in their own row, so they
-        // are pinned — assert x0 specifically stays free.
+    fun `a variable that is neither up- nor down-safe should be left free`() {
         val problem = Problem(
             0,
             3,
@@ -104,13 +99,12 @@ class DominatedVariablesTest {
             ),
         )
         val out = fixed(problem, emptyMap())
-        assertEquals(minObjective(problem, emptyMap()), minObjective(out, emptyMap()), "optimum changed")
-        assertTrue(out.finiteIntDomain(0).min != out.finiteIntDomain(0).max, "x0 must stay free")
+        assertEquals(minObjective(problem, emptyMap()), minObjective(out, emptyMap()))
+        assertTrue(out.finiteIntDomain(0).min != out.finiteIntDomain(0).max)
     }
 
     @Test
-    fun `variables in a global constraint are excluded`() {
-        // AllDifferent makes its variables' dual-fixing safety undecidable ⇒ nothing is pinned.
+    fun `variables in a global constraint should not be fixed`() {
         val problem = Problem(
             0,
             3,
@@ -122,7 +116,6 @@ class DominatedVariablesTest {
 
     private fun pos(v: Int) = Lit.make(v, true)
 
-    /** Minimum of `Σ weights·b` over the feasible Boolean assignments, or `null` if infeasible. */
     private fun minObjectiveBools(problem: Problem, weights: Map<Int, Long>): Long? {
         val nb = problem.numBoolVars
         var best: Long? = null
@@ -142,25 +135,18 @@ class DominatedVariablesTest {
         problem.factors.any { it is Clause && it.literals.size == 1 && it.literals[0] == lit }
 
     @Test
-    fun `booleans in a two-sided cardinality are excluded`() {
-        // Exactly-one (min == max == 1, both sides active) is not monotone in a single literal: both
-        // satisfying and unsatisfying a literal can violate it ⇒ its bools can't be dual-fixed.
+    fun `booleans in a two-sided cardinality should not be fixed`() {
         val problem = Problem(
             3,
             0,
             emptyArray(),
             listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 1, max = 1)),
         )
-        assertTrue(
-            Presolve.fixDominatedVariables(problem.bake(), emptyMap(), emptyMap()).isEmpty,
-            "expected no fixing",
-        )
+        assertTrue(Presolve.fixDominatedVariables(problem.bake(), emptyMap(), emptyMap()).isEmpty)
     }
 
     @Test
-    fun `negative-weight pseudo-boolean LE flips the safe direction`() {
-        // `-b0 <= 0` (always true): a rising sum violates LE, and with weight -1 the rising value is
-        // b0 = false ⇒ false-unsafe ⇒ the safe pin is true. Optimum (no objective) is preserved.
+    fun `a negative-weight pseudo-boolean LE should flip the safe direction`() {
         val problem = Problem(
             1,
             0,
@@ -168,11 +154,10 @@ class DominatedVariablesTest {
             listOf(PseudoBoolean(longArrayOf(-1), intArrayOf(pos(0)), PbOp.LE, 0L)),
         )
         val out = fixed(problem, emptyMap(), emptyMap())
-        assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
-        assertTrue(hasUnit(out, Lit.make(0, true)), "b0 should be pinned true")
+        assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()))
+        assertTrue(hasUnit(out, Lit.make(0, true)))
     }
 
-    /** One column, lower bound [lo], open above — the shape a finite domain cannot state. */
     private fun openAbove(lo: Long, vararg factors: Factor): Problem = Problem(
         numBoolVars = 0,
         intBounds = IntBounds.fromModelBounds(
@@ -184,7 +169,6 @@ class DominatedVariablesTest {
         factors = arrayOf(*factors),
     )
 
-    /** One column open below, upper bound [hi]. */
     private fun openBelow(hi: Long, vararg factors: Factor): Problem = Problem(
         numBoolVars = 0,
         intBounds = IntBounds.fromModelBounds(
@@ -197,34 +181,27 @@ class DominatedVariablesTest {
     )
 
     @Test
-    fun `a down-safe column open above is pinned to its lower bound`() {
-        // x >= 0, open above, occurring only as `+x <= 7`: lowering is always safe, so an optimum sits
-        // at 0. The open upper side is irrelevant to that argument — which is the whole point.
+    fun `a down-safe column open above should be pinned to its lower bound`() {
         val problem = openAbove(0L, Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7))
 
         val delta = Presolve.fixDominatedSourceVariables(problem, emptyMap())
 
-        val out = assertNotNull(problem.withSourcePassDelta(delta), "the pin must not refute the model")
+        val out = assertNotNull(problem.withSourcePassDelta(delta))
         assertEquals(0L, out.intBounds.lower(0))
         assertEquals(0L, out.intBounds.upper(0))
     }
 
     @Test
-    fun `a down-safe column open below is left free`() {
-        // Same safe direction, but nothing to pin to: the reduction proves that lowering never costs,
-        // never where the lowering stops. Pinning to the invented endpoint would assert a bound the
-        // model does not state.
+    fun `a down-safe column open below should be left free`() {
         val problem = openBelow(7L, Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7))
 
         val delta = Presolve.fixDominatedSourceVariables(problem, emptyMap())
 
-        assertTrue(delta.isEmpty, "a column open on its safe side admits no pin")
+        assertTrue(delta.isEmpty)
     }
 
     @Test
-    fun `an up-safe column open above is left free while its bounded partner pins`() {
-        // -x0 + x1 <= 4 makes raising x0 safe and lowering x1 safe. x0 is open above, so its pin has no
-        // endpoint; x1 is closed below and pins. One open column must not cost the other its reduction.
+    fun `an up-safe column open above should stay free while its bounded partner pins`() {
         val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(
@@ -239,15 +216,13 @@ class DominatedVariablesTest {
         val delta = Presolve.fixDominatedSourceVariables(problem, mapOf(0 to -1L))
 
         val out = assertNotNull(problem.withSourcePassDelta(delta))
-        assertFalse(out.intBounds.hasUpper(0), "x0 stays open above")
+        assertFalse(out.intBounds.hasUpper(0))
         assertEquals(0L, out.intBounds.lower(1))
         assertEquals(0L, out.intBounds.upper(1))
     }
 
     @Test
-    fun `a pin lands on the declared value set rather than the wider model range`() {
-        // A column declaring `0..1000` inside a model range of `0..1000000`: the range's endpoint is a
-        // value the declaration excludes, so pinning there refutes a model `x = 1000` satisfies.
+    fun `a pin should land on the declared value set rather than the wider model range`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -258,7 +233,7 @@ class DominatedVariablesTest {
 
         val delta = Presolve.fixDominatedSourceVariables(problem, emptyMap())
 
-        val out = assertNotNull(problem.withSourcePassDelta(delta), "the pin must not refute the model")
+        val out = assertNotNull(problem.withSourcePassDelta(delta))
         assertEquals(1000L, out.intBounds.lower(0))
         assertEquals(1000L, out.intBounds.upper(0))
     }

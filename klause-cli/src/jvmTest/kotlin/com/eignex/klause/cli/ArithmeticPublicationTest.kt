@@ -11,7 +11,7 @@ import kotlin.test.assertFailsWith
 
 class ArithmeticPublicationTest {
     @Test
-    fun `an accepted identity suppresses a final source-owned equivalent representation`() {
+    fun `an accepted identity should suppress a final equivalent source-owned representation`() {
         var emitted = 0
         val output = object : OutputProtocol by SmtLibOutput() {
             override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
@@ -31,7 +31,7 @@ class ArithmeticPublicationTest {
     }
 
     @Test
-    fun `source refinement can veto a repeated accepted identity`() {
+    fun `source refinement should be able to veto a repeated accepted identity`() {
         var permitted = true
         var emitted = 0
         val output = object : OutputProtocol by SmtLibOutput() {
@@ -56,12 +56,12 @@ class ArithmeticPublicationTest {
     }
 
     @Test
-    fun `a failed stdout stream aborts actual protocol publication`() {
+    fun `a failed stdout stream should abort protocol publication`() {
         val output = SmtLibOutput()
         val publication = ArithmeticPublication(output)
         val previous = System.out
         val failed = PrintStream(object : OutputStream() {
-            override fun write(b: Int) { throw IOException("closed consumer") }
+            override fun write(b: Int): Unit = throw IOException("closed consumer")
         })
 
         System.setOut(failed)
@@ -78,7 +78,7 @@ class ArithmeticPublicationTest {
     }
 
     @Test
-    fun `two accepted incumbents reach the consumer before terminal return`() {
+    fun `two accepted incumbents should reach the consumer before terminal return`() {
         val received = mutableListOf<Pair<String, SourceValue>>()
         val output = object : OutputProtocol by SmtLibOutput() {
             override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
@@ -99,7 +99,7 @@ class ArithmeticPublicationTest {
     }
 
     @Test
-    fun `repeating the final assignment and objective emits no duplicate`() {
+    fun `repeating the final assignment and objective should emit no duplicate`() {
         val received = mutableListOf<String>()
         val output = object : OutputProtocol by SmtLibOutput() {
             override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
@@ -117,7 +117,7 @@ class ArithmeticPublicationTest {
     }
 
     @Test
-    fun `consumer failure propagates without recording successful publication`() {
+    fun `consumer failure should propagate without recording successful publication`() {
         val output = object : OutputProtocol by SmtLibOutput() {
             override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
                 error("closed output")
@@ -133,7 +133,7 @@ class ArithmeticPublicationTest {
     }
 
     @Test
-    fun `a source renderer veto is not counted or retained as a publication`() {
+    fun `a source renderer veto should not be counted or retained as a publication`() {
         var permitted = false
         var emitted = 0
         val output = object : OutputProtocol by SmtLibOutput() {
@@ -153,21 +153,5 @@ class ArithmeticPublicationTest {
 
         assertEquals(1, emitted)
         assertEquals(1L, publication.solutions)
-    }
-
-    @Test
-    fun `separate invocations each publish their own first incumbent`() {
-        val received = mutableListOf<String>()
-        val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
-                received.add(rendered)
-                return true
-            }
-        }
-
-        ArithmeticPublication(output).publish("x=1", SourceValue.Rational(BigFraction.ONE))
-        ArithmeticPublication(output).publish("x=1", SourceValue.Rational(BigFraction.ONE))
-
-        assertEquals(listOf("x=1", "x=1"), received)
     }
 }

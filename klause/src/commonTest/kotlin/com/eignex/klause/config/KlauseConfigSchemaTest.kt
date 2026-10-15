@@ -6,15 +6,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class KlauseConfigSchemaTest {
-
     @Test
-    fun `raw model resource defaults match the core defaults`() {
+    fun `raw model resource defaults should match the core defaults`() {
         assertEquals(KlauseConfig.DEFAULT.problemSettings(), ProblemSettings())
     }
 
-
     @Test
-    fun `property key derives from the knob name as a dotted klause path`() {
+    fun `the property key should derive from the knob name as a dotted klause path`() {
         val keys = KlauseConfigSchema.keys.associateBy { it.name }
         assertEquals("klause.float.buckets", keys.getValue("floatBuckets").propertyKey)
         assertEquals("klause.lp.max.tableau.cells", keys.getValue("lpMaxTableauCells").propertyKey)
@@ -22,7 +20,7 @@ class KlauseConfigSchemaTest {
     }
 
     @Test
-    fun `fromProps applies overrides looked up by property key and leaves the rest at base`() {
+    fun `fromProps should apply overrides by property key and leave the rest at base`() {
         val overrides = mapOf(
             "klause.float.buckets" to "2048",
             "klause.unbounded.float.lo" to "-5.5",
@@ -36,12 +34,11 @@ class KlauseConfigSchemaTest {
         assertEquals(12.5, config.unboundedFloatHi)
         assertEquals(256, config.bitsetThreshold)
         assertTrue(!config.pinAbsentOptVars)
-        // An untouched knob keeps the base value.
         assertEquals(KlauseConfig.DEFAULT.floatScale, config.floatScale)
     }
 
     @Test
-    fun `fromProps ignores an unparseable value and keeps the base`() {
+    fun `fromProps should ignore an unparseable value and keep the base`() {
         val config = KlauseConfig.fromProps(KlauseConfig.DEFAULT) { key ->
             if (key == "klause.float.buckets") "not-a-number" else null
         }

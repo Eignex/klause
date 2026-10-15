@@ -30,15 +30,8 @@ internal sealed interface LpReferenceObjective {
     data object ProbeBoundDecline : LpReferenceObjective
 }
 
-/*
- * Test-only exact reference for the normalized [LpModel] seam.
- *
- * Integer data is lifted from its `Long` storage and continuous data from its exact IEEE value. The
- * adapter rebuilds an exact model rather than calling a float solver or any production certifier. A
- * finite probe box may provide a valid feasible witness, but cannot prove infeasibility or an objective
- * bound for the open model, so those claims decline. Objective attainment is decided by an independent
- * exact feasibility run with the computed infimum imposed as an equality.
- */
+// A finite probe box can supply a feasible witness but cannot prove infeasibility or a bound for the
+// open model, so those claims decline.
 internal class LpReferenceAdapter(
     private val cancellation: Cancellation = Cancellation.Never,
     private val maxPivots: Int = Int.MAX_VALUE,

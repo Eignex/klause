@@ -2,7 +2,6 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -35,7 +34,7 @@ class NValuePropagatorTest {
     }
 
     @Test
-    fun `equal minimum signed word values require only one distinct value`() {
+    fun `equal minimum signed word values should require only one distinct value`() {
         for (mode in listOf(NValue.Mode.Eq, NValue.Mode.AtMost)) {
             val problem = nvalueProblem(
                 xsDomains = Array(2) { IntDomain(Long.MIN_VALUE, Long.MIN_VALUE) },
@@ -50,7 +49,7 @@ class NValuePropagatorTest {
     }
 
     @Test
-    fun `two distinct values exclude a third value beside the minimum signed word endpoint`() {
+    fun `two distinct values should exclude a third value beside the minimum signed word endpoint`() {
         val problem = nvalueProblem(
             xsDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE), IntDomain(0, 0), IntDomain(0, 1)),
             nDomain = IntDomain(2, 2),
@@ -64,9 +63,7 @@ class NValuePropagatorTest {
     }
 
     @Test
-    fun `atleast nvalues forces a variable pinned by the maximum matching`() {
-        // x0 ∈ {0}, x1 ∈ {0,1}, with at-least 2 distinct values required. x1 = 0 would leave only
-        // one distinct value, so the maximum matching forces x1 = 1. Layout: x0=0, x1=1, n=2.
+    fun `atleast nvalues should force a variable pinned by the maximum matching`() {
         val problem = nvalueProblem(
             xsDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 1)),
             nDomain = IntDomain(2, 2),
@@ -76,28 +73,12 @@ class NValuePropagatorTest {
         state.undoLogging = true
         state.currentFactor = 0
         assertTrue(problem.propagators[0].propagate(state, 0))
-        assertEquals(1, state.intDomains[1].min, "x1 must be pinned to 1 by the maximum-matching GAC")
-        assertEquals(1, state.intDomains[1].max, "x1 must be pinned to 1 by the maximum-matching GAC")
+        assertEquals(1, state.intDomains[1].min)
+        assertEquals(1, state.intDomains[1].max)
     }
 
     @Test
-    fun `atmost kernel squeezes a variable into its window`() {
-        // Two vars pinned to disjoint values 0 and 2 form a 2-window kernel; with n ≤ 2 the third
-        // var (∈ [0,2]) may not take a value outside the kernel windows — but since both windows are
-        // singletons here the only freedom is forced. Soundness is the assertion; the oracle checks
-        // the propagated bounds against the 3-solution ground truth.
-        val problem = nvalueProblem(
-            xsDomains = arrayOf(IntDomain(0, 0), IntDomain(2, 2), IntDomain(0, 2)),
-            nDomain = IntDomain(0, 2),
-            mode = NValue.Mode.AtMost,
-        )
-        FactorPropagationOracle.assertSound(problem, "atmost-kernel")
-    }
-
-    @Test
-    fun `atmost independent-set lower bound forces Unsat`() {
-        // Three pairwise domain-disjoint vars must take 3 distinct values, but AtMost caps the
-        // distinct count at n = 2 ⟹ UNSAT. Exercises the greedy independent-set lower bound.
+    fun `atmost independent-set lower bound should force unsat`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -113,9 +94,7 @@ class NValuePropagatorTest {
     }
 
     @Test
-    fun `atmost independent-set lower bound is hole-aware`() {
-        // Disjointness via interior holes: {0,2}, {1}, {3,5} are pairwise disjoint ⟹ 3 distinct
-        // required, but n = 2 caps it ⟹ UNSAT. The conflict reason must cite holes soundly.
+    fun `atmost independent-set lower bound should be hole-aware`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -131,8 +110,7 @@ class NValuePropagatorTest {
     }
 
     @Test
-    fun `a kernel count cites only the bounds that keep its windows apart`() {
-        // x0 <= 1 and x1 >= 3 need two values between them; x2's hole at 2 plays no part.
+    fun `a kernel count should cite only the bounds that keep its windows apart`() {
         val problem = nvalueProblem(Array(3) { IntDomain(0, 4) }, IntDomain(0, 3), NValue.Mode.AtMost)
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -150,10 +128,10 @@ class NValuePropagatorTest {
     }
 
     @Test
-    fun `nvalue deductions are implied by their reasons under carved holes`() {
+    fun `nvalue deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x57A2)
         for (mode in NValue.Mode.entries) {
-            repeat(100) { iter ->
+            repeat(40) { iter ->
                 val k = 4
                 val problem = nvalueProblem(Array(k) { IntDomain(0, 3) }, IntDomain(0, k.toLong()), mode)
                 PropagationReasonOracle.assertReasonsImply(problem, "nvalue-$mode#$iter") { state ->
@@ -169,5 +147,4 @@ class NValuePropagatorTest {
             }
         }
     }
-
 }

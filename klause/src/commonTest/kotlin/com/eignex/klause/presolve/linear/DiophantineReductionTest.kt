@@ -16,9 +16,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class DiophantineReductionTest {
-
     @Test
-    fun `an implied equality carves off-residue values without replacing its factor`() {
+    fun `an implied equality should carve off-residue values without replacing its factor`() {
         val source = Linear(longArrayOf(2, 3, 3), intArrayOf(0, 1, 2), LinearOp.EQ, 10)
         val factor = object : Factor by source, Propagator by source.propagatorProjection() {
             override val linearForm: LinearForm = LinearForm.Relaxation(source.linearRows)
@@ -36,7 +35,6 @@ class DiophantineReductionTest {
     private fun problem(domains: Array<IntDomain>, vararg factors: Factor) =
         Problem(numBoolVars = 0, numIntVars = domains.size, intDomains = domains, factors = factors.toList()).bake()
 
-    /** `2x + 3y + 3z = 10` over declared ranges, with `x` open above when [openX] is set. */
     private fun sourceProblem(xHi: Long, openX: Boolean = false) = Problem(
         numBoolVars = 0,
         numIntVars = 3,
@@ -46,8 +44,8 @@ class DiophantineReductionTest {
     )
 
     @Test
-    fun `the source form moves each closed side to the nearest in-class value`() {
-        // x ≡ 2 (mod 3), so the declared 0..7 narrows to 2..5.
+    fun `source reduction should move each closed side to the nearest in-class value`() {
+        // x = 2 (mod 3), so the declared 0..7 narrows to 2..5.
         val bounds = assertNotNull(DiophantineReduction.reduceSource(sourceProblem(xHi = 7)).bounds)
 
         assertEquals(2, bounds.lower(0))
@@ -55,7 +53,7 @@ class DiophantineReductionTest {
     }
 
     @Test
-    fun `the source form leaves an open side open`() {
+    fun `source reduction should leave an open side open`() {
         val bounds = assertNotNull(DiophantineReduction.reduceSource(sourceProblem(xHi = 0, openX = true)).bounds)
 
         assertEquals(2, bounds.lower(0))
@@ -63,8 +61,7 @@ class DiophantineReductionTest {
     }
 
     @Test
-    fun `the source form refutes a congruence with no solution`() {
-        // 2x + 4y = 3: 2x ≡ 3 (mod 4) has no solution.
+    fun `source reduction should refute a congruence with no solution`() {
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -74,5 +71,4 @@ class DiophantineReductionTest {
 
         assertTrue(DiophantineReduction.reduceSource(p).infeasible)
     }
-
 }

@@ -1,14 +1,18 @@
 package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -23,7 +27,7 @@ import kotlin.test.assertTrue
 class LocalSearchSolverTest {
 
     @Test
-    fun `slice boundaries preserve the seeded satisfaction walk`() {
+    fun `slice boundaries should preserve the seeded satisfaction walk`() {
         val problem = Problem(
             4,
             0,
@@ -51,7 +55,7 @@ class LocalSearchSolverTest {
     }
 
     @Test
-    fun `cancellation pauses the walk without exhausting it`() {
+    fun `cancellation should pause the walk without exhausting it`() {
         val problem = Problem(
             80,
             0,
@@ -80,7 +84,7 @@ class LocalSearchSolverTest {
     }
 
     @Test
-    fun `cancellation during a slice preserves the remaining work allowance`() {
+    fun `cancellation during a slice should preserve the remaining work allowance`() {
         val problem = Problem(
             3,
             0,
@@ -112,7 +116,7 @@ class LocalSearchSolverTest {
     }
 
     @Test
-    fun `an exhausted resumed walk keeps its terminal verdict`() {
+    fun `an exhausted resumed walk should keep its terminal verdict`() {
         val problem = Problem(
             4,
             0,
@@ -137,7 +141,7 @@ class LocalSearchSolverTest {
     }
 
     @Test
-    fun `minimize reports an objective past the 64-bit range without wrapping`() {
+    fun `minimize should report an objective past the 64-bit range without wrapping`() {
         val wide = 1L shl 62
         val problem = Problem(
             0,
@@ -154,7 +158,7 @@ class LocalSearchSolverTest {
     }
 
     @Test
-    fun `a gradient view that disagrees with the linear objective only guides moves`() {
+    fun `a gradient view that disagrees with the linear objective should only guide moves`() {
         // The view reads p = x0·x1 alone; the linear objective p + x0 is the rewrite presolve left behind.
         val problem = Problem(
             0,
@@ -176,7 +180,7 @@ class LocalSearchSolverTest {
     }
 
     @Test
-    fun `a satisfy run starts from a supplied assignment`() {
+    fun `a satisfy run should start from a supplied assignment`() {
         val problem = Problem(
             0,
             2,
@@ -192,5 +196,114 @@ class LocalSearchSolverTest {
             .solve(LocalSearchParams(maxFlips = 1, randomSeed = 1, initialAssignment = start))
 
         assertEquals(listOf(4L, 3L), assertIs<SolveResult.Sat>(result).assignment.ints.toList())
+    }
+
+    // Choose ≥ 4 of 12 booleans to minimise their weights: the optimum picks the four cheapest.
+    private fun problem() = Problem(
+        numBoolVars = 12,
+        numIntVars = 0,
+        intDomains = emptyArray(),
+        factors = arrayOf<Factor>(Cardinality(IntArray(12) { Lit.make(it, true) }, min = 4, max = 12)),
+    )
+
+    private val weights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L, 12L, 4L, 11L, 10L)
+    private val optimum = 10.0 // 1 (var4) + 2 (var6) + 3 (var1) + 4 (var9)
+
+    // The four dearest weights are at indices 8, 10, 11, 3; pinning them true forces a worst-case
+    // feasible selection, which the pooled optimum (those four false) cannot satisfy.
+    private val dearest = listOf(8, 10, 11, 3)
+    private val pinnedOptimum = 42.0 // 12 + 11 + 10 + 9
+
+    private fun optimalSample(): Sample {
+        // The four cheapest weights are at indices 4, 6, 1, 9.
+        val cheapest = weights.indices.sortedBy { weights[it] }.take(4).toSet()
+        return Sample(BooleanArray(12) { it in cheapest }, LongArray(0))
+    }
+
+    private fun objective() = LinearObjective(boolWeights = weights)
+
+    private fun exchangeHolding(sample: Sample, objective: LinearObjective) =
+        IncumbentExchange.minimizing<Sample>().apply { offer(sample, objective.evaluate(sample)) }
+
+    @Test
+    fun `each improving incumbent should be offered to the shared exchange`() {
+        val objective = objective()
+        val exchange = IncumbentExchange.minimizing<Sample>()
+        val result = LocalSearchSolver(problem().bake()).minimize(
+            objective,
+            LocalSearchParams(maxFlips = 300L, randomSeed = 1L, pooledIncumbents = exchange),
+        )
+        val sample = assertNotNull(result.assignment)
+        val standing = assertNotNull(exchange.current())
+        assertEquals(objective.evaluate(sample), standing.objective)
+    }
+
+    @Test
+    fun `a pooled optimum should be adopted on restart and reported as the result`() {
+        val objective = objective()
+        val result = LocalSearchSolver(problem().bake()).minimize(
+            objective,
+            LocalSearchParams(
+                maxFlips = 300L,
+                randomSeed = 1L,
+                pooledIncumbents = exchangeHolding(optimalSample(), objective),
+            ),
+        )
+        val sample = assertNotNull(result.assignment)
+        assertEquals(optimum, objective.evaluate(sample))
+    }
+
+    @Test
+    fun `a pooled assignment that violates the run's pins should not be adopted`() {
+        val objective = objective()
+        val result = LocalSearchSolver(problem().bake()).minimize(
+            objective,
+            LocalSearchParams(
+                maxFlips = 300L,
+                randomSeed = 1L,
+                assumptions = Assumptions(bools = dearest.associateWith { true }),
+                pooledIncumbents = exchangeHolding(optimalSample(), objective),
+            ),
+        )
+        val sample = assertNotNull(result.assignment)
+        assertTrue(dearest.all { sample.bools[it] })
+        assertTrue(
+            objective.evaluate(sample) >= pinnedOptimum,
+            "a pin-violating foreign assignment is never imported under assumptions",
+        )
+    }
+
+    @Test
+    fun `minimize should respect a bool assumption`() {
+        val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
+        val solver = LocalSearchSolver(problem.bake())
+        val obj = LinearObjective(boolWeights = longArrayOf(-1L, -1L, -1L, -1L))
+        val sample = solver.minimize(
+            obj,
+            LocalSearchParams(
+                randomSeed = 3L,
+                maxFlips = 2_000L,
+                assumptions = Assumptions(bools = mapOf(2 to false)),
+            ),
+        ).assignment
+        assertNotNull(sample)
+        assertEquals(listOf(true, true, false, true), (0 until 4).map { sample.bools[it] })
+    }
+
+    @Test
+    fun `assumptions should compose with hard constraints`() {
+        val clauses = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))))
+        val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = clauses)
+        val solver = LocalSearchSolver(problem.bake())
+        val sample = solver.sample(
+            LocalSearchParams(
+                randomSeed = 9L,
+                maxFlips = 1_000,
+                assumptions = Assumptions(bools = mapOf(0 to false)),
+            ),
+        ).assignment
+        assertNotNull(sample)
+        assertEquals(false, sample.bools[0])
+        assertEquals(true, sample.bools[1])
     }
 }

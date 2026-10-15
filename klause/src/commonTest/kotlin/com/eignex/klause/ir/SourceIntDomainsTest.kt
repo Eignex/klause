@@ -9,7 +9,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SourceIntDomainsTest {
-
     private fun openUpperBounds(): IntBounds = IntBounds.fromModelBounds(
         lowerBounds = longArrayOf(0),
         upperBounds = longArrayOf(0),
@@ -18,17 +17,17 @@ class SourceIntDomainsTest {
     )
 
     @Test
-    fun `a bounds declaration admits its whole range`() {
+    fun `a bounds declaration should admit its whole range`() {
         val declared = SourceIntDomains.ofBounds(
             IntBounds.fromModelBounds(longArrayOf(2), longArrayOf(9), null, null),
         )
 
-        assertNull(declared.declaredOrNull(0), "no value set is stated beyond the range")
+        assertNull(declared.declaredOrNull(0))
         assertEquals(IntDomain(2, 9), declared.finiteDomain(0))
     }
 
     @Test
-    fun `a non-contiguous declaration keeps the values its bounds cannot state`() {
+    fun `a non-contiguous declaration should keep the values its bounds cannot state`() {
         val holey = IntDomain(0, 6).excludeValue(2).excludeValue(4)
         val declared = SourceIntDomains.ofDomains(arrayOf(holey))
 
@@ -39,7 +38,7 @@ class SourceIntDomainsTest {
     }
 
     @Test
-    fun `an open side has no finite declaration to materialize`() {
+    fun `an open side should have no finite declaration to materialize`() {
         val declared = SourceIntDomains.ofBounds(openUpperBounds())
 
         assertFalse(declared.bounds.hasUpper(0))
@@ -47,30 +46,30 @@ class SourceIntDomainsTest {
     }
 
     @Test
-    fun `an open-marked column declares nothing though it carries a finite box`() {
+    fun `an open-marked column should declare nothing though it carries a finite box`() {
         val declared = SourceIntDomains.ofDomains(
             arrayOf(IntDomain(0, 1L shl 40)),
             openHi = booleanArrayOf(true),
         )
 
-        assertNull(declared.declaredOrNull(0), "an invented endpoint is not something the model states")
-        assertEquals(IntDomain(0, 1L shl 40), declared.finiteDomain(0), "the box stays available to branch on")
-        assertFalse(declared.bounds.hasUpper(0), "the fallback endpoint is not a stated bound")
+        assertNull(declared.declaredOrNull(0))
+        assertEquals(IntDomain(0, 1L shl 40), declared.finiteDomain(0))
+        assertFalse(declared.bounds.hasUpper(0))
         assertTrue(declared.bounds.hasLower(0))
     }
 
     @Test
-    fun `a shared declaration reads the array it was given rather than a copy`() {
+    fun `a shared declaration should read the array it was given rather than a copy`() {
         val domains = arrayOf(IntDomain(0, 1))
         val declared = SourceIntDomains.ofDomains(domains, shared = true)
 
         domains[0] = IntDomain(1, 1)
 
-        assertEquals(IntDomain(1, 1), declared.finiteDomain(0), "an already-folded view owns the array it passes")
+        assertEquals(IntDomain(1, 1), declared.finiteDomain(0))
     }
 
     @Test
-    fun `rebounding an open column replaces its box rather than intersecting it`() {
+    fun `rebounding an open column should replace its box rather than intersect it`() {
         val declared = SourceIntDomains.ofDomains(
             arrayOf(IntDomain(0, 6)),
             openHi = booleanArrayOf(true),
@@ -78,11 +77,11 @@ class SourceIntDomainsTest {
 
         val tighter = declared.rebounded(IntBounds.fromModelBounds(longArrayOf(10), longArrayOf(10), null, null))
 
-        assertEquals(IntDomain(10, 10), tighter?.finiteDomain(0), "a box endpoint must not cap a proved bound")
+        assertEquals(IntDomain(10, 10), tighter?.finiteDomain(0))
     }
 
     @Test
-    fun `rebounding intersects a declared value set instead of replacing it`() {
+    fun `rebounding should intersect a declared value set instead of replacing it`() {
         val declared = SourceIntDomains.ofDomains(arrayOf(IntDomain(0, 9).excludeValue(5)))
 
         val tighter = declared.rebounded(IntBounds.fromModelBounds(longArrayOf(3), longArrayOf(7), null, null))
@@ -91,21 +90,21 @@ class SourceIntDomainsTest {
     }
 
     @Test
-    fun `rebounding a declared value set out of range reports no declaration`() {
+    fun `rebounding a declared value set out of range should report no declaration`() {
         val declared = SourceIntDomains.ofDomains(arrayOf(IntDomain(0, 9).excludeValues(longArrayOf(4, 5, 6))!!))
 
         assertNull(declared.rebounded(IntBounds.fromModelBounds(longArrayOf(4), longArrayOf(6), null, null)))
     }
 
     @Test
-    fun `a model declaring bounds alone states no value set but materializes its range`() {
+    fun `a model declaring bounds alone should state no value set but materialize its range`() {
         val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(3), null, null),
             factors = emptyArray(),
         )
 
-        assertNull(problem.intDomainOrNull(0), "a bounds declaration states no value set")
+        assertNull(problem.intDomainOrNull(0))
         assertEquals(IntDomain(0, 3), problem.declaredIntDomains.finiteDomain(0))
     }
 }

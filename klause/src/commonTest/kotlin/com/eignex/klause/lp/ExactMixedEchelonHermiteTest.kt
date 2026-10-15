@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class ExactMixedEchelonHermiteTest {
 
     @Test
-    fun `preserves double-bounded activities through mixed recovery`() {
+    fun `exact reduction should preserve double-bounded activities through mixed recovery`() {
         val source = listOf(
             row(mapOf(0 to 1, 1 to 2, 2 to -2), lower = 1, upper = 1),
             row(mapOf(0 to 1), lower = 0, upper = 0),
@@ -25,7 +25,7 @@ class ExactMixedEchelonHermiteTest {
     }
 
     @Test
-    fun `scales rational integer tails together with their activity range`() {
+    fun `exact reduction should scale rational integer tails with their activity range`() {
         val source = listOf(
             row(mapOf(0 to 2, 1 to 1), lower = 1, upper = 3),
             row(mapOf(0 to 1), lower = 1, upper = 2),
@@ -42,7 +42,7 @@ class ExactMixedEchelonHermiteTest {
     }
 
     @Test
-    fun `forward substitution detects an affine integer contradiction behind a real pivot`() {
+    fun `forward substitution should detect an integer contradiction behind a real pivot`() {
         val source = listOf(
             row(mapOf(0 to 1, 1 to 2, 2 to -2), lower = 1, upper = 1),
             row(mapOf(0 to 1), lower = 0, upper = 0),

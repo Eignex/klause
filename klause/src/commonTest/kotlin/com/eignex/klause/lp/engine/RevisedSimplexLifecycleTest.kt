@@ -12,7 +12,7 @@ import kotlin.test.assertSame
 
 class RevisedSimplexLifecycleTest {
     @Test
-    fun `a failed basis close retires the owner once and retains its work`() {
+    fun `a failed basis close should retire the owner once and retain its work`() {
         val model = LpBuilder().apply {
             addVar(0L, 3L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
@@ -41,7 +41,7 @@ class RevisedSimplexLifecycleTest {
     }
 
     @Test
-    fun `an unreadable retiring basis ledger keeps incomplete accounting`() {
+    fun `an unreadable retiring basis ledger should keep incomplete accounting`() {
         val model = LpBuilder().apply {
             addVar(0L, 3L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)

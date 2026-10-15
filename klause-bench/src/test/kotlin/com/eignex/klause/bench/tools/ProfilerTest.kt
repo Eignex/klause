@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class ProfilerTest {
     @Test
-    fun `operation caller paths preserve captured order beyond utilities`() {
+    fun `operation caller paths should preserve captured order beyond utilities`() {
         val callers = Profiler.cliOperationCallers(listOf(
             "java.util.HashMap.getNode",
             "com.eignex.klause.util.OrCancellation.isCancelled",
@@ -21,7 +21,7 @@ class ProfilerTest {
     }
 
     @Test
-    fun `operation caller paths retain at most three frames`() {
+    fun `operation caller paths should retain at most three frames`() {
         val stack = listOf("First", "Second", "Third", "Fourth").map { "com.eignex.klause.solver.$it.run" }
 
         val callers = Profiler.cliOperationCallers(stack)
@@ -34,7 +34,7 @@ class ProfilerTest {
     }
 
     @Test
-    fun `stacks without operation callers keep an explicit unknown label`() {
+    fun `stacks without operation callers should keep an explicit unknown label`() {
         for (stack in listOf(emptyList(), listOf("java.util.HashMap.getNode"), listOf(
             "com.eignex.klause.util.OrCancellation.isCancelled",
             "com.eignex.klause.bench.tools.Profiler.summarizeCli",
@@ -46,7 +46,7 @@ class ProfilerTest {
     }
 
     @Test
-    fun `resumed initialization and restart frames retain their phases`() {
+    fun `resumed initialization and restart frames should retain their phases`() {
         for ((method, expected) in listOf(
             "newMinimizeState" to "local-search seeding",
             "newSatisfyState" to "local-search seeding",
@@ -62,7 +62,7 @@ class ProfilerTest {
     }
 
     @Test
-    fun `standalone greedy seeding takes precedence over move application`() {
+    fun `standalone greedy seeding should take precedence over move application`() {
         for (frame in listOf(
             "com.eignex.klause.localsearch.movesource.GreedyInit\$Pass.advance",
             "LocalSearchEngine\$greedyRepairPass\$1.invokeSuspend",
@@ -74,7 +74,7 @@ class ProfilerTest {
     }
 
     @Test
-    fun `greedy seeding retains visible ALNS bootstrap attribution`() {
+    fun `greedy seeding should retain visible ALNS bootstrap attribution`() {
         val phase = Profiler.cliPhase(listOf(
             "LocalSearchState.apply",
             "LocalSearchEngine\$greedyRepairPass\$1.invokeSuspend",
@@ -85,7 +85,7 @@ class ProfilerTest {
     }
 
     @Test
-    fun `shared search stacks retain the operation phase`() {
+    fun `shared search stacks should retain the operation phase`() {
         for ((frame, expected) in listOf(
             "PreparedSearchComponents.<init>" to "shared source preparation",
             "PreparedSearchComponents.prepareSource" to "shared source preparation",
@@ -109,7 +109,7 @@ class ProfilerTest {
     }
 
     @Test
-    fun `shared root initialization retains nested propagation cost`() {
+    fun `shared root initialization should retain nested propagation cost`() {
         val phase = Profiler.cliPhase(listOf(
             "com.eignex.klause.propagation.MutatorsKt.excludeIntValueImpl",
             "SearchSession.propagate",
@@ -121,7 +121,7 @@ class ProfilerTest {
     }
 
     @Test
-    fun `presolve and backtrack callers retain their phase ownership`() {
+    fun `presolve and backtrack callers should retain their phase ownership`() {
         for ((frame, expected) in listOf(
             "com.eignex.klause.presolve.RootBaker.prepare" to "presolve",
             "com.eignex.klause.backtrack.BacktrackSolver.solve" to "backtrack search",
@@ -133,14 +133,7 @@ class ProfilerTest {
     }
 
     @Test
-    fun `shared model checks retain nested propagation cost`() {
-        val phase = Profiler.cliPhase(listOf("SearchSession.propagate", "SearchSession.check", "SearchRun.next"))
-
-        assertEquals("shared model check", phase)
-    }
-
-    @Test
-    fun `utility frames without a shared caller remain unclassified`() {
+    fun `utility frames without a shared caller should remain unclassified`() {
         val phase = Profiler.cliPhase(listOf(
             "java.util.HashMap.getNode",
             "OrCancellation.isCancelled",

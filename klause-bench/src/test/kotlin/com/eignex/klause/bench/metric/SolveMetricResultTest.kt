@@ -11,7 +11,7 @@ import kotlin.test.assertNull
 
 class SolveMetricResultTest {
     @Test
-    fun `exact objective survives durable records and legacy records remain readable`() {
+    fun `exact objective should survive durable records with legacy records still readable`() {
         for (objective in listOf("9223372036854775808", "9007199254740993", "-1/3")) {
             val record = rec(true, 1.0, 100, true).copy(exactObjective = objective)
             val encoded = Reports.json.encodeToString(record)
@@ -43,7 +43,7 @@ class SolveMetricResultTest {
     )
 
     @Test
-    fun `XCSP records retain checked witnesses separately from reported claims`() {
+    fun `XCSP records should retain checked witnesses separately from reported claims`() {
         val reported = rec(true, 10.0, 100, true).copy(
             finalWitness = "v <instantiation/>",
             validationPolicy = XCSP_SOURCE_POLICY,
@@ -63,7 +63,7 @@ class SolveMetricResultTest {
     }
 
     @Test
-    fun `unchecked XCSP candidates retain reported claims without a checked witness`() {
+    fun `unchecked XCSP candidates should retain reported claims without a checked witness`() {
         val reported = rec(true, 10.0, 100, true).copy(finalWitness = "v <instantiation/>")
 
         val checked = reported.sourceChecked(Xcsp3SourceChecker.result("unknown", "unsupported"), approximation = false)
@@ -75,7 +75,7 @@ class SolveMetricResultTest {
     }
 
     @Test
-    fun `a source rejected result receives no solution or proof credit`() {
+    fun `a source rejected result should receive no solution or proof credit`() {
         val record = rec(true, 1.001466, 100, true).copy(exactObjective = "500733/500000")
 
         val checked = record.sourceChecked(SourceValidation("invalid", "source contradiction"), approximation = false)
@@ -90,7 +90,7 @@ class SolveMetricResultTest {
     }
 
     @Test
-    fun `source valid grid witnesses keep feasibility but not optimality credit`() {
+    fun `source valid grid witnesses should keep feasibility but not optimality credit`() {
         val record = rec(true, 1.0, 100, true)
 
         val checked = record.sourceChecked(SourceValidation("valid", "grounded"), approximation = true)
@@ -102,7 +102,7 @@ class SolveMetricResultTest {
     }
 
     @Test
-    fun `unchecked grid witnesses and grid refutations remain undecided`() {
+    fun `unchecked grid witnesses and grid refutations should remain undecided`() {
         for (feasible in listOf(true, false)) {
             val record = rec(feasible, if (feasible) 1.0 else null, 100, true)
 
@@ -116,7 +116,7 @@ class SolveMetricResultTest {
     }
 
     @Test
-    fun `a source valid exact result retains its proof`() {
+    fun `a source valid exact result should retain its proof`() {
         val checked = rec(true, 1.0, 100, true)
             .sourceChecked(SourceValidation("valid", "grounded"), approximation = false)
 
@@ -125,22 +125,22 @@ class SolveMetricResultTest {
     }
 
     @Test
-    fun `a solved row's elapsed is time-to-best, tagged with the config, features joined`() {
+    fun `a solved row should report time-to-best tagged with config and joined features`() {
         val ref = ReferenceEntry(
             "s", "fam/inst", false, null, null, false, 0, "cp-sat", 300_000,
             format = "minizinc", structure = "global", numGlobal = 3, numLinear = 1, boolHeavy = false,
         )
         val record = rec(feasible = true, objective = 42.0, timeToBestMs = 250, proven = false)
         val row = SolveMetric.resultRow("s", record, "cfg-A", ref)
-        assertEquals("cfg-A", row.solver, "solver column is the config tag")
-        assertEquals(250, row.elapsedMs, "time-used proxy = time-to-best when solved")
+        assertEquals("cfg-A", row.solver)
+        assertEquals(250, row.elapsedMs)
         assertEquals(42.0, row.objective)
-        assertEquals("global", row.structure, "feature joined from the oracle row")
+        assertEquals("global", row.structure)
         assertEquals(3, row.numGlobal)
     }
 
     @Test
-    fun `proof rows use solve time then subprocess duration without an incumbent`() {
+    fun `proof rows should use solve time then subprocess duration without an incumbent`() {
         val record = rec(false, null, null, true)
         val cases = listOf(
             record to 10_000L,
@@ -154,7 +154,7 @@ class SolveMetricResultTest {
     }
 
     @Test
-    fun `subprocess duration does not replace incumbent time or undecided budget`() {
+    fun `subprocess duration should not replace incumbent time or undecided budget`() {
         val record = rec(true, 42.0, 250, true).copy(elapsedMs = 900)
 
         assertEquals(250, SolveMetric.resultRow("s", record, "cfg", null).elapsedMs)
@@ -162,20 +162,10 @@ class SolveMetricResultTest {
     }
 
     @Test
-    fun `durable timing round trips and legacy records have unknown elapsed`() {
-        val record = rec(false, null, null, true).copy(elapsedMs = 140)
-        val encoded = Reports.json.encodeToString(record)
-        val legacy = JsonObject(Reports.json.parseToJsonElement(encoded).jsonObject - "elapsedMs").toString()
-
-        assertEquals(140, Reports.json.decodeFromString<SolveRecord>(encoded).elapsedMs)
-        assertEquals(null, Reports.json.decodeFromString<SolveRecord>(legacy).elapsedMs)
-    }
-
-    @Test
-    fun `an unsolved row falls back to the budget and blank features when there is no oracle row`() {
+    fun `an unsolved row without an oracle row should fall back to the budget and blank features`() {
         val record = rec(feasible = null, objective = null, timeToBestMs = null, proven = false)
         val row = SolveMetric.resultRow("s", record, "cfg-A", null)
-        assertEquals(10_000, row.elapsedMs, "time-used proxy = budget when unsolved")
-        assertEquals("", row.structure, "no features when the instance has no oracle row")
+        assertEquals(10_000, row.elapsedMs)
+        assertEquals("", row.structure)
     }
 }

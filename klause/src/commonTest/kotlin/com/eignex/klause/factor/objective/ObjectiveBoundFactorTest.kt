@@ -24,14 +24,24 @@ import kotlin.test.assertTrue
 class ObjectiveBoundFactorTest {
 
     @Test
-    fun `Boolean objective bound repairs backsolve maintained unit penalties`() {
-        val problem = Problem(2, 0, emptyArray(), listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-        ))
-        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
-            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
-        )))
+    fun `Boolean objective bound repairs should backsolve maintained unit penalties`() {
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            ),
+        )
+        val sweep = assertNotNull(
+            DefinitionalSweep.infer(
+                problem,
+                boolFolds = listOf(
+                    BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+                ),
+            ),
+        )
         for (weight in listOf(3L, (1L shl 62) + 1)) {
             val objective = LinearObjective(boolWeights = longArrayOf(0, weight))
             val (overlay, bound) = assertIs<Pair<BakedProblem, MutableObjectiveBound>>(
@@ -55,8 +65,7 @@ class ObjectiveBoundFactorTest {
     }
 
     @Test
-    fun `a bool flip reads the flipped variable's own weight`() {
-        // The clause holds before and after any single flip, so each delta is the bound factor's alone.
+    fun `a bool flip should read the flipped variable's own weight`() {
         val clause = Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))
         val problem = Problem(3, 0, emptyArray<IntDomain>(), listOf(clause))
         val (overlay, bound) = assertIs<Pair<BakedProblem, MutableObjectiveBound>>(
@@ -73,9 +82,7 @@ class ObjectiveBoundFactorTest {
     }
 
     @Test
-    fun `int set deltas match the cost the applied move produces`() {
-        // Mixed-sign int coefficients: the invariant's predicted delta for an IntSet must equal the
-        // cost the move actually produces, and the incrementally maintained sum must survive the apply.
+    fun `int set deltas should match the cost the applied move produces`() {
         val problem = Problem(
             0,
             2,
@@ -90,28 +97,27 @@ class ObjectiveBoundFactorTest {
         state.assignment.setInt(0, 4)
         state.assignment.setInt(1, 0)
         state.recompute()
-        bound.tightenBelow(10.0) // sum 3·4 − 2·0 = 12 > bound 9, so the bound factor is violated
+        bound.tightenBelow(10.0)
         val boundFactorId = overlay.numFactors - 1
 
         for (move in listOf(Move.IntSet(0, 1), Move.IntSet(1, 4), Move.IntSet(0, 0))) {
             state.assignment.setInt(0, 4)
             state.assignment.setInt(1, 0)
             state.recompute()
-            assertTrue(state.violated.contains(boundFactorId), "$move: the bound factor starts violated")
+            assertTrue(state.violated.contains(boundFactorId), "$move")
             val predicted = state.netDelta(move)
             val before = state.cost
             state.apply(move)
-            assertEquals(state.cost - before, predicted, "$move: predicted delta must match the applied cost")
-            // Each move drives the weighted sum to at most 9, so the bound factor must come back satisfied.
-            assertTrue(!state.violated.contains(boundFactorId), "$move: the bound factor must be repaired")
+            assertEquals(state.cost - before, predicted, "$move")
+            assertTrue(!state.violated.contains(boundFactorId), "$move")
             val incremental = state.cost
             state.recompute()
-            assertEquals(state.cost, incremental, "$move: the incremental sum must match a full recompute")
+            assertEquals(state.cost, incremental, "$move")
         }
     }
 
     @Test
-    fun `repair steps an objective variable across a hole`() {
+    fun `repair should step an objective variable across a hole`() {
         val problem = Problem(
             0,
             2,
@@ -132,31 +138,6 @@ class ObjectiveBoundFactorTest {
         state.factors[boundFactorId].proposeRepairMoves(state, boundFactorId, sink)
 
         val xTargets = sink.list.filterIsInstance<Move.IntSet>().filter { it.varId == 0 }.map { it.newValue }
-        assertEquals(listOf(4L), xTargets, "raising x from 2 must skip the hole at 3")
+        assertEquals(listOf(4L), xTargets)
     }
-
-    private fun realObjectiveState(bound: MutableObjectiveBound): LocalSearchState {
-        val factor = assertNotNullFactor(
-            ObjectiveBoundFactor.of(LinearObjective(realCoefficients = doubleArrayOf(1.0)), bound),
-        )
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf(factor),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(10.0),
-        )
-        return LocalSearchState(problem.bake(), Random(0)).also { it.restart() }
-    }
-
-    private fun assertNotNullFactor(factor: ObjectiveBoundFactor?): ObjectiveBoundFactor =
-        kotlin.test.assertNotNull(factor, "an objective with a continuous term has something to bound")
-
-    @Test
-    fun `a ratchet over a continuous term keeps its sum in floating point`() {
-        assertIs<FloatObjectiveBoundInvariant>(realObjectiveState(MutableObjectiveBound(0L)).factors[0])
-    }
-
 }

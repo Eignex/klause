@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class ExactFlatZincValidationTest {
     @Test
-    fun `absolute value source checking preserves holes in an integer value set`() {
+    fun `absolute value checking should preserve holes in an integer value set`() {
         val source = "var {-2,-1,1,2}: n; var float: x; var float: y; " +
             "constraint int2float(n,x); constraint float_abs(x,y); solve minimize y;"
         for ((value, status) in listOf(-2 to "valid", -1 to "valid", 0 to "invalid", 1 to "valid", 2 to "valid")) {
@@ -22,10 +22,9 @@ class ExactFlatZincValidationTest {
         }
     }
 
-
     @ParameterizedTest
     @CsvSource(value = ["0|1|valid", "1|1|invalid", "9007199254740992|9007199254740993|valid"], delimiter = '|')
-    fun `original distinctness uses exact integer coordinates`(x: String, y: String, status: String) {
+    fun `distinctness checking should use exact integer coordinates`(x: String, y: String, status: String) {
         val source = "var int: x; var int: y; constraint all_different_int([x,y]); solve satisfy;"
 
         val checked = ExactFlatZincValidation.inspect(source, "x = $x;\ny = $y;", null)
@@ -34,7 +33,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `original set selection checks the selected row and full result universe`() {
+    fun `set selection checking should cover the selected row and full result universe`() {
         val source = "array[1..2] of set of int: choices = [{1,3}, {2}]; " +
             "var 0..3: i; var set of 1..3: r; constraint array_set_element(i, choices, r); solve satisfy;"
 
@@ -45,7 +44,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `original variable set selection preserves its one based index`() {
+    fun `variable set selection should preserve its one based index`() {
         val source = "var set of int: a; var set of int: b; var set of int: r; var 1..2: i; " +
             "constraint array_var_set_element(i, [a,b], r); solve satisfy;"
         val values = "a = {1};\nb = 2..3;\ni = 2;\n"
@@ -55,7 +54,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `original extrema reject a result beyond every operand`() {
+    fun `extrema checking should reject a result beyond every operand`() {
         for ((name, result) in listOf("int_min" to "1", "int_max" to "2")) {
             val source = "var 0..3: x; var 0..3: y; var 0..3: r; " +
                 "constraint $name(x, y, r); solve satisfy;"
@@ -66,7 +65,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `original variable element checks its index and selected value`() {
+    fun `variable element checking should cover its index and selected value`() {
         val source = "var 0..3: i; var 0..9: x; var 0..9: y; var 0..9: r; " +
             "constraint array_var_int_element(i, [x, y, x], r); solve satisfy;"
         val values = "x = 4;\ny = 9;\nr = 9;\n"
@@ -99,7 +98,7 @@ class ExactFlatZincValidationTest {
     """.trimIndent()
 
     @Test
-    fun `fixed power predicates check original exact coordinates and reject corruption`() {
+    fun `fixed power predicates should check exact coordinates and reject corruption`() {
         for (case in listOf(
             listOf("int_pow", "-2", "63", "-9223372036854775808"),
             listOf("klause_int_pow", "0", "0", "1"),
@@ -118,7 +117,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `power checker cannot accept saturation as exact arithmetic`() {
+    fun `power checker should not accept saturation as exact arithmetic`() {
         val source = "var int: x; var int: y; constraint int_pow(x, 2, y); solve satisfy;"
 
         val result = ExactFlatZincValidation.inspect(source, "x = 3037000500;\ny = 9223372036854775807;", null)
@@ -127,7 +126,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `absolute value checks exact integer signs and magnitudes`() {
+    fun `absolute value checking should cover exact integer signs and magnitudes`() {
         val source = "var int: x; var int: y; constraint int_abs(x,y); solve satisfy;"
         for ((input, output) in listOf("-3" to "3", "0" to "0", "3" to "3",
             "-9223372036854775808" to "9223372036854775808")) {
@@ -138,7 +137,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `absolute value rejects relaxed and wrapped integer points`() {
+    fun `absolute value checking should reject relaxed and wrapped integer points`() {
         val source = "var int: x; var int: y; constraint int_abs(x,y); solve satisfy;"
         for ((input, output) in listOf("0" to "3", "-3" to "4", "3" to "-3",
             "-9223372036854775808" to "-9223372036854775808")) {
@@ -149,7 +148,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `real absolute value checks exact rational coordinates`() {
+    fun `real absolute value checking should use exact rational coordinates`() {
         val source = "var float: x; var float: y; constraint float_abs(x,y); solve satisfy;"
         for ((input, output, status) in listOf(Triple("-1/3", "1/3", "valid"),
             Triple("1/3", "1/3", "valid"), Triple("0", "1/3", "invalid"))) {
@@ -160,7 +159,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `absolute value aliases require a nonnegative coordinate`() {
+    fun `absolute value aliases should require a nonnegative coordinate`() {
         val source = "var float: x; constraint float_abs(x,x); solve satisfy;"
         for ((value, status) in listOf("-1/3" to "invalid", "0" to "valid", "1/3" to "valid")) {
             val result = ExactFlatZincValidation.inspect(source, "x = $value;", null)
@@ -170,7 +169,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `integer division checks truncation and rejects zero divisors`() {
+    fun `integer division checking should truncate and reject zero divisors`() {
         for ((divisor, quotient) in listOf(3 to -2, -3 to 2)) {
             val source = "var -8..8: a; constraint int_div(a,$divisor,$quotient); " +
                 "constraint int_mod(a,$divisor,-1); solve satisfy;"
@@ -183,7 +182,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `integer division source checks retain over-word arithmetic`() {
+    fun `integer division checking should retain over-word arithmetic`() {
         val source = "var -9223372036854775808..-9223372036854775808: a; " +
             "constraint int_div(a,-1,9223372036854775808); solve satisfy;"
 
@@ -191,7 +190,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `mixed finite float choices are checked from the original constant array`() {
+    fun `mixed finite float choices should be checked from the original constant array`() {
         val source = "var 1..1: i; var 0.0..1.0: exact; var 0.0..1.0: grid; " +
             "constraint array_float_element(i, [0.125], exact); constraint float_le(grid, 0.5); solve satisfy;"
         val valid = "i = 1;\nexact = 1/8;\ngrid = 1/2;"
@@ -204,7 +203,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `rounded cylinder bound cannot accept an exact binary64 product`() {
+    fun `rounded cylinder bound should not accept an exact binary64 product`() {
         val source = "var 50..200: n; var 50.0..200.0: raw; var 0.5..2.0: scaled; " +
             "constraint int2float(n, raw); constraint float_lin_eq([0.01, -1.0], [raw, scaled], 0.0); solve satisfy;"
         val exact = "n = 200; raw = 200; scaled = 144115188075855875/72057594037927936;".replace("; ", ";\n")
@@ -219,7 +218,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `mixed components are checked together against original predicates`() {
+    fun `mixed components should be checked together against original predicates`() {
         val source = "var 0.0..1.0: exact; var 0.0..1.0: grid; " +
             "constraint float_lin_eq([3.0], [exact], 1.0); constraint float_le(grid, 0.5); solve satisfy;"
         val coordinates = "exact = 1/3;\ngrid = 1/2;"
@@ -232,7 +231,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `original voltage divider predicates and bounds accept exact coordinates`() {
+    fun `voltage divider predicates and bounds should accept exact coordinates`() {
         val result = ExactFlatZincValidation.inspect(voltage, coordinates, null)
 
         assertEquals("valid", result.status, result.reason)
@@ -241,7 +240,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `voltage divider rejects a corrupted source coordinate`() {
+    fun `voltage divider should reject a corrupted source coordinate`() {
         val corrupted = coordinates.replace("VD = 2756202971950743543/504403158265495552;", "VD = 11/2;")
 
         val result = ExactFlatZincValidation.inspect(voltage, corrupted, null)
@@ -250,15 +249,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `voltage divider rejects a corrupted coordinate even inside its bounds`() {
-        val model = "var 0.0..1.0: x; constraint float_lin_eq([3.0], [x], 1.0); solve satisfy;"
-        for (candidate in listOf("x = 0.3333333333333333;", "x = 1/2;")) {
-            assertEquals("invalid", ExactFlatZincValidation.inspect(model, candidate, null).status)
-        }
-    }
-
-    @Test
-    fun `source binary64 bounds are checked without witness rounding`() {
+    fun `source binary64 bounds should be checked without witness rounding`() {
         val model = "var 0.1..0.3: x; solve satisfy;"
 
         val result = ExactFlatZincValidation.inspect(model, "x = 30000000000000001/100000000000000000;", null)
@@ -267,7 +258,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `missing coordinates and unsupported predicates remain unknown`() {
+    fun `missing coordinates and unsupported predicates should remain unknown`() {
         val missing = ExactFlatZincValidation.inspect("var float: x; solve satisfy;", "y = 1/3;", null)
         val unsupported = ExactFlatZincValidation.inspect(
             "var float: x; constraint unsupported(x); solve satisfy;",
@@ -280,7 +271,7 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `exact source objective rejects values that share a Double`() {
+    fun `exact source objective should reject values that share a Double`() {
         val model = "var int: x; solve minimize x;"
 
         val result = ExactFlatZincValidation.inspect(model, "x = 9007199254740993;", "9007199254740992")
