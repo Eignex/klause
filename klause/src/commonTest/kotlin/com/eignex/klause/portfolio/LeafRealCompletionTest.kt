@@ -148,7 +148,7 @@ class LeafRealCompletionTest {
                 assertEquals(if (pin == 0L) 1.0 else 0.2, witness.reals.single())
                 assertTrue(check(witness))
                 if (tolerance) assertNull(witness.exactReals)
-                else assertEquals(BigFraction.ofLong(if (pin == 0L) 5L else 1L) / BigFraction.ofLong(5L),
+                else assertEquals(if (pin == 0L) BigFraction.ONE else BigFraction.ofLong(5L).reciprocal(),
                     source.sourceWitness(witness.ints, witness.exactReals).objective)
             }
         }
