@@ -96,6 +96,24 @@ internal reorder/precision restarts. Owner-local exact factors require the same
 matrix and ordered basis. Edits still require fresh RHS, seats, costs and proof
 checks; reuse does not replenish spending.
 
+## Structural admission
+
+Exact basis verification checks current row and coordinate ceilings before authority,
+heading, matrix or factor setup. Continuation target capture checks its current row,
+column and cell ceilings before exact-bound scans or exporting a basis. Dimension
+rejection does not construct an exception. The entry work debit and current
+cancellation, time and work checks still precede that rejection.
+
+The basis verifier can reuse one immutable empty dimension-decline report. This
+report contains no model, basis, policy, proof or resource owner. Every call checks
+its current dimensions and mechanism limits before selecting it; no prior eligibility
+verdict is cached. Model edits, different dimensions, raised ceilings and acceptance
+policy changes therefore require no cache invalidation. Entry interruptions and
+value-, basis- or spending-dependent declines use fresh reports and cannot select
+that shared report. Admissible calls retain complete authority and proof checking.
+A structural decline still supplies no witness, bound or refutation and cannot
+replace a later admissible attempt or floating tolerance acceptance.
+
 ## Mixed deduction operations
 
 `LpDeductionCertificate` exposes exact source-objective bounds, reduced costs,

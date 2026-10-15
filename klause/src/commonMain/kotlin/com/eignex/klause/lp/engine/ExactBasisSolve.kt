@@ -155,9 +155,7 @@ internal class ExactBasisAuthority(val model: LpModel, basis: Basis, val meter: 
 
     init {
         meter.charge()
-        if (model.m > meter.limits.factor.dimension ||
-            model.numVars.toLong() > meter.limits.verification.maxCoordinates
-        ) {
+        if (!meter.limits.admitsDimensions(model)) {
             throw ExactBasisStop(ExactBasisDecline.DIMENSION)
         }
         if (basis.basicVars.size != model.m || basis.status.size != model.numVars) {
