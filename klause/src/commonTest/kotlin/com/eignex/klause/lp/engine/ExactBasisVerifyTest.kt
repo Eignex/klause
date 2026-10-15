@@ -6,6 +6,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -13,6 +14,23 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class ExactBasisVerifyTest {
+    @Test
+    fun `structural decline reports cannot be mutated between charged calls`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+        val limits = ExactBasisLimits(RationalBasisLimits(dimension = 0))
+        val first = verifyExactBasis(model, basis, limits = limits)
+
+        assertFails { (first.metrics.operations as MutableList<ExactBasisWork>).clear() }
+        val repeated = verifyExactBasis(model, basis, limits = limits)
+
+        assertEquals(1L, repeated.metrics.work)
+        assertEquals(ExactBasisDecline.DIMENSION, repeated.metrics.decline)
+    }
+
     @Test
     fun `repeated structural declines allow later certificates under current dimensions and values`() {
         val model = LpBuilder().apply {
