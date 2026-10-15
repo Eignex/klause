@@ -3,6 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
@@ -343,7 +344,7 @@ class SmtLibPolynomialTest {
         val terms = assertIs<PolynomialRealFormula.And>(parsed.formula).operands
         val assertion = assertIs<PolynomialRealFormula.Atom>(terms[0])
         assertEquals(PolynomialExpression.Variable(SourceRealId(1)), assertion.left)
-        val selection = assertIs<PolynomialRealFormula.Selection>(terms[1])
+        val selection = assertIs<PolynomialSelection>(terms[1])
         assertEquals(SourceRealId(1), selection.result)
         assertEquals(PolynomialRealFormula.BooleanVariable(SourceBoolId(0)), selection.condition)
         val x = PolynomialExpression.Variable(SourceRealId(0))

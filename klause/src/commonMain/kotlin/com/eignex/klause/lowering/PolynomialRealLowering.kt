@@ -3,6 +3,7 @@ package com.eignex.klause.lowering
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
@@ -30,7 +31,7 @@ internal class PolynomialRealLowering(
     ): PolynomialExpression {
         if (condition is PolynomialRealFormula.Constant) return if (condition.value) whenTrue else whenFalse
         val value = opaqueReal()
-        definitions.add(PolynomialRealFormula.Selection(value.id, condition, whenTrue, whenFalse))
+        definitions.add(PolynomialSelection(value.id, condition, whenTrue, whenFalse))
         captureConditional?.invoke(PolynomialConditional(value.id.index, condition, whenTrue, whenFalse))
         return value
     }

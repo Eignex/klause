@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -33,7 +34,7 @@ class SmtLibAdmissionTest {
                 else assertIs<SmtLibInput.NonlinearInteger>(input).problem.formula
 
             val selection = assertIs<PolynomialRealFormula.And>(formula).operands
-                .filterIsInstance<PolynomialRealFormula.Selection>().single()
+                .filterIsInstance<PolynomialSelection>().single()
 
             assertEquals(SourceRealId(1), selection.result)
             assertEquals(PolynomialRealFormula.BooleanVariable(SourceBoolId(0)), selection.condition)

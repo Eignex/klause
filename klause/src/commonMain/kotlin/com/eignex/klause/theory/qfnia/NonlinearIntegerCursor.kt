@@ -9,6 +9,7 @@ import com.eignex.klause.arithmetic.polynomial.ceilInteger
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
@@ -312,7 +313,7 @@ private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: Polyn
                 expressions.addLast(node.left)
                 expressions.addLast(node.right)
             }
-            is PolynomialRealFormula.Selection -> {
+            is PolynomialSelection -> {
                 formulas.addLast(node.condition)
                 expressions.addLast(node.whenTrue)
                 expressions.addLast(node.whenFalse)

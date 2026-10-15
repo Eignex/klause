@@ -9,27 +9,27 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.polynomial.ceilInteger
 import com.eignex.klause.arithmetic.polynomial.exactInteger
 import com.eignex.klause.backtrack.searchWork
-import com.eignex.klause.portfolio.PortfolioWorker
-import com.eignex.klause.solver.InstructionSlicedSearch
-import com.eignex.klause.solver.ReseedGuard
-import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
-import com.eignex.klause.solver.evidence.quadraticEngineInvocation
-import com.eignex.klause.solver.result.MinimizeResult
-import kotlin.time.Duration.Companion.milliseconds
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.QuadraticObjectiveSpec
+import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.quadraticEngineInvocation
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
 import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.openPolynomial
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticIncumbent
@@ -63,6 +63,7 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.unaryMinus
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Optimize a quadratic objective over exact open integer and real source coordinates.
@@ -214,7 +215,7 @@ internal class QuadraticIntegerOptimization(
                 is PolynomialRealFormula.And -> booleanWork.addAll(formula.operands)
                 is PolynomialRealFormula.Or -> booleanWork.addAll(formula.operands)
                 is PolynomialRealFormula.Not -> booleanWork.addLast(formula.operand)
-                is PolynomialRealFormula.Selection -> booleanWork.addLast(formula.condition)
+                is PolynomialSelection -> booleanWork.addLast(formula.condition)
                 else -> Unit
             }
         }
