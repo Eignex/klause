@@ -2237,8 +2237,10 @@ search from a source-checked supplied MPS point. Pass `input=<original MPS path>
 or `text64=<base64 original bytes>`, with `initial64=<base64 JSON>` mapping every
 original column name to an exact integer, decimal or rational string. Optional
 `exact=false`, `instructions=20`, `seed=3`, `repeats=3` and `timeout=3000` retain
-bounded deterministic controls. The original source must admit the supplied point;
-no bounds or rows are added to it. The ordinary finite mixed projection and numerical
+bounded deterministic controls. Execution uses one active JVM processor, forking a
+child JVM with its own recording when necessary. The original source must admit the supplied point;
+no bounds or rows are added to it. A private objective auxiliary is initialized from
+the supplied point's original source cost. The ordinary finite mixed projection and numerical
 leaf completion own execution. An unavailable numerical completion remains undecided.
 
 Run this committed profile through the lab client on AWS at an immutable revision.
