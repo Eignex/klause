@@ -267,7 +267,7 @@ private fun LpRelaxation.treeDiscretePoint(point: List<BigFraction>, session: Pr
         }
         val column = boolColOf.getOrElse(variable) { -1 }
         if (column < 0) continue
-        bools[variable] = when (point[column]) {
+        bools[variable] = when (point.getOrNull(column) ?: return null) {
             BigFraction.ZERO -> false
             BigFraction.ONE -> true
             else -> return null
@@ -278,7 +278,7 @@ private fun LpRelaxation.treeDiscretePoint(point: List<BigFraction>, session: Pr
         val domain = session.intDomain(variable)
         val column = intColOf.getOrElse(variable) { -1 }
         val value = if (domain.valueCount == 1L || column < 0) domain.min
-        else ExactLpNumber.of(point[column]).legacyLong() ?: return null
+        else ExactLpNumber.of(point.getOrNull(column) ?: return null).legacyLong() ?: return null
         if (!domain.contains(value)) return null
         ints[variable] = value
     }

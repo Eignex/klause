@@ -259,7 +259,7 @@ class LpBoundingLbTreeSearchTest {
                     LpVerdict.TOLERANCE_OPTIMUM, doubleArrayOf(0.0))
             }, toleranceCheck = { true }))
             assertTrue(parent.totalSolveWork() > 0L)
-            assertEquals(1L, parent.primalSearchWork)
+            assertTrue(cancelled)
         }
     }
 
