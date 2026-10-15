@@ -619,6 +619,14 @@ class LocalSearchState private constructor(
         }
     }
 
+    internal fun feasibleObjectiveDelta(obj: Objective?, move: Move): Double {
+        if (feedsDefinitions(move) && (obj is LinearObjective || obj is FunctionalObjective)) {
+            return evaluateMove(move, obj, feasibleObjective = true).objectiveDelta
+        }
+        if (netDelta(move) > 0L) return Double.POSITIVE_INFINITY
+        return obj?.let { objectiveDelta(it, move) } ?: 0.0
+    }
+
     private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double {
         objectiveDeltaSum.reset()
         var realDelta = 0.0
@@ -1167,11 +1175,12 @@ class LocalSearchState private constructor(
         refineCumulative: Boolean = false,
         weightedResidual: Boolean = false,
         elementEligibility: MoveSink? = null,
+        feasibleObjective: Boolean = false,
     ): MoveEval {
         check(!probeActive && !moveActive) { "local-search probes cannot be nested" }
         moveActive = true
         try {
-            return probeMove(move, objective, refineCumulative, weightedResidual, elementEligibility)
+            return probeMove(move, objective, refineCumulative, weightedResidual, elementEligibility, feasibleObjective)
         } finally {
             moveActive = false
         }
@@ -1183,6 +1192,7 @@ class LocalSearchState private constructor(
         refineCumulative: Boolean,
         weightedResidual: Boolean,
         elementEligibility: MoveSink?,
+        feasibleObjective: Boolean,
     ): MoveEval {
         val oldCost = cost
         val oldBestCost = bestCostSeen
@@ -1229,11 +1239,12 @@ class LocalSearchState private constructor(
             }
             val delta = cost - oldCost
             val weighted = if (weights.allocated) weightedDegreeDelta(checkNotNull(degBefore)) else delta.toDouble()
-            val objectiveDelta = when (objective) {
-                is LinearObjective -> probeLinearObjectiveDelta(objective)
-                is FunctionalObjective ->
+            val objectiveDelta = when {
+                feasibleObjective && cost > 0L -> Double.POSITIVE_INFINITY
+                objective is LinearObjective -> probeLinearObjectiveDelta(objective)
+                objective is FunctionalObjective ->
                     (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble()
-                null -> 0.0
+                objective == null -> 0.0
                 else -> objective.evaluate(assignment) - oldObjective
             }
             val breaks = if (move is Move.Compound) newlyViolated else breakCount

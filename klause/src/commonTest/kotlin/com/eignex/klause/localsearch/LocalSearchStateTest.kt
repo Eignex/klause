@@ -15,7 +15,10 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.FunctionalObjective
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.Objective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -25,6 +28,78 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LocalSearchStateTest {
+    @Test
+    fun `feasible objective grades include every maintained compound output`() {
+        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(3, true))),
+            Clause(intArrayOf(Lit.make(1, false), Lit.make(3, false))),
+        ))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setBool(2, true)
+        state.assignment.setBool(3, true)
+        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(2, intArrayOf(Lit.make(0, false)), true),
+            BoolFoldDefinition(3, intArrayOf(Lit.make(1, false)), true),
+        ))?.network(0, 4)
+        state.recompute()
+        val objective = LinearObjective(boolWeights = longArrayOf(0, 0, 2, 3))
+        val move = Move.Compound(listOf(Move.BoolFlip(0), Move.BoolFlip(1)))
+
+        val delta = state.feasibleObjectiveDelta(objective, move)
+
+        assertEquals(-5.0, delta)
+        assertTrue(state.assignment.boolValue(2))
+        assertTrue(state.assignment.boolValue(3))
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `feasible objective grades reject hard violations from maintained inputs`() {
+        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(0, false))),
+        ))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setBool(1, true)
+        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+        ))?.network(0, 2)
+        state.recompute()
+        val objective = LinearObjective(boolWeights = longArrayOf(0, 5))
+
+        val delta = state.feasibleObjectiveDelta(objective, Move.BoolFlip(0))
+
+        assertEquals(Double.POSITIVE_INFINITY, delta)
+        assertFalse(state.assignment.boolValue(0))
+        assertTrue(state.assignment.boolValue(1))
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `hard rejection does not invoke custom objectives`() {
+        val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(0, false))),
+        ))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setBool(1, true)
+        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+        ))?.network(0, 2)
+        state.recompute()
+        val objective = object : Objective {
+            override fun evaluate(sample: Sample): Double = error("hard violations cannot reach objective evaluation")
+        }
+
+        val delta = state.feasibleObjectiveDelta(objective, Move.BoolFlip(0))
+
+        assertEquals(Double.POSITIVE_INFINITY, delta)
+    }
+
     @Test
     fun `defined output writes preserve the source tabu window`() {
         for (positive in listOf(false, true)) {
