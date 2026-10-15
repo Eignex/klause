@@ -75,7 +75,8 @@ class LeafRealCompletionTest {
             " M1 'MARKER' 'INTEND'\n X COST 0.1 R 3\nRHS\n RHS R 1\n" +
             "BOUNDS\n BV B I\n UP B X 1\nENDATA\n").toProblem()
         val objective = source.objective?.toLinearObjective()
-        val sample = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(1.0), listOf(BigFraction.ONE))
+        val sample = Sample(booleanArrayOf(), longArrayOf(0), DoubleArray(source.model.numRealVars) { 1.0 },
+            List(source.model.numRealVars) { BigFraction.ONE })
         val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
         val check: (Sample) -> Boolean = { source.withinTolerance(it.ints, it.reals) }
 
@@ -91,7 +92,7 @@ class LeafRealCompletionTest {
         assertEquals(source.sourceObjective(sample.ints, cp.reals),
             source.sourceObjective(witness.sample.ints, witness.sample.reals))
         assertTrue(witness.work > 0L)
-        assertEquals(listOf(BigFraction.ONE), sample.exactReals)
+        assertEquals(List(source.model.numRealVars) { BigFraction.ONE }, sample.exactReals)
     }
 
     @Test
@@ -145,7 +146,8 @@ class LeafRealCompletionTest {
 
                 val witness = assertIs<Completion.Witness>(completion).sample
                 assertEquals(pin, witness.ints.single())
-                assertEquals(if (pin == 0L) 1.0 else 0.2, witness.reals.single())
+                assertEquals(if (pin == 0L) 1.0 else 0.2,
+                    witness.approximateRealValue(source.columns.single { it.real }.id))
                 assertTrue(check(witness))
                 if (tolerance) assertNull(witness.exactReals)
                 else assertEquals(if (pin == 0L) BigFraction.ONE else BigFraction.ofLong(5L).reciprocal(),
