@@ -10,10 +10,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.pipeline.NumericalLinearRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
-import com.eignex.klause.solver.pipeline.SourceProblemRoute
-import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
@@ -28,7 +26,7 @@ import kotlin.time.TimeSource
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
  * klause's hybrid model (see [com.eignex.klause.formats.mps.toProblem]: integer columns become CP search
  * variables, float columns become LP-only continuous variables the simplex resolves). An open integer
- * model uses a supported theory pipeline or searches for source-checked incumbents.
+ * model uses numerical relaxations and source-certified integer branching.
  * Emits an `o <cost>` line per improving incumbent, then a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
  * `s UNBOUNDED` / `s UNSATISFIABLE` / `s UNKNOWN` and a `v name=value` line. `-s` statistics are `c`
  * comment lines.
@@ -47,8 +45,20 @@ internal object MpsMode : CliMode {
             val source = Mps.parse(openFileSource(path))
             val settings = common.config.problemSettings()
             val lowered = source.toProblem(settings)
-            val usesExactSource = common.exact && !lowered.sourceExact
-            val compiled = if (usesExactSource) source.toExactSourceProblem(settings) else lowered
+            var compiled = if (common.exact && !lowered.sourceExact) source.toExactSourceProblem(settings) else lowered
+            var routingLpStats = LpStats()
+            val routingStart = TimeSource.Monotonic.markNow()
+            var numerical = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
+                compiled.maximize, common.routingCancellation())
+            val route = numerical.finiteRoute { routingLpStats = it }
+            if (route == null && !compiled.sourceExact) {
+                compiled = source.toExactSourceProblem(settings)
+                numerical = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
+                    compiled.maximize, common.routingCancellation())
+            }
+            val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
+            if (route != null) common.logRoute(route, routingElapsedMs)
+            else common.frontendRouting = CliRoutingStats("numerical-mip", routingElapsedMs)
             if (common.exact) requireExactMpsSource(compiled)
             val state = MpsOutputState(compiled.objectiveScale, compiled.toleranceDifference,
                 compiled.sourceExact, compiled.sourceDifference)
@@ -90,75 +100,19 @@ internal object MpsMode : CliMode {
                 renderMpsOpenModel(compiled, assignment)
             }
             val objective = compiled.objective?.toLinearObjective()
-            var routingLpStats = LpStats()
-            val routingStart = TimeSource.Monotonic.markNow()
-            val route = compiled.model.pipelineRoute(
-                objective,
-                compiled.maximize,
-                routePureRealToTheory = false,
-                boundCancellation = common.routingCancellation(),
-                routeLinearToTheory = false,
-                onLpStats = { routingLpStats = it },
-            )
-            val routingElapsedMs = routingStart.elapsedNow().inWholeMilliseconds
-            common.logRoute(route, routingElapsedMs)
-            return when (route) {
-                is SourceProblemRoute.PolynomialTheory -> polynomialSolvable(route, renderOpen, routingElapsedMs)
-                // Finite solving minimizes; the open route negates a maximized objective itself.
-                is SourceProblemRoute.Finite -> mpsLinearSolvable(
-                    compiled,
-                    common.exact,
-                    linearSolvable(
-                        route.problem,
-                        if (compiled.maximize) objective?.negated() else objective,
-                        compiled.maximize,
-                        render,
-                        routingLpStats = routingLpStats,
-                        routingElapsedMs = routingElapsedMs,
-                    ),
-                )
-
-                is SourceProblemRoute.OpenTheory -> {
-                    state.witnessOnly = !compiled.sourceExact
-                    // Refuting a lowered objective bound does not refute the corresponding decimal source bound.
-                    val canDecide = when {
-                        state.witnessOnly -> false
-                        route.request.objective == null -> true
-                        else -> OpenTheoryPipeline.canMinimize(route.request)
-                    }
-                    if (canDecide) {
-                        openTheorySolvable(
-                            route.request,
-                            renderOpen,
-                            routingLpStats,
-                            routingElapsedMs,
-                        )
-                    } else {
-                        openLocalSearchSolvable(
-                            route.request.model,
-                            renderOpen,
-                            routingLpStats,
-                            routingElapsedMs,
-                            objective = if (compiled.maximize) objective?.negated() else objective,
-                            maximize = compiled.maximize,
-                        )
-                    }
-                }
-
-                // No theory decides it, so local search looks for incumbents alone.
-                is SourceProblemRoute.UnsupportedOpen -> {
-                    state.witnessOnly = !compiled.sourceExact
-                    openLocalSearchSolvable(
-                        route.problem,
-                        renderOpen,
-                        routingLpStats,
-                        routingElapsedMs,
-                        objective = if (compiled.maximize) objective?.negated() else objective,
-                        maximize = compiled.maximize,
-                    )
-                }
-
-                SourceProblemRoute.Refuted -> refutedSolvable(routingLpStats, routingElapsedMs)
+            return if (route != null) {
+                mpsLinearSolvable(compiled, common.exact, linearSolvable(
+                    route.problem,
+                    if (compiled.maximize) objective?.negated() else objective,
+                    compiled.maximize,
+                    render,
+                    routingLpStats = routingLpStats,
+                    routingElapsedMs = routingElapsedMs,
+                ))
+            } else {
+                Solvable(finite = null, render = render, objectiveValue = null,
+                    pipeline = SolvablePipeline.NumericalLinear(numerical, renderOpen),
+                    routingLpStats = routingLpStats, routingElapsedMs = routingElapsedMs)
             }
         }
 

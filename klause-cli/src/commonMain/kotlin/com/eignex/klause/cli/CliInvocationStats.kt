@@ -35,6 +35,7 @@ internal fun cliInvocationStats(common: CommonOptions, pipeline: SolvablePipelin
         common.frontendRouting,
         when (pipeline) {
             SolvablePipeline.FiniteCp -> "finite-cp"
+            is SolvablePipeline.NumericalLinear -> "numerical-mip"
             is SolvablePipeline.OpenTheory -> "open-theory"
             is SolvablePipeline.PolynomialTheory -> "polynomial-theory"
             is SolvablePipeline.NonlinearIntegerTheory -> "nonlinear-integer-theory"
