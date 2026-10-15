@@ -1,7 +1,9 @@
 package com.eignex.klause.theory
 
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearForm
@@ -54,6 +56,7 @@ object BuiltInEncoderProvider : EncoderProvider {
 
     override fun select(factor: Factor, target: EncodingTarget): Encoder = when {
         target !in EncodingTarget.entries -> unsupported
+        factor is ArrayMinMax || factor is Element -> selectionEncoder
         target == EncodingTarget.POLYNOMIAL && factor is ContinuousProduct -> continuousProduct
         target == EncodingTarget.POLYNOMIAL && factor is RealProduct -> mixedProduct
         target == EncodingTarget.LINEAR && factor is RealProduct -> conditionedProduct(factor)

@@ -9,6 +9,19 @@ This page owns source correspondence and refused contexts during schema lowering
 [Development](../development.md#kotlin-dsl) gives a small DSL example;
 [model ownership](../model.md) and [library API](../api.md) define storage and mappings.
 
+## Integer extrema and selection
+
+Nested integer `min`/`max` expressions retain `ArrayMinMax` factors over their
+materialized operands, including repeated references. Integer array selection
+retains an ordered `Element` with zero-based indexes; indexes outside the array
+remain forbidden. Integer conditionals channel their source condition to a 0/1
+index and retain an `Element` over the else and then values. Reified surrounding
+comparisons retain these expression definitions and their original condition
+polarity. Optional-value handling retains its existing presence guards and pins.
+
+Finite consumers use native filtering and local-search scoring. Selected arithmetic
+consumers use the complete private [selection encodings](../model.md#factor-projection-selection).
+
 ## Schema floats
 
 Schema float rows join the names they reference into components. Top-level

@@ -55,6 +55,11 @@ precedes component initialization; capture and bounded exact comparison evaluati
 retain the existing numerical operation owner. No extra LP,
 graph check, Boolean draw or source-clause index is created. A custom registered
 provider retains precedence, even when it declines a selected Boolean.
+When initialization establishes complete pure-real difference-graph admission under
+the production certification policy, the first live default primitive consultation
+supplies no preference and releases optional hint state for that opening. This applies
+to the admitted source even if a later private branch uses LP fallback; it does not
+classify individual point origins. Explicit allowances retain graph-point guidance.
 Compound source-clause preferences remain opt-in through the existing allowance.
 Their existing real-coordinate producer admission is unchanged.
 Explicit zero retains bounded construction observations without component steering;
@@ -104,6 +109,11 @@ The scalar policy admits 4,096-bit normalized rationals and bounds intermediate
 products before evaluation. Copying, term visits and bit/word arithmetic costs
 charge the current operation token's native meter and poll its unchanged deadline.
 No LP or graph invocation, complete-check charge or allowance is created for hints.
+Default graph suppression retains registration and all capture work already spent.
+Release occurs only after a live consultation passes the existing availability and
+containing-stop checks. It prevents subsequent optional captures without changing the
+source candidate or arithmetic state. Unavailable points and caller-preempted
+consultations can retain capture costs until release or close.
 Publication is transactional; a cancelled scan publishes nothing. Arithmetic
 decisions, retraction and restart invalidate preferences. A Boolean decision absent
 from all arithmetic dependencies can retain the same point preferences in its

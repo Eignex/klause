@@ -209,6 +209,16 @@ the decoding and ownership boundary; assembly adds no independent proof authorit
 
 ## Factor projection selection
 
+`ArrayMinMax` and integer `Element` retain their native source payloads through
+compilation. Their selected linear, difference and polynomial encoders share
+equivalent relation construction in `lowering`. An extremum bounds every operand
+and equals at least one of them. An element constrains the index range and guards
+each selected equality by its exact index value. This linear-size encoding retains
+ordered entries, offsets, aliases and full-width integer constants. Installation
+retains source attribution and uses the receiving cancellation/work allowance;
+an interrupted relation is discarded. Native finite projections remain available
+alongside arithmetic participation.
+
 `FactorProjectionProviders.prepare(problem)` captures immutable selected propagation,
 scoring, relaxation and theory encoder descriptors against one canonical `Problem`. The descriptors
 couple declared capabilities to their factories or emitters; null selects an unsupported

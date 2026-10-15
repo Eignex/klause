@@ -9,6 +9,15 @@ does not establish an exact source optimum or refutation.
 owns route selection. The sections below cover Boolean lowering, float
 representation and output reconstruction.
 
+## Integer extrema and selection
+
+Binary `int_min`/`int_max` and array integer minimum/maximum predicates retain
+`ArrayMinMax` factors. Integer and Boolean array selection retains `Element`,
+including its one-based index range and ordered repeated entries. Result aliases
+retain every operand role. MiniZinc's existing predicate wrappers use these same
+FlatZinc paths. Finite projections use native filtering and scoring; selected
+arithmetic projections install complete private guarded relations.
+
 ## FlatZinc Boolean channels
 
 FlatZinc retains `bool2int` channels and recognizes them independently of constraint

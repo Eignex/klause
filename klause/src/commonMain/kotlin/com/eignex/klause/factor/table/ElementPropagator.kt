@@ -154,7 +154,7 @@ internal class ElementPropagator(
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val len = arr.size
         if (!state.tightenIntMin(idx, indexOffset.toLong())) return false
-        if (!state.tightenIntMax(idx, (indexOffset + len - 1).toLong())) return false
+        if (!state.tightenIntMax(idx, indexOffset.toLong() + len - 1)) return false
         if (!arrIsVars) {
             val st = (state.refPayload[factorId] as? ElementConstState)
                 ?: ElementConstState(state, idx, result, arr, indexOffset).also { state.refPayload[factorId] = it }

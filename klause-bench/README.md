@@ -750,7 +750,9 @@ later cases still capture output and record their unavailable checker outcome.
 `checkFzn=true` checks every complete FlatZinc publication with the existing independent
 flattened-text checker and records its `valid`, `invalid`, or `unknown` outcome in
 `source-check-fzn.json`. It uses authoritative coordinate comments when supplied and
-checks the preceding `% objective=` cost or finite `_objective` field against the
+checks binary integer/float extrema, integer array extrema, and constant or variable
+integer/Boolean array selection directly from the original predicates. Index bounds
+and repeated entries retain their source meaning. It checks the preceding `% objective=` cost or finite `_objective` field against the
 original solve objective. When both are present, their exact values must agree. Its source scope
 is `flatzinc-binary64`, as described under source validation below. Interrupted
 captures reject verdict markers and terminal `optimizationStatus` comments, including

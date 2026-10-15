@@ -278,8 +278,8 @@ internal class ElementConstState(
             val id = idFor(resRem[i])
             if (id < 0) continue
             for (pos in positionsOfId[id]) {
-                val iv = pos + indexOffset
-                if (iv.toLong() in idxDom) idxToExclude.add(iv.toLong())
+                val iv = pos.toLong() + indexOffset
+                if (iv in idxDom) idxToExclude.add(iv)
             }
         }
         return idxToExclude
