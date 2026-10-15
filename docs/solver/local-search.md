@@ -747,7 +747,9 @@ coordinates, satisfy the current model and active assumptions (including deduced
 restrictions), and pass the shared source witness checker. CP repair's configured
 source tolerance callback also governs seed admission; without it, real coordinates
 require exact validation. Portfolio pool identity checks retain source mapping and
-objective compatibility. Shared objective telemetry must agree with the consumer's
+objective compatibility. An independently scoped inner local-search session has no
+captured consumer scope available to this admission path, so it uses bootstrap instead
+of importing a seed. Shared objective telemetry must agree with the consumer's
 objective; strict improvement is compared using its exact evaluation. Samples own
 immutable coordinates and do not transfer mutable worker state or proof authority.
 

@@ -199,6 +199,24 @@ class AlnsTest {
     }
 
     @Test
+    fun `a scoped inner session validates its seed through bootstrap`() {
+        val problem = selectProblem()
+        val inner = LocalSearchSolver(problem)
+        val seed = selectOptimum()
+        inner.session().use { scoped ->
+            scoped.push(Assumptions(bools = SELECT_DEAREST.associateWith { true }))
+            val alns = Alns(inner, session = scoped, maxIterations = 0)
+
+            val result = alns.minimize(selectObjective, LocalSearchParams(
+                initialAssignment = seed, maxFlips = 1, randomSeed = 3,
+            ))
+
+            val sample = assertNotNull(result.assignment)
+            assertTrue(SELECT_DEAREST.all { sample.boolValue(it) })
+        }
+    }
+
+    @Test
     fun `deduced restrictions reject a supplied incumbent without exact pins`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyList<Factor>()).bake()
         val seed = Sample(BooleanArray(0), longArrayOf(0))

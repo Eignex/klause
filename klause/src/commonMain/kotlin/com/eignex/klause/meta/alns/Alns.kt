@@ -179,7 +179,7 @@ internal class Alns(
         private var supplied = false
 
         fun acquire(current: Sample?, cancellation: Cancellation): Sample? {
-            if (cancellation()) return null
+            if (cancellation() || session?.depth?.let { it > 0 } == true) return null
             var best = current
             if (!supplied) {
                 params.initialAssignment?.let { if (accepts(it, best, cancellation)) best = it }
