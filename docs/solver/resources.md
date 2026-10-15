@@ -349,9 +349,9 @@ primary owner; complete checks still visit these redundant relations. An omitted
 nonparticipating finite factor requires fresh subset installation. An initial target's resource
 decline disables reuse in that call; fresh installation retains per-target decline and
 fallback semantics. Cancellation observed by a reuse consultation stops the remaining
-target preparation and retains an explicit resource cause even if a predicate token
-subsequently clears. Reuse cannot bypass the containing stop or transfer an installation
-between linear and difference targets.
+target preparation, withholds both installed fragments and retains an explicit resource
+cause even if a predicate token subsequently clears. Reuse cannot bypass the
+containing stop or transfer an installation between linear and difference targets.
 
 The exact-linear source factory charges factor, row and coefficient visits to its
 supplied cancellation meter. Exact rational row conversion and owned-buffer copies
