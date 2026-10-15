@@ -13,6 +13,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
@@ -25,6 +26,7 @@ import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -133,8 +135,13 @@ class SelectionEncoderTest {
                 RealProduct(3, 0, 1, 1.0, 1.0)),
             numRealVars = 2, realLower = doubleArrayOf(1.0, 0.0), realUpper = doubleArrayOf(1.0, 3.0))
         val shared = assertNotNull(source.prepareExecutionPlan().polynomialModel)
+        val pins = mapOf(
+            shared.integerColumns.getValue(0) to BigFraction.ONE,
+            shared.integerColumns.getValue(1) to BigFraction.ZERO,
+            shared.integerColumns.getValue(2) to BigFraction.ofLong(2),
+        )
 
-        val result = shared.service.invocation().use { it.check() }
+        val result = shared.service.invocation().use { it.check(PolynomialCondition(lower = pins, upper = pins)) }
 
         assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(listOf(0, 1, 2), shared.encodingAttributions.map { it.sourceFactorIndex })
