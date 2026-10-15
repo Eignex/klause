@@ -1,8 +1,11 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -23,6 +26,63 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
+    @Test
+    fun `restricted arithmetic conditional branches exclude unreachable values without equality expansion`() {
+        val terms = listOf(
+            "(ite c (+ inner 1) 9)" to 4L,
+            "(ite c (* 2 inner) 9)" to 6L,
+            "(ite c (- 7 inner) 9)" to 4L,
+            "(ite c (+ (* (- 2) inner) 7) 9)" to 1L,
+            "(ite (not c) (+ inner 1) 9)" to 3L,
+            "(ite c 9 (+ inner 1))" to 3L,
+        )
+        for (guard in listOf("b", "(= x 0)")) {
+            for ((term, unreachable) in terms) {
+                val builder = Compiler.Builder(
+                    Long.MIN_VALUE, Long.MAX_VALUE, false,
+                    conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+                )
+                val reader = SExprReader(StringCharSource(
+                    "(declare-const b Bool) (declare-const x Int) " +
+                        "(assert (let ((c $guard)) (let ((inner (ite c 2 3))) (= $term $unreachable))))",
+                ))
+                while (true) builder.command(reader.readCommandOrNull() ?: break)
+                val parsed = builder.build()
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+                )
+
+                assertIs<ComponentResult.Conflict>(session.initialize(), "$guard: $term")
+            }
+        }
+    }
+
+    @Test
+    fun `conditional arithmetic fallback preserves exact branch values`() {
+        val terms = listOf(
+            "(+ (* 2 (ite b 9223372036854775807 0)) 1)" to "18446744073709551615",
+            "(+ (* 2 (ite b (+ x y) 0)) 1)" to "7",
+        )
+        for ((term, selected) in terms) {
+            for (branch in listOf(false, true)) {
+                val parsed = SmtLib.parse("""
+                    (declare-const b Bool) (declare-const x Int) (declare-const y Int) (declare-const z Int)
+                    (assert (= x 1)) (assert (= y 2)) (assert ${if (branch) "b" else "(not b)"})
+                    (assert (= z (ite b $term 9)))
+                """.trimIndent())
+
+                val result = BacktrackSolver.source(parsed.model)
+                    .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+                val sample = assertIs<OpenTheoryResult.Sat>(
+                    result, "$term: $branch",
+                ).assignment
+                assertEquals(if (branch) selected else "9", sample.intValue(parsed.intVarNames.getValue("z")))
+            }
+        }
+    }
+
     @Test
     fun `repeated conditional guards exclude unreachable values without equality expansion`() {
         val terms = listOf(

@@ -87,6 +87,9 @@ A directly nested single-guard integer conditional can be restricted by the encl
 branch's compiled literal or complement. This reads its definition without changing
 shared uses. Equal surviving narrow branch terms reuse that term without a selection.
 Definition dependency pruning still runs when this removes the last integer selection.
+Scaled or shifted single-variable terms use the selected branch when it has at most
+one variable and checked coefficient/constant arithmetic fits a signed word. Other
+affine terms retain their original definition, avoiding expansion of shared expressions.
 Unmatched and multiple-guard definitions are not restricted; wide terms retain their exact lowering.
 Conditional definitions retain immutable equality meanings for their guards.
 When a branch compares a simple integer variable with a constant, these meanings

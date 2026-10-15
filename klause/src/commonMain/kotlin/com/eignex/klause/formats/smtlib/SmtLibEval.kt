@@ -473,11 +473,19 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
 }
 
 private fun Compiler.Builder.branchUnder(term: LinComb, knownLiteral: Int): LinComb {
-    val variable = term.asSimpleVar() ?: return term
+    val entry = term.coeffs.entries.singleOrNull() ?: return term
     // An inner definition can have independent consumers outside this branch.
-    return iteChains.branchUnder(variable, knownLiteral)
-        ?: conditionalEqualities.branchUnder(variable, knownLiteral)
-        ?: term
+    val selected = iteChains.branchUnder(entry.key, knownLiteral)
+        ?: conditionalEqualities.branchUnder(entry.key, knownLiteral)
+        ?: return term
+    if (entry.value == 1L && term.constant == 0L) return selected
+    // Avoid expanding shared affine definitions across their consumers.
+    if (selected.coeffs.size > 1) return term
+    return try {
+        selected.scaled(entry.value).plus(LinComb(emptyMap(), term.constant))
+    } catch (_: ArithmeticException) {
+        term
+    }
 }
 
 /** Post a hard linear relation `a ⟨op⟩ b`; a variable-free relation is checked for consistency
