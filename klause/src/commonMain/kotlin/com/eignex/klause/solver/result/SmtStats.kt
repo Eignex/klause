@@ -89,6 +89,8 @@ data class SmtStats(
     val completeSearchLinearChecks: Long? = null,
     /** Returned continuous points before source acceptance; null until a complete traversal is observed. */
     val completeSearchLinearPoints: Long? = null,
+    /** Returned LP verdict and stage observations before the caller stop check; excludes private queries. */
+    val completeSearchLinearOutcomes: Map<String, Long>? = null,
 ) {
     /** Combine independent solve slices. */
     fun mergedWith(other: SmtStats): SmtStats {
@@ -125,6 +127,13 @@ data class SmtStats(
                 ?: other.completeSearchLinearChecks,
             completeSearchLinearPoints?.let { it + (other.completeSearchLinearPoints ?: 0L) }
                 ?: other.completeSearchLinearPoints,
+            when {
+                completeSearchLinearOutcomes == null -> other.completeSearchLinearOutcomes
+                other.completeSearchLinearOutcomes == null -> completeSearchLinearOutcomes
+                else -> (completeSearchLinearOutcomes.keys + other.completeSearchLinearOutcomes.keys)
+                    .associateWith { (completeSearchLinearOutcomes[it] ?: 0L) +
+                        (other.completeSearchLinearOutcomes[it] ?: 0L) }
+            },
         )
     }
 }
@@ -175,10 +184,12 @@ internal class SmtStatsSink {
     private var completeSearchMinUnassignedBooleans: Int? = null
     private var completeSearchLinearChecks: Long? = null
     private var completeSearchLinearPoints: Long? = null
+    private var completeSearchLinearOutcomes: MutableMap<String, Long>? = null
 
     fun observeCompleteSearchBooleans(variables: Int, unassigned: Int) {
         if (completeSearchLinearChecks == null) completeSearchLinearChecks = 0L
         if (completeSearchLinearPoints == null) completeSearchLinearPoints = 0L
+        if (completeSearchLinearOutcomes == null) completeSearchLinearOutcomes = linkedMapOf()
         val previous = completeSearchMinUnassignedBooleans
         if (previous == null || unassigned < previous) {
             completeSearchBooleanVariables = variables
@@ -188,6 +199,11 @@ internal class SmtStatsSink {
 
     fun observeCompleteSearchLinearCheck() {
         completeSearchLinearChecks = (completeSearchLinearChecks ?: 0L) + 1L
+    }
+
+    fun observeCompleteSearchLinearOutcome(key: String) {
+        val outcomes = checkNotNull(completeSearchLinearOutcomes)
+        outcomes[key] = (outcomes[key] ?: 0L) + 1L
     }
 
     fun observeCompleteSearchLinearPoint() {
@@ -244,6 +260,6 @@ internal class SmtStatsSink {
         wideWitnessCandidates, wideWitnessAccepted, continuation, sourceLp,
         realGraphOpenings, graphPointHintCaptures, lpPointHintCaptures, defaultGraphHintReleases,
         completeSearchBooleanVariables, completeSearchMinUnassignedBooleans,
-        completeSearchLinearChecks, completeSearchLinearPoints,
+        completeSearchLinearChecks, completeSearchLinearPoints, completeSearchLinearOutcomes?.toMap(),
     )
 }
