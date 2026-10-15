@@ -188,7 +188,8 @@ internal class Alns(
             if (cancellation()) return null
             val fresh = exchange?.current()
             if (fresh != null && fresh.version > seenVersion) {
-                if (fresh.objective.isFinite() && accepts(fresh.assignment, best, cancellation) &&
+                if (fresh.assignment !== current && fresh.objective.isFinite() &&
+                    accepts(fresh.assignment, best, cancellation) &&
                     objective.evaluate(fresh.assignment) == fresh.objective
                 ) best = fresh.assignment
                 if (!cancellation()) seenVersion = fresh.version
@@ -270,14 +271,14 @@ internal class Alns(
             pooled.publish(bestSample, bestObj)
         }
 
-        fun adopt(sample: Sample): Boolean {
+        fun adopt(sample: Sample, publish: Boolean = true): Boolean {
             val obj = objective.evaluate(sample)
             if (objective.evaluateExact(sample) >= objective.evaluateExact(bestSample)) return false
             bestSample = sample
             bestObj = obj
             incumbent = sample
             incumbentObj = obj
-            pooled.publish(sample, obj)
+            if (publish) pooled.publish(sample, obj)
             return true
         }
 
@@ -335,7 +336,7 @@ internal class Alns(
                 telemetry.outerAllowance += iterFlips
                 nodeBudget?.allowance?.spendMoves(iterFlips)
                 pooled.acquire(bestSample, params.cancellation)?.let { sample ->
-                    if (adopt(sample)) onIncumbent?.invoke(result())
+                    if (adopt(sample, publish = false)) onIncumbent?.invoke(result())
                 }
                 val destroyIdx = destroyBandit.choose()
                 val repairIdx = repairBandit.choose()
