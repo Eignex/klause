@@ -1469,8 +1469,11 @@ code-size result or compiler saving. Validate those boundaries before probing.
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
 three default symbol queries, `CompileQueue` and `CompileTaskWrapper` from the
-pinned Linux x86-64 JVM library. Each function's complete declared span must fit
-an allocated executable section and one matching file-backed executable segment.
+pinned Linux x86-64 JVM library. Optional arguments select up to 16 distinct ASCII
+source identifiers, each at most 128 characters, using the symbol reader's query
+rules. Invalid queries fail before downloading the decoder. Each function's complete
+declared span must fit an allocated executable section and one matching file-backed
+executable segment.
 The capture retains at most 16 KiB per function and 256 candidate records, with
 explicit truncated, non-function, undefined, zero-size and per-record error states.
 

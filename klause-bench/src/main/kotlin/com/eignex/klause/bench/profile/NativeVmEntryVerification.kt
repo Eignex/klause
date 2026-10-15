@@ -9,7 +9,8 @@ internal object NativeVmEntryVerification {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty())
+        require(args.size <= 16 && args.distinct().size == args.size)
+        require(args.all { it.length in 1..128 && it.matches(Regex("[A-Za-z0-9_]+")) })
         ProfileCaptureArchive.run {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
             val root = File(requireNotNull(System.getProperty("klause.workspace.root")))
@@ -19,7 +20,7 @@ internal object NativeVmEntryVerification {
             val command = listOf(
                 "python3", File(root, "klause-bench/tools/read_native_vm_entries.py").path,
                 File(runtime, "lib/server/libjvm.so").path, LIBRARY_SHA256, File(out, "vm-entries.json").path,
-            )
+            ) + args
             val process = ProcessBuilder(command).directory(root)
                 .redirectOutput(File(out, "entries.stdout"))
                 .redirectError(File(out, "entries.stderr")).start()
