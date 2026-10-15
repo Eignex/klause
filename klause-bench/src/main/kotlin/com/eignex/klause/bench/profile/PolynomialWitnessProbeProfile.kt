@@ -93,6 +93,18 @@ internal object PolynomialWitnessProbeProfile {
             it.name == "polynomialPointFixings"
         }
 
+        fun workCheckpoint(owner: Any): ProbeStop? {
+            val boundary = coupledEnd.get(owner) as? Long ?: return null
+            val charged = spent.getLong(owner)
+            if (charged < boundary) return null
+            return ProbeStop(
+                charged,
+                boundary,
+                probeEnd.get(owner) as? Long,
+                Thread.currentThread().stackTrace.map { it.toString() },
+            )
+        }
+
         fun measure(text: String, observed: Boolean, chargeStacks: Boolean = false): ProbeRecord {
             val source = parse.invoke(parser.getField("INSTANCE").get(null), text, Cancellation.Never, false, false)
             val sourceFormula = formula.invoke(source)
@@ -119,16 +131,9 @@ internal object PolynomialWitnessProbeProfile {
                 override fun isCancelled(): Boolean {
                     val current = owner
                     if (observed && current != null && !captured) {
-                        val boundary = coupledEnd.get(current) as? Long
-                        val charged = spent.getLong(current)
-                        if (boundary != null && charged >= boundary) {
+                        workCheckpoint(current)?.let { stop ->
                             captured = true
-                            stops += ProbeStop(
-                                charged,
-                                boundary,
-                                probeEnd.get(current) as? Long,
-                                Thread.currentThread().stackTrace.map { it.toString() },
-                            )
+                            stops += stop
                         }
                     }
                     return false
