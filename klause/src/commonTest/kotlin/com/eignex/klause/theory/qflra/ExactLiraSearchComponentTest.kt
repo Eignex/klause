@@ -34,6 +34,7 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExecutionControlAdapter
+import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
@@ -119,6 +120,79 @@ class ExactLiraSearchComponentTest {
                 assertEquals(BigFraction.ZERO, witness.reals.single())
             }
         }
+    }
+
+    @Test
+    fun `mixed partial point preferences do not accept fractional source integers`() {
+        for (relation in listOf(LinearOp.EQ, LinearOp.GE)) {
+            val model = Problem(
+                numBoolVars = 1, intBounds = openBounds(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0),
+                        doubleArrayOf(1.0), relation, 1.0),
+                    Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 1.0),
+                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(false, hints.preferredBool(0))
+                assertIs<ComponentCheck.Indeterminate>(component.check(session))
+                assertNull(session.boolValue(0))
+
+                val result = session.solve(1, candidateHints = hints)
+
+                if (relation == LinearOp.EQ) {
+                    assertIs<SearchResult.Exhausted>(result)
+                } else {
+                    val witness = assertNotNull(assertIs<SearchResult.Satisfied>(result)
+                        .model.valueOf<ExactLiraAssignment>(component))
+                    assertEquals(BIG_ONE, witness.ints.single())
+                    assertEquals(BigFraction.ZERO, witness.reals.single())
+                    assertEquals(false, witness.boolValue(0))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `mixed point preferences expire across integer branch retraction`() {
+        val model = Problem(
+            numBoolVars = 1, intBounds = openBounds(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        val component = ExactLiraSearchComponent(model)
+        val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+        try {
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(false, hints.preferredBool(0))
+            val split = assertNotNull(SourceBoundAtom.integerSplit(session,
+                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                BigFraction.of(bigIntOf(1), bigIntOf(2))))
+
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
+            assertNull(hints.preferredBool(0))
+            session.popTo(0)
+            assertNull(hints.preferredBool(0))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
+
+            assertEquals(false, hints.preferredBool(0))
+        } finally {
+            component.close()
+        }
+        assertNull(hints.preferredBool(0))
     }
 
     @Test

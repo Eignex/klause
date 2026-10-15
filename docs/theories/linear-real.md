@@ -47,10 +47,12 @@ raw incidence progress and private ledger debit. Unobserved fields remain absent
 An interrupted prefix supplies no semantic preference and is not a full literal count.
 These guesses only order exhaustive Boolean splits; they supply no values, facts,
 conflicts or source verdict.
-With the default null `openHintFlips` allowance, a pure-real source with one linear
-completion owner can use direct primitive preferences from its existing completed
-point. Registration precedes component initialization; capture and bounded exact
-comparison evaluation retain the existing numerical operation owner. No extra LP,
+With the default null `openHintFlips` allowance, a source with real coordinates and
+one linear completion owner can use direct primitive preferences from its existing
+completed point. Mixed integer columns retain their complete integrality and source
+checks; fractional partial values provide only comparison preferences. Registration
+precedes component initialization; capture and bounded exact comparison evaluation
+retain the existing numerical operation owner. No extra LP,
 graph check, Boolean draw or source-clause index is created. A custom registered
 provider retains precedence, even when it declines a selected Boolean.
 Compound source-clause preferences remain opt-in through the existing allowance.
