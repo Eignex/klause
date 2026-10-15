@@ -117,6 +117,37 @@ class CompletedMoveEvaluationTest {
     }
 
     @Test
+    fun `unchanged incumbents reuse completed proposals across sampled picks`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 2)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.recompute()
+        var initial = state.assignment.snapshot()
+        var calls = 0
+        val evaluation = CompletedMoveEvaluation(
+            state, LinearObjective(intCoefficients = longArrayOf(1)), Cancellation.Never,
+            mayAttempt = { true }, complete = { candidate -> calls++; Completion.Witness(candidate) },
+            current = { initial },
+        )
+        val move = Move.IntSet(0, 1)
+        evaluation.begin()
+        val completed = evaluation.attempt(move)
+
+        evaluation.begin()
+        val reused = evaluation.attempt(move)
+
+        assertEquals(completed, reused)
+        assertEquals(1, calls)
+        state.apply(Move.IntSet(0, 2))
+        initial = state.assignment.snapshot()
+        evaluation.begin()
+        evaluation.attempt(move)
+        assertEquals(2, calls)
+    }
+
+    @Test
     fun `a throwing completion leaves the live assignment unchanged`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),

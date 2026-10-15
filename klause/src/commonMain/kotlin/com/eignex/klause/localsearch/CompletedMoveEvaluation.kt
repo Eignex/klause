@@ -16,6 +16,7 @@ internal class CompletedMoveEvaluation(
 ) {
     private val witnesses = mutableMapOf<Move, Sample>()
     private val grades = mutableMapOf<Move, Double>()
+    private var base: Sample? = null
     private var coordinate = 0
     private var direction = 0
     private var proposal = 0
@@ -25,8 +26,15 @@ internal class CompletedMoveEvaluation(
         private set
 
     fun begin() {
-        witnesses.clear()
-        grades.clear()
+        val sample = current()
+        if (sample != base) {
+            witnesses.clear()
+            grades.clear()
+            base = sample
+        } else {
+            while (witnesses.size > 2) witnesses.remove(witnesses.keys.first())
+            grades.keys.retainAll(witnesses.keys)
+        }
         exploration = null
         productiveMove = null
     }
@@ -100,7 +108,10 @@ internal class CompletedMoveEvaluation(
     fun sample(move: Move): Sample? = witnesses[move]
 
     fun attempt(move: Move): Sample? {
-        witnesses[move]?.let { return it }
+        witnesses.remove(move)?.let {
+            witnesses[move] = it
+            return it
+        }
         if (grades.containsKey(move) || !changesFinite(move) || cancellation() || !mayAttempt()) return null
         grades[move] = Double.POSITIVE_INFINITY
         val candidate = state.completionCandidate(move) ?: return null

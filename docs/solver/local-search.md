@@ -663,8 +663,8 @@ coordinate touching a continuous factor: a channeling-aware flip, neighbor or do
 endpoint, including directions whose direct objective cost rises. Its proposals retain
 that source's configured phase and pool.
 Real-only guesses do not enter numerical move probing: completion already optimizes
-the real coordinates for the current finite pins. Raw continuous feasibility and objective deltas order probes without rejecting that
-exploration. A violated finite-only row whose selected scoring projection declares
+the real coordinates for the current finite pins. Raw continuous feasibility and
+objective deltas order probes without rejecting that exploration. A violated finite-only row whose selected scoring projection declares
 an exact assignment check declines the pinned proposal before numerical completion;
 continuous changes cannot repair that source violation. Heuristic and unsupported
 finite checks retain their ordinary completion/publication checks.
@@ -676,6 +676,8 @@ the original objective on completed samples, and improving tabu aspiration uses 
 comparison. The recipe retains its acceptance, configuration, schedule and restart
 policies. A selected finite move and completed reals commit as one compound transition;
 its authoritative sample is retained for publication without repeating completion.
+Sampled picks at the same completed incumbent retain up to two successful proposal completions;
+changing that incumbent invalidates the cache. Undecided attempts remain retryable.
 An accepted source completion supplies feasible-phase authority even when floating
 row scores retain a residual; source tolerance does not become an exact proof.
 Reverted probes preserve assignment, definitions, costs, configuration and activity.
