@@ -332,6 +332,12 @@ and frontend routing remain caller responsibilities.
 Before projection, bounded witness probing checks complete exact points and can
 repair one coordinate at a time using roots of an equality specialized at all other
 coordinates. Repaired points can guide later repairs even when the full check fails.
+Each bounded complete-point check captures its coordinates and reuses completed exact
+powers within that point. Its returned assignment uses those captured values.
+Every original atom and Boolean relation remains checked under the same native
+allowance; the cache supplies no independent acceptance authority. Later proposals
+capture fresh points. Ordinary CAD checks retain their direct evaluator. See
+[point arithmetic](../arithmetic/polynomial.md#algebraic-arithmetic-and-lifting).
 Nonlinear numeric conjunctions also propose coupled exact lines from positive
 rational and zero centers on referenced unfixed coordinates. Source monomial co-occurrence
 selects coordinate groups. Unconditional affine
