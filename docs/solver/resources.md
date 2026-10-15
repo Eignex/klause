@@ -196,6 +196,12 @@ Every spent charge and the original deadline remain in force. A stopped repair
 publishes no point, model or conflict, and optional seed storage is released even
 when hint indexing declines.
 
+Default Boolean-complete mixed disjunction ordering reads only the current
+factor's unresolved rows. Its bounded exact comparisons charge the current
+arithmetic operation and retain the opening hint stop. A copied optimal float
+prefix is a guess; it supplies no proof package or separate numerical allowance.
+The snapshot is cleared by assertions, retraction, restart and close.
+
 Complete mixed witness recovery uses the current exact-linear operation token for
 integer guesses, source-prefix reconstruction, selected-row substitution, graph
 construction and full-row validation. Its difference potential query charges copied cells and conservative
