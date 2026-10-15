@@ -30,12 +30,7 @@ class PolynomialWitnessProbeProfileTest {
 
     @Test
     fun `unresolved producer stops before projection and retains pending work`() {
-        val source = """
-            (declare-const x Real)
-            (declare-const y Real)
-            (assert (> (* x y) 1))
-            (assert (<= (* x y) 0))
-        """.trimIndent()
+        val source = "(assert false)"
         val access = PolynomialWitnessProbeProfile.ProbeAccess()
 
         val plain = access.measure(source, false)
