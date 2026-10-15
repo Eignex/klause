@@ -162,7 +162,12 @@ MPS finite invocations restrict continuous completion through an immutable numer
 execution policy. LS and ALNS retain their finite recipes and numerical residual LP
 completion even when every discrete root coordinate is fixed. Other source routes
 retain their existing exact-neighborhood admission. The policy changes neither
-worker binding/source permissions nor invocation allowances.
+worker binding/source permissions nor invocation allowances. The configured source
+tolerance callback reaches backtrack leaves, LS completion, ALNS bootstrap and CP
+repair through the same scenario. Worker copies retain that callback across budget,
+diagnostic and numerical-execution configuration. Exact MPS invocations supply no
+tolerance callback; a floating completion cannot acquire exact witness or proof
+authority through sharing.
 
 Workers that need arithmetic completion share the same source scope and require
 that check before publishing a witness. A neighbourhood refutation or failed

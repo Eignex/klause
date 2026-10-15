@@ -1,16 +1,17 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.LP_WORK_PER_NODE
-import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
@@ -19,17 +20,14 @@ import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.util.Cancellation
 import kotlin.math.ceil
 
-/**
- * Completes a local-search candidate over LP-only continuous columns the way a backtrack leaf is completed: pin every
- * Boolean and integer column to the candidate's value and solve the residual LP over the continuous columns exactly.
- *
- * The candidate's own continuous values are floating-point guesses, so they are only where the search stood; the
- * exact LP decides whether a completion exists and supplies its rational point. [objective], when given, is what the
- * residual LP minimizes, so the completion is the best one for the candidate's discrete values. It runs under the
- * search's own cancellation, its work charged to the search; a solve that cancellation cuts short decides nothing.
- */
-internal class LeafRealCompletion(private val problem: Problem, private val objective: LinearObjective?) :
-    CandidateCompletion {
+internal class LeafRealCompletion(
+    private val problem: Problem,
+    private val objective: LinearObjective?,
+    private val toleranceCheck: ((Sample) -> Boolean)?,
+    private val context: LpSolveContext = LpSolveContext.Production,
+) : CandidateCompletion {
+    constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
+
     private val encoders = problem.selectedFactorProjections()
     private val absCompletion = if (problem.factors.any { it is RealAbs }) AbsRealCompletion(problem) else null
 
@@ -57,11 +55,20 @@ internal class LeafRealCompletion(private val problem: Problem, private val obje
             }
         }
         val sink = LpStatsSink(LpRoute.STANDALONE)
-        val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink, encoders = encoders)
+        val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
+            context = context, toleranceCheck = toleranceCheck, encoders = encoders)
         val work = movesFor(sink.snapshot().standaloneWorkOps.sum)
+        if (cancellation()) return Completion.Undecided(work)
         return when (real.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
                 Completion.Witness(candidate.copy(reals = real.reals, exactReals = real.exactReals), work)
+
+            LpVerdict.TOLERANCE_OPTIMUM -> {
+                val completed = candidate.copy(reals = real.reals, exactReals = null)
+                if (toleranceCheck?.invoke(completed) == true && !cancellation()) {
+                    Completion.Witness(completed, work)
+                } else Completion.Undecided(work)
+            }
 
             // The rows the proof combines are what the candidate's discrete part cannot satisfy together.
             LpVerdict.INFEASIBLE -> Completion.Refuted(real.refutingFactors, work)

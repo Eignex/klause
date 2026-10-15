@@ -27,7 +27,11 @@ sealed interface Completion {
     /** What deciding the candidate cost, in local-search moves. */
     val work: Long
 
-    /** [sample] is a solution of the model; it carries the candidate's discrete values and any completed reals. */
+    /**
+     * [sample] meets the completion's configured source witness guarantee, with the candidate's discrete values
+     * and any completed reals. Floating coordinates accepted by an explicit source tolerance policy remain
+     * approximate; this result supplies no optimality or exact-coordinate authority.
+     */
     class Witness(val sample: Sample, override val work: Long = 0L) : Completion
 
     /** The candidate is no solution. [factors] names the model rows that show it, when the check knows them;

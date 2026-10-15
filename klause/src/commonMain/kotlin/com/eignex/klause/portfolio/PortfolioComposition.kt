@@ -80,7 +80,7 @@ data class PortfolioScenario(
     val lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
     /** Entering-column policy used by every backtrack arm's zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
-    /** Tolerance semantics for every backtrack arm's continuous leaves; see [BacktrackParams.toleranceCheck]. */
+    /** Source tolerance semantics for every arm's continuous completion; see [BacktrackParams.toleranceCheck]. */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     /** Optional override of the local-search arm pool — per-arm factories (a fresh recipe per slot).
      *  `null` uses the curated `LocalSearchCatalog` pool unchanged; a non-null pool is the CLI's resolved
@@ -240,7 +240,14 @@ internal object PortfolioComposition {
     ): List<WorkerConfig> {
         val arms = composeArms(scenario, facts)
         val check = scenario.toleranceCheck ?: return arms
-        return arms.map { if (it is BacktrackWorkerConfig) it.withToleranceCheck(check) else it }
+        return arms.map {
+            when (it) {
+                is BacktrackWorkerConfig -> it.withToleranceCheck(check)
+                is LocalSearchWorkerConfig -> it.withToleranceCheck(check)
+                is AlnsWorkerConfig -> it.withToleranceCheck(check)
+                else -> it
+            }
+        }
     }
 
     internal fun plan(scenario: PortfolioScenario, facts: ProblemFacts): PortfolioArmPlan {
