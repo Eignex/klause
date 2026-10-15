@@ -7,6 +7,8 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,11 +42,38 @@ class DivModTest {
     }
 
     @Test
+    fun `word division agrees with exact arithmetic at signed boundaries`() {
+        for (convention in DivisionConvention.entries) {
+            val relation = DivMod(0, 1, 2, 3, convention)
+            for ((a, b) in listOf(Long.MIN_VALUE to Long.MIN_VALUE, Long.MIN_VALUE to -1L,
+                Long.MIN_VALUE to 1L, Long.MIN_VALUE to 3L, -7L to Long.MIN_VALUE,
+                7L to Long.MIN_VALUE, Long.MAX_VALUE to -3L)) {
+                val exact = assertNotNull(relation.outputs(bigIntOf(a), bigIntOf(b)))
+                val expected = if (exact.first.fitsLong() && exact.second.fitsLong())
+                    exact.first.toLongExact() to exact.second.toLongExact() else null
+
+                assertEquals(expected, relation.wordOutputs(a, b), "$convention $a $b")
+            }
+        }
+    }
+
+    @Test
     fun `coupled outputs remove unsupported divisor values`() {
         val problem = Problem(0, 4, arrayOf(IntDomain(17, 17), IntDomain(3, 6),
             IntDomain(3, 3), IntDomain(2, 2)), arrayOf<Factor>(DivMod(0, 1, 2, 3)))
 
         val session = PropagationSession(problem)
+
+        assertFalse(session.isUnsatAtRoot)
+        assertEquals(IntDomain(5, 5), session.intDomain(1))
+    }
+
+    @Test
+    fun `fixed quotient and remainder determine a divisor beyond tuple enumeration`() {
+        val source = Problem(0, 4, arrayOf(IntDomain(17, 17), IntDomain(1, 1_000_000),
+            IntDomain(3, 3), IntDomain(2, 2)), arrayOf<Factor>(DivMod(0, 1, 2, 3)))
+
+        val session = PropagationSession(source)
 
         assertFalse(session.isUnsatAtRoot)
         assertEquals(IntDomain(5, 5), session.intDomain(1))
