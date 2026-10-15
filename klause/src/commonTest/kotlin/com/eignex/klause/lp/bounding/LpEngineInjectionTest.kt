@@ -122,6 +122,38 @@ class LpEngineInjectionTest {
     }
 
     @Test
+    fun `private root probes charge assembly and solves once to the containing engine`() {
+        val sink = SolveStatsSink(backend = "private-root")
+        budgetedEngine(sink, LpPlan(bounding = true, rootMaxWork = 12_000L)).use { parent ->
+            parent.forObjective(LinearObjective(), Cancellation.Never, rootProbe = true).use { child ->
+                child.noteNodeOverhead(3_000L)
+                child.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 2_000L))
+
+                assertEquals(5_000L, parent.totalSolveWork())
+                assertEquals(5_000L, child.totalSolveWork())
+                assertEquals(7_000L, child.nodeQueryWorkBudget())
+                assertEquals(2_000.0, sink.snapshot().lp.rootWorkOps.sum)
+                assertEquals(3_000.0, sink.snapshot().lp.overheadOps.sum)
+            }
+        }
+    }
+
+    @Test
+    fun `standalone completion reduces remaining root work without duplicate accounting`() {
+        budgetedEngine(SolveStatsSink(backend = "completion-root"),
+            LpPlan(bounding = true, rootMaxWork = 12_000L)).use { engine ->
+            engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
+
+            assertEquals(4_000L, engine.rootPrimalWorkBudget(additionalWork = 3_000L))
+            assertEquals(5_000L, engine.totalSolveWork())
+            assertFalse(engine.workSpentExceeds(12_000L, additionalWork = 6_999L))
+            assertTrue(engine.workSpentExceeds(12_000L, additionalWork = 7_000L))
+            assertFalse(engine.lpWorkAllowanceSpent(additionalWork = 14_999L))
+            assertTrue(engine.lpWorkAllowanceSpent(additionalWork = 15_000L))
+        }
+    }
+
+    @Test
     fun `root primal work is independent of the adaptive node allowance`() {
         val problem = boundedProblem()
         val plan = LpPlan(bounding = true, rootMaxWork = 50_000_000L)

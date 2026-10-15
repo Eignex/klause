@@ -669,7 +669,7 @@ class ResumableMinimizeTest {
                 fixture.solver.resumable(objective, params).use { search ->
                     val result = search.runSlice(Cancellation.Never, 1000L, 100_000L) { offered += it.sample }
                     assertEquals(0.0, search.stats.search.nodes.sum)
-                    assertTrue(result !is MinimizeResult.Optimal)
+                    assertTrue(result !is MinimizeResult.Infeasible)
                 }
 
                 assertEquals(if (enabled) 1 else 0, offered.size)
@@ -686,12 +686,13 @@ class ResumableMinimizeTest {
 
     @Test
     fun `mixed tree probing keeps tolerance witnesses separate from exact certification`() {
-        for (tolerated in listOf(false, true)) {
+        for (acceptance in listOf(null, false, true)) {
+            val tolerated = acceptance == true
             val fixture = UnresolvedRealLeafFixture(true)
             fixture.acceptProof = { _, _ -> false }
             val offered = ArrayList<Sample>()
-            val check: ((Sample) -> Boolean)? = if (tolerated) {
-                { sample -> sample.ints.single() + 2.0 * sample.reals.single() == 2.0 &&
+            val check: ((Sample) -> Boolean)? = if (acceptance != null) {
+                { sample -> acceptance && sample.ints.single() + 2.0 * sample.reals.single() == 2.0 &&
                     sample.reals.single() in 0.0..1.0 }
             } else null
             val params = fixture.params.copy(maxDecisions = 0L, toleranceCheck = check,
