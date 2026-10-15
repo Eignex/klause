@@ -902,6 +902,18 @@ class ExactLiraSearchComponent private constructor(
 
             is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual -> {
                 node = node.copy(retainedReduction = null)
+                val variable = when (decision) {
+                    is SearchDecision.IntAtMost -> decision.variable
+                    is SearchDecision.IntAtLeast -> decision.variable
+                    is SearchDecision.IntEqual -> decision.variable
+                    else -> error("expected an integer decision")
+                }
+                if (canForwardFinitePoint(variable, priorPoint, priorHints, wasDirty, wasForwardPending)) {
+                    candidate = priorPoint
+                    pointHintValues = priorHints
+                    pendingPointForward = true
+                    deferredSourceRows = true
+                }
             }
         }
         nodesByLevel.put(context.decisionLevel, node)
@@ -920,6 +932,24 @@ class ExactLiraSearchComponent private constructor(
         if (point == null || hints == null || pointHintStop()) return false
         return hints[variable] == bools[variable] ||
             (hints[variable] == UNASSIGNED && variable !in arithmeticVariables)
+    }
+
+    private fun canForwardFinitePoint(
+        variable: Int,
+        point: List<BigFraction>?,
+        hints: IntArray?,
+        wasDirty: Boolean,
+        wasForwardPending: Boolean,
+    ): Boolean {
+        if (pointForwardBlocks == null || (wasDirty && !wasForwardPending) || point == null || hints == null) {
+            return false
+        }
+        for (finite in finiteIntVars) {
+            operationStop.charge(1)
+            if (operationStop() || pointHintStop()) return false
+            if (finite == variable) return true
+        }
+        return false
     }
 
     private fun installSource(): Boolean {
@@ -1092,7 +1122,7 @@ class ExactLiraSearchComponent private constructor(
         if (retainedPoint != null && retainedHints != null && bools.any { it == UNASSIGNED }) {
             if (!context.consumeCheck()) return ComponentResult.Indeterminate
             checked = true
-            // Unblocked matching activators only add rows the retained point already satisfies.
+            // Matching activators add satisfied rows; finite updates check their published bounds.
             // Complete leaves and source-proof queries still materialize every pending row.
             if (pointWithinPublishedBounds(retainedPoint, context)) {
                 val cursor = if (pointHintCursor >= 0) nextPointBoolean(retainedHints, context, pointHintCursor) else -1

@@ -38,6 +38,7 @@ import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
@@ -58,6 +59,46 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PreparedSearchRegistrationTest {
+    @Test
+    fun `finite bounds retain a mixed point only while it satisfies the published interval`() {
+        val source = Problem(
+            numBoolVars = 3, numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0)),
+            openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.LE, 0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        var certifications = 0
+        val plan = source.componentPlan()
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
+        plan.search(source, emptyMap()).use { planned ->
+            val theory = assertIs<ExactLiraSearchComponent>(planned.theory)
+            theory.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { _, success ->
+                certifications++
+                success
+            }))
+            assertIs<ComponentResult.Consistent>(planned.session.initialize())
+            val rootCertifications = certifications
+            assertTrue(rootCertifications > 0)
+
+            assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.IntAtMost(0, 1)))
+
+            assertEquals(1L, planned.session.intUpperBound(0))
+            assertEquals(rootCertifications, certifications)
+            assertEquals(true, planned.candidateHints.preferredBool(1))
+            assertIs<ComponentResult.Consistent>(planned.session.push(SearchDecision.IntAtLeast(0, 1)))
+            assertTrue(certifications > rootCertifications)
+            val result = assertIs<SearchRunEvent.Satisfied>(planned.session.openConditionedRun(3).next())
+            assertEquals(BIG_ONE, result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
+        }
+    }
+
     @Test
     fun `published finite bounds invalidate a matching mixed point before reuse`() {
         val source = Problem(
@@ -91,7 +132,7 @@ class PreparedSearchRegistrationTest {
 
             assertEquals(1L, planned.session.intLowerBound(1))
             assertTrue(certifications > rootCertifications)
-            val result = assertIs<SearchResult.Satisfied>(planned.session.solve(3))
+            val result = assertIs<SearchRunEvent.Satisfied>(planned.session.openConditionedRun(3).next())
             assertEquals(BIG_ZERO, result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
             assertEquals(BIG_ONE,
                 result.model.valueOf(SearchExactIntValue(SourceIntId(1))))

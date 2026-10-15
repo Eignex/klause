@@ -275,9 +275,10 @@ activations can retain that same table and point during a
 partial Boolean traversal. Each forward check consumes the ordinary theory-check
 allowance and charges current finite-bound comparisons and cursor visits to the
 existing operation token. Advancing never revisits earlier primitive IDs within
-that point's monotone scope. Arithmetic changes and retraction invalidate reuse;
-source-proof queries and complete leaves materialize pending rows. No forward
-check renews a numerical allowance or counts as a new point capture.
+that point's monotone scope. Finite-bound updates charge owner lookup and can
+retain the point only after its full interval check. Open arithmetic changes and
+retraction invalidate reuse; source-proof queries and complete leaves materialize
+pending rows. No forward check renews a numerical allowance or counts as a new point capture.
 
 Other built-in linear guidance and compound indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.
