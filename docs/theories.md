@@ -69,6 +69,15 @@ publishes no partial enforcing relation. Relaxation support cannot substitute fo
 source enforcement. [Provider extensions](api.md#projection-provider-extensions)
 define the public selection and mapping obligations.
 
+Within one component-planning call, a completed unconditioned full-source linear
+or difference installation can also supply that target's participating fragment
+when its ordered original factor indices retain the entire source. The source,
+captured projections and empty condition scope are identical within this call.
+The two targets retain separate private coordinate allocators and installed models.
+Subsets, including difference fragments excluding shared clauses, install separately;
+null or incomplete installations cannot supply a retained fragment. This reuse
+retains immutable relations, never mutable theory state or a cross-call cache.
+
 Participation and completeness are separate. A batch service can be sound and incomplete;
 its legacy `TheoryCheck.Cancelled` answer leaves the fragment undecided under cancellation,
 limits or incomplete checking. The bridge maps it to an indeterminate component answer.

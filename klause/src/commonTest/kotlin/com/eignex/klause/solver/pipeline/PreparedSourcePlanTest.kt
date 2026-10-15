@@ -9,6 +9,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -20,15 +21,21 @@ import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingAffineExpression
+import com.eignex.klause.theory.EncodingLinearTerm
 import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.LinearEncodingFormula
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -43,6 +50,159 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
+    @Test
+    fun `complete component encodings retain spent work independently per target and call`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+            openIntHi = booleanArrayOf(true))
+        val installations = mutableMapOf<EncodingTarget, Int>()
+        var charged = 0L
+        val stop = object : Cancellation {
+            override fun isCancelled(): Boolean = false
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (target == EncodingTarget.POLYNOMIAL) selected
+            else Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                assertSame(source.factors.single(), view)
+                assertEquals(target, encoding.target)
+                assertEquals(0, encoding.sourceFactorIndex)
+                installations[target] = (installations[target] ?: 0) + 1
+                encoding.cancellation.charge(1000)
+                val decline = selected.install(view, encoding)
+                if (decline == null && target == EncodingTarget.LINEAR) {
+                    val auxiliary = encoding.realAuxiliary()
+                    encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                        EncodingLinearTerm.auxiliary(auxiliary, BigFraction.ONE),
+                    )), LinearOp.EQ, BigFraction.ZERO))
+                }
+                decline
+            }
+        })
+        val projections = providers.prepare(source)
+
+        for (invocation in 1..2) {
+            val plan = source.componentPlan(projections, cancellation = stop)
+
+            assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+            assertEquals(invocation, installations[EncodingTarget.LINEAR])
+            assertEquals(invocation, installations[EncodingTarget.DIFFERENCE])
+            assertTrue(charged >= invocation * 2000L)
+            val fragment = assertNotNull(plan.encodedTheoryFragment(source))
+            assertEquals(1, fragment.numFactors)
+            assertEquals(0, fragment.numRealVars)
+            assertEquals(0, assertIs<EncodedTheoryFactor>(fragment.factors.single()).attribution.sourceFactorIndex)
+        }
+    }
+
+    @Test
+    fun `component subsets and shared clause exclusions install their own ordered scope`() {
+        for (sharedClause in listOf(false, true)) {
+            val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+            val excluded: Factor = if (sharedClause) Clause(intArrayOf(0))
+            else Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 1)
+            val source = Problem(1, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+                arrayOf(row, excluded), openIntHi = booleanArrayOf(true, false))
+            val installations = mutableMapOf<Pair<EncodingTarget, Int>, Int>()
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (target == EncodingTarget.POLYNOMIAL) selected
+                else Encoder(selected.support) { view, encoding ->
+                    val key = target to encoding.sourceFactorIndex
+                    installations[key] = (installations[key] ?: 0) + 1
+                    selected.install(view, encoding)
+                }
+            })
+
+            val plan = source.componentPlan(providers.prepare(source))
+
+            assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+            assertEquals(if (sharedClause) FactorOwner.SHARED else FactorOwner.CP, plan.factorOwner(1))
+            assertEquals(if (sharedClause) 1 else 2, installations[EncodingTarget.LINEAR to 0])
+            assertEquals(2, installations[EncodingTarget.DIFFERENCE to 0])
+            assertEquals(1, installations[EncodingTarget.LINEAR to 1])
+            assertEquals(1, installations[EncodingTarget.DIFFERENCE to 1])
+            val fragment = assertNotNull(plan.encodedTheoryFragment(source))
+            assertEquals(1, fragment.numFactors)
+            assertSame(row, assertIs<EncodedTheoryFactor>(fragment.factors.single()).source)
+        }
+    }
+
+    @Test
+    fun `incomplete full component installation is retried for the selected scope`() {
+        for (decline in listOf(EncoderDecline.UNSUPPORTED, EncoderDecline.RESOURCE)) {
+            val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+                arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+                openIntHi = booleanArrayOf(true))
+            val installations = mutableMapOf<EncodingTarget, Int>()
+            val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (target == EncodingTarget.POLYNOMIAL) selected
+                else Encoder(selected.support) { view, encoding ->
+                    val invocation = (installations[target] ?: 0) + 1
+                    installations[target] = invocation
+                    if (target == EncodingTarget.LINEAR && invocation == 1) {
+                        selected.install(view, encoding)
+                        decline
+                    } else selected.install(view, encoding)
+                }
+            })
+
+            val plan = source.componentPlan(providers.prepare(source))
+
+            assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+            assertEquals(2, installations[EncodingTarget.LINEAR])
+            assertEquals(if (decline == EncoderDecline.RESOURCE) 2 else 1,
+                installations[EncodingTarget.DIFFERENCE])
+            assertEquals(1, assertNotNull(plan.encodedTheoryFragment(source)).numFactors)
+        }
+    }
+
+    @Test
+    fun `a transient containing stop cannot reuse an earlier completed component encoding`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+            openIntHi = booleanArrayOf(true))
+        var installations = 0
+        val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (target == EncodingTarget.POLYNOMIAL) selected
+            else Encoder(selected.support) { view, encoding ->
+                installations++
+                encoding.cancellation.charge(1000)
+                selected.install(view, encoding)
+            }
+        })
+        val projections = providers.prepare(source)
+        var completedWork = 0L
+        for (limited in listOf(false, true)) {
+            var charged = 0L
+            var pendingStop = false
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = pendingStop.also { pendingStop = false }
+                override fun workMeter(): WorkMeter = WorkMeter {
+                    charged += it
+                    if (limited && charged >= completedWork - 1) pendingStop = true
+                }
+            }
+
+            val plan = source.componentPlan(projections, cancellation = stop)
+
+            assertEquals(if (limited) 4 else 2, installations)
+            assertTrue(charged >= 2000L)
+            if (limited) {
+                assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, plan.theoryPipeline)
+                assertEquals(EncoderDecline.RESOURCE, plan.encodingDecline)
+                assertNull(plan.encodedTheoryFragment(source))
+                assertFalse(stop())
+            } else {
+                assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+                completedWork = charged
+            }
+        }
+    }
+
     @Test
     fun `unchanged routing retains completed encoder work and source objective`() {
         val source = Problem(0, 0, emptyArray(), arrayOf(

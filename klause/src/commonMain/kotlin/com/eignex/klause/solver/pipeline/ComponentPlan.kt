@@ -373,8 +373,12 @@ fun Problem.componentPlan(
         if (intBounds.hasLower(variable) && intBounds.hasUpper(variable)) IntVariableOwner.CP
         else IntVariableOwner.THEORY
     }
-    val linear = projections.linearTheoryModel(EncodingTarget.LINEAR, cancellation = cancellation)
-    val difference = projections.linearTheoryModel(EncodingTarget.DIFFERENCE, cancellation = cancellation)
+    var initialResourceDecline = false
+    val linear = projections.linearTheoryModel(EncodingTarget.LINEAR, cancellation = cancellation,
+        onDecline = { if (it == EncoderDecline.RESOURCE) initialResourceDecline = true })
+    val difference = projections.linearTheoryModel(
+        EncodingTarget.DIFFERENCE, cancellation = cancellation,
+        onDecline = { if (it == EncoderDecline.RESOURCE) initialResourceDecline = true })
     val completeTheory = when {
         linear?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
         difference != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
@@ -433,16 +437,42 @@ fun Problem.componentPlan(
         factorOwners[index] == FactorOwner.CP && factors[index].variables.reals.isNotEmpty()
     }
     val kept = factors.indices.filter { encoded[it] || factorOwners[it] == FactorOwner.SHARED }
+    val differenceKept = kept.filter { factorOwners[it] != FactorOwner.SHARED }
     var linearDecline: EncoderDecline? = null
     var differenceDecline: EncoderDecline? = null
-    val fragment = projections.linearTheoryModel(EncodingTarget.LINEAR, kept, cancellation = cancellation,
-        onDecline = { linearDecline = it })
-    val differenceFragment = projections.linearTheoryModel(EncodingTarget.DIFFERENCE,
-        kept.filter { factorOwners[it] != FactorOwner.SHARED }, cancellation = cancellation,
-        onDecline = { differenceDecline = it })
+    var preparationStopped = false
+    // These lists are ordered subsets of the original indices; equal size retains the complete scope.
+    val fragment = when {
+        !initialResourceDecline && linear != null && kept.size == factors.size -> {
+            cancellation.charge(1)
+            if (cancellation()) {
+                preparationStopped = true
+                linearDecline = EncoderDecline.RESOURCE
+                null
+            } else linear
+        }
+        else -> projections.linearTheoryModel(EncodingTarget.LINEAR, kept, cancellation = cancellation,
+            onDecline = { linearDecline = it })
+    }
+    val differenceFragment = when {
+        preparationStopped -> {
+            differenceDecline = EncoderDecline.RESOURCE
+            null
+        }
+        !initialResourceDecline && difference != null && differenceKept.size == factors.size -> {
+            cancellation.charge(1)
+            if (cancellation()) {
+                preparationStopped = true
+                differenceDecline = EncoderDecline.RESOURCE
+                null
+            } else difference
+        }
+        else -> projections.linearTheoryModel(EncodingTarget.DIFFERENCE,
+            differenceKept, cancellation = cancellation, onDecline = { differenceDecline = it })
+    }
     val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
     val route = when {
-        cancellation() -> ProblemPipeline.UNSUPPORTED_OPEN
+        preparationStopped || cancellation() -> ProblemPipeline.UNSUPPORTED_OPEN
         unownedOpenColumn != null || unownedRealFactor -> ProblemPipeline.UNSUPPORTED_OPEN
         !needsArithmetic -> ProblemPipeline.FINITE_CP
         fragment?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
@@ -455,7 +485,7 @@ fun Problem.componentPlan(
         unownedOpenColumn?.let { unplaceable(it, projections, factorOwners) }, projections, encoded,
         if (route == ProblemPipeline.DIFFERENCE_THEORY) differenceFragment else fragment,
         if (route != ProblemPipeline.UNSUPPORTED_OPEN) null
-        else if (cancellation() || linearDecline == EncoderDecline.RESOURCE ||
+        else if (preparationStopped || cancellation() || linearDecline == EncoderDecline.RESOURCE ||
             differenceDecline == EncoderDecline.RESOURCE) EncoderDecline.RESOURCE
         else linearDecline ?: differenceDecline)
 }
