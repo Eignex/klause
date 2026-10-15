@@ -8,6 +8,34 @@ import kotlin.test.assertIs
 class ClauseSearchComponentTest {
 
     @Test
+    fun `widely separated watched identifiers retain their implications`() {
+        for (variable in listOf(1, 257, 65_537, (1 shl 30) - 1)) {
+            val literal = variable shl 1
+            val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, literal))))))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+
+            assertEquals(true, session.boolValue(variable))
+        }
+    }
+
+    @Test
+    fun `widely separated watches propagate after a reversed sibling assignment`() {
+        for (variable in listOf(1, 257, 65_537, (1 shl 30) - 1)) {
+            val literal = variable shl 1
+            val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0, literal))))))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(literal xor 1)))
+
+            assertEquals(true, session.boolValue(0))
+        }
+    }
+
+    @Test
     fun `unit clause implies its literal at the root`() {
         val session = SearchSession(listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(0))))))
 

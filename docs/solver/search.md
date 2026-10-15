@@ -35,7 +35,8 @@ owns decisions, Boolean values, reasons and publishers, integer facts, undo leve
 pending assertion delivery.
 [SearchLearning](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 owns shared clauses, attachment and propagation cursors, unit reawakening, reduction and
-telemetry. Retraction removes trail facts and restores integer premises before clamping
+telemetry. Watched-clause literal and signature indexes use primitive integer keys;
+clause identifiers and watch-list order remain stable across index growth and rebuilds. Retraction removes trail facts and restores integer premises before clamping
 the learned propagation cursor and notifying components. Root rebuild clears facts while
 retaining learned clauses and reawakening units. Native CP clause state remains CP-owned.
 [SearchRun](../../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchRun.kt)

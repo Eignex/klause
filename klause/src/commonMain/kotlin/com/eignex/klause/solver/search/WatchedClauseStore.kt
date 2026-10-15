@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * Assignment view and consequence sink a [WatchedClauseStore] propagates through.
@@ -38,8 +39,8 @@ internal class WatchedClauseStore {
     private val clauses = ArrayList<IntArray>()
     private val lbds = IntArrayList()
     private val used = ArrayList<Boolean>()
-    private val watchers = HashMap<Int, IntArrayList>()
-    private val signatures = HashMap<Int, IntArrayList>()
+    private val watchers = MutableIntObjectMap<IntArrayList>()
+    private val signatures = MutableIntObjectMap<IntArrayList>()
     private val unitClauses = IntArrayList()
 
     /** Number of retained clauses. */
