@@ -1468,6 +1468,10 @@ USDT identity bytes, JFR compilation/thread identities and compatible log record
 Omitted log levels remain unknown. A separately labelled invalid read must appear;
 additional read errors or reported losses prevent argument corroboration. Every raw
 record, unmatched lifetime and independent compilation identity remains available.
+Remote summaries count retained identity matches, missing matches and lifetime
+failures without relaxing capture-wide guards. Staged compile-ID, method/level/OSR
+and native-thread matches distinguish absent JFR records from identity mismatches;
+all same-ID candidates and unmatched JFR records remain in the report.
 Per-record association supplies no complete calling convention, queue/root census,
 loss-free capture, return-size semantics, clock alignment or compiler-saving proof.
 
