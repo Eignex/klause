@@ -18,6 +18,14 @@ retain every operand role. MiniZinc's existing predicate wrappers use these same
 FlatZinc paths. Finite projections use native filtering and scoring; selected
 arithmetic projections install complete private guarded relations.
 
+## Integer division
+
+`int_div` and `int_mod`, including MiniZinc-generated calls, retain truncating
+`DivMod` factors. Matching calls share the quotient/remainder relation and link any
+separate declared outputs with exact equalities. A zero divisor is forbidden by the
+relation; a domain containing zero keeps its nonzero alternatives. Output aliases
+and signed-word endpoints retain [exact division semantics](../model.md#integer-division-relations).
+
 ## FlatZinc Boolean channels
 
 FlatZinc retains `bool2int` channels and recognizes them independently of constraint

@@ -112,6 +112,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
             FloatObjectiveBoundInvariant(boolVars, boolWeights, intVars, intCoeffs, realVars, realCoeffs, bound)
         }
 
+    is DivMod -> DivModInvariant(this)
+
     is Product -> ProductInvariant(a, b, result)
 
     is Power -> PowerInvariant((base as Power.Coordinate.Integer).id.index, exponent,

@@ -22,6 +22,14 @@ polarity. Optional-value handling retains its existing presence guards and pins.
 Finite consumers use native filtering and local-search scoring. Selected arithmetic
 consumers use the complete private [selection encodings](../model.md#factor-projection-selection).
 
+## Integer division
+
+Integer `/` and `%` preserve a shared truncating `DivMod` relation for the same
+materialized operands. The schema requires the denominator domain to exclude zero.
+Quotient and remainder remain correlated through nested arithmetic and reified
+comparisons. [Integer division relations](../model.md#integer-division-relations)
+define exact overflow, remapping and consumer support.
+
 ## Schema floats
 
 Schema float rows join the names they reference into components. Top-level

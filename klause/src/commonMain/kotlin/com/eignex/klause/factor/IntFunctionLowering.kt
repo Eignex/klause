@@ -1,18 +1,14 @@
 package com.eignex.klause.factor
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import kotlin.math.abs
 
-// Single source of truth for int_abs, int_min/max, int_div/mod: the schema and FlatZinc compilers
-// share this lowering so their encodings cannot drift apart. Truncated-toward-zero throughout
-// (MiniZinc semantics); nothing in the supported front-ends requires Euclidean.
+// Shared source relations for the schema and FlatZinc frontends.
 internal object IntFunctionLowering {
 
     @Suppress("UNUSED_PARAMETER")
@@ -41,7 +37,6 @@ internal object IntFunctionLowering {
 
     class TruncDivMod(val quotient: Int, val remainder: Int, val factors: List<Factor>)
 
-    // b ≠ 0 is the caller's responsibility (left to propagation).
     fun truncatedDivMod(
         a: Int,
         b: Int,
@@ -50,55 +45,11 @@ internal object IntFunctionLowering {
         quotient: Int?,
         remainder: Int?,
         freshInt: (IntDomain) -> Int,
-        freshBool: () -> Int,
+        @Suppress("UNUSED_PARAMETER") freshBool: () -> Int,
+        existing: List<Factor> = emptyList(),
     ): TruncDivMod {
-        val out = ArrayList<Factor>()
-        // Constant positive divisor over a non-negative dividend: truncated == floor, so the
-        // whole relation is one linear `a = B·q + r` with tight aux domains. The general
-        // encoding below posts a var·var product plus an |b| reification chain and gives q a
-        // ±|a| span — half a million spurious q values per constraint on divisibility-grid models.
-        if (domainB.min == domainB.max && domainB.min > 0 && domainA.min >= 0) {
-            val bConst = domainB.min
-            val q = quotient ?: freshInt(IntDomain(domainA.min / bConst, domainA.max / bConst))
-            val rem = remainder ?: freshInt(IntDomain(0L, bConst - 1))
-            out += Linear(longArrayOf(1L, -bConst, -1L), intArrayOf(a, q, rem), LinearOp.EQ, 0L)
-            if (remainder != null) {
-                // A supplied (FZN-declared) rem may carry a wider/signed domain — bound it.
-                out += Linear(intArrayOf(1), intArrayOf(rem), LinearOp.GE, 0)
-                out += Linear(longArrayOf(1L), intArrayOf(rem), LinearOp.LE, bConst - 1)
-            }
-            return TruncDivMod(q, rem, out)
-        }
-        val bMag = maxOf(abs(domainB.min), abs(domainB.max))
-        val aMag = maxOf(abs(domainA.min), abs(domainA.max))
-        val qDomain = if (bMag == 0L) IntDomain(-aMag, aMag) else IntDomain(-aMag - 1, aMag + 1)
-        val q = quotient ?: freshInt(qDomain)
-        val rem = remainder ?: freshInt(IntDomain(-bMag + 1, bMag - 1))
-        val prod = freshInt(IntDomain(-aMag - bMag - 1, aMag + bMag + 1))
-        out += Product(a = q, b = b, result = prod)
-        out += Linear(intArrayOf(1, 1, -1), intArrayOf(prod, rem, a), LinearOp.EQ, 0)
-        // |rem| < |b|, channeling |b| via an abs reification: absB ≥ b, absB ≥ −b, (absB = b ∨ absB = −b).
-        val absB = freshInt(IntDomain(0L, bMag))
-        out += Linear(intArrayOf(1, -1), intArrayOf(b, absB), LinearOp.LE, 0)
-        out += Linear(intArrayOf(-1, -1), intArrayOf(b, absB), LinearOp.LE, 0)
-        val absBpa = freshBool()
-        val absBpb = freshBool()
-        out += ReifiedLinear(absBpa, intArrayOf(1, -1), intArrayOf(absB, b), LinearOp.EQ, 0)
-        out += ReifiedLinear(absBpb, intArrayOf(1, 1), intArrayOf(absB, b), LinearOp.EQ, 0)
-        out += Clause(intArrayOf(Lit.make(absBpa, true), Lit.make(absBpb, true)))
-        out += Linear(intArrayOf(1, -1), intArrayOf(rem, absB), LinearOp.LE, -1) // rem ≤ |b| − 1
-        out += Linear(intArrayOf(-1, -1), intArrayOf(rem, absB), LinearOp.LE, -1) // rem ≥ −|b| + 1
-        // Truncated sign rule: rem > 0 → a ≥ 0; rem < 0 → a ≤ 0 (rem = 0 unconstrained).
-        val remPos = freshBool()
-        val remNeg = freshBool()
-        out += ReifiedLinear(remPos, intArrayOf(1), intArrayOf(rem), LinearOp.GE, 1)
-        out += ReifiedLinear(remNeg, intArrayOf(1), intArrayOf(rem), LinearOp.LE, -1)
-        val aNonNeg = freshBool()
-        val aNonPos = freshBool()
-        out += ReifiedLinear(aNonNeg, intArrayOf(1), intArrayOf(a), LinearOp.GE, 0)
-        out += ReifiedLinear(aNonPos, intArrayOf(1), intArrayOf(a), LinearOp.LE, 0)
-        out += Clause(intArrayOf(Lit.make(remPos, false), Lit.make(aNonNeg, true))) // remPos → aNonNeg
-        out += Clause(intArrayOf(Lit.make(remNeg, false), Lit.make(aNonPos, true))) // remNeg → aNonPos
-        return TruncDivMod(q, rem, out)
+        val relation = com.eignex.klause.lowering.retainDivMod(a, b, domainA, domainB,
+            quotient, remainder, existing, freshInt)
+        return TruncDivMod(relation.quotient, relation.remainder, relation.factors)
     }
 }

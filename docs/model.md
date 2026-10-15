@@ -33,6 +33,31 @@ Neither floating scores nor a product relaxation enforce the source relation.
 Generic `Problem` polynomial composition keeps its [finite integer boundary](theories/polynomial-real.md#scope-and-boundaries);
 admitted open/wide SMT powers retain their exact nonlinear source snapshots.
 
+## Integer division relations
+
+`factor.arithmetic.DivMod` retains a dividend, a literal or variable divisor and both
+integer outputs. `DivisionConvention.TRUNCATING` rounds the quotient toward zero;
+`EUCLIDEAN` requires a nonnegative remainder. Both require a nonzero divisor and
+`dividend = divisor * quotient + remainder`, with remainder magnitude below the
+divisor magnitude. Exact arithmetic does not wrap at the signed-word boundary.
+Finite output domains can therefore make minimum-word division by minus one infeasible.
+
+Role fields and structural keys preserve aliases and convention through remapping.
+Frontends share quotient/remainder auxiliaries only for identical operands and
+convention, retaining equality rows for distinct declared outputs. Source factors
+remain intact during consumer selection. Shared equivalent formulas live in
+`lowering.DivModEncoding`; the linear encoder handles a literal divisor or explicitly
+requires a variable-divisor fixing. Polynomial encoding enforces the entire relation,
+including the nonzero and sign cases. Difference encoding is unsupported. No product
+relaxation supplies division enforcement. Installed formulas retain the original factor
+attribution and condition lifetime under the [theory contract](theories.md).
+
+Finite propagation combines signed bounds with support filtering over at most 4,096
+operand pairs per call. It checks repeated roles simultaneously; large domains retain
+sound bounds and exact pinned checks. [Local search](solver/local-search.md#definitions-and-repairs)
+maintains eligible unique outputs and offers correlated repairs. Domain restrictions,
+pins, competing definitions and cycles remain authoritative.
+
 ## Published assignments and objectives
 
 `Sample`, exact theory assignments and reconstructed witnesses own immutable

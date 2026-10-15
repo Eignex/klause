@@ -246,6 +246,7 @@ private fun FlatZincCompiler.emitTruncDivMod(a: Int, b: Int, qVar: Int?, remVar:
         remainder = remVar,
         freshInt = { d -> allocInt("__divmod_${a}_${b}_i${n++}", d.min, d.max) },
         freshBool = { allocBool("__divmod_${a}_${b}_b${n++}") },
+        existing = factors,
     )
     factors.addAll(res.factors)
 }

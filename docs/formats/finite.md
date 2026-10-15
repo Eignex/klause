@@ -60,6 +60,13 @@ operands as definition hints. Top-level equalities retain output aliases; hints 
 not orient unrelated sums or unhinted min/max globals. Domains and independently posted
 output constraints remain authoritative during local-search definition maintenance.
 
+XCSP3 `div` and `mod` expressions retain a shared truncating `DivMod` relation.
+Nonzero signed-word constants are admitted. The variable-divisor path retains its
+nonnegative-dividend and positive-divisor requirement; wider literal divisors and
+other variable sign combinations remain unsupported. MPS, DIMACS/WCNF and OPB/WBO
+have no applicable integer quotient/remainder syntax or recovered relation.
+See [integer division relations](../model.md#integer-division-relations).
+
 ### Source validation
 
 The benchmark's opt-in XCSP source checker evaluates the final assignment against

@@ -89,7 +89,7 @@ class DefinitionalSweep internal constructor(
             boolFolds: List<BoolFoldDefinition> = emptyList(),
         ): DefinitionalSweep? {
             val base = infer(problem.factors, problem.numIntVars, definedHints, boolFolds)
-            val nodes = base?.nodes.orEmpty() + elementResultDefinitions(problem, definedHints)
+            val nodes = base?.nodes.orEmpty() + elementResultDefinitions(problem, definedHints) + divModDefinitions(problem)
             val ordered = literalDefinitions(problem, definedHints, nodes)
             return if (ordered.isEmpty()) null else DefinitionalSweep(ordered)
         }

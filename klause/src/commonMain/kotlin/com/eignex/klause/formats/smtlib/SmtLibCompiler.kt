@@ -47,6 +47,7 @@ internal object Compiler {
         /** The auxiliary real pinned to 1 that absorbs a wide row's oversized constant, or -1. */
         internal var realOneVar = -1
         internal val intDomains = ArrayList<PresolveDomain>()
+        internal val divModTerms = HashMap<SmtDivModKey, Pair<IntComb, IntComb>>()
 
         /** Open `ite`-on-equality chains and the equality atoms their conditions are read from. */
         internal val iteChains = IteChainTable()
