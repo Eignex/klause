@@ -312,6 +312,13 @@ its separate transport limit does not extend the opening deadline. A running roo
 is explicitly closed. This diagnostic claims neither CLI routing equivalence nor a
 source verdict, and cannot establish a default-route recovery.
 
+With `inspect=disjunction-names`, the tool additionally replays predicate registration
+from the cached preparation fragment in a fresh registry, using only the original
+deadline's remaining time. It records the first refused row and any existing
+complementary names under the unchanged registry limit. This is isolated naming
+demand: it neither captures the actual rebound fragment nor reproduces earlier
+component registrations, initializes a solver, or proves the opening's refusal cause.
+
 `bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
 explicit registered linear peers over original real, wide-integer, strict and guarded
 sources. Pass `repeats=N warmups=N cases=<comma-separated names>`; defaults are three

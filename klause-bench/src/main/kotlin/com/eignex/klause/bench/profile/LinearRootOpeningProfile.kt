@@ -39,7 +39,10 @@ internal object LinearRootOpeningProfile {
             require('=' in argument) { "expected key=value" }
             argument.substringBefore('=') to argument.substringAfter('=')
         }
-        require(options.keys == setOf("suite", "problem", "sha256"))
+        val required = setOf("suite", "problem", "sha256")
+        require(options.keys == required || options.keys == required + "inspect")
+        val inspection = options["inspect"]
+        require(inspection == null || inspection == "disjunction-names")
         val expected = options.getValue("sha256")
         require(expected.matches(Regex("[0-9a-f]{64}")))
         val reference = Catalog.uncapped(options.getValue("suite")).problems
@@ -132,6 +135,7 @@ internal object LinearRootOpeningProfile {
         } finally {
             (run as? AutoCloseable)?.close()
         }
+        if (inspection != null) LinearDisjunctionInspection.inspect(engine, stop, out)
     }
 
     private fun launch(args: Array<String>, out: File) {
