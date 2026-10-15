@@ -481,6 +481,8 @@ private fun Compiler.Builder.branchUnder(term: LinComb, knownLiteral: Int): LinC
     if (entry.value == 1L && term.constant == 0L) return selected
     // Avoid expanding shared affine definitions across their consumers.
     if (selected.coeffs.size > 1) return term
+    // Preserve materialized ranges when a selected child chain can still be extended.
+    if (selected.coeffs.keys.any { iteChains.openAt(it) != null }) return term
     return try {
         selected.scaled(entry.value).plus(LinComb(emptyMap(), term.constant))
     } catch (_: ArithmeticException) {

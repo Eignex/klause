@@ -27,6 +27,21 @@ import kotlin.test.assertTrue
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `affine restriction preserves the range of a materialized child`() {
+        val parsed = SmtLib.parse("""
+            (declare-const i Int) (assert (<= 0 i 2))
+            (assert (let ((inner (ite (= i 0) 5 (+ (ite (= i 1) 1 2) 1))))
+                (= (+ (ite (= i 0) 99 (- inner 1)) inner) 104)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model)
+            .solve(BacktrackParams(randomSeed = 0, maxDecisions = 100))
+
+        val sample = assertIs<OpenTheoryResult.Sat>(result, result.toString()).assignment
+        assertEquals("0", sample.intValue(parsed.intVarNames.getValue("i")))
+    }
+
+    @Test
     fun `restricted arithmetic conditional branches exclude unreachable values without equality expansion`() {
         val terms = listOf(
             "(ite c (+ inner 1) 9)" to 4L,
