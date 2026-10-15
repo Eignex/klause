@@ -72,38 +72,40 @@ internal fun PropagationState.holeLevelFor(v: Int, k: Long): Int {
 }
 
 internal class RootHoleHistory {
-    private class Run(var first: Long, var last: Long)
-    private val runs = ArrayList<Run>()
+    private val runs = LongArrayList()
 
     operator fun contains(value: Long): Boolean {
         val before = insertionPoint(value) - 1
-        return before >= 0 && value <= runs[before].last
+        return before >= 0 && value <= runs[before * 2 + 1]
     }
 
     fun add(value: Long) {
-        val index = insertionPoint(value)
-        val before = runs.getOrNull(index - 1)
-        if (before != null && value <= before.last) return
-        val after = runs.getOrNull(index)
-        val joinsBefore = before != null && before.last != Long.MAX_VALUE && before.last + 1L == value
-        val joinsAfter = after != null && value != Long.MAX_VALUE && value + 1L == after.first
+        val index = insertionPoint(value) * 2
+        val before = index - 2
+        if (before >= 0 && value <= runs[before + 1]) return
+        val joinsBefore = before >= 0 && runs[before + 1] != Long.MAX_VALUE && runs[before + 1] + 1L == value
+        val joinsAfter = index < runs.size && value != Long.MAX_VALUE && value + 1L == runs[index]
         when {
             joinsBefore && joinsAfter -> {
-                checkNotNull(before).last = checkNotNull(after).last
-                runs.removeAt(index)
+                runs[before + 1] = runs[index + 1]
+                for (position in index until runs.size - 2) runs[position] = runs[position + 2]
+                runs.truncateTo(runs.size - 2)
             }
-            joinsBefore -> checkNotNull(before).last = value
-            joinsAfter -> checkNotNull(after).first = value
-            else -> runs.add(index, Run(value, value))
+            joinsBefore -> runs[before + 1] = value
+            joinsAfter -> runs[index] = value
+            else -> {
+                runs.insertAt(index, value)
+                runs.insertAt(index + 1, value)
+            }
         }
     }
 
     private fun insertionPoint(value: Long): Int {
         var low = 0
-        var high = runs.size
+        var high = runs.size / 2
         while (low < high) {
             val middle = (low + high) ushr 1
-            if (runs[middle].first <= value) low = middle + 1 else high = middle
+            if (runs[middle * 2] <= value) low = middle + 1 else high = middle
         }
         return low
     }
