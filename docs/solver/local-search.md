@@ -626,6 +626,13 @@ violation improvements contribute telemetry without becoming restart anchors. Pu
 samples and samples retained by custom restart policies remain independent of subsequent
 updates.
 
+Built-in anchored perturbations restore exact Boolean and integer pins after their
+random draws and clear the tabu/configuration epoch while retaining write activity.
+Restarts wrapped by definition or implicit initialization record best cost only after
+that reconciliation; scores from the restart callback's intermediate assignment do
+not lower the retained best cost. Supplied optimization seeds are reconciled before
+their first cost observation as well.
+
 Satisfaction draws, sample/enumeration streams and resumable satisfaction share the same
 restart-anchor lifecycle. Fixed-cadence and Luby policies ignore the anchor and retain no
 assignment copy. Anchoring and custom policies retain the exact best assignment in private

@@ -99,6 +99,9 @@ internal fun anchorAndPerturb(
             }
         }
     }
+    state.assumptions.forEachBool { variable, value -> state.assignment.setBool(variable, value) }
+    state.assumptions.forEachInt { variable, value -> state.assignment.setInt(variable, value) }
+    state.resetStepCounters()
     state.recompute()
 }
 
