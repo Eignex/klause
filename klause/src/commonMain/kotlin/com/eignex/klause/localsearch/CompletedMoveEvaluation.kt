@@ -116,7 +116,7 @@ internal class CompletedMoveEvaluation(
         grades[move] = Double.POSITIVE_INFINITY
         val candidate = state.completionCandidate(move) ?: return null
         val before = current()
-        // Completion optimizes all real coordinates for fixed finite pins; changing only a real guess repeats that query.
+        // The real subproblem depends on finite pins; changing only a real guess repeats its query.
         if (candidate.hammingDistanceTo(before) == 0) return null
         val decided = complete(candidate)
         if (decided !is Completion.Witness || cancellation()) return null
