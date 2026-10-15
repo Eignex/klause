@@ -38,6 +38,7 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     cancellation: Cancellation = Cancellation.Never,
     fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
     onDecline: (EncoderDecline) -> Unit = {},
+    completeFiniteConditions: Boolean = false,
 ): Problem? {
     require(target != EncodingTarget.POLYNOMIAL)
     val integerPins = fixedIntegers.toMap()
@@ -46,7 +47,8 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     val origins = ArrayList<Int>()
     val allocator = EncodingRealAllocator(problem.numRealVars)
     for (index in indices) {
-        val relations = installLinearFactor(index, target, integerPins, booleanPins, cancellation, allocator, onDecline)
+        val relations = installLinearFactor(index, target, integerPins, booleanPins, cancellation, allocator,
+            onDecline, completeFiniteConditions)
             ?: return null
         factors += relations
         repeat(relations.size) { origins += index }
@@ -65,9 +67,11 @@ internal fun PreparedFactorProjections.installLinearFactor(
     cancellation: Cancellation = Cancellation.Never,
     allocator: EncodingRealAllocator = EncodingRealAllocator(problem.numRealVars),
     onDecline: (EncoderDecline) -> Unit = {},
+    completeFiniteConditions: Boolean = false,
 ): List<EncodedTheoryFactor>? {
     val selected = encoder(index, target)
-    if (target == EncodingTarget.LINEAR && selected.support == EncoderSupport.CONDITIONED &&
+    if (completeFiniteConditions && target == EncodingTarget.LINEAR &&
+        selected.support == EncoderSupport.CONDITIONED &&
         selected.requiredIntegers.any { it !in integerPins }
     ) return installConditionedLinearFactor(index, integerPins, booleanPins, cancellation, allocator, onDecline)
     val source = problem.factors[index]

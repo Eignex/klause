@@ -1,11 +1,13 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
@@ -67,7 +69,8 @@ internal fun Compiler.Builder.closeProductBounds() {
     val premises = Problem(settings = settings, numBoolVars = 0, intBounds = modelIntBounds(),
         factors = Array(boundPremises.size) { index ->
             val row = boundPremises[index]
-            Linear(row.coeffs, row.vars, row.op, row.bound)
+            ExactLinear.of(IntArray(row.vars.size) { Term.ofIntVar(row.vars[it]) },
+                row.coeffs.map { BigFraction.ofLong(it) }, row.op, BigFraction.ofLong(row.bound))
         })
     val closed = when (val outcome = premises.closeOpenBounds(sourceCancellation)) {
         OpenPresolveResult.Refuted -> smtUnsupported("nonlinear source has refuted integer premises")

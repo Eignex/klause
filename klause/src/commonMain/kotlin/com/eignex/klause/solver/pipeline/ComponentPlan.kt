@@ -241,7 +241,7 @@ class ComponentPlan internal constructor(
         var decline: EncoderDecline? = null
         val fragment = if (appended) {
             selection.linearTheoryModel(encodingTarget(), selectedTheoryFactorIndices(), cancellation = cancellation,
-                onDecline = { decline = it })
+                onDecline = { decline = it }, completeFiniteConditions = true)
         } else installedFragment?.let { it.rebindEncoding(spec, it.factors, it.impliedFactorMask) }
         return ComponentPlan(spec, intOwners, factorOwners,
             if (appended && hasTheoryComponent && fragment == null) ProblemPipeline.UNSUPPORTED_OPEN
@@ -294,7 +294,7 @@ class ComponentPlan internal constructor(
         val selected = spec.componentPlan(factorProjections, cancellation = cancellation)
         if (selected.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN) return null
         val fragment = factorProjections.linearTheoryModel(EncodingTarget.LINEAR,
-            selected.selectedTheoryFactorIndices(), cancellation = cancellation) ?: return null
+            selected.selectedTheoryFactorIndices(), cancellation = cancellation, completeFiniteConditions = true) ?: return null
         val route = when {
             fragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
             fragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
@@ -376,10 +376,12 @@ fun Problem.componentPlan(
     }
     var initialResourceDecline = false
     val linear = projections.linearTheoryModel(EncodingTarget.LINEAR, cancellation = cancellation,
-        onDecline = { if (it == EncoderDecline.RESOURCE) initialResourceDecline = true })
+        onDecline = { if (it == EncoderDecline.RESOURCE) initialResourceDecline = true },
+        completeFiniteConditions = true)
     val difference = projections.linearTheoryModel(
         EncodingTarget.DIFFERENCE, cancellation = cancellation,
-        onDecline = { if (it == EncoderDecline.RESOURCE) initialResourceDecline = true })
+        onDecline = { if (it == EncoderDecline.RESOURCE) initialResourceDecline = true },
+        completeFiniteConditions = true)
     val completeTheory = when {
         linear?.supportsExactLra() == true -> ProblemPipeline.EXACT_LRA
         difference != null && numRealVars == 0 && supportsCompleteDifferenceTheory(
@@ -455,7 +457,7 @@ fun Problem.componentPlan(
             } else linear
         }
         else -> projections.linearTheoryModel(EncodingTarget.LINEAR, kept, cancellation = cancellation,
-            onDecline = { linearDecline = it })
+            onDecline = { linearDecline = it }, completeFiniteConditions = true)
     }
     val differenceFragment = when {
         preparationStopped -> {
@@ -471,7 +473,7 @@ fun Problem.componentPlan(
             } else difference
         }
         else -> projections.linearTheoryModel(EncodingTarget.DIFFERENCE,
-            differenceKept, cancellation = cancellation, onDecline = { differenceDecline = it })
+            differenceKept, cancellation = cancellation, onDecline = { differenceDecline = it }, completeFiniteConditions = true)
     }
     val needsArithmetic = intOwners.any { it == IntVariableOwner.THEORY } || encoded.any { it } || numRealVars != 0
     val route = when {

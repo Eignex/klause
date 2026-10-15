@@ -31,7 +31,7 @@ class ConditionedLinearEncodingTest {
         })
 
         val relation = providers.prepare(source).linearTheoryModel(EncodingTarget.LINEAR,
-            onDecline = { decline = it })
+            onDecline = { decline = it }, completeFiniteConditions = true)
 
         assertNull(relation)
         assertEquals(2, installations)
@@ -56,7 +56,7 @@ class ConditionedLinearEncodingTest {
         })
 
         val relation = providers.prepare(source).linearTheoryModel(EncodingTarget.LINEAR,
-            cancellation = Cancellation { stopped }, onDecline = { decline = it })
+            cancellation = Cancellation { stopped }, onDecline = { decline = it }, completeFiniteConditions = true)
 
         assertNull(relation)
         assertEquals(EncoderDecline.RESOURCE, decline)
