@@ -18,6 +18,8 @@ import com.eignex.klause.lp.bounding.sparseCertifiedPrune
 import com.eignex.klause.lp.bounding.sparseSafePrune
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -35,6 +37,8 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import kotlin.math.nextDown
+import kotlin.math.nextUp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -445,6 +449,114 @@ class LpBoundingTest {
                     )
 
                     assertEquals(cutoff < minimum, result.prune)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `continuous node pruning respects independently accepted objective certifiers`() {
+        for (safe in listOf(false, true)) for (integer in listOf(false, true)) {
+            for ((sign, minimum) in listOf(1L to 3.125, -1L to -4.625)) {
+                val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+                    numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+                val objective = LinearObjective(intCoefficients = longArrayOf(sign), constant = 3L * sign,
+                    realCoefficients = doubleArrayOf(0.5 * sign))
+                val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, successful ->
+                    successful && when (certifier) {
+                        LpCertifier.SAFE_OBJECTIVE -> safe
+                        LpCertifier.INTEGER -> integer
+                        else -> false
+                    }
+                })
+                val sink = SolveStatsSink(backend = "continuous-policy")
+                val session = PropagationSession(problem)
+                LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink, context).use { engine ->
+                    val result = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session,
+                        minimum - 0.125, sink, Cancellation.Never, -1, true)
+
+                    assertEquals(safe || integer, result.prune, "safe=$safe integer=$integer sign=$sign")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `continuous recovery pruning and root publication retain only accepted safe bounds`() {
+        for (safe in listOf(false, true)) for (integer in listOf(false, true)) {
+            for ((sign, minimum) in listOf(1L to 3.125, -1L to -4.625)) {
+                val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+                    numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+                val objective = LinearObjective(intCoefficients = longArrayOf(sign), constant = 3L * sign,
+                    realCoefficients = doubleArrayOf(0.5 * sign))
+                val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, successful ->
+                    successful && when (certifier) {
+                        LpCertifier.SAFE_OBJECTIVE -> safe
+                        LpCertifier.INTEGER -> integer
+                        else -> false
+                    }
+                })
+                val sink = SolveStatsSink(backend = "continuous-recovery")
+                LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink, context).use { engine ->
+                    val relaxer = assertNotNull(engine.lpRelaxer)
+                    val result = engine.sparseCertifiedPrune(relaxer, PropagationSession(problem),
+                        minimum - 0.125, sink, Cancellation.Never)
+                    val root = engine.rootLpRelaxationBound(relaxer, emptyList())
+
+                    assertEquals(safe, result.prune)
+                    if (safe) assertEquals(minimum, root) else assertTrue(root.isNaN())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `safe continuous bounds conservatively enclose cutoff equality and neighbors`() {
+        for ((sign, minimum) in listOf(1L to 3.125, -1L to -4.625)) {
+            for (cutoff in listOf(minimum.nextDown(), minimum, minimum.nextUp(),
+                    Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NaN)) {
+                val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+                    numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+                val objective = LinearObjective(intCoefficients = longArrayOf(sign), constant = 3L * sign,
+                    realCoefficients = doubleArrayOf(0.5 * sign))
+                val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, successful ->
+                    successful && certifier == LpCertifier.SAFE_OBJECTIVE
+                })
+                val sink = SolveStatsSink(backend = "continuous-cutoff")
+                LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink, context).use { engine ->
+                    val relaxer = assertNotNull(engine.lpRelaxer)
+                    val expected = cutoff.isFinite() && cutoff < minimum
+
+                    assertEquals(expected, engine.sparseSafePrune(relaxer, PropagationSession(problem),
+                        cutoff, sink, Cancellation.Never, -1, true).prune)
+                    assertEquals(expected, engine.sparseCertifiedPrune(relaxer, PropagationSession(problem),
+                        cutoff, sink, Cancellation.Never).prune)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `continuous root bounds preserve fractional source units beside wide constants`() {
+        for (constant in listOf(3L, 9007199254740995L, -9007199254740993L, Long.MIN_VALUE, Long.MAX_VALUE)) {
+            for (coefficient in listOf(0.125, -0.125)) {
+                val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(),
+                    numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.25))
+                val objective = LinearObjective(intCoefficients = longArrayOf(1L), constant = constant,
+                    realCoefficients = doubleArrayOf(coefficient))
+                val sink = SolveStatsSink(backend = "continuous-source")
+                val exact = BigFraction.ofLong(constant) + assertNotNull(BigFraction.ofDouble(coefficient)) *
+                    assertNotNull(BigFraction.ofDouble(if (coefficient > 0.0) 0.25 else 1.25))
+                LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                    val relaxer = assertNotNull(engine.lpRelaxer)
+                    val root = engine.rootLpRelaxationBound(relaxer, emptyList())
+
+                    assertTrue(assertNotNull(BigFraction.ofDouble(root)) <= exact)
+                    assertTrue(assertNotNull(BigFraction.ofDouble(root.nextUp())) > exact)
+                    assertFalse(engine.sparseSafePrune(relaxer, PropagationSession(problem),
+                        exact.toDouble(), sink, Cancellation.Never, -1, true).prune)
+                    assertFalse(engine.sparseCertifiedPrune(relaxer, PropagationSession(problem),
+                        exact.toDouble(), sink, Cancellation.Never).prune)
                 }
             }
         }

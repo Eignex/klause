@@ -663,7 +663,7 @@ internal fun LpEngine.sparseSafePrune(
     }
     val full = checkNotNull(BigFraction.ofDouble(lower)) + BigFraction.ofLong(boundRel.objectiveConstant)
     val sourceRange = sourceObjectiveRange(boundRel)
-    val cutoff = if (canPrune && sourceRange != null) enclosingCutoff(bound) else null
+    val cutoff = if (canPrune) sourceObjectiveCutoff(boundRel, bound) else null
     if (cutoff != null && full >= cutoff) {
         sink.lp.observePrune()
         return LpNodeOutcome(true, null)
@@ -1198,6 +1198,16 @@ private fun enclosingCutoff(bound: Double): BigFraction? {
     return BigFraction.ofDouble(if (abs(bound) >= EXACT_INTEGER_DOUBLE_LIMIT) bound.nextUp() else bound)
 }
 
+private fun LpEngine.sourceObjectiveCutoff(relaxation: LpRelaxation, bound: Double): BigFraction? {
+    if (!bound.isFinite() || !relaxation.model.finiteExactInput()) return null
+    return if (relaxation.model.hasIntegralObjective()) {
+        if (sourceObjectiveRange(relaxation) != null) enclosingCutoff(bound) else null
+    } else {
+        // A continuous source value can round to the cutoff from above, even in a small Double bin.
+        BigFraction.ofDouble(bound.nextUp())
+    }
+}
+
 private fun LpRelaxation.objectiveVariableLowerBound(variable: Int, lower: BigFraction): Long? =
     objectiveVariableValue(variable, lower)?.ceilLong()
 
@@ -1260,8 +1270,7 @@ internal fun LpEngine.sparseCertifiedPrune(
         solveContext.certificationPolicy,
     )
         ?: return LpNodeOutcome(false, null)
-    if (sourceObjectiveRange(relaxation) == null) return LpNodeOutcome(false, null)
-    val cutoff = enclosingCutoff(bound) ?: return LpNodeOutcome(false, null)
+    val cutoff = sourceObjectiveCutoff(relaxation, bound) ?: return LpNodeOutcome(false, null)
     val full = checkNotNull(BigFraction.ofDouble(lb)) + BigFraction.ofLong(relaxation.objectiveConstant)
     return if (full >= cutoff) {
         sink.lp.observePrune()
@@ -1307,8 +1316,9 @@ internal fun LpEngine.rootLpRelaxationBound(
         val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
         val projected = full?.lowerBoundDouble()
         when {
-            projected == null || sourceObjectiveRange(relaxation) == null -> Double.NaN
-            abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
+            projected == null -> Double.NaN
+            relaxation.model.hasIntegralObjective() && sourceObjectiveRange(relaxation) == null -> Double.NaN
+            relaxation.model.hasIntegralObjective() && abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
             else -> projected
         }
     }
