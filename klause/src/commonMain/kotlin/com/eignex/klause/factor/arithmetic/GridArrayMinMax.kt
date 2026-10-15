@@ -59,7 +59,8 @@ internal class GridArrayMinMax(
         val operation = if (equality) LinearOp.EQ else LinearOp.LE
         if (constants[left] && constants[right]) {
             val holds = if (equality) origins[left] == origins[right] else origins[left] <= origins[right]
-            return Linear(longArrayOf(0), intArrayOf(coordinates[0]), operation, if (holds) 0L else if (equality) 1L else -1L)
+            return Linear(longArrayOf(0), intArrayOf(coordinates[0]), operation,
+                if (holds) 0L else if (equality) 1L else -1L)
         }
         if (constants[left]) {
             return Linear(longArrayOf(scaled(-steps[right])), intArrayOf(coordinates[right]), operation,

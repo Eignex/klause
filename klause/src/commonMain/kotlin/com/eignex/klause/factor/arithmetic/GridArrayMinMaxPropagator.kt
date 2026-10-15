@@ -26,8 +26,9 @@ internal class GridArrayMinMaxPropagator(private val factor: GridArrayMinMax) : 
     }
     private val rows = (1 until factor.coordinates.size).map { factor.comparison(it, equality = true) }
 
-    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int): IntArray =
-        premises(state, atTrail, atLevel)
+    override fun explain(
+        state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int,
+    ): IntArray = premises(state, atTrail, atLevel)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray =
         premises(state, state.undo.size, state.currentLevel)
@@ -82,8 +83,8 @@ internal class GridArrayMinMaxPropagator(private val factor: GridArrayMinMax) : 
 
     private fun tighten(state: PropagationState, factorId: Int, variable: Int, value: BigInt, lower: Boolean): Boolean {
         val domain = state.intDomains[variable]
-        if (lower && value <= bigIntOf(domain.min) || !lower && value >= bigIntOf(domain.max)) return true
-        if (lower && value > bigIntOf(domain.max) || !lower && value < bigIntOf(domain.min)) return false
+        if ((lower && value <= bigIntOf(domain.min)) || (!lower && value >= bigIntOf(domain.max))) return true
+        if ((lower && value > bigIntOf(domain.max)) || (!lower && value < bigIntOf(domain.min))) return false
         val reason = when {
             state.currentLevel == 0 -> null
             state.undoLogging -> state.lazyReasonSlots(0, factorId)
