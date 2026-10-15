@@ -11,7 +11,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
-import com.eignex.klause.solver.search.SearchBranchProposal
+import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
@@ -37,9 +37,10 @@ class DifferenceRelativeBranchesTest {
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
             ),
         )
-        val component = DifferenceSearchComponent(model).withRelativeBranches(Cancellation.Never)
-        val brancher = assertIs<SearchBranchProposal>(component)
-        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+        val component = DifferenceSearchComponent(model)
+        val brancher = assertNotNull(component.prepareRelativeBranches(Cancellation.Never))
+        val session = SearchComponentSet(listOf(component), proposals = listOf(brancher))
+            .session(atoms = SearchAtomRegistry(1))
         assertIs<ComponentResult.Consistent>(session.initialize())
         val alternatives = assertNotNull(brancher.nextBranch(session))
         assertEquals(2, alternatives.size)
@@ -72,9 +73,10 @@ class DifferenceRelativeBranchesTest {
                 ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
             ),
         )
-        val component = DifferenceSearchComponent(model).withRelativeBranches(Cancellation.Never)
-        val brancher = assertIs<SearchBranchProposal>(component)
-        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+        val component = DifferenceSearchComponent(model)
+        val brancher = assertNotNull(component.prepareRelativeBranches(Cancellation.Never))
+        val session = SearchComponentSet(listOf(component), proposals = listOf(brancher))
+            .session(atoms = SearchAtomRegistry(1))
         assertIs<ComponentResult.Consistent>(session.initialize())
         val branch = assertNotNull(brancher.nextBranch(session))[0]
 
@@ -96,9 +98,10 @@ class DifferenceRelativeBranchesTest {
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
             ),
         )
-        val component = DifferenceSearchComponent(model).withRelativeBranches(Cancellation.Never)
-        val brancher = assertIs<SearchBranchProposal>(component)
-        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+        val component = DifferenceSearchComponent(model)
+        val brancher = assertNotNull(component.prepareRelativeBranches(Cancellation.Never))
+        val session = SearchComponentSet(listOf(component), proposals = listOf(brancher))
+            .session(atoms = SearchAtomRegistry(1))
         assertIs<ComponentResult.Consistent>(session.initialize())
         val first = assertNotNull(brancher.nextBranch(session))[1]
         assertIs<ComponentResult.Consistent>(session.push(first))
@@ -124,8 +127,10 @@ class DifferenceRelativeBranchesTest {
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
             ),
         )
-        val component = DifferenceSearchComponent(model).withRelativeBranches(Cancellation.Never)
-        val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1, maxAtoms = 0))
+        val component = DifferenceSearchComponent(model)
+        val brancher = assertNotNull(component.prepareRelativeBranches(Cancellation.Never))
+        val session = SearchComponentSet(listOf(component), proposals = listOf(brancher))
+            .session(atoms = SearchAtomRegistry(1, maxAtoms = 0))
         assertIs<ComponentResult.Consistent>(session.initialize())
 
         assertIs<SearchRunEvent.Satisfied>(session.openRun(1).next())

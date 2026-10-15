@@ -254,11 +254,12 @@ class DifferenceSearchComponent private constructor(
         relativeBranches = null
     }
 
-    internal fun withRelativeBranches(stop: Cancellation): TheoryComponent {
-        val source = base ?: return this
-        val branches = DifferenceRelativeBranches.create(source, model.numBoolVars, stop) ?: return this
+    internal fun prepareRelativeBranches(stop: Cancellation): SearchBranchProposal? {
+        if (model.numBoolVars == 0) return null
+        val source = base ?: return null
+        val branches = DifferenceRelativeBranches.create(source, model.numBoolVars, stop) ?: return null
         relativeBranches = branches
-        return object : TheoryComponent by this@DifferenceSearchComponent, SearchBranchProposal by branches {}
+        return branches
     }
 
     internal fun potentialHintAvailable(): Boolean = hintPoint?.let {
