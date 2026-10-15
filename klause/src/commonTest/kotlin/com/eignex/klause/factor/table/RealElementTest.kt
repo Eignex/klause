@@ -18,6 +18,18 @@ import kotlin.test.assertNotEquals
 
 class RealElementTest {
     @Test
+    fun `a selected real result alias retains an unbounded source direction`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(1, 1)),
+            arrayOf<Factor>(RealElement(0, 0, intArrayOf(0))),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
+
+        val result = BacktrackSolver(source.bake()).minimize(LinearObjective(realCoefficients = doubleArrayOf(-1.0)),
+            BacktrackParams(randomSeed = 0))
+
+        assertIs<MinimizeResult.Unbounded>(result)
+    }
+
+    @Test
     fun `real selection optimizes across every legal index`() {
         val source = Problem(0, 1, arrayOf(IntDomain(1, 3)),
             arrayOf<Factor>(RealElement(0, 0, doubleArrayOf(3.0, 1.0, 2.0))),
