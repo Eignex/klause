@@ -140,10 +140,11 @@ def archive(spec, request, root):
     prefix = ["aws", "--region", request["region"], "s3api"]
     location = ["--bucket", request["bucket"], "--key", spec["key"], "--if-match", spec["etag"]]
     exit_code, metadata = command(prefix + ["head-object"] + location, directory, "head", 30)
-    if exit_code or json.loads(metadata.read_text())["ContentLength"] > 64 * 1024 * 1024:
+    expected_size = json.loads(metadata.read_text())["ContentLength"] if exit_code == 0 else None
+    if expected_size is None or expected_size > 64 * 1024 * 1024:
         raise ValueError("Archive is unavailable or oversized")
     exit_code, _ = command(prefix + ["get-object"] + location + [str(obj)], directory, "download", 60)
-    if exit_code:
+    if exit_code or obj.stat().st_size != expected_size:
         raise ValueError("Archive download failed")
     identity = sha(obj)
     write(directory / "archive.json", {"key": spec["key"], "etag": spec["etag"], "sha256": identity})
@@ -152,27 +153,12 @@ def archive(spec, request, root):
     install = directory / "install"
     install.mkdir()
     process = subprocess.Popen(["zstd", "-dc", str(obj)], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    size, count, complete = 0, 0, False
+    complete = False
     try:
         with tarfile.open(fileobj=process.stdout, mode="r|") as tar:
-            for entry in tar:
-                name = pathlib.PurePosixPath(entry.name)
-                if name.is_absolute() or ".." in name.parts or not (entry.isdir() or entry.isfile()):
-                    raise ValueError("Unsafe archive member")
-                if not entry.name.startswith(("klause-cli/build/install/", "klause-bench/build/install/")):
-                    raise ValueError("Archive member outside installed distributions")
-                count += 1
-                size += entry.size
-                if count > 4096 or size > 96 * 1024 * 1024:
-                    raise ValueError("Expanded archive is oversized")
-                dest = install / name
-                if entry.isdir():
-                    dest.mkdir(parents=True, exist_ok=True)
-                else:
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    with tar.extractfile(entry) as source, dest.open("xb") as target:
-                        while block := source.read(1024 * 1024):
-                            target.write(block)
+            extract(tar, install)
+        if len(process.stdout.read(1024 * 1024 + 1)) > 1024 * 1024:
+            raise ValueError("Oversized archive trailer")
         complete = True
     finally:
         process.stdout.close()
@@ -194,6 +180,29 @@ def archive(spec, request, root):
     if not (lib / "klause-jvm-SNAPSHOT.jar").is_file():
         raise ValueError("Archived JVM CLI distribution is absent")
     return lib
+
+
+def extract(tar, install):
+    size, count = 0, 0
+    for entry in tar:
+        name = pathlib.PurePosixPath(entry.name)
+        if name.is_absolute() or ".." in name.parts or not (entry.isdir() or entry.isfile()):
+            raise ValueError("Unsafe archive member")
+        roots = ("klause-cli/build/install", "klause-bench/build/install")
+        if not any(entry.name == root or entry.name.startswith(root + "/") for root in roots):
+            raise ValueError("Archive member outside installed distributions")
+        count += 1
+        size += entry.size
+        if count > 4096 or size > 96 * 1024 * 1024:
+            raise ValueError("Expanded archive is oversized")
+        dest = install / name
+        if entry.isdir():
+            dest.mkdir(parents=True, exist_ok=True)
+        else:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with tar.extractfile(entry) as source, dest.open("xb") as target:
+                while block := source.read(1024 * 1024):
+                    target.write(block)
 
 
 def wall_patch(data, millis):
