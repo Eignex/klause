@@ -492,6 +492,13 @@ retaining coordinate bounds and omission counts.
 
 ## Scoring and probe restoration
 
+Under feasibility-first shaping, a self-owned feasible walk grades its unscaled
+objective delta and excludes proposals that break feasibility. This includes optimizing
+SA when its ordinary acceptance is Metropolis. Its temperature governs objective
+changes after feasibility; the zero pre-feasibility coefficient does not erase that
+gradient. Explicit linear shaping retains its configured scale, while a strategy's
+separate feasible acceptance retains its own unscaled objective policy.
+
 Moves feeding definitions score the complete propagated assignment, including derived
 factor degrees and objective coordinates. Compounds without definition readers retain
 additive linear objective scoring for distinct coordinates and the objective's own

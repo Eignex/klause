@@ -1024,6 +1024,7 @@ internal class LocalSearchEngine(
         // FeasibilityFirst leaves it at 0.0, identical to the no-shaping path.
         state.shaping.objective = objective
         state.shaping.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
+        state.shaping.feasibilityGated = params.costShaping.feasibilityGated
         // Warm-start from a caller-supplied (arity-compatible) assignment instead of a random
         // restart; null by default. See [LocalSearchParams.initialAssignment].
         val seeded = seedInitial(state, params, checkpoint, reconcile = true)

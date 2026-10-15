@@ -26,6 +26,8 @@ class ObjectiveShaping {
     var shapingLambda: Double = 0.0
         internal set
 
+    internal var feasibilityGated: Boolean = false
+
     private var objIntVarsCache: IntArray? = null
     private var objIntVarsFor: Objective? = null
 
