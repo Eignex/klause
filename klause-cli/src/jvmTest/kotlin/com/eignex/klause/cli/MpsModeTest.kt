@@ -20,6 +20,25 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `original nonzero underflow declines numerical MPS under either certification policy`() {
+        val source = File.createTempFile("mps-underflow-numerical", ".mps").apply {
+            writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1e-400\n" +
+                "RHS\n RHS R 0.1\nBOUNDS\n UP B X 1\nENDATA\n")
+            deleteOnExit()
+        }
+        for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
+            val text = capture {
+                assertEquals(0, runCli(arrayOf("-s", "-p", "1", *flags, source.absolutePath)))
+            }
+
+            assertTrue("s UNKNOWN" in text.lines(), text)
+            assertTrue("solvePipeline=numerical-mip" in text, text)
+            assertFalse("declaredTheoryRoute=" in text, text)
+            assertFalse(text.lines().any { it.startsWith("v ") }, text)
+        }
+    }
+
+    @Test
     fun `an infeasible constant MPS row retains numerical refutation under either policy`() {
         val source = File.createTempFile("mps-constant-infeasible", ".mps").apply {
             writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R 1\n" +

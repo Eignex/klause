@@ -32,6 +32,10 @@ projection retains its explicit tolerance correspondence.
 
 A hybrid lowering refusal retains the exact source adapter for numerical admission.
 An infeasible constant row remains an explicit contradiction for the solver.
+Numerical admission checks original decimal rows even when the default continuous
+working projection retains tolerance semantics. A nonzero source term that cannot
+project finitely declines before numerical execution; the exact source remains
+available for result qualification without selecting another execution route.
 
 `MpsModel.toExactSourceProblem` preserves parsed decimal numbers in native
 `ExactLinear` rows, clearing denominators without rounding. Real column

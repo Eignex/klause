@@ -10,6 +10,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -17,6 +18,22 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class NumericalLinearRequestTest {
+    @Test
+    fun `an unprojectable nonzero source coefficient declines without numerical work`() {
+        val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1e-400\n" +
+            "RHS\n RHS R 0.1\nBOUNDS\n UP B X 1\nENDATA\n").toExactSourceProblem()
+        val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
+
+        val result = request.solve()
+
+        assertFalse(request.numericalRowsSupported())
+        assertNull(request.finiteRoute())
+        assertNull(result.terminal)
+        assertNull(result.incumbent)
+        assertEquals(TerminationReason.Unsupported, result.reason)
+        assertEquals(0L, result.stats.smt.sourceLp.operations)
+    }
+
     @Test
     fun `source fixed indicators retain numerical bound closure and original declarations`() {
         val compiled = Mps.parse("ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
