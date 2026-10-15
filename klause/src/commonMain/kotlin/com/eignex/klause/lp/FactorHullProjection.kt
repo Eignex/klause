@@ -1,7 +1,6 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.GridAbs
-import com.eignex.klause.lowering.gridAbsoluteValueTable
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.global.GlobalCardinality
@@ -11,6 +10,7 @@ import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.lowering.gridAbsoluteValueTable
 
 /** The optional convex-hull family emitted by this factor's LP relaxation. */
 internal fun Factor.lpHullFamily(): HullFamily? = when (this) {

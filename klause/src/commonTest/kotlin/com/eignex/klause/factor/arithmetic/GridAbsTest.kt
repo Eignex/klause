@@ -3,8 +3,8 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.flatzinc.FlatZincParseException
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
-import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -82,33 +82,33 @@ class GridAbsTest {
                 GridAbs(0, result, -2.0, 2.0, 5, -2.0, 2.0, 5),
                 GridAbs(0, result, -1.0, 1.0, 5, 0.0, 0.8, 5),
             )) {
-            val source = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(relation))
-            val fragment = assertNotNull(FactorProjectionProviders.Default.prepare(source)
-                .linearTheoryModel(EncodingTarget.LINEAR))
-            for (input in 0L..4L) for (output in 0L..4L) {
-                val values = longArrayOf(input, output)
-                val held = fragment.factors.all { factor ->
-                    assertEquals(0, (factor as EncodedTheoryFactor).attribution.sourceFactorIndex)
-                    val form = assertNotNull(factor.linearForm)
-                    val rows = form.rows.map { row ->
-                        val constants = row.constants as IntegralConstants
-                        var activity = BIG_ZERO
-                        for (i in 0 until row.size) {
-                            activity += constants.exactCoeff(i) * bigIntOf(values[Term.intVar(row.ref(i))])
+                val source = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(relation))
+                val fragment = assertNotNull(FactorProjectionProviders.Default.prepare(source)
+                    .linearTheoryModel(EncodingTarget.LINEAR))
+                for (input in 0L..4L) for (output in 0L..4L) {
+                    val values = longArrayOf(input, output)
+                    val held = fragment.factors.all { factor ->
+                        assertEquals(0, (factor as EncodedTheoryFactor).attribution.sourceFactorIndex)
+                        val form = assertNotNull(factor.linearForm)
+                        val rows = form.rows.map { row ->
+                            val constants = row.constants as IntegralConstants
+                            var activity = BIG_ZERO
+                            for (i in 0 until row.size) {
+                                activity += constants.exactCoeff(i) * bigIntOf(values[Term.intVar(row.ref(i))])
+                            }
+                            val comparison = activity.compareTo(constants.exactBound)
+                            when (row.relation) {
+                                LinearOp.EQ -> comparison == 0
+                                LinearOp.NE -> comparison != 0
+                                LinearOp.LE -> comparison <= 0
+                                LinearOp.GE -> comparison >= 0
+                            }
                         }
-                        val comparison = activity.compareTo(constants.exactBound)
-                        when (row.relation) {
-                            LinearOp.EQ -> comparison == 0
-                            LinearOp.NE -> comparison != 0
-                            LinearOp.LE -> comparison <= 0
-                            LinearOp.GE -> comparison >= 0
-                        }
+                        if (form is LinearForm.Disjunction) rows.any { it } else rows.all { it }
                     }
-                    if (form is LinearForm.Disjunction) rows.any { it } else rows.all { it }
-                }
 
-                assertEquals(values[result] == relation.image[input.toInt()].toLong(), held)
-            }
+                    assertEquals(values[result] == relation.image[input.toInt()].toLong(), held)
+                }
             }
         }
     }
