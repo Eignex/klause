@@ -281,7 +281,9 @@ finite propagation is unavailable until a complete arithmetic consumer is select
 `GridArrayMinMax` retains per-coordinate grid steps, origins and the component's
 scaling policy. Its finite projection filters envelope rows and remaining
 operand equalities; exact finite checking and selected arithmetic encoders use
-the same signed coefficient and offset rounding. This relation does not establish exact physical source
+the same signed coefficient and offset rounding. Lazy propagation explanations
+retain the prior bounds for every operand, including the bounds that exclude
+other equality alternatives. This relation does not establish exact physical source
 arithmetic outside the declared grid policy.
 
 `RealElement` retains an integer index and ordered binary64 constants or real-column
