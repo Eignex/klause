@@ -487,6 +487,9 @@ private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     completeSearchLinearOutcomes?.forEach { (key, count) ->
         out += "smtCompleteSearchLinearOutcome_$key" to "$count"
     }
+    completeSearchStages?.forEach { (key, count) ->
+        out += "smtCompleteSearchStage_$key" to "$count"
+    }
     out += "smtWitnessCandidates" to "$witnessCandidates"
     out += "smtWitnessAccepted" to "$witnessAccepted"
     out += "smtStrictWitnessCandidates" to "$strictWitnessCandidates"
