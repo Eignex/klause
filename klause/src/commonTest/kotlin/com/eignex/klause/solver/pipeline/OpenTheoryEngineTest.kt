@@ -82,14 +82,15 @@ class OpenTheoryEngineTest {
                 numBoolVars = 2, numIntVars = 2,
                 intDomains = arrayOf(IntDomain(-2, 2), IntDomain(0, 0)),
                 openIntLo = booleanArrayOf(false, true), openIntHi = booleanArrayOf(false, true),
-                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0),
+                numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
                 factors = arrayOf(
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, -2),
                     Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
                     Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), doubleArrayOf(1.0),
-                        LinearOp.GE, if (positive) 1.0 else -3.0),
-                    Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), doubleArrayOf(1.0),
-                        LinearOp.LE, if (positive) 3.0 else -1.0),
+                        if (positive) LinearOp.GE else LinearOp.LE, if (positive) 1.0 else -1.0),
+                    Linear(intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), doubleArrayOf(-1.0),
+                        if (positive) LinearOp.GE else LinearOp.LE, if (positive) 1.0 else -1.0),
                     ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.LE, 0),
                 ),
             )
@@ -106,13 +107,22 @@ class OpenTheoryEngineTest {
                 assertNull(run.advance())
 
                 assertNull(run.session.boolValue(0))
-                assertNull(run.session.boolValue(1))
+                assertNull(run.session.boolValue(1),
+                    "finite interval ${run.session.intLowerBound(0)}..${run.session.intUpperBound(0)}")
                 assertTrue(run.session.intLowerBound(0)!! > -2L || run.session.intUpperBound(0)!! < 2L)
                 pause = false
                 val assignment = assertIs<OpenTheoryResult.Sat>(run.advance()).assignment
-                assertEquals(if (positive) 1L else -1L, assignment.intValue(0).toLong())
+                val integer = assignment.intValue(0).toLong()
+                assertTrue(if (positive) integer in 1L..2L else integer in -2L..-1L)
+                val real = assertNotNull(assignment.toSample(model).exactReals)[0]
+                val twiceInteger = BigFraction.ofLong(2L * integer)
+                val bound = BigFraction.ofLong(if (positive) 1L else -1L)
+                if (positive) {
+                    assertTrue(twiceInteger + real >= bound && twiceInteger - real >= bound)
+                } else {
+                    assertTrue(twiceInteger + real <= bound && twiceInteger - real <= bound)
+                }
                 assertEquals(assignment.intValue(1).toLong() <= 0L, assignment.boolValue(1))
-                assertEquals("0", assignment.realValue(0))
             }
         }
     }
