@@ -68,12 +68,12 @@ class GridArithmeticEncoderTest {
             val queries = OpenExactNeighborhood(encoded, TheoryParams(),
                 preparedSource = encoded.prepareExecutionPlan())
             queries.use {
-                val conflict = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO,
-                    1 to BigFraction.ZERO), emptyMap())
-                val negative = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO,
-                    1 to BigFraction.ofLong(4)), emptyMap())
-                val zero = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ofLong(2),
-                    1 to BigFraction.ZERO), emptyMap())
+                val conflictPins = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)
+                val negativePins = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ofLong(4))
+                val zeroPins = mapOf(0 to BigFraction.ofLong(2), 1 to BigFraction.ZERO)
+                val conflict = ExactNeighborhoodCondition(emptyMap(), conflictPins, conflictPins)
+                val negative = ExactNeighborhoodCondition(emptyMap(), negativePins, negativePins)
+                val zero = ExactNeighborhoodCondition(emptyMap(), zeroPins, zeroPins)
                 assertIs<ExactNeighborhoodResult.Refuted>(it.check(conflict, Cancellation.Never))
                 assertIs<ExactNeighborhoodResult.Undecided>(it.check(negative, Cancellation { true }))
                 val first = assertIs<ExactNeighborhoodResult.Witness>(it.check(negative, Cancellation.Never)).sample
