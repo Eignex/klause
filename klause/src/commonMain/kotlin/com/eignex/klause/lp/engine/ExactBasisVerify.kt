@@ -166,12 +166,24 @@ internal class ExactBasisCache(private val propose: ((ExactBasisAuthority) -> Ra
     }
 }
 
-// This report contains no model, basis, policy or spent allowance. Eligibility is checked afresh before reuse.
+// This report contains no model, basis, policy or retained allowance. Eligibility is checked afresh before reuse.
 private val dimensionDeclinedBasis = ExactBasisVerification(
-    null, null, null, null, null, false, null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    false,
+    null,
     ExactBasisMetrics(
         false, 0, 0, 0, 0, 0, 0, 0, 0,
-        ExactBasisPhase.entries.map { ExactBasisWork(it, if (it == ExactBasisPhase.ASSEMBLY) 1L else 0L, 0L) },
+        object : AbstractList<ExactBasisWork>() {
+            private val phases = ExactBasisPhase.entries.map {
+                ExactBasisWork(it, if (it == ExactBasisPhase.ASSEMBLY) 1L else 0L, 0L)
+            }
+            override val size: Int get() = phases.size
+            override fun get(index: Int): ExactBasisWork = phases[index]
+        },
         ExactBasisDecline.DIMENSION, ExactBasisPhase.ASSEMBLY,
     ),
 )
