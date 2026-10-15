@@ -24,6 +24,24 @@ of a nonlinear source relation. Original source checks still govern publication.
 | MPS | [MPS semantics](formats/mps.md): decimal correspondence, exact certification and tolerances |
 | DIMACS, WCNF, OPB/WBO and XCSP3 | [Finite formats](formats/finite.md): encodings, objectives and source validation |
 
+## Numeric authority and execution selection
+
+| Source | Numeric authority and ownership |
+|---|---|
+| Library IR and schema DSL | Declared integers, binary64 rational real coefficients and explicit exact objective coefficients remain source data. Source strategies prove available bounds before selecting completion; raw prepared-plan capture preserves its source identity without solving. |
+| FlatZinc and compiled MiniZinc | Exact float components use binary64 rational literals; grid components retain their declared approximation. Bounded `int2float` products can retain finite completion. Original MiniZinc checks are separate from checking the compiled FlatZinc predicates. |
+| SMT-LIB | Exact numerals, lexical scopes and original declarations govern admission. Source-proved mixed operand bounds precede nonlinear lowering. A complete conditioned linear cover can retain bounded choices beside open linear integers; uncovered nonlinear sources retain their exact snapshots. |
+| MPS | Original decimals, indicator conditions and objective units govern certification. Native exact source rows expose separate finite, numerical and exact views; default tolerance publication and explicit exact certification retain distinct guarantees. |
+| XCSP3 | Admitted arithmetic is finite integer arithmetic. Exact integer rows and native globals retain finite ownership; there is no original-decimal continuous LP path. |
+| DIMACS/WCNF and OPB/WBO | Boolean declarations and exact integer weights use the finite route. These formats supply no continuous declarations or original-decimal completion policy. |
+
+An exact source representation does not select an arithmetic engine. Completion
+consumes captured encoder support and its conditions; numerical representation
+limits can withhold one projection while preserving the same source model.
+See [library entry points](api.md#source-aware-strategy-entry-points),
+[presolve ownership](solver/presolve.md#rebuild-ownership) and
+[encoder composition](theories.md#extension-roles-and-completeness).
+
 ## Arithmetic role preservation
 
 Arithmetic products retain every operand occurrence and the separate result role,
