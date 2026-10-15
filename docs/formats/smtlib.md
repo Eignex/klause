@@ -111,6 +111,11 @@ canonical digit columns with one shared choice index across every digit. Constan
 branches retain constant digit arrays, including signed leading digits. Open
 values retain arithmetic ownership and exact equality links.
 
+Choice indexes reify the original signed guard directly, retaining its identity
+for arithmetic branch preferences. Guards are inputs to each conditional definition;
+their source or predicate definitions remain independently owned when unused
+choice state is removed or the same guard controls several selections.
+
 Affine real conditionals retain `RealElement` over materialized branch columns.
 Their choice index shares the source Boolean guard. Affine branch definitions keep
 exact rational coefficients, including mixed integer/real terms, and source real

@@ -127,15 +127,18 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         val integerOwners = definitions.keys.associateWith { Owner(it, integer = true) }
         val booleanOwners = HashMap<Int, Owner>()
         val ownedFactors = HashMap<Owner, List<Factor>>()
-        fun own(owner: Owner, parts: List<Factor>) {
+        fun own(owner: Owner, parts: List<Factor>, inputBooleans: Set<Int> = emptySet()) {
             ownedFactors[owner] = parts
             for (factor in parts) {
                 owners[factor] = owner
-                (factor as? ReifiedFactor)?.let { booleanOwners[it.auxBoolVar] = owner }
+                (factor as? ReifiedFactor)?.let {
+                    if (it.auxBoolVar !in inputBooleans) booleanOwners[it.auxBoolVar] = owner
+                }
             }
         }
         for ((variable, definition) in definitions) {
-            own(integerOwners.getValue(variable), definition.factors)
+            val inputBooleans = definition.guards.mapTo(HashSet()) { Lit.variable(it) }
+            own(integerOwners.getValue(variable), definition.factors, inputBooleans)
         }
         for ((variable, parts) in booleanDefinitions) {
             val owner = Owner(variable, integer = false)
