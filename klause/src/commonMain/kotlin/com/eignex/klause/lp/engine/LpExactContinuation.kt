@@ -75,15 +75,19 @@ internal fun captureContinuationTarget(
     var decline: ContinuationDecline? = null
     try {
         budget.step()
-        admitContinuation(model, budget)
-        // The hook validates current authority and returns owned target arrays.
-        budget.step(bytes = (model.m.toLong() + model.numVars) * 64L)
-        basis = solver.continuationBasis(model) ?: if (model.exactState == null) {
-            (result?.basis ?: solver.infeasibleBasis)?.let { Basis(it.basicVars.copyOf(), it.status.copyOf(), false) }
+        if (!limits.admitsDimensions(model)) {
+            decline = ContinuationDecline.DIMENSION
         } else {
-            null
+            admitContinuation(model, budget)
+            // The hook validates current authority and returns owned target arrays.
+            budget.step(bytes = (model.m.toLong() + model.numVars) * 64L)
+            basis = solver.continuationBasis(model) ?: if (model.exactState == null) {
+                (result?.basis ?: solver.infeasibleBasis)?.let { Basis(it.basicVars.copyOf(), it.status.copyOf(), false) }
+            } else {
+                null
+            }
+            budget.step()
         }
-        budget.step()
     } catch (stop: ContinuationStop) {
         decline = stop.reason
         basis = null
@@ -277,10 +281,12 @@ private fun admissionLimits(limits: ExactContinuationLimits) = limits.copy(
     maxAllocation = minOf(limits.maxAllocation, 4L * 1024L * 1024L),
 )
 
+internal fun ExactContinuationLimits.admitsDimensions(model: LpModel): Boolean =
+    model.m <= maxRows && model.numVars <= maxColumns &&
+        model.m.toLong() * (model.numVars.toLong() + model.m + 1L) <= maxCells
+
 private fun admitContinuation(model: LpModel, budget: ContinuationBudget) {
-    if (model.m > budget.limits.maxRows || model.numVars > budget.limits.maxColumns ||
-        model.m.toLong() * (model.numVars.toLong() + model.m + 1L) > budget.limits.maxCells
-    ) {
+    if (!budget.limits.admitsDimensions(model)) {
         throw ContinuationStop(ContinuationDecline.DIMENSION)
     }
     val size = model.exactState?.model?.keySize ?: model.csc.colVal.size.toLong() * 3L + model.numVars * 16L
@@ -387,9 +393,7 @@ private fun remainingContinuationLimits(limits: ExactContinuationLimits, session
 private class ContinuationAuthority(val input: ExactContinuationInput, val origins: List<BigFraction>)
 
 private fun captureContinuation(model: LpModel, basis: Basis, budget: ContinuationBudget): ContinuationAuthority {
-    if (model.m > budget.limits.maxRows || model.numVars > budget.limits.maxColumns ||
-        model.m.toLong() * (model.numVars.toLong() + model.m + 1) > budget.limits.maxCells
-    ) {
+    if (!budget.limits.admitsDimensions(model)) {
         throw ContinuationStop(ContinuationDecline.DIMENSION)
     }
     val size = model.exactState?.model?.keySize ?: model.csc.colVal.size.toLong() * 3L + model.numVars * 16L

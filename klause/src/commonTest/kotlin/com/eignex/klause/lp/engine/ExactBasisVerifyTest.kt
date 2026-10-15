@@ -14,6 +14,63 @@ import kotlin.time.Duration
 
 class ExactBasisVerifyTest {
     @Test
+    fun `repeated structural declines allow later certificates under current dimensions and values`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+        val cache = ExactBasisCache()
+        val limits = listOf(
+            ExactBasisLimits(RationalBasisLimits(dimension = 0)),
+            ExactBasisLimits(verification = ReconstructionLimits(maxCoordinates = 1)),
+        )
+        for (limit in limits) {
+            repeat(2) {
+                val declined = verifyExactBasis(model, basis, cache = cache, limits = limit)
+                assertEquals(ExactBasisDecline.DIMENSION, declined.metrics.decline)
+                assertEquals(1L, declined.metrics.work)
+                assertEquals(0L, declined.metrics.allocation)
+                assertEquals(0, declined.metrics.factoryCalls)
+                assertNull(declined.witness)
+                assertNull(declined.conflict)
+            }
+        }
+        model.rhs[0] = 2L
+
+        val admitted = verifyExactBasis(model, basis, cache = cache)
+
+        assertEquals(listOf(BigFraction.ofLong(2L)), assertNotNull(admitted.witness).primal)
+        assertEquals(BigFraction.ofLong(2L), assertNotNull(admitted.bound).value)
+        assertNull(admitted.metrics.decline)
+    }
+
+    @Test
+    fun `transient entry stops take precedence over structural rejection and permit retry`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+        val cache = ExactBasisCache()
+        val cases = listOf(
+            Triple(RationalBasisLimits(dimension = 0, work = 0L), Cancellation.Never, ExactBasisDecline.WORK),
+            Triple(RationalBasisLimits(dimension = 0, time = Duration.ZERO), Cancellation.Never, ExactBasisDecline.TIME),
+            Triple(RationalBasisLimits(dimension = 0), Cancellation { true }, ExactBasisDecline.CANCELLED),
+        )
+        for ((limit, cancellation, reason) in cases) {
+            val stopped = verifyExactBasis(model, basis, cache = cache,
+                limits = ExactBasisLimits(limit), cancellation = cancellation)
+            val retried = verifyExactBasis(model, basis, cache = cache)
+
+            assertEquals(reason, stopped.metrics.decline)
+            assertNull(stopped.witness)
+            assertNotNull(retried.witness)
+            assertNull(retried.metrics.decline)
+        }
+    }
+
+    @Test
     fun `reordered nonsymmetric basis verifies primal and true dual objective`() {
         val model = LpBuilder().apply {
             addVar(0L, 10L, cost = 3L)

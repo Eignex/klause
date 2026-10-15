@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -19,6 +20,35 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpSolveTest {
+    @Test
+    fun `structurally declined certification retries honor current policy and model authority`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 3L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE)
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel) =
+                Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+        }
+        val cache = LpExactContinuationCache()
+        val policy = LpCertificationPolicy { _, _ -> false }
+        val declined = certifyLpResult(model, solver, null, continuationCache = cache,
+            continuationLimits = ExactContinuationLimits(maxRows = 0))
+        val withheld = certifyLpResult(model, solver, null, continuationCache = cache, policy = policy)
+        model.rhs[0] = 2L
+
+        val admitted = certifyLpResult(model, solver, null, continuationCache = cache)
+
+        assertEquals(LpVerdict.INDETERMINATE, declined.verdict)
+        assertEquals(LpVerdict.INDETERMINATE, withheld.verdict)
+        assertEquals(LpVerdict.FEASIBLE, admitted.verdict)
+        assertEquals(listOf(BigFraction.ofLong(2L)), assertNotNull(admitted.witness).primal)
+        assertNull(admitted.rationalConflict)
+    }
+
     @Test
     fun `retained rational bounds omit inactive row weight and recover ancestor support after pop`() {
         val source = assertNotNull(LpBuilder().apply {

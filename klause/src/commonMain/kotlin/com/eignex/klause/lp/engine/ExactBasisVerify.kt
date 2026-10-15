@@ -166,6 +166,19 @@ internal class ExactBasisCache(private val propose: ((ExactBasisAuthority) -> Ra
     }
 }
 
+// This report contains no model, basis, policy or spent allowance. Eligibility is checked afresh before reuse.
+private val dimensionDeclinedBasis = ExactBasisVerification(
+    null, null, null, null, null, false, null,
+    ExactBasisMetrics(
+        false, 0, 0, 0, 0, 0, 0, 0, 0,
+        ExactBasisPhase.entries.map { ExactBasisWork(it, if (it == ExactBasisPhase.ASSEMBLY) 1L else 0L, 0L) },
+        ExactBasisDecline.DIMENSION, ExactBasisPhase.ASSEMBLY,
+    ),
+)
+
+internal fun ExactBasisLimits.admitsDimensions(model: LpModel): Boolean =
+    model.m <= factor.dimension && model.numVars.toLong() <= verification.maxCoordinates
+
 internal fun verifyExactBasis(
     model: LpModel,
     basis: Basis,
@@ -176,6 +189,16 @@ internal fun verifyExactBasis(
     observer: LpCertificationObserver? = null,
 ): ExactBasisVerification {
     val meter = ExactBasisMeter(limits, cancellation)
+    if (!limits.admitsDimensions(model)) {
+        val declined = try {
+            meter.charge()
+            dimensionDeclinedBasis
+        } catch (stop: ExactBasisStop) {
+            ExactBasisVerification(null, null, null, null, null, false, null, meter.snapshot(stop.reason))
+        }
+        observeBasisVerification(declined, rayRow, observer)
+        return declined
+    }
     var witness: ExactLpWitness? = null
     var bound: CertifiedLpBound? = null
     var conflict: BigRationalConflict? = null
@@ -253,14 +276,22 @@ internal fun verifyExactBasis(
         singularRank,
         meter.snapshot(decline),
     )
+    observeBasisVerification(result, rayRow, observer)
+    return result
+}
+
+private fun observeBasisVerification(
+    result: ExactBasisVerification,
+    rayRow: Int?,
+    observer: LpCertificationObserver?,
+) {
     observer?.observeBasisVerification(result.metrics)
     observer?.observe(
         if (rayRow == null) LpCertifier.EXACT_BASIS else LpCertifier.EXACT_FARKAS,
-        if (rayRow == null) witness != null else conflict != null,
+        if (rayRow == null) result.witness != null else result.conflict != null,
         LpCertifierCost.Reported,
     )
-    if (rayRow == null) observer?.observe(LpCertifier.RATIONAL, bound != null, LpCertifierCost.Reported)
-    return result
+    if (rayRow == null) observer?.observe(LpCertifier.RATIONAL, result.bound != null, LpCertifierCost.Reported)
 }
 
 private fun orderPermutation(order: IntArray): Boolean {
