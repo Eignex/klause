@@ -63,6 +63,13 @@ Continuous `float_min` and `float_max` retain `RealArrayMinMax`, including const
 operands and aliases. Complete arithmetic consumers own the equality alternatives.
 Scaled grid comparisons retain their component's numerical conversion policy.
 
+Grid `float_min` and `float_max` retain `GridArrayMinMax`. Each coordinate keeps
+its grid step, origin and scaling policy, so comparisons retain their signed
+rounding even when operands use different bucket units. Native filtering enforces
+the inequalities and requires an operand equality; selected linear/polynomial
+consumers install the complete alternatives privately. Grid witness and proof
+limits follow the component's existing approximation metadata.
+
 Constant float-array selection retains `RealElement` over continuous result
 columns and integer `Element` over grid bucket coordinates. Both retain the
 one-based source index and repeated entries. Grid entries use the result's existing

@@ -129,6 +129,7 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     is Circuit, is Cumulative, is Diffn,
     -> filteringRelaxation
     is ComparisonClause, is Xor, is LexLess, is Sort -> finiteFiltering
+    is GridArrayMinMax -> filteringRelaxation
     is RealElement -> realArithmetic.copy(propagation = PropagationCapability.BOUNDS_FILTERING, inertReason = null)
     is RealArrayMinMax -> realArithmetic.copy(propagation = PropagationCapability.UNSUPPORTED, inertReason = null)
     is RealAbs, is RealProduct, is ReifiedRealLinear -> realArithmetic

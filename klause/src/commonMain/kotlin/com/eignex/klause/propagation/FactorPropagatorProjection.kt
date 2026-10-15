@@ -53,6 +53,8 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is ArrayMinMax -> ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
 
+    is GridArrayMinMax -> GridArrayMinMaxPropagator(this)
+
     is Cardinality -> CardinalityPropagator(boolVars, intVars, literals, min, max)
 
     is Circuit -> if (subcircuit) SubcircuitPropagator(succ, n) else CircuitPropagator(succ, n)

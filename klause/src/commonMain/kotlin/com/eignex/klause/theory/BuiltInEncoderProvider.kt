@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.GridAbs
+import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
@@ -77,6 +78,7 @@ object BuiltInEncoderProvider : EncoderProvider {
         factor is RealAbs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.realPolynomial
         factor is GridAbs && target == EncodingTarget.LINEAR -> AbsEncoding.gridLinear
         factor is GridAbs && target == EncodingTarget.POLYNOMIAL -> AbsEncoding.gridPolynomial
+        factor is GridArrayMinMax && target != EncodingTarget.DIFFERENCE -> selectionEncoder
         factor is RealElement && target != EncodingTarget.DIFFERENCE -> selectionEncoder
         factor is RealArrayMinMax && target != EncodingTarget.DIFFERENCE -> selectionEncoder
         target == EncodingTarget.POLYNOMIAL && factor is ContinuousProduct -> continuousProduct

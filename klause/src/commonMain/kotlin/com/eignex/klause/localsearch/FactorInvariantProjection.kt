@@ -48,6 +48,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is ArrayMinMax -> ArrayMinMaxInvariant(result, xs, max)
 
+    is GridArrayMinMax -> GridArrayMinMaxInvariant(this)
+
     is Cardinality -> CardinalityInvariant(boolVars, literals, min, max)
 
     is Circuit -> if (subcircuit) {

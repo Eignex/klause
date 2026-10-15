@@ -1,6 +1,7 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
@@ -55,6 +56,23 @@ internal fun <T> realMinMaxEncoding(
         bounds += row(LinearRow.ofColumns(intArrayOf(), variables, constants,
             if (factor.max) LinearOp.GE else LinearOp.LE))
         equalities += row(LinearRow.ofColumns(intArrayOf(), variables, constants, LinearOp.EQ))
+    }
+    return all(bounds + any(equalities))
+}
+
+internal fun <T> gridMinMaxEncoding(
+    factor: GridArrayMinMax,
+    cancellation: Cancellation,
+    row: (LinearRow) -> T,
+    all: (List<T>) -> T,
+    any: (List<T>) -> T,
+): T {
+    val bounds = ArrayList<T>(factor.coordinates.size - 1)
+    val equalities = ArrayList<T>(factor.coordinates.size - 1)
+    for (position in 1 until factor.coordinates.size) {
+        selectionCheckpoint(cancellation)
+        bounds += row(factor.comparison(position, equality = false))
+        equalities += row(factor.comparison(position, equality = true))
     }
     return all(bounds + any(equalities))
 }
