@@ -302,7 +302,7 @@ class ExecutionOptions private constructor(
             val values = raw.mapValues { (key, value) ->
                 val option = ExecutionOption.byId[key]
                 if (option == null) OptionValue.Valid(Unit) else try {
-                    OptionValue.Valid(option.decode(EngineParams(listOf("$key=$value"))))
+                    OptionValue.Valid(option.decode(EngineParams(key, value)))
                 } catch (failure: PipelineConfigException) {
                     OptionValue.Invalid(requireNotNull(failure.message), configuration = true)
                 } catch (failure: IllegalArgumentException) {

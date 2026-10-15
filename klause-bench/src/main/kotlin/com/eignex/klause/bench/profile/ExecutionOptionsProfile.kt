@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
@@ -104,8 +105,12 @@ object ExecutionOptionsProfile {
 
     private fun describe(plan: PortfolioPlan.Execute): String {
         val scenario = plan.scenario
-        return listOf(scenario.seed, scenario.cores, scenario.arms, scenario.engine, scenario.sliceWork,
-            scenario.maxSliceWork, scenario.sliceGrowth, scenario.lpCeiling, scenario.zeroObjectivePricing)
+        val base = BacktrackParams(randomSeed = scenario.seed)
+        val edited = scenario.btEdit?.invoke(base) ?: base
+        return listOf(scenario.seed, scenario.cores, scenario.arms, scenario.engine, scenario.kind, scenario.sliceWork,
+            scenario.maxSliceWork, scenario.sliceGrowth, scenario.lpCeiling.emphasis, scenario.zeroObjectivePricing,
+            edited.randomSeed, edited.lubyRestartBase, edited.variableSelector::class.java.name,
+            edited.valueSelector::class.java.name)
             .joinToString("|")
     }
 }
