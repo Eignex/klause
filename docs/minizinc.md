@@ -46,7 +46,9 @@ adding it alone does not implement a constraint.
 Fixed nonnegative integer `pow` uses the `int_pow_fixed` override in
 `redefinitions-2.2.1.mzn` and emits `klause_int_pow`. Reifying the relation
 uses a private total power value and reifies only its equality to the requested result. Negative powers retain the
-standard integer-division decomposition; variable powers remain outside native support. Exact float powers follow [fixed-power source semantics](formats/flatzinc.md#fixed-powers).
+standard integer-division decomposition; variable powers remain outside native support. The native `float_pow` predicate accepts fixed nonnegative integral exponents and
+retains a real `Power` under exact policy or `GridPower` under grid policy. Other
+float exponents decline under [fixed-power source semantics](formats/flatzinc.md#fixed-powers).
 
 To extend native coverage, implement the factor and supported model/lowering
 paths, declare the predicate, and add focused source and end-to-end tests.
