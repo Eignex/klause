@@ -20,6 +20,26 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `open MPS indicator regions retain numerical optima under either certification policy`() {
+        val source = File.createTempFile("mps-open-indicator", ".mps").apply {
+            writeText("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                " I COST 0\n M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 2\n" +
+                "BOUNDS\n LI B I 0\n LO B X 0\nINDICATORS\n IF R I 0\nENDATA\n")
+            deleteOnExit()
+        }
+        for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
+            val text = capture {
+                assertEquals(0, runCli(arrayOf("-s", "-p", "1", *flags, source.absolutePath)))
+            }
+
+            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+            assertTrue("o 0" in text.lines(), text)
+            assertTrue("solvePipeline=numerical-mip" in text, text)
+            assertFalse("declaredTheoryRoute=" in text, text)
+        }
+    }
+
+    @Test
     fun `original nonzero underflow declines numerical MPS under either certification policy`() {
         val source = File.createTempFile("mps-underflow-numerical", ".mps").apply {
             writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1e-400\n" +
