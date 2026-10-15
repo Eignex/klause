@@ -55,11 +55,14 @@ responsibility.
 ## Exact source row projections
 
 Native exact linear rows retain their source rational meaning independently of
-finite filtering, heuristic scores and numerical LP emission. Representable scaled
-integer coefficients use the existing LP builder and exact certificate path. Tagged
-real columns preserve both parts of a split free column. An oversized numerical
-projection omits its rows and leaves source enforcement to the selected arithmetic
-encoding; it supplies no feasibility or proof authority by itself.
+finite filtering, heuristic scores and numerical LP emission. Compact coefficients
+use the existing integer LP builder. Wider coefficients, RHS values and objective
+definitions use an exact positive row normalization, with rational entries retained
+as LP certificate authority independently of the floating working projection.
+Tagged real columns preserve both parts of a split free column, and origin shifts
+are recomputed from those rational entries. A normalization whose nonzero entries
+cannot project to finite nonzero floating values declines numerical completion.
+An omitted relaxation row supplies no feasibility or proof authority by itself.
 
 A numerical row enabled by an integer indicator equality records both source bound
 premises. Its emission depends on that live pin and is retired when the pin retracts.

@@ -7,16 +7,29 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.toLongExact
 
-internal fun ExactLinear.finiteRelaxationSupported(): Boolean = relation != LinearOp.NE &&
+internal fun ExactLinear.finiteRelaxationSupported(): Boolean = numericalRow() != null
+
+private fun ExactLinear.compactRelaxationSupported(): Boolean =
     constants.exactBound.fitsLong() &&
-    constants.exactBound.toLongExact() != Long.MIN_VALUE &&
-    (0 until size).all {
-        constants.exactCoeff(it).fitsLong() && constants.exactCoeff(it).toLongExact() != Long.MIN_VALUE
-    }
+        constants.exactBound.toLongExact() in -9007199254740992L..9007199254740992L &&
+        (0 until size).all {
+            constants.exactCoeff(it).fitsLong() &&
+                constants.exactCoeff(it).toLongExact() in -9007199254740992L..9007199254740992L
+        }
 
 internal fun ExactLinear.emitExactLpRelaxation(builder: RelaxationBuilder, indicator: Int = -1, value: Long = 0L) {
     if (relation == LinearOp.NE) return
-    if (!finiteRelaxationSupported()) {
+    if (!compactRelaxationSupported()) {
+        if (builder is ExactRelaxationBuilder) {
+            val row = numericalRow() ?: return
+            val columns = IntArray(size) { index ->
+                val reference = ref(index)
+                if (Term.isInt(reference)) builder.intColumn(Term.intVar(reference))
+                else builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
+            }
+            builder.exactRow(columns, row, relation, indicator, value)
+            return
+        }
         if (indicator < 0 && variables.reals.isEmpty()) emitWideLpRelaxation(builder)
         return
     }
