@@ -1725,6 +1725,28 @@ contract remains separate from transitive callee effects, kernel return probes,
 task generation and live-read validation. Private reads, complete control flow,
 root census, clocks, code size and compiler savings remain unproved.
 
+`com.eignex.klause.bench.profile.NativeVmTaskLifecycleAbiReview` accepts five
+saved URL/hash pairs: `context=`, `original-context=`, `layout=`, `entries=` and
+`additional-entries=`, each with its `-sha256` option. Inputs are bounded at 16 MiB
+each and 32 MiB combined, the review at 32 MiB and child execution at 60 seconds.
+Original bytes, every entry, declaration, inline description and error remain
+retained. No native file or decoder is loaded.
+
+The fixed plan covers task allocation, initialization and free, plus both wrapper
+constructor/destructor aliases. It rebinds every validated task definition and
+member/type-reference closure from the original context into the lifecycle
+context. Parser cache accounting may differ; semantic descriptions must agree.
+Each canonical physical entry requires its complete bytes, source declaration,
+concrete parameter inventory and object lineage. Only the requested task pointers
+and initializer compile identity receive direct entry-register proofs. Unused
+locations remain uninterpreted. The allocator's normal pointer return class is
+separate from execution or delivery of a return. Wrapper destruction binds a
+boundary with no argument or field read; task association belongs to the current
+compiler thread. Missing aliases, conflicting descriptions, partial spans and
+unmatched physical definitions remain unproved. The complete calling convention,
+compiled lifetime, task generation, kernel callbacks, private reads, root census,
+clocks, code size and compiler savings remain unproved.
+
 ### Native executable entry bytes
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
