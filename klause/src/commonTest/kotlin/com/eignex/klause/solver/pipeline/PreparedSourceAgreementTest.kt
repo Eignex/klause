@@ -324,6 +324,7 @@ class PreparedSourceAgreementTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtLeast(0, 1L)))
             assertIs<ComponentCheck.Feasible>(session.check())
             session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.propagate())
             assertIs<ComponentCheck.Feasible>(session.check())
             val point = AssembledSearchModel(mapOf(
                 SearchExactIntValue(SourceIntId(0)) to bigIntOf(0),

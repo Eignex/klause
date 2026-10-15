@@ -458,7 +458,7 @@ class ExactLiraSearchComponent private constructor(
         beginOperation()
         return try {
             if (operationStop()) return ComponentResult.Indeterminate
-            val rows = agreementSourceRows()
+            val rows = agreementSourceRows(context)
                 ?: return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
             for (row in rows) {
                 if (row.columns.any { it in sourceRealCount until model.numRealVars }) continue
@@ -512,7 +512,7 @@ class ExactLiraSearchComponent private constructor(
             lpStop.charge(point.size.toLong() + 1L)
             if (operationStop()) return ComponentCheck.Indeterminate
             if (!point.admittedSourcePoint()) return coordinateDeclined(context)
-            val rows = agreementSourceRows() ?: return coordinateDeclined(context)
+            val rows = agreementSourceRows(context) ?: return coordinateDeclined(context)
             lpStop.charge(rows.sumOf { it.columns.size.toLong() + 1L })
             if (!operationStop() && point.satisfiesSourceRows(rows, lpStop) && !operationStop()) {
                 ComponentCheck.Feasible
@@ -522,11 +522,10 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun agreementSourceRows(): List<ExactRationalInequality>? {
+    private fun agreementSourceRows(context: SearchContext): List<ExactRationalInequality>? {
         lpStop.charge(model.numIntVars.toLong() + model.numRealVars + preparedRows.size + 1L)
         if (operationStop()) return null
-        val current = checkNotNull(context)
-        val bounded = node.withPublishedBounds(model.numIntVars, current::intLowerBound, current::intUpperBound)
+        val bounded = node.withPublishedBounds(model.numIntVars, context::intLowerBound, context::intUpperBound)
         return reduction.sourceRows(bools, bounded, lpStop)
     }
 
