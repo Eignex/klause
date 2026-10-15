@@ -15,6 +15,8 @@ UNITS = {b'compileBroker.cpp', b'compileTask.cpp', b'nmethod.cpp', b'compilerThr
 TYPE_NAMES = {b'CompileTask', b'nmethod', b'CodeBlob', b'CompilerThread'}
 FUNCTION_NAMES = {b'invoke_compiler_on_method', b'post_compiled_method', b'total_size',
                   b'compiler_thread_loop', b'thread_entry'}
+TASK_LIFECYCLE_FUNCTION_NAMES = {b'allocate', b'initialize', b'free',
+                                 b'CompileTaskWrapper', b'~CompileTaskWrapper'}
 MATCH_TAGS = {'DW_TAG_class_type', 'DW_TAG_structure_type', 'DW_TAG_subprogram', 'DW_TAG_inlined_subroutine'}
 REFERENCES = {'DW_AT_type', 'DW_AT_abstract_origin', 'DW_AT_specification',
               'DW_AT_object_pointer', 'DW_AT_containing_type'}
@@ -81,9 +83,22 @@ def names(die, seen=None, remaining=None):
     return result
 
 
-def inventory(dwarf, report, context=None):
+def selection_plan(selection):
+    if selection not in {'compiler', 'task-lifecycle'}:
+        raise ValueError('Unsupported compiler DWARF selection')
+    types = TYPE_NAMES | {b'CompileTaskWrapper'} if selection == 'task-lifecycle' else TYPE_NAMES
+    functions = FUNCTION_NAMES | TASK_LIFECYCLE_FUNCTION_NAMES if selection == 'task-lifecycle' else FUNCTION_NAMES
+    return {'name': selection, 'typeNames': sorted(name.decode('ascii') for name in types),
+            'functionNames': sorted(name.decode('ascii') for name in functions)}
+
+
+def inventory(dwarf, report, context=None, selection='compiler'):
+    plan = selection_plan(selection)
+    types = {name.encode('ascii') for name in plan['typeNames']}
+    functions = {name.encode('ascii') for name in plan['functionNames']}
     graph, pending, parents, selected_units = {}, deque(), {}, []
     report.update(units=[], selectedRecords=[], graph=graph, nameErrors=[], scannedDies=0,
+                  selectionPlan=plan,
                   selectedUnitTraversalCompleted=False, locationExpressionsEvaluated=False,
                   requestedUnitCoverage={name.decode('ascii'): [] for name in sorted(UNITS)})
     retained = 0
@@ -154,7 +169,7 @@ def inventory(dwarf, report, context=None):
                                                    'attributes': attributes(die),
                                                    'error': {'type': type(error).__name__, 'message': str(error)}}))
                 continue
-            expected = TYPE_NAMES if die.tag in {'DW_TAG_class_type', 'DW_TAG_structure_type'} else FUNCTION_NAMES
+            expected = types if die.tag in {'DW_TAG_class_type', 'DW_TAG_structure_type'} else functions
             if not any(bytes.fromhex(candidate['nameHex']) in expected for candidate in candidates):
                 continue
             if len(report['selectedRecords']) >= MAX_SELECTED:
@@ -193,19 +208,29 @@ def inventory(dwarf, report, context=None):
 
 
 def main(context_factory=None):
-    library, output = map(Path, sys.argv[1:])
+    arguments = sys.argv[1:]
+    library, output = map(Path, arguments[:2])
     report = {'completed': False, 'diagnosticOnly': True, 'acceptedSavingsCredit': False,
               'sourceSha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               'bindingSourceSha256': hashlib.sha256(Path(binding.__file__).read_bytes()).hexdigest(),
               'providerSourceSha256': hashlib.sha256(Path(provider.__file__).read_bytes()).hexdigest(),
               'fileBinding': {'library': {}, 'externalDebug': {}}, 'archive': {}, 'extraction': {}, 'provider': {},
               'actualFieldLayoutProven': False, 'actualTargetCallingConventionProven': False,
+              'actualCompiledTaskLifetimeProven': False, 'actualTaskGenerationProven': False,
+              'privateFieldReadsAuthorized': False,
               'actualControlFlowCoverageProven': False, 'rootCensusProven': False, 'codeSizeProven': False,
               'scope': 'Bound external-file DWARF records for four source compilation units only. All matching '
                        'type/function/inline candidates, children and referenced type/origin records retained. '
                        'No location-list/expression evaluation, target loading/invocation, register or field '
                        'reads, unique source layout/calling-convention/root/clock/size/runtime/compiler proof.'}
     try:
+        if len(arguments) == 2:
+            selection = 'compiler'
+        elif len(arguments) == 3 and arguments[2] == '--task-lifecycle':
+            selection = 'task-lifecycle'
+        else:
+            raise ValueError('Expected library, output and optional --task-lifecycle')
+        report['selectionPlan'] = selection_plan(selection)
         library = library.resolve()
         with library.open('rb') as source:
             if hashlib.file_digest(source, 'sha256').hexdigest() != binding.LIBRARY_SHA256:
@@ -233,7 +258,7 @@ def main(context_factory=None):
                     report['contextSourceSha256'] = context.source_sha256()
                     report['contextScope'] = context.scope()
                     report['contextUnits'] = context.units
-                inventory(dwarf, report.setdefault('dwarf', {}), context)
+                inventory(dwarf, report.setdefault('dwarf', {}), context, selection)
                 source.seek(0)
                 if hashlib.file_digest(source, 'sha256').hexdigest() != DEBUG_SHA256 or \
                         binding.symbols.identity(before) != binding.symbols.identity(os.fstat(source.fileno())) or \

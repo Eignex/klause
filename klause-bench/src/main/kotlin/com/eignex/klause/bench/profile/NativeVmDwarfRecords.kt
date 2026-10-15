@@ -8,7 +8,8 @@ internal object NativeVmDwarfRecords {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty() || args.contentEquals(arrayOf("context=true")))
+        val taskLifecycle = args.contentEquals(arrayOf("task-lifecycle=true"))
+        require(args.isEmpty() || args.contentEquals(arrayOf("context=true")) || taskLifecycle)
         val reader = if (args.isEmpty()) "read_native_vm_dwarf_records.py" else "read_native_vm_dwarf_context.py"
         ProfileCaptureArchive.run {
             val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile.apply { mkdirs() }
@@ -23,10 +24,12 @@ internal object NativeVmDwarfRecords {
                 File(root, "klause-bench/tools/$name").copyTo(File(out, name))
             }
             val runtime = File(System.getProperty("java.home")).canonicalFile
-            val process = ProcessBuilder(
+            val command = mutableListOf(
                 "python3", File(root, "klause-bench/tools/$reader").path,
                 File(runtime, "lib/server/libjvm.so").path, File(out, "vm-dwarf-records.json").path,
-            ).directory(root).redirectOutput(File(out, "dwarf-records.stdout"))
+            )
+            if (taskLifecycle) command += "--task-lifecycle"
+            val process = ProcessBuilder(command).directory(root).redirectOutput(File(out, "dwarf-records.stdout"))
                 .redirectError(File(out, "dwarf-records.stderr")).start()
             val finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             if (!finished) process.destroyForcibly().waitFor()
