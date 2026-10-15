@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.util.Cancellation
 import java.io.File
 import kotlinx.serialization.json.JsonObject
@@ -25,6 +26,10 @@ internal object LinearLpShapeInspection {
             ?: return skipped(out, "component-source-unavailable", stop)
         val definitions = field(system, "definitions") as? Map<*, *>
             ?: return skipped(out, "live-definitions-unavailable", stop)
+        val finiteIntegers = field(component, "finiteIntVars") as? IntArray
+            ?: return skipped(out, "finite-coordinate-ownership-unavailable", stop)
+        val context = field(component, "context") as? SearchContext
+            ?: return skipped(out, "live-search-context-unavailable", stop)
         val activeSide = state.javaClass.methods.singleOrNull {
             it.name.substringBefore('$') == "activeSide" && it.parameterCount == 2
         } ?: return skipped(out, "active-bound-access-unavailable", stop)
@@ -46,7 +51,8 @@ internal object LinearLpShapeInspection {
             visited++
         }
         val sourceColumns = inspectSourceColumns(
-            state, model, structuralColumns, boundedRows, activeSide, stop,
+            state, model, source.numRealVars, structuralColumns, boundedRows, activeSide,
+            finiteIntegers.mapTo(HashSet()) { source.numRealVars + it }, context, stop,
         )
         val stopped = stop()
         write(out, buildJsonObject {
@@ -88,9 +94,12 @@ internal object LinearLpShapeInspection {
     private fun inspectSourceColumns(
         state: Any,
         model: Any,
+        realColumns: Int,
         structuralColumns: Int,
         boundedRows: Set<Int>,
         activeSide: java.lang.reflect.Method,
+        finiteColumns: Set<Int>,
+        context: SearchContext,
         stop: Cancellation,
     ): JsonObject {
         val matrix = field(model, "matrix") as? List<*>
@@ -112,6 +121,10 @@ internal object LinearLpShapeInspection {
         var boundedDefinition = 0
         var unfixedBoundedDefinition = 0
         var freeWithoutBoundedDefinition = 0
+        var finiteOwned = 0
+        var unpinnedFinite = 0
+        var unpinnedFiniteWithoutAnyDefinition = 0
+        var unpinnedFiniteWithoutBoundedDefinition = 0
         for (column in matrix.indices) {
             if (stop()) break
             val entries = matrix[column] as? List<*> ?: error("missing exact column metadata")
@@ -137,6 +150,16 @@ internal object LinearLpShapeInspection {
             if (used) boundedDefinition++
             if (used && !fixed) unfixedBoundedDefinition++
             if (lower == null && upper == null && !used) freeWithoutBoundedDefinition++
+            if (column in finiteColumns) {
+                finiteOwned++
+                val integer = column - realColumns
+                val pin = context.intLowerBound(integer)
+                if (pin == null || pin != context.intUpperBound(integer)) {
+                    unpinnedFinite++
+                    if (entries.isEmpty()) unpinnedFiniteWithoutAnyDefinition++
+                    if (!used) unpinnedFiniteWithoutBoundedDefinition++
+                }
+            }
             visited++
         }
         return buildJsonObject {
@@ -148,6 +171,12 @@ internal object LinearLpShapeInspection {
             put("withBoundedDefinition", boundedDefinition)
             put("unfixedWithBoundedDefinition", unfixedBoundedDefinition)
             put("freeWithoutBoundedDefinition", freeWithoutBoundedDefinition)
+            put("finiteOwned", finiteOwned)
+            put("unpinnedFiniteOwned", unpinnedFinite)
+            put("unpinnedFiniteOwnedWithoutAnyDefinition", unpinnedFiniteWithoutAnyDefinition)
+            put("unpinnedFiniteOwnedWithoutBoundedDefinition", unpinnedFiniteWithoutBoundedDefinition)
+            put("anyDefinitionOrUnpinnedFiniteOwned", anyDefinition + unpinnedFiniteWithoutAnyDefinition)
+            put("boundedDefinitionOrUnpinnedFiniteOwned", boundedDefinition + unpinnedFiniteWithoutBoundedDefinition)
         }
     }
 

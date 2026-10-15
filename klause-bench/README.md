@@ -328,6 +328,8 @@ not identify the cause of a later CLI continuation decline.
 Source-column counts additionally distinguish exact root fixings, references from
 bounded expression definitions and free columns without such references. These are
 stored-state observations under the same deadline, without projecting or deleting columns.
+The same observation records finite coordinate ownership and published pins, including
+how many unpinned finite coordinates lack definition references. It chooses no domain values.
 
 `bench.profile.SourceAgreementProfile` compares one combined exact linear owner with
 explicit registered linear peers over original real, wide-integer, strict and guarded
