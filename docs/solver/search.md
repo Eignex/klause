@@ -514,7 +514,9 @@ LP explanations cite selected source bound witnesses and recursively expanded ro
 fixing and cutoff premises. Objective-relative fixing can use a weaker completed
 certificate while pruning retains the strongest bound. Cancelling a continuous
 reduced cost through an active singleton row retains that row's scope even when
-the original certificate had a finite supporting endpoint. Mixed-row feasibility certificates also provide
+the original certificate had a finite supporting endpoint. Node bounding supplies
+narrowed integral columns as ordering hints, including when mixed relaxations are
+rebuilt without a bound trail. Mixed-row feasibility certificates also provide
 integer domain bounds without an incumbent. Interval reasons exclude the target's own
 endpoint and retain all supporting row and bound premises. Optional integer-residue
 checks retain both real interval sides and the prior target endpoint that delimits

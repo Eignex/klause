@@ -124,9 +124,11 @@ endpoint signs must remain supported, with no separately scoped or unsupported
 logical side, and the complete adjusted vector is checked again. At most eight row adjustments are tried, returning one completed candidate.
 The operation requires a primary certificate, independently of an objective lattice
 or objective-expression candidate. A charged eligibility scan precedes workspace
-allocation. Rows incident to the query's changed integral columns precede other
-rows; a query without those changes retains source order. This preference supplies
-no proof premise, and the complete selected vector still requires verification.
+allocation. Rows incident to the caller's preferred integral columns precede other
+rows. Without an explicit preference, the exact query's changed columns supply the
+ordering; a query without either retains source order. Invalid and continuous
+column hints are ignored. These preferences supply no proof premise, and the
+complete selected vector still requires verification.
 This candidate can expose an integral fixing direction even when the original
 certificate already has valid finite endpoint support. An equality-derived
 candidate takes precedence; otherwise finite-endpoint cancellation precedes a
