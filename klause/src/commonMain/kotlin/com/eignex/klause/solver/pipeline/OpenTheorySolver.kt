@@ -392,6 +392,7 @@ class OpenTheoryEngine internal constructor(
         var handedOff = false
         var failure: Throwable? = null
         try {
+            (planned.theory as? ExactLiraSearchComponent)?.observeCompleteTraversal()
             planned.session.bindOpenTheoryWork(work)
             when (planned.session.initialize()) {
                 ComponentResult.Consistent -> Unit

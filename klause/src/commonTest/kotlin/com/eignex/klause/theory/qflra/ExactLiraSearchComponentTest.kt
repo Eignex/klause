@@ -67,6 +67,34 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `complete traversal observations exclude private query openings`() {
+        for (complete in listOf(false, true)) {
+            val stats = SmtStatsSink()
+            ExactLiraSearchComponent(partialModel()).use { component ->
+                component.observeWith(stats)
+                if (complete) component.observeCompleteTraversal()
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(if (complete) (0 until 2).count { session.boolValue(it) == null } else null,
+                    stats.snapshot().completeSearchMinUnassignedBooleans)
+                assertEquals(if (complete) 0L else null, stats.snapshot().completeSearchLinearChecks)
+
+                repeat(2) {
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+                    session.popTo(0)
+                }
+
+                val observed = stats.snapshot()
+                assertEquals(if (complete) 2 else null, observed.completeSearchBooleanVariables)
+                assertEquals(if (complete) 0 else null, observed.completeSearchMinUnassignedBooleans)
+                assertEquals(complete, (observed.completeSearchLinearChecks ?: 0L) > 0L)
+                assertEquals(complete, (observed.completeSearchLinearPoints ?: 0L) > 0L)
+            }
+        }
+    }
+
+    @Test
     fun `satisfied source bounds retain the point until complete checking`() {
         val model = Problem(
             numBoolVars = 3, intBounds = openBounds(), numRealVars = 1,

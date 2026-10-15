@@ -821,6 +821,18 @@ no proof.
 
 ## Statistics
 
+Complete traversal observations are installed by the complete open-theory caller,
+excluding private neighborhood openings. `smtCompleteSearchBooleanVariables` pairs
+the compiled model's Boolean count with its smallest observed
+`smtCompleteSearchMinUnassignedBooleans`; these include lowered auxiliaries, not
+only input declarations. The pair is absent until observed and survives retraction
+and aggregation as a historical minimum. `smtCompleteSearchLinearChecks` counts LP
+attempts with all those Booleans assigned; `smtCompleteSearchLinearPoints` counts
+their returned continuous points before source-disjunction selection, integrality
+and full-source acceptance. Unobserved counts remain absent rather than zero.
+These observations add no scan, numerical query,
+allowance or result authority and do not explain an UNKNOWN verdict by themselves.
+
 | Field | Meaning |
 |---|---|
 | `propagations` | Finite Boolean, singleton, bound, hole and survivor-set deductions reported by completed search fixpoints; excludes decision and root pins |

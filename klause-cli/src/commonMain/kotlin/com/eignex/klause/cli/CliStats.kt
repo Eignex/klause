@@ -480,6 +480,10 @@ private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     out += "smtGraphPointHintCaptures" to "$graphPointHintCaptures"
     out += "smtLpPointHintCaptures" to "$lpPointHintCaptures"
     out += "smtDefaultGraphHintReleases" to "$defaultGraphHintReleases"
+    completeSearchBooleanVariables?.let { out += "smtCompleteSearchBooleanVariables" to "$it" }
+    completeSearchMinUnassignedBooleans?.let { out += "smtCompleteSearchMinUnassignedBooleans" to "$it" }
+    completeSearchLinearChecks?.let { out += "smtCompleteSearchLinearChecks" to "$it" }
+    completeSearchLinearPoints?.let { out += "smtCompleteSearchLinearPoints" to "$it" }
     out += "smtWitnessCandidates" to "$witnessCandidates"
     out += "smtWitnessAccepted" to "$witnessAccepted"
     out += "smtStrictWitnessCandidates" to "$strictWitnessCandidates"
