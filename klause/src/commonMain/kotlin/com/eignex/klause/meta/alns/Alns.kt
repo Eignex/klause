@@ -2,16 +2,13 @@ package com.eignex.klause.meta.alns
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
-import com.eignex.klause.localsearch.PooledIncumbents
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
@@ -19,12 +16,17 @@ import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.cancelledWhen
@@ -120,8 +122,8 @@ internal class Alns(
      *  accepts as a new best is offered to it, and only a candidate the exchange verifies *and* finds
      *  strictly better than the standing one is installed. Before each iteration ALNS adopts a not-yet-seen
      *  installed incumbent that beats its own, so the next neighbourhood is destroyed from the globally-best
-     *  assignment. Version-gated; importing is skipped when the run carries assumption pins. Null leaves the
-     *  run private. */
+     *  assignment. Startup and retained bootstrap slices also acquire incumbents; source validation checks
+     *  coordinates and active assumptions before adoption. Null leaves the run private. */
     val pooledIncumbents: IncumbentExchange<Sample, Double>? = null,
     private val literalSweep: DefinitionalSweep? = null,
 ) : ResumableOptimizer<LocalSearchParams> {
@@ -162,16 +164,63 @@ internal class Alns(
         val newBest: Boolean,
     )
 
+    internal var incumbentToleranceCheck: ((Sample) -> Boolean)? = backtrackParams?.toleranceCheck
+
     private var activeSearch = false
+
+    private inner class IncumbentSeeds(
+        private val objective: LinearObjective,
+        private val params: LocalSearchParams,
+    ) {
+        private val exchange = pooledIncumbents ?: params.pooledIncumbents
+        private var seenVersion = 0L
+        private val toleranceCheck = incumbentToleranceCheck
+        private val assumptions = backtrackParams?.assumptions?.mergedWith(params.assumptions) ?: params.assumptions
+        private var supplied = false
+
+        fun acquire(current: Sample?, cancellation: Cancellation): Sample? {
+            if (cancellation()) return null
+            var best = current
+            if (!supplied) {
+                params.initialAssignment?.let { if (accepts(it, best, cancellation)) best = it }
+                supplied = !cancellation()
+            }
+            if (cancellation()) return null
+            val fresh = exchange?.current()
+            if (fresh != null && fresh.version > seenVersion) {
+                if (fresh.objective.isFinite() && accepts(fresh.assignment, best, cancellation) &&
+                    objective.evaluate(fresh.assignment) == fresh.objective
+                ) best = fresh.assignment
+                if (!cancellation()) seenVersion = fresh.version
+            }
+            return best.takeUnless { it === current }
+        }
+
+        private fun accepts(sample: Sample, current: Sample?, cancellation: Cancellation): Boolean {
+            val checked = finiteWitnessVerifier(problem, objective, assumptions, cancellation, toleranceCheck)
+                .verify(Candidate(sample, null))
+            if (checked !is Verification.Accepted || cancellation()) return false
+            if (!objective.evaluate(sample).isFinite()) return false
+            return current == null || objective.evaluateExact(sample) < objective.evaluateExact(current)
+        }
+
+        fun publish(sample: Sample, value: Double) {
+            exchange?.offer(sample, value)
+        }
+    }
 
     @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally")
     override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
         check(!activeSearch) { "an ALNS handle is active" }
         _iterationLog.clear()
         val telemetry = AlnsStatsSink()
-        val initialResult = bootstrapIncumbent(objective, params, telemetry)
-        val initialSample = initialResult.assignment ?: return withTelemetry(initialResult, telemetry.snapshot())
-        val search = NeighborhoodSearch(objective, params, initialSample, telemetry)
+        val seeds = IncumbentSeeds(objective, params)
+        val initialSample = seeds.acquire(null, params.cancellation) ?: run {
+            if (params.cancellation()) return MinimizeResult.Unknown(TerminationReason.Cancelled)
+            val initialResult = bootstrapIncumbent(objective, params, telemetry)
+            initialResult.assignment ?: return withTelemetry(initialResult, telemetry.snapshot())
+        }
+        val search = NeighborhoodSearch(objective, params, initialSample, telemetry, seeds)
         var primaryFailure: Throwable? = null
         try {
             return search.advance(params)
@@ -199,6 +248,7 @@ internal class Alns(
         params: LocalSearchParams,
         initialSample: Sample,
         private val telemetry: AlnsStatsSink,
+        private val pooled: IncumbentSeeds,
     ) : AutoCloseable {
         var bestSample = initialSample
             private set
@@ -206,11 +256,6 @@ internal class Alns(
             private set
         private var incumbent = bestSample
         private var incumbentObj = bestObj
-        private val pooled = PooledIncumbents(
-            exchange = pooledIncumbents,
-            importEnabled = params.assumptions.isEmpty,
-            evaluate = { objective.evaluate(it) },
-        )
         private val acceptancePolicy = acceptanceFor?.invoke(bestObj) ?: acceptance
         private var repairSearch: RepairSearch? = null
         private var repairOpened = false
@@ -227,7 +272,7 @@ internal class Alns(
 
         fun adopt(sample: Sample): Boolean {
             val obj = objective.evaluate(sample)
-            if (obj >= bestObj) return false
+            if (objective.evaluateExact(sample) >= objective.evaluateExact(bestSample)) return false
             bestSample = sample
             bestObj = obj
             incumbent = sample
@@ -289,12 +334,8 @@ internal class Alns(
                 instructionsUsed += iterFlips
                 telemetry.outerAllowance += iterFlips
                 nodeBudget?.allowance?.spendMoves(iterFlips)
-                pooled.poll(bestObj)?.let { (sample, obj) ->
-                    bestSample = sample
-                    bestObj = obj
-                    incumbent = sample
-                    incumbentObj = obj
-                    onIncumbent?.invoke(result())
+                pooled.acquire(bestSample, params.cancellation)?.let { sample ->
+                    if (adopt(sample)) onIncumbent?.invoke(result())
                 }
                 val destroyIdx = destroyBandit.choose()
                 val repairIdx = repairBandit.choose()
@@ -345,7 +386,7 @@ internal class Alns(
                 }
                 val repairedObj = objective.evaluate(repaired)
 
-                val isNewBest = repairedObj < bestObj
+                val isNewBest = objective.evaluateExact(repaired) < objective.evaluateExact(bestSample)
                 val accept = isNewBest || acceptancePolicy.accept(repairedObj, incumbentObj, rng)
                 val reward = when {
                     isNewBest -> newBestReward
@@ -437,14 +478,13 @@ internal class Alns(
         private val params: LocalSearchParams,
     ) : InstructionSlicedSearch, IncumbentBootstrapSearch {
         private val telemetry = AlnsStatsSink()
+        private val seeds = IncumbentSeeds(objective, params)
         private var cpBootstrap: ResumableSearch? = null
         private var lsBootstrap: ResumableSearch? = null
         private var cpAttempted = false
         private var lsAttempted = false
         private var cpFinished = backtrack == null
         private var lsFinished = false
-        private var cpClosed = false
-        private var lsClosed = false
         private var bootstrapStats = SolveStats.EMPTY
         private var neighborhood: NeighborhoodSearch? = null
         private var verdict: MinimizeResult? = null
@@ -499,7 +539,10 @@ internal class Alns(
             val before = telemetry.bootstrapLsMoves + telemetry.outerAllowance
             try {
                 if (token()) return null
-                if (neighborhood == null) bootstrapIncumbent(token, sliceInstructions, onIncumbent)
+                if (neighborhood == null) {
+                    seeds.acquire(null, token)?.let { acceptBootstrap(it, onIncumbent) }
+                    if (neighborhood == null) bootstrapIncumbent(token, sliceInstructions, onIncumbent)
+                }
                 val search = neighborhood
                 if (search == null) {
                     if (cpFinished && lsFinished) {
@@ -606,7 +649,7 @@ internal class Alns(
             observeBootstrapWork()
             val search = neighborhood
             if (search == null) {
-                neighborhood = NeighborhoodSearch(objective, params, sample, telemetry)
+                neighborhood = NeighborhoodSearch(objective, params, sample, telemetry, seeds)
                 onIncumbent(checkNotNull(neighborhood).result().copy(stats = stats))
             } else if (search.adopt(sample)) {
                 onIncumbent(search.result().copy(stats = stats))
@@ -629,12 +672,17 @@ internal class Alns(
             return completed
         }
 
-        private fun closeBootstrap() {
-            val searches = listOf(cpBootstrap.takeUnless { cpClosed }, lsBootstrap.takeUnless { lsClosed })
-            cpClosed = true
-            lsClosed = true
-            closeSearches(searches)
+        private fun releaseBootstrap(): List<AutoCloseable?> {
             observeBootstrapWork()
+            lsBootstrap?.let { bootstrapStats = it.stats }
+            val searches = listOf(cpBootstrap, lsBootstrap)
+            cpBootstrap = null
+            lsBootstrap = null
+            return searches
+        }
+
+        private fun closeBootstrap() {
+            closeSearches(releaseBootstrap())
         }
 
         private fun closeSearches(searches: List<AutoCloseable?>) {
@@ -653,11 +701,8 @@ internal class Alns(
         override fun close() {
             if (closed) return
             closed = true
-            val searches = listOf(
-                cpBootstrap.takeUnless { cpClosed }, lsBootstrap.takeUnless { lsClosed }, neighborhood,
-            )
-            cpClosed = true
-            lsClosed = true
+            val searches = releaseBootstrap() + neighborhood
+            neighborhood = null
             try {
                 closeSearches(searches)
             } finally {

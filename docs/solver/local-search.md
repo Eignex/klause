@@ -738,6 +738,29 @@ after publication receive null. Anchor capture and expansion consume no RNG draw
 search instructions. Anchor capture and expansion remain ordinary loop work outside the
 restart seeding timer.
 
+## ALNS incumbent acquisition
+
+ALNS checks a supplied assignment and the latest verified shared incumbent before
+constructing its bootstrap, then polls once between retained bootstrap slices and
+before each neighborhood iteration. A fresh candidate must cover finite and real
+coordinates, satisfy the current model and active assumptions (including deduced
+restrictions), and pass the shared source witness checker. CP repair's configured
+source tolerance callback also governs seed admission; without it, real coordinates
+require exact validation. Portfolio pool identity checks retain source mapping and
+objective compatibility. Shared objective telemetry must agree with the consumer's
+objective; strict improvement is compared using its exact evaluation. Samples own
+immutable coordinates and do not transfer mutable worker state or proof authority.
+
+An absent, stale or unsuitable candidate leaves unfinished bootstrap preparation
+and search intact. Cancellation during admission leaves the candidate eligible for
+a later slice. Adoption releases both bootstrap handles before opening repair,
+retaining their measured work in statistics. Release detaches the handles before
+closing them: adoption, terminal completion, explicit close and exceptions each
+close a child at most once, including when a close throws. Invocation cancellation
+pauses owned state; closing the containing handle releases it. Seed acquisition
+renews no instruction, native-work, query or wall-time allowance. Repair uses the
+original containing budget and existing cooperative slice limits.
+
 ## Handles and exclusive ownership
 
 Local-search optimization handles retain the live assignment, RNG, factor payloads,
