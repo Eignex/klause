@@ -1,5 +1,6 @@
 """Retain source headers and decoded range/location records without evaluating expressions."""
 from contextlib import contextmanager
+from collections.abc import Mapping
 import hashlib
 import io
 import json
@@ -76,7 +77,7 @@ def bounded_sections(dwarf):
 def serial(raw, depth=0):
     if depth > 8:
         raise ContextLimit('DWARF context nesting exceeds bounds')
-    if isinstance(raw, dict):
+    if isinstance(raw, Mapping):
         if len(raw) > MAX_ENTRIES:
             raise ContextLimit('DWARF context mapping exceeds bounds')
         internal = {'directory_entry_format_parser', 'file_name_entry_format_parser'}

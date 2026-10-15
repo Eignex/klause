@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 from collections import namedtuple
+from collections import UserDict
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -76,9 +77,9 @@ class ReadNativeVmDwarfContextTest(unittest.TestCase):
 
     def test_serialized_headers_retain_names_and_decline_oversized_nested_values(self):
         self.assertEqual({'path': {'bytesHex': '66696c65'}, 'index': 0},
-                         context.serial({'path': b'file', 'index': 0, '_io': object(),
+                         context.serial(UserDict({'path': b'file', 'index': 0, '_io': object(),
                                          'directory_entry_format_parser': object(),
-                                         'file_name_entry_format_parser': object()}))
+                                         'file_name_entry_format_parser': object()})))
         for raw in [[0] * (context.MAX_ENTRIES + 1), object()]:
             with self.subTest(kind=type(raw).__name__), self.assertRaises(ValueError):
                 context.serial(raw)
