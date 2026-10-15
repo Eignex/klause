@@ -363,4 +363,20 @@ class LpBoundingLbTreeSearchTest {
         }
     }
 
+    @Test
+    fun `mixed fractional descent tries the nearer integer side before completing a point`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.75)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0))
+
+        val sample = engine(problem, objective).use {
+            assertNotNull(it.lbTreeSearch(objective, Cancellation.Never)).sample
+        }
+
+        assertEquals(1L, sample.ints.single())
+        assertEquals(0.0, sample.reals.single())
+        assertEquals(1.0, objective.evaluate(sample))
+    }
+
 }

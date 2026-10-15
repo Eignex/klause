@@ -147,18 +147,22 @@ internal fun LpEngine.lbTreeSearch(
                 }
                 var expansions = 0
                 dive.cpAdapter.attach(session, feasibility = false)
-                dive.cpAdapter.fractional = { split }
+                dive.cpAdapter.fractional = { split?.takeIf { problem.numRealVars == 0 || it.boolean } }
                 dive.cpAdapter.branching = {
-                    val variable = (0 until problem.numIntVars).firstOrNull { session.intDomain(it).valueCount > 1 }
-                    if (variable == null) {
-                        null
-                    } else {
-                        val domain = session.intDomain(variable)
-                        val target = targets[variable]?.takeIf { domain.contains(it) } ?: domain.min
-                        buildList {
-                            add(SearchDecision.IntEqual(variable, target))
-                            if (target > domain.min) add(SearchDecision.IntAtMost(variable, target - 1L))
-                            if (target < domain.max) add(SearchDecision.IntAtLeast(variable, target + 1L))
+                    val fractional = split?.takeIf { problem.numRealVars > 0 && !it.boolean }
+                    val alternatives = fractional?.nearestIntegerAlternatives()
+                    if (alternatives != null) alternatives else {
+                        val variable = (0 until problem.numIntVars).firstOrNull { session.intDomain(it).valueCount > 1 }
+                        if (variable == null) {
+                            null
+                        } else {
+                            val domain = session.intDomain(variable)
+                            val target = targets[variable]?.takeIf { domain.contains(it) } ?: domain.min
+                            buildList {
+                                add(SearchDecision.IntEqual(variable, target))
+                                if (target > domain.min) add(SearchDecision.IntAtMost(variable, target - 1L))
+                                if (target < domain.max) add(SearchDecision.IntAtLeast(variable, target + 1L))
+                            }
                         }
                     }
                 }
@@ -254,6 +258,17 @@ internal fun LpEngine.lbTreeSearch(
     } finally {
         accountPropagation()
     }
+}
+
+private fun LpFractionalBranch.nearestIntegerAlternatives(): List<SearchDecision>? {
+    val upper = value.ceilLong() ?: return null
+    if (upper == Long.MIN_VALUE) return null
+    val lower = upper - 1L
+    val down = SearchDecision.IntAtMost(variable, lower)
+    val up = SearchDecision.IntAtLeast(variable, upper)
+    return if (BigFraction.ofLong(upper) - value < value - BigFraction.ofLong(lower)) {
+        listOf(up, down)
+    } else listOf(down, up)
 }
 
 private fun LpRelaxation.treeDiscretePoint(point: List<BigFraction>, session: PropagationSession): Sample? {

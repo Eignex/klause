@@ -679,7 +679,9 @@ The explicitly enabled `lbTreeSearch` incumbent probe also admits finite mixed
 models. Its private finite trail starts under the caller's assumptions and retains
 exhaustive fractional and value alternatives. A completed finite numerical point can order
 mixed choices when exact point certification declines; a fractional split must be
-strictly inside the live discrete domain. This hint supplies no witness or bound
+strictly inside the live discrete domain. Mixed integer splits try the nearer side
+of the LP value first and retain both complementary alternatives, with lower-side
+ties. This hint supplies no witness or bound
 permission. A complete integral discrete point can enter completion before its
 coordinates become singleton CP domains. It first passes the same discrete
 fixpoint under the caller's assumptions. A newly accepted point ends the probe;
