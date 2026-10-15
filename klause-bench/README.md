@@ -1570,6 +1570,21 @@ children, 128 scope levels and 32 MiB of retained metadata. The parent allows
 evaluation. Selected-unit coverage establishes no unique source layout, calling
 convention, register/field read, complete root census or compiler saving.
 
+`com.eignex.klause.bench.profile.NativeVmDwarfRecordReview` accepts `records=`,
+`records-sha256=` and `producer-sha256=` for a saved inventory from the pinned
+reader. It preserves the complete input and every selected type/function/inline
+candidate. Member review follows bounded typedef/qualifier chains and reports
+constant storage widths and member offsets within declared owner bounds.
+Bit fields, missing types, unknown widths, expression locations and conflicting
+definitions remain unresolved. CompileTask field concordance includes every
+retained non-declaration, including incomplete definitions. Declarations and
+duplicate candidates remain in the report. Parameter locations and ranges are
+retained without evaluation; inheritance is not expanded. This review loads no
+native file and establishes no actual field layout, entry calling convention,
+live field read, complete root census or compiler saving.
+Input is bounded at 8 MiB, output review records at 32 MiB, type chains at
+32 records, and the parent allows 60 seconds. Partial reports remain failures.
+
 ### Native executable entry bytes
 
 `com.eignex.klause.bench.profile.NativeVmEntryVerification` retains bytes for the
