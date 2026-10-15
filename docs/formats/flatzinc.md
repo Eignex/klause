@@ -23,6 +23,10 @@ relations for its membership indicators. The union of all operand and result
 universes includes implicit false indicators, so a selected member outside the
 result universe remains forbidden. Empty universes still retain the index range.
 
+Membership of an integer variable in a set retains its full signed-word domain.
+Equality channels cover only declared universe elements present in that domain;
+unreified membership requires one such element and its set indicator to hold.
+
 ## Integer division
 
 `int_div` and `int_mod`, including MiniZinc-generated calls, retain truncating

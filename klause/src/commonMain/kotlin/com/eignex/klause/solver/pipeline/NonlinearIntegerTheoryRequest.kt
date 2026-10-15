@@ -105,7 +105,7 @@ internal class NonlinearIntegerInvocation(
     private val external = polynomial.timeout or polynomial.cancellation
     private val stop = external or Cancellation {
         polynomial.maximumWork?.let { native.workSpent >= it } == true || resource != null ||
-            nodeBudget?.exhausted() == true
+            nodeBudget?.allowance?.exhausted() == true
     }
     private val pins: PolynomialCondition = assumptions()
 
@@ -133,7 +133,7 @@ internal class NonlinearIntegerInvocation(
         var heuristicStats = SolveStats.EMPTY
         fun search(cap: Long, nativeCap: Long? = null) {
             if (result != null || stop()) return
-            val allowed = minOf(cap, nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE)
+            val allowed = minOf(cap, nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE)
             when (val checked = query(pins, allowed, nativeCap = nativeCap)) {
                 is QfNraResult.Satisfiable -> result = OpenTheoryResult.Sat(capture(checked.assignment), searchStats)
                 is QfNraResult.Unsatisfiable -> result = OpenTheoryResult.Unsat(searchStats)
@@ -154,7 +154,7 @@ internal class NonlinearIntegerInvocation(
                     List(sample.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) }
                 },
                 adaptive = adaptive, seed = polynomial.strategy.localSearch.randomSeed ?: 1L,
-                nodeBudget = nodeBudget, maximumMoves = cap, nativeWork = { native.workSpent },
+                nodeBudget = nodeBudget?.allowance, maximumMoves = cap, nativeWork = { native.workSpent },
             )
             neighborhood.advance(stop, Long.MAX_VALUE)
             val solved = neighborhood.solveResult(reason())
@@ -199,7 +199,7 @@ internal class NonlinearIntegerInvocation(
                 ExactNeighborhood(source.boolCount, centers, this,
                     coordinateValues = { sample ->
                         List(sample.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) }
-                    }, adaptive = adaptive, seed = slot.seed, nodeBudget = nodeBudget,
+                    }, adaptive = adaptive, seed = slot.seed, nodeBudget = nodeBudget?.allowance,
                     maximumMoves = minOf(params.maximumMoves, polynomial.strategy.localSearch.maxFlips,
                         if (adaptive) polynomial.strategy.alnsIterations.toLong() else Long.MAX_VALUE),
                     maximumInstructions = polynomial.strategy.localSearch.maxInstructions ?: Long.MAX_VALUE,
@@ -229,12 +229,12 @@ internal class NonlinearIntegerInvocation(
             val segment = global or Cancellation { slice.expired() }
             val before = cursor.stats.candidates
             val offered = if (sliceNodes < 0) Long.MAX_VALUE else sliceNodes
-            val cap = minOf(offered, nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE)
+            val cap = minOf(offered, nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE)
             val checked = cursor.runSlice(segment, cap)
             native = cursor.stats.polynomial
             searchStats = searchStats.copy(search = SearchStats(nodes = SumResult(cursor.stats.candidates.toDouble())))
             var charged = cursor.stats.candidates - before
-            while (charged > 0) { nodeBudget?.spend(); charged-- }
+            while (charged > 0) { nodeBudget?.allowance?.spend(); charged-- }
             (checked?.result as? QfNraResult.Unknown)?.resource?.let { declined ->
                 resource = when (declined) {
                     com.eignex.klause.arithmetic.polynomial.PolynomialResource.DENSE_COEFFICIENTS ->
@@ -341,7 +341,7 @@ internal class NonlinearIntegerInvocation(
             if (nodeBudget != null) {
                 var decisions = execution.stats.candidates
                 while (decisions > 0) {
-                    nodeBudget.spend()
+                    nodeBudget.allowance.spend()
                     decisions--
                 }
             }

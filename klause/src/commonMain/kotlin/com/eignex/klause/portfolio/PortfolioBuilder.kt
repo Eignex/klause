@@ -19,6 +19,7 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
 

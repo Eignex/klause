@@ -54,6 +54,30 @@ class LagrangianBoundTest {
     }
 
     @Test
+    fun `large assignment costs do not prune a feasible all-different`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(1, 1), IntDomain(2, 2)),
+            arrayOf<Factor>(AllDifferent(intArrayOf(0, 1), domainMin = 1, domainSize = 2)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L shl 54, 0L))
+        val bound = LagrangianBound(problem, objective)
+
+        val result = assertNotNull(
+            bound.computeBound(
+                PropagationSession(problem),
+                Double.POSITIVE_INFINITY,
+                LongArray(bound.multiplierCount),
+                1,
+            ),
+        )
+
+        assertFalse(result.prune)
+        assertEquals(1L shl 54, result.boundNumerator / result.denominator)
+    }
+
+    @Test
     fun `two coupled all-different blocks give a valid bound`() {
         // Two disjoint AllDifferents (x0..x2 and x3..x5) over [0,4], coupled by x0 + x3 >= 6.
         // Each block is solved as its own assignment; the coupling is priced via a multiplier.

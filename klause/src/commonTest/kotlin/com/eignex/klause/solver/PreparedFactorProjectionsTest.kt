@@ -38,8 +38,11 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
@@ -315,6 +318,12 @@ class PreparedFactorProjectionsTest {
 
         assertTrue(rejected is Completion.Refuted)
         assertTrue(accepted is Completion.Witness)
+
+        val finiteCheck = finiteWitnessVerifier(baked, null)
+        assertIs<Verification.Rejected>(finiteCheck.verify(
+            Candidate(Sample(booleanArrayOf(false, false), longArrayOf()), null)))
+        assertIs<Verification.Accepted<*, *>>(finiteCheck.verify(
+            Candidate(Sample(booleanArrayOf(true, false), longArrayOf()), null)))
     }
 
     @Test

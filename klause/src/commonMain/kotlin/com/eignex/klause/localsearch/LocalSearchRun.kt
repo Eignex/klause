@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink

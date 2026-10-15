@@ -16,6 +16,21 @@ import kotlin.test.assertTrue
 
 class ApproxMCTest {
 
+    @Test
+    fun `hash scaled cell counts saturate beyond the public count range`() {
+        val cases = listOf(
+            Triple(3, 60, 3L shl 60),
+            Triple(2, 62, Long.MAX_VALUE),
+            Triple(1, 63, Long.MAX_VALUE),
+            Triple(1, 64, Long.MAX_VALUE),
+            Triple(0, 64, 0L),
+        )
+
+        for ((count, hashes, expected) in cases) {
+            assertEquals(expected, ApproxMC.scaleCellCount(count, hashes), "count=$count hashes=$hashes")
+        }
+    }
+
     private fun unconstrained(n: Int) =
         Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>())
 

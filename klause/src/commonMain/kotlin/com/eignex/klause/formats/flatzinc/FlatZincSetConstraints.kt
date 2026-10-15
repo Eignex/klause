@@ -75,18 +75,17 @@ internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
     }
     val layout = resolveSetVar(sExpr)
     if (elem is FznExpr.IntLit) {
-        emitSetInConst(elem.value.toInt(), layout, rExpr)
+        emitSetInConst(elem.value, layout, rExpr)
         return
     }
     val xVar = resolveIntVar(elem)
-    val dom = intDomains[xVar]
-    emitSetInVarInt(xVar, dom.min.toInt(), dom.max.toInt(), layout, rExpr)
+    emitSetInVarInt(xVar, layout, rExpr)
 }
 
 private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, rExpr: FznExpr?) {
     if (elem is FznExpr.IntLit) {
-        val v = elem.value.toInt()
-        val isMember = values.binarySearchInt(v) >= 0
+        val v = elem.value
+        val isMember = v in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() && values.binarySearchInt(v.toInt()) >= 0
         if (rExpr != null) {
             val r = resolveBoolLit(rExpr)
             factors.add(Clause(intArrayOf(if (isMember) r else Lit.negate(r))))
@@ -147,8 +146,12 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
     }
 }
 
-private fun FlatZincCompiler.emitSetInConst(xConst: Int, layout: SetVarLayout, rExpr: FznExpr?) {
-    val idx = layout.layout.indexOf(xConst)
+private fun FlatZincCompiler.emitSetInConst(xConst: Long, layout: SetVarLayout, rExpr: FznExpr?) {
+    val idx = if (xConst in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+        layout.layout.indexOf(xConst.toInt())
+    } else {
+        -1
+    }
     if (idx < 0) {
         if (rExpr != null) {
             val r = resolveBoolLit(rExpr)
@@ -168,9 +171,12 @@ private fun FlatZincCompiler.emitSetInConst(xConst: Int, layout: SetVarLayout, r
     }
 }
 
-private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, xLo: Int, xHi: Int, layout: SetVarLayout, rExpr: FznExpr?) {
+private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, layout: SetVarLayout, rExpr: FznExpr?) {
     val membershipLits = IntArrayList()
-    for (v in xLo..xHi) {
+    val domain = intDomains[xVar]
+    for (i in layout.elements.indices) {
+        val v = layout.elements[i]
+        if (v.toLong() !in domain) continue
         val chan = allocBool("__set_in_chan_${layout.name}_$v")
         factors.add(
             ReifiedLinear(
@@ -181,25 +187,11 @@ private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, xLo: Int, xHi: Int, layo
                 bound = v,
             ),
         )
-        val setIdx = layout.layout.indexOf(v)
+        val ind = layout.indicatorBoolIds[i]
         if (rExpr == null) {
-            if (setIdx < 0) {
-                factors.add(Clause(intArrayOf(Lit.make(chan, false))))
-            } else {
-                factors.add(
-                    Clause(
-                        intArrayOf(
-                            Lit.make(chan, false),
-                            Lit.make(layout.indicatorBoolIds[setIdx], true),
-                        ),
-                    ),
-                )
-            }
+            factors.add(Clause(intArrayOf(Lit.make(chan, false), Lit.make(ind, true))))
+            membershipLits.add(Lit.make(chan, true))
         } else {
-            if (setIdx < 0) {
-                continue
-            }
-            val ind = layout.indicatorBoolIds[setIdx]
             val aux = allocBool("__set_in_aux_${layout.name}_$v")
             factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(chan, true))))
             factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(ind, true))))
@@ -207,7 +199,9 @@ private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, xLo: Int, xHi: Int, layo
             membershipLits.add(Lit.make(aux, true))
         }
     }
-    if (rExpr != null) {
+    if (rExpr == null) {
+        if (membershipLits.isEmpty()) postFalseFactor() else factors.add(Clause(membershipLits.toIntArray()))
+    } else {
         reifyOrOfLits(membershipLits.toIntArray(), resolveBoolLit(rExpr))
     }
 }

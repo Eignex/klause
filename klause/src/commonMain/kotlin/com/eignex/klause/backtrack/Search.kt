@@ -13,7 +13,6 @@ import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpBranching
@@ -58,6 +57,7 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
+import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
@@ -419,13 +419,13 @@ private class CpSatisfactionTraversalPolicy(
     override val solveParams = SearchSolveParams(
         maxDecisions = minOf(
             params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE,
-            params.nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE,
+            params.nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE,
         ),
         restart = restart,
     )
     override val booleanBranching = BooleanBranching.None
     override val decisionBudget = SearchDecisionBudget {
-        params.nodeBudget?.let { budget ->
+        params.nodeBudget?.allowance?.let { budget ->
             budget.spend()
             !budget.exhausted()
         } ?: true
@@ -590,7 +590,6 @@ internal class BacktrackBrancher(
         }
         phase.onSolution(sample)
     }
-
 
 }
 

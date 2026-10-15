@@ -2,7 +2,7 @@
 
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve

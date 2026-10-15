@@ -34,7 +34,7 @@ data class LocalSearchParams(
      */
     val maxInstructions: Long? = null,
     /**
-     * The solve-wide node allowance this run also spends, at [com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK]
+     * The solve-wide node allowance this run also spends, at [com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK]
      * moves per node; the run stops at the move that would pass it. `null` = none.
      */
     val nodeBudget: NodeBudget? = null,

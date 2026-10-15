@@ -15,10 +15,35 @@ import com.eignex.klause.propagation.propagate
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class LexLessPropagatorTest {
+
+    @Test
+    fun `empty vector comparisons follow lexicographic length ordering`() {
+        for (strict in listOf(false, true)) {
+            for ((xs, ys) in listOf(
+                intArrayOf() to intArrayOf(),
+                intArrayOf() to intArrayOf(0),
+                intArrayOf(0) to intArrayOf(),
+            )) {
+                val problem = Problem(
+                    numBoolVars = 0,
+                    numIntVars = 1,
+                    intDomains = arrayOf(IntDomain(0, 1)),
+                    factors = arrayOf<Factor>(LexLess(xs, ys, strict)),
+                )
+                val state = PropagationState(problem, Assumptions.None)
+                state.currentFactor = 0
+                val expected = xs.size < ys.size || (xs.size == ys.size && !strict)
+
+                assertEquals(expected, problem.propagators[0].propagate(state, 0))
+                if (!expected) assertNull(problem.propagators[0].conflictReason(state, 0))
+            }
+        }
+    }
 
     @Test
     fun `a lex conflict cites only the prefix and the pair that decides it`() {

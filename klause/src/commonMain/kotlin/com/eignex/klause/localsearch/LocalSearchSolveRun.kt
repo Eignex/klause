@@ -47,7 +47,7 @@ internal class LocalSearchSolveRun(
                 unknown(TerminationReason.Unsupported)
             }
         }
-        val available = params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE
+        val available = params.nodeBudget?.allowance?.movesLeft() ?: Long.MAX_VALUE
         if (available == 0L) return unknown(TerminationReason.BudgetExhausted)
         control.offer(global, sliceMillis, sliceInstructions, available)
         if (control.instructions >= control.limit || control.token()) return null

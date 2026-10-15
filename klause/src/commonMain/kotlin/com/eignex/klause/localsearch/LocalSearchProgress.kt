@@ -20,7 +20,7 @@ internal class LocalSearchProgress(
     }
 
     fun charge(moves: Long) {
-        params.nodeBudget?.spendMoves(moves - charged)
+        params.nodeBudget?.allowance?.spendMoves(moves - charged)
         charged = moves
     }
 

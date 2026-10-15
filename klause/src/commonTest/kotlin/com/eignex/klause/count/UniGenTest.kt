@@ -14,7 +14,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.pipeline.verifyOpenWitness
+import com.eignex.klause.solver.validation.verifyOpenWitness
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
