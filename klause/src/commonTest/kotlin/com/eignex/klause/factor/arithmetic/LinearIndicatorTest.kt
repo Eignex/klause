@@ -62,7 +62,7 @@ class LinearIndicatorTest {
             val disabled = completion.solve(Sample(booleanArrayOf(), longArrayOf(0)))
 
             assertEquals(LpVerdict.INFEASIBLE, enabled.verdict)
-            assertEquals(LpVerdict.FEASIBLE, disabled.verdict)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, disabled.verdict)
             assertTrue(enabled.refutingFactors.contains(0))
         }
     }

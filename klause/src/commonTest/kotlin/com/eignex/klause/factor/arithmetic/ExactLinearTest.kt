@@ -33,7 +33,7 @@ class ExactLinearTest {
 
         val result = LeafRealSolver(source, null).use { it.solve(Sample(booleanArrayOf(), longArrayOf(0))) }
 
-        assertEquals(LpVerdict.FEASIBLE, result.verdict)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
         assertEquals(listOf(value), result.exactReals)
     }
 
