@@ -1532,6 +1532,23 @@ reserves that header in addition to the 128-byte identity payload bound.
 Per-record association supplies no complete calling convention, queue/root census,
 loss-free capture, return-size semantics, clock alignment or compiler-saving proof.
 
+Live argument captures also request an explicit final ring-buffer loss-counter
+snapshot. A Linux x86-64 helper binds the original observer PID, start ticks,
+executable digest and mount namespace, then retains its map descriptor. The map's
+BTF must identify the single `__bt__event_loss_counter` variable at offset zero in
+`.data.event_loss_counter`, with complete unsigned 64-bit CPU-slot dimensions.
+Ambiguous maps, unsupported layouts and incomplete ownership prevent child release.
+The helper writes only a separately created control map, checking both zero data
+and a nonzero highest slot through the same kernel lookup path.
+
+After the observer exits and drains, the helper reads every retained counter slot.
+Raw BTF, slot bytes, controls and process/map identities remain in the capture.
+Saved review checks these bindings and the pinned helper source before admitting
+a final counter value. Missing evidence or a nonzero final counter prevents
+argument corroboration. Stderr summaries do not replace this explicit snapshot.
+The counter covers tracer ring-buffer output; it does not prove probe invocation
+coverage, root completeness, call lifetimes, clocks, code sizes or compiler savings.
+
 ### Table profiling
 
 ```sh
