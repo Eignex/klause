@@ -368,8 +368,7 @@ class ExactLiraSearchComponent private constructor(
     internal val hasDefaultPointBooleanProposal: Boolean get() = pointHintBooleanSelection
 
     internal fun partialPointFiniteBranchAvailable(): Boolean =
-        pointHintBooleanSelection && finiteIntVars.isNotEmpty() && disjunctionAtoms.isEmpty() &&
-            candidate != null && partialPointHintAvailable()
+        pointHintBooleanSelection && finiteIntVars.isNotEmpty() && candidate != null && partialPointHintAvailable()
 
     internal fun partialPointBranchProposal(): SearchBranchProposal? {
         check(context == null)
@@ -1319,15 +1318,14 @@ class ExactLiraSearchComponent private constructor(
         context: SearchContext,
         partialPoint: Boolean,
     ): List<SearchDecision>? {
-        if (dirty || hasSourceDisjunctions ||
-            (outcome != null && outcome != ComponentCheck.Feasible)
-        ) return null
+        if (dirty || (outcome != null && outcome != ComponentCheck.Feasible)) return null
         val point = candidate ?: return null
         if (partialPoint) {
             lpStop.charge(5)
             if (operationStop() || pointHintStop() || !context.consumeCheck()) return null
             return finitePointAlternatives(variable, point, context)
         }
+        if (hasSourceDisjunctions) return null
         lpStop.charge(model.numIntVars.toLong() + model.numBoolVars + preparedRows.size + 1L)
         if (operationStop() || bools.any { it == UNASSIGNED } ||
             node.nextDisequality(model, disjunctionAtoms, bools) != null || !context.consumeCheck()

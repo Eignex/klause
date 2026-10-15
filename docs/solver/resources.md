@@ -287,6 +287,8 @@ current unfixed finite owner charges each visit to the existing operation token;
 the value/bound consultation charges that token and consumes the ordinary branch
 check. Missing or nonintegral coordinates retain the ordinary fallback. This
 choice creates no LP invocation, proof authority, model value or new allowance.
+Unselected disjunctions retain their ordinary propagation, exhaustive alternatives
+and complete-source checks.
 
 Other built-in linear guidance and compound indexed preferences remain opt-in.
 Their existing real-coordinate producer admission is unchanged.

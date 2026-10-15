@@ -8,6 +8,7 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.PlannedSearch
@@ -88,6 +89,13 @@ internal object LinearPointAdmissionProfile {
                         val variables = field(component, "pointHintVariables") as? IntArray
                         val cursor = field(component, "pointHintCursor") as Int
                         val first = variables?.getOrNull(cursor)
+                        val finite = field(component, "finiteIntVars") as IntArray
+                        val point = field(component, "candidate") as? List<*>
+                        val firstFinite = finite.firstOrNull { variable ->
+                            planned.session.intLowerBound(variable) == null ||
+                                planned.session.intLowerBound(variable) != planned.session.intUpperBound(variable)
+                        }
+                        val finiteValue = firstFinite?.let { point?.getOrNull(model.numRealVars + it) as? BigFraction }
                         val entries = rows?.sumOf { prepared ->
                             (field(requireNotNull(prepared), "row") as LinearRow).size.toLong() + 1L
                         }?.plus(model.numBoolVars.toLong() + model.numIntVars + model.numRealVars)
@@ -107,7 +115,11 @@ internal object LinearPointAdmissionProfile {
                         put("forwardBlockedVariables", blocks?.size)
                         put("pointValuesPublished", hints != null)
                         put("pointCoordinates", (field(component, "candidate") as? List<*>)?.size)
-                        put("finiteIntegerOwners", (field(component, "finiteIntVars") as IntArray).size)
+                        put("finiteIntegerOwners", finite.size)
+                        put("disjunctionGroups", (field(component, "disjunctionAtoms") as Map<*, *>).size)
+                        put("firstUnfixedFiniteVariable", firstFinite)
+                        put("firstUnfixedFinitePoint", finiteValue?.toString())
+                        put("firstUnfixedFinitePointIntegral", finiteValue?.isInteger())
                         put("dirty", field(component, "dirty") as Boolean)
                         put("pendingPointForward", field(component, "pendingPointForward") as Boolean)
                         put("decisionLevel", planned.session.decisionLevel)

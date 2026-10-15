@@ -74,7 +74,9 @@ counting forward reuse as another LP capture.
 After available primitive preferences, a default mixed opening can try an integral
 current finite coordinate before an uncovered Boolean gate. The shared CP owner
 receives its equality and the remaining lower/upper alternatives; the point adds
-no fact or proof authority. Missing, fractional, stopped or out-of-interval point
+no fact or proof authority. Unselected disjunctions still require their ordinary
+source checks; a residual point can only order the finite alternatives. Missing,
+fractional, stopped or out-of-interval point
 coordinates retain ordinary selection. Complete Boolean leaves retain their
 existing arithmetic and finite priority. This partial-point choice charges owner
 visits and the ordinary branch check under the current operation token, with no
@@ -84,8 +86,9 @@ Open mixed traversal consults arithmetic proposals before the finite fallback. A
 continuous point can guide adjacent exhaustive integer splits while bounded declarations
 retain CP ownership. Integral point coordinates guide a finite equality and its remaining
 lower/upper alternatives; CP enforces domains, holes and unrelated finite factors on each
-alternative. A point supplies no pin or publication authority. Missing points, unresolved
-disjunctions and stops retain the ordinary finite fallback. Complete checks still require
+alternative. A point supplies no pin or publication authority. Missing points and
+stops retain the ordinary finite fallback. Without a live default partial table,
+unresolved disjunctions retain that fallback too. Complete checks still require
 all finite coordinates to be fixed, and retraction discards the point with its LP scope.
 
 Complete workers and open local search can share checked incumbents under the

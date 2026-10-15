@@ -170,7 +170,9 @@ counting forward reuse as another LP capture.
 After available primitive preferences, a default mixed opening can try an integral
 current finite coordinate before an uncovered Boolean gate. The shared CP owner
 receives its equality and the remaining lower/upper alternatives; the point adds
-no fact or proof authority. Missing, fractional, stopped or out-of-interval point
+no fact or proof authority. Unselected disjunctions still require their ordinary
+source checks; a residual point can only order the finite alternatives. Missing,
+fractional, stopped or out-of-interval point
 coordinates retain ordinary selection. Complete Boolean leaves retain their
 existing arithmetic and finite priority. This partial-point choice charges owner
 visits and the ordinary branch check under the current operation token, with no
