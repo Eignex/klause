@@ -282,9 +282,13 @@ class ExactLiraSearchComponent private constructor(
         smtStats = stats
     }
 
-    internal fun partialPointHints(stop: Cancellation): Pair<IntArray, SearchCandidateHints>? {
+    internal fun partialPointHints(
+        stop: Cancellation,
+        allowIntegerOnly: Boolean = false,
+    ): Pair<IntArray, SearchCandidateHints>? {
         check(context == null)
-        if (model.numRealVars == 0 || model.numBoolVars == 0 || model.numBoolVars > MAX_POINT_HINT_ENTRIES ||
+        if (model.numRealVars == 0 && (!allowIntegerOnly || model.numIntVars == 0)) return null
+        if (model.numBoolVars == 0 || model.numBoolVars > MAX_POINT_HINT_ENTRIES ||
             preparedRows.size > MAX_POINT_HINT_ENTRIES || stop()
         ) {
             return null

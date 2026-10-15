@@ -46,7 +46,7 @@ data class TheoryParams(
      * separates the producer's own cost from the proposal's effect.
      *
      * A null allowance permits direct primitive point preferences for one linear completion owner
-     * with source real coordinates, including mixed integer/real sources, without a source-clause index
+     * with source integer or real coordinates, without a source-clause index
      * or Boolean draw. Other built-in linear point guidance and compound source-clause preferences use
      * this opt-in. Zero permits bounded construction observations
      * but publishes no component preference; a positive value permits indexed preferences after caller

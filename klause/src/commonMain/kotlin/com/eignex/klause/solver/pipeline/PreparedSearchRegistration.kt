@@ -59,7 +59,8 @@ internal class SearchComponentOpening(
             val registered = primitiveHints
             if (registered == null) {
                 val direct = if (openHintFlips == null) {
-                    (defaultComponent as? ExactLiraSearchComponent)?.partialPointHints(cancellation)?.second
+                    (defaultComponent as? ExactLiraSearchComponent)
+                        ?.partialPointHints(cancellation, allowIntegerOnly = true)?.second
                 } else null
                 if (direct == null) outcome(HintIndexOutcome.NO_PROVIDER) else accounted = true
                 return direct ?: SearchCandidateHints.None
@@ -181,7 +182,7 @@ internal class PreparedSearchRegistrations(
                 theory,
                 resources,
                 opening.candidateHints(source, theory.takeIf {
-                    arithmetic.size == 1 && source.numRealVars > 0
+                    arithmetic.size == 1 && (source.numRealVars > 0 || source.numIntVars > 0)
                 }),
             )
         } catch (failure: Throwable) {

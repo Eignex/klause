@@ -27,9 +27,9 @@ those assertions through their decision scope, checks the residual system and
 contributes exact source coordinates at a complete check. Disequalities require
 an applicable direction and remain part of the source check.
 
-For a source containing real coordinates, the linear component can reuse the exact
-source-coordinate prefix of an existing
-completed LP witness, or the point from its existing feasible difference check,
+For a source containing integer or real coordinates, the exact-linear component can
+reuse the exact source-coordinate prefix of an existing completed LP witness, or
+the point from its existing feasible difference check,
 to prefer primitive comparison polarities while Booleans remain open. Positive
 source comparisons retain strictness, equality, disequality and signed Boolean
 coefficients. Every member sharing an activator must be evaluable and agree;
@@ -47,15 +47,16 @@ raw incidence progress and private ledger debit. Unobserved fields remain absent
 An interrupted prefix supplies no semantic preference and is not a full literal count.
 These guesses only order exhaustive Boolean splits; they supply no values, facts,
 conflicts or source verdict.
-With the default null `openHintFlips` allowance, a source with real coordinates and
-one linear completion owner can use direct primitive preferences from its existing
-completed point. Mixed integer columns retain their complete integrality and source
+With the default null `openHintFlips` allowance, one linear completion owner can use
+direct primitive preferences from its existing completed point, including for
+integer-only sources. Integer columns retain their complete integrality and source
 checks; fractional partial values provide only comparison preferences. Registration
 precedes component initialization; capture and bounded exact comparison evaluation
 retain the existing numerical operation owner. No extra LP,
 graph check, Boolean draw or source-clause index is created. A custom registered
 provider retains precedence, even when it declines a selected Boolean.
 Compound source-clause preferences remain opt-in through the existing allowance.
+Their existing real-coordinate producer admission is unchanged.
 Explicit zero retains bounded construction observations without component steering;
 positive values permit indexed preferences. Arithmetic and index work keep their
 existing cumulative owners and limits, independently of the Boolean draw's flip ceiling.
@@ -94,8 +95,10 @@ remain invocation-owned. Retraction restores their premises and invalidates
 incompatible evidence. Open work and numerical limits retain their own currencies;
 a stopped source check withholds the witness or proof.
 
-Sources with no real coordinates or no Booleans retain traversal without this
-optional hint work. Optional hint storage admits at most 65,536 source
+Sources with no numeric coordinates or no Booleans retain traversal without this
+optional hint work. Integer-only registration is limited to the default-null
+primitive path; explicit allowances retain their existing producer admission.
+Optional hint storage admits at most 65,536 source
 row/term/coordinate/index entries.
 The scalar policy admits 4,096-bit normalized rationals and bounds intermediate
 products before evaluation. Copying, term visits and bit/word arithmetic costs

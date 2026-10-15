@@ -33,6 +33,16 @@ and ceiling thresholds. Finite variables receive scoped fixings from their finit
 owner, preserving bounds and holes. Shared search owns decision levels, retraction and conflict
 learning; the arithmetic component owns row assertions and numerical checks.
 
+With null `openHintFlips`, one exact-linear completion owner can reuse a completed
+partial LP point for direct primitive Boolean preferences, including integer-only
+sources. Registration charges the opening token; capture and bounded comparison
+evaluation charge the existing numerical operation. No extra LP check or clause
+index is created. Fractional coordinates guide branch order only: complete
+integrality, source checks and exhaustive integer branches retain authority.
+Custom providers retain precedence. Stops, arithmetic changes, retraction and close
+withhold stale preferences. Explicit zero and positive allowances retain their
+existing real-coordinate producer admission and opt-in behavior.
+
 [Open portfolios](../solver/portfolio.md) can pair the proof-producing route with
 source-checked local-search workers. Current strategy admission limits remain
 coverage gaps under the [vision](../vision.md#shared-model-breadth).
