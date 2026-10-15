@@ -28,6 +28,37 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ElementPropagatorTest {
+    @Test
+    fun `selection range can extend past the signed integer index offset`() {
+        val offset = Int.MAX_VALUE.toLong()
+        for (variables in listOf(false, true)) {
+            val source = Problem(0, 4, arrayOf(IntDomain(offset, offset + 1), IntDomain(9, 9),
+                IntDomain(4, 4), IntDomain(9, 9)), arrayOf<Factor>(Element(0, 1,
+                if (variables) longArrayOf(2, 3) else longArrayOf(4, 9), variables, Int.MAX_VALUE)))
+            val state = PropagationState(source, Assumptions.None)
+
+            assertTrue(source.propagators[0].propagate(state, 0))
+
+            assertEquals(offset + 1, state.intDomains[0].min)
+            assertEquals(offset + 1, state.intDomains[0].max)
+        }
+    }
+
+    @Test
+    fun `removed constants exclude their high offset positions`() {
+        val offset = Int.MAX_VALUE.toLong()
+        val source = Problem(0, 2, arrayOf(IntDomain(offset, offset + 1), IntDomain(4, 9)),
+            arrayOf<Factor>(Element(0, 1, longArrayOf(4, 9), false, Int.MAX_VALUE)))
+        val state = PropagationState(source, Assumptions.None)
+        val propagator = source.propagators[0]
+        assertTrue(propagator.propagate(state, 0))
+
+        assertTrue(state.tightenIntMax(1, 4))
+        assertTrue(propagator.propagate(state, 0))
+
+        assertEquals(offset, state.intDomains[0].min)
+        assertEquals(offset, state.intDomains[0].max)
+    }
 
     @Test
     fun `var-array conflict reason is a sound nonempty witness`() {
