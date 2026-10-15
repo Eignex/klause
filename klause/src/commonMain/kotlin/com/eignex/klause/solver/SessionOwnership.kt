@@ -63,6 +63,8 @@ private open class OwnedSearch(protected val source: ResumableSearch, release: (
 
 private class OwnedInstructionSearch(private val instructionSource: InstructionSlicedSearch, release: () -> Unit) :
     OwnedSearch(instructionSource, release), InstructionSlicedSearch {
+    override val chargedInstructions: Long get() = instructionSource.chargedInstructions
+
     override fun runInstructionSlice(
         global: Cancellation,
         sliceMillis: Long,
