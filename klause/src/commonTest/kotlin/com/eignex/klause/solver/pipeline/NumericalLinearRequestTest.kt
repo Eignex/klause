@@ -120,6 +120,20 @@ class NumericalLinearRequestTest {
     }
 
     @Test
+    fun `a free integer equality beyond Long retains its numerical attained coordinate`() {
+        val compiled = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+            " I COST 1 R 1\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 9223372036854775808\n" +
+            "BOUNDS\n FR B I\nENDATA\n").toExactSourceProblem()
+        val request = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective())
+
+        val result = request.solve()
+
+        val optimal = assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
+        assertEquals("9223372036854775808", optimal.sample.exactIntValue(0).toString())
+        assertNull(request.finiteRoute())
+    }
+
+    @Test
     fun `an unbounded relaxation cannot override integer infeasibility`() {
         val compiled = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
             " I R 2\n M1 'MARKER' 'INTEND'\n X COST 1\nRHS\n RHS R 1\n" +
