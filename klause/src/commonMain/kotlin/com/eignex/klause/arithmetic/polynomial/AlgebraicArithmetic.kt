@@ -215,14 +215,50 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         return result
     }
 
-    fun evaluate(polynomial: Polynomial, coordinates: Map<Int, AlgebraicReal>): AlgebraicReal {
+    fun evaluate(polynomial: Polynomial, coordinates: Map<Int, AlgebraicReal>): AlgebraicReal =
+        evaluateAt(polynomial) { variable, exponent ->
+            val coordinate = requireNotNull(coordinates[variable]) { "missing algebraic coordinate" }
+            power(coordinate, exponent)
+        }
+
+    fun pointEvaluation(coordinates: Map<Int, AlgebraicReal>): PointEvaluation = PointEvaluation(coordinates)
+
+    inner class PointEvaluation internal constructor(coordinates: Map<Int, AlgebraicReal>) {
+        private val point = buildMap {
+            arithmetic.step()
+            for ((id, value) in coordinates) {
+                arithmetic.step()
+                put(id, value)
+            }
+        }
+        private val powers = HashMap<Pair<Int, Int>, AlgebraicReal>()
+        val coordinateCount: Int get() = point.size
+
+        fun coordinate(variable: Int): AlgebraicReal = point.getValue(variable)
+
+        fun evaluate(polynomial: Polynomial): AlgebraicReal = evaluateAt(polynomial, ::power)
+
+        private fun power(variable: Int, exponent: Int): AlgebraicReal {
+            arithmetic.step()
+            val key = variable to exponent
+            powers[key]?.let { return it }
+            val value = this@AlgebraicArithmetic.power(coordinate(variable), exponent)
+            arithmetic.step()
+            powers[key] = value
+            return value
+        }
+    }
+
+    private inline fun evaluateAt(
+        polynomial: Polynomial,
+        power: (Int, Int) -> AlgebraicReal,
+    ): AlgebraicReal {
         var result = rational(BigFraction.ZERO)
         for ((monomial, coefficient) in polynomial.terms) {
             arithmetic.step()
             var term = rational(coefficient)
             for (variable in monomial.variables) {
-                val coordinate = requireNotNull(coordinates[variable]) { "missing algebraic coordinate" }
-                term = multiply(term, power(coordinate, monomial.exponent(variable)))
+                term = multiply(term, power(variable, monomial.exponent(variable)))
             }
             result = add(result, term)
         }
