@@ -49,6 +49,33 @@ class NumericalLinearRequestTest {
     }
 
     @Test
+    fun `an upper only integer retains maximization sense and its attained optimum`() {
+        val compiled = Mps.parse("OBJSENSE\n MAX\nROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+            " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n FR B I\n UI B I 2\nENDATA\n")
+            .toExactSourceProblem()
+
+        val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective(),
+            compiled.maximize).solve()
+
+        val optimal = assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)), optimal.value)
+        assertEquals(2L, optimal.sample.intValue(0))
+    }
+
+    @Test
+    fun `wide source bounds retain their original attained integer coordinate`() {
+        val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+            " I COST 1\n M1 'MARKER' 'INTEND'\nBOUNDS\n LI B I 9223372036854775808\nENDATA\n")
+            .toExactSourceProblem()
+
+        val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve()
+
+        val optimal = assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
+        assertEquals("9223372036854775808", optimal.sample.exactIntValue(0).toString())
+        assertEquals("9223372036854775808", result.value.toString())
+    }
+
+    @Test
     fun `an unbounded relaxation cannot override integer infeasibility`() {
         val compiled = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
             " I R 2\n M1 'MARKER' 'INTEND'\n X COST 1\nRHS\n RHS R 1\n" +
@@ -95,6 +122,21 @@ class NumericalLinearRequestTest {
         assertEquals(BigFraction.ZERO, result.value)
         assertNull(result.terminal)
         assertEquals(TerminationReason.Cancelled, result.reason)
+    }
+
+    @Test
+    fun `an incomplete integer split retains only its checked root bound`() {
+        val compiled = Mps.parse("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+            " I COST 1 R 2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 1\nBOUNDS\n LI B I 0\nENDATA\n")
+            .toExactSourceProblem()
+
+        val result = NumericalLinearRequest(compiled.model, compiled.objective?.toLinearObjective()).solve(
+            TheoryParams(maxLeaves = 1))
+
+        assertNull(result.terminal)
+        val bound = assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2).reciprocal()), bound.value)
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
     }
 
     @Test
