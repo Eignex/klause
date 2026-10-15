@@ -1827,11 +1827,14 @@ The manifest binds saved bytes; accepting an observation also requires the
 original capture's authenticated source and worker provenance.
 
 The pinned observer emits compiler diagnostics on stdout before attachment.
-The reviewer recognizes a single external-warning rendering only when its
-location and context exactly match the original script and its hint precedes
-one attachment/readiness boundary. The original observer command must match the
-source-bound invocation. Diagnostic prefixes are bounded at 4096 lines and 1 MiB;
-malformed, duplicated, interleaved, late or unexplained output declines the guard.
+The reviewer recognizes external-compiler and redundant `uint64` cast warnings
+only when locations, source contexts and any column underlines match the original
+script. External-compiler warnings retain their hints. The stdout readiness marker
+bounds compiler output; stderr independently retains its `Attached` status.
+The original observer command must match the source-bound invocation; no total
+order across the two output streams is inferred. Diagnostic prefixes are bounded
+at 4096 lines and 1 MiB; malformed, duplicated, interleaved, late or unexplained
+output declines the guard.
 All diagnostic bytes remain retained. Recognizing this rendering proves no
 compiler-warning safety or probe coverage. The expected invalid-read control,
 runtime warning checks, callback sequences and owned loss proof retain their

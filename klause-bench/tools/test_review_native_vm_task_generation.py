@@ -105,27 +105,28 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                 review.parse_records('', pid, entries)
 
     def test_compiler_warning_rendering_requires_original_context_and_an_unambiguous_attachment_boundary(self):
-        script = 'BEGIN { printf("VALIDATION_FAULT_EXPECTED"); buf(uptr(0), 1); }'
+        source = ['BEGIN { printf("VALIDATION_FAULT_EXPECTED"); buf(uptr(0), 1); }', 'END { clear(@sequence); }']
+        script = '\n'.join(source)
         path = '/original/observer.bt'
         launch = {'observerBinary': '/original/AppRun', 'observerCommand': [
             'sudo', '-n', 'unshare', '--mount', '--propagation', 'private', 'env',
             '__BPFTRACE_NOTIFY_PROBES_ATTACHED=1', 'BPFTRACE_MAX_STRLEN=132', 'sh', '-c',
             'printf "%s\\n" "$$" > "$1"; exec "$3" -k -B none "$2"',
             'observer', '/original/observer.pid', path, '/original/AppRun']}
-        warning = [path + ':1: WARNING: found external warnings', script,
+        warning = [path + ':1-2: WARNING: found external warnings', *source,
                    'HINT: include/header.h:1: warning: declaration does not declare anything',
                    '1 warning generated.']
-        boundary = ['Attaching 2 probes...', review.capture.observer.ATTACHED]
+        boundary = [review.capture.observer.ATTACHED]
         variants = {
             'complete': warning + boundary,
             'without warnings': boundary,
             'foreign source': [warning[0].replace('/original/', '/foreign/'), *warning[1:], *boundary],
-            'invalid span': [warning[0].replace(':1:', ':0:'), *warning[1:], *boundary],
-            'wide span': [warning[0].replace(':1:', ':1-2:'), *warning[1:], *boundary],
-            'different context': [warning[0], script + ' changed', *warning[2:], *boundary],
+            'invalid span': [warning[0].replace(':1-2:', ':0-2:'), *warning[1:], *boundary],
+            'wide span': [warning[0].replace(':1-2:', ':1-3:'), *warning[1:], *boundary],
+            'different context': [warning[0], source[0] + ' changed', *warning[2:], *boundary],
             'missing context': [warning[0], *warning[2:], *boundary],
-            'missing hint': warning[:2] + boundary,
-            'empty hint': warning[:2] + ['HINT: '] + boundary,
+            'missing hint': warning[:3] + boundary,
+            'empty hint': warning[:3] + ['HINT: '] + boundary,
             'duplicate warning': warning * 2 + boundary,
             'compiler error': [*warning, 'include/header.h:2: error: invalid declaration', *boundary],
             'runtime error': [*warning, 'observer.bt:1:1-2: WARNING: Bad address', *boundary],
@@ -134,12 +135,15 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
             'interleaved terminal': [*warning, 'DRAIN_MARKER\t1', *boundary],
             'extra hint': [*warning, 'HINT: another diagnostic', *boundary],
             'escape sequence': [*warning, '\x1b[31mchanged', *boundary],
-            'no attachment': warning + boundary[1:],
-            'zero attachment': warning + ['Attaching 0 probes...', boundary[1]],
-            'duplicate attachment': warning + [boundary[0], *boundary],
-            'no readiness': warning + boundary[:1],
-            'duplicate readiness': warning + [*boundary, boundary[1]],
-            'readiness before attachment': warning + boundary[::-1],
+            'no attachment': warning + boundary,
+            'zero attachment': warning + boundary,
+            'duplicate attachment': warning + boundary,
+            'wrong plural': warning + boundary,
+            'stdout attachment': warning + ['Attached 2 probes', *boundary],
+            'old stdout rendering': warning + ['Attaching 2 probes...', *boundary],
+            'no readiness': warning,
+            'duplicate readiness': warning + boundary * 2,
+            'readiness in stderr': warning + boundary,
             'unknown prefix': ['unknown', *warning, *boundary],
             'byte bound': warning + boundary,
             'prefix line bound': warning + boundary,
@@ -149,12 +153,18 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                     patch.object(review, 'MAX_DIAGNOSTIC_BYTES', 1 if name == 'byte bound' else 1024 * 1024), \
                     patch.object(review, 'MAX_DIAGNOSTIC_LINES', 2 if name == 'prefix line bound' else 4096):
                 text = '\n'.join(lines)
+                stderr = {'no attachment': '', 'zero attachment': 'Attached 0 probes\n',
+                          'duplicate attachment': 'Attached 2 probes\nAttached 2 probes\n',
+                          'wrong plural': 'Attached 1 probes\n',
+                          'readiness in stderr': 'Attached 2 probes\n' + review.capture.observer.ATTACHED + '\n'
+                          }.get(name, 'Attached 2 probes\n')
 
-                result = review.compiler_diagnostics(text, script, launch)
+                result = review.compiler_diagnostics(text, stderr, script, launch)
 
                 accepted = name in ('complete', 'without warnings')
                 self.assertEqual(accepted, result['renderingProven'])
                 self.assertFalse(result['compilerWarningSafetyProven'])
+                self.assertFalse(result['crossStreamOrderProven'])
                 if name == 'complete':
                     self.assertEqual(warning, result['warnings'][0]['rawLines'])
                 if not accepted:
@@ -166,7 +176,7 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                        {'observerCommand': ['foreign'] * 16},
                        {'observerCommand': ['foreign'] * 14 + [None, '/AppRun']}]:
             with self.subTest(launch=launch):
-                result = review.compiler_diagnostics('', '', launch)
+                result = review.compiler_diagnostics('', '', '', launch)
 
                 self.assertFalse(result['renderingProven'])
                 self.assertEqual([], result['warnings'])
@@ -176,7 +186,48 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
         for text, script, bound in [('one\ntwo', '', 'MAX_RECORDS'), ('', 'one\ntwo', 'MAX_DIAGNOSTIC_LINES')]:
             with self.subTest(bound=bound), patch.object(review, bound, 0), \
                     self.assertRaisesRegex(ValueError, 'line inventory'):
-                review.compiler_diagnostics(text, script, {})
+                review.compiler_diagnostics(text, '', script, {})
+
+    def test_compiler_cast_renderings_require_exact_source_columns_and_underlines(self):
+        source = ['x\t(uint64)arg0;', 'y\t(uint64)arg1;']
+        script, path = '\n'.join(source), '/original/observer.bt'
+        launch = {'observerBinary': '/original/AppRun', 'observerCommand': [
+            'sudo', '-n', 'unshare', '--mount', '--propagation', 'private', 'env',
+            '__BPFTRACE_NOTIFY_PROBES_ATTACHED=1', 'BPFTRACE_MAX_STRLEN=132', 'sh', '-c',
+            'printf "%s\\n" "$$" > "$1"; exec "$3" -k -B none "$2"',
+            'observer', '/original/observer.pid', path, '/original/AppRun']}
+        first = [path + ':1:3-11: WARNING: Unnecessary cast: expression is already of type uint64',
+                 'x    (uint64)arg0;', '     ~~~~~~~~']
+        second = [first[0].replace(':1:', ':2:'), 'y    (uint64)arg1;', first[2]]
+        variants = {'complete': first + second, 'first only': first,
+                    'changed underline': [*first[:2], '     ~~~~~~~'],
+                    'unexpanded tab': [first[0], source[0], first[2]],
+                    'invalid column': [first[0].replace(':3-11:', ':0-11:'), *first[1:]],
+                    'wide column': [first[0].replace(':3-11:', ':3-99:'), *first[1:]],
+                    'missing underline': first[:2], 'duplicate': first * 2,
+                    'unknown type': [first[0].replace('uint64', 'int64'), *first[1:]],
+                    'unexpected hint': [*first, 'HINT: unexplained']}
+        for name, lines in variants.items():
+            with self.subTest(name=name):
+                result = review.compiler_diagnostics('\n'.join([*lines, review.capture.observer.ATTACHED]),
+                                                     'Attached 2 probes\n', script, launch)
+
+                self.assertEqual(name in ('complete', 'first only'), result['renderingProven'])
+                self.assertFalse(result['compilerWarningSafetyProven'])
+                self.assertFalse(result['crossStreamOrderProven'])
+                if name == 'complete':
+                    self.assertEqual([first, second], [row['rawLines'] for row in result['warnings']])
+
+    def test_compiler_source_context_preserves_multiline_tabs_and_single_line_byte_columns(self):
+        source = ['x\t(uint64)arg0;', 'END {}']
+        self.assertEqual(source, review.compiler_source_context(source, 1, 2, None))
+        self.assertEqual(['x    (uint64)arg0;', '     ~~~~~~~~'],
+                         review.compiler_source_context(source, 1, 1, [3, 11]))
+        for rows, first, last, columns in [(source, 0, 1, [1, 2]), (source, 1, 3, None),
+                                           (source, 1, 2, [1, 2]), (source, 1, 1, None),
+                                           (source, 1, 1, [3, 99]), (['é'], 1, 1, [1, 2])]:
+            with self.subTest(rows=rows, first=first, last=last, columns=columns), self.assertRaises(ValueError):
+                review.compiler_source_context(rows, first, last, columns)
 
     def test_cross_thread_pointer_reuse_keeps_all_initialization_candidates_without_clock_order(self):
         selected = {role: [{'name': names[0]}] for role, (names, _) in review.capture.HOOKS.items()}
@@ -365,7 +416,8 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
             self.assertEqual(set(review.INPUTS), set(report['inputSha256']))
 
     def test_saved_source_process_and_counter_guards_require_their_own_complete_evidence(self):
-        for mode in ['valid', 'compiler-warning', 'late-warning', 'unknown-output', 'missing-ready',
+        for mode in ['valid', 'compiler-warning', 'compiler-casts', 'late-warning', 'unknown-output', 'missing-ready',
+                     'missing-attachment', 'stdout-attachment', 'wrong-plural',
                      'read-warning', 'invocation', 'source', 'selection', 'script', 'namespace',
                      'missing-counter', 'bad-counter']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
@@ -423,12 +475,22 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                     'native_vm_event_loss.py': Path(review.event_loss.__file__).read_bytes(),
                     'child-compilations.stdout': b'{"recording":{"events":[]}}',
                     'live/hotspot.xml': b'<hotspot_log><failure reason="retained"/></hotspot_log>'}
-                ready = b'Attaching 2 probes...\n__BPFTRACE_NOTIFY_PROBES_ATTACHED\n'
+                ready = b'__BPFTRACE_NOTIFY_PROBES_ATTACHED\n'
                 data['live/observer/observer.stdout'] = ready + data['live/observer/observer.stdout']
+                data['live/observer/observer.stderr'] = b'Attached 2 probes\n' + data['live/observer/observer.stderr']
                 warning = (f'/original/observer.bt:1-{len(script.decode().splitlines())}: WARNING: found external warnings\n'.encode()
                            + script + b'HINT: include/header.h:1: warning: declaration does not declare anything\n'
                            b'1 warning generated.\n')
-                if mode == 'compiler-warning':
+                external_warning = warning
+                if mode == 'compiler-casts':
+                    cast_lines = [(index, line) for index, line in enumerate(script.decode().splitlines(), 1)
+                                  if '(uint64)' in line][:2]
+                    for index, line in cast_lines:
+                        column = line.index('(uint64)') + 1
+                        warning += (f'/original/observer.bt:{index}:{column}-{column + 8}: WARNING: '
+                                    'Unnecessary cast: expression is already of type uint64\n'
+                                    + line + '\n' + ' ' * (column - 1) + '~' * 8 + '\n').encode()
+                if mode in ('compiler-warning', 'compiler-casts'):
                     data['live/observer/observer.stdout'] = warning + data['live/observer/observer.stdout']
                 if mode == 'late-warning':
                     data['live/observer/observer.stdout'] += warning
@@ -439,6 +501,13 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                         b'__BPFTRACE_NOTIFY_PROBES_ATTACHED\n', b'')
                 if mode == 'read-warning':
                     data['live/observer/observer.stderr'] += b'observer.bt:2:1-2: WARNING: Bad address\n'
+                if mode == 'missing-attachment':
+                    data['live/observer/observer.stderr'] = data['live/observer/observer.stderr'].replace(b'Attached 2 probes\n', b'')
+                if mode == 'stdout-attachment':
+                    data['live/observer/observer.stdout'] = b'Attached 2 probes\n' + data['live/observer/observer.stdout']
+                    data['live/observer/observer.stderr'] = data['live/observer/observer.stderr'].replace(b'Attached 2 probes\n', b'')
+                if mode == 'wrong-plural':
+                    data['live/observer/observer.stderr'] = data['live/observer/observer.stderr'].replace(b'Attached 2 probes', b'Attached 1 probes')
                 for name, raw in data.items():
                     path = out / name
                     path.parent.mkdir(parents=True, exist_ok=True)
@@ -455,14 +524,16 @@ class NativeVmTaskGenerationReviewTest(unittest.TestCase):
                         review.inspect(out, Path(library), out, report)
 
                         self.assertTrue(report['completed'])
-                        delivered = mode not in ('late-warning', 'unknown-output', 'missing-ready', 'read-warning', 'invocation')
+                        delivered = mode not in ('late-warning', 'unknown-output', 'missing-ready', 'read-warning',
+                                                 'invocation', 'missing-attachment', 'stdout-attachment', 'wrong-plural')
                         self.assertEqual(delivered, report['delivery']['selectedSequencedDeliveryProven'])
-                        self.assertEqual(mode in ('valid', 'compiler-warning'), report['observedTaskEntryRecordsValidated'])
+                        self.assertEqual(mode in ('valid', 'compiler-warning', 'compiler-casts'),
+                                         report['observedTaskEntryRecordsValidated'])
                         self.assertEqual(mode not in ('missing-counter', 'bad-counter'),
                                          report['lossCounter']['finalLossCounterZeroProven'])
                         self.assertFalse(report['diagnostics']['compilerDiagnostics']['compilerWarningSafetyProven'])
-                        if mode == 'compiler-warning':
-                            self.assertEqual(warning.decode().splitlines(),
+                        if mode in ('compiler-warning', 'compiler-casts'):
+                            self.assertEqual(external_warning.decode().splitlines(),
                                              report['diagnostics']['compilerDiagnostics']['warnings'][0]['rawLines'])
                             self.assertEqual(warning.decode().splitlines(),
                                              report['nativeRecords']['otherLines'][:len(warning.decode().splitlines())])
