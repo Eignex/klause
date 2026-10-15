@@ -79,6 +79,8 @@ def correlate(baseline, layout):
             try:
                 if not broker['completed'] or not broker['independentIdentityMatched']:
                     raise ValueError('Original complete independent JFR identity is unproved')
+                if len(broker['posts']) != 1:
+                    raise ValueError('Original broker publication callback is absent or ambiguous')
                 if len(broker.get('jfrMatches', [])) != 1 or broker['jfrMatches'][0]['succeeded'] is not True:
                     raise ValueError('Unique successful original JFR compilation is absent')
                 event = broker['jfrMatches'][0]['raw']['values']

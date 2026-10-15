@@ -1685,8 +1685,9 @@ alignment, total code size or compiler savings.
 With `review=return-sizes`, the same saved-archive review also pairs recorded
 `total-size` entries and returns by thread and observed call nesting. The complete
 original and complementary log reviews remain in the output. A size comparison
-requires one call inside a completed publication callback and public compilation
-pair, matching broker-task and nmethod receiver metadata, a unique independently
+requires one publication callback per broker invocation and one size call inside
+that completed callback and public compilation pair, matching broker-task and
+nmethod receiver metadata, a unique independently
 matched successful JFR compilation, and the original read, sequence-delivery and
 owned-counter guards. Ambiguous calls are rejected before comparing their values.
 The captured low 32 return bits must agree with the recorded unsigned value and
