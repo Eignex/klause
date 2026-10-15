@@ -159,7 +159,7 @@ fun FinitePipeline.planFixedBacktrack(request: FixedBacktrackPlanRequest): Fixed
     val annotation = request.annotatedParams
     val base = annotation ?: BacktrackPresets.conflictDriven()
     val engineParams = request.executionOptions.reader()
-    val dryRun = engineParams[ExecutionOption.DryRunSolver] ?: false
+    val dryRun = engineParams[ExecutionOption.dryRunSolver] ?: false
     val params = applyFixedBacktrackParams(
         base.copy(
             randomSeed = request.randomSeed ?: base.randomSeed,
@@ -194,7 +194,7 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
 
     val kind = if (request.optimize) Kind.COP else Kind.CSP
     val bt = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else BtResolution(null, null)
-    if (mix == EngineMix.BACKTRACK && params[ExecutionOption.DryRunSolver] == true) {
+    if (mix == EngineMix.BACKTRACK && params[ExecutionOption.dryRunSolver] == true) {
         // The listing renders each arm as it would be built: the pinned or curated recipes, edited and budgeted.
         val rebuilt = bt.edit != null || request.nodeBudget != null
         val listed = bt.pool ?: if (rebuilt) BacktrackCatalog.factories(kind) else null

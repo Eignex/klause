@@ -36,9 +36,9 @@ object ExecutionOptionsProfile {
         val out = File(settings["out"] ?: requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val pairs = listOf("seed=17", "arms=8", "var-selector=vsids", "luby=43", "slice-work=1000")
         val typed = ExecutionOptions(
-            ExecutionOption.Seed(17L), ExecutionOption.Arms(8),
-            ExecutionOption.VariableSelector(VarSelectorKind.VSIDS), ExecutionOption.Luby(43L),
-            ExecutionOption.SliceWork(1_000L),
+            ExecutionOption.seed(17L), ExecutionOption.arms(8),
+            ExecutionOption.variableSelector(VarSelectorKind.VSIDS), ExecutionOption.luby(43L),
+            ExecutionOption.sliceWork(1_000L),
         )
         val parsed = ExecutionOptions.parse(pairs)
         val meter = ManagementFactory.getThreadMXBean() as ThreadMXBean

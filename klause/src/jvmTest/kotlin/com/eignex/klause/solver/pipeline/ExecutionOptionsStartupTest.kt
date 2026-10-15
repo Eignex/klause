@@ -23,7 +23,10 @@ class ExecutionOptionsStartupTest {
             }
         }
 
-        val seed = loader.use { Class.forName("$name\$Seed", true, it).getField("INSTANCE").get(null) }
+        val seed = loader.use {
+            val companion = Class.forName(name, true, it).getField("Companion").get(null)
+            companion.javaClass.getMethod("getSeed").invoke(companion)
+        }
 
         assertNotNull(seed)
     }
