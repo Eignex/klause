@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.metric
 
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -10,7 +11,7 @@ class ExactFlatZincValidationTest {
         val source = "var {-2,-1,1,2}: n; var float: x; var float: y; " +
             "constraint int2float(n,x); constraint float_abs(x,y); solve minimize y;"
         for ((value, status) in listOf(-2 to "valid", -1 to "valid", 0 to "invalid", 1 to "valid", 2 to "valid")) {
-            val magnitude = kotlin.math.abs(value)
+            val magnitude = abs(value)
 
             val result = ExactFlatZincValidation.inspect(source, "n = $value;\nx = $value;\ny = $magnitude;",
                 magnitude.toString())
