@@ -1,6 +1,10 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.metric.MiniZincSourceValidation
+import com.eignex.klause.bench.metric.SolveEvidence
+import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import java.io.File
@@ -12,7 +16,11 @@ import java.util.zip.GZIPInputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -28,7 +36,7 @@ object SourceRecordCheck {
         require(
             bundleOptions == setOf("bundle", "sha256") || bundleOptions == setOf("input64", "sha256"),
         ) {
-            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest> and checker=source|boolean"
+            "Use bundle=<https URL> or input64=<base64 gzip bytes>, with sha256=<digest> and checker=source|boolean|minizinc"
         }
         require(options["captureSources"] in listOf(null, "true", "false")) { "captureSources must be true or false" }
         require(options["witnessOnly"] in listOf(null, "true", "false")) { "witnessOnly must be true or false" }
@@ -37,7 +45,8 @@ object SourceRecordCheck {
         val checker = when (options["checker"] ?: "source") {
             "source" -> "verify_source_results.py"
             "boolean" -> "verify_boolean_source_results.py"
-            else -> error("checker must be source or boolean")
+            "minizinc" -> null
+            else -> error("checker must be source, boolean or minizinc")
         }
         require(!witnessOnly || checker == "verify_source_results.py") { "witnessOnly requires the source checker" }
 
@@ -109,6 +118,10 @@ object SourceRecordCheck {
             }
             out.resolve("source-capture.json").writeText(captures.toString() + "\n")
         }
+        if (checker == null) {
+            checkMiniZinc(records, out)
+            return
+        }
         val log = out.resolve("checker-install.log")
         fun execute(file: File, command: List<String>) {
             val process = ProcessBuilder(command).redirectErrorStream(true)
@@ -144,6 +157,46 @@ object SourceRecordCheck {
 
         check(environment.deleteRecursively())
         println(out.resolve("source-checks.json").readText())
+    }
+
+    private fun checkMiniZinc(cases: JsonArray, out: File) {
+        require(cases.isNotEmpty()) { "No saved MiniZinc witnesses" }
+        Reports.writeJson(out.resolve("compiler.json").path, MiniZincCompatibility.compiler)
+        val checks = buildJsonArray {
+            for (entry in cases) {
+                val case = entry.jsonObject
+                val record = case.getValue("record").jsonObject
+                val problem = case.getValue("problem").jsonObject
+                val suite = problem.getValue("suite").jsonPrimitive.content
+                val name = problem.getValue("problem").jsonPrimitive.content
+                val ref = Catalog.uncapped(suite).problems.single { it.name == name }
+                val hashes = record.getValue("sourceHashes").jsonObject.mapValues { it.value.jsonPrimitive.content }
+                require(SolveEvidence.sourceHashes(ref) == hashes) { "Original MiniZinc source identity differs" }
+                val witness = record.getValue("finalWitness").jsonPrimitive.content
+                val candidate = requireNotNull(MiniZincSourceValidation.candidate("$witness\n----------\n")) {
+                    "Record has no complete source DZN assignments"
+                }
+                val validation = MiniZincSourceValidation.validate(ref, "$candidate\n----------\n",
+                    record["objective"]?.jsonPrimitive?.doubleOrNull,
+                    record["exactObjective"]?.jsonPrimitive?.contentOrNull)
+                add(buildJsonObject {
+                    put("index", case.getValue("index"))
+                    put("sourceHashes", record.getValue("sourceHashes"))
+                    put("originalWitnessSha256", sha(witness.toByteArray()))
+                    put("pinnedCandidate", candidate)
+                    put("pinnedCandidateSha256", sha(candidate.toByteArray()))
+                    put("validation", Reports.json.encodeToJsonElement(validation))
+                    put("proofCertificateChecked", false)
+                })
+            }
+        }
+        out.resolve("source-checks.json").writeText(checks.toString() + "\n")
+        check(checks.all { entry ->
+            val validation = entry.jsonObject.getValue("validation").jsonObject
+            validation.getValue("status").jsonPrimitive.content == "valid" &&
+                validation.getValue("scope").jsonPrimitive.content == "minizinc-source"
+        }) { "Original MiniZinc source checking incomplete; inspect source-checks.json" }
+        println("Checked ${checks.size} saved witnesses against original MiniZinc sources")
     }
 
     private fun collectCatalogSources(cases: JsonArray, sources: File, out: File) {
