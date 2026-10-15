@@ -770,22 +770,27 @@ class Portfolio(
                 eligible.filter { preparationRevisits[it] && !busy[it] && !retired[it] }
                     .minByOrNull { (it - nextPreparationArm + workers.size) % workers.size }
             }
+            val owed = if (dedicated || probe != null) null else owedArm(eligible) ?: owedCompleteArm(eligible)
             val arm = when {
                 dedicated -> lane
 
                 probe != null -> probe.also { probed[it] = true }
 
-                revisit != null -> revisit.also {
-                    preparationRevisits[it] = false
-                    nextPreparationArm = (it + 1) % workers.size
-                }
+                owed != null -> owed
+
+                revisit != null -> revisit
 
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
+            val revisiting = !dedicated && !improving && probe == null && preparationRevisits[arm]
+            if (revisiting) {
+                preparationRevisits[arm] = false
+                nextPreparationArm = (arm + 1) % workers.size
+            }
             val auxiliary = improving && arm in incumbentProbeArms && !productive[arm]
             val probing = probe != null || (auxiliary && !trialStarted[arm])
-            val baseAllowance = probing || revisit != null || workers[arm].auxiliaryProof
+            val baseAllowance = probing || revisiting || workers[arm].auxiliaryProof
             val allowance = if (baseAllowance) baseSliceWork else sliceWork
             val time = if (baseAllowance) baseSliceMillis else slice
             val remainingTime = if ((handles[arm] as? ResumableSearch)?.preparationPending != false) {
@@ -800,7 +805,7 @@ class Portfolio(
                 if (auxiliary) minOf(allowance, trialWorkLimit - trialSearchWork[arm]) else allowance,
                 whole = dedicated,
                 probeCount = eligible.count { !workers[it].auxiliaryProof }.coerceAtLeast(1),
-                preparationRevisit = revisit != null,
+                preparationRevisit = revisiting,
             )
         }
 
@@ -860,11 +865,11 @@ class Portfolio(
                 armNanos[it].toDouble() + (activeSince[it]?.elapsedNow()?.inWholeNanoseconds ?: 0L)
             }
             // A bootstrap and its local-search peers share one feasibility family.
-            val families = active.map {
+            val activeFamilyCount = active.map {
                 if (workers[it].family.observable) ArmFamily.LocalSearch else ArmFamily.Backtrack
             }.distinct().size
             val covered = (elapsed.values.sum() - baseSliceMillis.milliseconds.inWholeNanoseconds).coerceAtLeast(0.0)
-            val owed = covered / families / complete.size
+            val owed = covered / activeFamilyCount / complete.size
             return free.minBy { elapsed.getValue(it) }.takeIf { elapsed.getValue(it) < owed }
         }
 
