@@ -13,6 +13,7 @@ import time
 
 ATTACHED = '__BPFTRACE_NOTIFY_PROBES_ATTACHED'
 MAX_BYTES = 128
+BUFFER_HEADER_BYTES = 4
 
 
 def file_digest(path):
@@ -126,7 +127,7 @@ def observe(destination, library, observer_binary, command, timeout, script_buil
     script = destination / 'observer.bt'
     observer_pid = destination / 'observer.pid'
     observer_command = ['sudo', '-n', 'unshare', '--mount', '--propagation', 'private',
-                        'env', ATTACHED + '=1', 'BPFTRACE_MAX_STRLEN=' + str(MAX_BYTES),
+                        'env', ATTACHED + '=1', 'BPFTRACE_MAX_STRLEN=' + str(MAX_BYTES + BUFFER_HEADER_BYTES),
                         'sh', '-c', 'printf "%s\\n" "$$" > "$1"; exec "$3" -k -B none "$2"',
                         'observer', str(observer_pid), str(script), str(observer_binary)]
     receipt = dict(command=command, observerCommand=observer_command, rootPid=child,
