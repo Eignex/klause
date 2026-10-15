@@ -797,6 +797,9 @@ internal class LocalSearchEngine(
             },
             current = { (liveCompletion as? Completion.Witness)?.sample ?: state.assignment.snapshot() },
         ) else null
+        var checkSuppliedStart = completedMoves != null && params.initialAssignment?.let {
+            it.numBoolVars == problem.numBoolVars && it.numIntVars == problem.numIntVars
+        } == true
 
         fun reportProgress() = progress.optimization(
             totalFlips, restartCount, stallCount, bestObj, bestSample != null,
@@ -839,6 +842,25 @@ internal class LocalSearchEngine(
                 // nothing on the fast path and forces the poll once the window blows its budget.
                 if (sink.elapsedMs() - lastCheckMs >= CANCEL_CHECK_TARGET_MS * CANCEL_OVERRUN_FACTOR) {
                     cancelCountdown = 0
+                }
+            }
+            if (checkSuppliedStart) {
+                checkSuppliedStart = false
+                val candidate = if (state.cost != 0L && state.intValuesInDomain()) {
+                    state.completionCandidate()
+                } else null
+                if (candidate != null) {
+                    val decided = decide(state, candidate, params.cancellation, sink.ls) { work ->
+                        totalFlips += work
+                        progress.charge(totalFlips)
+                    }
+                    if (decided is Completion.Witness) liveCompletion = decided
+                    if (params.cancellation()) {
+                        checkSuppliedStart = checkpoint != null && liveCompletion == null
+                        cancelCountdown = 0
+                        continue
+                    }
+                    if (liveCompletion == null && totalFlips >= maxFlips) continue
                 }
             }
             if (state.cost == 0L || liveCompletion is Completion.Witness) {

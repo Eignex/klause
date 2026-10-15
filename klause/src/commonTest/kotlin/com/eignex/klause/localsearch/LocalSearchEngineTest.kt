@@ -1119,6 +1119,92 @@ class LocalSearchEngineTest {
     }
 
     @Test
+    fun `supplied residual incumbents use charged completion before repair`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
+            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0 - 1e-12))
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+            completion = { candidate, _ -> Completion.Witness(candidate, work = 4) },
+        )
+
+        val result = search.improvements(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 4, initialAssignment = initial), null,
+        ).last()
+
+        val best = assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(initial, best.sample)
+        assertEquals(4.0, best.stats.ls.moves.sum)
+        assertEquals(1.0, best.stats.ls.completions.sum)
+    }
+
+    @Test
+    fun `supplied mixed starts retain exact finite row checks`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
+            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+            completion = { candidate, _ -> Completion.Witness(candidate.copy(reals = doubleArrayOf(0.0))) },
+        )
+
+        val first = search.improvements(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 4,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0))), null,
+        ).filterIsInstance<MinimizeResult.BestFound>().first()
+
+        assertEquals(1L, first.sample.intValue(0))
+    }
+
+    @Test
+    fun `interrupted residual start completion resumes before repair`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(ExactLinear.of(
+                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.GE, BigFraction.ONE,
+            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0 - 1e-12))
+        var expired = false
+        var interrupted = false
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), greedyRepairOnRestart = false,
+            completion = { candidate, _ ->
+                if (!interrupted) {
+                    interrupted = true
+                    expired = true
+                    Completion.Undecided(work = 1)
+                } else Completion.Witness(candidate, work = 3)
+            },
+        )
+        val found = mutableListOf<Sample>()
+
+        search.resumable(
+            LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0)),
+            LocalSearchParams(maxInstructions = 4, initialAssignment = initial),
+        ).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1) { found += it.sample })
+            assertTrue(found.isEmpty())
+            expired = false
+
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { found += it.sample }
+
+            val best = assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(initial, best.sample)
+            assertEquals(listOf(initial), found)
+            assertEquals(4.0, best.stats.ls.moves.sum)
+        }
+    }
+
+    @Test
     fun `worse restart states retain ordinary completion admission`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(Linear(
