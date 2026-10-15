@@ -42,7 +42,7 @@ internal object PreparedPlanProfile {
         val polynomial = Problem(0, 1, arrayOf(IntDomain(0, 8)), arrayOf(ContinuousProduct(0, 0, 1)),
             numRealVars = 2, realLower = doubleArrayOf(-2.0, 0.0), realUpper = doubleArrayOf(2.0, 4.0))
         val openText = "(declare-const x Real) (assert (> x 0)) (assert (< x 3))"
-        val open = (SmtLibAdmission.parse(openText) as SmtLibInput.Linear).problem.problem
+        val open = (SmtLibAdmission.parse(openText) as SmtLibInput.Linear).problem.model
         val nonlinearText = "(declare-const x Int) (assert (= (* x x) 4))"
         val nonlinear = (SmtLibAdmission.parse(nonlinearText) as SmtLibInput.NonlinearInteger).problem
         val nativeText = "(declare-const x Real) (assert (= (* x x) 2))"
