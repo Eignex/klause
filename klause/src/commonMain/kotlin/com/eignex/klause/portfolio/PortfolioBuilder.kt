@@ -191,7 +191,8 @@ object PortfolioBuilder {
             return workers
         } catch (failure: Throwable) {
             for (worker in workers.asReversed()) {
-                runCatching { worker.close() }.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
+                runCatching { worker.close() }.exceptionOrNull()
+                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
             }
             throw failure
         }
