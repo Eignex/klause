@@ -922,7 +922,10 @@ cancellation between large terms. Embedded expression parameters in group/slide
 templates remain unknown when the pinned parser cannot expand them. Indexed vector elements admit only `rank="any"`,
 constant or variable entries, and an in-range index whose exact offset fits a signed
 integer. Matrix elements audit row and column offsets separately, check the selected row's bounds (including ragged rows),
-and bound every source entry to the reference checker's integer range. Ranked and unindexed elements remain unchecked.
+and bound every source entry to the reference checker's integer range. For satisfaction sources containing only
+matrix selections, ragged matrices use an exact source-cell equality check with a distinct checker identity;
+the pinned reference loader assumes a rectangular constant matrix. Mixed constraint sets or objectives keep
+the reference checker and can remain unknown. Ranked and unindexed elements remain unchecked.
 
 Supported expression trees are evaluated with `BigInteger` and compared with the
 pinned evaluator, including its normalized intension tree. Matching cancellation
