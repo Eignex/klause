@@ -25,7 +25,7 @@ import kotlin.test.assertIs
 class ExactLinearTest {
     @Test
     fun `numerical completion retains exact negative values of a free real column`() {
-        val value = BigFraction.ofLong(-1) / BigFraction.ofLong(10)
+        val value = BigFraction.of(bigIntOf(-1), bigIntOf(10))
         val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.EQ, value)
         val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(row), numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
