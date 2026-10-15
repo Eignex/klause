@@ -12884,6 +12884,8 @@ final class com.eignex.klause.solver.pipeline/ExecutionOptions { // com.eignex.k
     final val explicitArms // com.eignex.klause.solver.pipeline/ExecutionOptions.explicitArms|{}explicitArms[0]
         final fun <get-explicitArms>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/ExecutionOptions.explicitArms.<get-explicitArms>|<get-explicitArms>(){}[0]
 
+    final fun withNumericalCompletion(): com.eignex.klause.solver.pipeline/ExecutionOptions // com.eignex.klause.solver.pipeline/ExecutionOptions.withNumericalCompletion|withNumericalCompletion(){}[0]
+
     final object Companion { // com.eignex.klause.solver.pipeline/ExecutionOptions.Companion|null[0]
         final fun parse(kotlin.collections/List<kotlin/String>): com.eignex.klause.solver.pipeline/ExecutionOptions // com.eignex.klause.solver.pipeline/ExecutionOptions.Companion.parse|parse(kotlin.collections.List<kotlin.String>){}[0]
     }
@@ -13122,6 +13124,19 @@ final class com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest { //
         final fun <get-preparedPlan>(): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.preparedPlan.<get-preparedPlan>|<get-preparedPlan>(){}[0]
     final val problem // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/NonlinearIntegerProblem // com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest.problem.<get-problem>|<get-problem>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/NumericalLinearRequest { // com.eignex.klause.solver.pipeline/NumericalLinearRequest|null[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/NumericalLinearRequest.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;com.eignex.klause.util.Cancellation){}[0]
+
+    final val maximize // com.eignex.klause.solver.pipeline/NumericalLinearRequest.maximize|{}maximize[0]
+        final fun <get-maximize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/NumericalLinearRequest.maximize.<get-maximize>|<get-maximize>(){}[0]
+    final val objective // com.eignex.klause.solver.pipeline/NumericalLinearRequest.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/NumericalLinearRequest.objective.<get-objective>|<get-objective>(){}[0]
+
+    final fun finiteRoute(kotlin/Function1<com.eignex.klause.solver.result/LpStats, kotlin/Unit> = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute? // com.eignex.klause.solver.pipeline/NumericalLinearRequest.finiteRoute|finiteRoute(kotlin.Function1<com.eignex.klause.solver.result.LpStats,kotlin.Unit>){}[0]
+    final fun numericalRowsSupported(com.eignex.klause.util/Cancellation = ...): kotlin/Boolean // com.eignex.klause.solver.pipeline/NumericalLinearRequest.numericalRowsSupported|numericalRowsSupported(com.eignex.klause.util.Cancellation){}[0]
+    final fun solve(com.eignex.klause.solver.pipeline/TheoryParams = ..., kotlin/Boolean = ..., kotlin/Function2<com.eignex.klause.solver/Sample, com.eignex.klause.simplex.exact/BigFraction, kotlin/Unit> = ...): com.eignex.klause.solver.result/LinearOptimizationResult // com.eignex.klause.solver.pipeline/NumericalLinearRequest.solve|solve(com.eignex.klause.solver.pipeline.TheoryParams;kotlin.Boolean;kotlin.Function2<com.eignex.klause.solver.Sample,com.eignex.klause.simplex.exact.BigFraction,kotlin.Unit>){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/OpenPreparation { // com.eignex.klause.solver.pipeline/OpenPreparation|null[0]
