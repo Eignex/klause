@@ -2240,7 +2240,8 @@ original column name to an exact integer, decimal or rational string. Optional
 `exact=false`, `instructions=20`, `seed=3`, `repeats=3` and `timeout=3000` retain
 bounded deterministic controls. File and catalog inputs require `sourceSHA256=<original hash>`;
 inline bytes pin their own identity. Execution uses one active JVM processor, forking a
-child JVM with its own recording when necessary. The original source must admit the supplied point;
+child JVM with its own recording when necessary. The supplied point must meet the configured source guarantee: exact feasibility for
+exact requests, or the existing original-source tolerance check in default mode;
 no bounds or rows are added to it. A private objective auxiliary is initialized from
 the supplied point's original source cost. The ordinary finite mixed projection and numerical
 leaf completion own execution. An unavailable numerical completion remains undecided.
