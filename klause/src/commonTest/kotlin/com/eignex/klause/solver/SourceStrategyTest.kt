@@ -6,6 +6,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -60,6 +62,38 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SourceStrategyTest {
+    @Test
+    fun `a spent polynomial allowance does not block proved finite completion`() {
+        val source = Problem(0, 2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2).excludeValue(1)), arrayOf(
+                RealProduct(0, 0, 1, 1.0, 1.0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                AllDifferent(intArrayOf(0, 1), 0, 3),
+            ), openIntHi = booleanArrayOf(true, false), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val params = PolynomialTheoryParams(maximumWork = 0, strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 128, randomSeed = 17),
+        ))
+
+        for (strategy in listOf(BacktrackSolver.source(source), LocalSearchSolver.source(source))) {
+            val witness = assertIs<OpenTheoryResult.Sat>(strategy.solve(params)).assignment
+
+            assertEquals("1", witness.intValue(0))
+            assertTrue(witness.intValue(1).toLong() in listOf(0L, 2L))
+        }
+        assertTrue(source.intBounds.isOpenUpper(0))
+    }
+
+    @Test
+    fun `a spent polynomial allowance withholds required continuous completion`() {
+        val source = Problem(0, 0, emptyArray(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
+            realLower = doubleArrayOf(-2.0, 1.0), realUpper = doubleArrayOf(2.0, 1.0))
+
+        val result = BacktrackSolver.source(source).solve(PolynomialTheoryParams(maximumWork = 0))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+    }
+
     @Test
     fun `a source invocation opens selected inert deduction and checks its witness`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
