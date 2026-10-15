@@ -27,6 +27,12 @@ remain implementation limits. [Sessions](sessions.md) owns assumptions;
 [resource allowances](resources.md) owns containing budgets;
 [LP certification](../lp/certification.md) owns numerical proof checks.
 
+Optimization exhaustion without an incumbent is an original-source refutation only
+when the complete arm used no finite shared cutoff. The scheduler retains observed
+cutoffs for proof admission: a callback that returned only positive infinity leaves
+the source space unrestricted; a finite cutoff supports its conditional bound.
+Heuristic and improvement-only arms do not gain refutation authority from exhaustion.
+
 ## Witnesses and proof scope
 
 Open portfolios transport exact assignments in `Sample` rather than through a side
