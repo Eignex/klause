@@ -49,6 +49,7 @@ internal fun Problem.prepareOpenSource(
 ): OpenSourcePreparation {
     projections?.requireSource(this)
     val preparation = budget?.orSpent(cancellation) ?: cancellation
+    println("c idl-preparation entry stop=${cancellation()} phase=${preparation()} budget=${budget?.spent()}")
     val prepared = PresolvePipeline.prepareSource(
         this,
         config,
@@ -58,6 +59,7 @@ internal fun Problem.prepareOpenSource(
         budget,
     )
     if (prepared.infeasible) return OpenSourcePreparation.Refuted(prepared)
+    println("c idl-preparation passes stop=${cancellation()} phase=${preparation()} budget=${budget?.spent()} changed=${prepared.changed}")
     return prepared.planned(prepared.problem, projections, cancellation)
 }
 

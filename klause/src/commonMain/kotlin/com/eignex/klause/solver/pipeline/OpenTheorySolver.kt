@@ -335,6 +335,7 @@ class OpenTheoryEngine internal constructor(
         if (cancellation()) return OpenTheoryStart.Decided(unknown(params.timeout(), stats = stats, state = state))
         // Preparation runs before the route exists, so its refutation is the model's verdict.
         val source = prepare(cancellation)
+        println("c idl-opening source=${source::class.simpleName} outer=${cancellation()} phase=${preparationCancellation()}")
         val prepared = source.prepared
         if (cancellation()) return OpenTheoryStart.Decided(unknown(params.timeout(), stats = stats, state = state))
         stats.presolve = prepared.stats.takeIf { prepared.changed || it.infeasible }
@@ -346,6 +347,7 @@ class OpenTheoryEngine internal constructor(
             is OpenSourcePreparation.Planned -> source
         }
         val selectedPlan = routed.plan
+        println("c idl-opening route=${routed.route} encoding=${selectedPlan.encodingDecline} changed=${prepared.changed}")
         if (selectedPlan.encodingDecline == EncoderDecline.RESOURCE) {
             return OpenTheoryStart.Decided(unknown(false, budgetExhausted = true, stats = stats, state = state))
         }
@@ -371,6 +373,7 @@ class OpenTheoryEngine internal constructor(
             }
         }
         val plan = selectedPlan.forObjectiveRound(model, appended = false, cancellation = cancellation)
+        println("c idl-opening bound-model-same=${model === routed.model} outer=${cancellation()} phase=${preparationCancellation()}")
         if (cancellation()) return OpenTheoryStart.Decided(unknown(params.timeout(), stats = stats, state = state))
         val cpDomains = plan.cpSourceDomains(model)
         val planned = plan.search(
@@ -387,6 +390,7 @@ class OpenTheoryEngine internal constructor(
         var failure: Throwable? = null
         try {
             planned.session.bindOpenTheoryWork(work)
+            println("c idl-opening initialize")
             when (planned.session.initialize()) {
                 ComponentResult.Consistent -> Unit
 
