@@ -24,7 +24,6 @@ private fun PreparedFactorProjections.conditionedLinearDomains(index: Int): List
     val selected = encoder(index, EncodingTarget.LINEAR)
     if (selected.support != EncoderSupport.CONDITIONED || selected.requiredBooleans.isNotEmpty()) return null
     val conditions = selected.requiredIntegers.distinct()
-    if (conditions.isEmpty()) return null
     var cases = 1L
     return conditions.map { id ->
         if (id.index !in 0 until problem.numIntVars || !problem.intBounds.hasLower(id.index) ||

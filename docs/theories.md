@@ -55,7 +55,7 @@ value of its required finite declarations. It retains source integer guards on
 each installed relation, combines all factors in the same arithmetic owner, and
 keeps finite globals and domain holes with their CP owner. The captured encoder
 remains conditioned. This consumer caps the Cartesian cover at 4096 cases and
-declines open conditions, Boolean-only conditions and oversized covers. A failed
+declines open integer conditions, required Boolean pins and oversized covers. A failed
 or interrupted case discards the entire receiving relation. Explicit leaf pins
 continue to install only their scoped relation. The numerical mixed-product
 completion requires every possible integer operand to be exactly representable
