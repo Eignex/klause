@@ -110,7 +110,7 @@ class MpsCompiledTest {
 
         val witness = compiled.sourceWitness(longArrayOf(1L), listOf(BigFraction.ofLong(2L).reciprocal()))
 
-        assertEquals(1, compiled.model.numRealVars)
+        assertEquals(1, compiled.columns.count { it.real })
         assertEquals("1/2", witness.objective.toString())
     }
 
@@ -124,7 +124,7 @@ class MpsCompiledTest {
 
         val witness = compiled.sourceWitness(longArrayOf(0L), listOf(BigFraction.ofLong(2L).reciprocal()))
 
-        assertEquals(1, compiled.model.numRealVars)
+        assertEquals(1, compiled.columns.count { it.real })
         assertEquals("1/2", witness.objective.toString())
     }
 
@@ -136,7 +136,7 @@ class MpsCompiledTest {
                 "BOUNDS\n BV B X\n FR B Z\nENDATA",
         ).toProblem()
 
-        assertEquals(1, compiled.model.numRealVars)
+        assertEquals(1, compiled.columns.count { it.real })
     }
 
     @Test
@@ -162,7 +162,7 @@ class MpsCompiledTest {
 
         val witness = compiled.sourceWitness(longArrayOf(1L), listOf(BigFraction.ofLong(2L)))
 
-        assertEquals(1, compiled.model.numRealVars)
+        assertEquals(1, compiled.columns.count { it.real })
         assertEquals("2", witness.objective.toString())
     }
 
@@ -175,7 +175,7 @@ class MpsCompiledTest {
 
         val witness = compiled.sourceWitness(longArrayOf(1L), listOf(BigFraction.ofLong(3L)))
 
-        assertEquals(1, compiled.model.numRealVars)
+        assertEquals(1, compiled.columns.count { it.real })
         assertEquals("30000000000000003", witness.objective.toString())
     }
 
@@ -187,7 +187,7 @@ class MpsCompiledTest {
                 "BOUNDS\n BV B X\n FR B Z\nENDATA",
         ).toProblem()
 
-        assertEquals(1, compiled.model.numRealVars)
+        assertEquals(1, compiled.columns.count { it.real })
     }
 
     @Test
@@ -344,11 +344,11 @@ class MpsCompiledTest {
 
     @Test
     fun `a row touching a continuous column lowers onto the denominator of its decimals`() {
-        val vars = listOf(
-            MpsVar("x", integer = false, lower = 0.0, upper = 100.0),
-            MpsVar("y", integer = true, lower = 0.0, upper = 10.0),
-        )
-        val row = lower(vars, MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(0.9, 1.0), 54.0, 54.0))
+        val compiled = Mps.parse(
+            "ROWS\n E C\nCOLUMNS\n X C 0.9\n M0 'MARKER' 'INTORG'\n Y C 1\n" +
+                " M1 'MARKER' 'INTEND'\nRHS\n R C 54\nBOUNDS\n UP B X 100\n UI B Y 10\nENDATA",
+        ).toProblem()
+        val row = compiled.model.factors.single() as Linear
 
         val constants = assertNotNull(row.realConstants)
         assertEquals(9.0, constants.realCoefficients.at(0), "the real term is restated in whole numbers")
